@@ -48,24 +48,19 @@ def _get_task_names_cached() -> tuple[str, ...]:
     Returns a tuple for cache compatibility.
     """
     from qdash.api.dependencies import get_task_file_service
-    from qdash.common.config.loader import ConfigLoader
-    from qdash.common.config.paths import CALIBTASKS_DIR
+    from qdash.common.config.backend import get_default_backend
 
-    default_backend = "qubex"
     try:
-        settings = ConfigLoader.load_settings()
-        ui_settings = settings.get("ui", {})
-        task_files_settings = ui_settings.get("task_files", {})
-        default_backend = task_files_settings.get("default_backend", "qubex")
+        default_backend = get_default_backend()
     except Exception as e:
-        logger.warning(f"Failed to load settings: {e}")
+        logger.warning(f"Failed to load default backend: {e}")
+        default_backend = "qubex"
 
-    backend_path = CALIBTASKS_DIR / default_backend
+    service = get_task_file_service()
+    backend_path = service._base_path / default_backend
     if not backend_path.exists() or not backend_path.is_dir():
         logger.warning(f"Backend directory not found: {backend_path}")
         return ()
-
-    service = get_task_file_service()
     tasks = service._collect_tasks_from_directory(backend_path, backend_path)
     return tuple(task.name for task in tasks)
 

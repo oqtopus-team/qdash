@@ -8,26 +8,21 @@ import {
   Calendar,
   CheckCircle,
   Clock,
-  Cpu,
   Download,
   ExternalLink,
-  LayoutGrid,
-  List,
   StopCircle,
+  UserRound,
   XCircle,
 } from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
-import { formatDate, formatTime, formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
+import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
 import { ExecutionDAG } from "./ExecutionDAG";
 
-import type { ExecutionResponseDetail, Task } from "@/schemas";
+import type { ExecutionResponseDetail } from "@/schemas";
 
 import { useGetExecution, useCancelExecution } from "@/client/execution/execution";
-import { InteractiveFigureModal } from "@/components/charts/InteractiveFigureModal";
-import { TaskFigure } from "@/components/charts/TaskFigure";
-import { TaskGridView } from "@/components/features/chip/TaskGridView";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
@@ -36,22 +31,26 @@ type FilterOption = {
   label: string;
 };
 
+type TopologyMode = "1q" | "2q";
+
+type ActorFields = {
+  user_id?: string | null;
+  username?: string;
+};
+
 interface ExecutionDetailClientProps {
   chipId: string;
   executionId: string;
 }
 
+function formatActorLabel(actor?: ActorFields | null) {
+  if (actor?.username) return `@${actor.username}`;
+  return actor?.user_id || "Unknown";
+}
+
 export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailClientProps) {
-  const [expandedFigure, setExpandedFigure] = useState<{
-    path: string;
-    jsonPath?: string;
-    qid: string;
-    index: number;
-  } | null>(null);
-  const [taskViewMode, setTaskViewMode] = useState<"list" | "grid" | "topology">("list");
-  const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(null);
-  const [filterQubitId, setFilterQubitId] = useState<string>("all");
-  const [filterTaskName, setFilterTaskName] = useState<string>("all");
+  const [topologyMode, setTopologyMode] = useState<TopologyMode>("1q");
+  const [filterTaskName, setFilterTaskName] = useState<string>("");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const calculateDetailedDuration = (
@@ -123,44 +122,31 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     );
   };
 
-  // Extract unique qubit IDs and task names for filtering
-  const uniqueQubitIds = useMemo(() => {
-    if (!execution?.task) return [];
-    const qids = new Set<string>();
-    execution.task.forEach((task) => {
-      if (task.qid) {
-        qids.add(task.qid);
-      }
-    });
-    return Array.from(qids).sort();
-  }, [execution?.task]);
-
   const uniqueTaskNames = useMemo(() => {
     if (!execution?.task) return [];
     const names = new Set<string>();
     execution.task.forEach((task) => {
-      if (task.name) {
+      const isCouplingTask = task.qid?.includes("-") ?? false;
+      const matchesTopologyMode =
+        topologyMode === "2q" ? isCouplingTask : task.qid ? !isCouplingTask : false;
+      if (task.name && matchesTopologyMode) {
         names.add(task.name);
       }
     });
-    return Array.from(names).sort();
-  }, [execution?.task]);
-
-  const qubitFilterOptions: FilterOption[] = useMemo(
-    () => [
-      { value: "all", label: "All Qubits" },
-      ...uniqueQubitIds.map((qid) => ({ value: qid, label: qid })),
-    ],
-    [uniqueQubitIds],
-  );
+    return Array.from(names);
+  }, [execution?.task, topologyMode]);
 
   const taskFilterOptions: FilterOption[] = useMemo(
-    () => [
-      { value: "all", label: "All Tasks" },
-      ...uniqueTaskNames.map((name) => ({ value: name, label: name })),
-    ],
+    () => uniqueTaskNames.map((name) => ({ value: name, label: name })),
     [uniqueTaskNames],
   );
+
+  useEffect(() => {
+    const firstTaskName = uniqueTaskNames[0] ?? "";
+    if (!filterTaskName || !uniqueTaskNames.includes(filterTaskName)) {
+      setFilterTaskName(firstTaskName);
+    }
+  }, [filterTaskName, uniqueTaskNames]);
 
   const filterSelectStyles = useMemo<StylesConfig<FilterOption, false>>(
     () => ({
@@ -189,48 +175,13 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
   const filteredTasks = useMemo(() => {
     if (!execution?.task) return [];
     return execution.task.filter((task) => {
-      const matchesQubitId = filterQubitId === "all" || task.qid === filterQubitId;
-      const matchesTaskName = filterTaskName === "all" || task.name === filterTaskName;
-      return matchesQubitId && matchesTaskName;
+      const isCouplingTask = task.qid?.includes("-") ?? false;
+      const matchesTopologyMode =
+        topologyMode === "2q" ? isCouplingTask : task.qid ? !isCouplingTask : false;
+      const matchesTaskName = !!filterTaskName && task.name === filterTaskName;
+      return matchesTopologyMode && matchesTaskName;
     });
-  }, [execution?.task, filterQubitId, filterTaskName]);
-
-  // Transform tasks for TaskGridView (adds taskId field)
-  const tasksForGridView = useMemo(() => {
-    return filteredTasks
-      .filter((task): task is Task & { task_id: string } => !!task.task_id)
-      .map((task) => ({
-        ...task,
-        taskId: task.task_id,
-      }));
-  }, [filteredTasks]);
-
-  // Auto-select first task when filters change
-  useEffect(() => {
-    if (!execution?.task) return;
-
-    const filtered = execution.task.filter((task) => {
-      const matchesQubitId = filterQubitId === "all" || task.qid === filterQubitId;
-      const matchesTaskName = filterTaskName === "all" || task.name === filterTaskName;
-      return matchesQubitId && matchesTaskName;
-    });
-
-    if (filtered.length > 0) {
-      // Find the index of the first filtered task in the original task array
-      const firstFilteredTaskIndex = execution.task.findIndex((task) => task === filtered[0]);
-      // Only update if the current selection is not in the filtered list
-      const currentTaskInFilteredList =
-        selectedTaskIndex !== null &&
-        filtered.some((task) => execution.task[selectedTaskIndex] === task);
-
-      if (!currentTaskInFilteredList) {
-        setSelectedTaskIndex(firstFilteredTaskIndex);
-      }
-    } else {
-      setSelectedTaskIndex(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterQubitId, filterTaskName, execution?.task]);
+  }, [execution?.task, filterTaskName, topologyMode]);
 
   // Filter out tasks without task_id and ensure all required fields are present
   const validTasks = useMemo(() => {
@@ -254,51 +205,6 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
         };
       });
   }, [execution?.task]);
-
-  const selectedTask =
-    selectedTaskIndex !== null && execution?.task ? execution.task[selectedTaskIndex] : null;
-
-  const getStatusIcon = (status?: string) => {
-    switch (status) {
-      case "completed":
-        return <CheckCircle className="text-success" size={18} />;
-      case "failed":
-        return <XCircle className="text-error" size={18} />;
-      case "cancelled":
-        return <StopCircle className="text-neutral" size={18} />;
-      case "running":
-        return <Clock className="text-info" size={18} />;
-      default:
-        return <Clock className="text-warning" size={18} />;
-    }
-  };
-
-  const getStatusBadge = (status?: string) => {
-    switch (status) {
-      case "completed":
-        return <span className="badge badge-success badge-sm">Completed</span>;
-      case "failed":
-        return <span className="badge badge-error badge-sm">Failed</span>;
-      case "cancelled":
-        return <span className="badge badge-neutral badge-sm">Cancelled</span>;
-      case "running":
-        return <span className="badge badge-info badge-sm status-pulse">Running</span>;
-      case "scheduled":
-        return <span className="badge badge-warning badge-sm">Scheduled</span>;
-      default:
-        return <span className="badge badge-warning badge-sm">Pending</span>;
-    }
-  };
-
-  const formatDateTime = (dateStr?: string | null) => {
-    if (!dateStr) return "-";
-    return (
-      <>
-        <div className="font-medium">{formatDate(dateStr)}</div>
-        <div className="text-xs text-base-content/60">{formatTime(dateStr)}</div>
-      </>
-    );
-  };
 
   if (isDetailLoading) {
     return <ExecutionDetailPageSkeleton />;
@@ -365,6 +271,11 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               <span className="font-medium mr-1">Duration:</span>
               <span>{execution.elapsed_time}</span>
             </div>
+            <div className="flex items-center text-base-content/70 min-w-0">
+              <UserRound className="mr-2 text-info/70 flex-shrink-0" size={14} />
+              <span className="font-medium mr-1">User:</span>
+              <span className="truncate">{formatActorLabel(execution)}</span>
+            </div>
           </div>
         </div>
 
@@ -416,59 +327,39 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
 
         <div className="bg-base-100 rounded-lg shadow-md p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
-            <h2 className="text-lg sm:text-xl font-bold">
-              Tasks
-              <span className="badge badge-primary ml-2">
-                {filteredTasks.length}
-                {filteredTasks.length !== execution.task?.length &&
-                  ` / ${execution.task?.length || 0}`}
-              </span>
-            </h2>
-            <div className="btn-group self-start sm:self-auto">
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold">Task Topology</h2>
+              <p className="mt-1 text-xs text-base-content/60">
+                {filteredTasks.length} {topologyMode === "2q" ? "coupling" : "one-qubit"} tasks
+                shown on the chip layout
+              </p>
+            </div>
+            <div className="tabs tabs-boxed bg-base-200 w-fit">
               <button
-                className={`btn btn-sm ${taskViewMode === "list" ? "btn-primary" : ""}`}
-                onClick={() => setTaskViewMode("list")}
+                type="button"
+                className={`tab ${topologyMode === "1q" ? "tab-active" : ""}`}
+                onClick={() => {
+                  setTopologyMode("1q");
+                  setFilterTaskName("");
+                }}
               >
-                <List size={16} />
-                List
+                Qubit
               </button>
               <button
-                className={`btn btn-sm ${taskViewMode === "grid" ? "btn-primary" : ""}`}
-                onClick={() => setTaskViewMode("grid")}
+                type="button"
+                className={`tab ${topologyMode === "2q" ? "tab-active" : ""}`}
+                onClick={() => {
+                  setTopologyMode("2q");
+                  setFilterTaskName("");
+                }}
               >
-                <LayoutGrid size={16} />
-                Grid
-              </button>
-              <button
-                className={`btn btn-sm ${taskViewMode === "topology" ? "btn-primary" : ""}`}
-                onClick={() => setTaskViewMode("topology")}
-              >
-                <Cpu size={16} />
-                Topology
+                Coupling
               </button>
             </div>
           </div>
 
           {/* Filter Controls */}
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
-            <div className="form-control flex-1 min-w-0">
-              <label className="label py-1">
-                <span className="label-text text-xs font-semibold">Qubit ID</span>
-              </label>
-              <Select<FilterOption, false>
-                className="text-sm"
-                classNamePrefix="react-select"
-                options={qubitFilterOptions}
-                value={qubitFilterOptions.find((option) => option.value === filterQubitId) ?? null}
-                onChange={(option: SingleValue<FilterOption>) => {
-                  setFilterQubitId(option?.value ?? "all");
-                }}
-                placeholder="All Qubits"
-                isSearchable
-                styles={filterSelectStyles}
-              />
-            </div>
-
             <div className="form-control flex-1 min-w-0">
               <label className="label py-1">
                 <span className="label-text text-xs font-semibold">Task Name</span>
@@ -479,403 +370,21 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                 options={taskFilterOptions}
                 value={taskFilterOptions.find((option) => option.value === filterTaskName) ?? null}
                 onChange={(option: SingleValue<FilterOption>) => {
-                  setFilterTaskName(option?.value ?? "all");
+                  setFilterTaskName(option?.value ?? "");
                 }}
-                placeholder="All Tasks"
+                placeholder="Select task"
                 isSearchable
                 styles={filterSelectStyles}
               />
             </div>
-
-            {(filterQubitId !== "all" || filterTaskName !== "all") && (
-              <div className="form-control sm:self-end">
-                <label className="label py-1 hidden sm:flex">
-                  <span className="label-text text-xs font-semibold opacity-0">Clear</span>
-                </label>
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => {
-                    setFilterQubitId("all");
-                    setFilterTaskName("all");
-                  }}
-                >
-                  Clear Filters
-                </button>
-              </div>
-            )}
           </div>
 
-          {taskViewMode === "list" ? (
-            <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-400px)]">
-              {/* Left Panel - Task Timeline */}
-              <div className="w-full lg:w-96 lg:flex-shrink-0">
-                <div className="card bg-base-100 shadow-xl h-64 lg:h-full">
-                  <div className="card-body p-4 overflow-hidden flex flex-col">
-                    <h3 className="card-title text-lg mb-2">Timeline</h3>
-
-                    <div className="flex-1 overflow-y-auto space-y-2">
-                      {filteredTasks.length === 0 ? (
-                        <div className="flex items-center justify-center h-full text-base-content/60 text-sm">
-                          No tasks match the selected filters
-                        </div>
-                      ) : (
-                        filteredTasks.map((task, filteredIndex: number) => {
-                          // Find the original index in execution.task
-                          const originalIndex = execution.task.findIndex((t) => t === task);
-                          return (
-                            <div
-                              key={originalIndex}
-                              className={`cursor-pointer transition-all rounded-lg border-2 ${
-                                selectedTaskIndex === originalIndex
-                                  ? "border-primary bg-primary/10"
-                                  : "border-base-300 hover:border-base-400 hover:bg-base-200"
-                              }`}
-                              onClick={() => setSelectedTaskIndex(originalIndex)}
-                            >
-                              <div className="p-3">
-                                {/* Timeline connector */}
-                                <div className="flex items-start gap-3">
-                                  <div className="flex flex-col items-center">
-                                    <div className="text-xl">{getStatusIcon(task.status)}</div>
-                                    {filteredIndex < filteredTasks.length - 1 && (
-                                      <div className="w-0.5 h-8 bg-base-300 my-1"></div>
-                                    )}
-                                  </div>
-
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                      {task.task_id ? (
-                                        <Link
-                                          href={`/task-results/${task.task_id}`}
-                                          className="text-sm font-semibold truncate text-primary hover:underline"
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          {task.name}
-                                        </Link>
-                                      ) : (
-                                        <div className="text-sm font-semibold truncate">
-                                          {task.name}
-                                        </div>
-                                      )}
-                                      {getStatusBadge(task.status)}
-                                    </div>
-
-                                    <div className="text-sm">{formatDateTime(task.start_at)}</div>
-
-                                    {task.elapsed_time && (
-                                      <div className="text-xs text-base-content/60 mt-1">
-                                        Duration: {task.elapsed_time}
-                                      </div>
-                                    )}
-
-                                    {task.qid && (
-                                      <div className="text-xs text-base-content/70 mt-1 truncate">
-                                        Qubit: {task.qid}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Panel - Task Details */}
-              <div className="flex-1 overflow-hidden">
-                {selectedTask ? (
-                  <div className="card bg-base-100 shadow-xl h-auto lg:h-full">
-                    <div className="card-body p-4 sm:p-6 overflow-y-auto">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
-                        <h3 className="card-title text-lg sm:text-xl break-all">
-                          {selectedTask.name}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(selectedTask.status)}
-                          {selectedTask.task_id && (
-                            <Link
-                              href={`/task-results/${selectedTask.task_id}`}
-                              className="btn btn-sm btn-outline btn-primary gap-1"
-                            >
-                              <ExternalLink size={14} />
-                              View Details
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Task Information */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                        <div>
-                          <div className="text-sm text-base-content/60 mb-1">Task ID</div>
-                          <div className="font-mono text-sm break-all">
-                            {selectedTask.task_id ? (
-                              <Link
-                                href={`/task-results/${selectedTask.task_id}`}
-                                className="text-primary hover:underline"
-                              >
-                                {selectedTask.task_id}
-                              </Link>
-                            ) : (
-                              "N/A"
-                            )}
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="text-sm text-base-content/60 mb-1">Qubit ID</div>
-                          <div className="font-medium">{selectedTask.qid || "N/A"}</div>
-                        </div>
-
-                        <div>
-                          <div className="text-sm text-base-content/60 mb-1">Start Time</div>
-                          <div className="text-sm">{formatDateTime(selectedTask.start_at)}</div>
-                        </div>
-
-                        <div>
-                          <div className="text-sm text-base-content/60 mb-1">End Time</div>
-                          <div className="text-sm">{formatDateTime(selectedTask.end_at)}</div>
-                        </div>
-
-                        {selectedTask.elapsed_time && (
-                          <div>
-                            <div className="text-sm text-base-content/60 mb-1">Duration</div>
-                            <div className="font-medium">{selectedTask.elapsed_time}</div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Raw Data Files */}
-                      {selectedTask.raw_data_path && selectedTask.raw_data_path.length > 0 && (
-                        <div className="mb-6">
-                          <h4 className="text-lg font-semibold mb-3">
-                            Raw Data ({selectedTask.raw_data_path.length})
-                          </h4>
-                          <div className="space-y-2">
-                            {selectedTask.raw_data_path.map((path: string, i: number) => (
-                              <div
-                                key={i}
-                                className="flex items-center justify-between bg-base-200 p-2 rounded"
-                              >
-                                <span className="text-sm truncate flex-1 mr-4">
-                                  {path.split("/").pop()}
-                                </span>
-                                <button
-                                  onClick={() => {
-                                    const link = document.createElement("a");
-                                    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-                                    const apiUrl = "/api";
-                                    link.href = `${apiUrl}/file/raw_data?path=${encodeURIComponent(
-                                      normalizedPath,
-                                    )}`;
-                                    const filename = path.split("/").pop() || "file";
-                                    link.download = filename;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                  }}
-                                  className="btn btn-sm btn-primary"
-                                >
-                                  <Download className="mr-2" size={14} />
-                                  Download
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Figures */}
-                      {selectedTask.figure_path &&
-                        (Array.isArray(selectedTask.figure_path)
-                          ? selectedTask.figure_path.length > 0
-                          : true) && (
-                          <div className="mb-6">
-                            <h4 className="text-lg font-semibold mb-3">
-                              Figures (
-                              {Array.isArray(selectedTask.figure_path)
-                                ? selectedTask.figure_path.length
-                                : 1}
-                              )
-                            </h4>
-                            <div className="space-y-4">
-                              {(Array.isArray(selectedTask.figure_path)
-                                ? selectedTask.figure_path
-                                : [selectedTask.figure_path]
-                              ).map((path: string, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="bg-base-200 rounded-lg p-4 overflow-hidden"
-                                >
-                                  <div className="text-sm text-base-content/60 mb-2">
-                                    Figure {idx + 1}
-                                  </div>
-                                  <div className="bg-white rounded-lg p-2">
-                                    <TaskFigure
-                                      path={path}
-                                      qid={selectedTask.qid || ""}
-                                      className="w-full h-auto max-h-[500px] object-contain"
-                                    />
-                                  </div>
-                                  {selectedTask.json_figure_path &&
-                                    selectedTask.json_figure_path[idx] && (
-                                      <div className="mt-2 flex justify-center">
-                                        <button
-                                          className="btn btn-sm btn-primary"
-                                          onClick={() => {
-                                            setExpandedFigure({
-                                              path,
-                                              jsonPath: selectedTask.json_figure_path?.[idx] || "",
-                                              qid: selectedTask.qid || "",
-                                              index: idx,
-                                            });
-                                          }}
-                                        >
-                                          Interactive View
-                                        </button>
-                                      </div>
-                                    )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                      {/* Output Parameters */}
-                      {selectedTask.output_parameters && (
-                        <div className="mb-6">
-                          <h4 className="text-lg font-semibold mb-3">Output Parameters</h4>
-                          <div className="overflow-x-auto">
-                            <table className="table table-zebra table-sm">
-                              <thead>
-                                <tr>
-                                  <th>Parameter</th>
-                                  <th>Value</th>
-                                  <th>Unit</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {Object.entries(selectedTask.output_parameters).map(
-                                  ([key, value]: [string, unknown]) => {
-                                    const paramValue = (
-                                      typeof value === "object" &&
-                                      value !== null &&
-                                      "value" in value
-                                        ? value
-                                        : { value }
-                                    ) as {
-                                      value: number | string;
-                                      unit?: string;
-                                    };
-                                    return (
-                                      <tr key={key}>
-                                        <td className="font-medium">{key}</td>
-                                        <td className="font-mono">
-                                          {typeof paramValue.value === "number"
-                                            ? paramValue.value.toFixed(6)
-                                            : String(paramValue.value)}
-                                        </td>
-                                        <td>{paramValue.unit || "-"}</td>
-                                      </tr>
-                                    );
-                                  },
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Input Parameters */}
-                      {selectedTask.input_parameters && (
-                        <div className="mb-6">
-                          <h4 className="text-lg font-semibold mb-3">Input Parameters</h4>
-                          <div className="overflow-x-auto">
-                            <table className="table table-zebra table-sm">
-                              <thead>
-                                <tr>
-                                  <th>Parameter</th>
-                                  <th>Value</th>
-                                  <th>Unit</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {Object.entries(selectedTask.input_parameters).map(
-                                  ([key, value]: [string, unknown]) => {
-                                    const paramValue = (
-                                      typeof value === "object" &&
-                                      value !== null &&
-                                      "value" in value
-                                        ? value
-                                        : { value }
-                                    ) as {
-                                      value: number | string | object;
-                                      unit?: string;
-                                    };
-                                    return (
-                                      <tr key={key}>
-                                        <td className="font-medium">{key}</td>
-                                        <td className="font-mono">
-                                          {typeof paramValue.value === "number"
-                                            ? paramValue.value.toFixed(6)
-                                            : typeof paramValue.value === "object"
-                                              ? JSON.stringify(paramValue.value)
-                                              : String(paramValue.value)}
-                                        </td>
-                                        <td>{paramValue.unit || "-"}</td>
-                                      </tr>
-                                    );
-                                  },
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Message */}
-                      {selectedTask.message && (
-                        <div>
-                          <h4 className="text-lg font-semibold mb-3">Message</h4>
-                          <div className="alert">
-                            <span>{selectedTask.message}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="card bg-base-100 shadow-xl h-auto lg:h-full min-h-32">
-                    <div className="card-body flex items-center justify-center">
-                      <div className="text-center text-base-content/60">
-                        Select a task from the timeline to view details
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : taskViewMode === "grid" ? (
-            <div className="mt-4">
-              <TaskGridView
-                tasks={tasksForGridView}
-                qubitId={chipId}
-                emptyMessage="No tasks found"
-              />
-            </div>
-          ) : (
-            <div className="mt-4">
-              <ExecutionTopologyView
-                chipId={chipId}
-                tasks={execution.task || []}
-                filterTaskName={filterTaskName}
-              />
-            </div>
-          )}
+          <ExecutionTopologyView
+            chipId={chipId}
+            tasks={execution.task || []}
+            topologyMode={topologyMode}
+            filterTaskName={filterTaskName}
+          />
         </div>
       </div>
 
@@ -936,15 +445,6 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           </div>
         </div>
       )}
-
-      {/* Figure Expansion Modal - Interactive View Only */}
-      <InteractiveFigureModal
-        isOpen={!!expandedFigure}
-        onClose={() => setExpandedFigure(null)}
-        figureJsonPath={expandedFigure?.jsonPath || ""}
-        title="Interactive Figure"
-        figureIndex={expandedFigure?.index}
-      />
     </div>
   );
 }

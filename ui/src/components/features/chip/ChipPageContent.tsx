@@ -122,7 +122,7 @@ export function ChipPageContent() {
   const aiReviewBadgesByTaskId = useMemo(() => {
     const badges = new Map<string, AiReviewBadgeState>();
     for (const entry of notesSummaryData?.data?.task_notes ?? []) {
-      const content = entry.note?.content ?? "";
+      const content = entry.ai_review_note?.content || entry.note?.content || "";
       const badge = getAiReviewBadgeState(content);
       if (badge) {
         badges.set(entry.task_id, badge);

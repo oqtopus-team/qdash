@@ -14,4 +14,6 @@ export interface TaskNoteEntry {
   task_id: string;
   qid: string;
   note: NoteModel;
+  /** AI-generated review note for this task result */
+  ai_review_note?: NoteModel;
 }

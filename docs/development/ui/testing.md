@@ -207,11 +207,10 @@ describe("ChipList", () => {
 ### Development Server
 
 ```bash
-# Start development server
-cd ui
-bun run dev
+# Start the host-side development stack
+task dev-local
 
-# Access at http://localhost:3000
+# Access at http://localhost:5714
 ```
 
 ### Testing Workflow
@@ -220,10 +219,10 @@ bun run dev
 
    ```bash
    # From project root
-   docker compose up -d
+   task deploy-local
 
    # Or start UI separately for faster iteration
-   cd ui && bun run dev
+   task dev-local
    ```
 
 2. **Test each page manually**

@@ -44,35 +44,18 @@ Technical architecture documentation for QDash components.
 ### Related Documentation
 
 - [Main Documentation](../../README.md)
-- [Development Flow](../development-flow.md)
-- [Tools Documentation](../../src/tools/README.md)
+- [Development Flow](../development/development-flow.md)
 
 ### Implementation
 
-- 1-Qubit Scheduler: `src/qdash/workflow/engine/calibration/scheduler/one_qubit_scheduler.py`
-- CR Scheduler: `src/qdash/workflow/engine/calibration/scheduler/cr_scheduler.py`
-- Visualization: `src/tools/cr_scheduler_visualizer.py`
-- Tests: `tests/qdash/workflow/engine/calibration/scheduler/`
+- 1-Qubit Scheduler: `src/qdash/workflow/engine/scheduler/one_qubit_scheduler.py`
+- CR Scheduler: `src/qdash/workflow/engine/scheduler/cr_scheduler.py`
+- Tests: `tests/qdash/workflow/engine/scheduler/`
 
 ### Configuration
 
-- Wiring configs: `/workspace/qdash/config/qubex/{chip_id}/config/wiring.yaml`
-- Device topology: Generated via `src/tools/device_topology_generator.py`
-
-## Visualization Tools
-
-### CR Schedule Visualizer
-
-Generate visual representations of CR gate schedules:
-
-```bash
-python src/tools/cr_scheduler_visualizer.py
-```
-
-**Output:**
-
-- Console: Schedule statistics and group breakdown
-- Files: `.tmp/schedule_output/*.png` with lattice visualizations
+- Wiring configs: `config/qubex-config/{chip_id}/config/wiring.yaml`
+- Device topology: Generated via `scripts/generate_topology.py`
 
 ## Contributing
 
@@ -101,7 +84,7 @@ Each architecture document should include:
 Use Python syntax highlighting:
 
 ```python
-from qdash.workflow.engine.cr_scheduler import CRScheduler
+from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler
 
 scheduler = CRScheduler(username="alice", chip_id="64Qv3")
 result = scheduler.generate()

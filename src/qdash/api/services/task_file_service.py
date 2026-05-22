@@ -8,9 +8,6 @@ import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 from fastapi import HTTPException
 
 from qdash.api.lib.file_utils import validate_relative_path
@@ -26,14 +23,18 @@ from qdash.api.schemas.task_file import (
     TaskInfo,
 )
 from qdash.common.config.backend import (
+    get_default_backend,
     get_task_category,
     get_tasks,
     load_backend_config,
 )
 from qdash.common.config.loader import ConfigLoader
-from qdash.common.config.paths import CALIBTASKS_DIR
+from qdash.common.config.path_resolver import resolve_calibtasks_base_path
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TaskFileService:
@@ -48,11 +49,11 @@ class TaskFileService:
             Base path for calibration task files. Defaults to CALIBTASKS_DIR.
 
         """
-        self._base_path = calibtasks_base_path or CALIBTASKS_DIR
+        self._base_path = calibtasks_base_path or resolve_calibtasks_base_path()
         self._task_cache: dict[str, tuple[float, list[TaskInfo]]] = {}
 
     def get_settings(self) -> TaskFileSettings:
-        """Get task file settings from config/settings.yaml.
+        """Get task file settings from config/app/settings.yaml.
 
         Returns
         -------
@@ -65,7 +66,7 @@ class TaskFileService:
             ui_settings = settings.get("ui", {})
             task_files_settings = ui_settings.get("task_files", {})
             return TaskFileSettings(
-                default_backend=task_files_settings.get("default_backend"),
+                default_backend=get_default_backend(),
                 default_view_mode=task_files_settings.get("default_view_mode"),
                 sort_order=task_files_settings.get("sort_order"),
             )
@@ -204,7 +205,7 @@ class TaskFileService:
             raise HTTPException(status_code=500, detail=f"Error saving file: {e!s}")
 
     def get_backend_config(self) -> BackendConfigResponse:
-        """Get backend configuration from backend.yaml.
+        """Get backend configuration from config/app/backend.yaml.
 
         Returns
         -------
@@ -215,7 +216,7 @@ class TaskFileService:
         try:
             config = load_backend_config()
             return BackendConfigResponse(
-                default_backend=config.default_backend,
+                default_backend=get_default_backend(),
                 backends={
                     name: {"description": b.description, "tasks": b.tasks}
                     for name, b in config.backends.items()
@@ -241,7 +242,7 @@ class TaskFileService:
         sort_order : str | None
             Sort order for tasks.
         enabled_only : bool
-            If True, only return tasks enabled in backend.yaml.
+            If True, only return tasks enabled in config/app/backend.yaml.
 
         Returns
         -------

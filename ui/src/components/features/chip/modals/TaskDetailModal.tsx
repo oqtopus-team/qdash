@@ -9,6 +9,7 @@ import type { Task } from "@/schemas";
 import { useGetTaskResult } from "@/client/task/task";
 import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureContent";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import {
@@ -111,7 +112,7 @@ export function TaskDetailModal({
     error: fetchError,
   } = useGetTaskResult(taskId!, {
     query: {
-      enabled: isOpen && !!taskId && !taskProp,
+      enabled: isOpen && !!taskId,
     },
   });
 
@@ -135,12 +136,12 @@ export function TaskDetailModal({
     : null;
 
   const task = taskProp || fetchedTask;
-  const error = (fetchError as Error)?.message || null;
+  const error = taskProp ? null : (fetchError as Error)?.message || null;
 
   if (!isOpen) return null;
 
   // Loading state
-  if (loading) {
+  if (loading && !taskProp) {
     return (
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
         <div className="bg-base-100 rounded-xl p-8">
@@ -483,6 +484,9 @@ export function TaskDetailModal({
               </div>
             )}
 
+            {noteTaskId && (
+              <TaskResultAiReviewNote note={fetchedTaskData?.ai_review_note} hideWhenEmpty />
+            )}
             {noteTaskId && <TaskResultMemo taskId={noteTaskId} chipId={chipId} hideWhenEmpty />}
 
             {/* Parameters Tables (detailed variant only) */}

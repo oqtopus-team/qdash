@@ -30,17 +30,14 @@ cd qdash
 
 ### Initial Setup
 
-Run the initialization script to create necessary directories and environment files:
+Create the environment file from the example:
 
 ```shell
-chmod +x scripts/init.sh
-scripts/init.sh
+cp .env.example .env
 ```
 
-This script will:
-
-- Create required data directories
-- Generate `.env` file from template
+Data directories are created by Docker Compose and `task dev-local-setup` as needed. Edit `.env`
+before starting services if you need custom ports, data paths, or admin credentials.
 
 ### Using DevContainer (Recommended)
 
@@ -81,26 +78,55 @@ git config --global user.email
 
 Set them in the container if either command is empty.
 
+### Using Nix (Lightweight Host Shell)
+
+Nix can provide the local CLI toolchain without starting the DevContainer. This is useful when
+you want to run Python tests, UI checks, or Docker Compose tasks from the host shell while keeping
+the service stack in Docker.
+
+Install [Nix](https://nixos.org/download/) with flakes enabled, then enter the development shell:
+
+```shell
+nix develop
+```
+
+The shell provides Python 3.11, uv, Bun, Node.js 20, go-task, Docker CLI/Compose, jq, PostgreSQL
+client tools, and the secret scanning tools used by the project. It also sets `UV_PYTHON` to the
+Nix-provided Python 3.11 so `uv sync` does not accidentally select Python 3.12 on macOS, where
+some workflow backend dependencies may fail to build. It does not start MongoDB, PostgreSQL,
+Prefect, API, or UI services by itself; use the existing Docker Compose tasks for those services.
+
+After entering the Nix shell for the first time, install project dependencies:
+
+```shell
+task dev-local-setup
+```
+
+Then start the lightweight development stack:
+
+```shell
+task dev-local
+```
+
+This starts MongoDB, PostgreSQL, Prefect, the deployment service, and the user flow worker with
+Docker Compose, then runs the API and UI on the host. The UI is available at
+<http://localhost:5714>.
+
 ### Install Dependencies
 
 The DevContainer installs Python, frontend, and Lefthook dependencies automatically during
 creation. To refresh dependencies manually, run:
 
 ```shell
-uv sync --all-groups --all-packages
-
-cd ui && bun install --frozen-lockfile
+task dev-local-setup
 ```
 
 ## Running Services
 
-### Start All Services
+### Full Docker Compose Stack
 
 ```shell
-docker compose up -d
-
-# Or using task
-task deploy-dev
+task deploy-local
 ```
 
 This starts the following services:
@@ -109,11 +135,25 @@ This starts the following services:
 - **mongo-express**: MongoDB admin UI (port 8081)
 - **postgres**: PostgreSQL database (port 5432)
 - **prefect-server**: Prefect workflow server (port 4200)
-- **workflow**: Calibration workflow worker
 - **deployment-service**: Prefect deployment management
 - **user-flow-worker**: User flow execution worker
 - **api**: FastAPI backend (port 5715)
 - **ui**: Next.js frontend (port 5714)
+
+### Lightweight Host Stack
+
+```shell
+task dev-local
+```
+
+This starts the supporting services in Docker Compose and runs the API and UI directly on the
+host. Use this flow when editing backend or frontend code frequently.
+
+The component tasks are:
+
+- `task dev-services`: start MongoDB, PostgreSQL, Prefect, deployment-service, and user-flow-worker
+- `task dev-api-local`: run the FastAPI app on the host against Docker services
+- `task dev-ui-local`: run the Next.js app on the host against the local API
 
 ### Access Points
 
@@ -132,11 +172,14 @@ This starts the following services:
 # Show all available tasks
 task
 
-# Deploy in dev mode
-task deploy-dev
+# Start the full Docker Compose stack
+task deploy-local
+
+# Start supporting services with host API/UI
+task dev-local
 
 # Deploy with Cloudflare Tunnel
-task deploy-prod
+task deploy
 
 # Restart API service
 task restart-api
@@ -145,20 +188,20 @@ task restart-api
 ### Code Quality
 
 ```shell
-# Format all code
-task fmt
-
-# Format Python only
-task fmt-python
-
-# Format UI only
-task fmt-ui
-
-# Run linting
+# Auto-fix Python and UI lint/format issues
 task lint
 
+# Auto-fix Python only
+task lint-python
+
+# Auto-fix UI only
+task lint-ui
+
+# Check Python linting and formatting without modifying files
+task ci-lint
+
 # Run mypy type checking
-task lint-mypy
+task ci-typecheck
 ```
 
 ### Testing
@@ -173,8 +216,8 @@ task test-api
 # Run workflow tests only
 task test-workflow
 
-# Run database model tests
-task test-dbmodel
+# Run UI tests only
+task test-ui
 
 # Run tests with coverage
 task test-coverage
@@ -252,5 +295,10 @@ Key environment variables are configured in `.env`. See `.env.example` for avail
 | `MONGO_PORT`              | 27017   | MongoDB port                |
 | `POSTGRES_PORT`           | 5432    | PostgreSQL port             |
 | `PREFECT_PORT`            | 4200    | Prefect dashboard port      |
+| `DEPLOYMENT_SERVICE_PORT` | 4006    | Deployment service port     |
+| `CALIB_DATA_PATH`         | -       | Calibration data mount path |
+| `CALIB_TASKS_PATH`        | -       | Calibration tasks path      |
+| `CONFIG_PATH`             | -       | Qubex backend config repository/data path |
 | `NEXT_PUBLIC_API_URL`     | -       | Public API URL for frontend |
 | `NEXT_PUBLIC_PREFECT_URL` | -       | Prefect dashboard URL       |
+| `NEXT_ALLOWED_DEV_ORIGINS` | -       | Additional hostnames allowed to access the Next.js dev server |

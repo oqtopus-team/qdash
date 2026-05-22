@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-import { ExternalLink, ArrowUpRight, StopCircle } from "lucide-react";
+import { ExternalLink, ArrowUpRight, StopCircle, UserRound } from "lucide-react";
 import Link from "next/link";
 
 import { formatDate, formatDateTime } from "@/lib/utils/datetime";
 
-import { ExecutionStats } from "./ExecutionStats";
+import { ExecutionDurationBreakdown } from "./ExecutionDurationBreakdown";
 
 import type { ExecutionResponseSummary } from "@/schemas";
 
@@ -26,6 +26,16 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
+
+type ActorFields = {
+  user_id?: string | null;
+  username?: string;
+};
+
+function formatActorLabel(actor?: ActorFields | null) {
+  if (actor?.username) return `@${actor.username}`;
+  return actor?.user_id || "Unknown";
+}
 
 function PaginationControls({
   currentPage,
@@ -224,10 +234,11 @@ export function ExecutionPageContent() {
         </PageFiltersBar.Group>
       </PageFiltersBar>
       {/* Statistics display */}
-      <ExecutionStats
+      <ExecutionDurationBreakdown
         executions={cardData}
         selectedTag={selectedTag}
         onTagSelect={setSelectedTag}
+        allItemsHref={`/execution/durations${selectedChip ? `?chip=${encodeURIComponent(selectedChip)}` : ""}`}
       />
       {/* Pagination controls - Top */}
       <PaginationControls
@@ -295,6 +306,10 @@ export function ExecutionPageContent() {
                   {execution.elapsed_time && (
                     <span className="sm:hidden">{execution.elapsed_time}</span>
                   )}
+                  <span className="inline-flex items-center gap-1 min-w-0">
+                    <UserRound className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{formatActorLabel(execution)}</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -432,6 +447,10 @@ export function ExecutionPageContent() {
                         {detailTask.elapsed_time && (
                           <span className="ml-2 sm:ml-3">{detailTask.elapsed_time}</span>
                         )}
+                        <span className="ml-2 sm:ml-3 inline-flex items-center gap-1">
+                          <UserRound className="h-3 w-3" />
+                          {formatActorLabel(detailTask)}
+                        </span>
                       </div>
                       {expandedTaskIndex === idx && (
                         <div className="mt-2 sm:mt-3 space-y-2 sm:space-y-3">

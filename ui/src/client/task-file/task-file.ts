@@ -47,7 +47,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 /**
- * Get task file settings from config/settings.yaml.
+ * Get task file settings from config/app/settings.yaml.
 
 Returns
 -------
@@ -513,7 +513,7 @@ export const useSaveTaskFileContent = <TError = HTTPValidationError,
       return useMutation(mutationOptions, queryClient);
     }
     /**
- * Get backend configuration from backend.yaml.
+ * Get backend configuration from config/app/backend.yaml.
 
 Returns
 -------

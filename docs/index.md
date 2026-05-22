@@ -11,11 +11,14 @@ hero:
     alt: OQTOPUS
   actions:
     - theme: brand
-      text: Get Started
-      link: /getting-started/quick-start
+      text: Operator Guide
+      link: /operator-guide/
     - theme: alt
-      text: What is QDash?
-      link: /getting-started/what-is-qdash
+      text: Developer Guide
+      link: /developer-guide/
+    - theme: alt
+      text: Quick Start
+      link: /getting-started/quick-start
 
 features:
   - icon: ⚡

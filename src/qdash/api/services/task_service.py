@@ -174,6 +174,8 @@ class TaskService:
             status=task_result.status,
             execution_id=task_result.execution_id,
             flow_name=flow_name,
+            user_id=task_result.user_id,
+            username=task_result.username,
             figure_path=task_result.figure_path,
             json_figure_path=task_result.json_figure_path,
             input_parameters=task_result.input_parameters,
@@ -187,6 +189,7 @@ class TaskService:
             start_at=task_result.start_at,
             end_at=task_result.end_at,
             elapsed_time=task_result.elapsed_time,
+            ai_review_note=task_result.ai_review_note,
         )
 
     def get_task_knowledge_markdown(self, task_name: str) -> str:

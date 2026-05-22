@@ -1,0 +1,46 @@
+# QDash Settings
+# This file contains default settings for the QDash application.
+#
+# Note: Container-side paths (like /app/calib_data) are defined as constants
+# in source code. To customize host-side paths, use .env and docker-compose.yaml.
+
+# =============================================================================
+# Backend Configuration
+# =============================================================================
+# QDash supports two backend types:
+#   - qubex: Production backend using real quantum hardware via qubex library
+#   - fake: Testing backend with simulated measurements (no hardware required)
+#
+# Both backends use IDENTICAL task names, enabling seamless switching:
+#   task_names = ["CheckFineChevron", "CheckRabi", "CheckT1"]
+#
+#   # For testing without hardware
+#   config = CalibConfig(backend_name="fake", ...)
+#
+#   # For production with real hardware
+#   config = CalibConfig(backend_name="qubex", ...)
+#
+# Fake backend available tasks (same names as qubex):
+#   - CheckFineChevron: Entry point, outputs qubit_frequency, readout_frequency
+#   - CheckRabi: Rabi oscillation measurement
+#   - CheckT1: T1 relaxation time measurement
+#   - CheckT2Echo: T2 echo (Hahn echo) measurement
+#   - RandomizedBenchmarking: Gate fidelity measurement
+
+# =============================================================================
+# UI Settings
+# =============================================================================
+ui:
+  # Task Files Editor Settings
+  task_files:
+    # Default backend to select when opening the Task Files page
+    # Available backends: qubex, fake
+    default_backend: qubex
+
+    # Default view mode for the sidebar
+    # Options: tasks, files
+    default_view_mode: tasks
+
+    # Task list sort order
+    # Options: type_then_name, name_only, file_path
+    sort_order: type_then_name

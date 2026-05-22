@@ -1,19 +1,9 @@
 "use client";
 
-import {
-  Bot,
-  Check,
-  Download,
-  LoaderCircle,
-  X,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Move,
-} from "lucide-react";
+import { Bot, Check, Download, LoaderCircle, X, Maximize2, Move } from "lucide-react";
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
 
@@ -29,6 +19,7 @@ import {
 } from "@/components/features/chip/DownloadConfirmModal";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CouplingTaskHistoryModal } from "@/components/features/chip/modals/CouplingTaskHistoryModal";
+import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -95,36 +86,6 @@ function getPendingAiReviewTaskIds(
     }
   }
   return taskIds;
-}
-
-// Zoom control buttons component
-function ZoomControls() {
-  const { zoomIn, zoomOut, resetTransform } = useControls();
-  return (
-    <div className="absolute top-2 right-2 z-30 flex flex-col gap-1">
-      <button
-        onClick={() => zoomIn()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Zoom in"
-      >
-        <ZoomIn className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => zoomOut()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Zoom out"
-      >
-        <ZoomOut className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => resetTransform()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Reset view"
-      >
-        <Maximize2 className="h-4 w-4" />
-      </button>
-    </div>
-  );
 }
 
 export function CouplingGrid({
@@ -1178,7 +1139,7 @@ export function CouplingGrid({
             centerOnInit={true}
             onTransform={handleTransform}
           >
-            <ZoomControls />
+            <GridZoomControls />
             <TransformComponent
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{

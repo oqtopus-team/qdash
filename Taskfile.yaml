@@ -17,14 +17,15 @@ tasks:
     desc: Restart the API service
 
   generate:
-    dir: ui
     dotenv: [.env]
     cmds:
-      - docker compose -f ../compose.yaml restart api && sleep 2
-      - curl http://api:$API_PORT/openapi.json | jq > ../docs/oas/openapi.json
-      - bunx orval@7.14.0 --config ./orval.config.cjs
-      - bun run fmt
-      - bun run lint:fix
+      - |
+        OPENAPI_TMP="$(mktemp)"
+        ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
+        mv "$OPENAPI_TMP" docs/oas/openapi.json
+      - cd ui && bunx orval@7.14.0 --config ./orval.config.cjs
+      - cd ui && bun run fmt
+      - cd ui && bun run lint:fix
     desc: Generate the TypeScript client
 
   knowledge:
@@ -74,6 +75,41 @@ tasks:
     cmds:
       - bun install
       - bun run docs:dev --host
+
+  # =============================================================================
+  # Lightweight local development (Nix shell + Docker services)
+  # =============================================================================
+
+  dev-services:
+    desc: Start only the services needed by host-side API/UI development
+    cmds:
+      - docker compose up -d mongo postgres prefect-server deployment-service user-flow-worker
+
+  dev-local-setup:
+    desc: Install dependencies needed by host-side API/UI development
+    cmds:
+      - uv sync --locked --all-groups --all-packages
+      - mkdir -p "${CONFIG_PATH:-./config/qubex-config}"
+      - bun --cwd ui install --frozen-lockfile
+
+  dev-api-local:
+    desc: Start the API on the host against Docker services
+    dotenv: [.env]
+    cmds:
+      - MONGO_HOST="${MONGO_HOST:-localhost}" PREFECT_API_URL="http://127.0.0.1:${PREFECT_PORT:-4200}/api" DEPLOYMENT_SERVICE_URL="http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}" uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
+
+  dev-ui-local:
+    desc: Start the UI on the host against the local API
+    dir: ui
+    dotenv: [../.env]
+    cmds:
+      - PORT="${UI_PORT:-5714}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" bun run dev
+
+  dev-local:
+    desc: Start lightweight local development services, API, and UI
+    cmds:
+      - task: dev-services
+      - task --parallel dev-api-local dev-ui-local
 
   # =============================================================================
   # Python Tests (all tests run in-memory, no MongoDB required)
@@ -269,15 +305,6 @@ tasks:
     cmds:
       - bun run build
 
-  # =============================================================================
-  # Legacy aliases (for backwards compatibility)
-  # =============================================================================
-
-  lint-mypy:
-    desc: "[Deprecated] Use ci-typecheck instead"
-    cmds:
-      - task: ci-typecheck
-
   tbls-docs:
     cmds:
       - tbls doc -c .tbls.yml -f
@@ -304,26 +331,6 @@ tasks:
       - task check-lock-workflow
       - task check-lock-dev
     desc: Check dependency locks
-
-  export-api:
-    cmds:
-      - task: check-lock-api
-    desc: "[Deprecated] Use check-lock-api instead"
-
-  export-workflow:
-    cmds:
-      - task: check-lock-workflow
-    desc: "[Deprecated] Use check-lock-workflow instead"
-
-  export-dev:
-    cmds:
-      - task: check-lock-dev
-    desc: "[Deprecated] Use check-lock-dev instead"
-
-  export-all:
-    cmds:
-      - task: check-locks
-    desc: "[Deprecated] Use check-locks instead"
 
   build-api:
     cmds:

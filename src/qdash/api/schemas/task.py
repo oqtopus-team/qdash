@@ -3,9 +3,10 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
+from qdash.datamodel.note import NoteModel
 
 
 class InputParameterModel(BaseModel):
@@ -165,6 +166,8 @@ class TaskResultResponse(BaseModel):
         qid (str): The qubit or coupling ID.
         status (str): The task status.
         execution_id (str): The execution ID.
+        user_id (str | None): Internal ID of the user who executed the task.
+        username (str): Username snapshot of the user who executed the task.
         figure_path (list[str]): List of figure paths.
         json_figure_path (list[str]): List of JSON figure paths.
         input_parameters (dict): Input parameters.
@@ -184,6 +187,8 @@ class TaskResultResponse(BaseModel):
     status: str
     execution_id: str
     flow_name: str = ""
+    user_id: str | None = None
+    username: str = ""
     figure_path: list[str]
     json_figure_path: list[str]
     input_parameters: dict[str, Any]
@@ -197,6 +202,10 @@ class TaskResultResponse(BaseModel):
     start_at: datetime | None = None
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None
+    ai_review_note: NoteModel = Field(
+        default_factory=NoteModel,
+        description="AI-generated review note for this task result",
+    )
 
     model_config = ConfigDict(from_attributes=True)
 

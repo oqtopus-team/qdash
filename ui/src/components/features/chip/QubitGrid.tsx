@@ -1,19 +1,9 @@
 "use client";
 
-import {
-  Check,
-  Download,
-  Bot,
-  LoaderCircle,
-  X,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Move,
-} from "lucide-react";
-import { useMemo, useState, useRef, useCallback, memo, useEffect } from "react";
+import { Check, Download, Bot, LoaderCircle, X, Maximize2, Move } from "lucide-react";
+import { useMemo, useState, useRef, useCallback, memo, useEffect, type KeyboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
 
@@ -29,6 +19,7 @@ import {
 } from "@/components/features/chip/DownloadConfirmModal";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskHistoryModal } from "@/components/features/chip/modals/TaskHistoryModal";
+import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
@@ -70,36 +61,6 @@ const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
   aiReviewNotes: false,
   aiReviewReplayBundles: false,
 };
-
-// Zoom control buttons component
-function ZoomControls() {
-  const { zoomIn, zoomOut, resetTransform } = useControls();
-  return (
-    <div className="absolute top-2 right-2 z-30 flex flex-col gap-1">
-      <button
-        onClick={() => zoomIn()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Zoom in"
-      >
-        <ZoomIn className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => zoomOut()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Zoom out"
-      >
-        <ZoomOut className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => resetTransform()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Reset view"
-      >
-        <Maximize2 className="h-4 w-4" />
-      </button>
-    </div>
-  );
-}
 
 // Memoized empty cell component
 const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }) {
@@ -239,9 +200,19 @@ const GridCell = memo(function GridCell({
   }
 
   // Zoomed-in: show full figure
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onClick();
+    }
+  };
+
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
       className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${muxBgClass} ${
         isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2" : ""
       } ${isSelectionMode && !canBeSelected ? "opacity-40 cursor-not-allowed" : ""}`}
@@ -292,7 +263,7 @@ const GridCell = memo(function GridCell({
           )}
         </div>
       )}
-    </button>
+    </div>
   );
 });
 
@@ -1161,7 +1132,7 @@ export function QubitGrid({
             centerOnInit={true}
             onTransform={handleTransform}
           >
-            <ZoomControls />
+            <GridZoomControls />
             <TransformComponent
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{

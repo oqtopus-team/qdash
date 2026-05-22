@@ -17,7 +17,8 @@ from git.exc import GitCommandError
 
 from qdash.api.lib.file_utils import validate_relative_path
 from qdash.api.schemas.file import FileTreeNode
-from qdash.common.config.paths import QUBEX_CONFIG_BASE
+from qdash.common.config.path_resolver import resolve_config_base_path
+from qdash.common.utils.commit_message import format_machine_commit_message
 from qdash.common.utils.datetime import now_iso
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class FileService:
             Base path for config files. Defaults to QUBEX_CONFIG_BASE.
 
         """
-        self._base_path = config_base_path or QUBEX_CONFIG_BASE
+        self._base_path = config_base_path or resolve_config_base_path()
 
     def download_file(self, path: str) -> FileResponse:
         """Download a raw data file.
@@ -481,7 +482,7 @@ class FileService:
                 repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
 
                 now_jst = now_iso()
-                commit_msg = f"{commit_message} at {now_jst}"
+                commit_msg = format_machine_commit_message(commit_message, now_jst)
                 repo.index.commit(commit_msg)
 
                 logger.info(f"Pushing branch {branch_name} to remote")

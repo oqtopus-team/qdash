@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { TaskResultResponseUserId } from './taskResultResponseUserId';
 import type { TaskResultResponseInputParameters } from './taskResultResponseInputParameters';
 import type { TaskResultResponseOutputParameters } from './taskResultResponseOutputParameters';
 import type { TaskResultResponseRunParameters } from './taskResultResponseRunParameters';
@@ -13,6 +14,7 @@ import type { ReExecutionEntry } from './reExecutionEntry';
 import type { TaskResultResponseStartAt } from './taskResultResponseStartAt';
 import type { TaskResultResponseEndAt } from './taskResultResponseEndAt';
 import type { TaskResultResponseElapsedTime } from './taskResultResponseElapsedTime';
+import type { NoteModel } from './noteModel';
 
 /**
  * Response model for task result by task_id.
@@ -24,6 +26,8 @@ Attributes
     qid (str): The qubit or coupling ID.
     status (str): The task status.
     execution_id (str): The execution ID.
+    user_id (str | None): Internal ID of the user who executed the task.
+    username (str): Username snapshot of the user who executed the task.
     figure_path (list[str]): List of figure paths.
     json_figure_path (list[str]): List of JSON figure paths.
     input_parameters (dict): Input parameters.
@@ -42,6 +46,8 @@ export interface TaskResultResponse {
   status: string;
   execution_id: string;
   flow_name?: string;
+  user_id?: TaskResultResponseUserId;
+  username?: string;
   figure_path: string[];
   json_figure_path: string[];
   input_parameters: TaskResultResponseInputParameters;
@@ -55,4 +61,6 @@ export interface TaskResultResponse {
   start_at?: TaskResultResponseStartAt;
   end_at?: TaskResultResponseEndAt;
   elapsed_time?: TaskResultResponseElapsedTime;
+  /** AI-generated review note for this task result */
+  ai_review_note?: NoteModel;
 }

@@ -16,6 +16,7 @@ from typing import Any
 from prefect import get_run_logger
 from pydantic import BaseModel, Field
 
+from qdash.common.config.loader import ConfigLoader
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 
@@ -35,12 +36,32 @@ class ConfigFileType(Enum):
     ALL_PARAMS = "all_params"
 
 
+def _load_default_params_file_names() -> list[str] | None:
+    """Load default params batch allowlist from QDash settings."""
+    workflow_settings = ConfigLoader.load_workflow()
+    if not isinstance(workflow_settings, dict):
+        return None
+    github_settings = workflow_settings.get("github", {})
+    if not isinstance(github_settings, dict):
+        return None
+    value = github_settings.get("params_file_names")
+    if value is None:
+        return None
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError("workflow.github.params_file_names must be a list of strings")
+    return value
+
+
 class GitHubPushConfig(BaseModel):
     """Configuration for GitHub push operations.
 
     Attributes:
         enabled: Whether to push to GitHub on finish_calibration()
         file_types: List of file types to push (default: [CALIB_NOTE, ALL_PARAMS])
+        params_file_names: Optional allowlist for ALL_PARAMS, such as
+            ["params.yaml", "drag.yaml"]. If omitted, defaults to
+            workflow.github.params_file_names from QDash workflow config. If neither is
+            configured, all *.yaml files are pushed.
         commit_message: Custom commit message (default: auto-generated)
         branch: Target branch (default: "main")
         props_within_24hrs: For PROPS type, only include data from last 24 hours
@@ -59,6 +80,7 @@ class GitHubPushConfig(BaseModel):
     file_types: list[ConfigFileType] = Field(
         default_factory=lambda: [ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
     )
+    params_file_names: list[str] | None = Field(default_factory=_load_default_params_file_names)
     commit_message: str | None = None
     branch: str = "main"
     props_within_24hrs: bool = False
@@ -350,7 +372,7 @@ class GitHubIntegration:
         return str(commit_sha)
 
     def _push_all_params(self, config: GitHubPushConfig) -> dict[str, Any]:
-        """Push all yaml files in params directory in a single commit.
+        """Push configured yaml files in params directory in a single commit.
 
         Args:
             config: Push configuration
@@ -366,9 +388,11 @@ class GitHubIntegration:
             self.logger.warning(f"Params directory not found: {params_dir}")
             return {"error": f"Directory not found: {params_dir}"}
 
-        # Collect all yaml files
+        # Collect yaml files. By default this preserves the historical ALL_PARAMS
+        # behavior; params_file_names narrows the batch to an explicit allowlist.
         files: list[tuple[str, str]] = []
-        for yaml_file in params_dir.glob("*.yaml"):
+        yaml_files = self._select_param_yaml_files(params_dir, config.params_file_names)
+        for yaml_file in yaml_files:
             source_path = str(yaml_file)
             repo_subpath = f"{self.chip_id}/params/{yaml_file.name}"
             files.append((source_path, repo_subpath))
@@ -394,3 +418,29 @@ class GitHubIntegration:
         except Exception as e:
             self.logger.error(f"Failed to push params: {e}")
             return {"error": str(e)}
+
+    def _select_param_yaml_files(
+        self,
+        params_dir: Path,
+        params_file_names: list[str] | None,
+    ) -> list[Path]:
+        """Select params YAML files to push, optionally constrained by filename."""
+        if params_file_names is None:
+            return sorted(params_dir.glob("*.yaml"))
+
+        files: list[Path] = []
+        seen: set[str] = set()
+        for file_name in params_file_names:
+            normalized = file_name.strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            path = Path(normalized)
+            if path.name != normalized or path.suffix != ".yaml":
+                raise ValueError(f"Invalid params file name: {file_name!r}")
+            yaml_file = params_dir / normalized
+            if yaml_file.exists():
+                files.append(yaml_file)
+            else:
+                self.logger.warning(f"Configured params file not found, skipping: {yaml_file}")
+        return files

@@ -42,26 +42,54 @@ function compareTargets(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true });
 }
 
+function isAiGeneratedNote(content: string, username: string): boolean {
+  const lead = content
+    .trimStart()
+    .replace(/^#{1,6}\s*/, "")
+    .replace(/^\*\*/, "")
+    .toLowerCase();
+
+  return (
+    lead.startsWith("ai review") ||
+    lead.startsWith("ai triage") ||
+    (username === "qdash-ai" && /\b(?:review|triage)\b/i.test(lead.slice(0, 120)))
+  );
+}
+
 export function DashboardNotesSummary({
   notesByTarget,
   taskNotes,
   onEdit,
 }: DashboardNotesSummaryProps) {
+  const visibleNotesByTarget = useMemo(() => {
+    const entries = Object.entries(notesByTarget)
+      .map(
+        ([targetId, notes]) =>
+          [
+            targetId,
+            notes.filter((note) => !isAiGeneratedNote(note.content, note.username)),
+          ] as const,
+      )
+      .filter(([, notes]) => notes.length > 0);
+
+    return Object.fromEntries(entries) as Record<string, NoteEntryWithMetric[]>;
+  }, [notesByTarget]);
+
   const sortedTargets = useMemo(
-    () => Object.keys(notesByTarget).sort(compareTargets),
-    [notesByTarget],
+    () => Object.keys(visibleNotesByTarget).sort(compareTargets),
+    [visibleNotesByTarget],
   );
 
   const totalChipNotes = useMemo(
-    () => sortedTargets.reduce((sum, t) => sum + (notesByTarget[t]?.length ?? 0), 0),
-    [sortedTargets, notesByTarget],
+    () => sortedTargets.reduce((sum, t) => sum + (visibleNotesByTarget[t]?.length ?? 0), 0),
+    [sortedTargets, visibleNotesByTarget],
   );
 
   const sortedTaskNotes = useMemo(
     () =>
-      [...taskNotes].sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-      ),
+      taskNotes
+        .filter((note) => !isAiGeneratedNote(note.content, note.username))
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
     [taskNotes],
   );
 
@@ -88,7 +116,7 @@ export function DashboardNotesSummary({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {sortedTargets.map((targetId) => {
-              const notes = [...(notesByTarget[targetId] ?? [])].sort((a, b) =>
+              const notes = [...(visibleNotesByTarget[targetId] ?? [])].sort((a, b) =>
                 a.metricTitle.localeCompare(b.metricTitle),
               );
               return (

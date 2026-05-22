@@ -44,6 +44,13 @@ class MockExecutionService:
     def reload(self):
         return self
 
+    def merge_calib_data(self, calib_data):
+        for qid, params in calib_data.qubit.items():
+            self.calib_data.qubit.setdefault(qid, {}).update(params)
+        for qid, params in calib_data.coupling.items():
+            self.calib_data.coupling.setdefault(qid, {}).update(params)
+        return self
+
     @classmethod
     def create(cls, **kwargs):
         return cls(**kwargs)
@@ -274,6 +281,86 @@ class TestCalibServiceParameterManagement:
         # Get nonexistent parameter
         result = session.get_parameter("0", "nonexistent")
         assert result is None
+
+    def test_sync_backend_params_filters_configured_push_files_to_changed_files(
+        self,
+        monkeypatch,
+    ):
+        """Only configured params files changed by this calibration should be batch-pushed."""
+        from qdash.workflow.service.github import GitHubPushConfig
+
+        class FakeUpdater:
+            def update(self, qid, params):
+                assert qid == "0"
+                assert params == {"t1": {"value": 12.0}}
+                return {"t1.yaml"}
+
+        orchestrator = MagicMock()
+        orchestrator._execution_service = MockExecutionService()
+        orchestrator._execution_service.calib_data.qubit = {
+            "0": {"t1": {"value": 12.0}},
+        }
+        orchestrator._backend = MagicMock()
+
+        session = CalibService.__new__(CalibService)
+        session.chip_id = "chip_1"
+        session._orchestrator = orchestrator
+        session.github_push_config = GitHubPushConfig(
+            params_file_names=["t1.yaml", "t2_echo.yaml"],
+        )
+
+        monkeypatch.setattr(
+            "qdash.workflow.service.calib_service.get_params_updater",
+            lambda backend, chip_id: FakeUpdater(),
+        )
+        logger = MagicMock()
+
+        session._sync_backend_params_before_push(logger)
+
+        assert session.github_push_config.params_file_names == ["t1.yaml"]
+        logger.info.assert_called_once()
+
+    def test_merge_task_result_calib_data_before_push_loads_completed_outputs(
+        self,
+        monkeypatch,
+    ):
+        """Parent sessions should rebuild calib_data from isolated child task results."""
+        from qdash.datamodel.task import ParameterModel, TaskTypes
+
+        class FakeFinder:
+            def sort(self, sort):
+                return self
+
+            def run(self):
+                return [
+                    MagicMock(
+                        qid="0",
+                        task_type=TaskTypes.QUBIT,
+                        task_id="task-1",
+                        output_parameters={"control_amplitude": {"value": 0.25}},
+                    )
+                ]
+
+        monkeypatch.setattr(
+            "qdash.dbmodel.task_result_history.TaskResultHistoryDocument.find",
+            lambda query: FakeFinder(),
+        )
+
+        orchestrator = MagicMock()
+        orchestrator._execution_service = MockExecutionService()
+
+        session = CalibService.__new__(CalibService)
+        session.project_id = "test_project"
+        session.execution_id = "exec-1"
+        session._orchestrator = orchestrator
+
+        session._merge_task_result_calib_data_before_push(MagicMock())
+
+        execution_service = session.execution_service
+        assert execution_service is not None
+        merged = execution_service.calib_data.qubit["0"]["control_amplitude"]
+        assert isinstance(merged, ParameterModel)
+        assert merged.value == 0.25
 
 
 class TestGlobalSessionHelpers:

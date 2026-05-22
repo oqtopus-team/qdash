@@ -34,7 +34,7 @@ router = APIRouter()
 def get_task_file_settings(
     service: Annotated[TaskFileService, Depends(get_task_file_service)],
 ) -> TaskFileSettings:
-    """Get task file settings from config/settings.yaml.
+    """Get task file settings from config/app/settings.yaml.
 
     Returns
     -------
@@ -143,7 +143,7 @@ def save_task_file_content(
 def get_backend_config(
     service: Annotated[TaskFileService, Depends(get_task_file_service)],
 ) -> BackendConfigResponse:
-    """Get backend configuration from backend.yaml.
+    """Get backend configuration from config/app/backend.yaml.
 
     Returns
     -------

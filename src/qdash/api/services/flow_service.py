@@ -24,7 +24,12 @@ from qdash.api.schemas.flow import (
     SaveFlowRequest,
     SaveFlowResponse,
 )
-from qdash.common.config.paths import SERVICE_DIR, TEMPLATES_DIR, USER_FLOWS_DIR
+from qdash.common.config.path_resolver import (
+    resolve_user_flows_dir,
+    resolve_workflow_service_dir,
+    resolve_workflow_templates_dir,
+    to_container_user_flow_path,
+)
 from qdash.config import get_settings
 
 if TYPE_CHECKING:
@@ -35,8 +40,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger("uvicorn.app")
 
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
+
+
+def _to_deployment_service_path(file_path: Path) -> Path:
+    """Map API-local user flow paths to the deployment-service container path."""
+    return to_container_user_flow_path(file_path, runtime_user_flows_dir=USER_FLOWS_DIR)
+
+
+TEMPLATES_DIR = resolve_workflow_templates_dir()
 TEMPLATES_METADATA_FILE = TEMPLATES_DIR / "templates.json"
-FLOW_HELPERS_DIR = SERVICE_DIR
+FLOW_HELPERS_DIR = resolve_workflow_service_dir()
+USER_FLOWS_DIR = resolve_user_flows_dir()
 
 
 class FlowService:
@@ -108,7 +122,7 @@ class FlowService:
         try:
             deployment_name = f"{project_id}-{request.name}"
             deployment_id = await self._register_flow_deployment(
-                file_path=str(file_path),
+                file_path=str(_to_deployment_service_path(file_path)),
                 flow_function_name=request.flow_function_name,
                 deployment_name=deployment_name,
                 old_deployment_id=old_deployment_id,

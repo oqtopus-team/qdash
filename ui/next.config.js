@@ -1,10 +1,16 @@
 /** @type {import('next').NextConfig} */
+const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const nextConfig = {
   output: "standalone",
+  ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
   async rewrites() {
     // Proxy /api/* to backend API server
     // This allows UI-only deployment without exposing API port
-    const apiUrl = process.env.INTERNAL_API_URL || "http://localhost:5715";
+    const apiUrl = process.env.INTERNAL_API_URL || "http://127.0.0.1:5715";
     return [
       {
         source: "/api/:path*",

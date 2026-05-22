@@ -15,6 +15,7 @@ import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
+import { TaskResultAiReviewNote } from "./TaskResultAiReviewNote";
 import { TaskResultIssues } from "./TaskResultIssues";
 import { TaskResultMemo } from "./TaskResultMemo";
 import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
@@ -615,7 +616,10 @@ export function QubitMetricHistoryModal({
         </div>
       )}
 
-      {/* Memo (above issues) */}
+      {/* Notes (above issues) */}
+      {selectedTask?.task_id && (
+        <TaskResultAiReviewNote taskId={selectedTask.task_id} hideWhenEmpty />
+      )}
       {selectedTask?.task_id && <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} />}
 
       {/* Issues */}

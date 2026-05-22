@@ -23,6 +23,7 @@ from qdash.api.schemas.issue_knowledge import (
     ListIssueKnowledgeResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
+from qdash.common.config.path_resolver import resolve_calib_data_path
 from qdash.copilot.prompts.issue_knowledge import ISSUE_KNOWLEDGE_EXTRACTION_PROMPT
 from qdash.dbmodel.issue_knowledge import IssueKnowledgeDocument
 from qdash.dbmodel.user import UserDocument
@@ -627,7 +628,7 @@ class IssueKnowledgeService:
                 figures_dir = target.parent / "figures"
                 figures_dir.mkdir(parents=True, exist_ok=True)
                 for fig_path in doc.figure_paths:
-                    src = Path(fig_path)
+                    src = resolve_calib_data_path(fig_path)
                     if src.is_file():
                         dst = figures_dir / src.name
                         shutil.copy2(src, dst)

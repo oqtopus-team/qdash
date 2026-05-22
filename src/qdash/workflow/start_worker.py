@@ -7,12 +7,17 @@ from pathlib import Path
 
 from qdash.workflow.logging_config import setup_logging
 
+
+def _prefect_logging_yaml_path() -> Path:
+    return Path("/app/config/app/logging/prefect.yaml")
+
+
 if __name__ == "__main__":
     setup_logging(service_name="worker")
 
     # Point Prefect to the custom logging config so that flow/task run logs
     # are also written to /app/logs/prefect.log via RotatingFileHandler.
-    prefect_logging_yaml = Path("/app/config/logging/prefect.yaml")
+    prefect_logging_yaml = _prefect_logging_yaml_path()
     os.environ.setdefault("PREFECT_LOGGING_SETTINGS_PATH", str(prefect_logging_yaml))
 
     # Ensure the log directory exists for Prefect's file handler

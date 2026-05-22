@@ -522,7 +522,7 @@ Please run qubit frequency calibration first.
 
 ```python
 FileNotFoundError: Wiring config not found:
-/workspace/qdash/config/qubex/{chip_id}/config/wiring.yaml
+config/qubex-config/{chip_id}/config/wiring.yaml
 ```
 
 **No valid CR pairs:**
@@ -531,58 +531,10 @@ FileNotFoundError: Wiring config not found:
 ValueError: No valid CR pairs after filtering
 ```
 
-## Visualization
-
-Use the visualizer tool to inspect schedules:
-
-```bash
-# Basic usage (legacy mode)
-python src/tools/cr_scheduler_visualizer.py
-
-# Plugin mode with design-based direction (default)
-python src/tools/cr_scheduler_visualizer.py --use-plugins
-
-# Plugin mode with measured frequency directionality
-python src/tools/cr_scheduler_visualizer.py --use-plugins --measured
-
-# Use simple MUX conflict scheduler (no intra/inter prioritization)
-python src/tools/cr_scheduler_visualizer.py --use-plugins --scheduler mux-conflict
-
-# With candidate qubits and fidelity filter
-python src/tools/cr_scheduler_visualizer.py --use-plugins \
-    --candidate-qubits 0 1 2 3 --min-fidelity 0.95
-
-# Custom chip and user
-python src/tools/cr_scheduler_visualizer.py --chip-id 144Qv1 --username alice
-
-# Show all options
-python src/tools/cr_scheduler_visualizer.py --help
-```
-
-**Command-line Options:**
-
-- `--chip-id CHIP_ID` - Chip ID to use (default: 64Qv3)
-- `--username USERNAME` - Username for chip data access (default: orangekame3)
-- `--use-plugins` - Use plugin architecture instead of legacy mode
-- `--candidate-qubits Q1 Q2 ...` - Candidate qubit IDs to filter
-- `--min-fidelity THRESHOLD` - Minimum fidelity threshold (e.g., 0.95)
-- `--measured` - Use measured frequency directionality (default is design-based)
-- `--scheduler {mux-conflict,intra-then-inter}` - Scheduler strategy (default: intra-then-inter)
-
-**Output:**
-
-- Console: Schedule statistics and group breakdown
-- Files: Timestamped directories (e.g., `.tmp/schedule_output_20250115_143022/`) with visual representations
-  - `combined_schedule.png`: All groups with color-coded edges
-  - `schedule_group_N.png`: Individual group visualizations
-
-Each run creates a new timestamped directory, enabling easy comparison of different scheduler configurations or calibration data across multiple runs.
-
 ## References
 
-- Core Implementation: `src/qdash/workflow/engine/calibration/cr_scheduler.py`
-- Plugin Architecture: `src/qdash/workflow/engine/calibration/cr_scheduler_plugins.py`
-- Core Tests: `tests/qdash/workflow/engine/calibration/test_cr_scheduler.py`
-- Plugin Tests: `tests/qdash/workflow/engine/calibration/test_cr_scheduler_plugins.py`
-- Visualization: `src/tools/cr_scheduler_visualizer.py`
+- Core Implementation: `src/qdash/workflow/engine/scheduler/cr_scheduler.py`
+- Plugin Architecture: `src/qdash/workflow/engine/scheduler/plugins/`
+- Core Tests: `tests/qdash/workflow/engine/scheduler/test_cr_scheduler.py`
+- Plugin Tests: `tests/qdash/workflow/engine/scheduler/test_plugins.py`
 - Topology: [Square Lattice Topology](./square-lattice-topology.md)

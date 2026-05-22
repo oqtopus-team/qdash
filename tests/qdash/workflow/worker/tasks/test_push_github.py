@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from git import Repo
 from git.exc import GitCommandError, InvalidGitRepositoryError
 
@@ -133,3 +134,104 @@ class TestGitHubPushConfigDefaults:
 
         config = GitHubPushConfig(file_types=[ConfigFileType.PROPS])
         assert config.file_types == [ConfigFileType.PROPS]
+
+    def test_params_file_names_defaults_to_none(self):
+        """Default params_file_names keeps the historical all-yaml behavior."""
+        from qdash.workflow.service.github import GitHubPushConfig
+
+        with patch("qdash.workflow.service.github.ConfigLoader.load_workflow", return_value={}):
+            config = GitHubPushConfig()
+        assert config.params_file_names is None
+
+    def test_params_file_names_loads_from_qdash_settings(self):
+        """Default params_file_names can be managed in QDash settings."""
+        from qdash.workflow.service.github import GitHubPushConfig
+
+        with patch(
+            "qdash.workflow.service.github.ConfigLoader.load_workflow",
+            return_value={"github": {"params_file_names": ["params.yaml"]}},
+        ):
+            config = GitHubPushConfig()
+
+        assert config.params_file_names == ["params.yaml"]
+
+    def test_explicit_params_file_names_overrides_qdash_settings(self):
+        """An explicit config value should override the QDash settings default."""
+        from qdash.workflow.service.github import GitHubPushConfig
+
+        with patch(
+            "qdash.workflow.service.github.ConfigLoader.load_workflow",
+            return_value={"github": {"params_file_names": ["params.yaml"]}},
+        ):
+            config = GitHubPushConfig(params_file_names=["drag.yaml"])
+
+        assert config.params_file_names == ["drag.yaml"]
+
+    def test_invalid_qdash_settings_params_file_names_raises(self):
+        """Invalid QDash settings should fail during GitHubPushConfig creation."""
+        from qdash.workflow.service.github import GitHubPushConfig
+
+        with (
+            patch(
+                "qdash.workflow.service.github.ConfigLoader.load_workflow",
+                return_value={"github": {"params_file_names": "params.yaml"}},
+            ),
+            pytest.raises(ValueError, match=r"workflow\.github\.params_file_names"),
+        ):
+            GitHubPushConfig()
+
+
+class TestSelectParamYamlFiles:
+    """Tests for selecting params YAML files for ALL_PARAMS batch pushes."""
+
+    def _make_integration(self):
+        from qdash.workflow.service.github import GitHubIntegration
+
+        integration = GitHubIntegration.__new__(GitHubIntegration)
+        integration.logger = MagicMock()
+        return integration
+
+    def test_selects_all_yaml_files_by_default(self, tmp_path: Path):
+        """Should preserve ALL_PARAMS behavior when no allowlist is configured."""
+        integration = self._make_integration()
+        (tmp_path / "params.yaml").write_text("a: 1")
+        (tmp_path / "drag.yaml").write_text("a: 2")
+        (tmp_path / "README.md").write_text("ignored")
+
+        files = integration._select_param_yaml_files(tmp_path, None)
+
+        assert [path.name for path in files] == ["drag.yaml", "params.yaml"]
+
+    def test_selects_configured_yaml_files(self, tmp_path: Path):
+        """Should only include configured params file names."""
+        integration = self._make_integration()
+        (tmp_path / "params.yaml").write_text("a: 1")
+        (tmp_path / "drag.yaml").write_text("a: 2")
+
+        files = integration._select_param_yaml_files(tmp_path, ["params.yaml"])
+
+        assert [path.name for path in files] == ["params.yaml"]
+
+    def test_skips_missing_configured_files(self, tmp_path: Path):
+        """Missing allowlisted files should not fail the whole batch."""
+        integration = self._make_integration()
+        (tmp_path / "params.yaml").write_text("a: 1")
+
+        files = integration._select_param_yaml_files(tmp_path, ["params.yaml", "drag.yaml"])
+
+        assert [path.name for path in files] == ["params.yaml"]
+        integration.logger.warning.assert_called_once()
+
+    def test_rejects_subpaths(self, tmp_path: Path):
+        """Only simple file names are allowed in the params allowlist."""
+        integration = self._make_integration()
+
+        with pytest.raises(ValueError, match="Invalid params file name"):
+            integration._select_param_yaml_files(tmp_path, ["nested/params.yaml"])
+
+    def test_rejects_non_yaml_files(self, tmp_path: Path):
+        """Only .yaml files are valid params batch targets."""
+        integration = self._make_integration()
+
+        with pytest.raises(ValueError, match="Invalid params file name"):
+            integration._select_param_yaml_files(tmp_path, ["params.yml"])

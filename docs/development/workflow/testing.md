@@ -61,16 +61,16 @@ tests/qdash/workflow/
 
 ### Mapping Rules
 
-| Source Path                                                       | Test Path                                                                |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `src/qdash/workflow/engine/calibration/task/manager.py`           | `tests/qdash/workflow/engine/calibration/task/test_manager.py`           |
-| `src/qdash/workflow/engine/calibration/task/executor.py`          | `tests/qdash/workflow/engine/calibration/task/test_executor.py`          |
-| `src/qdash/workflow/engine/calibration/task/state_manager.py`     | `tests/qdash/workflow/engine/calibration/task/test_state_manager.py`     |
-| `src/qdash/workflow/engine/calibration/execution/manager.py`      | `tests/qdash/workflow/engine/calibration/execution/test_manager.py`      |
-| `src/qdash/workflow/engine/calibration/execution/service.py`      | `tests/qdash/workflow/engine/calibration/execution/test_service.py`      |
-| `src/qdash/workflow/engine/calibration/scheduler/cr_scheduler.py` | `tests/qdash/workflow/engine/calibration/scheduler/test_cr_scheduler.py` |
-| `src/qdash/workflow/service/context.py`                           | `tests/qdash/workflow/service/test_context.py`                           |
-| `src/qdash/workflow/service/session.py`                           | `tests/qdash/workflow/service/test_session.py`                           |
+| Source Path                                                   | Test Path                                                         |
+| ------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `src/qdash/workflow/engine/task/executor.py`                  | `tests/qdash/workflow/engine/task/test_executor.py`               |
+| `src/qdash/workflow/engine/task/result_processor.py`          | `tests/qdash/workflow/engine/task/test_result_processor.py`       |
+| `src/qdash/workflow/engine/task/state_manager/manager.py`     | `tests/qdash/workflow/engine/task/test_state_manager.py`          |
+| `src/qdash/workflow/engine/execution/service.py`              | `tests/qdash/workflow/engine/execution/test_service.py`           |
+| `src/qdash/workflow/engine/scheduler/cr_scheduler.py`         | `tests/qdash/workflow/engine/scheduler/test_cr_scheduler.py`      |
+| `src/qdash/workflow/engine/scheduler/one_qubit_scheduler.py`  | `tests/qdash/workflow/engine/scheduler/test_one_qubit_scheduler.py` |
+| `src/qdash/workflow/service/context.py`                       | `tests/qdash/workflow/service/test_context.py`                    |
+| `src/qdash/workflow/service/session.py`                       | `tests/qdash/workflow/service/test_session.py`                    |
 
 ---
 
@@ -1069,13 +1069,13 @@ pytest tests/qdash/workflow/ -v
 ### Run Specific Test File
 
 ```bash
-pytest tests/qdash/workflow/engine/calibration/test_task_manager.py -v
+pytest tests/qdash/workflow/engine/task/test_state_manager.py -v
 ```
 
 ### Run Specific Test Class
 
 ```bash
-pytest tests/qdash/workflow/engine/calibration/test_task_manager.py::TestTaskStateManagement -v
+pytest tests/qdash/workflow/engine/task/test_state_manager.py::TestTaskStatusTransitions -v
 ```
 
 ### Run With Coverage
@@ -1087,6 +1087,5 @@ pytest tests/qdash/workflow/ --cov=src/qdash/workflow --cov-report=html
 ### Run Parameterized Tests Only
 
 ```bash
-pytest tests/qdash/workflow/engine/calibration/test_cr_scheduler.py -v -k "parametrize"
+pytest tests/qdash/workflow/engine/scheduler/test_cr_scheduler.py -v -k "parametrize"
 ```
-

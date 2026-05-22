@@ -7,5 +7,5 @@ from qdash.common.infrastructure.logging import setup_logging as _setup
 
 
 def setup_logging(service_name: str = "workflow") -> None:
-    """Configure application-wide logging from ``config/logging/workflow.yaml``."""
+    """Configure application-wide logging from ``config/app/logging/workflow.yaml``."""
     _setup("workflow", log_file=f"/app/logs/{service_name}.log")

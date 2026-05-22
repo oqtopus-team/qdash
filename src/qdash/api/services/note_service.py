@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime  # noqa: TC003
 from typing import TYPE_CHECKING
@@ -37,6 +38,42 @@ def _make_note(content: str, username: str) -> NoteModel:
 
 def _is_set(note: NoteModel) -> bool:
     return bool(note.content) or note.updated_at is not None
+
+
+_AI_GENERATED_NOTE_RE = re.compile(
+    r"^\s*(?:(?:#{1,6}\s*)?AI\s+(?:review|triage)|\*\*AI\s+(?:review|triage)\*\*)"
+    r"\b[\s\S]*?(?:\r?\n\r?\n---\r?\n\r?\n|$)",
+    re.IGNORECASE,
+)
+
+
+def _split_legacy_ai_generated_note(content: str) -> tuple[str, str]:
+    match = _AI_GENERATED_NOTE_RE.search(content or "")
+    if match is None:
+        return content.strip(), ""
+    return content[match.end() :].strip(), match.group(0).strip()
+
+
+def _task_note_entry(doc: TaskResultHistoryDocument) -> TaskNoteEntry | None:
+    user_content, legacy_ai_review_content = _split_legacy_ai_generated_note(
+        doc.user_note.content or ""
+    )
+    user_note = (
+        doc.user_note.model_copy(update={"content": user_content}) if user_content else NoteModel()
+    )
+    ai_review_note = getattr(doc, "ai_review_note", NoteModel())
+    if not _is_set(ai_review_note) and legacy_ai_review_content:
+        ai_review_note = doc.user_note.model_copy(update={"content": legacy_ai_review_content})
+
+    if not _is_set(user_note) and not _is_set(ai_review_note):
+        return None
+
+    return TaskNoteEntry(
+        task_id=doc.task_id,
+        qid=doc.qid,
+        note=user_note,
+        ai_review_note=ai_review_note,
+    )
 
 
 @dataclass(frozen=True)
@@ -751,14 +788,17 @@ class NoteService:
                 CouplingDocument.chip_id == chip_id,
             ).run()
         )
-        # Use the partial sparse index on user_note.updated_at so we only scan
-        # the small subset of task results that actually have a note set.
+        # Use partial sparse note indexes so the dashboard only scans task
+        # results with user-authored notes or AI review notes.
         task_docs = list(
             TaskResultHistoryDocument.find(
                 {
                     "project_id": project_id,
                     "chip_id": chip_id,
-                    "user_note.updated_at": {"$ne": None},
+                    "$or": [
+                        {"user_note.updated_at": {"$ne": None}},
+                        {"ai_review_note.updated_at": {"$ne": None}},
+                    ],
                 }
             ).run()
         )
@@ -829,11 +869,7 @@ class NoteService:
                 target_type="coupling", target_id=d.qid, legacy=d.metric_notes
             )
         ]
-        task_notes = [
-            TaskNoteEntry(task_id=d.task_id, qid=d.qid, note=d.user_note)
-            for d in task_docs
-            if _is_set(d.user_note)
-        ]
+        task_notes = [entry for d in task_docs if (entry := _task_note_entry(d)) is not None]
         return ChipNotesSummaryResponse(
             chip_id=chip_id,
             qubits=qubits,

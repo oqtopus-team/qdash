@@ -10,26 +10,31 @@
 
 ### Route Structure
 
-QDash uses Next.js 15 App Router with route groups for organization:
+QDash uses Next.js App Router with route groups for organization:
 
 ```
 src/app/
 ├── (auth)/                     # Protected routes
 │   ├── admin/page.tsx          # /admin
+│   ├── ai-reviews/
+│   │   ├── page.tsx            # /ai-reviews
+│   │   └── [reviewRunId]/
+│   │       └── page.tsx        # /ai-reviews/:reviewRunId
 │   ├── analysis/page.tsx       # /analysis
 │   ├── chat/page.tsx           # /chat
-│   ├── chip/
-│   │   ├── page.tsx            # /chip
-│   │   └── [chipId]/
-│   │       └── qubit/
-│   │           └── [qubitId]/
-│   │               └── page.tsx # /chip/:chipId/qubit/:qubitId
-│   ├── execution/
-│   │   ├── page.tsx            # /execution
-│   │   └── [executionId]/
-│   │       └── page.tsx        # /execution/:executionId
+│   ├── chip/page.tsx           # /chip
+│   ├── cryo/page.tsx           # /cryo
+│   ├── dashboard/page.tsx      # /dashboard
+│   ├── execution/page.tsx      # /execution
 │   ├── files/page.tsx          # /files
+│   ├── forum/
+│   │   ├── page.tsx            # /forum
+│   │   └── [postId]/page.tsx   # /forum/:postId
+│   ├── import/page.tsx         # /import
 │   ├── inbox/page.tsx          # /inbox (default landing page)
+│   ├── issue-knowledge/
+│   │   ├── page.tsx            # /issue-knowledge
+│   │   └── [knowledgeId]/page.tsx # /issue-knowledge/:knowledgeId
 │   ├── issues/
 │   │   ├── page.tsx            # /issues
 │   │   └── [issueId]/
@@ -37,7 +42,12 @@ src/app/
 │   ├── metrics/page.tsx        # /metrics
 │   ├── provenance/page.tsx     # /provenance
 │   ├── settings/page.tsx       # /settings
-│   ├── task-results/page.tsx   # /task-results
+│   ├── task-knowledge/
+│   │   ├── page.tsx            # /task-knowledge
+│   │   └── [taskName]/page.tsx # /task-knowledge/:taskName
+│   ├── task-results/
+│   │   ├── page.tsx            # /task-results
+│   │   └── [taskId]/page.tsx   # /task-results/:taskId
 │   ├── tasks/page.tsx          # /tasks
 │   └── workflow/
 │       ├── page.tsx            # /workflow
@@ -45,7 +55,7 @@ src/app/
 │       └── [name]/page.tsx     # /workflow/:name
 ├── (public)/                   # Public routes
 │   └── login/page.tsx          # /login
-├── api/                        # API route handlers (SSE streaming)
+├── api/                        # Next.js route handlers and proxy endpoints
 ├── globals.css                 # Global styles
 ├── layout.tsx                  # Root layout
 ├── page.tsx                    # / (redirects to /inbox)
@@ -93,24 +103,31 @@ components/
 │   └── ...                 # Other UI primitives
 │
 ├── charts/                 # Visualization components
-│   ├── Plot.tsx            # Lightweight Plotly wrapper (plotly.js-basic-dist)
+│   ├── Plot.tsx            # Plotly wrapper (plotly.js-dist-min)
 │   ├── PlotCard.tsx        # Reusable plot container
 │   └── TaskFigure.tsx      # Task result figure
 │
 ├── features/               # Feature-specific components
 │   ├── admin/              # Admin page components
+│   ├── ai-reviews/         # AI review list/detail components
 │   ├── analysis/           # Analysis page components
 │   ├── chat/               # Copilot chat components
 │   ├── chip/               # Chip page components
+│   ├── cryo/               # Cryostat monitoring components
+│   ├── dashboard/          # Dashboard components
 │   ├── execution/          # Execution page components
 │   ├── files/              # File management components
 │   ├── flow/               # Flow editor components
+│   ├── forum/              # Forum components
+│   ├── import/             # Data import components
 │   ├── inbox/              # Inbox components
+│   ├── issue-knowledge/    # Issue-derived knowledge components
 │   ├── issues/             # Issue tracking components
 │   ├── metrics/            # Metrics dashboard components
 │   ├── provenance/         # Data provenance components
 │   ├── qubit/              # Qubit detail components
 │   ├── settings/           # Settings page components
+│   ├── task-knowledge/     # Task knowledge components
 │   ├── task-results/       # Task result components
 │   └── tasks/              # Task management components
 │
