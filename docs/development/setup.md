@@ -297,7 +297,7 @@ Key environment variables are configured in `.env`. See `.env.example` for avail
 | `PREFECT_PORT`            | 4200    | Prefect dashboard port      |
 | `DEPLOYMENT_SERVICE_PORT` | 4006    | Deployment service port     |
 | `CALIB_DATA_PATH`         | -       | Calibration data mount path |
-| `CALTASKS_PATH`           | -       | Calibration tasks path      |
+| `CALIB_TASKS_PATH`        | -       | Calibration tasks path      |
 | `CONFIG_PATH`             | -       | Qubex config path           |
 | `NEXT_PUBLIC_API_URL`     | -       | Public API URL for frontend |
 | `NEXT_PUBLIC_PREFECT_URL` | -       | Prefect dashboard URL       |

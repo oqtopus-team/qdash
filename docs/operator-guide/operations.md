@@ -49,4 +49,4 @@ If task figures do not render, confirm `CALIB_DATA_PATH` points at the directory
 `/app/calib_data` in Docker.
 
 If config or task file pages return missing-path errors, confirm `CONFIG_PATH` and
-`CALTASKS_PATH` in `.env`.
+`CALIB_TASKS_PATH` in `.env`.
