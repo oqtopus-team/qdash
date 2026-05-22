@@ -87,7 +87,7 @@ class CopilotConfig(BaseModel):
     analysis_model: ModelConfig | None = None
     # Optional list of selectable task result analysis models. The first entry
     # is used as the default when `analysis_model` is unset. `analysis_model`
-    # remains for backward compatibility with existing copilot.yaml files.
+    # remains for backward compatibility with existing copilot config files.
     analysis_models: list[ModelConfig] = Field(default_factory=list)
     # Optional list of selectable models for general chat. The first entry is
     # used as the default. When unset, the configured `model` above is used.
@@ -105,7 +105,8 @@ def load_copilot_config() -> CopilotConfig:
     """Load Copilot configuration from YAML file.
 
     Uses ConfigLoader for unified loading with local override support.
-    Configuration is loaded from copilot.yaml with optional copilot.local.yaml overlay.
+    Configuration is loaded by merging copilot/config.yaml, copilot/chat.yaml,
+    and copilot/review.yaml, each with optional local overlays.
 
     Returns
     -------

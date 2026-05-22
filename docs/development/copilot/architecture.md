@@ -27,7 +27,9 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 | `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter, `SSETaskBridge` for queue-poll-heartbeat-drain pattern |
 | `src/qdash/api/lib/copilot_config.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `ScoringThreshold` models; YAML loading with local override |
 | `src/qdash/datamodel/task_knowledge.py` | `TaskKnowledge` model with domain-specific knowledge per calibration task |
-| `config/copilot.yaml` | Main configuration file for model settings, scoring thresholds, system prompts |
+| `config/copilot/config.yaml` | Shared enablement, language, and default model settings |
+| `config/copilot/chat.yaml` | General chat models, prompt, initial message, and suggestions |
+| `config/copilot/review.yaml` | Task result analysis models, scoring thresholds, and AI review prompts |
 | `ui/src/hooks/useCopilotChat.ts` | React hook for the chat page: session management, SSE consumption, localStorage persistence |
 | `ui/src/hooks/useAnalysisChat.ts` | React hook for the analysis sidebar: task-scoped SSE streaming, message management |
 | `ui/src/components/features/chat/CopilotChatPage.tsx` | Chat page UI: session list, message rendering, blocks/chart display |
@@ -35,9 +37,10 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 
 ## Configuration
 
-### `config/copilot.yaml`
+### `config/copilot/`
 
 ```yaml
+# config.yaml
 enabled: true
 
 # Language settings
@@ -51,30 +54,16 @@ model:
   temperature: 0.7
   max_output_tokens: 2048
 
-analysis_models:
+# chat.yaml
+chat_models:
   - provider: ollama
     name: gemma4:26b
     base_url: env:OLLAMA_BASE_URL
     api_key_env: OLLAMA_API_KEY
-    keep_alive: 30m
-    temperature: 1.0
-    top_p: 0.95
-    top_k: 64
-    reasoning_effort: none
-    disable_thinking_instruction: true
-    max_output_tokens: 4096
-  - provider: ollama
-    name: gemma4:31b
-    base_url: env:OLLAMA_BASE_URL
-    api_key_env: OLLAMA_API_KEY
-    keep_alive: 30m
-    temperature: 1.0
-    top_p: 0.95
-    top_k: 64
-    reasoning_effort: none
-    disable_thinking_instruction: true
-    max_output_tokens: 4096
+system_prompt: |
+  You are QDash Copilot...
 
+# review.yaml
 # Metrics for chip health evaluation
 evaluation_metrics:
   qubit: [qubit_frequency, anharmonicity, t1, t2_echo, ...]
@@ -88,7 +77,7 @@ scoring:
     bad: 20
     unit: "μs"
     higher_is_better: true
-  # ... (see config/copilot.yaml for full list)
+  # ... (see config/copilot/review.yaml for full list)
 
 # Task analysis settings
 analysis:
@@ -103,7 +92,9 @@ analysis:
   max_conversation_turns: 10
 ```
 
-Configuration is loaded via `ConfigLoader` with local override support (`copilot.local.yaml`).
+Configuration is loaded via `ConfigLoader` by deep-merging `config.yaml`, `chat.yaml`, and
+`review.yaml`. Each file supports a `.local.yaml` overlay, and legacy root-level
+`copilot.yaml` remains a fallback during migration.
 
 ### Environment Variables
 
@@ -145,7 +136,7 @@ For prompt and task-knowledge tuning, use the [AI review evaluation loop](./ai-r
 
 - **Entry point**: `enqueue_ai_review_note()` in `src/qdash/workflow/engine/task/ai_review.py`
 - **Trigger**: task-result history save paths in the workflow recorder and repository
-- **Configuration**: `analysis.ai_review_tasks` and `analysis.ai_review_message` in `config/copilot.yaml`
+- **Configuration**: `analysis.ai_review_tasks` and `analysis.ai_review_message` in `config/copilot/review.yaml`
 - **Execution model**: asynchronous background thread pool, de-duplicated by `task_id`
 - **Model selection**: `analysis_model`, then the first `analysis_models` entry, then the general `model`
 - **AI review quality path**: automatic review inherits

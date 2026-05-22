@@ -584,7 +584,7 @@ async def run_chat(
 
     # OpenAI and Ollama 0.13.3+ expose /v1/responses (tool-call, json_schema,
     # reasoning-item preservation). Providers that only ship /v1/chat/completions
-    # (e.g. DeepSeek) opt in via `api_style: chat_completions` in copilot.yaml.
+    # (e.g. DeepSeek) opt in via `api_style: chat_completions` in copilot/chat.yaml.
     if config.model.api_style == "chat_completions":
         # ds4-server and similar providers expose tools and chat completions
         # but reject `response_format: json_schema` / strict mode. Reinforce

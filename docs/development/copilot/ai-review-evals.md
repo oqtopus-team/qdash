@@ -36,7 +36,7 @@ The snapshot stores:
 
 ## Replay A Snapshot
 
-Replay the saved snapshot with the current `copilot.yaml` and current code:
+Replay the saved snapshot with the current `copilot/review.yaml` and current code:
 
 ```bash
 uv run python -m qdash.copilot.evals.ai_review run \
@@ -70,7 +70,7 @@ Each replay writes:
 
 Use `frozen` mode when you are tuning:
 
-- `analysis.ai_review_message` in `config/copilot.yaml`
+- `analysis.ai_review_message` in `config/copilot/review.yaml`
 - model choice or output-token settings
 - deterministic formatting or guard behavior
 
@@ -83,7 +83,7 @@ Use `rebuild` mode when you are tuning:
 
 ## Model Overrides
 
-You can override the replay model without editing `copilot.yaml`:
+You can override the replay model without editing `copilot/review.yaml`:
 
 ```bash
 uv run python -m qdash.copilot.evals.ai_review run \

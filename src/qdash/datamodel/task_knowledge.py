@@ -157,7 +157,7 @@ class TaskKnowledge(BaseModel):
     )
     evaluation_criteria: str = Field(
         default="",
-        description="Qualitative evaluation criteria (thresholds are in copilot.yaml)",
+        description="Qualitative evaluation criteria (thresholds are in copilot/review.yaml)",
     )
     check_questions: list[str] = Field(
         default_factory=list,

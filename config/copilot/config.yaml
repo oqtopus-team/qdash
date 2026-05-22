@@ -1,0 +1,24 @@
+# Copilot Shared Configuration
+# Common settings for QDash Copilot. Chat and review-specific settings live in
+# chat.yaml and review.yaml.
+
+enabled: true
+
+# Language configuration
+# thinking_language: Language for internal reasoning (en recommended for technical accuracy)
+# response_language: Language for user-facing responses (ja or en)
+thinking_language: en
+response_language: en
+
+# Default model configuration.
+# Chat-specific selectable models live in chat.yaml.
+# Review/analysis-specific selectable models live in review.yaml.
+model:
+  # Provider: "openai", "anthropic", or "ollama"
+  provider: openai
+  # Latest general-purpose OpenAI model
+  name: gpt-5.4
+  # Temperature for response generation (0.0 - 2.0)
+  temperature: 0.7
+  # Maximum tokens for response
+  max_output_tokens: 4096

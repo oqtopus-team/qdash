@@ -80,6 +80,15 @@ class ConfigLoader:
     @lru_cache(maxsize=1)
     def load_copilot(cls) -> dict[str, Any]:
         """Load copilot configuration."""
+        config: dict[str, Any] = {}
+        for filename in (
+            "copilot/config.yaml",
+            "copilot/chat.yaml",
+            "copilot/review.yaml",
+        ):
+            config = _deep_merge(config, cls._load_with_local(filename))
+        if config:
+            return config
         return cls._load_with_local("copilot.yaml")
 
     @classmethod
