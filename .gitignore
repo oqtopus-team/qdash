@@ -230,7 +230,6 @@ src/qdash/workflow/.calibration/*.json
 src/qdash/workflow/.classifier/*/*
 # Ignore all files in config directory except committed configs
 config/qubex/*
-!config/custom/*.template
 !config/metrics.yaml
 !config/settings.yaml
 !config/copilot.yaml
@@ -241,6 +240,7 @@ config/task-knowledge/
 # Local settings overrides (not committed)
 # These allow per-developer customization without modifying committed files
 config/*.local.yaml
+config/**/*.local.yaml
 src/tools/schedule/*
 .serena/
 .mcp.json
