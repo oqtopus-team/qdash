@@ -10,10 +10,10 @@ if TYPE_CHECKING:
     from qdash.api.services.flow_schedule_service import FlowScheduleService
     from qdash.api.services.flow_service import FlowService
 
-from qdash.api.dependency_cache import (
+from qdash.api.dependencies.cache import (
     cached_dependency_provider,
 )
-from qdash.api.dependency_cache import (
+from qdash.api.dependencies.cache import (
     clear_dependency_caches as _clear_dependency_caches,
 )
 from qdash.api.services.admin_service import AdminService
