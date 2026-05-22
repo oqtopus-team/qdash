@@ -8,3 +8,9 @@
 # ui:
 #   task_files:
 #     default_backend: fake
+
+# Example: Restrict params/*.yaml files pushed by workflow GitHub sync
+# workflow:
+#   github:
+#     params_file_names:
+#       - params.yaml

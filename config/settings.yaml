@@ -44,3 +44,28 @@ ui:
     # Task list sort order
     # Options: type_then_name, name_only, file_path
     sort_order: type_then_name
+
+# =============================================================================
+# Workflow Settings
+# =============================================================================
+workflow:
+  github:
+    # Optional allowlist for params/*.yaml files pushed by ALL_PARAMS.
+    # Leave empty to preserve the historical behavior of pushing all *.yaml files.
+    # Example:
+    # params_file_names:
+    #   - params.yaml
+    params_file_names:
+      - control_amplitude.yaml
+      - readout_amplitude.yaml
+      - control_frequency.yaml
+      - qubit_frequency.yaml
+      - readout_frequency.yaml
+      - resonator_frequency.yaml
+      - t1.yaml
+      - t2_star.yaml
+      - t2_echo.yaml
+      - x90_gate_fidelity.yaml
+      - zx90_gate_fidelity.yaml
+      - bell_state_fidelity.yaml
+      - readout_fidelity.yaml

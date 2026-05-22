@@ -76,6 +76,10 @@ class FakeCheckRabi(FakeTask):
             unit="a.u.",
             description="Rabi oscillation offset",
         ),
+        "control_amplitude": ParameterModel(
+            unit="a.u.",
+            description="Control pulse amplitude",
+        ),
         "maximum_rabi_frequency": ParameterModel(
             unit="MHz/a.u.",
             description="Maximum Rabi frequency per unit control amplitude",
@@ -145,9 +149,10 @@ class FakeCheckRabi(FakeTask):
 
         # Maximum Rabi frequency = rabi_frequency / control_amplitude
         fake_control_amplitude = 0.0125  # Default control amplitude for fake backend
-        self.output_parameters["maximum_rabi_frequency"].value = (
-            result["rabi_frequency"] / fake_control_amplitude
-        )
+        maximum_rabi_frequency = result["rabi_frequency"] / fake_control_amplitude
+        self.output_parameters["maximum_rabi_frequency"].value = maximum_rabi_frequency
+        ratio = maximum_rabi_frequency / 1000
+        self.output_parameters["control_amplitude"].value = min(0.0125 / ratio, 0.99)
 
         output_parameters = self.attach_execution_id(execution_id)
 

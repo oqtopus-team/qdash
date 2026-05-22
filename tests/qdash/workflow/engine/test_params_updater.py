@@ -9,7 +9,7 @@ import pytest
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
-from qdash.workflow.engine.params_updater import _QubexParamsUpdater
+from qdash.workflow.engine.params_updater import _QubexParamsUpdater, get_params_updater
 
 
 class TestParamsUpdaterNoneHandling:
@@ -131,9 +131,10 @@ data:
 
     def test_update_existing_value(self, updater, yaml_file):
         """Test updating an existing qubit value."""
-        updater._update_yaml(yaml_file, "Q00", 15.0)
+        updated = updater._update_yaml(yaml_file, "Q00", 15.0)
 
         content = yaml_file.read_text()
+        assert updated is True
         assert "Q00: 15.0" in content
         assert "meta:" in content  # meta section preserved
         assert "description: Test parameter file" in content
@@ -184,10 +185,11 @@ data:
         original_mtime = yaml_file.stat().st_mtime
 
         # Update with same value
-        updater._update_yaml(yaml_file, "Q00", 10.5)
+        updated = updater._update_yaml(yaml_file, "Q00", 10.5)
 
         # File should not be modified
         new_mtime = yaml_file.stat().st_mtime
+        assert updated is False
         assert original_mtime == new_mtime
 
     def test_nonexistent_file_is_skipped(self, updater, tmp_path):
@@ -195,7 +197,7 @@ data:
         nonexistent = tmp_path / "nonexistent.yaml"
 
         # Should not raise
-        updater._update_yaml(nonexistent, "Q00", 10.0)
+        assert updater._update_yaml(nonexistent, "Q00", 10.0) is False
 
     def test_extract_value_from_db_parameter_dict(self, updater):
         """Test DB calibration data dictionaries can be written to params files."""
@@ -220,8 +222,62 @@ data:
             "qdash.common.domain.qubit._get_chip_size",
             return_value=144,
         ):
-            updater.update("47", {"control_amplitude": {"value": 0.25}})
+            updated_files = updater.update("47", {"control_amplitude": {"value": 0.25}})
 
+        assert updated_files == {"control_amplitude.yaml"}
+        assert "Q047: 0.25" in (params_dir / "control_amplitude.yaml").read_text()
+
+    def test_update_returns_only_changed_yaml_file_names(self, tmp_path):
+        """Update should report the params files that were actually changed."""
+        params_dir = tmp_path / "params"
+        params_dir.mkdir()
+        (params_dir / "qubit_frequency.yaml").write_text("data:\n  Q047: 4.2\n")
+        (params_dir / "control_frequency.yaml").write_text("data:\n  Q047: 4.0\n")
+        (params_dir / "t1.yaml").write_text("data:\n  Q047: 10.0\n")
+
+        backend = MagicMock()
+        backend.config = {
+            "project_id": "project-1",
+            "chip_id": "144Qv1",
+            "params_dir": str(params_dir),
+        }
+        backend.get_instance.side_effect = AssertionError("should not connect")
+        updater = _QubexParamsUpdater(backend, chip_id="144Qv1")
+
+        with patch("qdash.common.domain.qubit._get_chip_size", return_value=144):
+            updated_files = updater.update(
+                "47",
+                {
+                    "qubit_frequency": {"value": 4.2},
+                    "t1": {"value": 12.0},
+                },
+            )
+
+        assert updated_files == {"control_frequency.yaml", "t1.yaml"}
+
+    def test_fake_backend_uses_yaml_params_updater(self, tmp_path):
+        """Fake backend should support params YAML updates for local verification."""
+        from qdash.workflow.engine.backend.fake import FakeBackend
+
+        params_dir = tmp_path / "params"
+        params_dir.mkdir()
+        (params_dir / "control_amplitude.yaml").write_text("data:\n  Q047: 0.1\n")
+
+        backend = FakeBackend(
+            {
+                "project_id": "project-1",
+                "chip_id": "144Qv1",
+                "params_dir": str(params_dir),
+            }
+        )
+
+        updater = get_params_updater(backend, chip_id="144Qv1")
+        assert updater is not None
+
+        with patch("qdash.common.domain.qubit._get_chip_size", return_value=144):
+            updated_files = updater.update("47", {"control_amplitude": {"value": 0.25}})
+
+        assert updated_files == {"control_amplitude.yaml"}
         assert "Q047: 0.25" in (params_dir / "control_amplitude.yaml").read_text()
 
     def test_insert_ordered_between_existing(self, updater, yaml_file):

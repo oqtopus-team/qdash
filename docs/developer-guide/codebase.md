@@ -33,4 +33,4 @@ Important mounted paths:
 
 - `CALIB_DATA_PATH` ↔ `/app/calib_data`
 - `CONFIG_PATH` ↔ `/app/config/qubex-config`
-- `CALTASKS_PATH` ↔ `/app/qdash/workflow/calibtasks`
+- `CALIB_TASKS_PATH` ↔ `/app/qdash/workflow/calibtasks`

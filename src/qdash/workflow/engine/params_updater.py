@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class ParamsUpdater(Protocol):
     """Protocol for backend-specific parameter updaters."""
 
-    def update(self, qid: str, output_parameters: dict[str, Any]) -> None: ...
+    def update(self, qid: str, output_parameters: dict[str, Any]) -> set[str]: ...
 
 
 def get_params_updater(
@@ -36,6 +36,9 @@ def get_params_updater(
     qubex_updater = _resolve_qubex_updater(backend, chip_id)
     if qubex_updater is not None:
         return qubex_updater
+    fake_updater = _resolve_fake_updater(backend, chip_id)
+    if fake_updater is not None:
+        return fake_updater
     return None
 
 
@@ -46,6 +49,18 @@ def _resolve_qubex_updater(backend: BaseBackend, chip_id: str | None) -> ParamsU
         return None
 
     if not isinstance(backend, QubexBackend):
+        return None
+
+    return _QubexParamsUpdater(backend, chip_id)
+
+
+def _resolve_fake_updater(backend: BaseBackend, chip_id: str | None) -> ParamsUpdater | None:
+    try:
+        from qdash.workflow.engine.backend.fake import FakeBackend
+    except ImportError:
+        return None
+
+    if not isinstance(backend, FakeBackend):
         return None
 
     return _QubexParamsUpdater(backend, chip_id)
@@ -83,14 +98,15 @@ class _QubexParamsUpdater:
         self._yaml.indent(mapping=2, sequence=4, offset=2)
         self._yaml.representer.add_representer(type(None), represent_none)
 
-    def update(self, qid: str, output_parameters: dict[str, Any]) -> None:
+    def update(self, qid: str, output_parameters: dict[str, Any]) -> set[str]:
+        updated_files: set[str] = set()
         params_dir = self._resolve_params_dir()
         if params_dir is None:
-            return
+            return updated_files
 
         label = self._resolve_qubit_label(qid)
         if label is None:
-            return
+            return updated_files
 
         for key, param in output_parameters.items():
             file_name = self.PARAM_FILE_MAP.get(key)
@@ -102,11 +118,15 @@ class _QubexParamsUpdater:
                 continue
 
             file_path = params_dir / file_name
-            self._update_yaml(file_path, label, value)
+            if self._update_yaml(file_path, label, value):
+                updated_files.add(file_name)
 
             for extra_file in self.EXTRA_FILE_MAP.get(key, []):
                 extra_path = params_dir / extra_file
-                self._update_yaml(extra_path, label, value)
+                if self._update_yaml(extra_path, label, value):
+                    updated_files.add(extra_file)
+
+        return updated_files
 
     def _resolve_params_dir(self) -> Path | None:
         config_dir = getattr(self._backend, "config", {}).get("params_dir")
@@ -205,10 +225,10 @@ class _QubexParamsUpdater:
             return value
         return None
 
-    def _update_yaml(self, file_path: Path, qubit_label: str, value: float | int | str) -> None:
+    def _update_yaml(self, file_path: Path, qubit_label: str, value: float | int | str) -> bool:
         """Update YAML file with file locking and atomic write to prevent race conditions."""
         if not file_path.exists():
-            return
+            return False
 
         lock_path = file_path.with_suffix(file_path.suffix + ".lock")
         lock_path.touch(exist_ok=True)
@@ -231,7 +251,7 @@ class _QubexParamsUpdater:
 
             current_value = section.get(qubit_label)
             if self._values_equal(current_value, value):
-                return
+                return False
 
             if isinstance(section, CommentedMap):
                 self._set_ordered(section, qubit_label, value)
@@ -253,6 +273,7 @@ class _QubexParamsUpdater:
             os.replace(tmp_path, file_path)
 
         lock_path.touch(exist_ok=True)
+        return True
 
     @staticmethod
     def _values_equal(current: Any, new: Any) -> bool:
