@@ -1121,7 +1121,7 @@ export function CouplingGrid({
         className={`flex-1 relative overflow-hidden flex justify-center ${
           viewMode === "pan-zoom"
             ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "shadow-xl border border-base-300 rounded-lg"
+            : "bg-base-200/60 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
