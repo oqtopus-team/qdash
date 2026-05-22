@@ -892,7 +892,7 @@ export function QubitGrid({
     <div className="flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8">
       {isTaskError && <div className="alert alert-error">Failed to load data</div>}
       {/* View Mode Toggle and Download Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg py-2">
         <div className="flex items-center gap-4">
           <div className="tabs tabs-boxed bg-base-300 w-fit">
             {isSquareGrid && (
@@ -1111,10 +1111,10 @@ export function QubitGrid({
 
       {/* Grid display */}
       <div
-        className={`flex-1 relative overflow-hidden flex justify-center ${
+        className={`flex-1 relative flex justify-center ${
           viewMode === "pan-zoom"
-            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "border-2 border-base-300 rounded-lg"
+            ? "overflow-hidden bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
+            : "overflow-hidden shadow-xl border border-base-300 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
