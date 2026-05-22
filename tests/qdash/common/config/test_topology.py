@@ -37,12 +37,12 @@ def test_load_topology_reads_domain_topologies(monkeypatch, tmp_path):
     load_topology.cache_clear()
 
 
-def test_list_topologies_falls_back_to_legacy_root_topologies(monkeypatch, tmp_path):
-    topologies_dir = tmp_path / "topologies"
-    topologies_dir.mkdir()
-    _write_topology(topologies_dir / "legacy-topology.yaml", "legacy-topology", num_qubits=4)
+def test_list_topologies_reads_domain_topologies(monkeypatch, tmp_path):
+    topologies_dir = tmp_path / "domain" / "topologies"
+    topologies_dir.mkdir(parents=True)
+    _write_topology(topologies_dir / "test-topology.yaml", "test-topology", num_qubits=4)
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
 
     assert list_topologies(size=4) == [
-        {"id": "legacy-topology", "name": "Test Topology", "num_qubits": 4}
+        {"id": "test-topology", "name": "Test Topology", "num_qubits": 4}
     ]

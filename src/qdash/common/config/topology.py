@@ -56,7 +56,6 @@ class TopologyDefinition(BaseModel):
 
 
 TOPOLOGIES_DIR = "domain/topologies"
-LEGACY_TOPOLOGIES_DIR = "topologies"
 
 
 def _get_config_dir() -> Path:
@@ -65,11 +64,7 @@ def _get_config_dir() -> Path:
 
 
 def _topologies_dir() -> Path:
-    config_dir = _get_config_dir()
-    topologies_dir = config_dir / TOPOLOGIES_DIR
-    if topologies_dir.exists():
-        return topologies_dir
-    return config_dir / LEGACY_TOPOLOGIES_DIR
+    return _get_config_dir() / TOPOLOGIES_DIR
 
 
 @lru_cache(maxsize=32)
