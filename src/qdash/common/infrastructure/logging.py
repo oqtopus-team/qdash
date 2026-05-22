@@ -9,21 +9,15 @@ from pathlib import Path
 import yaml
 
 _CONFIG_DIR = Path("/app/config/app/logging")
-_LEGACY_CONFIG_DIR = Path("/app/config/logging")
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _LOCAL_CONFIG_DIR = _REPO_ROOT / "config" / "app" / "logging"
-_LEGACY_LOCAL_CONFIG_DIR = _REPO_ROOT / "config" / "logging"
 
 
 def _resolve_config_dir(config_dir: Path) -> Path:
     if config_dir.exists():
         return config_dir
-    if config_dir == _CONFIG_DIR and _LEGACY_CONFIG_DIR.exists():
-        return _LEGACY_CONFIG_DIR
     if config_dir == _CONFIG_DIR and _LOCAL_CONFIG_DIR.exists():
         return _LOCAL_CONFIG_DIR
-    if config_dir == _CONFIG_DIR and _LEGACY_LOCAL_CONFIG_DIR.exists():
-        return _LEGACY_LOCAL_CONFIG_DIR
     return config_dir
 
 

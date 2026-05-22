@@ -40,9 +40,7 @@ class PolicyConfig(BaseModel):
 def load_policy_config() -> PolicyConfig:
     """Load policy configuration from YAML.
 
-    Uses ConfigLoader for unified loading with local override support.
-    Configuration is loaded from domain/policy.yaml with optional
-    domain/policy.local.yaml overlay.
+    Uses ConfigLoader for unified loading from domain/policy.yaml.
     """
     data: dict[str, Any] = ConfigLoader.load_policy()
     try:
