@@ -71,7 +71,9 @@ def test_load_copilot_merges_chat_and_review_yaml(monkeypatch, tmp_path):
     copilot_dir = tmp_path / "copilot"
     copilot_dir.mkdir()
     (copilot_dir / "config.yaml").write_text("enabled: true\n")
-    (copilot_dir / "chat.yaml").write_text("chat_models:\n  - provider: openai\n    name: gpt-5.4\n")
+    (copilot_dir / "chat.yaml").write_text(
+        "chat_models:\n  - provider: openai\n    name: gpt-5.4\n"
+    )
     (copilot_dir / "review.yaml").write_text(
         "analysis:\n  ai_review_tasks:\n    - CheckQubitSpectroscopy\n"
     )
