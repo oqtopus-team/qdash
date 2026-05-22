@@ -11,6 +11,7 @@ from filelock import FileLock
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
+from qdash.common.config.loader import ConfigLoader
 from qdash.datamodel.task import ParameterModel
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.worker.flows.push_props.formatter import represent_none
@@ -19,6 +20,60 @@ if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
 
 logger = logging.getLogger(__name__)
+
+
+def _load_params_updater_settings() -> dict[str, Any]:
+    workflow_settings = ConfigLoader.load_settings().get("workflow", {})
+    if not isinstance(workflow_settings, dict):
+        return {}
+    settings = workflow_settings.get("params_updater", {})
+    if not isinstance(settings, dict):
+        return {}
+    return settings
+
+
+def _validate_yaml_file_name(file_name: str) -> str:
+    normalized = file_name.strip()
+    path = Path(normalized)
+    if not normalized or path.name != normalized or path.suffix != ".yaml":
+        raise ValueError(f"Invalid params updater YAML file name: {file_name!r}")
+    return normalized
+
+
+def _load_param_file_map() -> dict[str, str]:
+    settings = _load_params_updater_settings()
+    value = settings.get("parameter_file_map")
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError("workflow.params_updater.parameter_file_map must be a mapping")
+
+    result: dict[str, str] = {}
+    for parameter_name, file_name in value.items():
+        if not isinstance(parameter_name, str) or not isinstance(file_name, str):
+            raise ValueError(
+                "workflow.params_updater.parameter_file_map must map strings to strings"
+            )
+        result[parameter_name] = _validate_yaml_file_name(file_name)
+    return result
+
+
+def _load_extra_file_map() -> dict[str, list[str]]:
+    settings = _load_params_updater_settings()
+    value = settings.get("extra_file_map")
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError("workflow.params_updater.extra_file_map must be a mapping")
+
+    result: dict[str, list[str]] = {}
+    for parameter_name, file_names in value.items():
+        if not isinstance(parameter_name, str) or not isinstance(file_names, list):
+            raise ValueError("workflow.params_updater.extra_file_map must map strings to lists")
+        if not all(isinstance(file_name, str) for file_name in file_names):
+            raise ValueError("workflow.params_updater.extra_file_map values must be string lists")
+        result[parameter_name] = [_validate_yaml_file_name(file_name) for file_name in file_names]
+    return result
 
 
 class ParamsUpdater(Protocol):
@@ -69,29 +124,11 @@ def _resolve_fake_updater(backend: BaseBackend, chip_id: str | None) -> ParamsUp
 class _QubexParamsUpdater:
     """Synchronize calibration results with Qubex params YAML files."""
 
-    PARAM_FILE_MAP: dict[str, str] = {
-        "t1": "t1.yaml",
-        "t2_echo": "t2_echo.yaml",
-        "t2_star": "t2_star.yaml",
-        "readout_amplitude": "readout_amplitude.yaml",
-        "resonator_frequency": "readout_frequency.yaml",
-        "readout_frequency": "readout_frequency.yaml",
-        "control_amplitude": "control_amplitude.yaml",
-        "qubit_frequency": "qubit_frequency.yaml",
-        "x90_gate_fidelity": "x90_gate_fidelity.yaml",
-        "x180_gate_fidelity": "x180_gate_fidelity.yaml",
-        "zx90_gate_fidelity": "zx90_gate_fidelity.yaml",
-        "average_gate_fidelity": "average_gate_fidelity.yaml",
-        "average_readout_fidelity": "average_readout_fidelity.yaml",
-    }
-
-    EXTRA_FILE_MAP: dict[str, list[str]] = {
-        "qubit_frequency": ["control_frequency.yaml"],
-    }
-
     def __init__(self, backend: Any, chip_id: str | None) -> None:
         self._backend = backend
         self._chip_id = chip_id
+        self._param_file_map = _load_param_file_map()
+        self._extra_file_map = _load_extra_file_map()
         self._yaml = YAML(typ="rt")
         self._yaml.preserve_quotes = True
         self._yaml.width = None
@@ -109,7 +146,7 @@ class _QubexParamsUpdater:
             return updated_files
 
         for key, param in output_parameters.items():
-            file_name = self.PARAM_FILE_MAP.get(key)
+            file_name = self._param_file_map.get(key)
             if file_name is None:
                 continue
 
@@ -121,7 +158,7 @@ class _QubexParamsUpdater:
             if self._update_yaml(file_path, label, value):
                 updated_files.add(file_name)
 
-            for extra_file in self.EXTRA_FILE_MAP.get(key, []):
+            for extra_file in self._extra_file_map.get(key, []):
                 extra_path = params_dir / extra_file
                 if self._update_yaml(extra_path, label, value):
                     updated_files.add(extra_file)

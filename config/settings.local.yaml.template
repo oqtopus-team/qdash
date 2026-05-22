@@ -14,3 +14,12 @@
 #   github:
 #     params_file_names:
 #       - params.yaml
+
+# Example: Override params YAML update mapping
+# workflow:
+#   params_updater:
+#     parameter_file_map:
+#       control_amplitude: control_amplitude.yaml
+#     extra_file_map:
+#       qubit_frequency:
+#         - control_frequency.yaml
