@@ -4,8 +4,9 @@ This module provides FastAPI dependency functions for injecting
 repositories and services into route handlers.
 """
 
+from collections.abc import Callable
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ParamSpec, Protocol, TypeVar
 
 if TYPE_CHECKING:
     from qdash.api.services.flow_schedule_service import FlowScheduleService
@@ -64,8 +65,29 @@ from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.repository.tag import MongoTagRepository
 from qdash.repository.task_definition import MongoTaskDefinitionRepository
 
+P = ParamSpec("P")
+R = TypeVar("R")
 
-@lru_cache(maxsize=1)
+
+class CachedDependencyProvider(Protocol[P, R]):
+    """Callable dependency provider with an attached cache clear hook."""
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
+
+    def cache_clear(self) -> None: ...
+
+
+_cached_dependency_providers: list[CachedDependencyProvider[..., object]] = []
+
+
+def cached_dependency_provider(func: Callable[P, R]) -> CachedDependencyProvider[P, R]:
+    """Cache and register a dependency provider for centralized reset."""
+    cached = lru_cache(maxsize=1)(func)
+    _cached_dependency_providers.append(cached)
+    return cached
+
+
+@cached_dependency_provider
 def get_chip_repository() -> MongoChipRepository:
     """Get the chip repository instance.
 
@@ -78,7 +100,7 @@ def get_chip_repository() -> MongoChipRepository:
     return MongoChipRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_execution_counter_repository() -> MongoExecutionCounterRepository:
     """Get the execution counter repository instance.
 
@@ -91,7 +113,7 @@ def get_execution_counter_repository() -> MongoExecutionCounterRepository:
     return MongoExecutionCounterRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_task_result_repository() -> MongoTaskResultHistoryRepository:
     """Get the task result history repository instance.
 
@@ -104,7 +126,7 @@ def get_task_result_repository() -> MongoTaskResultHistoryRepository:
     return MongoTaskResultHistoryRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_chip_service() -> ChipService:
     """Get the chip service instance.
 
@@ -121,7 +143,7 @@ def get_chip_service() -> ChipService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_execution_history_repository() -> MongoExecutionHistoryRepository:
     """Get the execution history repository instance.
 
@@ -134,7 +156,7 @@ def get_execution_history_repository() -> MongoExecutionHistoryRepository:
     return MongoExecutionHistoryRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_execution_lock_repository() -> MongoExecutionLockRepository:
     """Get the execution lock repository instance.
 
@@ -147,7 +169,7 @@ def get_execution_lock_repository() -> MongoExecutionLockRepository:
     return MongoExecutionLockRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_execution_service() -> ExecutionService:
     """Get the execution service instance.
 
@@ -163,7 +185,7 @@ def get_execution_service() -> ExecutionService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_calibration_note_repository() -> MongoCalibrationNoteRepository:
     """Get the calibration note repository instance.
 
@@ -176,7 +198,7 @@ def get_calibration_note_repository() -> MongoCalibrationNoteRepository:
     return MongoCalibrationNoteRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_calibration_service() -> CalibrationService:
     """Get the calibration service instance.
 
@@ -191,7 +213,7 @@ def get_calibration_service() -> CalibrationService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_device_topology_service() -> DeviceTopologyService:
     """Get the device topology service instance.
 
@@ -207,7 +229,7 @@ def get_device_topology_service() -> DeviceTopologyService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_metrics_service() -> MetricsService:
     """Get the metrics service instance.
 
@@ -223,7 +245,7 @@ def get_metrics_service() -> MetricsService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_task_result_service() -> TaskResultService:
     """Get the task result service instance.
 
@@ -239,55 +261,55 @@ def get_task_result_service() -> TaskResultService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_tag_repository() -> MongoTagRepository:
     """Get the tag repository instance."""
     return MongoTagRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_backend_repository() -> MongoBackendRepository:
     """Get the backend repository instance."""
     return MongoBackendRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_task_definition_repository() -> MongoTaskDefinitionRepository:
     """Get the task definition repository instance."""
     return MongoTaskDefinitionRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_qubit_calibration_repository() -> MongoQubitCalibrationRepository:
     """Get the qubit calibration repository instance."""
     return MongoQubitCalibrationRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_coupling_calibration_repository() -> MongoCouplingCalibrationRepository:
     """Get the coupling calibration repository instance."""
     return MongoCouplingCalibrationRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_parameter_version_repository() -> MongoParameterVersionRepository:
     """Get the parameter version repository instance."""
     return MongoParameterVersionRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_provenance_relation_repository() -> MongoProvenanceRelationRepository:
     """Get the provenance relation repository instance."""
     return MongoProvenanceRelationRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_activity_repository() -> MongoActivityRepository:
     """Get the provenance activity repository instance."""
     return MongoActivityRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_seed_import_service() -> SeedImportService:
     """Get the seed import service instance."""
     return SeedImportService(
@@ -298,7 +320,7 @@ def get_seed_import_service() -> SeedImportService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_manual_update_service() -> ManualUpdateService:
     """Get the manual parameter update service instance."""
     return ManualUpdateService(
@@ -310,7 +332,7 @@ def get_manual_update_service() -> ManualUpdateService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_provenance_service() -> ProvenanceService:
     """Get the provenance service instance."""
     return ProvenanceService(
@@ -320,43 +342,43 @@ def get_provenance_service() -> ProvenanceService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_issue_service() -> IssueService:
     """Get the issue service instance."""
     return IssueService(notification_service=get_notification_service())
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_forum_service() -> ForumService:
     """Get the forum service instance."""
     return ForumService(notification_service=get_notification_service())
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_issue_knowledge_service() -> IssueKnowledgeService:
     """Get the issue knowledge service instance."""
     return IssueKnowledgeService()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_copilot_runtime() -> CopilotRuntime:
     """Get the copilot runtime instance."""
     return CopilotRuntime()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_admin_service() -> AdminService:
     """Get the admin service instance."""
     return AdminService()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_config_service() -> ConfigService:
     """Get the config service instance."""
     return ConfigService()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_task_service() -> TaskService:
     """Get the task service instance."""
     return TaskService(
@@ -364,49 +386,49 @@ def get_task_service() -> TaskService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_note_service() -> NoteService:
     """Get the unified note service instance."""
     return NoteService(notification_service=get_notification_service())
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_notification_service() -> NotificationService:
     """Get the notification service instance."""
     return NotificationService()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_copilot_chat_session_service() -> CopilotChatSessionService:
     """Get the copilot chat session service instance."""
     return CopilotChatSessionService()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_cryostat_repository() -> MongoCryostatRepository:
     """Get the cryostat repository instance."""
     return MongoCryostatRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_cryostat_service() -> CryostatService:
     """Get the cryostat service instance."""
     return CryostatService(cryostat_repository=get_cryostat_repository())
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_cooldown_repository() -> MongoCooldownRepository:
     """Get the cool-down repository instance."""
     return MongoCooldownRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_cooldown_wiring_event_repository() -> MongoCooldownWiringEventRepository:
     """Get the cool-down wiring event repository instance."""
     return MongoCooldownWiringEventRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_cooldown_service() -> CooldownService:
     """Get the cool-down service instance."""
     return CooldownService(
@@ -415,7 +437,7 @@ def get_cooldown_service() -> CooldownService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_cooldown_wiring_event_service() -> CooldownWiringEventService:
     """Get the cool-down wiring event service instance."""
     return CooldownWiringEventService(
@@ -424,13 +446,13 @@ def get_cooldown_wiring_event_service() -> CooldownWiringEventService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_user_repository() -> MongoUserRepository:
     """Get the user repository instance."""
     return MongoUserRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_auth_service() -> AuthService:
     """Get the auth service instance."""
     return AuthService(
@@ -439,19 +461,19 @@ def get_auth_service() -> AuthService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_project_repository() -> MongoProjectRepository:
     """Get the project repository instance."""
     return MongoProjectRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_membership_repository() -> MongoProjectMembershipRepository:
     """Get the project membership repository instance."""
     return MongoProjectMembershipRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_project_service() -> ProjectService:
     """Get the project service instance."""
     return ProjectService(
@@ -461,31 +483,31 @@ def get_project_service() -> ProjectService:
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_task_file_service() -> TaskFileService:
     """Get the task file service instance."""
     return TaskFileService()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_file_service() -> FileService:
     """Get the file service instance."""
     return FileService()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_reanalysis_service() -> ReanalysisService:
     """Get the spectroscopy-reanalysis service instance."""
     return ReanalysisService()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_flow_repository() -> MongoFlowRepository:
     """Get the flow repository instance."""
     return MongoFlowRepository()
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_flow_service() -> "FlowService":
     """Get the flow service instance."""
     from qdash.api.services.flow_service import FlowService
@@ -495,7 +517,7 @@ def get_flow_service() -> "FlowService":
     )
 
 
-@lru_cache(maxsize=1)
+@cached_dependency_provider
 def get_flow_schedule_service() -> "FlowScheduleService":
     """Get the flow schedule service instance."""
     from qdash.api.services.flow_schedule_service import FlowScheduleService
@@ -512,53 +534,5 @@ def clear_dependency_caches() -> None:
     must be rebuilt after dependency overrides, configuration changes, or
     database session resets.
     """
-    get_chip_repository.cache_clear()
-    get_execution_counter_repository.cache_clear()
-    get_task_result_repository.cache_clear()
-    get_chip_service.cache_clear()
-    get_execution_history_repository.cache_clear()
-    get_execution_lock_repository.cache_clear()
-    get_execution_service.cache_clear()
-    get_calibration_note_repository.cache_clear()
-    get_calibration_service.cache_clear()
-    get_device_topology_service.cache_clear()
-    get_metrics_service.cache_clear()
-    get_task_result_service.cache_clear()
-    get_tag_repository.cache_clear()
-    get_backend_repository.cache_clear()
-    get_task_definition_repository.cache_clear()
-    get_qubit_calibration_repository.cache_clear()
-    get_coupling_calibration_repository.cache_clear()
-    get_parameter_version_repository.cache_clear()
-    get_provenance_relation_repository.cache_clear()
-    get_activity_repository.cache_clear()
-    get_seed_import_service.cache_clear()
-    get_manual_update_service.cache_clear()
-    get_provenance_service.cache_clear()
-    get_issue_service.cache_clear()
-    get_forum_service.cache_clear()
-    get_issue_knowledge_service.cache_clear()
-    get_copilot_runtime.cache_clear()
-    get_admin_service.cache_clear()
-    get_config_service.cache_clear()
-    get_task_service.cache_clear()
-    get_note_service.cache_clear()
-    get_notification_service.cache_clear()
-    get_copilot_chat_session_service.cache_clear()
-    get_cryostat_repository.cache_clear()
-    get_cryostat_service.cache_clear()
-    get_cooldown_repository.cache_clear()
-    get_cooldown_wiring_event_repository.cache_clear()
-    get_cooldown_service.cache_clear()
-    get_cooldown_wiring_event_service.cache_clear()
-    get_user_repository.cache_clear()
-    get_auth_service.cache_clear()
-    get_project_repository.cache_clear()
-    get_membership_repository.cache_clear()
-    get_project_service.cache_clear()
-    get_task_file_service.cache_clear()
-    get_file_service.cache_clear()
-    get_reanalysis_service.cache_clear()
-    get_flow_repository.cache_clear()
-    get_flow_service.cache_clear()
-    get_flow_schedule_service.cache_clear()
+    for provider in _cached_dependency_providers:
+        provider.cache_clear()
