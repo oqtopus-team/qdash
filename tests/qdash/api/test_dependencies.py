@@ -4,15 +4,7 @@ from qdash.api import dependencies
 
 
 def _clear_dependency_caches() -> None:
-    dependencies.get_activity_repository.cache_clear()
-    dependencies.get_coupling_calibration_repository.cache_clear()
-    dependencies.get_manual_update_service.cache_clear()
-    dependencies.get_parameter_version_repository.cache_clear()
-    dependencies.get_provenance_relation_repository.cache_clear()
-    dependencies.get_provenance_service.cache_clear()
-    dependencies.get_qubit_calibration_repository.cache_clear()
-    dependencies.get_seed_import_service.cache_clear()
-    dependencies.get_user_repository.cache_clear()
+    dependencies.clear_dependency_caches()
 
 
 def test_provenance_services_use_shared_repository_providers() -> None:
@@ -49,3 +41,13 @@ def test_manual_update_service_uses_calibration_repository_providers() -> None:
 
     assert service._qubit_repo is qubit_repo
     assert service._coupling_repo is coupling_repo
+
+
+def test_clear_dependency_caches_rebuilds_cached_providers() -> None:
+    _clear_dependency_caches()
+    first_service = dependencies.get_config_service()
+
+    dependencies.clear_dependency_caches()
+    second_service = dependencies.get_config_service()
+
+    assert second_service is not first_service
