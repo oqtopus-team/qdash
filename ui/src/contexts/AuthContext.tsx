@@ -80,6 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Handle errors
   useEffect(() => {
+    if (isPublicAuthRoute) {
+      return;
+    }
     if (userError) {
       if (isAuthenticationError(userError)) {
         removeAuth();
@@ -90,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false);
     }
-  }, [userError, clearServerSession, removeAuth]);
+  }, [isPublicAuthRoute, userError, clearServerSession, removeAuth]);
 
   // Initialization
   useEffect(() => {
