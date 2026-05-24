@@ -1162,6 +1162,7 @@ export function CouplingGrid({
         taskName={selectedTaskInfo?.taskName || ""}
         isOpen={!!selectedTaskInfo}
         onClose={() => setSelectedTaskInfo(null)}
+        selectedDate={selectedDate}
       />
     </div>
   );

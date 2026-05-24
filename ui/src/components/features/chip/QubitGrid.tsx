@@ -1155,6 +1155,7 @@ export function QubitGrid({
         taskName={selectedTaskInfo?.taskName || ""}
         isOpen={!!selectedTaskInfo}
         onClose={() => setSelectedTaskInfo(null)}
+        selectedDate={selectedDate}
       />
     </div>
   );

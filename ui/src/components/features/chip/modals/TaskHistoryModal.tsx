@@ -28,6 +28,7 @@ interface TaskHistoryModalProps {
   taskName: string;
   isOpen: boolean;
   onClose: () => void;
+  selectedDate?: string;
 }
 
 type MobileTab = "history" | "details";
@@ -38,6 +39,7 @@ export function TaskHistoryModal({
   taskName,
   isOpen,
   onClose,
+  selectedDate,
 }: TaskHistoryModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<MobileTab>("history");
@@ -122,13 +124,31 @@ export function TaskHistoryModal({
     },
   );
 
-  const historyArray = Object.entries(data?.data?.data || {})
-    .map(([key, task]) => ({ key, task: task as Task }))
-    .sort((a, b) => {
-      const dateA = a.task.end_at ? new Date(a.task.end_at).getTime() : 0;
-      const dateB = b.task.end_at ? new Date(b.task.end_at).getTime() : 0;
-      return dateB - dateA;
+  const historyArray = useMemo(
+    () =>
+      Object.entries(data?.data?.data || {})
+        .map(([key, task]) => ({ key, task: task as Task }))
+        .sort((a, b) => {
+          const dateA = a.task.end_at ? new Date(a.task.end_at).getTime() : 0;
+          const dateB = b.task.end_at ? new Date(b.task.end_at).getTime() : 0;
+          return dateB - dateA;
+        }),
+    [data],
+  );
+
+  React.useEffect(() => {
+    if (!isOpen || historyArray.length === 0) return;
+    if (!selectedDate || selectedDate === "latest") {
+      setSelectedIndex(0);
+      return;
+    }
+    const idx = historyArray.findIndex((item) => {
+      if (!item.task.end_at) return false;
+      const dateStr = formatDateTime(item.task.end_at, "yyyyMMdd");
+      return dateStr === selectedDate;
     });
+    setSelectedIndex(idx >= 0 ? idx : 0);
+  }, [isOpen, historyArray, selectedDate]);
 
   const selectedItem = historyArray[selectedIndex];
   const selectedTask = selectedItem?.task;
