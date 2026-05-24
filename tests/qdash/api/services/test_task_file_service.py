@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from qdash.api.dependencies import get_task_file_service
-from qdash.api.services.chip_service import _get_task_names_cached, get_task_names
+from qdash.api.services.chip.service import _get_task_names_cached, get_task_names
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.common.config.backend import clear_cache as clear_backend_config_cache
 

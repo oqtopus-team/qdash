@@ -26,12 +26,12 @@ from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.provenance import ProvenanceRelationType
 from qdash.dbmodel.qubit import QubitDocument
-from qdash.dbmodel.user import UserDocument
 from qdash.repository.provenance import (
     MongoActivityRepository,
     MongoParameterVersionRepository,
     MongoProvenanceRelationRepository,
 )
+from qdash.repository.user import MongoUserRepository
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +52,19 @@ class SeedImportService:
     with full provenance tracking for data lineage.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        activity_repo: MongoActivityRepository | None = None,
+        param_version_repo: MongoParameterVersionRepository | None = None,
+        relation_repo: MongoProvenanceRelationRepository | None = None,
+        user_repository: MongoUserRepository | None = None,
+    ) -> None:
         """Initialize the seed import service."""
         self._config_base = QUBEX_CONFIG_BASE
-        self._activity_repo = MongoActivityRepository()
-        self._param_version_repo = MongoParameterVersionRepository()
-        self._relation_repo = MongoProvenanceRelationRepository()
+        self._activity_repo = activity_repo or MongoActivityRepository()
+        self._param_version_repo = param_version_repo or MongoParameterVersionRepository()
+        self._relation_repo = relation_repo or MongoProvenanceRelationRepository()
+        self._user_repository = user_repository or MongoUserRepository()
 
     def _params_dir(self, chip_id: str) -> pathlib.Path:
         """Get the params directory for a chip.
@@ -83,9 +90,8 @@ class SeedImportService:
             raise ValueError(f"Invalid chip_id: {chip_id}")
         return pathlib.Path(self._config_base) / chip_id / "params"
 
-    @staticmethod
-    def _user_id_for_username(username: str) -> str | None:
-        user = UserDocument.find_one({"username": username}).run()
+    def _user_id_for_username(self, username: str) -> str | None:
+        user = self._user_repository.find_by_username(username)
         return user.user_id if user else None
 
     def import_seeds(
