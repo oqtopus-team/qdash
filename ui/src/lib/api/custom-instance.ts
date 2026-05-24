@@ -5,9 +5,9 @@ import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import { getProjectId } from "@/lib/auth/session";
 
 export const AXIOS_INSTANCE = Axios.create({
-  // Use /api proxy route (handled by Next.js rewrites)
-  // Falls back to direct API URL for backward compatibility
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "/api",
+  // Browser API calls must go through the Next.js route handler so HttpOnly
+  // session cookies can be translated into backend Authorization headers.
+  baseURL: "/api",
 });
 
 // Add request interceptor
