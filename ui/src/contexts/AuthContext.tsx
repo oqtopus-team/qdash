@@ -3,10 +3,11 @@
 import type { ReactNode } from "react";
 import { createContext, useCallback, useContext, useState, useEffect } from "react";
 import Axios from "axios";
+import { useQueryClient } from "@tanstack/react-query";
 
 import type { User } from "@/schemas";
 
-import { useGetCurrentUser, useLogin, useLogout } from "@/client/auth/auth";
+import { useGetCurrentUser, useLogin } from "@/client/auth/auth";
 
 interface AuthContextType {
   user: User | null;
@@ -29,6 +30,7 @@ function isAuthenticationError(error: unknown): boolean {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,9 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Login mutation
   const loginMutation = useLogin();
-
-  // Logout mutation
-  const logoutMutation = useLogout();
 
   // Get user info
   const {
@@ -128,10 +127,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      // Call logout API first
-      await logoutMutation.mutateAsync();
-      // Clear cache
-      await Promise.all([loginMutation.reset(), logoutMutation.reset()]);
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      await queryClient.clear();
+      loginMutation.reset();
       // Clear state
       setUser(null);
       // Remove auth info (middleware will handle redirect automatically)
@@ -145,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       removeAuth();
       window.location.href = "/login";
     }
-  }, [logoutMutation, removeAuth, loginMutation]);
+  }, [loginMutation, queryClient, removeAuth]);
 
   return (
     <AuthContext.Provider

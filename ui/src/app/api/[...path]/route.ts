@@ -70,10 +70,22 @@ function clearSessionCookie(response: NextResponse): void {
     path: "/",
     maxAge: 0,
   });
+  response.headers.append(
+    "Set-Cookie",
+    `${ACCESS_TOKEN_COOKIE}=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`,
+  );
 }
 
 async function proxyRequest(request: NextRequest, context: RouteContext): Promise<Response> {
   const { path = [] } = await context.params;
+  const backendPath = path.join("/");
+
+  if (backendPath === "auth/logout") {
+    const response = NextResponse.json({ message: "Successfully logged out" });
+    clearSessionCookie(response);
+    return response;
+  }
+
   const url = backendUrl(path, request.nextUrl.search);
   const method = request.method.toUpperCase();
   const hasBody = method !== "GET" && method !== "HEAD";
@@ -85,7 +97,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext): Promis
     cache: "no-store",
   });
 
-  if (path.join("/") === "auth/login") {
+  if (backendPath === "auth/login") {
     const payload = await upstream.json();
     const responsePayload = { ...payload };
     const token =
@@ -107,10 +119,6 @@ async function proxyRequest(request: NextRequest, context: RouteContext): Promis
     statusText: upstream.statusText,
     headers: copyResponseHeaders(upstream),
   });
-
-  if (path.join("/") === "auth/logout") {
-    clearSessionCookie(response);
-  }
 
   return response;
 }
