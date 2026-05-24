@@ -905,9 +905,9 @@ export function CouplingGrid({
         </div>
       )}
       {/* View mode toggle and Download controls */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg py-2">
         <div className="flex items-center gap-4">
-          <div className="tabs tabs-boxed bg-base-200 w-fit">
+          <div className="tabs tabs-boxed bg-base-300 w-fit">
             {isSquareGrid && (
               <button
                 className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
@@ -1118,10 +1118,10 @@ export function CouplingGrid({
 
       {/* Grid display */}
       <div
-        className={`flex-1 relative overflow-hidden flex justify-center ${
+        className={`flex-1 relative flex justify-center ${
           viewMode === "pan-zoom"
             ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : ""
+            : "bg-base-200/60 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
