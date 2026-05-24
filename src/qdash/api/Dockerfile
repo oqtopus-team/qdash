@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /app
@@ -20,7 +22,8 @@ ENV UV_COMPILE_BYTECODE=1 \
 COPY pyproject.toml uv.lock ./
 COPY src/qdash/api/pyproject.toml src/qdash/api/pyproject.toml
 COPY src/qdash/workflow/pyproject.toml src/qdash/workflow/pyproject.toml
-RUN uv sync --locked --package qdash-api --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --package qdash-api --no-dev
 
 FROM python:3.11-slim-bookworm
 
