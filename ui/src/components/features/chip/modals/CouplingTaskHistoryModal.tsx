@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, History, FileText, GitBranch, Bot } from "lucide-react";
@@ -33,6 +33,7 @@ interface CouplingTaskHistoryModalProps {
   taskName: string;
   isOpen: boolean;
   onClose: () => void;
+  selectedDate?: string;
 }
 
 type MobileTab = "history" | "details";
@@ -43,6 +44,7 @@ export function CouplingTaskHistoryModal({
   taskName,
   isOpen,
   onClose,
+  selectedDate,
 }: CouplingTaskHistoryModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
@@ -113,13 +115,31 @@ export function CouplingTaskHistoryModal({
     },
   );
 
-  const historyArray = Object.entries(data?.data?.data || {})
-    .map(([key, task]) => ({ key, task: task as Task }))
-    .sort((a, b) => {
-      const dateA = a.task.end_at ? new Date(a.task.end_at).getTime() : 0;
-      const dateB = b.task.end_at ? new Date(b.task.end_at).getTime() : 0;
-      return dateB - dateA;
+  const historyArray = useMemo(
+    () =>
+      Object.entries(data?.data?.data || {})
+        .map(([key, task]) => ({ key, task: task as Task }))
+        .sort((a, b) => {
+          const dateA = a.task.end_at ? new Date(a.task.end_at).getTime() : 0;
+          const dateB = b.task.end_at ? new Date(b.task.end_at).getTime() : 0;
+          return dateB - dateA;
+        }),
+    [data],
+  );
+
+  React.useEffect(() => {
+    if (!isOpen || historyArray.length === 0) return;
+    if (!selectedDate || selectedDate === "latest") {
+      setSelectedIndex(0);
+      return;
+    }
+    const idx = historyArray.findIndex((item) => {
+      if (!item.task.end_at) return false;
+      const dateStr = formatDateTime(item.task.end_at, "yyyyMMdd");
+      return dateStr === selectedDate;
     });
+    setSelectedIndex(idx >= 0 ? idx : 0);
+  }, [isOpen, historyArray, selectedDate]);
 
   const selectedItem = historyArray[selectedIndex];
   const selectedTask = selectedItem?.task;
