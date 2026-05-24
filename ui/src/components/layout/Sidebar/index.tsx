@@ -160,20 +160,12 @@ export function Sidebar() {
   const modalRef = useRef<HTMLDialogElement>(null);
   const { isOpen, isMobileOpen, toggleSidebar, setMobileSidebarOpen } = useSidebar();
   const { canEdit } = useProject();
-  const { user, logout: authLogout } = useAuth();
+  const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const { data: unreadNotificationsResponse } = useUnreadNotificationCount();
   const unreadNotifications = unreadNotificationsResponse?.data.unread_count ?? 0;
   const isAdmin = user?.system_role === "admin";
   const isDarkTheme = DARK_THEMES.includes(theme as (typeof DARK_THEMES)[number]);
-
-  const handleLogout = useCallback(async () => {
-    try {
-      await authLogout();
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  }, [authLogout]);
 
   const openProfileModal = useCallback(() => {
     if (modalRef.current) {
@@ -192,11 +184,6 @@ export function Sidebar() {
     }
     router.push("/settings");
   }, [isMobileOpen, setMobileSidebarOpen, router]);
-
-  const handleModalLogout = useCallback(async () => {
-    modalRef.current?.close();
-    await handleLogout();
-  }, [handleLogout]);
 
   // Close mobile sidebar when clicking a link
   const handleLinkClick = () => {
@@ -473,13 +460,10 @@ export function Sidebar() {
           </button>
 
           {/* Logout */}
-          <button
-            onClick={handleModalLogout}
-            className="btn btn-ghost w-full justify-start gap-3 h-12 text-error"
-          >
+          <Link href="/logout" className="btn btn-ghost w-full justify-start gap-3 h-12 text-error">
             <LogOut size={18} />
             <span>Logout</span>
-          </button>
+          </Link>
         </div>
       </div>
       <form method="dialog" className="modal-backdrop">

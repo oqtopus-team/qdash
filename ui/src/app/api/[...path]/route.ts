@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { ACCESS_TOKEN_COOKIE, clearSessionCookie } from "@/lib/auth/cookies";
+
 const INTERNAL_API_URL = process.env.INTERNAL_API_URL || "http://127.0.0.1:5715";
-const ACCESS_TOKEN_COOKIE = "access_token";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 type RouteContext = {
@@ -58,22 +59,6 @@ function setSessionCookie(response: NextResponse, token: string): void {
     path: "/",
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
-}
-
-function clearSessionCookie(response: NextResponse): void {
-  response.cookies.set({
-    name: ACCESS_TOKEN_COOKIE,
-    value: "",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0,
-  });
-  response.headers.append(
-    "Set-Cookie",
-    `${ACCESS_TOKEN_COOKIE}=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`,
-  );
 }
 
 async function proxyRequest(request: NextRequest, context: RouteContext): Promise<Response> {

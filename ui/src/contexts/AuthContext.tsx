@@ -139,13 +139,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Remove auth info (middleware will handle redirect automatically)
       removeAuth();
       // Explicitly navigate to login page
-      window.location.href = "/login";
+      window.location.href = "/logout";
     } catch (error) {
       console.error("Logout failed:", error);
       // Same handling on error
       setUser(null);
       removeAuth();
-      window.location.href = "/login";
+      window.location.href = "/logout";
     }
   }, [loginMutation, queryClient, removeAuth]);
 
