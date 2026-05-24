@@ -13,10 +13,10 @@ describe("session helpers", () => {
     localStorage.clear();
   });
 
-  it("reads the access token cookie", () => {
+  it("does not expose the access token to client code", () => {
     document.cookie = "access_token=token-value; path=/";
 
-    expect(getAccessToken()).toBe("token-value");
+    expect(getAccessToken()).toBeNull();
   });
 
   it("returns null when the access token cookie is missing", () => {
@@ -29,13 +29,12 @@ describe("session helpers", () => {
     expect(getProjectId()).toBe("project-1");
   });
 
-  it("builds auth headers from token and project context", () => {
+  it("builds project context headers without bearer tokens", () => {
     document.cookie = "access_token=encoded%20token; path=/";
     localStorage.setItem("qdash_current_project_id", "project-1");
 
     expect(buildAuthHeaders()).toEqual({
       "Content-Type": "application/json",
-      Authorization: "Bearer encoded token",
       "X-Project-Id": "project-1",
     });
   });

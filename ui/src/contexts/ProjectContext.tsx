@@ -40,7 +40,7 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 const PROJECT_STORAGE_KEY = "qdash_current_project_id";
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
-  const { user, accessToken } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const pathname = usePathname();
   const [urlProjectId, setUrlProjectId] = useState<string | null>(null);
@@ -55,14 +55,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     refetch,
   } = useListProjects({
     query: {
-      enabled: !!accessToken,
+      enabled: isAuthenticated,
       retry: false,
     },
   });
 
   const { data: membersData } = useListProjectMembers(projectId ?? "", {
     query: {
-      enabled: !!projectId && !!accessToken,
+      enabled: !!projectId && isAuthenticated,
       retry: false,
     },
   });
@@ -174,7 +174,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   ]);
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!isAuthenticated) {
       setCurrentProject(null);
       setProjectId(null);
       setRole(null);
@@ -189,7 +189,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setRole(null);
     localStorage.removeItem(PROJECT_STORAGE_KEY);
     clearProjectFromUrl();
-  }, [accessToken, clearProjectFromUrl, isLoading, projects.length, urlProjectInitialized]);
+  }, [isAuthenticated, clearProjectFromUrl, isLoading, projects.length, urlProjectInitialized]);
 
   const switchProject = useCallback(
     (newProjectId: string) => {

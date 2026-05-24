@@ -7,6 +7,24 @@
  */
 
 const INTERNAL_API_URL = process.env.INTERNAL_API_URL || "http://127.0.0.1:5715";
+const ACCESS_TOKEN_COOKIE = "access_token";
+
+function readCookie(request: Request, name: string): string | null {
+  const cookie = request.headers.get("cookie");
+  if (!cookie) return null;
+
+  const value = cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`))
+    ?.split("=")[1];
+  if (!value) return null;
+
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Forward relevant headers from the incoming request to the backend.
@@ -16,9 +34,9 @@ function forwardHeaders(request: Request): Record<string, string> {
     "Content-Type": "application/json",
   };
 
-  const auth = request.headers.get("authorization");
-  if (auth) {
-    headers["Authorization"] = auth;
+  const token = readCookie(request, ACCESS_TOKEN_COOKIE);
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   const username = request.headers.get("x-username");

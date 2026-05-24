@@ -7,11 +7,11 @@ import Axios from "axios";
 import type { User } from "@/schemas";
 
 import { useGetCurrentUser, useLogin, useLogout } from "@/client/auth/auth";
-import { getAccessToken } from "@/lib/auth/session";
 
 interface AuthContextType {
   user: User | null;
   username: string | null;
+  isAuthenticated: boolean;
   accessToken: string | null;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
@@ -31,22 +31,22 @@ function isAuthenticationError(error: unknown): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Save authentication info
-  const saveAuth = useCallback((token: string, user: string) => {
-    const maxAge = 365 * 24 * 60 * 60; // 1 year (long-term token)
-    document.cookie = `access_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`;
-    setAccessToken(token);
+  const saveAuth = useCallback((user: string) => {
     setUsername(user);
   }, []);
 
   // Remove authentication info
   const removeAuth = useCallback(() => {
-    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-    setAccessToken(null);
     setUsername(null);
+  }, []);
+
+  const clearServerSession = useCallback(() => {
+    void fetch("/api/auth/logout", { method: "POST" }).catch((error: unknown) => {
+      console.warn("Failed to clear server session:", error);
+    });
   }, []);
 
   // Login mutation
@@ -56,9 +56,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutMutation = useLogout();
 
   // Get user info
-  const { data: userData, error: userError } = useGetCurrentUser({
+  const {
+    data: userData,
+    error: userError,
+    refetch: refetchCurrentUser,
+  } = useGetCurrentUser({
     query: {
-      enabled: !!accessToken,
       retry: false,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
@@ -71,29 +74,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (userData?.data) {
       setUser(userData.data);
       setUsername(userData.data.username);
+      setLoading(false);
     }
   }, [userData]);
 
   // Handle errors
   useEffect(() => {
     if (userError) {
-      console.error("Failed to fetch user info:", userError);
       if (isAuthenticationError(userError)) {
         removeAuth();
+        clearServerSession();
         setUser(null);
+      } else {
+        console.error("Failed to fetch user info:", userError);
       }
+      setLoading(false);
     }
-  }, [userError, removeAuth]);
+  }, [userError, clearServerSession, removeAuth]);
 
   // Initialization
   useEffect(() => {
-    const token = getAccessToken();
-
-    if (token) {
-      setAccessToken(token);
+    if (userData || userError) {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [removeAuth]);
+  }, [userData, userError]);
 
   const login = useCallback(
     async (username: string, password: string) => {
@@ -106,8 +110,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
 
-        // Save auth info (access_token and username)
-        saveAuth(response.data.access_token, response.data.username);
+        // The API route stores the session token in an HttpOnly cookie.
+        saveAuth(response.data.username);
+        await refetchCurrentUser();
       } catch (error) {
         console.error("Login failed:", error);
         // Clear auth info
@@ -118,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false); // End loading
       }
     },
-    [loginMutation, saveAuth, removeAuth],
+    [loginMutation, refetchCurrentUser, saveAuth, removeAuth],
   );
 
   const logout = useCallback(async () => {
@@ -143,7 +148,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logoutMutation, removeAuth, loginMutation]);
 
   return (
-    <AuthContext.Provider value={{ user, username, accessToken, login, logout, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        username,
+        isAuthenticated: !!user,
+        accessToken: null,
+        login,
+        logout,
+        loading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

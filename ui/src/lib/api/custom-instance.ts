@@ -2,7 +2,7 @@ import Axios, { AxiosHeaders } from "axios";
 
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
 
-import { getAccessToken, getProjectId } from "@/lib/auth/session";
+import { getProjectId } from "@/lib/auth/session";
 
 export const AXIOS_INSTANCE = Axios.create({
   // Use /api proxy route (handled by Next.js rewrites)
@@ -12,18 +12,14 @@ export const AXIOS_INSTANCE = Axios.create({
 
 // Add request interceptor
 AXIOS_INSTANCE.interceptors.request.use((config) => {
-  const token = getAccessToken();
+  const projectId = getProjectId();
 
-  if (token) {
+  if (projectId) {
     if (!config.headers) {
       config.headers = new AxiosHeaders();
     }
     if (config.headers instanceof AxiosHeaders) {
-      config.headers.set("Authorization", `Bearer ${token}`);
-      const projectId = getProjectId();
-      if (projectId) {
-        config.headers.set("X-Project-Id", projectId);
-      }
+      config.headers.set("X-Project-Id", projectId);
     }
   }
 
