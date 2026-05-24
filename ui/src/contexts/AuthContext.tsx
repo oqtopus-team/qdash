@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { createContext, useCallback, useContext, useState, useEffect } from "react";
 import Axios from "axios";
 import { useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 
 import type { User } from "@/schemas";
 
@@ -31,6 +32,9 @@ function isAuthenticationError(error: unknown): boolean {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const pathname = usePathname();
+  const isPublicAuthRoute =
+    pathname === "/login" || pathname === "/signup" || pathname === "/logout";
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,12 +59,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useLogin();
 
   // Get user info
-  const {
-    data: userData,
-    error: userError,
-    refetch: refetchCurrentUser,
-  } = useGetCurrentUser({
+  const { data: userData, error: userError } = useGetCurrentUser({
     query: {
+      enabled: !isPublicAuthRoute,
       retry: false,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
@@ -93,10 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialization
   useEffect(() => {
+    if (isPublicAuthRoute) {
+      setLoading(false);
+      return;
+    }
     if (userData || userError) {
       setLoading(false);
     }
-  }, [userData, userError]);
+  }, [isPublicAuthRoute, userData, userError]);
 
   const login = useCallback(
     async (username: string, password: string) => {
@@ -111,7 +116,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // The API route stores the session token in an HttpOnly cookie.
         saveAuth(response.data.username);
-        await refetchCurrentUser();
       } catch (error) {
         console.error("Login failed:", error);
         // Clear auth info
@@ -122,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false); // End loading
       }
     },
-    [loginMutation, refetchCurrentUser, saveAuth, removeAuth],
+    [loginMutation, saveAuth, removeAuth],
   );
 
   const logout = useCallback(async () => {
