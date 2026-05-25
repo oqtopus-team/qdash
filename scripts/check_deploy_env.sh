@@ -33,7 +33,7 @@ for key in TUNNEL_TOKEN QDASH_HOST; do
   fi
 done
 
-for key in ENV COMPOSE_PROJECT_NAME QDASH_HOST QDASH_LOCAL_DOMAIN QDASH_LOCAL_HOST CLIENT_URL NEXT_PUBLIC_PREFECT_URL PROXY_PORT; do
+for key in ENV COMPOSE_PROJECT_NAME QDASH_HOST QDASH_LOCAL_HOST CLIENT_URL NEXT_PUBLIC_PREFECT_URL PROXY_PORT PREFECT_FORWARD_PORT; do
   count="$(
     awk -v key="$key" '
       $0 ~ "^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=" { count++ }
@@ -54,7 +54,7 @@ for key in QDASH_UI_UPSTREAM QDASH_API_UPSTREAM; do
   esac
 done
 
-for key in MONGO_PORT MONGO_EXPRESS_PORT POSTGRES_PORT PREFECT_PORT API_PORT UI_PORT; do
+for key in MONGO_PORT MONGO_EXPRESS_PORT POSTGRES_PORT PREFECT_PORT PREFECT_FORWARD_PORT API_PORT UI_PORT; do
   value="$(env_value "$key")"
   if [ -n "$value" ]; then
     case "$value" in
