@@ -2,7 +2,3 @@ services:
   reverse-proxy:
     ports:
       - "127.0.0.1:${PROXY_PORT:-18080}:80"
-
-  prefect-server:
-    ports:
-      - "127.0.0.1:${PREFECT_FORWARD_PORT:-14200}:4200"

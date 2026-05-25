@@ -10,7 +10,6 @@ PORT_KEYS=(
   MONGO_EXPRESS_PORT
   POSTGRES_PORT
   PREFECT_PORT
-  PREFECT_FORWARD_PORT
   API_PORT
   UI_PORT
   DEPLOYMENT_SERVICE_PORT
@@ -109,7 +108,12 @@ else
 fi
 
 proxy_name="$instance"
-host="localhost"
+local_name="$env_name"
+local_domain="${QDASH_LOCAL_DOMAIN:-$(env_value QDASH_LOCAL_DOMAIN)}"
+if [ -z "$local_domain" ]; then
+  local_domain="qdash.test"
+fi
+host="${local_name}.${local_domain}"
 force=0
 if [ "${1:-}" = "--force" ]; then
   force=1
@@ -134,6 +138,8 @@ declare -A updates
 updates[ENV]="$env_name"
 updates[COMPOSE_PROJECT_NAME]="$proxy_name"
 updates[QDASH_INSTANCE]="$instance"
+updates[QDASH_LOCAL_DOMAIN]="$local_domain"
+updates[QDASH_HOST]="$host"
 updates[QDASH_LOCAL_HOST]="$host"
 updates[QDASH_API_HOST]="api.${host}"
 updates[QDASH_PREFECT_HOST]="prefect.${host}"
@@ -152,7 +158,7 @@ done
 
 updates[CLIENT_URL]="http://${updates[QDASH_LOCAL_HOST]}:${updates[PROXY_PORT]}"
 updates[NEXT_PUBLIC_API_URL]="/api"
-updates[NEXT_PUBLIC_PREFECT_URL]="http://localhost:${updates[PREFECT_PORT]}"
+updates[NEXT_PUBLIC_PREFECT_URL]="http://prefect.${updates[QDASH_LOCAL_HOST]}:${updates[PROXY_PORT]}"
 updates[QDASH_UI_UPSTREAM]="ui:${updates[UI_PORT]}"
 updates[QDASH_API_UPSTREAM]="api:${updates[API_PORT]}"
 updates[PREFECT_API_URL]='http://localhost:${PREFECT_PORT}/api'
@@ -214,5 +220,7 @@ else
   echo "Updated .env for $instance"
 fi
 echo "Compose project: $proxy_name"
-echo "Proxy: http://localhost:${updates[PROXY_PORT]}"
-echo "Prefect: http://localhost:${updates[PREFECT_PORT]}"
+echo "Proxy: http://${host}:${updates[PROXY_PORT]}"
+echo "Local alias: http://${updates[QDASH_LOCAL_HOST]}:${updates[PROXY_PORT]}"
+echo "API: http://api.${host}:${updates[PROXY_PORT]}"
+echo "Prefect: http://prefect.${host}:${updates[PROXY_PORT]}"
