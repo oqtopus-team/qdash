@@ -2,7 +2,7 @@
 	auto_https off
 }
 
-http://{$QDASH_HOST:qdash.qdash.test}, http://{$QDASH_LOCAL_HOST:qdash.qdash.test} {
+http://{$QDASH_HOST:qdash.localhost}, http://{$QDASH_LOCAL_HOST:qdash.localhost} {
 	handle /api/* {
 		reverse_proxy {$QDASH_API_UPSTREAM:api:5715}
 	}
@@ -12,14 +12,14 @@ http://{$QDASH_HOST:qdash.qdash.test}, http://{$QDASH_LOCAL_HOST:qdash.qdash.tes
 	}
 }
 
-http://{$QDASH_API_HOST:api.qdash.qdash.test} {
+http://{$QDASH_API_HOST:api.qdash.localhost} {
 	reverse_proxy {$QDASH_API_UPSTREAM:api:5715}
 }
 
-http://{$QDASH_PREFECT_HOST:prefect.qdash.qdash.test} {
+http://{$QDASH_PREFECT_HOST:prefect.qdash.localhost} {
 	reverse_proxy prefect-server:4200
 }
 
-http://{$QDASH_MONGO_HOST:mongo.qdash.qdash.test} {
+http://{$QDASH_MONGO_HOST:mongo.qdash.localhost} {
 	reverse_proxy mongo-express:8081
 }

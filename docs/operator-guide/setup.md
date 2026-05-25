@@ -68,18 +68,15 @@ service URL for operator-only access.
 stack; it does not rewrite `.env`.
 
 For multiple QDash environments on the same server, give each environment a unique
-`COMPOSE_PROJECT_NAME`, `QDASH_HOST`, `QDASH_LOCAL_HOST`, `PROXY_PORT`, and database data path. Set
-`QDASH_LOCAL_DOMAIN` to the local wildcard DNS zone used on the workstation. The
+`COMPOSE_PROJECT_NAME`, `QDASH_HOST`, `QDASH_LOCAL_HOST`, `PROXY_PORT`, and database data path. The
 application service ports can stay at their defaults because `task deploy` publishes only the
 reverse proxy on `127.0.0.1:${PROXY_PORT}` for SSH forwarding.
 
 ```env
-ENV=dev
-QDASH_INSTANCE=dev-qdash
+ENV=dev-qdash
 COMPOSE_PROJECT_NAME=dev-qdash
-QDASH_LOCAL_DOMAIN=qdash.test
 QDASH_HOST=qdash-dev.qiqb.dev
-QDASH_LOCAL_HOST=dev-qdash.qdash.test
+QDASH_LOCAL_HOST=dev-qdash.localhost
 CLIENT_URL=https://qdash-dev.qiqb.dev
 PROXY_PORT=18080
 POSTGRES_DATA_PATH=./postgres_data_dev
