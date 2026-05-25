@@ -149,8 +149,8 @@ done
 updates[CLIENT_URL]='http://${ENV}.localhost:${PROXY_PORT}'
 updates[NEXT_PUBLIC_API_URL]="/api"
 updates[NEXT_PUBLIC_PREFECT_URL]='http://prefect.${ENV}.localhost:${PROXY_PORT}'
-updates[QDASH_UI_UPSTREAM]='ui:${UI_PORT}'
-updates[QDASH_API_UPSTREAM]='api:${API_PORT}'
+updates[QDASH_UI_UPSTREAM]="ui:${updates[UI_PORT]}"
+updates[QDASH_API_UPSTREAM]="api:${updates[API_PORT]}"
 updates[PREFECT_API_URL]='http://localhost:${PREFECT_PORT}/api'
 updates[INTERNAL_API_URL]='http://api:${API_PORT}'
 

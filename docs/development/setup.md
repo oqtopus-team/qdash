@@ -156,8 +156,9 @@ The component tasks are:
 - `task dev-api-local`: run the FastAPI app on the host against Docker services
 - `task dev-ui-local`: run the Next.js app on the host against the local API
 
-When running multiple Docker Compose instances, update `.env` with instance-specific ports before
-starting the stack. `task deploy-local` runs this assignment automatically:
+When running multiple local Docker Compose instances, update `.env` with instance-specific ports
+before starting the stack. `task dev-local` and `task deploy-local` run this assignment
+automatically:
 
 ```shell
 task deploy-local
@@ -166,27 +167,29 @@ task deploy-local
 `QDASH_INSTANCE` defaults to `ENV`, so the default `.env` uses the `dev-fake-qdash` namespace
 from `ENV="dev-fake-qdash"`. Set `QDASH_INSTANCE` only when the local instance name should differ from
 `ENV`. The assignment task derives `COMPOSE_PROJECT_NAME`, reverse-proxy hostnames, service ports,
-and public URLs from that instance name. Existing assigned ports are kept on later deploys for the
-same instance.
+and public URLs from that instance name. The default `.env.example` leaves local ports empty so the
+assignment task can choose less collision-prone free ports. Existing assigned ports are kept on
+later deploys for the same instance.
 
 The Compose stack includes a Caddy reverse proxy. For `ENV="dev-fake-qdash"`, the proxied URLs
 are `http://dev-fake-qdash.localhost:${PROXY_PORT}`,
 `http://api.dev-fake-qdash.localhost:${PROXY_PORT}`,
 `http://prefect.dev-fake-qdash.localhost:${PROXY_PORT}`, and
 `http://mongo.dev-fake-qdash.localhost:${PROXY_PORT}`. These URLs work for both `task dev-local` and
-`task deploy-local`; the direct service ports remain available for tools that connect to MongoDB,
-PostgreSQL, or the API directly.
+`task deploy-local`; the direct service ports remain available in these local tasks for tools that
+connect to MongoDB, PostgreSQL, or the API directly. `task deploy` does not publish these host ports;
+Cloudflare Tunnel reaches the reverse proxy through Docker networking at `http://reverse-proxy:80`.
 
 The main UI hostname also proxies `/api/*` to the API, so frontend traffic can stay on one origin.
 
 ### Access Points
 
-| Service           | URL                        |
-| ----------------- | -------------------------- |
-| QDash UI          | http://localhost:5714      |
-| API Documentation | http://localhost:5715/docs |
-| Prefect Dashboard | http://localhost:4200      |
-| MongoDB Admin     | http://localhost:8081      |
+| Service           | URL                                             |
+| ----------------- | ----------------------------------------------- |
+| QDash UI          | `http://${ENV}.localhost:${PROXY_PORT}`         |
+| API Documentation | `http://api.${ENV}.localhost:${PROXY_PORT}/docs` |
+| Prefect Dashboard | `http://prefect.${ENV}.localhost:${PROXY_PORT}` |
+| MongoDB Admin     | `http://mongo.${ENV}.localhost:${PROXY_PORT}`   |
 
 ## Development Commands
 

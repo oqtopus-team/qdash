@@ -5,8 +5,6 @@ services:
     restart: always
     env_file:
       - .env
-    ports:
-      - "${MONGO_PORT:-27017}:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -20,8 +18,6 @@ services:
     restart: always
     env_file:
       - .env
-    ports:
-      - "${MONGO_EXPRESS_PORT:-8081}:8081"
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -40,8 +36,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${POSTGRES_DATA_PATH:-./postgres_data}:/var/lib/postgresql/data
     healthcheck:
@@ -58,8 +52,6 @@ services:
       - .env
     entrypoint: ["/bin/bash", "-c"]
     command: ["prefect server start --host 0.0.0.0"]
-    ports:
-      - "${PREFECT_PORT:-4200}:4200"
     environment:
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
@@ -89,8 +81,6 @@ services:
       - ./logs/deployment:/app/logs
     working_dir: /app/qdash/workflow
     command: uvicorn deployment_service:app --host 0.0.0.0 --port 8001 --reload
-    ports:
-      - "${DEPLOYMENT_SERVICE_PORT:-8001}:8001"
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
       - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
@@ -137,8 +127,6 @@ services:
     privileged: true
     env_file:
       - .env
-    ports:
-      - "${API_PORT:-5715}:${API_PORT:-5715}"
     volumes:
       - ./src/qdash/api:/app/qdash/api
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (used by reanalysis service)
@@ -189,8 +177,6 @@ services:
       - .env
     environment:
       - PORT=${UI_PORT:-5714}
-    ports:
-      - "${UI_PORT:-5714}:${UI_PORT:-5714}"
     depends_on:
       - api
     networks:
@@ -203,8 +189,6 @@ services:
     environment:
       - QDASH_UI_UPSTREAM=${QDASH_UI_UPSTREAM}
       - QDASH_API_UPSTREAM=${QDASH_API_UPSTREAM}
-    ports:
-      - "${PROXY_PORT:-8080}:80"
     volumes:
       - ./config/proxy/Caddyfile:/etc/caddy/Caddyfile:ro
     extra_hosts:

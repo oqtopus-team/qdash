@@ -33,6 +33,17 @@ for key in TUNNEL_TOKEN QDASH_HOST CLIENT_URL NEXT_PUBLIC_API_URL QDASH_UI_UPSTR
   fi
 done
 
+for key in QDASH_UI_UPSTREAM QDASH_API_UPSTREAM; do
+  value="$(env_value "$key")"
+  case "$value" in
+    *'$'*|*:)
+      echo "Invalid deploy setting: $key=$value" >&2
+      echo "Use an explicit Docker service upstream, for example ui:5714 or api:5715." >&2
+      missing=1
+      ;;
+  esac
+done
+
 if [ "$missing" -ne 0 ]; then
   echo "Set Cloudflare deploy settings in .env before running task deploy." >&2
   echo "Cloudflare public hostname service URL should be: http://reverse-proxy:80" >&2
