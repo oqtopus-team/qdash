@@ -158,6 +158,7 @@ services:
     environment:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/api:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
       - CALIB_DATA_PATH=/app/calib_data
+      - CLIENT_URL=${CLIENT_URL}
       - PREFECT_API_URL=http://prefect-server:4200/api
       - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
     networks:
@@ -177,6 +178,8 @@ services:
       - .env
     environment:
       - PORT=${UI_PORT:-5714}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_PREFECT_URL=${NEXT_PUBLIC_PREFECT_URL}
     depends_on:
       - api
     networks:
@@ -188,6 +191,9 @@ services:
       - .env
     environment:
       - QDASH_LOCAL_HOST=${QDASH_LOCAL_HOST}
+      - QDASH_API_HOST=${QDASH_API_HOST}
+      - QDASH_PREFECT_HOST=${QDASH_PREFECT_HOST}
+      - QDASH_MONGO_HOST=${QDASH_MONGO_HOST}
       - QDASH_UI_UPSTREAM=${QDASH_UI_UPSTREAM}
       - QDASH_API_UPSTREAM=${QDASH_API_UPSTREAM}
     volumes:

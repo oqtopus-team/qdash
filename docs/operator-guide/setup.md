@@ -65,22 +65,22 @@ Configure Cloudflare Tunnel public hostnames to forward to `http://reverse-proxy
 hostname serves the UI and `/api/*`; optional Prefect and Mongo Express hostnames can use the same
 service URL for operator-only access.
 `task deploy` validates the tunnel token and reverse-proxy hostname settings before starting the
-stack; it does not rewrite `.env`.
+stack; it resolves templated URL values for Compose and does not rewrite `.env`. When left unset or
+templated, `CLIENT_URL` becomes `https://${QDASH_HOST}`, `NEXT_PUBLIC_API_URL` becomes `/api`, and
+`NEXT_PUBLIC_PREFECT_URL` becomes `http://prefect.${ENV}.${QDASH_LOCAL_DOMAIN}:${PROXY_PORT}`.
 
 For multiple QDash environments on the same server, give each environment a unique
-`COMPOSE_PROJECT_NAME`, `QDASH_HOST`, `QDASH_LOCAL_HOST`, `PROXY_PORT`, and database data path. Set
-`QDASH_LOCAL_DOMAIN` to the local wildcard DNS zone used on the workstation. The
+`ENV`, `QDASH_INSTANCE`, `QDASH_HOST`, `PROXY_PORT`, and database data path. Set
+`QDASH_LOCAL_DOMAIN` to the local wildcard DNS zone used on the workstation. `COMPOSE_PROJECT_NAME`
+defaults from `QDASH_INSTANCE`, and `QDASH_LOCAL_HOST` defaults from `ENV`. The
 application service ports can stay at their defaults because `task deploy` publishes only the
 reverse proxy on `127.0.0.1:${PROXY_PORT}` for SSH forwarding.
 
 ```env
 ENV=dev
 QDASH_INSTANCE=dev-qdash
-COMPOSE_PROJECT_NAME=dev-qdash
 QDASH_LOCAL_DOMAIN=qdash.test
 QDASH_HOST=qdash-dev.qiqb.dev
-QDASH_LOCAL_HOST=dev-qdash.qdash.test
-CLIENT_URL=https://qdash-dev.qiqb.dev
 PROXY_PORT=18080
 POSTGRES_DATA_PATH=./postgres_data_dev
 MONGO_DATA_PATH=./mongo_data_dev/data/db
