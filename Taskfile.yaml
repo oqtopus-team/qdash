@@ -381,10 +381,11 @@ tasks:
     desc: Start the UI development server
 
   deploy:
+    dotenv: [.env]
     cmds:
       - task: knowledge-pull
       - scripts/check_deploy_env.sh
-      - docker compose --profile tunnel up -d --build
+      - QDASH_UI_UPSTREAM="ui:${UI_PORT:-5714}" QDASH_API_UPSTREAM="api:${API_PORT:-5715}" docker compose --profile tunnel up -d --build
       - sleep 3
-      - docker compose restart api
+      - QDASH_UI_UPSTREAM="ui:${UI_PORT:-5714}" QDASH_API_UPSTREAM="api:${API_PORT:-5715}" docker compose restart api
     desc: Deploy the application with Docker Compose

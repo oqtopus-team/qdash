@@ -26,7 +26,7 @@ env_value() {
 }
 
 missing=0
-for key in TUNNEL_TOKEN QDASH_HOST CLIENT_URL NEXT_PUBLIC_API_URL QDASH_UI_UPSTREAM QDASH_API_UPSTREAM; do
+for key in TUNNEL_TOKEN QDASH_HOST CLIENT_URL NEXT_PUBLIC_API_URL; do
   if [ -z "$(env_value "$key")" ]; then
     echo "Missing required deploy setting: $key" >&2
     missing=1
@@ -37,9 +37,7 @@ for key in QDASH_UI_UPSTREAM QDASH_API_UPSTREAM; do
   value="$(env_value "$key")"
   case "$value" in
     *'$'*|*:)
-      echo "Invalid deploy setting: $key=$value" >&2
-      echo "Use an explicit Docker service upstream, for example ui:5714 or api:5715." >&2
-      missing=1
+      echo "WARNING: $key=$value will be overridden by task deploy." >&2
       ;;
   esac
 done
