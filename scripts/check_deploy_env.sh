@@ -42,6 +42,23 @@ for key in QDASH_UI_UPSTREAM QDASH_API_UPSTREAM; do
   esac
 done
 
+for key in MONGO_PORT MONGO_EXPRESS_PORT POSTGRES_PORT PREFECT_PORT API_PORT UI_PORT; do
+  value="$(env_value "$key")"
+  if [ -n "$value" ]; then
+    case "$value" in
+      *[!0-9]*)
+        echo "Invalid deploy setting: $key=$value" >&2
+        echo "$key must be an integer or removed from .env so the application default is used." >&2
+        missing=1
+        ;;
+    esac
+  elif grep -Eq "^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=" "$ENV_FILE"; then
+    echo "Invalid deploy setting: $key is empty" >&2
+    echo "$key must be an integer or removed from .env so the application default is used." >&2
+    missing=1
+  fi
+done
+
 if [ "$missing" -ne 0 ]; then
   echo "Set Cloudflare deploy settings in .env before running task deploy." >&2
   echo "Cloudflare public hostname service URL should be: http://reverse-proxy:80" >&2
