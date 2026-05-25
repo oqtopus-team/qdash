@@ -7,13 +7,14 @@ import { useState, useEffect, useMemo, type ReactElement } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Braces,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   File,
   FileCode2,
   Folder,
   FolderOpen,
   ListTree,
-  PanelLeft,
   Pencil,
   Plus,
   Save,
@@ -375,13 +376,6 @@ export function TasksPageContent() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            <button
-              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="btn btn-sm btn-ghost hidden sm:flex"
-              title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
-            >
-              <PanelLeft size={16} />
-            </button>
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
               <span className="text-sm font-medium flex-shrink-0 hidden sm:inline">Task Files</span>
               {selectedBackend && (
@@ -511,6 +505,19 @@ export function TasksPageContent() {
             </div>
           </div>
 
+          {/* Sidebar toggle */}
+          <button
+            onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+            className="flex items-center justify-center w-5 flex-shrink-0 bg-base-200 hover:bg-base-300 border-r border-base-300 transition-colors cursor-pointer"
+            aria-label={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
+          >
+            {isSidebarVisible ? (
+              <ChevronLeft size={14} className="text-base-content/50" />
+            ) : (
+              <ChevronRight size={14} className="text-base-content/50" />
+            )}
+          </button>
+
           {/* Editor */}
           <div className="flex-1 flex flex-col">
             {selectedFile ? (
@@ -592,17 +599,6 @@ export function TasksPageContent() {
         <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">
           <div tabIndex={0} role="button" className="btn btn-circle btn-primary shadow-lg">
             <Plus size={20} />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              Sidebar
-            </span>
-            <button
-              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="btn btn-circle btn-outline bg-base-100 shadow-lg"
-            >
-              <PanelLeft size={20} />
-            </button>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
