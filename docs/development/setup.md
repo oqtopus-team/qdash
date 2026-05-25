@@ -362,7 +362,7 @@ Key environment variables are configured in `.env`. See `.env.example` for avail
 
 | Variable                  | Default | Description                 |
 | ------------------------- | ------- | --------------------------- |
-| `PROXY_PORT`              | 8080    | Reverse proxy port          |
+| `PROXY_PORT`              | 18080   | Reverse proxy port          |
 | `API_PORT`                | 5715    | Backend API port            |
 | `UI_PORT`                 | 5714    | Frontend UI port            |
 | `QDASH_INSTANCE`          | -       | Optional local instance name; defaults to `ENV` |
