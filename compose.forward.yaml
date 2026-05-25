@@ -1,0 +1,4 @@
+services:
+  reverse-proxy:
+    ports:
+      - "127.0.0.1:${PROXY_PORT:-18080}:80"

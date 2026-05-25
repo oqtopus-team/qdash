@@ -2,7 +2,7 @@
 	auto_https off
 }
 
-http://{$QDASH_HOST:qdash.localhost} {
+http://{$QDASH_HOST:qdash.localhost}, http://{$QDASH_LOCAL_HOST:qdash.localhost} {
 	handle /api/* {
 		reverse_proxy {$QDASH_API_UPSTREAM:api:5715}
 	}

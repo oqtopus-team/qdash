@@ -385,7 +385,7 @@ tasks:
     cmds:
       - task: knowledge-pull
       - scripts/check_deploy_env.sh
-      - QDASH_UI_UPSTREAM="ui:${UI_PORT:-5714}" QDASH_API_UPSTREAM="api:${API_PORT:-5715}" docker compose --profile tunnel up -d --build
+      - QDASH_UI_UPSTREAM="ui:${UI_PORT:-5714}" QDASH_API_UPSTREAM="api:${API_PORT:-5715}" docker compose -f compose.yaml -f compose.forward.yaml --profile tunnel up -d --build
       - sleep 3
-      - QDASH_UI_UPSTREAM="ui:${UI_PORT:-5714}" QDASH_API_UPSTREAM="api:${API_PORT:-5715}" docker compose restart api
-    desc: Deploy the application with Docker Compose
+      - QDASH_UI_UPSTREAM="ui:${UI_PORT:-5714}" QDASH_API_UPSTREAM="api:${API_PORT:-5715}" docker compose -f compose.yaml -f compose.forward.yaml restart api
+    desc: Deploy with Cloudflare Tunnel and localhost-only reverse proxy for SSH forwarding
