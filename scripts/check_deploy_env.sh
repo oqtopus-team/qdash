@@ -33,7 +33,7 @@ for key in TUNNEL_TOKEN QDASH_HOST CLIENT_URL NEXT_PUBLIC_API_URL; do
   fi
 done
 
-for key in ENV COMPOSE_PROJECT_NAME QDASH_HOST QDASH_LOCAL_HOST CLIENT_URL PROXY_PORT; do
+for key in ENV COMPOSE_PROJECT_NAME QDASH_HOST QDASH_LOCAL_DOMAIN QDASH_LOCAL_HOST CLIENT_URL PROXY_PORT; do
   count="$(
     awk -v key="$key" '
       $0 ~ "^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=" { count++ }
@@ -50,6 +50,17 @@ for key in QDASH_UI_UPSTREAM QDASH_API_UPSTREAM; do
   case "$value" in
     *'$'*|*:)
       echo "WARNING: $key=$value will be overridden by task deploy." >&2
+      ;;
+  esac
+done
+
+for key in CLIENT_URL NEXT_PUBLIC_PREFECT_URL; do
+  value="$(env_value "$key")"
+  case "$value" in
+    *'$'*)
+      echo "Invalid deploy setting: $key=$value" >&2
+      echo "$key must be an explicit URL before running task deploy." >&2
+      missing=1
       ;;
   esac
 done

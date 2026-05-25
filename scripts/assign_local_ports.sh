@@ -96,16 +96,23 @@ find_free_port() {
   exit 1
 }
 
-env_name="$(instance_name "${ENV:-$(env_value ENV)}")"
+env_name="$(sanitize "${ENV:-$(env_value ENV)}")"
+if [ -z "$env_name" ]; then
+  env_name="dev"
+fi
 raw_instance="${QDASH_INSTANCE:-$(env_value QDASH_INSTANCE)}"
 if [ -n "$raw_instance" ]; then
   instance="$(instance_name "$raw_instance")"
 else
-  instance="$env_name"
+  instance="$(instance_name "$env_name")"
 fi
 
 proxy_name="$instance"
-host="${proxy_name}.localhost"
+local_domain="${QDASH_LOCAL_DOMAIN:-$(env_value QDASH_LOCAL_DOMAIN)}"
+if [ -z "$local_domain" ]; then
+  local_domain="qdash.test"
+fi
+host="${proxy_name}.${local_domain}"
 force=0
 if [ "${1:-}" = "--force" ]; then
   force=1
@@ -130,8 +137,9 @@ declare -A updates
 updates[ENV]="$env_name"
 updates[COMPOSE_PROJECT_NAME]="$proxy_name"
 updates[QDASH_INSTANCE]="$instance"
+updates[QDASH_LOCAL_DOMAIN]="$local_domain"
 updates[QDASH_HOST]="$host"
-updates[QDASH_LOCAL_HOST]="${env_name}.localhost"
+updates[QDASH_LOCAL_HOST]="${proxy_name}.${local_domain}"
 updates[QDASH_API_HOST]="api.${host}"
 updates[QDASH_PREFECT_HOST]="prefect.${host}"
 updates[QDASH_MONGO_HOST]="mongo.${host}"
@@ -147,9 +155,9 @@ for index in "${!PORT_KEYS[@]}"; do
   fi
 done
 
-updates[CLIENT_URL]='http://${ENV}.localhost:${PROXY_PORT}'
+updates[CLIENT_URL]="http://${updates[QDASH_LOCAL_HOST]}:${updates[PROXY_PORT]}"
 updates[NEXT_PUBLIC_API_URL]="/api"
-updates[NEXT_PUBLIC_PREFECT_URL]='http://prefect.${ENV}.localhost:${PROXY_PORT}'
+updates[NEXT_PUBLIC_PREFECT_URL]="http://prefect.${updates[QDASH_LOCAL_HOST]}:${updates[PROXY_PORT]}"
 updates[QDASH_UI_UPSTREAM]="ui:${updates[UI_PORT]}"
 updates[QDASH_API_UPSTREAM]="api:${updates[API_PORT]}"
 updates[PREFECT_API_URL]='http://localhost:${PREFECT_PORT}/api'
