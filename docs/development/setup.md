@@ -110,7 +110,7 @@ task dev-local
 
 This starts MongoDB, PostgreSQL, Prefect, the deployment service, and the user flow worker with
 Docker Compose, then runs the API and UI on the host. The UI is available through the reverse proxy
-at `http://dev-fake.qdash.test:${PROXY_PORT}`.
+at `http://localhost:${PROXY_PORT}`.
 
 ### Install Dependencies
 
@@ -164,74 +164,50 @@ automatically:
 task deploy-local
 ```
 
-`ENV` is the short application environment label and is used for local hostnames.
-`QDASH_INSTANCE` defaults to `${ENV}-qdash` and is used for the Compose project name. The default
-`.env` uses `ENV="dev-fake"` and `QDASH_INSTANCE=dev-fake-qdash`, so Docker resources are scoped by
-the instance while local URLs stay short. The assignment task derives `COMPOSE_PROJECT_NAME`,
-reverse-proxy hostnames, service ports, and public URLs from these values. Existing assigned ports
-are kept on later deploys for the same instance.
+`ENV` is the short application environment label. `QDASH_INSTANCE` defaults to `${ENV}-qdash` and is
+used for the Compose project name. The default `.env` uses `ENV="dev-fake"` and
+`QDASH_INSTANCE=dev-fake-qdash`, so Docker resources are scoped by the instance while local access
+uses `localhost` ports. The assignment task derives `COMPOSE_PROJECT_NAME`, service ports, and local
+URLs from these values. Existing assigned ports are kept on later deploys for the same instance.
 
-The Compose stack includes a Caddy reverse proxy. For `ENV="dev-fake"`, the proxied
-URLs are `http://dev-fake.qdash.test:${PROXY_PORT}`,
-`http://api.dev-fake.qdash.test:${PROXY_PORT}`,
-`http://prefect.dev-fake.qdash.test:${PROXY_PORT}`, and
-`http://mongo.dev-fake.qdash.test:${PROXY_PORT}`. These URLs work for both `task dev-local` and
-`task deploy-local`; the direct service ports remain available in these local tasks for tools that
-connect to MongoDB, PostgreSQL, or the API directly. `task deploy` does not publish these service
-ports; Cloudflare Tunnel reaches the reverse proxy through Docker networking at
-`http://reverse-proxy:80`.
+The Compose stack includes a Caddy reverse proxy. QDash is served at
+`http://localhost:${PROXY_PORT}`, and the main UI hostname proxies `/api/*` to the API so frontend
+traffic can stay on one origin. Prefect is available directly at `http://localhost:${PREFECT_PORT}`
+for `task dev-local` and `task deploy-local`.
 
-The main UI hostname also proxies `/api/*` to the API, so frontend traffic can stay on one origin.
-
-For server environments that should also be reachable through SSH port forwarding, set
-`QDASH_LOCAL_DOMAIN` once for the local wildcard DNS zone. `QDASH_LOCAL_HOST` defaults to
-`${ENV}.${QDASH_LOCAL_DOMAIN}` and only needs to be set when the local alias should differ
-from that pattern. `task deploy` resolves templated URL values before starting Compose: `CLIENT_URL`
-defaults to `https://${QDASH_HOST}`, `NEXT_PUBLIC_API_URL` defaults to `/api`, and
-`NEXT_PUBLIC_PREFECT_URL` defaults to `http://prefect.${QDASH_LOCAL_HOST}:${PROXY_PORT}`.
-`task deploy` keeps the Cloudflare Tunnel setup and publishes only the reverse proxy on
-`127.0.0.1:${PROXY_PORT}`. Forward it from the workstation with a matching local port:
+For server environments that should also be reachable through SSH port forwarding, `task deploy`
+keeps the Cloudflare Tunnel setup and publishes only the reverse proxy and Prefect on `127.0.0.1`.
+`task deploy` resolves templated URL values before starting Compose: `CLIENT_URL` defaults to
+`https://${QDASH_HOST}`, `NEXT_PUBLIC_API_URL` defaults to `/api`, and `NEXT_PUBLIC_PREFECT_URL`
+defaults to `http://localhost:${PREFECT_FORWARD_PORT}`. Forward the ports from the workstation:
 
 ```shell
-ssh -L 18080:127.0.0.1:18080 anemone
+ssh -L 18080:127.0.0.1:18080 -L 14200:127.0.0.1:14200 anemone
 ```
 
-Then open `http://${ENV}.qdash.test:18080`.
-Configure local wildcard DNS once so `*.${QDASH_LOCAL_DOMAIN}` resolves to `127.0.0.1`; this avoids per-host
-`/etc/hosts` entries and does not depend on public DNS.
-
-On macOS with Homebrew:
-
-```shell
-brew install dnsmasq
-mkdir -p "$(brew --prefix)/etc/dnsmasq.d"
-echo 'address=/.qdash.test/127.0.0.1' | sudo tee "$(brew --prefix)/etc/dnsmasq.d/qdash.conf"
-sudo mkdir -p /etc/resolver
-echo 'nameserver 127.0.0.1' | sudo tee /etc/resolver/qdash.test
-sudo brew services start dnsmasq
-```
+Then open `http://localhost:18080` for QDash and `http://localhost:14200/dashboard` for Prefect.
 
 When running multiple QDash environments on one server, keep `ENV`, the Docker Compose project name,
-forwarded proxy port, local alias, public hostname, and data paths unique for each environment. The
-internal service ports such as `API_PORT=5715` and `UI_PORT=5714` may stay the same because they are
-not published directly by `task deploy`.
+forwarded ports, public hostname, and data paths unique for each environment. The internal service
+ports such as `API_PORT=5715` and `UI_PORT=5714` may stay the same because they are not published
+directly by `task deploy`.
 
 ```env
 # qdash-dev
 ENV=dev
 QDASH_INSTANCE=dev-qdash
-QDASH_LOCAL_DOMAIN=qdash.test
 QDASH_HOST=qdash-dev.qiqb.dev
 PROXY_PORT=18080
+PREFECT_FORWARD_PORT=14200
 POSTGRES_DATA_PATH=./postgres_data_dev
 MONGO_DATA_PATH=./mongo_data_dev/data/db
 
 # qdash-stg
 ENV=stg
 QDASH_INSTANCE=stg-qdash
-QDASH_LOCAL_DOMAIN=qdash.test
 QDASH_HOST=qdash-stg.qiqb.dev
 PROXY_PORT=18081
+PREFECT_FORWARD_PORT=14201
 POSTGRES_DATA_PATH=./postgres_data_stg
 MONGO_DATA_PATH=./mongo_data_stg/data/db
 ```
@@ -239,17 +215,22 @@ MONGO_DATA_PATH=./mongo_data_stg/data/db
 Forward both environments from the workstation when needed:
 
 ```shell
-ssh -L 18080:127.0.0.1:18080 -L 18081:127.0.0.1:18081 anemone
+ssh \
+  -L 18080:127.0.0.1:18080 \
+  -L 14200:127.0.0.1:14200 \
+  -L 18081:127.0.0.1:18081 \
+  -L 14201:127.0.0.1:14201 \
+  anemone
 ```
 
 ### Access Points
 
 | Service           | URL                                             |
 | ----------------- | ----------------------------------------------- |
-| QDash UI          | `http://${ENV}.qdash.test:${PROXY_PORT}`         |
-| API Documentation | `http://api.${ENV}.qdash.test:${PROXY_PORT}/docs` |
-| Prefect Dashboard | `http://prefect.${ENV}.qdash.test:${PROXY_PORT}` |
-| MongoDB Admin     | `http://mongo.${ENV}.qdash.test:${PROXY_PORT}`   |
+| QDash UI          | `http://localhost:${PROXY_PORT}`       |
+| API Documentation | `http://localhost:${PROXY_PORT}/docs`  |
+| Prefect Dashboard | `http://localhost:${PREFECT_FORWARD_PORT}` for `task deploy`, `http://localhost:${PREFECT_PORT}` for local tasks |
+| MongoDB Admin     | `http://localhost:${MONGO_EXPRESS_PORT}` for local tasks |
 
 ## Development Commands
 
@@ -378,6 +359,7 @@ Key environment variables are configured in `.env`. See `.env.example` for avail
 | Variable                  | Default | Description                 |
 | ------------------------- | ------- | --------------------------- |
 | `PROXY_PORT`              | 18080   | Reverse proxy port          |
+| `PREFECT_FORWARD_PORT`    | 14200   | Prefect SSH forwarding port used by `task deploy` |
 | `API_PORT`                | 5715    | Backend API port            |
 | `UI_PORT`                 | 5714    | Frontend UI port            |
 | `QDASH_INSTANCE`          | -       | Optional instance name; defaults to `${ENV}-qdash` |
