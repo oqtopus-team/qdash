@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type PolicyViolationResponseMeasured = number | null;
+export type ExecutionResponseDetailUserId = string | null;

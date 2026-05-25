@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type PolicyViolationResponseValidFrom = string | null;
+export type TaskResultResponseUserId = string | null;

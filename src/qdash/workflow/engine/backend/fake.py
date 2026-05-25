@@ -13,6 +13,11 @@ class FakeBackend(BaseBackend):
         self._config = config
         self._instance: Any | None = None
 
+    @property
+    def config(self) -> dict[str, Any]:
+        """Return the configuration dictionary for the Fake backend."""
+        return self._config
+
     def version(self) -> str:
         """Return the version of the Fake backend."""
         return "0.1.0"

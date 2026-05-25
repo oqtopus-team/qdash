@@ -87,6 +87,8 @@ class ExecutionService:
                 name=f"{execution.name}-{execution.execution_id}",
                 execution_id=execution.execution_id,
                 status=execution.status,
+                user_id=execution.user_id,
+                username=execution.username,
                 start_at=execution.start_at,
                 end_at=execution.end_at,
                 elapsed_time=execution.elapsed_time,
@@ -127,6 +129,8 @@ class ExecutionService:
             name=f"{execution.name}-{execution.execution_id}",
             status=execution.status,
             flow_name=execution.name,
+            user_id=execution.user_id,
+            username=execution.username,
             start_at=execution.start_at,
             end_at=execution.end_at,
             elapsed_time=execution.elapsed_time,
@@ -308,6 +312,8 @@ class ExecutionService:
                     pass  # Keep elapsed as None for invalid values
             tasks.append(
                 Task(
+                    user_id=doc.user_id,
+                    username=doc.username,
                     task_id=doc.task_id,
                     qid=doc.qid,
                     name=doc.name,

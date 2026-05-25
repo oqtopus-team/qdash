@@ -117,14 +117,14 @@ services:
       - ./src/qdash/repository:/app/qdash/repository
       - ./src/qdash/config.py:/app/qdash/config.py
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
-      - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config
-      - ./config:/app/config
+      - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
+      - ./config:/app/config # QDash app/domain/copilot config files
       - ./logs/worker:/app/logs
     working_dir: /app/qdash/workflow
     command: python start_worker.py
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
-      - PREFECT_LOGGING_SETTINGS_PATH=/app/config/logging/prefect.yaml
+      - PREFECT_LOGGING_SETTINGS_PATH=/app/config/app/logging/prefect.yaml
       - PYTHONPATH=/app:/app/qdash:/app/qdash/workflow:/app/qdash/dbmodel
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
     networks:
@@ -152,9 +152,9 @@ services:
       - ./src/qdash/workflow/templates:/app/qdash/workflow/templates # Flow templates
       - ./src/qdash/workflow/service:/app/qdash/workflow/service # Calibration service modules
       - ${CALIBTASKS_PATH:-./src/qdash/workflow/calibtasks}:/app/qdash/workflow/calibtasks # Calibration tasks
-      - ./config:/app/config # Metrics metadata and other config files
+      - ./config:/app/config # QDash app/domain/copilot config files
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
-      - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config
+      - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - ./logs/api:/app/logs
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug

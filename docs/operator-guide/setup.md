@@ -20,8 +20,11 @@ Review these values before starting services:
 | `API_PORT` / `UI_PORT` / `PREFECT_PORT` | Host ports for API, UI, and Prefect |
 | `MONGO_DATA_PATH` / `POSTGRES_DATA_PATH` | Persistent database storage |
 | `CALIB_DATA_PATH` | Calibration figures and run artifacts |
-| `CONFIG_PATH` | Qubex backend configuration |
+| `CONFIG_PATH` | Qubex backend configuration repository/data |
 | `DEFAULT_BACKEND` | Backend selected by default |
+
+QDash application settings are committed under `config/app`, `config/domain`, and
+`config/copilot`; `CONFIG_PATH` is only for the Qubex backend configuration tree.
 
 ## Full Stack
 

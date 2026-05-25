@@ -12,6 +12,7 @@ from git.exc import GitCommandError, InvalidGitRepositoryError
 from prefect import get_run_logger, task
 
 from qdash.common.config.paths import QUBEX_CONFIG_BASE
+from qdash.common.utils.commit_message import format_machine_commit_message
 from qdash.common.utils.datetime import now_iso
 
 if TYPE_CHECKING:
@@ -111,7 +112,7 @@ def push_github(
         now_jst = now_iso()
         repo.git.config("user.name", "github-actions[bot]")
         repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
-        repo.index.commit(f"{commit_message} at {now_jst}")
+        repo.index.commit(format_machine_commit_message(commit_message, now_jst))
 
         repo.remotes.origin.push()
 
@@ -199,7 +200,7 @@ def push_github_batch(
         now_jst = now_iso()
         repo.git.config("user.name", "github-actions[bot]")
         repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
-        repo.index.commit(f"{commit_message} at {now_jst}")
+        repo.index.commit(format_machine_commit_message(commit_message, now_jst))
 
         repo.remotes.origin.push()
 

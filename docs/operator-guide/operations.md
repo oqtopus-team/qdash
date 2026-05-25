@@ -48,5 +48,6 @@ If workflow execution fails with a missing work pool, restart `deployment-servic
 If task figures do not render, confirm `CALIB_DATA_PATH` points at the directory mounted to
 `/app/calib_data` in Docker.
 
-If config or task file pages return missing-path errors, confirm `CONFIG_PATH` and
-`CALTASKS_PATH` in `.env`.
+If Qubex config or task file pages return missing-path errors, confirm `CONFIG_PATH` points
+to the Qubex backend configuration tree and `CALIB_TASKS_PATH` points to the calibration
+task directory in `.env`.

@@ -66,7 +66,7 @@ def single_task_executor(
         flow_name=flow_name or f"re-execute:{task_name}",
         tags=tags,
         project_id=project_id,
-        enable_github_pull=False,
+        enable_github_pull=True,
         enable_github=update_params,
         use_lock=False,
         parameter_overrides=parameter_overrides,

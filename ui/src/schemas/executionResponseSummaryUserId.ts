@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type PolicyViolationResponseWarnThreshold = number | null;
+export type ExecutionResponseSummaryUserId = string | null;

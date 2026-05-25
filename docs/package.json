@@ -11,7 +11,7 @@
     "docs:preview": "vitepress preview"
   },
   "dependencies": {
-    "vitepress-openapi": "^0.1.20"
+    "vitepress-openapi": "^0.2.0"
   },
   "overrides": {
     "brace-expansion": "^2.0.3",

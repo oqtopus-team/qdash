@@ -23,16 +23,25 @@ def _env_path(name: str) -> Path | None:
     return Path(value).expanduser().resolve() if value else None
 
 
+def _first_existing_env_path(*names: str) -> Path | None:
+    for name in names:
+        env_value = _env_path(name)
+        if env_value is not None and env_value.exists():
+            return env_value
+    return None
+
+
 def _resolve_runtime_base_path(
     *,
-    env_name: str | None,
+    env_name: str | tuple[str, ...] | None,
     container_path: Path,
     repo_local_path: Path | None = None,
 ) -> Path:
     """Resolve a base path with explicit env, container, then repo-local fallback."""
     if env_name:
-        env_value = _env_path(env_name)
-        if env_value is not None and env_value.exists():
+        env_names = (env_name,) if isinstance(env_name, str) else env_name
+        env_value = _first_existing_env_path(*env_names)
+        if env_value is not None:
             return env_value
     if container_path.exists():
         return container_path
@@ -42,7 +51,7 @@ def _resolve_runtime_base_path(
 
 
 def resolve_config_base_path() -> Path:
-    """Resolve the Qubex config directory for host and container execution."""
+    """Resolve the Qubex backend configuration tree for host and container execution."""
     return _resolve_runtime_base_path(
         env_name="CONFIG_PATH",
         container_path=QUBEX_CONFIG_BASE,
@@ -53,7 +62,7 @@ def resolve_config_base_path() -> Path:
 def resolve_calibtasks_base_path() -> Path:
     """Resolve the calibration task directory for host and container execution."""
     return _resolve_runtime_base_path(
-        env_name="CALTASKS_PATH",
+        env_name=("CALIB_TASKS_PATH", "CALTASKS_PATH"),
         container_path=CALIBTASKS_DIR,
         repo_local_path=REPO_WORKFLOW_DIR / "calibtasks",
     )

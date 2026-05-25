@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { TaskUserId } from './taskUserId';
 import type { TaskTaskId } from './taskTaskId';
 import type { TaskQid } from './taskQid';
 import type { TaskUpstreamId } from './taskUpstreamId';
@@ -26,6 +27,8 @@ import type { TaskTaskType } from './taskTaskType';
  * Task is a Pydantic model that represents a task.
  */
 export interface Task {
+  user_id?: TaskUserId;
+  username?: string;
   task_id?: TaskTaskId;
   qid?: TaskQid;
   name?: string;

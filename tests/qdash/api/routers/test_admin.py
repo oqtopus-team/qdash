@@ -87,7 +87,8 @@ class TestAdminUsersEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert "cleared" in data
-        assert "policy.yaml" in data["cleared"]
+        assert "app/workflow.yaml" in data["cleared"]
+        assert "domain/metrics.yaml" in data["cleared"]
 
     def test_reload_config_caches_requires_admin(
         self, test_client, admin_user, regular_user, user_headers

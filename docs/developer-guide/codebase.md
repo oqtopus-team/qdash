@@ -32,5 +32,8 @@ inside individual services.
 Important mounted paths:
 
 - `CALIB_DATA_PATH` ↔ `/app/calib_data`
-- `CONFIG_PATH` ↔ `/app/config/qubex-config`
-- `CALTASKS_PATH` ↔ `/app/qdash/workflow/calibtasks`
+- `CONFIG_PATH` ↔ `/app/config/qubex-config` for the Qubex backend configuration repository/data
+- `CALIB_TASKS_PATH` ↔ `/app/qdash/workflow/calibtasks`
+
+QDash application configuration is separate from `CONFIG_PATH` and lives under `config/app`,
+`config/domain`, and `config/copilot`.

@@ -4483,7 +4483,7 @@
           "task-file"
         ],
         "summary": "Get task file settings",
-        "description": "Get task file settings from config/settings.yaml.\n\nReturns\n-------\n    Task file settings including default backend",
+        "description": "Get task file settings from config/app/settings.yaml.\n\nReturns\n-------\n    Task file settings including default backend",
         "operationId": "getTaskFileSettings",
         "responses": {
           "200": {
@@ -4688,7 +4688,7 @@
           "task-file"
         ],
         "summary": "Get backend configuration",
-        "description": "Get backend configuration from backend.yaml.\n\nReturns\n-------\n    Backend configuration",
+        "description": "Get backend configuration from config/app/backend.yaml.\n\nReturns\n-------\n    Backend configuration",
         "operationId": "getBackendConfig",
         "responses": {
           "200": {
@@ -13455,226 +13455,6 @@
           }
         }
       }
-    },
-    "/provenance/policy/violations": {
-      "get": {
-        "tags": [
-          "provenance"
-        ],
-        "summary": "Get policy violations for current parameter versions",
-        "description": "Get policy violations evaluated on current (latest valid) parameter versions.",
-        "operationId": "getProvenancePolicyViolations",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "severity",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter by severity (warn)",
-              "title": "Severity"
-            },
-            "description": "Filter by severity (warn)"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 500,
-              "minimum": 1,
-              "description": "Maximum number of violations to return",
-              "default": 200,
-              "title": "Limit"
-            },
-            "description": "Maximum number of violations to return"
-          },
-          {
-            "name": "parameter_names",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter by parameter names",
-              "title": "Parameter Names"
-            },
-            "description": "Filter by parameter names"
-          },
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PolicyViolationsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/provenance/policy/impact/{entity_id}": {
-      "get": {
-        "tags": [
-          "provenance"
-        ],
-        "summary": "Get policy violations for current versions in impact set",
-        "description": "Get policy violations for current versions within the impact graph of an entity.",
-        "operationId": "getProvenancePolicyImpactViolations",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "entity_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Entity identifier",
-              "title": "Entity Id"
-            },
-            "description": "Entity identifier"
-          },
-          {
-            "name": "max_depth",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 20,
-              "minimum": 1,
-              "description": "Maximum traversal depth",
-              "default": 10,
-              "title": "Max Depth"
-            },
-            "description": "Maximum traversal depth"
-          },
-          {
-            "name": "severity",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter by severity (warn)",
-              "title": "Severity"
-            },
-            "description": "Filter by severity (warn)"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 500,
-              "minimum": 1,
-              "description": "Maximum number of violations to return",
-              "default": 200,
-              "title": "Limit"
-            },
-            "description": "Maximum number of violations to return"
-          },
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PolicyViolationsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -16045,7 +15825,7 @@
             "type": "number",
             "title": "Delta Per Step",
             "description": "Average delta per step",
-            "default": 0
+            "default": 0.0
           },
           "current_value": {
             "anyOf": [
@@ -16454,6 +16234,22 @@
             "title": "Flow Name",
             "default": ""
           },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
           "start_at": {
             "anyOf": [
               {
@@ -16524,7 +16320,7 @@
           "note"
         ],
         "title": "ExecutionResponseDetail",
-        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution.\n    tags (list[str]): Tags associated with the execution.\n    chip_id (str): The chip ID for the execution."
+        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    user_id (str | None): Internal ID of the user who started the execution.\n    username (str): Username snapshot of the user who started the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution.\n    tags (list[str]): Tags associated with the execution.\n    chip_id (str): The chip ID for the execution."
       },
       "ExecutionResponseSummary": {
         "properties": {
@@ -16539,6 +16335,22 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
           },
           "start_at": {
             "anyOf": [
@@ -16598,7 +16410,7 @@
           "note"
         ],
         "title": "ExecutionResponseSummary",
-        "description": "ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    execution_id (str): The ID of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    tags (list[str]): Tags associated with the execution.\n    note (dict): Notes for the execution."
+        "description": "ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    execution_id (str): The ID of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    user_id (str | None): Internal ID of the user who started the execution.\n    username (str): Username snapshot of the user who started the execution.\n    tags (list[str]): Tags associated with the execution.\n    note (dict): Notes for the execution."
       },
       "ExpectedResultResponse": {
         "properties": {
@@ -17038,8 +16850,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 10000,
-                "minimum": 0
+                "maximum": 10000.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -17179,8 +16991,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 10000,
-                "minimum": 0
+                "maximum": 10000.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -20390,7 +20202,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0
+            "default": 0.0
           },
           "previous_error": {
             "anyOf": [
@@ -20628,7 +20440,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0
+            "default": 0.0
           },
           "version": {
             "type": "integer",
@@ -20732,126 +20544,6 @@
         ],
         "title": "PasswordReset",
         "description": "Password reset request model (admin only)."
-      },
-      "PolicyViolationResponse": {
-        "properties": {
-          "entity_id": {
-            "type": "string",
-            "title": "Entity Id"
-          },
-          "parameter_name": {
-            "type": "string",
-            "title": "Parameter Name"
-          },
-          "qid": {
-            "type": "string",
-            "title": "Qid",
-            "default": ""
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Value"
-          },
-          "unit": {
-            "type": "string",
-            "title": "Unit",
-            "default": ""
-          },
-          "error": {
-            "type": "number",
-            "title": "Error",
-            "default": 0
-          },
-          "valid_from": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Valid From"
-          },
-          "severity": {
-            "type": "string",
-            "title": "Severity",
-            "description": "warn"
-          },
-          "check_type": {
-            "type": "string",
-            "title": "Check Type",
-            "description": "min|max|staleness_hours|uncertainty_ratio"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message",
-            "default": ""
-          },
-          "warn_threshold": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Warn Threshold"
-          },
-          "measured": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Measured"
-          }
-        },
-        "type": "object",
-        "required": [
-          "entity_id",
-          "parameter_name",
-          "value",
-          "severity",
-          "check_type"
-        ],
-        "title": "PolicyViolationResponse",
-        "description": "Response model for a policy violation on a current parameter version."
-      },
-      "PolicyViolationsResponse": {
-        "properties": {
-          "violations": {
-            "items": {
-              "$ref": "#/components/schemas/PolicyViolationResponse"
-            },
-            "type": "array",
-            "title": "Violations"
-          },
-          "total_count": {
-            "type": "integer",
-            "title": "Total Count",
-            "description": "Total violations matching query",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "title": "PolicyViolationsResponse",
-        "description": "Response model for a list of policy violations."
       },
       "Position": {
         "properties": {
@@ -22438,6 +22130,22 @@
       },
       "Task": {
         "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
           "task_id": {
             "anyOf": [
               {
@@ -23428,6 +23136,22 @@
             "title": "Flow Name",
             "default": ""
           },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
           "figure_path": {
             "items": {
               "type": "string"
@@ -23549,7 +23273,7 @@
           "output_parameters"
         ],
         "title": "TaskResultResponse",
-        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time.\n    source_task_id (str | None): Parent task ID this was re-executed from.\n    re_executions (list[ReExecutionEntry]): Child task results from re-executions."
+        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    user_id (str | None): Internal ID of the user who executed the task.\n    username (str): Username snapshot of the user who executed the task.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time.\n    source_task_id (str | None): Parent task ID this was re-executed from.\n    re_executions (list[ReExecutionEntry]): Child task results from re-executions."
       },
       "TimeSeriesData": {
         "properties": {
@@ -23668,7 +23392,7 @@
         "properties": {
           "unread_count": {
             "type": "integer",
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Unread Count"
           }
         },
@@ -24514,10 +24238,5 @@
         "scheme": "bearer"
       }
     }
-  },
-  "servers": [
-    {
-      "url": "/api"
-    }
-  ]
+  }
 }

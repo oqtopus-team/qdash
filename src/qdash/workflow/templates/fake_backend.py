@@ -6,7 +6,7 @@ Demonstrates how to switch between backends using CalibService.
 Backend Switching:
     - backend_name="fake": Use simulated measurements (no hardware required)
     - backend_name="qubex": Use real quantum hardware via qubex library
-    - backend_name=None: Use default from config/backend.yaml
+    - backend_name=None: Use default from config/app/backend.yaml
 
 Available Fake Tasks (same names as qubex for seamless switching):
     - CheckFineChevron: Entry point, outputs qubit_frequency, readout_frequency
@@ -74,7 +74,7 @@ def fake_calibration(
         tasks: Task names to run. Default: ["CheckFineChevron", "CheckRabi", "CheckT1", "CheckT2Echo"]
                For full provenance test, add "RandomizedBenchmarking".
         backend_name: Backend to use ("fake" for testing, "qubex" for production,
-                      None for default from backend.yaml)
+                      None for default from config/app/backend.yaml)
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
 
