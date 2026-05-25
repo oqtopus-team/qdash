@@ -7,14 +7,13 @@ import { useState, useEffect, useMemo, type ReactElement } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Braces,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   File,
   FileCode2,
   Folder,
   FolderOpen,
   ListTree,
+  PanelLeft,
   Pencil,
   Plus,
   Save,
@@ -438,85 +437,86 @@ export function TasksPageContent() {
         {/* Main content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
-          <div
-            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-base-100 border-r border-base-300 flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden`}
-          >
-            {/* Tab buttons */}
-            <div className="flex border-b border-base-300">
-              <button
-                onClick={() => setViewMode("files")}
-                className={`flex-1 px-3 py-2 text-xs font-medium flex items-center justify-center gap-1 transition-colors ${
-                  viewMode === "files"
-                    ? "text-base-content bg-base-100 border-b-2 border-primary"
-                    : "text-base-content/50 hover:text-base-content/80 hover:bg-base-200"
-                }`}
-              >
-                <ListTree size={14} />
-                Files
-              </button>
-              <button
-                onClick={() => setViewMode("tasks")}
-                className={`flex-1 px-3 py-2 text-xs font-medium flex items-center justify-center gap-1 transition-colors ${
-                  viewMode === "tasks"
-                    ? "text-base-content bg-base-100 border-b-2 border-primary"
-                    : "text-base-content/50 hover:text-base-content/80 hover:bg-base-200"
-                }`}
-              >
-                <Braces size={14} />
-                Tasks
-              </button>
+          <div className="bg-base-100 border-r border-base-300 flex flex-shrink-0">
+            {/* Collapsible panel */}
+            <div
+              className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} flex flex-col transition-all duration-200 overflow-hidden`}
+            >
+              {/* Tab buttons */}
+              <div className="flex border-b border-base-300">
+                <button
+                  onClick={() => setViewMode("files")}
+                  className={`flex-1 px-3 py-2 text-xs font-medium flex items-center justify-center gap-1 transition-colors whitespace-nowrap ${
+                    viewMode === "files"
+                      ? "text-base-content bg-base-100 border-b-2 border-primary"
+                      : "text-base-content/50 hover:text-base-content/80 hover:bg-base-200"
+                  }`}
+                >
+                  <ListTree size={14} />
+                  Files
+                </button>
+                <button
+                  onClick={() => setViewMode("tasks")}
+                  className={`flex-1 px-3 py-2 text-xs font-medium flex items-center justify-center gap-1 transition-colors whitespace-nowrap ${
+                    viewMode === "tasks"
+                      ? "text-base-content bg-base-100 border-b-2 border-primary"
+                      : "text-base-content/50 hover:text-base-content/80 hover:bg-base-200"
+                  }`}
+                >
+                  <Braces size={14} />
+                  Tasks
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto py-2">
+                {viewMode === null ? (
+                  <div className="flex items-center justify-center py-4">
+                    <span className="loading loading-spinner loading-sm"></span>
+                  </div>
+                ) : viewMode === "files" ? (
+                  <>
+                    <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
+                      EXPLORER
+                    </h2>
+                    <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
+                      {selectedBackend ? `${selectedBackend} Tasks` : "Select Backend"}
+                    </div>
+                    {isTreeLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <span className="loading loading-spinner loading-sm"></span>
+                      </div>
+                    ) : treeError ? (
+                      <div className="text-xs text-red-400 px-3">Error loading tree</div>
+                    ) : (
+                      fileTreeData && renderFileTree(fileTreeData)
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
+                      TASK LIST
+                    </h2>
+                    <div className="text-xs text-base-content/50 px-3 mb-2">
+                      Click to view source, copy button for Flow Editor
+                    </div>
+                    {renderTaskList()}
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto py-2">
-              {viewMode === null ? (
-                <div className="flex items-center justify-center py-4">
-                  <span className="loading loading-spinner loading-sm"></span>
-                </div>
-              ) : viewMode === "files" ? (
-                <>
-                  <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
-                    EXPLORER
-                  </h2>
-                  <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
-                    {selectedBackend ? `${selectedBackend} Tasks` : "Select Backend"}
-                  </div>
-                  {isTreeLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <span className="loading loading-spinner loading-sm"></span>
-                    </div>
-                  ) : treeError ? (
-                    <div className="text-xs text-red-400 px-3">Error loading tree</div>
-                  ) : (
-                    fileTreeData && renderFileTree(fileTreeData)
-                  )}
-                </>
-              ) : (
-                <>
-                  <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
-                    TASK LIST
-                  </h2>
-                  <div className="text-xs text-base-content/50 px-3 mb-2">
-                    Click to view source, copy button for Flow Editor
-                  </div>
-                  {renderTaskList()}
-                </>
-              )}
+            {/* Toggle button - always visible */}
+            <div className="flex flex-col bg-transparent">
+              <button
+                onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+                className="px-2 py-2 text-base-content/50 hover:text-base-content hover:bg-base-200 transition-colors border-b border-base-300"
+                aria-label={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
+              >
+                <PanelLeft size={16} />
+              </button>
             </div>
           </div>
-
-          {/* Sidebar toggle */}
-          <button
-            onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-            className="flex items-center justify-center w-5 flex-shrink-0 bg-base-200 hover:bg-base-300 border-r border-base-300 transition-colors cursor-pointer"
-            aria-label={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
-          >
-            {isSidebarVisible ? (
-              <ChevronLeft size={14} className="text-base-content/50" />
-            ) : (
-              <ChevronRight size={14} className="text-base-content/50" />
-            )}
-          </button>
 
           {/* Editor */}
           <div className="flex-1 flex flex-col">
