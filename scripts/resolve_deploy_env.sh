@@ -44,14 +44,14 @@ qdash_instance="${qdash_instance:-${env_name}-qdash}"
 compose_project_name="${COMPOSE_PROJECT_NAME:-$(env_value COMPOSE_PROJECT_NAME)}"
 compose_project_name="${compose_project_name:-$qdash_instance}"
 
-local_domain="${QDASH_LOCAL_DOMAIN:-$(env_value QDASH_LOCAL_DOMAIN)}"
-local_domain="${local_domain:-qdash.test}"
-
 local_host="${QDASH_LOCAL_HOST:-$(env_value QDASH_LOCAL_HOST)}"
-local_host="${local_host:-${env_name}.${local_domain}}"
+local_host="${local_host:-localhost}"
 
 proxy_port="${PROXY_PORT:-$(env_value PROXY_PORT)}"
 proxy_port="${proxy_port:-18080}"
+
+prefect_forward_port="${PREFECT_FORWARD_PORT:-$(env_value PREFECT_FORWARD_PORT)}"
+prefect_forward_port="${prefect_forward_port:-14200}"
 
 ui_port="${UI_PORT:-$(env_value UI_PORT)}"
 ui_port="${ui_port:-5714}"
@@ -73,19 +73,19 @@ next_public_api_url="${next_public_api_url:-/api}"
 prefect_url="${NEXT_PUBLIC_PREFECT_URL:-$(env_value NEXT_PUBLIC_PREFECT_URL)}"
 case "$prefect_url" in
   ""|*'$'*)
-    prefect_url="http://prefect.${local_host}:${proxy_port}"
+    prefect_url="http://localhost:${prefect_forward_port}"
     ;;
 esac
 
 emit_export ENV "$env_name"
 emit_export QDASH_INSTANCE "$qdash_instance"
 emit_export COMPOSE_PROJECT_NAME "$compose_project_name"
-emit_export QDASH_LOCAL_DOMAIN "$local_domain"
 emit_export QDASH_LOCAL_HOST "$local_host"
 emit_export QDASH_API_HOST "api.${local_host}"
 emit_export QDASH_PREFECT_HOST "prefect.${local_host}"
 emit_export QDASH_MONGO_HOST "mongo.${local_host}"
 emit_export PROXY_PORT "$proxy_port"
+emit_export PREFECT_FORWARD_PORT "$prefect_forward_port"
 emit_export CLIENT_URL "$client_url"
 emit_export NEXT_PUBLIC_API_URL "$next_public_api_url"
 emit_export NEXT_PUBLIC_PREFECT_URL "$prefect_url"
