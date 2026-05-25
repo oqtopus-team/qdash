@@ -108,12 +108,11 @@ else
 fi
 
 proxy_name="$instance"
-local_name="$env_name"
 local_domain="${QDASH_LOCAL_DOMAIN:-$(env_value QDASH_LOCAL_DOMAIN)}"
 if [ -z "$local_domain" ]; then
   local_domain="qdash.test"
 fi
-host="${local_name}.${local_domain}"
+host="${proxy_name}.${local_domain}"
 force=0
 if [ "${1:-}" = "--force" ]; then
   force=1
@@ -140,7 +139,7 @@ updates[COMPOSE_PROJECT_NAME]="$proxy_name"
 updates[QDASH_INSTANCE]="$instance"
 updates[QDASH_LOCAL_DOMAIN]="$local_domain"
 updates[QDASH_HOST]="$host"
-updates[QDASH_LOCAL_HOST]="$host"
+updates[QDASH_LOCAL_HOST]="${proxy_name}.${local_domain}"
 updates[QDASH_API_HOST]="api.${host}"
 updates[QDASH_PREFECT_HOST]="prefect.${host}"
 updates[QDASH_MONGO_HOST]="mongo.${host}"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE="${ENV_FILE:-.env}"
+ENV_FILE=".env"
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "Missing .env. Create it with: cp .env.example .env" >&2
@@ -19,21 +19,21 @@ env_value() {
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
       gsub(/^"|"$/, "", line)
       gsub(/^'\''|'\''$/, "", line)
-      value = line
+      print line
+      exit
     }
-    END { print value }
   ' "$ENV_FILE"
 }
 
 missing=0
-for key in TUNNEL_TOKEN QDASH_HOST; do
+for key in TUNNEL_TOKEN QDASH_HOST CLIENT_URL NEXT_PUBLIC_API_URL; do
   if [ -z "$(env_value "$key")" ]; then
     echo "Missing required deploy setting: $key" >&2
     missing=1
   fi
 done
 
-for key in ENV COMPOSE_PROJECT_NAME QDASH_HOST QDASH_LOCAL_DOMAIN QDASH_LOCAL_HOST CLIENT_URL NEXT_PUBLIC_PREFECT_URL PROXY_PORT; do
+for key in ENV COMPOSE_PROJECT_NAME QDASH_HOST QDASH_LOCAL_DOMAIN QDASH_LOCAL_HOST CLIENT_URL PROXY_PORT; do
   count="$(
     awk -v key="$key" '
       $0 ~ "^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=" { count++ }
@@ -50,6 +50,17 @@ for key in QDASH_UI_UPSTREAM QDASH_API_UPSTREAM; do
   case "$value" in
     *'$'*|*:)
       echo "WARNING: $key=$value will be overridden by task deploy." >&2
+      ;;
+  esac
+done
+
+for key in CLIENT_URL NEXT_PUBLIC_PREFECT_URL; do
+  value="$(env_value "$key")"
+  case "$value" in
+    *'$'*)
+      echo "Invalid deploy setting: $key=$value" >&2
+      echo "$key must be an explicit URL before running task deploy." >&2
+      missing=1
       ;;
   esac
 done
@@ -77,14 +88,7 @@ if [ "$missing" -ne 0 ]; then
   exit 1
 fi
 
-client_url="$(env_value CLIENT_URL)"
-case "$client_url" in
-  ""|*'$'*)
-    client_url="https://$(env_value QDASH_HOST)"
-    ;;
-esac
-
-case "$client_url" in
+case "$(env_value CLIENT_URL)" in
   http://*.localhost:*|https://*.localhost:*)
     echo "WARNING: CLIENT_URL points to .localhost; this is usually not intended for Cloudflare deploy." >&2
     ;;
