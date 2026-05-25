@@ -373,3 +373,8 @@ Key environment variables are configured in `.env`. See `.env.example` for avail
 | `NEXT_PUBLIC_API_URL`     | -       | Public API URL for frontend |
 | `NEXT_PUBLIC_PREFECT_URL` | -       | Prefect dashboard URL       |
 | `NEXT_ALLOWED_DEV_ORIGINS` | -       | Additional hostnames allowed to access the Next.js dev server |
+| `OLLAMA_BASE_URL`         | -       | Ollama/OpenAI-compatible endpoint for Copilot models |
+| `OLLAMA_API_KEY`          | -       | Optional API key for Ollama-compatible endpoints |
+| `OPENAI_API_KEY`          | -       | OpenAI API key for Copilot models |
+| `DS4_BASE_URL`            | -       | Optional DeepSeek v4 OpenAI-compatible gateway URL |
+| `DS4_API_KEY`             | -       | Optional DeepSeek v4 gateway API key |

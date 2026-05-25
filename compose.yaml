@@ -97,6 +97,8 @@ services:
     depends_on:
       - prefect-server
       - deployment-service
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./src/qdash/workflow:/app/qdash/workflow
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis
@@ -155,6 +157,8 @@ services:
       - mongo
       - prefect-server
       - deployment-service
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/api:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
       - CALIB_DATA_PATH=/app/calib_data
