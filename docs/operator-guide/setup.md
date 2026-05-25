@@ -61,24 +61,3 @@ task deploy
 ```
 
 This starts the Compose stack with the Cloudflare tunnel profile.
-Configure Cloudflare Tunnel public hostnames to forward to `http://reverse-proxy:80`. The main
-hostname serves the UI and `/api/*`; optional Prefect and Mongo Express hostnames can use the same
-service URL for operator-only access.
-`task deploy` validates the tunnel token and reverse-proxy hostname settings before starting the
-stack; it does not rewrite `.env`.
-
-For multiple QDash environments on the same server, give each environment a unique
-`COMPOSE_PROJECT_NAME`, `QDASH_HOST`, `QDASH_LOCAL_HOST`, `PROXY_PORT`, and database data path. The
-application service ports can stay at their defaults because `task deploy` publishes only the
-reverse proxy on `127.0.0.1:${PROXY_PORT}` for SSH forwarding.
-
-```env
-ENV=dev-qdash
-COMPOSE_PROJECT_NAME=dev-qdash
-QDASH_HOST=qdash-dev.qiqb.dev
-QDASH_LOCAL_HOST=dev-qdash.localhost
-CLIENT_URL=https://qdash-dev.qiqb.dev
-PROXY_PORT=18080
-POSTGRES_DATA_PATH=./postgres_data_dev
-MONGO_DATA_PATH=./mongo_data_dev/data/db
-```

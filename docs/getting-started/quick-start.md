@@ -57,8 +57,3 @@ You can share QDash securely without opening extra ports by using Cloudflare Tun
 4. Confirm in the Cloudflare dashboard that the tunnel status is “Connected”.
 
 Once connected, the hostname provided by Cloudflare (for example `https://your-tunnel.example.com`) will serve the same UI experience as `http://localhost:5714`, including charts and figures.
-Configure the tunnel public hostname service URL to `http://reverse-proxy:80`. The Compose reverse
-proxy serves the UI and `/api/*` from the main hostname; optional Prefect and Mongo Express
-hostnames can point to the same service URL when remote operator access is needed.
-`task deploy` validates the tunnel token and reverse-proxy hostname settings before starting the
-stack; it does not rewrite `.env`.
