@@ -1,0 +1,64 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:best-practices", ":dependencyDashboard"],
+  timezone: "Asia/Tokyo",
+  enabledManagers: ["pep621", "bun", "github-actions"],
+  minimumReleaseAge: "3 days",
+  prConcurrentLimit: 5,
+  prHourlyLimit: 2,
+  lockFileMaintenance: {
+    enabled: true,
+    branchTopic: "lfm",
+    minimumReleaseAgeBehaviour: "timestamp-optional",
+  },
+  vulnerabilityAlerts: {
+    enabled: true,
+    groupName: "security updates",
+    groupSlug: "sec",
+    minimumReleaseAge: "1 day",
+  },
+  packageRules: [
+    {
+      matchPackageNames: ["*"],
+      enabled: false,
+    },
+    {
+      matchUpdateTypes: ["patch", "digest", "pinDigest"],
+      enabled: true,
+      groupName: "maintenance",
+      groupSlug: "maint",
+    },
+    {
+      matchUpdateTypes: ["lockFileMaintenance"],
+      enabled: true,
+      groupName: "lock file maintenance",
+      groupSlug: "lfm",
+    },
+    {
+      matchUpdateTypes: ["minor"],
+      matchJsonata: ["isVulnerabilityAlert = false"],
+      enabled: true,
+      groupName: "minor updates",
+      groupSlug: "minor",
+      dependencyDashboardApproval: true,
+    },
+    {
+      matchUpdateTypes: ["major"],
+      matchJsonata: ["isVulnerabilityAlert = false"],
+      enabled: true,
+      groupName: "major updates",
+      groupSlug: "major",
+      dependencyDashboardApproval: true,
+    },
+    {
+      matchJsonata: ["isBreaking = true and not(isVulnerabilityAlert)"],
+      enabled: false,
+    },
+    {
+      matchJsonata: ["isVulnerabilityAlert = true"],
+      enabled: true,
+      groupName: "security updates",
+      groupSlug: "sec",
+    },
+  ],
+}
