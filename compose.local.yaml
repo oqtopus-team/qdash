@@ -29,4 +29,4 @@ services:
 
   reverse-proxy:
     ports:
-      - "${PROXY_PORT:-8080}:80"
+      - "${PROXY_PORT:-18080}:80"

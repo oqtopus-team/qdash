@@ -100,7 +100,7 @@ tasks:
     desc: Start only the services needed by host-side API/UI development
     dotenv: [.env]
     cmds:
-      - QDASH_UI_UPSTREAM="host.docker.internal:${UI_PORT:-5714}" QDASH_API_UPSTREAM="host.docker.internal:${API_PORT:-5715}" docker compose -f compose.yaml -f compose.local.yaml up -d mongo postgres prefect-server deployment-service user-flow-worker reverse-proxy
+      - QDASH_LOCAL_HOST="${QDASH_LOCAL_HOST:-${ENV:-qdash}.localhost}" QDASH_UI_UPSTREAM="host.docker.internal:${UI_PORT:-5714}" QDASH_API_UPSTREAM="host.docker.internal:${API_PORT:-5715}" docker compose -f compose.yaml -f compose.local.yaml up -d mongo postgres prefect-server deployment-service user-flow-worker reverse-proxy
 
   dev-local-setup:
     desc: Install dependencies needed by host-side API/UI development
@@ -114,14 +114,14 @@ tasks:
     desc: Start the API on the host against Docker services
     dotenv: [.env]
     cmds:
-      - MONGO_HOST="${MONGO_HOST:-localhost}" CLIENT_URL="http://${ENV:-dev-fake-qdash}.localhost:${PROXY_PORT:-8080}" PREFECT_API_URL="http://127.0.0.1:${PREFECT_PORT:-4200}/api" DEPLOYMENT_SERVICE_URL="http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}" uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
+      - MONGO_HOST="${MONGO_HOST:-localhost}" CLIENT_URL="http://${ENV:-dev-fake-qdash}.localhost:${PROXY_PORT:-18080}" PREFECT_API_URL="http://127.0.0.1:${PREFECT_PORT:-4200}/api" DEPLOYMENT_SERVICE_URL="http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}" uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
 
   dev-ui-local:
     desc: Start the UI on the host against the local API
     dir: ui
     dotenv: [../.env]
     cmds:
-      - PORT="${UI_PORT:-5714}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" NEXT_PUBLIC_PREFECT_URL="http://prefect.${ENV:-dev-fake-qdash}.localhost:${PROXY_PORT:-8080}" bun run dev
+      - PORT="${UI_PORT:-5714}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" NEXT_PUBLIC_PREFECT_URL="http://prefect.${ENV:-dev-fake-qdash}.localhost:${PROXY_PORT:-18080}" bun run dev
 
   dev-local:
     desc: Start lightweight local development services, API, and UI
@@ -385,7 +385,7 @@ tasks:
     cmds:
       - task: knowledge-pull
       - scripts/check_deploy_env.sh
-      - QDASH_UI_UPSTREAM="ui:${UI_PORT:-5714}" QDASH_API_UPSTREAM="api:${API_PORT:-5715}" docker compose -f compose.yaml -f compose.forward.yaml --profile tunnel up -d --build
+      - QDASH_LOCAL_HOST="${QDASH_LOCAL_HOST:-${ENV:-qdash}.localhost}" QDASH_UI_UPSTREAM="ui:${UI_PORT:-5714}" QDASH_API_UPSTREAM="api:${API_PORT:-5715}" docker compose -f compose.yaml -f compose.forward.yaml --profile tunnel up -d --build
       - sleep 3
-      - QDASH_UI_UPSTREAM="ui:${UI_PORT:-5714}" QDASH_API_UPSTREAM="api:${API_PORT:-5715}" docker compose -f compose.yaml -f compose.forward.yaml restart api
+      - QDASH_LOCAL_HOST="${QDASH_LOCAL_HOST:-${ENV:-qdash}.localhost}" QDASH_UI_UPSTREAM="ui:${UI_PORT:-5714}" QDASH_API_UPSTREAM="api:${API_PORT:-5715}" docker compose -f compose.yaml -f compose.forward.yaml restart api
     desc: Deploy with Cloudflare Tunnel and localhost-only reverse proxy for SSH forwarding

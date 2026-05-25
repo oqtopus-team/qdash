@@ -33,6 +33,18 @@ for key in TUNNEL_TOKEN QDASH_HOST CLIENT_URL NEXT_PUBLIC_API_URL; do
   fi
 done
 
+for key in ENV COMPOSE_PROJECT_NAME QDASH_HOST QDASH_LOCAL_HOST CLIENT_URL PROXY_PORT; do
+  count="$(
+    awk -v key="$key" '
+      $0 ~ "^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=" { count++ }
+      END { print count + 0 }
+    ' "$ENV_FILE"
+  )"
+  if [ "$count" -gt 1 ]; then
+    echo "WARNING: $key is defined $count times in .env; the last value wins." >&2
+  fi
+done
+
 for key in QDASH_UI_UPSTREAM QDASH_API_UPSTREAM; do
   value="$(env_value "$key")"
   case "$value" in

@@ -76,7 +76,7 @@ reverse proxy on `127.0.0.1:${PROXY_PORT}` for SSH forwarding.
 ENV=dev-qdash
 COMPOSE_PROJECT_NAME=dev-qdash
 QDASH_HOST=qdash-dev.qiqb.dev
-QDASH_LOCAL_HOST=${ENV}.localhost
+QDASH_LOCAL_HOST=dev-qdash.localhost
 CLIENT_URL=https://qdash-dev.qiqb.dev
 PROXY_PORT=18080
 POSTGRES_DATA_PATH=./postgres_data_dev

@@ -183,10 +183,9 @@ ports; Cloudflare Tunnel reaches the reverse proxy through Docker networking at
 The main UI hostname also proxies `/api/*` to the API, so frontend traffic can stay on one origin.
 
 For server environments that should also be reachable through SSH port forwarding, set
-`QDASH_LOCAL_HOST` to a stable local alias. It usually follows `ENV`, for example
-`QDASH_LOCAL_HOST=${ENV}.localhost`. `task deploy` keeps the Cloudflare Tunnel setup and publishes
-only the reverse proxy on `127.0.0.1:${PROXY_PORT}`. Forward it from the workstation with a matching
-local port:
+`QDASH_LOCAL_HOST` only when the local alias should differ from `${ENV}.localhost`. `task deploy`
+keeps the Cloudflare Tunnel setup and publishes only the reverse proxy on
+`127.0.0.1:${PROXY_PORT}`. Forward it from the workstation with a matching local port:
 
 ```shell
 ssh -L 18080:127.0.0.1:18080 anemone

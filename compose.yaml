@@ -187,6 +187,7 @@ services:
     env_file:
       - .env
     environment:
+      - QDASH_LOCAL_HOST=${QDASH_LOCAL_HOST}
       - QDASH_UI_UPSTREAM=${QDASH_UI_UPSTREAM}
       - QDASH_API_UPSTREAM=${QDASH_API_UPSTREAM}
     volumes:
