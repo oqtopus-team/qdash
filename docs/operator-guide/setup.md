@@ -61,3 +61,8 @@ task deploy
 ```
 
 This starts the Compose stack with the Cloudflare tunnel profile.
+Configure Cloudflare Tunnel public hostnames to forward to `http://reverse-proxy:80`. The main
+hostname serves the UI and `/api/*`; optional Prefect and Mongo Express hostnames can use the same
+service URL for operator-only access.
+`task deploy` validates the tunnel token and reverse-proxy hostname settings before starting the
+stack; it does not rewrite `.env`.

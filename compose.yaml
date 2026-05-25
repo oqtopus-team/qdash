@@ -1,4 +1,4 @@
-name: ${ENV:-default}
+name: ${COMPOSE_PROJECT_NAME:-${ENV:-default}}
 services:
   mongo:
     image: mongo
@@ -195,6 +195,22 @@ services:
       - api
     networks:
       - custom_net
+  reverse-proxy:
+    image: caddy:2
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - QDASH_UI_UPSTREAM=${QDASH_UI_UPSTREAM}
+      - QDASH_API_UPSTREAM=${QDASH_API_UPSTREAM}
+    ports:
+      - "${PROXY_PORT:-8080}:80"
+    volumes:
+      - ./config/proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - custom_net
   tunnel:
     image: cloudflare/cloudflared
     restart: unless-stopped
@@ -205,7 +221,10 @@ services:
       - --no-autoupdate
       - --no-chunked-encoding
       - run
-    network_mode: host
+    depends_on:
+      - reverse-proxy
+    networks:
+      - custom_net
     profiles:
       - tunnel
 networks:

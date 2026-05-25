@@ -109,8 +109,8 @@ task dev-local
 ```
 
 This starts MongoDB, PostgreSQL, Prefect, the deployment service, and the user flow worker with
-Docker Compose, then runs the API and UI on the host. The UI is available at
-<http://localhost:5714>.
+Docker Compose, then runs the API and UI on the host. The UI is available through the reverse proxy
+at `http://dev-fake-qdash.localhost:${PROXY_PORT}`.
 
 ### Install Dependencies
 
@@ -147,13 +147,37 @@ task dev-local
 ```
 
 This starts the supporting services in Docker Compose and runs the API and UI directly on the
-host. Use this flow when editing backend or frontend code frequently.
+host. Use this flow when editing backend or frontend code frequently. The reverse proxy also starts
+and routes the same local hostnames to the host-side API and UI processes.
 
 The component tasks are:
 
 - `task dev-services`: start MongoDB, PostgreSQL, Prefect, deployment-service, and user-flow-worker
 - `task dev-api-local`: run the FastAPI app on the host against Docker services
 - `task dev-ui-local`: run the Next.js app on the host against the local API
+
+When running multiple Docker Compose instances, update `.env` with instance-specific ports before
+starting the stack. `task deploy-local` runs this assignment automatically:
+
+```shell
+task deploy-local
+```
+
+`QDASH_INSTANCE` defaults to `ENV`, so the default `.env` uses the `dev-fake-qdash` namespace
+from `ENV="dev-fake-qdash"`. Set `QDASH_INSTANCE` only when the local instance name should differ from
+`ENV`. The assignment task derives `COMPOSE_PROJECT_NAME`, reverse-proxy hostnames, service ports,
+and public URLs from that instance name. Existing assigned ports are kept on later deploys for the
+same instance.
+
+The Compose stack includes a Caddy reverse proxy. For `ENV="dev-fake-qdash"`, the proxied URLs
+are `http://dev-fake-qdash.localhost:${PROXY_PORT}`,
+`http://api.dev-fake-qdash.localhost:${PROXY_PORT}`,
+`http://prefect.dev-fake-qdash.localhost:${PROXY_PORT}`, and
+`http://mongo.dev-fake-qdash.localhost:${PROXY_PORT}`. These URLs work for both `task dev-local` and
+`task deploy-local`; the direct service ports remain available for tools that connect to MongoDB,
+PostgreSQL, or the API directly.
+
+The main UI hostname also proxies `/api/*` to the API, so frontend traffic can stay on one origin.
 
 ### Access Points
 
@@ -290,8 +314,10 @@ Key environment variables are configured in `.env`. See `.env.example` for avail
 
 | Variable                  | Default | Description                 |
 | ------------------------- | ------- | --------------------------- |
+| `PROXY_PORT`              | 8080    | Reverse proxy port          |
 | `API_PORT`                | 5715    | Backend API port            |
 | `UI_PORT`                 | 5714    | Frontend UI port            |
+| `QDASH_INSTANCE`          | -       | Optional local instance name; defaults to `ENV` |
 | `MONGO_PORT`              | 27017   | MongoDB port                |
 | `POSTGRES_PORT`           | 5432    | PostgreSQL port             |
 | `PREFECT_PORT`            | 4200    | Prefect dashboard port      |
