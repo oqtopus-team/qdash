@@ -17,6 +17,10 @@ import {
 import { useGetCouplingMetricHistory } from "@/client/metrics/metrics";
 import { useGetExecution } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import {
+  ExecutionHistoryModalContent,
+  type ExecutionHistoryMobileTab,
+} from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
@@ -50,9 +54,6 @@ function formatMetricValue(value: number | null, unit: string, precision: number
   return displayValue.toFixed(precision);
 }
 
-// Mobile tab type
-type MobileTab = "history" | "tasks" | "details";
-
 export function CouplingMetricHistoryModal({
   chipId,
   couplingId,
@@ -63,7 +64,7 @@ export function CouplingMetricHistoryModal({
 }: CouplingMetricHistoryModalProps) {
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
-  const [mobileTab, setMobileTab] = useState<MobileTab>("history");
+  const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
   const [saveMessage, setSaveMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -662,59 +663,13 @@ export function CouplingMetricHistoryModal({
   );
 
   return (
-    <div className="h-full min-h-0 flex flex-col">
-      {/* Direction Toggle */}
-      <div className="mb-3 shrink-0">{directionToggle}</div>
-
-      {/* Mobile Tabs */}
-      <div className="lg:hidden mb-3 shrink-0">
-        <div className="tabs tabs-boxed bg-base-200">
-          <button
-            className={`tab gap-1 ${mobileTab === "history" ? "tab-active" : ""}`}
-            onClick={() => setMobileTab("history")}
-          >
-            <History className="h-3 w-3" />
-            History
-          </button>
-          <button
-            className={`tab gap-1 ${mobileTab === "tasks" ? "tab-active" : ""}`}
-            onClick={() => setMobileTab("tasks")}
-          >
-            <ListTodo className="h-3 w-3" />
-            Tasks
-          </button>
-          <button
-            className={`tab gap-1 ${mobileTab === "details" ? "tab-active" : ""}`}
-            onClick={() => setMobileTab("details")}
-          >
-            <FileText className="h-3 w-3" />
-            Details
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Content */}
-      <div className="lg:hidden flex-1 min-h-0 overflow-hidden">
-        {mobileTab === "history" && renderExecutionHistory()}
-        {mobileTab === "tasks" && renderTasksList()}
-        {mobileTab === "details" && renderTaskDetails()}
-      </div>
-
-      {/* Desktop Layout */}
-      <div className="hidden lg:flex gap-4 h-full min-h-0">
-        {/* Column 1: Execution History */}
-        <div className="w-1/4 flex flex-col min-h-0 border-r border-base-300 pr-4">
-          {renderExecutionHistory()}
-        </div>
-
-        {/* Column 2: Tasks */}
-        <div className="w-1/4 flex flex-col min-h-0 border-r border-base-300 pr-4">
-          {renderTasksList()}
-        </div>
-
-        {/* Column 3: Details – scrollable */}
-        <div className="w-1/2 overflow-y-auto min-h-0">{renderTaskDetails()}</div>
-      </div>
-    </div>
+    <ExecutionHistoryModalContent
+      mobileTab={mobileTab}
+      onMobileTabChange={setMobileTab}
+      topContent={directionToggle}
+      history={renderExecutionHistory()}
+      tasks={renderTasksList()}
+      details={renderTaskDetails()}
+    />
   );
 }

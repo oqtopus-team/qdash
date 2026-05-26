@@ -12,6 +12,10 @@ resolution-markers = [
     "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
+[options]
+exclude-newer = "2026-05-22T10:44:21.834431Z"
+exclude-newer-span = "P3D"
+
 [manifest]
 members = [
     "qdash",

@@ -98,6 +98,7 @@ def _document_to_task_result(doc: TaskResultHistoryDocument) -> TaskResult:
     """Convert a TaskResultHistoryDocument to a TaskResult schema."""
     return TaskResult(
         task_id=doc.task_id,
+        execution_id=doc.execution_id,
         name=doc.name,
         status=doc.status,
         message=doc.message,
