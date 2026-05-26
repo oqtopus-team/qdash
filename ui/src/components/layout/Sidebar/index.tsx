@@ -39,7 +39,6 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import { useTheme } from "@/contexts/ThemeContext";
-import { useLogout } from "@/client/auth/auth";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
@@ -168,16 +167,9 @@ export function Sidebar() {
   const isAdmin = user?.system_role === "admin";
   const isDarkTheme = DARK_THEMES.includes(theme as (typeof DARK_THEMES)[number]);
 
-  const logoutMutation = useLogout();
   const handleLogout = useCallback(async () => {
-    try {
-      await logoutMutation.mutateAsync();
-      authLogout();
-      router.push("/login");
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  }, [logoutMutation, authLogout, router]);
+    await authLogout();
+  }, [authLogout]);
 
   const openProfileModal = useCallback(() => {
     if (modalRef.current) {

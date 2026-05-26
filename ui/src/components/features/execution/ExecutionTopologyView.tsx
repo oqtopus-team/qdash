@@ -7,7 +7,7 @@ import type { Task } from "@/schemas";
 
 import { useGetChip } from "@/client/chip/chip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
-import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
+import { ExecutionTaskDetailModal } from "@/components/features/execution/ExecutionTaskDetailModal";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
@@ -16,6 +16,8 @@ import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
 
 interface ExecutionTopologyViewProps {
   chipId: string;
+  executionId: string;
+  executionName?: string;
   tasks: Task[];
   topologyMode: "1q" | "2q";
   filterTaskName: string;
@@ -236,6 +238,8 @@ const CouplingMarker = memo(function CouplingMarker({
 
 export function ExecutionTopologyView({
   chipId,
+  executionId,
+  executionName,
   tasks,
   topologyMode,
   filterTaskName,
@@ -356,14 +360,13 @@ export function ExecutionTopologyView({
   const showLabels = baseCellSize >= 20;
   const showFigures = baseCellSize >= 50;
 
-  // Selected task for modal
-  const selectedTask = useMemo(() => {
+  const selectedTasks = useMemo(() => {
     if (!selectedEntityId) return null;
-    const selectedTasks =
+    const entityTasks =
       topologyMode === "2q"
         ? couplingTasksByQid[selectedEntityId]
         : oneQTasksByQid[selectedEntityId];
-    return selectedTasks?.[0] ?? null;
+    return entityTasks ?? [];
   }, [couplingTasksByQid, oneQTasksByQid, selectedEntityId, topologyMode]);
 
   const visibleTaskGroups = topologyMode === "2q" ? couplingTasksByQid : oneQTasksByQid;
@@ -560,17 +563,15 @@ export function ExecutionTopologyView({
         </TransformWrapper>
       </div>
 
-      {/* Task detail modal */}
-      {selectedEntityId && selectedTask && (
-        <TaskDetailModal
+      {selectedEntityId && selectedTasks && (
+        <ExecutionTaskDetailModal
           isOpen={!!selectedEntityId}
-          task={selectedTask}
+          tasks={selectedTasks}
           qid={selectedEntityId}
           chipId={chipId}
+          executionId={executionId}
+          executionName={executionName}
           onClose={() => setSelectedEntityId(null)}
-          taskId={selectedTask.task_id || undefined}
-          taskName={selectedTask.name || undefined}
-          variant="detailed"
         />
       )}
     </div>

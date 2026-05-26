@@ -3,16 +3,21 @@
 import React, { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, History, FileText, GitBranch, Bot } from "lucide-react";
+import { ChevronRight, History, FileText, GitBranch, Bot, ListTodo } from "lucide-react";
 
-import type { Task } from "@/schemas";
+import type { TaskResult as Task } from "@/schemas";
 
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 
+import { useGetExecution } from "@/client/execution/execution";
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import {
+  ExecutionHistoryModalContent,
+  type ExecutionHistoryMobileTab,
+} from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
@@ -31,8 +36,6 @@ interface TaskHistoryModalProps {
   selectedDate?: string;
 }
 
-type MobileTab = "history" | "details";
-
 export function TaskHistoryModal({
   chipId,
   qid,
@@ -42,7 +45,8 @@ export function TaskHistoryModal({
   selectedDate,
 }: TaskHistoryModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [mobileTab, setMobileTab] = useState<MobileTab>("history");
+  const [selectedExecutionTaskIndex, setSelectedExecutionTaskIndex] = useState(0);
+  const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
   const [saveMessage, setSaveMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -151,7 +155,39 @@ export function TaskHistoryModal({
   }, [isOpen, historyArray, selectedDate]);
 
   const selectedItem = historyArray[selectedIndex];
-  const selectedTask = selectedItem?.task;
+  const selectedHistoryTask = selectedItem?.task;
+  const selectedExecutionId = selectedHistoryTask?.execution_id ?? null;
+  const { data: executionDetailData, isLoading: isExecutionLoading } = useGetExecution(
+    selectedExecutionId || "",
+    {
+      query: {
+        enabled: !!selectedExecutionId,
+        staleTime: 30000,
+        gcTime: 60000,
+      },
+    },
+  );
+  const executionTasks = useMemo(
+    () => (executionDetailData?.data?.task ?? []).filter((task) => task.qid === qid),
+    [executionDetailData?.data?.task, qid],
+  );
+  React.useEffect(() => {
+    if (executionTasks.length === 0) {
+      setSelectedExecutionTaskIndex(0);
+      return;
+    }
+    const historyTaskId = selectedHistoryTask?.task_id;
+    const matchingIndex = historyTaskId
+      ? executionTasks.findIndex((task) => task.task_id === historyTaskId)
+      : -1;
+    setSelectedExecutionTaskIndex(matchingIndex >= 0 ? matchingIndex : 0);
+  }, [executionTasks, selectedHistoryTask?.task_id]);
+  React.useEffect(() => {
+    if (executionTasks.length > 0 && selectedExecutionTaskIndex >= executionTasks.length) {
+      setSelectedExecutionTaskIndex(0);
+    }
+  }, [executionTasks.length, selectedExecutionTaskIndex]);
+  const selectedTask = executionTasks[selectedExecutionTaskIndex] ?? selectedHistoryTask;
   const figures = selectedTask
     ? Array.isArray(selectedTask.figure_path)
       ? selectedTask.figure_path
@@ -174,25 +210,32 @@ export function TaskHistoryModal({
       taskName: selectedTask.name || taskName,
       chipId,
       qid,
-      executionId: "",
+      executionId: selectedExecutionId || "",
       taskId: selectedTask.task_id,
     };
-  }, [selectedTask, chipId, qid, taskName]);
+  }, [selectedTask, selectedExecutionId, chipId, qid, taskName]);
 
   const handleSelectIndex = (idx: number) => {
     setSelectedIndex(idx);
+    setMobileTab("tasks");
+  };
+
+  const handleSelectExecutionTask = (idx: number) => {
+    setSelectedExecutionTaskIndex(idx);
     setMobileTab("details");
   };
 
-  // Column 1: History List
+  // Column 1: Execution History
   const renderHistoryList = () => (
     <div className="flex flex-col min-h-0 h-full">
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
           <History className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-bold text-base-content">History</h3>
+          <h3 className="text-sm font-bold text-base-content">Execution History</h3>
         </div>
-        <p className="text-xs text-base-content/50">{historyArray.length} results</p>
+        <p className="text-xs text-base-content/50">
+          {historyArray.length} executions with {taskName}
+        </p>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="flex flex-col gap-2">
@@ -210,7 +253,7 @@ export function TaskHistoryModal({
               >
                 <div className="flex justify-between items-start">
                   <div className="min-w-0 flex-1">
-                    <div className="font-bold text-sm">
+                    <div className="font-bold text-lg">
                       {item.task.status === "completed" ? (
                         <span className={isSelected ? "" : "text-success"}>Completed</span>
                       ) : item.task.status === "failed" ? (
@@ -222,6 +265,9 @@ export function TaskHistoryModal({
                     <div className="text-xs opacity-70 mt-1">
                       {item.task.end_at ? formatDateTimeCompact(item.task.end_at) : "N/A"}
                     </div>
+                    {item.task.name && (
+                      <div className="text-xs opacity-60 mt-1 truncate">{item.task.name}</div>
+                    )}
                     {idx === 0 && (
                       <span
                         className={`badge badge-xs mt-1 ${
@@ -247,7 +293,96 @@ export function TaskHistoryModal({
     </div>
   );
 
-  // Column 2: Task Details
+  // Column 2: Tasks in Execution
+  const renderTasksList = () => (
+    <div className="flex flex-col min-h-0 h-full">
+      <div className="mb-3 shrink-0">
+        <div className="flex items-center gap-2 mb-1">
+          <ListTodo className="h-4 w-4 text-secondary" />
+          <h3 className="text-sm font-bold text-base-content">Tasks in Execution</h3>
+        </div>
+        {selectedExecutionId ? (
+          <p className="text-[0.65rem] text-base-content/50 font-mono truncate">
+            {selectedExecutionId}
+          </p>
+        ) : null}
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {isExecutionLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <span className="loading loading-spinner loading-md"></span>
+          </div>
+        ) : executionTasks.length === 0 ? (
+          <div className="text-center py-8">
+            <ListTodo className="h-8 w-8 mx-auto text-base-content/30 mb-2" />
+            <p className="text-sm text-base-content/50">
+              No {taskName}-related tasks found for {qid}
+            </p>
+            <p className="text-xs text-base-content/40 mt-1">
+              This execution may not include calibration for this qubit
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {executionTasks.map((task, idx) => {
+              const isSelected = task.task_id === selectedTask?.task_id;
+              const isMatchingTask = task.name?.toLowerCase().includes(taskName.toLowerCase());
+              return (
+                <button
+                  key={task.task_id || `${task.name}-${idx}`}
+                  onClick={() => handleSelectExecutionTask(idx)}
+                  className={`w-full text-left p-3 rounded-lg transition-all border-2 ${
+                    isSelected
+                      ? "bg-secondary text-secondary-content border-secondary"
+                      : "bg-base-200 hover:bg-base-300 border-transparent hover:border-secondary/30"
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm truncate">{task.name || "Unnamed"}</span>
+                        {isMatchingTask && (
+                          <span
+                            className={`badge badge-xs ${
+                              isSelected ? "badge-secondary-content" : "badge-accent"
+                            }`}
+                          >
+                            {taskName}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs opacity-70 mt-1">
+                        {task.start_at ? formatDateTimeCompact(String(task.start_at)) : ""}
+                      </div>
+                      <span
+                        className={`badge badge-xs mt-1 ${
+                          task.status === "completed"
+                            ? "badge-success"
+                            : task.status === "failed"
+                              ? "badge-error"
+                              : "badge-warning"
+                        }`}
+                      >
+                        {task.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs opacity-60">#{idx + 1}</span>
+                      <ChevronRight
+                        className={`h-4 w-4 opacity-40 ${isSelected ? "opacity-80" : ""}`}
+                      />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Column 3: Task Details
   const renderTaskDetails = () => (
     <div className="flex flex-col">
       <div className="flex items-center justify-between mb-3 shrink-0">
@@ -255,39 +390,51 @@ export function TaskHistoryModal({
           <FileText className="h-4 w-4 text-accent" />
           <h3 className="text-sm font-bold text-base-content">Task Details</h3>
         </div>
-        {historyArray.length > 0 && (
+        {executionTasks.length > 0 ? (
+          <div className="text-xs text-base-content/60">
+            {selectedExecutionTaskIndex + 1} / {executionTasks.length}
+          </div>
+        ) : historyArray.length > 0 ? (
           <div className="text-xs text-base-content/60">
             {selectedIndex + 1} / {historyArray.length}
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Navigation Arrows */}
-      {historyArray.length > 1 && (
+      {executionTasks.length > 1 && (
         <div className="flex gap-2 mb-2 shrink-0">
           <button
             className="btn btn-xs btn-ghost"
-            disabled={selectedIndex === 0}
-            onClick={() => handleSelectIndex(Math.max(0, selectedIndex - 1))}
+            disabled={selectedExecutionTaskIndex === 0}
+            onClick={() => handleSelectExecutionTask(Math.max(0, selectedExecutionTaskIndex - 1))}
           >
-            ← Newer
+            ← Prev
           </button>
           <button
             className="btn btn-xs btn-ghost"
-            disabled={selectedIndex === historyArray.length - 1}
-            onClick={() => handleSelectIndex(Math.min(historyArray.length - 1, selectedIndex + 1))}
+            disabled={selectedExecutionTaskIndex === executionTasks.length - 1}
+            onClick={() =>
+              handleSelectExecutionTask(
+                Math.min(executionTasks.length - 1, selectedExecutionTaskIndex + 1),
+              )
+            }
           >
-            Older →
+            Next →
           </button>
         </div>
       )}
 
       {/* Figure Display - Fixed height with horizontal scroll */}
-      <div className="h-[280px] bg-base-200 rounded-lg p-3 overflow-x-auto overflow-y-hidden flex items-center justify-start gap-3">
-        {!selectedTask ? (
-          <div className="flex flex-col items-center justify-center w-full text-base-content/40">
+      <div className="h-[280px] bg-base-200 rounded-lg p-3 overflow-x-auto overflow-y-hidden flex items-center justify-start">
+        {isExecutionLoading ? (
+          <span className="loading loading-spinner loading-lg"></span>
+        ) : !selectedTask ? (
+          <div className="flex flex-col items-center justify-center text-base-content/40">
             <FileText className="h-12 w-12 mb-3 opacity-30" />
-            <p className="text-sm">Select a history item to view details</p>
+            <p className="text-sm">
+              {selectedExecutionId ? "Select a task to view details" : "Select an execution first"}
+            </p>
           </div>
         ) : figures.length > 0 ? (
           figures.map((fig, i) => (
@@ -296,7 +443,7 @@ export function TaskHistoryModal({
               path={fig}
               jsonFigurePath={jsonFigures[i]}
               qid={qid}
-              className="h-full w-auto object-contain flex-shrink-0"
+              className="h-full w-auto object-contain"
             />
           ))
         ) : selectedTask.task_id ? (
@@ -306,9 +453,9 @@ export function TaskHistoryModal({
             className="h-full w-auto object-contain"
           />
         ) : (
-          <div className="flex flex-col items-center justify-center w-full text-base-content/40">
+          <div className="flex flex-col items-center justify-center text-base-content/40">
             <FileText className="h-12 w-12 mb-3 opacity-30" />
-            <p className="text-sm">No figure available</p>
+            <p className="text-sm">No figure available for this task</p>
           </div>
         )}
       </div>
@@ -322,6 +469,10 @@ export function TaskHistoryModal({
               <span className="font-mono">{selectedTask.name}</span>
             </div>
           )}
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">Execution ID:</span>
+            <span className="font-mono truncate">{selectedExecutionId}</span>
+          </div>
           {selectedTask.task_id && (
             <div className="flex items-center gap-2">
               <span className="font-semibold">Task ID:</span>
@@ -333,34 +484,20 @@ export function TaskHistoryModal({
               </Link>
             </div>
           )}
-          {selectedTask.end_at && (
+          {selectedTask.start_at != null && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Calibrated At:</span>
-              <span>{formatDateTime(selectedTask.end_at)}</span>
+              <span className="font-semibold">Start:</span>
+              <span>{formatDateTime(String(selectedTask.start_at))}</span>
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">Status:</span>
-            <span
-              className={`badge badge-xs ${
-                selectedTask.status === "completed"
-                  ? "badge-success"
-                  : selectedTask.status === "failed"
-                    ? "badge-error"
-                    : "badge-warning"
-              }`}
-            >
-              {selectedTask.status}
-            </span>
-          </div>
-          {selectedTask.message && (
+          {selectedTask.end_at && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Message:</span>
-              <span>{selectedTask.message}</span>
+              <span className="font-semibold">End:</span>
+              <span>{formatDateTime(String(selectedTask.end_at))}</span>
             </div>
           )}
           {/* Provenance link and Ask AI */}
-          <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2">
+          <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
             <Link
               href={(() => {
                 const outputs = selectedTask.output_parameters
@@ -462,21 +599,22 @@ export function TaskHistoryModal({
       }}
     >
       <div
-        className={`modal-box w-full bg-base-100 p-0 flex flex-col transition-[max-width] duration-300 ease-in-out ${
-          isChatOpen ? "sm:w-[96vw] max-w-[88rem]" : "sm:w-11/12 max-w-5xl"
+        className={`modal-box w-full bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col transition-[max-width] duration-300 ease-in-out ${
+          isChatOpen ? "sm:w-[96vw] max-w-[112rem]" : "sm:w-11/12 max-w-[112rem]"
         }`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex justify-between items-center px-3 sm:px-6 pt-3 sm:pt-5 pb-2 sm:pb-3 border-b border-base-300">
-          <h3 className="font-bold text-base sm:text-lg truncate pr-2">
-            {taskName} - QID {qid}
-          </h3>
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg sm:text-2xl font-bold truncate">{taskName}</h2>
+            <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">QID {qid}</p>
+          </div>
           <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost flex-shrink-0">
             ✕
           </button>
         </div>
 
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           <div
             className={`flex flex-col min-w-0 p-3 sm:p-6 overflow-hidden ${
               isChatOpen ? "flex-1 lg:flex-[1.1]" : "flex-1"
@@ -504,41 +642,13 @@ export function TaskHistoryModal({
                 <span>No history available</span>
               </div>
             ) : (
-              <div className="h-full min-h-0 flex flex-col max-h-[70vh] sm:max-h-[75vh]">
-                {/* Mobile Tabs */}
-                <div className="lg:hidden mb-3 shrink-0">
-                  <div className="tabs tabs-boxed bg-base-200">
-                    <button
-                      className={`tab gap-1 ${mobileTab === "history" ? "tab-active" : ""}`}
-                      onClick={() => setMobileTab("history")}
-                    >
-                      <History className="h-3 w-3" />
-                      History
-                    </button>
-                    <button
-                      className={`tab gap-1 ${mobileTab === "details" ? "tab-active" : ""}`}
-                      onClick={() => setMobileTab("details")}
-                    >
-                      <FileText className="h-3 w-3" />
-                      Details
-                    </button>
-                  </div>
-                </div>
-
-                {/* Mobile Content */}
-                <div className="lg:hidden flex-1 min-h-0 overflow-y-auto">
-                  {mobileTab === "history" && renderHistoryList()}
-                  {mobileTab === "details" && renderTaskDetails()}
-                </div>
-
-                {/* Desktop Layout */}
-                <div className="hidden lg:flex gap-4 h-full min-h-0">
-                  <div className="w-1/3 flex flex-col min-h-0 border-r border-base-300 pr-4">
-                    {renderHistoryList()}
-                  </div>
-                  <div className="w-2/3 overflow-y-auto min-h-0">{renderTaskDetails()}</div>
-                </div>
-              </div>
+              <ExecutionHistoryModalContent
+                mobileTab={mobileTab}
+                onMobileTabChange={setMobileTab}
+                history={renderHistoryList()}
+                tasks={renderTasksList()}
+                details={renderTaskDetails()}
+              />
             )}
           </div>
 

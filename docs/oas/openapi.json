@@ -22811,6 +22811,17 @@
             ],
             "title": "Task Id"
           },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          },
           "qid": {
             "anyOf": [
               {

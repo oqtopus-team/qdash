@@ -15,6 +15,7 @@ class TaskResult(BaseModel):
     """TaskResult is a Pydantic model that represents a task result."""
 
     task_id: str | None = None
+    execution_id: str | None = None
     qid: str | None = None
     name: str = ""  # Default empty string for name
     upstream_id: str | None = None
