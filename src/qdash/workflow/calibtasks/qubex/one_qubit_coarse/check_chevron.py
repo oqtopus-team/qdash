@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from typing import Any, ClassVar, cast
 
 import plotly.graph_objects as go
+from qubex.contrib.experiment import estimate_qubit_frequency_from_chevron_adaptive
 from qubex.measurement.measurement_defaults import DEFAULT_READOUT_DURATION
 
 from qdash.datamodel.task import ParameterModel
@@ -17,13 +18,6 @@ from qdash.workflow.engine.backend.qubex import QubexBackend
 DEFAULT_COARSE_CONTROL_AMPLITUDE = 0.0625
 CONTROL_AMPLITUDE_MIN = 1e-4
 CONTROL_AMPLITUDE_MAX = 1.0
-
-
-def _estimate_qubit_frequency_from_chevron_adaptive(**kwargs: Any) -> Any:
-    """Load the adaptive chevron helper lazily for compatibility with older qubex builds."""
-    from qubex.contrib.experiment import estimate_qubit_frequency_from_chevron_adaptive
-
-    return estimate_qubit_frequency_from_chevron_adaptive(**kwargs)
 
 
 class CheckChevron(QubexTask):
@@ -168,11 +162,13 @@ class CheckChevron(QubexTask):
         qubit_frequency: float,
         control_amplitude: float,
     ) -> dict[str, Any]:
-        adaptive_result = _estimate_qubit_frequency_from_chevron_adaptive(
+        adaptive_result = estimate_qubit_frequency_from_chevron_adaptive(
             exp=exp,
             targets=[label],
             frequencies={label: qubit_frequency},
             amplitudes={label: control_amplitude},
+            plot=False,
+            save_image=False,
         )
         result_data = cast("dict[str, Any]", dict(adaptive_result.data))
         result_data["control_amplitude_used"] = result_data["amplitudes_used"][label]

@@ -90,7 +90,12 @@ tasks:
     cmds:
       - uv sync --locked --all-groups --all-packages
       - mkdir -p "${CONFIG_PATH:-./config/qubex-config}"
-      - bun --cwd ui install --frozen-lockfile
+      - bun install --cwd ui --frozen-lockfile
+
+  upgrade-uv-lock:
+    desc: Upgrade qubex and related qx packages in uv.lock
+    cmds:
+      - uv sync --all-groups --all-packages --no-cache --upgrade
 
   dev-api-local:
     desc: Start the API on the host against Docker services

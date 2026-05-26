@@ -157,9 +157,11 @@ class NoteService:
         if not isinstance(cooldown_id, str) or not cooldown_id:
             return None
         return CooldownDocument.find_one(
-            CooldownDocument.project_id == project_id,
-            CooldownDocument.cooldown_id == cooldown_id,
-            CooldownDocument.chip_ids == chip_id,
+            {
+                "project_id": project_id,
+                "cooldown_id": cooldown_id,
+                "chip_ids": chip_id,
+            }
         ).run()
 
     @staticmethod
@@ -202,8 +204,10 @@ class NoteService:
         end_at = ensure_timezone(end_at)
         cooldowns = list(
             CooldownDocument.find(
-                CooldownDocument.project_id == project_id,
-                CooldownDocument.chip_ids == chip_id,
+                {
+                    "project_id": project_id,
+                    "chip_ids": chip_id,
+                }
             ).run()
         )
         matches: list[CooldownDocument] = []
@@ -233,9 +237,11 @@ class NoteService:
     ) -> MetricNoteScope:
         if cooldown_id:
             cooldown = CooldownDocument.find_one(
-                CooldownDocument.project_id == project_id,
-                CooldownDocument.cooldown_id == cooldown_id,
-                CooldownDocument.chip_ids == chip_id,
+                {
+                    "project_id": project_id,
+                    "cooldown_id": cooldown_id,
+                    "chip_ids": chip_id,
+                }
             ).run()
             if cooldown is not None:
                 return cls._cooldown_scope(cooldown, "explicit_cooldown")

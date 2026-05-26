@@ -45,6 +45,11 @@ BRINGUP_TASKS: list[str] = [
     "CheckRabi",
 ]
 
+EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS: list[str] = [
+    "CheckResonatorSpectroscopy",
+    "CheckSimultaneousQubitSpectroscopy",
+]
+
 
 # =============================================================================
 # 1-Qubit Task Lists
@@ -57,7 +62,7 @@ CHECK_1Q_TASKS: list[str] = [
     "CreateHPIPulse",
     "CheckHPIPulse",
     # "CheckOptimalReadoutFrequency",
-    "CheckOptimalReadoutAmplitude",
+    # "CheckOptimalReadoutAmplitude",
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",

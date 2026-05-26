@@ -50,6 +50,10 @@ class TaskProtocol(Protocol):
         """Run the task."""
         ...
 
+    def batch_run(self, backend: Any, qids: list[str]) -> RunResult | None:
+        """Run the task for a batch of qubits."""
+        ...
+
     def postprocess(
         self, backend: Any, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:

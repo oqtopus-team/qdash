@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import logging
 import re
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
@@ -188,7 +189,11 @@ class TaskService:
             re_executions=re_executions,
             start_at=task_result.start_at,
             end_at=task_result.end_at,
-            elapsed_time=task_result.elapsed_time,
+            elapsed_time=(
+                timedelta(seconds=task_result.elapsed_time)
+                if task_result.elapsed_time is not None
+                else None
+            ),
             ai_review_note=task_result.ai_review_note,
         )
 

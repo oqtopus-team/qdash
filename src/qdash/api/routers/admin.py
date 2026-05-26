@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from qdash.api.dependencies import get_admin_service
 from qdash.api.lib.auth import get_admin_user
-from qdash.api.lib.policy_config import clear_policy_config_cache
 from qdash.api.schemas.admin import (
     AddMemberRequest,
     BulkUserImportResponse,
@@ -47,7 +46,6 @@ def reload_config_caches(
     ConfigLoader.clear_cache()
     clear_metrics_config_cache()
     clear_copilot_config_cache()
-    clear_policy_config_cache()
     return ConfigReloadResponse(
         cleared=[
             "app/settings.yaml",
@@ -57,7 +55,6 @@ def reload_config_caches(
             "copilot/review.yaml",
             "app/backend.yaml",
             "app/workflow.yaml",
-            "domain/policy.yaml",
         ]
     )
 

@@ -28,6 +28,10 @@ function isAuthenticationError(error: unknown): boolean {
   return status === 401 || status === 403;
 }
 
+function isRequestCancellation(error: unknown): boolean {
+  return Axios.isCancel(error) || (Axios.isAxiosError(error) && error.code === "ERR_CANCELED");
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string | null>(null);
@@ -77,6 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Handle errors
   useEffect(() => {
     if (userError) {
+      if (isRequestCancellation(userError)) {
+        return;
+      }
       console.error("Failed to fetch user info:", userError);
       if (isAuthenticationError(userError)) {
         removeAuth();

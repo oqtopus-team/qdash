@@ -150,6 +150,15 @@ class TaskExecutor:
         """Run the main task logic."""
         return task.run(backend, qid)
 
+    def _run_batch_task(
+        self,
+        task: TaskProtocol,
+        backend: BackendProtocol,
+        qids: list[str],
+    ) -> RunResult | None:
+        """Run the main task logic for a batch of qubits."""
+        return task.batch_run(backend, qids)
+
     def _run_postprocess(
         self,
         task: TaskProtocol,
@@ -432,6 +441,175 @@ class TaskExecutor:
         result.calib_data_delta = self.state_manager.calib_data
 
         return execution_service, result
+
+    def execute_batch(
+        self,
+        task: TaskProtocol,
+        backend: "BaseBackend",
+        qids: list[str],
+        execution_service: "ExecutionService | None" = None,
+    ) -> tuple["ExecutionService | None", dict[str, TaskExecutionResult]]:
+        """Execute a task once with batch_run, then postprocess each qid.
+
+        This path is for hardware-aware batch experiments where splitting the qids into
+        isolated task runs can cause device resource collisions. The task's ``batch_run``
+        is called exactly once for the provided qids.
+        """
+        task_name = task.get_name()
+        task_type = task.get_task_type()
+        results = {
+            qid: TaskExecutionResult(task_name=task_name, task_type=task_type, qid=qid)
+            for qid in qids
+        }
+        started_qids: list[str] = []
+
+        try:
+            for qid in qids:
+                self.state_manager.ensure_task_exists(task_name, task_type, qid)
+                self.state_manager.start_task(task_name, task_type, qid)
+                started_qids.append(qid)
+
+                if self._snapshot_loader is not None:
+                    self._apply_snapshot_overrides(task, task_name, task_type, qid)
+
+                run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
+                if run_params:
+                    self.state_manager.put_run_parameters(task_name, run_params, task_type, qid)
+
+                if execution_service is not None:
+                    executed_task = self.state_manager.get_task(task_name, task_type, qid)
+                    self.history_recorder.record_task_result(
+                        executed_task, execution_service.to_datamodel()
+                    )
+                    if self._source_task_id:
+                        self.history_recorder.set_source_task_id(
+                            project_id=execution_service.project_id,
+                            task_id=executed_task.task_id,
+                            source_task_id=self._source_task_id,
+                        )
+
+            if execution_service is not None:
+                execution_service = self._update_execution(execution_service)
+
+            run_result = self._run_batch_task(task, backend, qids)
+            for result in results.values():
+                result.r2 = run_result.r2 if run_result else None
+
+            if run_result is None:
+                for qid, result in results.items():
+                    self._complete_task(task_name, task_type, qid, "No run result")
+                    result.success = True
+                    result.message = "Completed without run result"
+                return execution_service, results
+
+            for qid, result in results.items():
+                try:
+                    postprocess_result = self._run_postprocess(task, backend, run_result, qid)
+
+                    if postprocess_result.output_parameters:
+                        try:
+                            self.result_processor.validate_fidelity(
+                                postprocess_result.output_parameters, task_name
+                            )
+                        except FidelityValidationError as e:
+                            raise ValueError(str(e)) from e
+
+                        task_model = self.state_manager.get_task(task_name, task_type, qid)
+                        task.attach_task_id(task_model.task_id)
+                        processed_params = self.result_processor.process_output_parameters(
+                            postprocess_result.output_parameters,
+                            task_name,
+                            self.execution_id,
+                            task_model.task_id,
+                        )
+                        self.state_manager.put_output_parameters(
+                            task_name, processed_params, task_type, qid
+                        )
+
+                    self._save_artifacts(postprocess_result, task_name, task_type, qid)
+
+                    if postprocess_result.validation_error:
+                        if postprocess_result.output_parameters:
+                            self.state_manager.clear_output_parameters(task_name, task_type, qid)
+                        if execution_service is not None:
+                            self._backend_saver.save(task, execution_service, qid, backend, False)
+                        raise ValueError(postprocess_result.validation_error)
+
+                    backend_success = True
+                    r2_error_msg: str | None = None
+                    if run_result.has_r2() and run_result.r2 is not None:
+                        r2_value = run_result.r2.get(qid)
+                        if r2_value is None:
+                            backend_success = False
+                        else:
+                            try:
+                                self.result_processor.validate_r2(
+                                    run_result.r2, qid, task.r2_threshold
+                                )
+                            except R2ValidationError:
+                                if postprocess_result.output_parameters:
+                                    self.state_manager.clear_output_parameters(
+                                        task_name, task_type, qid
+                                    )
+                                backend_success = False
+                                r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f}"
+
+                        if not backend_success and postprocess_result.output_parameters:
+                            self.state_manager.clear_output_parameters(task_name, task_type, qid)
+
+                    if execution_service is not None:
+                        self._backend_saver.save(
+                            task, execution_service, qid, backend, backend_success
+                        )
+
+                    if r2_error_msg is not None:
+                        raise ValueError(r2_error_msg)
+
+                    result.output_parameters = dict(
+                        self.state_manager.get_task(task_name, task_type, qid).output_parameters
+                    )
+                    self._complete_task(task_name, task_type, qid, f"{task_name} is completed")
+                    result.success = True
+                    result.message = "Completed"
+
+                except (R2ValidationError, FidelityValidationError, ValueError) as e:  # noqa: PERF203
+                    tb = traceback.format_exc()
+                    self._fail_task(task_name, task_type, qid, str(e), tb)
+                    result.message = str(e)
+                    result.stack_trace = tb
+                    continue
+
+            if execution_service is not None:
+                execution_service = self._update_execution(execution_service)
+
+        except Exception as e:
+            tb = traceback.format_exc()
+            for qid, result in results.items():
+                if result.success:
+                    continue
+                self._fail_task(task_name, task_type, qid, str(e), tb)
+                result.message = str(e)
+                result.stack_trace = tb
+            if isinstance(e, (R2ValidationError, FidelityValidationError, ValueError)):
+                raise
+            raise TaskExecutionError(f"Task {task_name} batch failed: {e}") from e
+
+        finally:
+            for qid in started_qids:
+                self.state_manager.end_task(task_name, task_type, qid)
+                if execution_service is not None:
+                    executed_task = self.state_manager.get_task(task_name, task_type, qid)
+                    self.history_recorder.record_task_result(
+                        executed_task, execution_service.to_datamodel()
+                    )
+            if execution_service is not None:
+                self.history_recorder.create_chip_history_snapshot(self.username)
+                execution_service = self._update_execution(execution_service)
+
+        for result in results.values():
+            result.calib_data_delta = self.state_manager.calib_data
+
+        return execution_service, results
 
     @staticmethod
     def _reconstruct_param(

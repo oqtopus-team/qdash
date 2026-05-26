@@ -36,12 +36,19 @@ logger = logging.getLogger(__name__)
 class ManualUpdateService:
     """Service for manually updating calibration parameters."""
 
-    def __init__(self) -> None:
-        self._qubit_repo = MongoQubitCalibrationRepository()
-        self._coupling_repo = MongoCouplingCalibrationRepository()
-        self._activity_repo = MongoActivityRepository()
-        self._param_version_repo = MongoParameterVersionRepository()
-        self._relation_repo = MongoProvenanceRelationRepository()
+    def __init__(
+        self,
+        qubit_repo: MongoQubitCalibrationRepository | None = None,
+        coupling_repo: MongoCouplingCalibrationRepository | None = None,
+        activity_repo: MongoActivityRepository | None = None,
+        param_version_repo: MongoParameterVersionRepository | None = None,
+        relation_repo: MongoProvenanceRelationRepository | None = None,
+    ) -> None:
+        self._qubit_repo = qubit_repo or MongoQubitCalibrationRepository()
+        self._coupling_repo = coupling_repo or MongoCouplingCalibrationRepository()
+        self._activity_repo = activity_repo or MongoActivityRepository()
+        self._param_version_repo = param_version_repo or MongoParameterVersionRepository()
+        self._relation_repo = relation_repo or MongoProvenanceRelationRepository()
 
     def update_parameters(
         self,

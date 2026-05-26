@@ -381,6 +381,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
 
           <ExecutionTopologyView
             chipId={chipId}
+            executionId={executionId}
+            executionName={execution.name}
             tasks={execution.task || []}
             topologyMode={topologyMode}
             filterTaskName={filterTaskName}

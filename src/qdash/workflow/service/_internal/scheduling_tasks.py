@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import traceback
 from importlib import import_module
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from prefect import flow, get_run_logger, task
 
@@ -606,6 +606,68 @@ def _get_dask_task_runner(n_workers: int = _DEFAULT_DASK_WORKERS) -> Any:
     return DaskTaskRunner(
         cluster_kwargs={"n_workers": n_workers, "threads_per_worker": 1, "processes": True}
     )
+
+
+def _qubit_batch_task_run_name(parameters: dict[str, Any]) -> str:
+    qids = parameters.get("qids", [])
+    return f"simultaneous-Q{'-'.join(map(str, qids))}"
+
+
+@task(task_run_name=cast("Any", _qubit_batch_task_run_name), log_prints=True)
+def calibrate_qubit_batch(
+    qids: list[str],
+    tasks: list[str],
+    session_config: dict[str, Any],
+) -> dict[str, Any]:
+    """Execute batch-capable tasks for qids in one isolated session."""
+    _ensure_prefect_logging()
+    logger = get_run_logger()
+    session = _create_isolated_session(session_config, qids)
+    try:
+        step_results: dict[str, dict[str, Any]] = {qid: {} for qid in qids}
+        for task_name in tasks:
+            logger.info(
+                "Running batch task %s for qids=%s in isolated session",
+                task_name,
+                qids,
+            )
+            task_results = session.execute_task_batch(task_name, qids)
+            for qid, task_result in task_results.items():
+                step_results.setdefault(qid, {})[task_name] = task_result
+        return step_results
+    finally:
+        session.finish_calibration(update_chip_history=False, push_to_github=False)
+        _flush_prefect_logs()
+
+
+def run_qubit_batch_calibration_isolated(
+    qids: list[str],
+    tasks: list[str],
+    session_config: dict[str, Any],
+) -> dict[str, Any]:
+    """Run batch-capable qubit tasks in one isolated process.
+
+    This is used for hardware-aware tasks that must receive all qids in one
+    ``execute_task_batch`` call, while still avoiding qubex global state in the
+    parent flow process.
+    """
+
+    @flow(task_runner=_get_dask_task_runner())
+    def _run_qubit_batch_flow(
+        qids: list[str],
+        tasks: list[str],
+        session_config: dict[str, Any],
+    ) -> dict[str, Any]:
+        future = calibrate_qubit_batch.submit(
+            qids=qids,
+            tasks=tasks,
+            session_config=session_config,
+        )
+        result: dict[str, Any] = future.result()
+        return result
+
+    result: dict[str, Any] = _run_qubit_batch_flow(qids, tasks, session_config)
+    return result
 
 
 def run_mux_calibrations_parallel(

@@ -145,18 +145,21 @@ class TestSeedImportServiceImportFromManual:
             patch(
                 "qdash.api.services.seed_import_service.MongoProvenanceRelationRepository"
             ) as relation_repo,
+            patch("qdash.api.services.seed_import_service.MongoUserRepository") as user_repo,
             patch("qdash.api.services.seed_import_service.QubitDocument") as qubit_doc,
         ):
             mock_activity = MagicMock()
             mock_activity.activity_id = "test-activity-id"
             activity_repo.return_value.create_activity.return_value = mock_activity
 
+            user_repo.return_value.find_by_username.return_value = None
             qubit_doc.find_one.return_value.run.return_value = None
 
             yield {
                 "activity": activity_repo,
                 "param_version": param_repo,
                 "relation": relation_repo,
+                "user": user_repo,
                 "qubit_doc": qubit_doc,
             }
 
@@ -271,18 +274,21 @@ class TestSeedImportServiceImportFromQubex:
             patch(
                 "qdash.api.services.seed_import_service.MongoProvenanceRelationRepository"
             ) as relation_repo,
+            patch("qdash.api.services.seed_import_service.MongoUserRepository") as user_repo,
             patch("qdash.api.services.seed_import_service.QubitDocument") as qubit_doc,
         ):
             mock_activity = MagicMock()
             mock_activity.activity_id = "test-activity-id"
             activity_repo.return_value.create_activity.return_value = mock_activity
 
+            user_repo.return_value.find_by_username.return_value = None
             qubit_doc.find_one.return_value.run.return_value = None
 
             yield {
                 "activity": activity_repo,
                 "param_version": param_repo,
                 "relation": relation_repo,
+                "user": user_repo,
                 "qubit_doc": qubit_doc,
             }
 

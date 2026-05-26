@@ -120,6 +120,9 @@ warn_required_dynamic_aliases = true
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
 
+[tool.uv]
+exclude-newer = "3 days"
+
 [tool.coverage.run]
 source = ["src/qdash"]
 omit = [
@@ -151,7 +154,7 @@ exclude_lines = [
 
 [dependency-groups]
 dev = [
-    "ruff==0.15.13",
+    "ruff==0.15.14",
     "pytest==9.0.3",
     "pytest-cov==7.1.0",
     "pytest-env==1.6.0",

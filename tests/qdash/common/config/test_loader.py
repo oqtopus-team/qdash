@@ -65,16 +65,6 @@ def test_load_metrics_reads_domain_yaml(monkeypatch, tmp_path):
     ConfigLoader.clear_cache()
 
 
-def test_load_policy_reads_domain_yaml(monkeypatch, tmp_path):
-    _write_yaml(tmp_path / "domain" / "policy.yaml", "version: 1\nrules: []\n")
-    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
-    ConfigLoader.clear_cache()
-
-    assert ConfigLoader.load_policy() == {"version": 1, "rules": []}
-
-    ConfigLoader.clear_cache()
-
-
 def test_load_copilot_reads_copilot_config_yaml(monkeypatch, tmp_path):
     _write_yaml(tmp_path / "copilot" / "config.yaml", "enabled: true\n")
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)

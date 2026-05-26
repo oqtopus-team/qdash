@@ -100,11 +100,6 @@ class ConfigLoader:
         return cls._load_config("app/workflow.yaml")
 
     @classmethod
-    def load_policy(cls) -> dict[str, Any]:
-        """Load provenance policy configuration."""
-        return cls._load_config("domain/policy.yaml")
-
-    @classmethod
     def clear_cache(cls) -> None:
         """Clear all cached configurations."""
         cls.load_settings.cache_clear()

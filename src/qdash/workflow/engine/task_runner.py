@@ -114,16 +114,16 @@ def execute_dynamic_task_batch_service(
     task_name = task_instance.get_name()
 
     try:
-        # Execute task for each qid
-        for qid in qids:
-            es, _result = task_context.executor.execute(
-                task=task_instance,
-                backend=backend,
-                execution_service=execution_service,
-                qid=qid,
-            )
-            assert es is not None  # guaranteed when execution_service is provided
-            execution_service = es
+        # Execute once via batch_run so the backend can build one hardware-aware
+        # experiment for the whole qid group.
+        es, _results = task_context.executor.execute_batch(
+            task=task_instance,
+            backend=backend,
+            execution_service=execution_service,
+            qids=qids,
+        )
+        assert es is not None  # guaranteed when execution_service is provided
+        execution_service = es
 
         # Save session state
         task_context.save()
