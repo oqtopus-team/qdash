@@ -20,6 +20,7 @@ def experimental_simultaneous_bringup(
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
+    simultaneous_spectroscopy_schedule_mode: str = "local_index",
 ) -> Any:
     """Run resonator and simultaneous qubit spectroscopy in one execution."""
     if mux_ids is None:
@@ -51,4 +52,11 @@ def experimental_simultaneous_bringup(
             "interval": {"value": 150 * 1024, "value_type": "int"},
         },
     )
-    return cal.run(targets, steps=[ExperimentalSimultaneousBringUp()])
+    return cal.run(
+        targets,
+        steps=[
+            ExperimentalSimultaneousBringUp(
+                simultaneous_spectroscopy_schedule_mode=simultaneous_spectroscopy_schedule_mode
+            )
+        ],
+    )

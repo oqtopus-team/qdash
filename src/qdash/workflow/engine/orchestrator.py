@@ -663,6 +663,16 @@ class CalibOrchestrator:
                 task_name, task_type=task_type, qid=qid
             )
             result["task_id"] = executed_task.task_id
+            if executed_task.status.value == "failed":
+                result["status"] = "failed"
+                if executed_task.message:
+                    result["error"] = executed_task.message
+            elif executed_task.status.value == "completed":
+                result["status"] = "success"
+            else:
+                result["status"] = executed_task.status.value
+                if executed_task.message:
+                    result["message"] = executed_task.message
             results[qid] = dict(result)
 
         return results

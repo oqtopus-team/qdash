@@ -29,6 +29,8 @@ def test_batch_run_calls_contrib_helper_with_labels(monkeypatch: pytest.MonkeyPa
         readout_frequencies: dict[str, float] | None,
         shots: int,
         interval: int,
+        plot: bool,
+        save_image: bool,
     ) -> dict[str, Any]:
         calls.update(
             {
@@ -40,6 +42,8 @@ def test_batch_run_calls_contrib_helper_with_labels(monkeypatch: pytest.MonkeyPa
                 "readout_frequencies": readout_frequencies,
                 "shots": shots,
                 "interval": interval,
+                "plot": plot,
+                "save_image": save_image,
             }
         )
         return {"Q00": {"fig": "fig-0"}, "Q01": {"fig": "fig-1"}}
@@ -64,10 +68,14 @@ def test_batch_run_calls_contrib_helper_with_labels(monkeypatch: pytest.MonkeyPa
     assert calls["targets"] == ["Q00", "Q01"]
     assert calls["frequency_range"][0] == pytest.approx(3.0)
     assert calls["power_range"][0] == pytest.approx(-40.0)
+    assert calls["power_range"][1] == pytest.approx(-35.0)
+    assert calls["power_range"][-1] == pytest.approx(-5.0)
     assert calls["readout_amplitudes"] is None
     assert calls["readout_frequencies"] is None
     assert calls["shots"] == 1024
     assert isinstance(calls["interval"], int)
+    assert calls["plot"] is False
+    assert calls["save_image"] is False
 
 
 def test_batch_run_builds_readout_maps_from_calibration_data(

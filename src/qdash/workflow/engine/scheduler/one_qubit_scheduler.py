@@ -999,15 +999,14 @@ class OneQubitScheduler:
     def generate_simultaneous_spectroscopy_batches(
         self,
         qids: list[str],
+        mode: str = "local_index",
     ) -> MuxBatchScheduleResult:
-        """Generate 4-step local-index schedule for simultaneous qubit spectroscopy.
+        """Generate a schedule for simultaneous qubit spectroscopy.
 
-        Each step contains the same local qubit index from every selected MUX:
+        Supported modes:
 
-        - Step 0: MUX0[0], MUX1[0], ...
-        - Step 1: MUX0[1], MUX1[1], ...
-        - Step 2: MUX0[2], MUX1[2], ...
-        - Step 3: MUX0[3], MUX1[3], ...
+        - ``local_index``: four local-index steps across selected MUXes.
+        - ``all``: one step containing all selected qids.
 
         The returned ``parallel_batches`` contains one batch per step so the
         step can be submitted as one simultaneous spectroscopy call. Wiring
@@ -1016,6 +1015,7 @@ class OneQubitScheduler:
 
         Args:
             qids: List of qubit IDs to schedule
+            mode: Scheduling mode for grouping qids
 
         Returns:
             MuxBatchScheduleResult containing MUX batch steps
@@ -1024,10 +1024,12 @@ class OneQubitScheduler:
             FileNotFoundError: If wiring configuration not found
             ValueError: If no valid qubits provided
         """
-        logger.info(
-            "Generating local-index simultaneous spectroscopy schedule for %s", self.chip_id
-        )
+        logger.info("Generating %s simultaneous spectroscopy schedule for %s", mode, self.chip_id)
         logger.info("  Input qubits: %s", qids)
+
+        if mode not in {"local_index", "all"}:
+            msg = f"Unsupported simultaneous spectroscopy schedule mode: {mode}"
+            raise ValueError(msg)
 
         if len(qids) == 0:
             msg = "No qubits provided"
@@ -1037,23 +1039,33 @@ class OneQubitScheduler:
         mux_box_map = self._build_mux_box_map(wiring_config)
         qid_to_mux = self._build_qubit_to_mux_map(wiring_config)
         box_a_qids, box_b_qids, mixed_qids = self._classify_qubits(qids, qid_to_mux, mux_box_map)
-        step_qids: list[list[str]] = [[] for _ in range(4)]
-
-        for qid in sorted(qids, key=int):
-            local_index = int(qid) % 4
-            step_qids[local_index].append(qid)
-
-        steps = []
-        for step_index, step in enumerate(step_qids):
-            if not step:
-                continue
-            steps.append(
+        sorted_qids = sorted(qids, key=int)
+        if mode == "all":
+            steps = [
                 MuxBatchStepInfo(
-                    step_index=step_index,
-                    box_type="LOCAL_INDEX",
-                    parallel_batches=[step],
+                    step_index=0,
+                    box_type="ALL",
+                    parallel_batches=[sorted_qids],
                 )
-            )
+            ]
+        else:
+            step_qids: list[list[str]] = [[] for _ in range(4)]
+
+            for qid in sorted_qids:
+                local_index = int(qid) % 4
+                step_qids[local_index].append(qid)
+
+            steps = []
+            for step_index, step in enumerate(step_qids):
+                if not step:
+                    continue
+                steps.append(
+                    MuxBatchStepInfo(
+                        step_index=step_index,
+                        box_type="LOCAL_INDEX",
+                        parallel_batches=[step],
+                    )
+                )
 
         metadata = {
             "total_qubits": len(qids),
@@ -1063,7 +1075,8 @@ class OneQubitScheduler:
             "num_steps": len(steps),
             "num_batches": sum(len(step.parallel_batches) for step in steps),
             "chip_id": self.chip_id,
-            "strategy": "simultaneous_spectroscopy_local_index_4step",
+            "strategy": f"simultaneous_spectroscopy_{mode}",
+            "schedule_mode": mode,
         }
 
         return MuxBatchScheduleResult(
@@ -1077,7 +1090,8 @@ class OneQubitScheduler:
         self,
         mux_ids: list[int],
         exclude_qids: list[str] | None = None,
+        mode: str = "local_index",
     ) -> MuxBatchScheduleResult:
         """Generate simultaneous spectroscopy MUX-batch schedule from MUX IDs."""
         qids = self._mux_ids_to_qids(mux_ids, exclude_qids)
-        return self.generate_simultaneous_spectroscopy_batches(qids=qids)
+        return self.generate_simultaneous_spectroscopy_batches(qids=qids, mode=mode)

@@ -1076,6 +1076,31 @@ class TestSimultaneousSpectroscopyMuxBatchScheduling:
             ]
         ]
 
+    def test_generate_simultaneous_spectroscopy_batches_all_mode(self, scheduler_simple):
+        """All mode batches every selected qid into one spectroscopy step."""
+        schedule = scheduler_simple.generate_simultaneous_spectroscopy_batches(
+            qids=["5", "0", "4", "1"],
+            mode="all",
+        )
+
+        assert schedule.total_steps == 1
+        assert schedule.total_batches == 1
+        assert schedule.steps[0].step_index == 0
+        assert schedule.steps[0].box_type == "ALL"
+        assert schedule.steps[0].parallel_batches == [["0", "1", "4", "5"]]
+        assert schedule.metadata["strategy"] == "simultaneous_spectroscopy_all"
+        assert schedule.metadata["schedule_mode"] == "all"
+
+    def test_generate_simultaneous_spectroscopy_batches_rejects_unknown_mode(
+        self, scheduler_simple
+    ):
+        """Unknown simultaneous spectroscopy modes fail early."""
+        with pytest.raises(ValueError, match="Unsupported simultaneous spectroscopy schedule mode"):
+            scheduler_simple.generate_simultaneous_spectroscopy_batches(
+                qids=["0", "1"],
+                mode="unknown",
+            )
+
     def test_generate_simultaneous_spectroscopy_batches_from_mux_with_exclude(
         self, scheduler_simple
     ):
@@ -1091,4 +1116,5 @@ class TestSimultaneousSpectroscopyMuxBatchScheduling:
         assert schedule.steps[2].parallel_batches == [["6"]]
         assert schedule.steps[3].parallel_batches == [["3", "7"]]
         assert schedule.metadata["total_qubits"] == 6
-        assert schedule.metadata["strategy"] == "simultaneous_spectroscopy_local_index_4step"
+        assert schedule.metadata["strategy"] == "simultaneous_spectroscopy_local_index"
+        assert schedule.metadata["schedule_mode"] == "local_index"

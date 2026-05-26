@@ -577,7 +577,7 @@ class TaskExecutor:
                     self._fail_task(task_name, task_type, qid, str(e), tb)
                     result.message = str(e)
                     result.stack_trace = tb
-                    raise
+                    continue
 
             if execution_service is not None:
                 execution_service = self._update_execution(execution_service)

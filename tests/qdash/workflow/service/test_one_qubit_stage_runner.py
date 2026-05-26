@@ -1,18 +1,22 @@
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
+from qdash.workflow.service.calib_service import CalibService
 from qdash.workflow.service.one_qubit_stage_runner import OneQubitStageRunner
 
 
-def _service() -> SimpleNamespace:
-    return SimpleNamespace(
-        username="alice",
-        chip_id="144Q-test",
-        backend_name="qubex",
-        project_id="project-1",
-        default_run_parameters={"interval": {"value": 1024}},
-        tags=["tag-1"],
-        note={"kind": "test"},
+def _service() -> CalibService:
+    return cast(
+        "CalibService",
+        SimpleNamespace(
+            username="alice",
+            chip_id="144Q-test",
+            backend_name="qubex",
+            project_id="project-1",
+            default_run_parameters={"interval": {"value": 1024}},
+            tags=["tag-1"],
+            note={"kind": "test"},
+        ),
     )
 
 
@@ -37,10 +41,12 @@ def test_execute_scheduled_mux_schedule_uses_parent_session_config(
     def run_mux_calibrations_parallel(
         *, mux_groups: list[list[str]], tasks: list[str], session_config: dict[str, Any]
     ) -> dict[str, Any]:
-        calls.append(
-            {"mux_groups": mux_groups, "tasks": tasks, "session_config": session_config}
-        )
-        return {qid: {tasks[0]: {"ok": True}, "status": "success"} for group in mux_groups for qid in group}
+        calls.append({"mux_groups": mux_groups, "tasks": tasks, "session_config": session_config})
+        return {
+            qid: {tasks[0]: {"ok": True}, "status": "success"}
+            for group in mux_groups
+            for qid in group
+        }
 
     monkeypatch.setattr(
         "qdash.workflow.service.one_qubit_stage_runner.run_mux_calibrations_parallel",
@@ -104,6 +110,55 @@ def test_execute_simultaneous_spectroscopy_schedule_batches_current_session(
     assert calls == [
         ("CheckSimultaneousQubitSpectroscopy", ["0"]),
         ("CheckSimultaneousQubitSpectroscopy", ["5"]),
+    ]
+    assert result == {
+        "step_0": {"0": {"CheckSimultaneousQubitSpectroscopy": {"task_id": "task-0"}}},
+        "step_1": {"5": {"CheckSimultaneousQubitSpectroscopy": {"task_id": "task-5"}}},
+    }
+
+
+def test_execute_simultaneous_spectroscopy_schedule_uses_isolated_batch(
+    monkeypatch: Any,
+) -> None:
+    runner = OneQubitStageRunner(_service())
+    calls: list[dict[str, Any]] = []
+
+    def run_qubit_batch_calibration_isolated(
+        *, qids: list[str], tasks: list[str], session_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        calls.append({"qids": qids, "tasks": tasks, "session_config": session_config})
+        return {qid: {tasks[0]: {"task_id": f"task-{qid}"}} for qid in qids}
+
+    monkeypatch.setattr(
+        "qdash.workflow.service.one_qubit_stage_runner.run_qubit_batch_calibration_isolated",
+        run_qubit_batch_calibration_isolated,
+    )
+    schedule = SimpleNamespace(
+        steps=[
+            SimpleNamespace(step_index=0, parallel_qids=["0", "4"]),
+            SimpleNamespace(step_index=1, parallel_qids=["1", "5"]),
+        ]
+    )
+    session_config = runner.build_session_config(execution_id="exec-1", flow_name="flow-1")
+
+    result = runner.execute_simultaneous_spectroscopy_schedule(
+        schedule,
+        tasks=["CheckSimultaneousQubitSpectroscopy"],
+        allowed_qids=["0", "5"],
+        session_config=session_config,
+    )
+
+    assert calls == [
+        {
+            "qids": ["0"],
+            "tasks": ["CheckSimultaneousQubitSpectroscopy"],
+            "session_config": session_config,
+        },
+        {
+            "qids": ["5"],
+            "tasks": ["CheckSimultaneousQubitSpectroscopy"],
+            "session_config": session_config,
+        },
     ]
     assert result == {
         "step_0": {"0": {"CheckSimultaneousQubitSpectroscopy": {"task_id": "task-0"}}},

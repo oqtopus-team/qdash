@@ -6,7 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
-from qdash.workflow.service._internal.scheduling_tasks import run_mux_calibrations_parallel
+from qdash.workflow.service._internal.scheduling_tasks import (
+    run_mux_calibrations_parallel,
+    run_qubit_batch_calibration_isolated,
+)
 from qdash.workflow.service.calib_service import get_session
 
 if TYPE_CHECKING:
@@ -35,7 +38,9 @@ class OneQubitStageRunner:
             "note": self.cal_service.note,
         }
 
-    def collect_scheduled_qids(self, schedule: Any, allowed_qids: list[str] | None = None) -> list[str]:
+    def collect_scheduled_qids(
+        self, schedule: Any, allowed_qids: list[str] | None = None
+    ) -> list[str]:
         """Collect qids from a scheduled MUX plan."""
         qids: list[str] = []
         for stage_info in schedule.stages:
@@ -91,6 +96,7 @@ class OneQubitStageRunner:
         *,
         tasks: list[str],
         allowed_qids: list[str] | None = None,
+        session_config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Run simultaneous spectroscopy batches under the current execution."""
         logger = get_run_logger()
@@ -104,6 +110,14 @@ class OneQubitStageRunner:
                 step.step_index,
                 len(step_qids),
             )
+            if session_config is not None:
+                all_results[f"step_{step.step_index}"] = run_qubit_batch_calibration_isolated(
+                    qids=step_qids,
+                    tasks=tasks,
+                    session_config=session_config,
+                )
+                continue
+
             session = get_session()
             step_results: dict[str, dict[str, Any]] = {qid: {} for qid in step_qids}
             for task_name in tasks:

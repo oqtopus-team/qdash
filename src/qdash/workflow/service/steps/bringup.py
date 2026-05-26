@@ -250,6 +250,7 @@ class ExperimentalSimultaneousBringUp(CalibrationStep):
 
     resonator_mode: str = "scheduled"
     qubit_mode: str = "simultaneous_spectroscopy"
+    simultaneous_spectroscopy_schedule_mode: str = "local_index"
     tasks: list[str] = field(default_factory=lambda: list(EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS))
 
     @property
@@ -300,7 +301,9 @@ class ExperimentalSimultaneousBringUp(CalibrationStep):
             mux_ids=targets.mux_ids, exclude_qids=targets.exclude_qids
         )
         qubit_schedule = scheduler.generate_simultaneous_spectroscopy_batches_from_mux(
-            mux_ids=targets.mux_ids, exclude_qids=targets.exclude_qids
+            mux_ids=targets.mux_ids,
+            exclude_qids=targets.exclude_qids,
+            mode=self.simultaneous_spectroscopy_schedule_mode,
         )
         runner = OneQubitStageRunner(service, project_id=service.project_id)
 
@@ -316,9 +319,7 @@ class ExperimentalSimultaneousBringUp(CalibrationStep):
             ctx.metadata["bringup"] = result
             return ctx
 
-        stage_flow_name = (
-            f"{service.flow_name}_{self.name}" if service.flow_name else self.name
-        )
+        stage_flow_name = f"{service.flow_name}_{self.name}" if service.flow_name else self.name
         created_execution = service.skip_execution or service.execution_service is None
         if created_execution:
             init_calibration(
@@ -339,6 +340,7 @@ class ExperimentalSimultaneousBringUp(CalibrationStep):
                     "type": "experimental-simultaneous-bringup",
                     "resonator_strategy": self.resonator_mode,
                     "qubit_strategy": qubit_schedule.metadata["strategy"],
+                    "qubit_schedule_mode": self.simultaneous_spectroscopy_schedule_mode,
                     "total_qubits": len(all_qids),
                     "total_steps": qubit_schedule.total_steps,
                 },
@@ -364,6 +366,7 @@ class ExperimentalSimultaneousBringUp(CalibrationStep):
         qubit_results = runner.execute_simultaneous_spectroscopy_schedule(
             qubit_schedule,
             tasks=["CheckSimultaneousQubitSpectroscopy"],
+            session_config=session_config,
         )
 
         session = get_session() if created_execution else service

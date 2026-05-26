@@ -42,6 +42,7 @@ class OneQubitConfig:
     flow_name: str | None
     project_id: str | None
     qids: list[str] | None = None  # Explicit qubit IDs (overrides mux_ids if set)
+    simultaneous_spectroscopy_schedule_mode: str = "local_index"
 
 
 # =============================================================================
@@ -353,6 +354,7 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
         schedule = scheduler.generate_simultaneous_spectroscopy_batches_from_mux(
             mux_ids=config.mux_ids,
             exclude_qids=config.exclude_qids,
+            mode=config.simultaneous_spectroscopy_schedule_mode,
         )
 
         runner = OneQubitStageRunner(cal_service, project_id=config.project_id)

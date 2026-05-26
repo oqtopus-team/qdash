@@ -1,5 +1,6 @@
+import logging
 from collections.abc import Mapping
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 from qubex.contrib.experiment.simultaneous_qubit_spectroscopy import simultaneous_qubit_spectroscopy
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
@@ -10,18 +11,21 @@ from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import CheckQubitSpectroscopy
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
+logger = logging.getLogger(__name__)
+
 
 class CheckSimultaneousQubitSpectroscopy(CheckQubitSpectroscopy):
     """Task to run qubit spectroscopy for multiple qubits simultaneously."""
 
     name: str = "CheckSimultaneousQubitSpectroscopy"
+    task_type: str = "qubit"
     timeout: int = 60 * 120
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         **CheckQubitSpectroscopy.run_parameters,
         "power_range": RunParameterModel(
             unit="dB",
             value_type="np.arange",
-            value=(-40.0, 1.0, 1.0),
+            value=(-40.0, 0.0, 5.0),
             description="Drive power sweep range for simultaneous qubit spectroscopy",
         ),
         "shots": RunParameterModel(
@@ -53,17 +57,30 @@ class CheckSimultaneousQubitSpectroscopy(CheckQubitSpectroscopy):
 
         readout_amplitudes, readout_frequencies = self._build_readout_maps(backend, qids, labels)
 
+        frequency_range = self._select_frequency_range(backend)
+        power_range = self.run_parameters["power_range"].get_value()
+        logger.info(
+            "Calling qubex simultaneous_qubit_spectroscopy for labels=%s "
+            "(frequency_points=%s, power_points=%s, measurement_points=%s)",
+            labels,
+            len(frequency_range),
+            len(power_range),
+            len(frequency_range) * len(power_range),
+        )
         raw_result = simultaneous_qubit_spectroscopy(
             exp,
             targets=labels,
-            frequency_range=self._select_frequency_range(backend),
-            power_range=self.run_parameters["power_range"].get_value(),
+            frequency_range=frequency_range,
+            power_range=power_range,
             readout_amplitudes=readout_amplitudes,
             readout_frequencies=readout_frequencies,
             shots=self.run_parameters["shots"].get_value(),
             interval=self.run_parameters["interval"].get_value(),
+            plot=False,
+            save_image=False,
         )
 
+        logger.info("Finished qubex simultaneous_qubit_spectroscopy for labels=%s", labels)
         self.save_calibration(backend)
         return RunResult(raw_result=self._normalize_results(raw_result, labels))
 
@@ -72,19 +89,21 @@ class CheckSimultaneousQubitSpectroscopy(CheckQubitSpectroscopy):
     ) -> tuple[dict[str, float] | None, dict[str, float] | None]:
         """Build per-target readout overrides for simultaneous spectroscopy."""
         if len(labels) == 1:
-            readout_amplitudes = {labels[0]: self._get_readout_amplitude_value()}
+            amplitude_map = {labels[0]: self._get_readout_amplitude_value()}
             readout_freq_param = self.input_parameters.get("readout_frequency")
-            readout_frequencies = (
+            frequency_map = (
                 {labels[0]: float(readout_freq_param.value)}
                 if readout_freq_param is not None and readout_freq_param.value is not None
                 else None
             )
-            return readout_amplitudes, readout_frequencies
+            return amplitude_map, frequency_map
 
-        project_id = backend.config.get("project_id")
-        chip_id = backend.config.get("chip_id")
-        if not project_id or not chip_id:
+        project_id_raw = backend.config.get("project_id")
+        chip_id_raw = backend.config.get("chip_id")
+        if not project_id_raw or not chip_id_raw:
             return None, None
+        project_id = str(project_id_raw)
+        chip_id = str(chip_id_raw)
 
         qubit_repo = MongoQubitCalibrationRepository()
         readout_amplitudes: dict[str, float] = {}
@@ -96,21 +115,17 @@ class CheckSimultaneousQubitSpectroscopy(CheckQubitSpectroscopy):
                 qid=qid,
             )
             self._add_readout_value(readout_amplitudes, label, calib_data.get("readout_amplitude"))
-            self._add_readout_value(
-                readout_frequencies, label, calib_data.get("readout_frequency")
-            )
+            self._add_readout_value(readout_frequencies, label, calib_data.get("readout_frequency"))
 
         return readout_amplitudes or None, readout_frequencies or None
 
     @staticmethod
-    def _add_readout_value(
-        values: dict[str, float], label: str, parameter: Any
-    ) -> None:
+    def _add_readout_value(values: dict[str, float], label: str, parameter: Any) -> None:
         """Add a readout value from a stored ParameterModel-shaped payload."""
         if isinstance(parameter, ParameterModel):
             value = parameter.value
         elif isinstance(parameter, Mapping):
-            value = parameter.get("value")
+            value = cast("Any", parameter.get("value"))
         else:
             value = None
         if value is not None:
