@@ -101,6 +101,8 @@ from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
     BOX_B,
     BOX_MIXED,
+    MuxBatchScheduleResult,
+    MuxBatchStepInfo,
     OneQubitScheduleResult,
     OneQubitStageInfo,
     SynchronizedOneQubitScheduleResult,
@@ -137,6 +139,8 @@ __all__ = [
     "ExecutionStateManager",
     "FidelityValidationError",
     # 1-Qubit Ordering Plugins
+    "MuxBatchScheduleResult",
+    "MuxBatchStepInfo",
     "MuxOrderingStrategy",
     "OneQubitScheduleResult",
     "OneQubitScheduler",

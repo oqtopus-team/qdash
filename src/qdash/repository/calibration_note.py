@@ -239,7 +239,7 @@ class MongoCalibrationNoteRepository:
             max_retries,
             query,
         )
-        raise last_error  # type: ignore[misc]
+        raise last_error
 
     def upsert_on_insert(
         self, note: CalibrationNoteModel, max_retries: int = 3
@@ -306,7 +306,7 @@ class MongoCalibrationNoteRepository:
             max_retries,
             query,
         )
-        raise last_error  # type: ignore[misc]
+        raise last_error
 
     def merge_note_fields(
         self,
@@ -372,7 +372,7 @@ class MongoCalibrationNoteRepository:
             max_retries,
             query_filter,
         )
-        raise last_error  # type: ignore[misc]
+        raise last_error
 
     def _to_model(self, doc: CalibrationNoteDocument) -> CalibrationNoteModel:
         """Convert a document to a domain model.

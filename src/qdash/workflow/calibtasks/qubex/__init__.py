@@ -34,6 +34,9 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_frequencies import Check
 from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
     CheckResonatorSpectroscopy,
 )
+from qdash.workflow.calibtasks.qubex.cw.check_simultaneous_qubit_spectroscopy import (
+    CheckSimultaneousQubitSpectroscopy,
+)
 from qdash.workflow.calibtasks.qubex.measurement.readout_classification import ReadoutClassification
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_chevron import CheckChevron
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_coarse_chevron import (
@@ -112,6 +115,7 @@ __all__ = [
     "CheckReflectionCoefficient",
     "CheckResonatorFrequencies",
     "CheckResonatorSpectroscopy",
+    "CheckSimultaneousQubitSpectroscopy",
     "CheckStatus",
     "CheckT1",
     "CheckT1Average",

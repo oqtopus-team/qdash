@@ -45,6 +45,11 @@ BRINGUP_TASKS: list[str] = [
     "CheckRabi",
 ]
 
+EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS: list[str] = [
+    "CheckResonatorSpectroscopy",
+    "CheckSimultaneousQubitSpectroscopy",
+]
+
 
 # =============================================================================
 # 1-Qubit Task Lists

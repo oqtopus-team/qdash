@@ -604,6 +604,17 @@ class CalibService:
         )
         return result
 
+    def execute_task_batch(
+        self,
+        task_name: str,
+        qids: list[str],
+        task_details: dict[str, Any] | None = None,
+        upstream_id: str | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Execute one calibration task with a single batch_run over qids."""
+        assert self._orchestrator is not None, "Session not initialized"
+        return self._orchestrator.run_task_batch(task_name, qids, task_details, upstream_id)
+
     def get_parameter(self, qid: str, param_name: str) -> Any:
         """Get a calibration parameter value for a qubit.
 

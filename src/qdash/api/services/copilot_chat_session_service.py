@@ -66,7 +66,7 @@ class CopilotChatSessionService:
     def list_sessions(self, *, username: str) -> ListCopilotChatSessionsResponse:
         docs = (
             CopilotChatSessionDocument.find(CopilotChatSessionDocument.username == username)
-            .sort(-CopilotChatSessionDocument.updated_at)
+            .sort("-updated_at")
             .to_list()
         )
         return ListCopilotChatSessionsResponse(sessions=[_to_summary(d) for d in docs])

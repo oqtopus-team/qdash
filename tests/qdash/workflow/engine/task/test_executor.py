@@ -51,6 +51,9 @@ class MockTask:
     def run(self, session: Any, qid: str) -> RunResult:
         return RunResult(raw_result={"data": [1, 2, 3]}, r2={"0": 0.95})
 
+    def batch_run(self, session: Any, qids: list[str]) -> RunResult:
+        return RunResult(raw_result={qid: {"data": [1, 2, 3]} for qid in qids})
+
     def postprocess(
         self, session: Any, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
@@ -207,6 +210,71 @@ class TestTaskExecutorExecuteTask:
         assert result["success"] is True
         assert result["message"] == "Completed without run result"
         mock_state_manager.update_task_status_to_completed.assert_called_once()
+
+    def test_execute_batch_calls_batch_run_once(
+        self, executor: TaskExecutor, mock_state_manager: MagicMock
+    ) -> None:
+        """Test batch execution calls batch_run once for all qids."""
+        task = MockTask()
+        task.run = MagicMock(return_value=RunResult(raw_result={}))  # type: ignore[method-assign]
+        task.batch_run = MagicMock(  # type: ignore[method-assign]
+            return_value=RunResult(raw_result={"0": {}, "4": {}})
+        )
+        task.postprocess = MagicMock(  # type: ignore[method-assign]
+            return_value=PostProcessResult(
+                output_parameters={"qubit_frequency": ParameterModel(value=5.0)},
+                figures=[],
+                raw_data=[],
+            )
+        )
+        session: Any = MockSession()
+
+        _, results = executor.execute_batch(task, session, ["0", "4"])
+
+        assert set(results) == {"0", "4"}
+        assert all(result.success for result in results.values())
+        task.batch_run.assert_called_once_with(session, ["0", "4"])
+        task.run.assert_not_called()
+        assert mock_state_manager.start_task.call_count == 2
+        assert mock_state_manager.end_task.call_count == 2
+
+    def test_execute_batch_continues_after_qid_validation_error(
+        self, executor: TaskExecutor, mock_state_manager: MagicMock
+    ) -> None:
+        """Test batch execution records per-qid validation failures without aborting."""
+        task = MockTask()
+        task.batch_run = MagicMock(  # type: ignore[method-assign]
+            return_value=RunResult(raw_result={"0": {}, "4": {}})
+        )
+
+        def postprocess(
+            _session: Any, _execution_id: str, _run_result: RunResult, qid: str
+        ) -> PostProcessResult:
+            if qid == "0":
+                return PostProcessResult(
+                    output_parameters={"qubit_frequency": ParameterModel(value=0.0)},
+                    figures=[],
+                    raw_data=[],
+                    validation_error="Qubit frequency too low for qid=0",
+                )
+            return PostProcessResult(
+                output_parameters={"qubit_frequency": ParameterModel(value=5.0)},
+                figures=[],
+                raw_data=[],
+            )
+
+        task.postprocess = MagicMock(side_effect=postprocess)  # type: ignore[method-assign]
+        session: Any = MockSession()
+
+        _, results = executor.execute_batch(task, session, ["0", "4"])
+
+        assert results["0"].success is False
+        assert results["0"].message == "Qubit frequency too low for qid=0"
+        assert results["4"].success is True
+        assert results["4"].message == "Completed"
+        assert task.postprocess.call_count == 2
+        mock_state_manager.update_task_status_to_failed.assert_called()
+        mock_state_manager.update_task_status_to_completed.assert_called()
 
     def test_execute_task_validates_r2(
         self, executor: TaskExecutor, mock_result_processor: MagicMock

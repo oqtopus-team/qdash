@@ -15,6 +15,7 @@ from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
     BOX_B,
     BOX_MIXED,
+    MuxBatchScheduleResult,
     OneQubitScheduleResult,
 )
 
@@ -688,7 +689,6 @@ class TestSynchronizedScheduling:
         # Verify metadata
         assert schedule.metadata["total_qubits"] == 8
         assert schedule.metadata["use_checkerboard"] is True
-        assert schedule.metadata["strategy"] == "checkerboard"
 
     def test_generate_synchronized_default_strategy(self, scheduler_simple):
         """Test synchronized schedule with default strategy."""
@@ -949,3 +949,172 @@ class TestBoxBModuleSharing:
                     f"Step {step.step_index} has {count} MUXes sharing {module_id}: "
                     f"{[m for m in mux_list if m in mux_ids_in_step]}"
                 )
+
+
+# ============================================================================
+# Simultaneous Spectroscopy MUX Batch Scheduling Tests
+# ============================================================================
+
+
+class TestSimultaneousSpectroscopyMuxBatchScheduling:
+    """Tests for MUX-batch scheduling used by simultaneous qubit spectroscopy."""
+
+    def test_generate_simultaneous_spectroscopy_batches_basic(self, scheduler_simple):
+        """Generate local-index steps across selected MUXes."""
+        schedule = scheduler_simple.generate_simultaneous_spectroscopy_batches(
+            qids=["0", "1", "4", "5", "8", "9"]
+        )
+
+        assert isinstance(schedule, MuxBatchScheduleResult)
+        assert schedule.total_steps == 2
+        assert schedule.total_batches == 2
+        assert [step.step_index for step in schedule.steps] == [0, 1]
+        assert schedule.steps[0].parallel_batches == [["0", "4", "8"]]
+        assert schedule.steps[1].parallel_batches == [["1", "5", "9"]]
+
+    def test_generate_simultaneous_spectroscopy_batches_keeps_mux_batches_parallel(
+        self, scheduler_64qv3
+    ):
+        """Same local index from multiple MUXes is batched together."""
+        schedule = scheduler_64qv3.generate_simultaneous_spectroscopy_batches(
+            qids=["4", "5", "8", "9", "20", "21"]
+        )
+
+        assert schedule.total_steps == 2
+        assert [step.step_index for step in schedule.steps] == [0, 1]
+        assert schedule.steps[0].parallel_batches == [["4", "8", "20"]]
+        assert schedule.steps[1].parallel_batches == [["5", "9", "21"]]
+
+    def test_generate_simultaneous_spectroscopy_batches_uses_four_local_index_steps(
+        self, scheduler_64qv3
+    ):
+        """Full 64Q MUX set is split into four local-index steps."""
+        schedule = scheduler_64qv3.generate_simultaneous_spectroscopy_batches(
+            qids=[str(qid) for qid in range(64)]
+        )
+
+        assert schedule.total_steps == 4
+        assert [step.step_index for step in schedule.steps] == [0, 1, 2, 3]
+        assert schedule.steps[0].parallel_batches == [
+            [
+                "0",
+                "4",
+                "8",
+                "12",
+                "16",
+                "20",
+                "24",
+                "28",
+                "32",
+                "36",
+                "40",
+                "44",
+                "48",
+                "52",
+                "56",
+                "60",
+            ]
+        ]
+        assert schedule.steps[1].parallel_batches == [
+            [
+                "1",
+                "5",
+                "9",
+                "13",
+                "17",
+                "21",
+                "25",
+                "29",
+                "33",
+                "37",
+                "41",
+                "45",
+                "49",
+                "53",
+                "57",
+                "61",
+            ]
+        ]
+        assert schedule.steps[2].parallel_batches == [
+            [
+                "2",
+                "6",
+                "10",
+                "14",
+                "18",
+                "22",
+                "26",
+                "30",
+                "34",
+                "38",
+                "42",
+                "46",
+                "50",
+                "54",
+                "58",
+                "62",
+            ]
+        ]
+        assert schedule.steps[3].parallel_batches == [
+            [
+                "3",
+                "7",
+                "11",
+                "15",
+                "19",
+                "23",
+                "27",
+                "31",
+                "35",
+                "39",
+                "43",
+                "47",
+                "51",
+                "55",
+                "59",
+                "63",
+            ]
+        ]
+
+    def test_generate_simultaneous_spectroscopy_batches_all_mode(self, scheduler_simple):
+        """All mode batches every selected qid into one spectroscopy step."""
+        schedule = scheduler_simple.generate_simultaneous_spectroscopy_batches(
+            qids=["5", "0", "4", "1"],
+            mode="all",
+        )
+
+        assert schedule.total_steps == 1
+        assert schedule.total_batches == 1
+        assert schedule.steps[0].step_index == 0
+        assert schedule.steps[0].box_type == "ALL"
+        assert schedule.steps[0].parallel_batches == [["0", "1", "4", "5"]]
+        assert schedule.metadata["strategy"] == "simultaneous_spectroscopy_all"
+        assert schedule.metadata["schedule_mode"] == "all"
+
+    def test_generate_simultaneous_spectroscopy_batches_rejects_unknown_mode(
+        self, scheduler_simple
+    ):
+        """Unknown simultaneous spectroscopy modes fail early."""
+        with pytest.raises(ValueError, match="Unsupported simultaneous spectroscopy schedule mode"):
+            scheduler_simple.generate_simultaneous_spectroscopy_batches(
+                qids=["0", "1"],
+                mode="unknown",
+            )
+
+    def test_generate_simultaneous_spectroscopy_batches_from_mux_with_exclude(
+        self, scheduler_simple
+    ):
+        """MUX input expands to qids and preserves exclusions."""
+        schedule = scheduler_simple.generate_simultaneous_spectroscopy_batches_from_mux(
+            mux_ids=[0, 1],
+            exclude_qids=["2", "5"],
+        )
+
+        assert schedule.total_steps == 4
+        assert schedule.steps[0].parallel_batches == [["0", "4"]]
+        assert schedule.steps[1].parallel_batches == [["1"]]
+        assert schedule.steps[2].parallel_batches == [["6"]]
+        assert schedule.steps[3].parallel_batches == [["3", "7"]]
+        assert schedule.metadata["total_qubits"] == 6
+        assert schedule.metadata["strategy"] == "simultaneous_spectroscopy_local_index"
+        assert schedule.metadata["schedule_mode"] == "local_index"

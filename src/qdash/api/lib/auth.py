@@ -1,8 +1,8 @@
 import logging
 
+import bcrypt
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from passlib.context import CryptContext
 
 from qdash.api.schemas.auth import User, UserInDB
 from qdash.datamodel.user import SystemRole
@@ -14,14 +14,8 @@ logger = logging.getLogger(__name__)
 # Initialize at module level
 initialize()
 
-# Optimize bcrypt settings
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__rounds=10,  # Lower rounds for development
-    bcrypt__ident="2b",
-    truncate_error=False,  # Disable password length check
-)
+BCRYPT_ROUNDS = 10
+BCRYPT_MAX_PASSWORD_BYTES = 72
 
 # Bearer Token authentication scheme
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -44,12 +38,23 @@ def username_header(x_username: str | None = Header(None, alias="X-Username")) -
     return x_username
 
 
+def _password_bytes(password: str) -> bytes:
+    password_bytes = password.encode("utf-8")
+    if len(password_bytes) > BCRYPT_MAX_PASSWORD_BYTES:
+        msg = "Password cannot be longer than 72 bytes"
+        logger.error(msg)
+        raise ValueError(msg)
+    return password_bytes
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hashed password."""
     if not plain_password or not hashed_password:
         return False
     try:
-        return bool(pwd_context.verify(plain_password, hashed_password))
+        return bool(
+            bcrypt.checkpw(_password_bytes(plain_password), hashed_password.encode("utf-8"))
+        )
     except Exception as e:
         logger.debug(f"Password verification failed: {e}")
         return False
@@ -61,7 +66,8 @@ def get_password_hash(password: str) -> str:
         msg = "Password cannot be empty"
         logger.error(msg)
         raise ValueError(msg)
-    return str(pwd_context.hash(password))
+    salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS, prefix=b"2b")
+    return bcrypt.hashpw(_password_bytes(password), salt).decode("utf-8")
 
 
 def get_user(username: str) -> UserInDB | None:

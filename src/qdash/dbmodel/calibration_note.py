@@ -165,7 +165,7 @@ class CalibrationNoteDocument(Document):
             max_retries,
             query,
         )
-        raise last_error  # type: ignore[misc]
+        raise last_error
 
     model_config = ConfigDict(
         from_attributes=True,
