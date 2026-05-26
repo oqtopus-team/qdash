@@ -70,17 +70,13 @@ class BaseTask(ABC):
         from copy import deepcopy
 
         # Calibration input parameters (for provenance)
-        self.input_parameters: dict[str, ParameterModel] = deepcopy(  # type: ignore[misc]
-            self.__class__.input_parameters
-        )
+        self.input_parameters: dict[str, ParameterModel] = deepcopy(self.__class__.input_parameters)
         # Calibration output parameters
-        self.output_parameters: dict[str, ParameterModel] = deepcopy(  # type: ignore[misc]
+        self.output_parameters: dict[str, ParameterModel] = deepcopy(
             self.__class__.output_parameters
         )
         # Experiment run configuration
-        self.run_parameters: dict[str, RunParameterModel] = deepcopy(  # type: ignore[misc]
-            self.__class__.run_parameters
-        )
+        self.run_parameters: dict[str, RunParameterModel] = deepcopy(self.__class__.run_parameters)
 
         if params is not None:
             self._convert_and_set_parameters(params)

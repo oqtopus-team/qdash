@@ -62,6 +62,10 @@ class MongoExecutionCounterRepository:
             The next index (0 on first call, then 1, 2, 3...)
 
         """
+        if project_id is None:
+            msg = "project_id is required to generate an execution index"
+            raise ValueError(msg)
+
         result: int = ExecutionCounterDocument.get_next_index(
             date=date,
             username=username,
@@ -80,7 +84,7 @@ class MongoExecutionCounterRepository:
 
         Parameters
         ----------
-        project_id : str
+        project_id : str | None
             The project identifier
         chip_id : str
             The chip identifier
