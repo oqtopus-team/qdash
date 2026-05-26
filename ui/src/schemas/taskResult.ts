@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { TaskResultTaskId } from './taskResultTaskId';
+import type { TaskResultExecutionId } from './taskResultExecutionId';
 import type { TaskResultQid } from './taskResultQid';
 import type { TaskResultUpstreamId } from './taskResultUpstreamId';
 import type { TaskResultMessage } from './taskResultMessage';
@@ -28,6 +29,7 @@ import type { TaskResultAiReview } from './taskResultAiReview';
  */
 export interface TaskResult {
   task_id?: TaskResultTaskId;
+  execution_id?: TaskResultExecutionId;
   qid?: TaskResultQid;
   name?: string;
   upstream_id?: TaskResultUpstreamId;
