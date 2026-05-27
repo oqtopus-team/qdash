@@ -11,17 +11,38 @@ git clone https://github.com/oqtopus-team/qdash.git
 cd qdash
 ```
 
-## Initial Setup
+## Qubex Setup
 
-Create the environment file from the example and install local dependencies.
+Create the Qubex-backed environment file:
 
 ```bash
-cp .env.example .env
+cp .env.example.qubex .env
+```
+
+Before starting services, edit `.env` if you need different ports, data directories, admin
+credentials, Qubex config repository settings, remote access settings, or Copilot provider
+credentials.
+
+Qubex-backed workflows also need configuration files under `CONFIG_PATH`. With the default
+`CONFIG_PATH="./config/qubex-config"`, put each chip's Qubex config tree at
+`./config/qubex-config/<chip_id>/`, including `config/`, `params/`, and optional `calibration/`
+directories. See the
+[Qubex system configuration guide](https://amachino.github.io/qubex/user-guide/getting-started/system-configuration/)
+for the required files.
+
+If your Qubex config is stored in a Git repository, set `CONFIG_REPO_URL`, `GITHUB_USER`, and
+`GITHUB_TOKEN` in `.env` so QDash can pull the latest config into `CONFIG_PATH` and push supported
+calibration updates back to the repository when workflow GitHub push is enabled.
+
+Complete this Qubex config setup before running `task deploy-local` or `task dev-local`.
+
+Install local dependencies after `.env` and Qubex config setup are ready:
+
+```bash
 task dev-local-setup
 ```
 
-The setup task installs Python and UI dependencies and creates the default Qubex config
-directory. Edit `.env` if you need different ports, data directories, or admin credentials.
+The setup task installs Python and UI dependencies and creates local data directories as needed.
 
 ## Start the Application
 
