@@ -28,16 +28,17 @@ git clone https://github.com/oqtopus-team/qdash.git
 cd qdash
 ```
 
-### Initial Setup
+### Qubex Setup
 
-Create the environment file from the example:
+Create the environment file from the Qubex example:
 
 ```shell
-cp .env.example .env
+cp .env.example.qubex .env
 ```
 
-Data directories are created by Docker Compose and `task dev-local-setup` as needed. Edit `.env`
-before starting services if you need custom ports, data paths, or admin credentials.
+Edit `.env` before starting services if you need custom ports, data paths, admin credentials,
+Qubex config repository settings, remote access settings, or Copilot provider credentials. Data
+directories are created by Docker Compose and `task dev-local-setup` as needed.
 
 ### Using DevContainer (Recommended)
 
@@ -286,7 +287,8 @@ lefthook install
 
 ## Environment Variables
 
-Key environment variables are configured in `.env`. See `.env.example` for available options:
+Key environment variables are configured in `.env`. See `.env.example.qubex` for the Qubex-backed
+defaults and `.env.example` for the fake backend defaults:
 
 | Variable                  | Default | Description                 |
 | ------------------------- | ------- | --------------------------- |
@@ -298,7 +300,11 @@ Key environment variables are configured in `.env`. See `.env.example` for avail
 | `DEPLOYMENT_SERVICE_PORT` | 4006    | Deployment service port     |
 | `CALIB_DATA_PATH`         | -       | Calibration data mount path |
 | `CALIB_TASKS_PATH`        | -       | Calibration tasks path      |
-| `CONFIG_PATH`             | -       | Qubex backend config repository/data path |
+| `CONFIG_PATH`             | -       | Qubex backend config root |
 | `NEXT_PUBLIC_API_URL`     | -       | Public API URL for frontend |
 | `NEXT_PUBLIC_PREFECT_URL` | -       | Prefect dashboard URL       |
 | `NEXT_ALLOWED_DEV_ORIGINS` | -       | Additional hostnames allowed to access the Next.js dev server |
+
+For Qubex-backed runs, `CONFIG_PATH` must contain chip-specific Qubex configuration directories.
+QDash reads `<CONFIG_PATH>/<chip_id>/config` and `<CONFIG_PATH>/<chip_id>/params`; see
+[Operator Setup](../operator-guide/setup.md#qubex-configuration-files) for the expected layout.

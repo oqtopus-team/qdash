@@ -29,8 +29,20 @@ task dev-local
 
 ## Full Docker Stack
 
+Create and review `.env` before starting the stack:
+
 ```bash
-cp .env.example .env
+cp .env.example.qubex .env
+```
+
+Edit `.env` if you need custom ports, data paths, admin credentials, Qubex config repository
+settings, remote access settings, or Copilot provider credentials. For Qubex workflows, make sure
+`CONFIG_PATH` contains the chip configuration tree described in the
+[Operator Setup](../operator-guide/setup.md#qubex-configuration-files).
+
+Then start the full stack:
+
+```bash
 task deploy-local
 ```
 
