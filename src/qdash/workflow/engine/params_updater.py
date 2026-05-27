@@ -82,6 +82,26 @@ class ParamsUpdater(Protocol):
     def update(self, qid: str, output_parameters: dict[str, Any]) -> set[str]: ...
 
 
+def resolve_param_yaml_file_names(output_parameters: dict[str, Any]) -> set[str]:
+    """Resolve params YAML files addressed by output parameter names.
+
+    This intentionally does not check whether the YAML value would change. Task
+    execution may have already updated local params files before finish-time
+    GitHub push, but the same files still need to be included in the batch push
+    candidate list.
+    """
+    param_file_map = _load_param_file_map()
+    extra_file_map = _load_extra_file_map()
+
+    file_names: set[str] = set()
+    for parameter_name in output_parameters:
+        file_name = param_file_map.get(parameter_name)
+        if file_name is not None:
+            file_names.add(file_name)
+        file_names.update(extra_file_map.get(parameter_name, []))
+    return file_names
+
+
 def get_params_updater(
     backend: BaseBackend | None, chip_id: str | None = None
 ) -> ParamsUpdater | None:

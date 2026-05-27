@@ -282,11 +282,11 @@ class TestCalibServiceParameterManagement:
         result = session.get_parameter("0", "nonexistent")
         assert result is None
 
-    def test_sync_backend_params_filters_configured_push_files_to_changed_files(
+    def test_sync_backend_params_filters_configured_push_files_to_touched_files(
         self,
         monkeypatch,
     ):
-        """Only configured params files changed by this calibration should be batch-pushed."""
+        """Only configured params files touched by this calibration should be batch-pushed."""
         from qdash.workflow.service.github import GitHubPushConfig
 
         class FakeUpdater:
@@ -312,6 +312,55 @@ class TestCalibServiceParameterManagement:
         monkeypatch.setattr(
             "qdash.workflow.service.calib_service.get_params_updater",
             lambda backend, chip_id: FakeUpdater(),
+        )
+        logger = MagicMock()
+
+        session._sync_backend_params_before_push(logger)
+
+        assert session.github_push_config.params_file_names == ["t1.yaml"]
+        logger.info.assert_called_once()
+
+    def test_sync_backend_params_keeps_touched_files_when_already_updated(
+        self,
+        monkeypatch,
+    ):
+        """Task-time params updates should still be batch-pushed on finish."""
+        from qdash.workflow.service.github import GitHubPushConfig
+
+        class FakeUpdater:
+            def update(self, qid, params):
+                assert qid == "0"
+                assert params == {"t1": {"value": 12.0}}
+                return set()
+
+        orchestrator = MagicMock()
+        orchestrator._execution_service = MockExecutionService()
+        orchestrator._execution_service.calib_data.qubit = {
+            "0": {"t1": {"value": 12.0}},
+        }
+        orchestrator._backend = MagicMock()
+
+        session = CalibService.__new__(CalibService)
+        session.chip_id = "chip_1"
+        session._orchestrator = orchestrator
+        session.github_push_config = GitHubPushConfig(
+            params_file_names=["t1.yaml", "t2_echo.yaml"],
+        )
+
+        monkeypatch.setattr(
+            "qdash.workflow.service.calib_service.get_params_updater",
+            lambda backend, chip_id: FakeUpdater(),
+        )
+        monkeypatch.setattr(
+            "qdash.workflow.engine.params_updater.ConfigLoader.load_workflow",
+            lambda: {
+                "params_updater": {
+                    "parameter_file_map": {
+                        "t1": "t1.yaml",
+                        "t2_echo": "t2_echo.yaml",
+                    },
+                },
+            },
         )
         logger = MagicMock()
 
