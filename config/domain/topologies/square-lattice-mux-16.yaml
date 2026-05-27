@@ -1,0 +1,86 @@
+name: Square Lattice with MUX
+description: Square lattice topology with 2x2 MUX groups
+grid_size: 4
+num_qubits: 16
+direction_convention: checkerboard_cr
+mux:
+  enabled: true
+  size: 2
+qubits:
+  0:
+    row: 0
+    col: 0
+  1:
+    row: 0
+    col: 1
+  2:
+    row: 1
+    col: 0
+  3:
+    row: 1
+    col: 1
+  4:
+    row: 0
+    col: 2
+  5:
+    row: 0
+    col: 3
+  6:
+    row: 1
+    col: 2
+  7:
+    row: 1
+    col: 3
+  8:
+    row: 2
+    col: 0
+  9:
+    row: 2
+    col: 1
+  10:
+    row: 3
+    col: 0
+  11:
+    row: 3
+    col: 1
+  12:
+    row: 2
+    col: 2
+  13:
+    row: 2
+    col: 3
+  14:
+    row: 3
+    col: 2
+  15:
+    row: 3
+    col: 3
+couplings:
+- [0, 1]
+- [0, 2]
+- [4, 1]
+- [3, 1]
+- [3, 2]
+- [8, 2]
+- [3, 6]
+- [3, 9]
+- [4, 5]
+- [4, 6]
+- [7, 5]
+- [7, 6]
+- [12, 6]
+- [7, 13]
+- [8, 9]
+- [8, 10]
+- [12, 9]
+- [11, 9]
+- [11, 10]
+- [11, 14]
+- [12, 13]
+- [12, 14]
+- [15, 13]
+- [15, 14]
+visualization:
+  show_mux_boundaries: true
+  region_size: 4
+id: square-lattice-mux-16

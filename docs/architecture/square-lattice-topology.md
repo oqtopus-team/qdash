@@ -6,6 +6,7 @@ QDash supports superconducting quantum processors with square lattice topology, 
 
 ### Supported Chip Sizes
 
+- **16-qubit chip**: 4×4 grid
 - **64-qubit chip**: 8×8 grid (e.g., 64Qv3)
 - **144-qubit chip**: 12×12 grid (e.g., 144Qv2)
 
@@ -140,6 +141,12 @@ Edges can be classified as:
 
 ### Total Edge Counts
 
+**16-qubit chip (4×4 grid):**
+
+- Horizontal edges: 4 rows × 3 edges/row = 12 edges
+- Vertical edges: 3 rows × 4 edges/row = 12 edges
+- **Total: 24 nearest-neighbor edges**
+
 **64-qubit chip (8×8 grid):**
 
 - Horizontal edges: 8 rows × 7 edges/row = 56 edges
@@ -260,11 +267,11 @@ Edges are named as `"q1-q2"` where:
 ### Usage
 
 ```bash
-# Generate a 64-qubit square-lattice topology
+# Generate a 16-qubit square-lattice topology
 uv run python scripts/generate_topology.py \
   --template square-lattice-mux \
-  --size 64 \
-  --output config/domain/topologies/64q-square-lattice.yaml
+  --size 16 \
+  --output config/domain/topologies/square-lattice-mux-16.yaml
 ```
 
 ## References

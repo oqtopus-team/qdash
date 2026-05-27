@@ -46,3 +46,19 @@ def test_list_topologies_reads_domain_topologies(monkeypatch, tmp_path):
     assert list_topologies(size=4) == [
         {"id": "test-topology", "name": "Test Topology", "num_qubits": 4}
     ]
+
+
+def test_builtin_16q_square_lattice_mux_topology(monkeypatch):
+    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", ConfigLoader.LOCAL_CONFIG_DIR)
+    load_topology.cache_clear()
+
+    topology = load_topology("square-lattice-mux-16")
+
+    assert topology.grid_size == 4
+    assert topology.num_qubits == 16
+    assert len(topology.qubits) == 16
+    assert len(topology.couplings) == 24
+    assert topology.mux.enabled is True
+    assert topology.mux.size == 2
+
+    load_topology.cache_clear()
