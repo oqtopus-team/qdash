@@ -527,7 +527,7 @@ export function CorrelationView() {
           {/* Row 1: Main Controls */}
           <div className="flex flex-col gap-3 sm:gap-4">
             {/* Row 1a: Type + Chip */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex flex-col sm:flex-row flex-wrap items-start gap-2 sm:gap-3">
               <div className="tabs tabs-boxed bg-base-200 h-8 sm:h-9">
                 <button
                   className={`tab h-full ${metricType === "qubit" ? "tab-active" : ""}`}
@@ -543,46 +543,48 @@ export function CorrelationView() {
                 </button>
               </div>
 
-              <div className="w-28 sm:w-48">
+              <div className="w-full sm:w-48">
                 <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
               </div>
 
-              {/* X Parameter Selection - inline */}
-              <span className="text-xs sm:text-sm font-medium">X:</span>
-              <div className="w-32 sm:w-56">
-                <Select<MetricOption, false>
-                  className="text-base-content"
-                  classNamePrefix="react-select"
-                  options={metricOptions}
-                  value={metricOptions.find((option) => option.value === xParameter) ?? null}
-                  onChange={(option: SingleValue<MetricOption>) => {
-                    if (option) {
-                      setXParameter(option.value);
-                    }
-                  }}
-                  placeholder="X parameter"
-                  isSearchable={false}
-                  styles={metricSelectStyles}
-                />
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs sm:text-sm font-medium">X:</span>
+                <div className="flex-1 sm:w-56 sm:flex-none">
+                  <Select<MetricOption, false>
+                    className="text-base-content"
+                    classNamePrefix="react-select"
+                    options={metricOptions}
+                    value={metricOptions.find((option) => option.value === xParameter) ?? null}
+                    onChange={(option: SingleValue<MetricOption>) => {
+                      if (option) {
+                        setXParameter(option.value);
+                      }
+                    }}
+                    placeholder="X parameter"
+                    isSearchable={false}
+                    styles={metricSelectStyles}
+                  />
+                </div>
               </div>
 
-              {/* Y Parameter Selection - inline */}
-              <span className="text-xs sm:text-sm font-medium">Y:</span>
-              <div className="w-32 sm:w-56">
-                <Select<MetricOption, false>
-                  className="text-base-content"
-                  classNamePrefix="react-select"
-                  options={metricOptions}
-                  value={metricOptions.find((option) => option.value === yParameter) ?? null}
-                  onChange={(option: SingleValue<MetricOption>) => {
-                    if (option) {
-                      setYParameter(option.value);
-                    }
-                  }}
-                  placeholder="Y parameter"
-                  isSearchable={false}
-                  styles={metricSelectStyles}
-                />
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs sm:text-sm font-medium">Y:</span>
+                <div className="flex-1 sm:w-56 sm:flex-none">
+                  <Select<MetricOption, false>
+                    className="text-base-content"
+                    classNamePrefix="react-select"
+                    options={metricOptions}
+                    value={metricOptions.find((option) => option.value === yParameter) ?? null}
+                    onChange={(option: SingleValue<MetricOption>) => {
+                      if (option) {
+                        setYParameter(option.value);
+                      }
+                    }}
+                    placeholder="Y parameter"
+                    isSearchable={false}
+                    styles={metricSelectStyles}
+                  />
+                </div>
               </div>
             </div>
 
