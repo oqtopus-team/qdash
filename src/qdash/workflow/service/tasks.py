@@ -33,8 +33,8 @@ BRINGUP_TASKS: list[str] = [
     "CheckResonatorSpectroscopy",  # MUX-level: estimates readout_frequency
     "Configure",  # Apply readout_frequency to backend
     "CheckQubitSpectroscopy",  # Qubit-level: coarse_qubit_frequency, anharmonicity, coarse_control_amplitude
-    "CheckControlAmplitude",  # Refine control_amplitude from the spectroscopy-derived coarse seed
-    "Configure",  # Apply coarse_qubit_frequency / control_amplitude to backend
+    "CheckControlAmplitude",  # Refine coarse_control_amplitude from spectroscopy-derived seed
+    "Configure",  # Apply coarse_qubit_frequency / params state to backend
     # Iterative coarse→fine refinement of (qubit_frequency, control_amplitude).
     # CheckRabi refines control_amplitude (Rabi-rate-derived) using the latest
     # qubit_frequency; CheckFineChevron refines qubit_frequency using the latest

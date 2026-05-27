@@ -907,16 +907,16 @@ def estimate_optimal_powers(
     ys: Sequence[float],
     local_boundaries: Sequence[BareShiftBoundary],
     minimum_usable_power: float,
+    *,
+    boundary_offset_db: float = 5.0,
 ) -> list[float]:
-    """Estimate optimal powers as midpoints between minimum usable and local low power."""
-    y_idx_0 = _arg_closest(ys, minimum_usable_power)
+    """Estimate optimal powers below each local bare-shift boundary."""
 
-    def compute_mid(y: float) -> float:
-        y_idx_1 = _arg_closest(ys, y)
-        y_idx_mid = (y_idx_0 + y_idx_1 + 1) // 2
-        return float(ys[y_idx_mid])
+    def compute_power(boundary_low_power: float) -> float:
+        target_power = max(boundary_low_power - boundary_offset_db, minimum_usable_power)
+        return float(ys[_arg_closest(ys, target_power)])
 
-    return [compute_mid(boundary.low_power) for boundary in local_boundaries]
+    return [compute_power(boundary.low_power) for boundary in local_boundaries]
 
 
 def estimate_resonator_frequency(

@@ -33,8 +33,8 @@ class BringUp(CalibrationStep):
     - CheckResonatorSpectroscopy (MUX-level): Estimates readout_frequency
     - Configure: Apply readout_frequency to backend
     - CheckQubitSpectroscopy: Estimates coarse_qubit_frequency, anharmonicity, coarse_control_amplitude
-    - CheckControlAmplitude: Refines control_amplitude via sqrt-Lorentzian fit
-    - Configure: Apply qubit_frequency / control_amplitude to backend
+    - CheckControlAmplitude: Refines coarse_control_amplitude via sqrt-Lorentzian fit
+    - Configure: Apply coarse_qubit_frequency / params state to backend
     - CheckChevron: Adaptive chevron with rough/fine search for qubit_frequency
     - CheckRabi: Refines control_amplitude (Rabi-rate-derived)
     - CheckFineChevron (x2): Refines qubit_frequency, ±10 MHz, with the latest control_amplitude

@@ -17,7 +17,7 @@ from qdash.analysis.spectroscopy.estimate_resonator_frequency import (
 from qdash.analysis.spectroscopy.mux import guess_sorted_slots_for_partial_mux
 
 
-def test_estimate_optimal_powers_uses_midpoint_between_minimum_and_local_low_power() -> None:
+def test_estimate_optimal_powers_uses_offset_below_local_low_power() -> None:
     ys = [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0]
     resonance = Resonance(high_power_peaks=None, low_power_peak=Peak(x=10, y=6, prominence=1.0))
 
@@ -32,7 +32,7 @@ def test_estimate_optimal_powers_uses_midpoint_between_minimum_and_local_low_pow
     assert optimal_powers == [-35.0]
 
 
-def test_estimate_optimal_powers_rounds_midpoint_up_when_between_grid_points() -> None:
+def test_estimate_optimal_powers_rounds_boundary_offset_to_nearest_grid_point() -> None:
     ys = [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0]
     local_boundary = BareShiftBoundary(
         high_power_min=-20.0,
@@ -44,6 +44,23 @@ def test_estimate_optimal_powers_rounds_midpoint_up_when_between_grid_points() -
         ys,
         [local_boundary],
         minimum_usable_power=-40.0,
+    )
+
+    assert optimal_powers == [-30.0]
+
+
+def test_estimate_optimal_powers_does_not_go_below_minimum_usable_power() -> None:
+    ys = [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0]
+    local_boundary = BareShiftBoundary(
+        high_power_min=-25.0,
+        high_power_max=0.0,
+        low_power=-30.0,
+    )
+
+    optimal_powers = estimate_optimal_powers(
+        ys,
+        [local_boundary],
+        minimum_usable_power=-30.0,
     )
 
     assert optimal_powers == [-30.0]
