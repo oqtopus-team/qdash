@@ -14,6 +14,7 @@ from qdash.workflow.engine.params_updater import (
     _load_param_file_map,
     _QubexParamsUpdater,
     get_params_updater,
+    resolve_param_yaml_file_names,
 )
 
 
@@ -259,6 +260,36 @@ data:
             )
 
         assert updated_files == {"control_frequency.yaml", "t1.yaml"}
+
+    def test_resolve_param_yaml_file_names_includes_mapped_and_extra_files(self):
+        """Push candidates should be resolved even before checking file diffs."""
+        with patch(
+            "qdash.workflow.engine.params_updater.ConfigLoader.load_workflow",
+            return_value={
+                "params_updater": {
+                    "parameter_file_map": {
+                        "qubit_frequency": "qubit_frequency.yaml",
+                        "t1": "t1.yaml",
+                    },
+                    "extra_file_map": {
+                        "qubit_frequency": ["control_frequency.yaml"],
+                    },
+                }
+            },
+        ):
+            file_names = resolve_param_yaml_file_names(
+                {
+                    "qubit_frequency": {"value": 4.2},
+                    "t1": {"value": 12.0},
+                    "unmapped": {"value": 1.0},
+                }
+            )
+
+        assert file_names == {
+            "control_frequency.yaml",
+            "qubit_frequency.yaml",
+            "t1.yaml",
+        }
 
     def test_update_uses_params_mapping_from_qdash_settings(self, tmp_path):
         """Parameter-to-YAML mapping should be configurable through QDash settings."""
