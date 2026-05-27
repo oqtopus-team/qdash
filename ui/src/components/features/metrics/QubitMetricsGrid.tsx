@@ -693,9 +693,15 @@ export function QubitMetricsGrid({
           </button>
         </div>
 
-        {viewMode === "region" && zoomMode === "full" && isSquareGrid && (
+        <div
+          className={
+            viewMode !== "region" || zoomMode !== "full" || !isSquareGrid
+              ? "invisible pointer-events-none"
+              : ""
+          }
+        >
           <RegionZoomToggle enabled={regionSelectionEnabled} onToggle={setRegionSelectionEnabled} />
-        )}
+        </div>
       </div>
 
       {/* Back button */}

@@ -931,15 +931,21 @@ export function CouplingGrid({
             </button>
           </div>
 
-          {viewMode === "region" &&
-            zoomMode === "full" &&
-            isSquareGrid &&
-            !downloadSelectionEnabled && (
-              <RegionZoomToggle
-                enabled={regionSelectionEnabled}
-                onToggle={setRegionSelectionEnabled}
-              />
-            )}
+          <div
+            className={
+              viewMode !== "region" ||
+              zoomMode !== "full" ||
+              !isSquareGrid ||
+              downloadSelectionEnabled
+                ? "invisible pointer-events-none"
+                : ""
+            }
+          >
+            <RegionZoomToggle
+              enabled={regionSelectionEnabled}
+              onToggle={setRegionSelectionEnabled}
+            />
+          </div>
         </div>
 
         {/* Download selection controls */}
