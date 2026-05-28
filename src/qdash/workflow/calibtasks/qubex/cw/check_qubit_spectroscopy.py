@@ -342,12 +342,17 @@ class CheckQubitSpectroscopy(QubexTask):
         if readout_freq_param is None:
             raise ValueError("readout_frequency input parameter is required")
 
-        result = exp.qubit_spectroscopy(
-            label,
-            frequency_range=self._select_frequency_range(backend),
-            readout_amplitude=self._get_readout_amplitude_value(),
-            readout_frequency=readout_freq_param.value,
-        )
+        with self._modified_qubit_readout_frequencies(
+            exp,
+            qubit_label=label,
+            frequency_overrides={"R" + label: float(readout_freq_param.value)},
+        ):
+            result = exp.qubit_spectroscopy(
+                label,
+                frequency_range=self._select_frequency_range(backend),
+                readout_amplitude=self._get_readout_amplitude_value(),
+                readout_frequency=readout_freq_param.value,
+            )
 
         self.save_calibration(backend)
 

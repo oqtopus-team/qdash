@@ -14,7 +14,13 @@ from qdash.analysis.spectroscopy.estimate_resonator_frequency import (
     estimate_local_bare_shift_boundary,
     estimate_optimal_powers,
 )
-from qdash.analysis.spectroscopy.mux import guess_sorted_slots_for_partial_mux
+from qdash.analysis.spectroscopy.mux import (
+    guess_sorted_slots_for_partial_mux,
+    peak_positions_from_assignment_order,
+    qid_for_sorted_slot,
+    resolve_resonator_assignment_order,
+    resonator_assignment_order_from_pattern,
+)
 
 
 def test_estimate_optimal_powers_uses_offset_below_local_low_power() -> None:
@@ -217,3 +223,19 @@ def test_guess_sorted_slots_for_partial_mux_assigns_large_gap_missing_slot() -> 
 
     assert slots == [0, 2, 3]
     assert mode == "slot1-missing-large-left-gap"
+
+
+def test_peak_positions_from_assignment_order_supports_16q_layout() -> None:
+    peak_positions = peak_positions_from_assignment_order([0, 3, 1, 2])
+
+    assert peak_positions == {0: 0, 3: 1, 1: 2, 2: 3}
+    assert qid_for_sorted_slot(2, 0, peak_positions) == 8
+    assert qid_for_sorted_slot(2, 1, peak_positions) == 11
+    assert qid_for_sorted_slot(2, 2, peak_positions) == 9
+    assert qid_for_sorted_slot(2, 3, peak_positions) == 10
+
+
+def test_resonator_assignment_order_from_named_patterns() -> None:
+    assert resonator_assignment_order_from_pattern("default") == (3, 0, 2, 1)
+    assert resonator_assignment_order_from_pattern("16q") == (0, 3, 1, 2)
+    assert resolve_resonator_assignment_order() == (3, 0, 2, 1)

@@ -148,7 +148,11 @@ class CheckChevron(QubexTask):
         )
 
         exp.params.readout_amplitude[label] = readout_amp
-        with exp.modified_frequencies({label: qubit_freq, "R" + label: readout_freq}):
+        with self._modified_qubit_readout_frequencies(
+            exp,
+            qubit_label=label,
+            frequency_overrides={label: qubit_freq, "R" + label: readout_freq},
+        ):
             result = self._run_adaptive_chevron(
                 exp=exp,
                 label=label,

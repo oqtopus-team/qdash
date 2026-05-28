@@ -1,5 +1,5 @@
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from typing import TYPE_CHECKING, Any
 
 from qdash.datamodel.task import ParameterModel
@@ -189,6 +189,77 @@ class QubexTask(BaseTask):
                     unit="",
                     description=f"Parameter {param_name} not found in DB",
                 )
+
+    @contextmanager
+    def _modified_qubit_readout_frequencies(
+        self,
+        exp: Any,
+        *,
+        qubit_label: str,
+        frequency_overrides: dict[str, float],
+        resonator_label: str | None = None,
+    ) -> Generator[None, None, None]:
+        """Apply Qubex backend settings and logical frequency overrides together.
+
+        ``modified_frequencies`` updates the experiment model, but Qblox/Quel1
+        backend LO/CNCO settings also need to follow explicit spectroscopy and
+        chevron frequency overrides. Unit-test dummy experiments do not expose
+        ``ctx``/``system_manager``, so they fall back to ``modified_frequencies`` only.
+        """
+        with ExitStack() as stack:
+            if hasattr(exp, "ctx") and hasattr(exp, "system_manager"):
+                for target_label, frequency in frequency_overrides.items():
+                    backend_settings = self._backend_settings_for_frequency(
+                        exp,
+                        qubit_label=qubit_label,
+                        resonator_label=resonator_label,
+                        target_label=target_label,
+                        frequency=float(frequency),
+                    )
+                    print(f"[backend_settings] {backend_settings}")
+                    stack.enter_context(
+                        exp.system_manager.modified_backend_settings(**backend_settings)
+                    )
+
+            stack.enter_context(exp.modified_frequencies(frequency_overrides))
+            yield
+
+    def _backend_settings_for_frequency(
+        self,
+        exp: Any,
+        *,
+        qubit_label: str,
+        resonator_label: str | None,
+        target_label: str,
+        frequency: float,
+    ) -> dict[str, Any]:
+        from qubex.system import MixingUtil
+        from qubex.system.quel1.quel1_system_constants import CNCO_CENTER_CTRL_HZ
+
+        resonator_label = resonator_label or "R" + qubit_label
+        experiment_system = exp.ctx.experiment_system
+        if target_label == qubit_label:
+            box = experiment_system.get_control_box_for_qubit(qubit_label)
+            ssb = box.traits.ctrl_ssb
+            cnco_center = CNCO_CENTER_CTRL_HZ
+        elif target_label == resonator_label:
+            box = experiment_system.get_readout_box_for_qubit(qubit_label)
+            ssb = box.traits.readout_ssb
+            cnco_center = box.traits.readout_cnco_center
+        else:
+            raise ValueError(f"Unsupported target label for {qubit_label}: {target_label}")
+
+        lo_freq, cnco_freq, _ = MixingUtil.calc_lo_cnco(
+            frequency * 1e9,
+            ssb=ssb,
+            cnco_center=cnco_center,
+        )
+        return {
+            "label": target_label,
+            "lo_freq": lo_freq,
+            "cnco_freq": cnco_freq,
+            "fnco_freq": 0,
+        }
 
     def batch_run(self, backend: "QubexBackend", qids: list[str]) -> RunResult:
         """Default implementation for batch run.

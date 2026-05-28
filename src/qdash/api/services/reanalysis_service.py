@@ -17,7 +17,6 @@ from fastapi import HTTPException
 
 from qdash.analysis.spectroscopy import (
     NUM_RESONATORS,
-    PEAK_POSITIONS,
     EstimateQubitFrequencyConfig,
     EstimateResonatorFrequencyConfig,
     create_bare_shift_boundary_estimator,
@@ -25,6 +24,8 @@ from qdash.analysis.spectroscopy import (
     estimate_and_mark_qubit_figure,
     estimate_resonator_frequency_from_figure,
     guess_sorted_slots_for_partial_mux,
+    peak_positions_from_assignment_order,
+    resolve_resonator_assignment_order,
 )
 from qdash.api.schemas.reanalysis import (
     ReanalyzeOutputParameter,
@@ -97,7 +98,13 @@ class ReanalysisService:
         marked_fig = create_marked_figure(raw_fig, resonances, rejected_resonances=rejected)
 
         trace = raw_fig.data[0]
-        readout_frequency = self._pick_resonator_for_qid(qid, list(trace.x), frequencies)
+        assignment_order = self._pick_resonator_assignment_order(params, doc.run_parameters)
+        readout_frequency = self._pick_resonator_for_qid(
+            qid,
+            list(trace.x),
+            frequencies,
+            assignment_order=assignment_order,
+        )
         outputs = [
             ReanalyzeOutputParameter(
                 name="readout_frequency",
@@ -332,7 +339,26 @@ class ReanalysisService:
         )
 
     @staticmethod
-    def _pick_resonator_for_qid(qid: str, xs: list[float], frequencies: list[float]) -> float:
+    def _pick_resonator_assignment_order(
+        params: ReanalyzeResonatorSpectroscopyParams,
+        stored_run_parameters: dict[str, Any],
+    ) -> list[int]:
+        pattern = params.resonator_assignment_pattern
+        if pattern is None:
+            stored_pattern = stored_run_parameters.get("resonator_assignment_pattern")
+            if isinstance(stored_pattern, dict) and "value" in stored_pattern:
+                pattern = str(stored_pattern["value"])
+
+        return list(resolve_resonator_assignment_order(pattern))
+
+    @staticmethod
+    def _pick_resonator_for_qid(
+        qid: str,
+        xs: list[float],
+        frequencies: list[float],
+        *,
+        assignment_order: list[int],
+    ) -> float:
         """Map the requested qid to the workflow-equivalent resonator frequency."""
         if not frequencies:
             return 0.0
@@ -344,7 +370,8 @@ class ReanalysisService:
             ) from exc
 
         id_in_mux = qid_int % NUM_RESONATORS
-        assigned_slot = PEAK_POSITIONS[id_in_mux]
+        peak_positions = peak_positions_from_assignment_order(assignment_order)
+        assigned_slot = peak_positions[id_in_mux]
         sorted_slots, assignment_mode = guess_sorted_slots_for_partial_mux(xs, frequencies)
         resonance_index = (
             sorted_slots.index(assigned_slot) if assigned_slot in sorted_slots else None

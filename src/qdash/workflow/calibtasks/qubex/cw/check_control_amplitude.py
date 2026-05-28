@@ -240,7 +240,12 @@ class CheckControlAmplitude(QubexTask):
         # phases before fitting — the deprecated version fits raw phases that
         # wrap at ±π near resonance, which makes fit_sqrt_lorentzian unstable
         # (e.g. R²≈0 with nonsensical Omega).
-        with exp.modified_frequencies({resonator_label: readout_frequency}):
+        with self._modified_qubit_readout_frequencies(
+            exp,
+            qubit_label=label,
+            resonator_label=resonator_label,
+            frequency_overrides={label: qubit_frequency, resonator_label: readout_frequency},
+        ):
             result = exp.measure_qubit_resonance(
                 label,
                 frequency_range=frequency_range,

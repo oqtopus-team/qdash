@@ -167,8 +167,16 @@ class CheckCoarseChevron(QubexTask):
             f"readout_frequency={readout_frequency.value}"
         )
 
-        exp.params.readout_amplitude[labels[0]] = readout_amp
-        with exp.modified_frequencies({"R" + labels[0]: readout_frequency.value}):
+        label = labels[0]
+        exp.params.readout_amplitude[label] = readout_amp
+        with self._modified_qubit_readout_frequencies(
+            exp,
+            qubit_label=label,
+            frequency_overrides={
+                label: float(qubit_frequency.value),
+                "R" + label: float(readout_frequency.value),
+            },
+        ):
             result = exp.chevron_pattern(
                 amplitudes={labels[0]: ctrl_amp_value},
                 frequencies={labels[0]: qubit_frequency.value},
