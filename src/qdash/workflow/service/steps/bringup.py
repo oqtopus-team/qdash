@@ -10,6 +10,7 @@ Tasks include:
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -31,15 +32,14 @@ class BringUp(CalibrationStep):
 
     Executes BRINGUP_TASKS:
     - CheckResonatorSpectroscopy (MUX-level): Estimates readout_frequency
-    - Configure: Apply readout_frequency to backend
     - CheckQubitSpectroscopy: Estimates coarse_qubit_frequency, anharmonicity, coarse_control_amplitude
-    - CheckControlAmplitude: Refines control_amplitude via sqrt-Lorentzian fit
-    - Configure: Apply qubit_frequency / control_amplitude to backend
+    - CheckControlAmplitude: Refines coarse_control_amplitude via sqrt-Lorentzian fit
     - CheckChevron: Adaptive chevron with rough/fine search for qubit_frequency
     - CheckRabi: Refines control_amplitude (Rabi-rate-derived)
-    - CheckFineChevron (x2): Refines qubit_frequency, ±10 MHz, with the latest control_amplitude
-    - CheckRabi (x2): Refines control_amplitude with the latest qubit_frequency
-      Two fine/rabi iterations converge to sub-kHz qubit_frequency for typical transmons.
+
+    Hardware reconfiguration is intentionally kept outside bring-up so intermediate
+    task outputs are passed through QDash state without reloading backend params
+    between tasks.
 
     MUX-level tasks run once per MUX for the representative qubit (qid % 4 == 0).
     Qubit-level tasks run for each qubit individually.
@@ -62,6 +62,7 @@ class BringUp(CalibrationStep):
 
     mode: str = "scheduled"
     tasks: list[str] = field(default_factory=lambda: list(BRINGUP_TASKS))
+    resonator_assignment_pattern: str | None = None
 
     @property
     def name(self) -> str:
@@ -86,6 +87,7 @@ class BringUp(CalibrationStep):
         tasks = self.tasks
 
         logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(tasks)} tasks")
+        self._apply_resonator_assignment_pattern(service)
 
         from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
         from qdash.workflow.service.targets import MuxTargets
@@ -124,6 +126,19 @@ class BringUp(CalibrationStep):
             + (f" (out of {total_muxes} MUXes)" if total_muxes else "")
         )
         return ctx
+
+    def _apply_resonator_assignment_pattern(self, service: CalibService) -> None:
+        """Inject step-level resonator assignment pattern as a task run parameter."""
+        if not self.resonator_assignment_pattern:
+            return
+
+        default_run_parameters = copy.deepcopy(service.default_run_parameters)
+        task_params = default_run_parameters.setdefault("CheckResonatorSpectroscopy", {})
+        task_params["resonator_assignment_pattern"] = {
+            "value": self.resonator_assignment_pattern,
+            "value_type": "str",
+        }
+        service.default_run_parameters = default_run_parameters
 
     def _execute_direct(
         self,
@@ -210,7 +225,9 @@ class BringUp(CalibrationStep):
                 )
 
         # Coarse qubit frequency and anharmonicity from CheckQubitSpectroscopy
-        qubit_result = raw.get("CheckQubitSpectroscopy", {})
+        qubit_result = raw.get("CheckQubitSpectroscopy", {}) or raw.get(
+            "CheckSimultaneousQubitSpectroscopy", {}
+        )
         if qubit_result and not qubit_result.get("skipped", False):
             # Coarse qubit frequency (f01) — proper qubit_frequency comes from
             # CheckChevron's adaptive chevron fit.
@@ -246,11 +263,11 @@ class BringUp(CalibrationStep):
 
 @dataclass
 class ExperimentalSimultaneousBringUp(CalibrationStep):
-    """Experimental bring-up using resonator spectroscopy and simultaneous qubit spectroscopy."""
+    """Experimental bring-up with simultaneous spectroscopy and regular follow-up tasks."""
 
     resonator_mode: str = "scheduled"
     qubit_mode: str = "simultaneous_spectroscopy"
-    simultaneous_spectroscopy_schedule_mode: str = "local_index"
+    simultaneous_spectroscopy_schedule_mode: str = "all"
     tasks: list[str] = field(default_factory=lambda: list(EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS))
 
     @property
@@ -293,6 +310,20 @@ class ExperimentalSimultaneousBringUp(CalibrationStep):
             )
             raise ValueError(msg)
 
+        reso_tasks = [task for task in self.tasks if task == "CheckResonatorSpectroscopy"]
+        qubit_tasks = [task for task in self.tasks if task == "CheckSimultaneousQubitSpectroscopy"]
+        followup_tasks = [
+            task
+            for task in self.tasks
+            if task not in {"CheckResonatorSpectroscopy", "CheckSimultaneousQubitSpectroscopy"}
+        ]
+        if not reso_tasks:
+            raise ValueError("ExperimentalSimultaneousBringUp requires CheckResonatorSpectroscopy")
+        if not qubit_tasks:
+            raise ValueError(
+                "ExperimentalSimultaneousBringUp requires CheckSimultaneousQubitSpectroscopy"
+            )
+
         wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
         scheduler = OneQubitScheduler(
             chip_id=service.chip_id, wiring_config_path=wiring_config_path
@@ -300,20 +331,19 @@ class ExperimentalSimultaneousBringUp(CalibrationStep):
         reso_schedule = scheduler.generate_from_mux(
             mux_ids=targets.mux_ids, exclude_qids=targets.exclude_qids
         )
-        qubit_schedule = scheduler.generate_simultaneous_spectroscopy_batches_from_mux(
-            mux_ids=targets.mux_ids,
-            exclude_qids=targets.exclude_qids,
+        runner = OneQubitStageRunner(service, project_id=service.project_id)
+        all_qids = runner.collect_scheduled_qids(reso_schedule)
+        if not all_qids:
+            result = BringUp(tasks=[])._build_result({})
+            ctx.metadata["experimental_simultaneous_bringup"] = result
+            ctx.metadata["bringup"] = result
+            return ctx
+
+        qubit_schedule = scheduler.generate_simultaneous_spectroscopy_batches(
+            qids=all_qids,
             mode=self.simultaneous_spectroscopy_schedule_mode,
         )
-        runner = OneQubitStageRunner(service, project_id=service.project_id)
-
-        all_qids = list(
-            dict.fromkeys(
-                runner.collect_scheduled_qids(reso_schedule)
-                + runner.collect_simultaneous_qids(qubit_schedule)
-            )
-        )
-        if not all_qids:
+        if not runner.collect_simultaneous_qids(qubit_schedule):
             result = BringUp(tasks=[])._build_result({})
             ctx.metadata["experimental_simultaneous_bringup"] = result
             ctx.metadata["bringup"] = result
@@ -343,6 +373,7 @@ class ExperimentalSimultaneousBringUp(CalibrationStep):
                     "qubit_schedule_mode": self.simultaneous_spectroscopy_schedule_mode,
                     "total_qubits": len(all_qids),
                     "total_steps": qubit_schedule.total_steps,
+                    "followup_tasks": followup_tasks,
                 },
             )
             session = get_session()
@@ -358,26 +389,39 @@ class ExperimentalSimultaneousBringUp(CalibrationStep):
         logger.info("[%s] Running resonator spectroscopy", self.name)
         reso_results = runner.execute_scheduled_mux_schedule(
             reso_schedule,
-            tasks=["CheckResonatorSpectroscopy"],
+            tasks=reso_tasks,
             session_config=session_config,
         )
 
         logger.info("[%s] Running simultaneous qubit spectroscopy", self.name)
         qubit_results = runner.execute_simultaneous_spectroscopy_schedule(
             qubit_schedule,
-            tasks=["CheckSimultaneousQubitSpectroscopy"],
+            tasks=qubit_tasks,
             session_config=session_config,
         )
 
+        followup_results: dict[str, Any] = {}
+        if followup_tasks:
+            logger.info("[%s] Running follow-up bringup tasks: %s", self.name, followup_tasks)
+            followup_results = runner.execute_scheduled_mux_schedule(
+                reso_schedule,
+                tasks=followup_tasks,
+                session_config=session_config,
+                allowed_qids=all_qids,
+            )
+
         session = get_session() if created_execution else service
-        stage_results = {"resonator": reso_results, "qubit": qubit_results}
+        stage_results = {
+            "resonator": reso_results,
+            "qubit": qubit_results,
+            "followup": followup_results,
+        }
         session.record_stage_result("experimental_simultaneous_bringup", stage_results)
         if created_execution:
             finish_calibration()
 
-        result = BringUp(tasks=[])._build_result(
-            {"combined": self._merge_qid_results(reso_results, qubit_results)}
-        )
+        merged_results = self._merge_qid_results(reso_results, qubit_results, followup_results)
+        result = BringUp(tasks=[])._build_result({"combined": merged_results})
         ctx.metadata["experimental_simultaneous_bringup"] = result
         ctx.metadata["bringup"] = result
         return ctx

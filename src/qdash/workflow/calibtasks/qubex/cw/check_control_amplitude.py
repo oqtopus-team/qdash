@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+MAX_COARSE_CONTROL_AMPLITUDE = 1.0
+
 
 class CheckControlAmplitude(QubexTask):
     """Task to estimate the control amplitude.
@@ -92,15 +94,12 @@ class CheckControlAmplitude(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "control_amplitude": ParameterModel(
-            unit="a.u.",
-            description="Estimated control amplitude scaled to target Rabi rate",
-        ),
         "coarse_control_amplitude": ParameterModel(
             unit="a.u.",
             description=(
                 "Refined coarse drive-amplitude seed for downstream chevron tasks. "
-                "Still a coarse calibration value, but improved over the spectroscopy seed."
+                "Still a coarse calibration value, but improved over the spectroscopy seed "
+                "and capped at 1.0 a.u."
             ),
         ),
         "coarse_qubit_frequency": ParameterModel(
@@ -158,13 +157,19 @@ class CheckControlAmplitude(QubexTask):
                     f"instead of {calibrated_amplitude:.6f} a.u."
                 )
                 calibrated_amplitude = coarse_floor
-            output_params_copy["control_amplitude"].value = calibrated_amplitude
+            if calibrated_amplitude > MAX_COARSE_CONTROL_AMPLITUDE:
+                print(
+                    f"Estimated coarse control amplitude for qid={qid} exceeded "
+                    f"{MAX_COARSE_CONTROL_AMPLITUDE:.1f} a.u.; using cap instead of "
+                    f"{calibrated_amplitude:.6f} a.u."
+                )
+                calibrated_amplitude = MAX_COARSE_CONTROL_AMPLITUDE
             output_params_copy["coarse_control_amplitude"].value = calibrated_amplitude
             rabi_rate_msg = (
                 f", rabi_rate={float(rabi_rate) * 1e3:.3f} MHz" if rabi_rate is not None else ""
             )
             print(
-                f"Estimated control amplitude for qid={qid}: "
+                f"Estimated coarse control amplitude for qid={qid}: "
                 f"{calibrated_amplitude:.6f} a.u.{rabi_rate_msg}"
             )
         else:
@@ -173,8 +178,9 @@ class CheckControlAmplitude(QubexTask):
                 "sqrt-Lorentzian fit did not converge; propagating spectroscopy coarse values"
             )
             if coarse_floor is not None:
-                output_params_copy["control_amplitude"].value = coarse_floor
-                output_params_copy["coarse_control_amplitude"].value = coarse_floor
+                output_params_copy["coarse_control_amplitude"].value = min(
+                    coarse_floor, MAX_COARSE_CONTROL_AMPLITUDE
+                )
             if coarse_frequency is not None:
                 output_params_copy["coarse_qubit_frequency"].value = coarse_frequency
 
@@ -234,7 +240,12 @@ class CheckControlAmplitude(QubexTask):
         # phases before fitting — the deprecated version fits raw phases that
         # wrap at ±π near resonance, which makes fit_sqrt_lorentzian unstable
         # (e.g. R²≈0 with nonsensical Omega).
-        with exp.modified_frequencies({resonator_label: readout_frequency}):
+        with self._modified_qubit_readout_frequencies(
+            exp,
+            qubit_label=label,
+            resonator_label=resonator_label,
+            frequency_overrides={label: qubit_frequency, resonator_label: readout_frequency},
+        ):
             result = exp.measure_qubit_resonance(
                 label,
                 frequency_range=frequency_range,

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ReanalyzeResonatorSpectroscopyParams(BaseModel):
@@ -44,6 +44,22 @@ class ReanalyzeResonatorSpectroscopyParams(BaseModel):
         default=None,
         description="Strength cutoff for the high_frequency_strength estimator.",
     )
+    resonator_assignment_pattern: str | None = Field(
+        default=None,
+        description=(
+            "Named resonator assignment pattern: default or 16q. "
+            "Use 16q for mux[0], mux[3], mux[1], mux[2]."
+        ),
+    )
+
+    @field_validator("resonator_assignment_pattern")
+    @classmethod
+    def validate_resonator_assignment_pattern(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if value not in {"default", "16q"}:
+            raise ValueError("resonator_assignment_pattern must be 'default' or '16q'")
+        return value
 
 
 class ReanalyzeQubitSpectroscopyParams(BaseModel):

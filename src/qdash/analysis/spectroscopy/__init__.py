@@ -40,10 +40,15 @@ from qdash.analysis.spectroscopy.estimate_resonator_frequency import (
     estimate_resonator_frequency_from_figure,
 )
 from qdash.analysis.spectroscopy.mux import (
+    DEFAULT_RESONATOR_ASSIGNMENT_ORDER,
     NUM_RESONATORS,
     PEAK_POSITIONS,
+    RESONATOR_ASSIGNMENT_PATTERNS,
     guess_sorted_slots_for_partial_mux,
+    peak_positions_from_assignment_order,
     qid_for_sorted_slot,
+    resolve_resonator_assignment_order,
+    resonator_assignment_order_from_pattern,
 )
 from qdash.analysis.spectroscopy.remove_false_spike import (
     RemoveFalseSpikeRange,
@@ -58,8 +63,10 @@ from qdash.analysis.spectroscopy.representative_y import (
 )
 
 __all__ = [
+    "DEFAULT_RESONATOR_ASSIGNMENT_ORDER",
     "NUM_RESONATORS",
     "PEAK_POSITIONS",
+    "RESONATOR_ASSIGNMENT_PATTERNS",
     "BareShiftBoundary",
     "BareShiftBoundaryEstimator",
     "BareShiftDebugOptions",
@@ -95,7 +102,10 @@ __all__ = [
     "estimate_resonator_frequency",
     "estimate_resonator_frequency_from_figure",
     "guess_sorted_slots_for_partial_mux",
+    "peak_positions_from_assignment_order",
     "qid_for_sorted_slot",
     "remove_false_spike",
     "remove_false_spike_from_figure",
+    "resolve_resonator_assignment_order",
+    "resonator_assignment_order_from_pattern",
 ]

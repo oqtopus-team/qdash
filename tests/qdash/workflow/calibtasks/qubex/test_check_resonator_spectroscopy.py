@@ -60,6 +60,53 @@ def test_postprocess_outputs_optimal_power_from_resonator_analysis() -> None:
     assert result.output_parameters["readout_amplitude"].execution_id == "exec-1"
 
 
+def test_postprocess_uses_named_16q_resonator_assignment_pattern() -> None:
+    task = CheckResonatorSpectroscopy()
+    task.run_parameters = copy.deepcopy(task.run_parameters)
+    task.run_parameters["bare_shift_estimator_type"].value = "config"
+    task.run_parameters["resonator_assignment_pattern"].value = "16q"
+    raw_fig = go.Figure(
+        data=[
+            go.Heatmap(
+                x=[6.0, 6.1, 6.2, 6.3],
+                y=[-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0],
+                z=[[0.0, 0.0, 0.0, 0.0] for _ in range(8)],
+            )
+        ]
+    )
+    resonances = [
+        Resonance(high_power_peaks=None, low_power_peak=Peak(x=i, y=6, prominence=1.0))
+        for i in range(4)
+    ]
+
+    with (
+        patch.object(task, "_prepare_analysis_figure", return_value=raw_fig),
+        patch(
+            "qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy."
+            "estimate_resonator_frequency_from_figure",
+            return_value=(resonances, [], [6.0, 6.1, 6.2, 6.3]),
+        ),
+        patch(
+            "qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy."
+            "estimate_minimum_usable_power",
+            return_value=-40.0,
+        ),
+        patch(
+            "qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy.create_marked_figure",
+            return_value=raw_fig,
+        ),
+    ):
+        result = task.postprocess(
+            MagicMock(),
+            "exec-1",
+            RunResult(raw_result={"fig": raw_fig}),
+            "1",
+        )
+
+    assert result.validation_error is None
+    assert result.output_parameters["readout_frequency"].value == 6.2
+
+
 def test_postprocess_rejects_invalid_resonator_result_without_outputs() -> None:
     task = CheckResonatorSpectroscopy()
     task.run_parameters = copy.deepcopy(task.run_parameters)

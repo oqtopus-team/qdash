@@ -31,23 +31,18 @@ Example:
 # - Qubit-level tasks run for each qubit individually
 BRINGUP_TASKS: list[str] = [
     "CheckResonatorSpectroscopy",  # MUX-level: estimates readout_frequency
-    "Configure",  # Apply readout_frequency to backend
     "CheckQubitSpectroscopy",  # Qubit-level: coarse_qubit_frequency, anharmonicity, coarse_control_amplitude
-    "CheckControlAmplitude",  # Refine control_amplitude from the spectroscopy-derived coarse seed
-    "Configure",  # Apply coarse_qubit_frequency / control_amplitude to backend
-    # Iterative coarse→fine refinement of (qubit_frequency, control_amplitude).
-    # CheckRabi refines control_amplitude (Rabi-rate-derived) using the latest
-    # qubit_frequency; CheckFineChevron refines qubit_frequency using the latest
-    # control_amplitude. Two fine/rabi iterations after the adaptive chevron converge to
-    # sub-kHz qubit_frequency for typical transmons.
+    "CheckControlAmplitude",  # Refine coarse_control_amplitude from spectroscopy-derived seed
+    # Refine qubit_frequency during bring-up without requiring Configure.
+    # Rabi remains a regular calibration task after backend configuration.
     "CheckChevron",
-    "Configure",  # Apply qubit_frequency / control_amplitude to backend
-    "CheckRabi",
 ]
 
 EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS: list[str] = [
     "CheckResonatorSpectroscopy",
     "CheckSimultaneousQubitSpectroscopy",
+    "CheckControlAmplitude",
+    "CheckChevron",
 ]
 
 

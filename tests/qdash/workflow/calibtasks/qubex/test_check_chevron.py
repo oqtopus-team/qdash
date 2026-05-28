@@ -18,12 +18,14 @@ else:
 class _DummyExperiment:
     def __init__(self) -> None:
         self.params = SimpleNamespace(readout_amplitude={"Q00": 0.0})
+        self.modified_frequency_calls: list[dict[str, float]] = []
 
     def get_qubit_label(self, qid: int) -> str:
         assert qid == 0
         return "Q00"
 
-    def modified_frequencies(self, _frequencies: dict[str, float]):
+    def modified_frequencies(self, frequencies: dict[str, float]):
+        self.modified_frequency_calls.append(frequencies)
         return nullcontext()
 
 
@@ -72,6 +74,7 @@ def test_check_chevron_run_uses_adaptive_helper(monkeypatch) -> None:
     assert captured["targets"] == ["Q00"]
     assert captured["frequencies"] == {"Q00": 4.25}
     assert captured["amplitudes"] == {"Q00": 0.07}
+    assert exp.modified_frequency_calls == [{"Q00": 4.25, "RQ00": 6.1}]
     assert captured["plot"] is False
     assert captured["save_image"] is False
     assert result.raw_result["resonant_frequencies"]["Q00"] == 4.321

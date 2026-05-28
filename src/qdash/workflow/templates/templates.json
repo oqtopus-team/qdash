@@ -10,7 +10,7 @@
   {
     "id": "experimental_simultaneous_bringup",
     "name": "Experimental Simultaneous Bring-up",
-    "description": "Experimental single-execution bring-up with resonator spectroscopy followed by local-index simultaneous qubit spectroscopy.",
+    "description": "Experimental single-execution bring-up with resonator spectroscopy, all-qubit simultaneous spectroscopy, and regular bring-up follow-up tasks.",
     "category": "advanced",
     "filename": "experimental_simultaneous_bringup.py",
     "function_name": "experimental_simultaneous_bringup"
