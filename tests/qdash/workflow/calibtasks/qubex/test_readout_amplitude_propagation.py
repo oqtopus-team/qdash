@@ -46,6 +46,7 @@ def test_bringup_uses_adaptive_check_chevron_before_fine_refinement() -> None:
     assert "CheckChevron" in BRINGUP_TASKS
     assert "CheckCoarseChevron" not in BRINGUP_TASKS
     assert "Configure" not in BRINGUP_TASKS
+    assert "CheckRabi" not in BRINGUP_TASKS
     assert "CheckControlAmplitude" in BRINGUP_TASKS
     assert BRINGUP_TASKS.index("CheckControlAmplitude") > BRINGUP_TASKS.index(
         "CheckQubitSpectroscopy"
@@ -60,5 +61,4 @@ def test_experimental_simultaneous_bringup_runs_regular_followup_tasks() -> None
         "CheckSimultaneousQubitSpectroscopy",
         "CheckControlAmplitude",
         "CheckChevron",
-        "CheckRabi",
     ]
