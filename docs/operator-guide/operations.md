@@ -11,6 +11,9 @@ task deploy-local
 # Host-side API/UI with Docker-backed services
 task dev-local
 
+# Stop host API/UI and local Docker Compose services
+task dev-local-down
+
 # Supporting services only
 task dev-services
 

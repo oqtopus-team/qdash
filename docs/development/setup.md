@@ -113,6 +113,12 @@ This starts MongoDB, PostgreSQL, Prefect, the deployment service, and the user f
 Docker Compose, then runs the API and UI on the host. The UI is available at
 <http://localhost:5714>.
 
+Stop the host API/UI processes and Docker Compose services:
+
+```shell
+task dev-local-down
+```
+
 ### Install Dependencies
 
 The DevContainer installs Python, frontend, and Lefthook dependencies automatically during
@@ -178,6 +184,9 @@ task deploy-local
 
 # Start supporting services with host API/UI
 task dev-local
+
+# Stop host API/UI and local Docker Compose services
+task dev-local-down
 
 # Deploy with Cloudflare Tunnel
 task deploy
