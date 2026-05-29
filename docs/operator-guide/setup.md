@@ -113,6 +113,12 @@ task dev-local
 This starts MongoDB, PostgreSQL, Prefect, deployment-service, and user-flow-worker in Docker,
 then runs the API and UI on the host.
 
+Stop the host API/UI processes and Docker Compose services:
+
+```bash
+task dev-local-down
+```
+
 ## Remote Access
 
 Set `TUNNEL_TOKEN` in `.env`, then run:

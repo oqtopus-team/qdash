@@ -8,6 +8,7 @@ Run commands from the repository root unless noted.
 task -l                  # list tasks
 task dev-local-setup     # install host-side Python/UI dependencies
 task dev-local           # Docker services + host API/UI
+task dev-local-down      # stop host API/UI and local Docker Compose services
 task deploy-local        # full Docker Compose stack
 ```
 

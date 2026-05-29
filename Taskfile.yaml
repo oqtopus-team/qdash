@@ -85,6 +85,61 @@ tasks:
     cmds:
       - docker compose up -d mongo postgres prefect-server deployment-service user-flow-worker
 
+  dev-local-down:
+    desc: Stop host API/UI processes and Docker Compose services started for development
+    dotenv: [.env]
+    silent: true
+    cmds:
+      - |
+        stop_pidfile() {
+          pid_file="$1"
+          name="$2"
+          expected="$3"
+          if [ ! -f "$pid_file" ]; then
+            echo "${name} pid file not found"
+            return
+          fi
+
+          pid="$(cat "$pid_file")"
+          command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+          if [ -n "$command" ] && echo "$command" | grep -F "$expected" >/dev/null; then
+            echo "Stopping ${name}: ${pid}"
+            /bin/kill "$pid" 2>/dev/null || true
+          else
+            echo "${name} pid file is stale: ${pid}"
+          fi
+          rm -f "$pid_file"
+        }
+
+        stop_command() {
+          pattern="$1"
+          name="$2"
+          pids="$(ps ax -o pid= -o command= | awk -v pattern="$pattern" -v self="$$" 'index($0, pattern) > 0 && $1 != self {print $1}')"
+          if [ -n "$pids" ]; then
+            echo "Stopping ${name} processes: ${pids}"
+            /bin/kill $pids 2>/dev/null || true
+          fi
+        }
+
+        stop_port() {
+          port="$1"
+          name="$2"
+          pids="$(lsof -ti "tcp:${port}" -sTCP:LISTEN || true)"
+          if [ -n "$pids" ]; then
+            echo "Stopping ${name} on port ${port}: ${pids}"
+            /bin/kill $pids 2>/dev/null || true
+          else
+            echo "${name} is not listening on port ${port}"
+          fi
+        }
+        stop_pidfile ".tmp/dev-api-local.pid" "API" "uvicorn src.qdash.api.main:app"
+        stop_pidfile ".tmp/dev-ui-local.pid" "UI" "bun run dev"
+        stop_command "uvicorn src.qdash.api.main:app" "API"
+        stop_command "bun run dev" "UI"
+        stop_port "${API_PORT:-5715}" "API"
+        stop_port "${UI_PORT:-5714}" "UI"
+      - docker compose down
+
   dev-local-setup:
     desc: Install dependencies needed by host-side API/UI development
     cmds:
@@ -100,15 +155,27 @@ tasks:
   dev-api-local:
     desc: Start the API on the host against Docker services
     dotenv: [.env]
+    silent: true
     cmds:
-      - MONGO_HOST="${MONGO_HOST:-localhost}" PREFECT_API_URL="http://127.0.0.1:${PREFECT_PORT:-4200}/api" DEPLOYMENT_SERVICE_URL="http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}" uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
+      - |
+        /bin/sh -c '
+        mkdir -p .tmp
+        echo "$$" > .tmp/dev-api-local.pid
+        MONGO_HOST="${MONGO_HOST:-localhost}" PREFECT_API_URL="http://127.0.0.1:${PREFECT_PORT:-4200}/api" DEPLOYMENT_SERVICE_URL="http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}" exec uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
+        '
 
   dev-ui-local:
     desc: Start the UI on the host against the local API
     dir: ui
     dotenv: [../.env]
+    silent: true
     cmds:
-      - PORT="${UI_PORT:-5714}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" bun run dev
+      - |
+        /bin/sh -c '
+        mkdir -p ../.tmp
+        echo "$$" > ../.tmp/dev-ui-local.pid
+        PORT="${UI_PORT:-5714}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" exec bun run dev
+        '
 
   dev-local:
     desc: Start lightweight local development services, API, and UI
