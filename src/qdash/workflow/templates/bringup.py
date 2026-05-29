@@ -13,7 +13,6 @@ Example:
 
 from typing import Any
 
-import numpy as np  # noqa: F401  # used by commented per-task overrides below
 from prefect import flow
 
 from qdash.workflow.service import CalibService
@@ -33,6 +32,7 @@ def bringup(
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
+    resonator_assignment_pattern: str | None = None,
 ) -> Any:
     """Bring-up calibration for MUX-level characterization.
 
@@ -52,6 +52,8 @@ def bringup(
             - "synchronized": Step-based synchronized execution
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
+        resonator_assignment_pattern: Named resonator assignment pattern for
+            CheckResonatorSpectroscopy. Use "16q" for mux[0], mux[3], mux[1], mux[2].
 
     Returns:
         Pipeline results with bring-up step outputs
@@ -62,6 +64,17 @@ def bringup(
         exclude_qids = []
 
     targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
+
+    default_run_parameters: dict[str, Any] = {
+        "interval": {"value": 150 * 1024, "value_type": "int"},
+    }
+    if resonator_assignment_pattern:
+        default_run_parameters["CheckResonatorSpectroscopy"] = {
+            "resonator_assignment_pattern": {
+                "value": resonator_assignment_pattern,
+                "value_type": "str",
+            },
+        }
 
     steps = [
         BringUp(mode=mode),
@@ -74,21 +87,6 @@ def bringup(
         tags=tags,
         project_id=project_id,
         skip_execution=True,
-        default_run_parameters={
-            "interval": {"value": 150 * 1024, "value_type": "int"},
-            # Per-task overrides — uncomment to extend coherence sweep ranges.
-            # "CheckT1": {
-            #     "time_range": {
-            #         "value": (np.log10(100), np.log10(1000 * 1000), 51),  # 100 ns 〜 1 ms
-            #         "value_type": "np.logspace",
-            #     },
-            # },
-            # "CheckT2Echo": {
-            #     "time_range": {
-            #         "value": (np.log10(300), np.log10(500 * 1000), 51),  # 300 ns 〜 500 μs
-            #         "value_type": "np.logspace",
-            #     },
-            # },
-        },
+        default_run_parameters=default_run_parameters,
     )
     return cal.run(targets, steps=steps)

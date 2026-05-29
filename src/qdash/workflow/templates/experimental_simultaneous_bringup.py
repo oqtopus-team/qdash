@@ -20,9 +20,9 @@ def experimental_simultaneous_bringup(
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
-    simultaneous_spectroscopy_schedule_mode: str = "local_index",
+    simultaneous_spectroscopy_schedule_mode: str = "all",
 ) -> Any:
-    """Run resonator and simultaneous qubit spectroscopy in one execution."""
+    """Run resonator, all-qubit simultaneous spectroscopy, and bring-up follow-up tasks."""
     if mux_ids is None:
         mux_ids = list(range(16))
     if exclude_qids is None:

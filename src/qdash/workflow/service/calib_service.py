@@ -855,12 +855,15 @@ class CalibService:
         if updater_instance is None:
             return
 
-        updated_param_files: set[str] = set()
+        from qdash.workflow.engine.params_updater import resolve_param_yaml_file_names
+
+        push_candidate_files: set[str] = set()
         for qid, params in self.execution_service.calib_data.qubit.items():
             if "-" in qid or not params:
                 continue
+            push_candidate_files.update(resolve_param_yaml_file_names(params))
             try:
-                updated_param_files.update(updater_instance.update(qid, params))
+                push_candidate_files.update(updater_instance.update(qid, params))
             except Exception as exc:
                 logger.warning(f"Failed to sync params for qid={qid}: {exc}")
 
@@ -869,12 +872,12 @@ class CalibService:
             self.github_push_config.params_file_names = [
                 file_name
                 for file_name in configured_param_files
-                if file_name in updated_param_files
+                if file_name in push_candidate_files
             ]
-            skipped_files = sorted(set(configured_param_files) - updated_param_files)
+            skipped_files = sorted(set(configured_param_files) - push_candidate_files)
             if skipped_files:
                 logger.info(
-                    "Skipping unchanged params files from GitHub push: %s",
+                    "Skipping params files not touched by this calibration: %s",
                     ", ".join(skipped_files),
                 )
 

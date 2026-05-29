@@ -112,8 +112,14 @@ class CheckChevron(QubexTask):
         readout_amplitude = self.input_parameters["readout_amplitude"]
         assert readout_frequency is not None
         assert qubit_frequency is not None
+        if qubit_frequency.value is None:
+            raise ValueError("coarse_qubit_frequency input parameter is required")
+        if readout_frequency.value is None:
+            raise ValueError("readout_frequency input parameter is required")
         if readout_amplitude is None or readout_amplitude.value is None:
             raise ValueError("readout_amplitude input parameter is required")
+        qubit_freq = float(qubit_frequency.value)
+        readout_freq = float(readout_frequency.value)
         readout_amp = float(readout_amplitude.value)
 
         ca_param = self.input_parameters.get("coarse_control_amplitude")
@@ -136,17 +142,21 @@ class CheckChevron(QubexTask):
         print(
             f"[run] CheckChevron params for {label}: "
             f"coarse_control_amplitude={ctrl_amp_value}, "
-            f"coarse_qubit_frequency={qubit_frequency.value}, "
+            f"coarse_qubit_frequency={qubit_freq}, "
             f"readout_amplitude={readout_amp}, "
-            f"readout_frequency={readout_frequency.value}"
+            f"readout_frequency={readout_freq}"
         )
 
         exp.params.readout_amplitude[label] = readout_amp
-        with exp.modified_frequencies({"R" + label: readout_frequency.value}):
+        with self._modified_qubit_readout_frequencies(
+            exp,
+            qubit_label=label,
+            frequency_overrides={label: qubit_freq, "R" + label: readout_freq},
+        ):
             result = self._run_adaptive_chevron(
                 exp=exp,
                 label=label,
-                qubit_frequency=float(qubit_frequency.value),
+                qubit_frequency=qubit_freq,
                 control_amplitude=float(ctrl_amp_value),
             )
 

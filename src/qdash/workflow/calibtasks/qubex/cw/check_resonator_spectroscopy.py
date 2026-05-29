@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from qdash.analysis.spectroscopy import (
     NUM_RESONATORS,
-    PEAK_POSITIONS,
     BareShiftBoundary,
     EstimateResonatorFrequencyConfig,
     RemoveFalseSpikeRange,
@@ -18,8 +17,10 @@ from qdash.analysis.spectroscopy import (
     estimate_optimal_powers,
     estimate_resonator_frequency_from_figure,
     guess_sorted_slots_for_partial_mux,
+    peak_positions_from_assignment_order,
     qid_for_sorted_slot,
     remove_false_spike_from_figure,
+    resolve_resonator_assignment_order,
 )
 from qdash.common.visualization.figure_metadata import set_figure_role
 from qdash.datamodel.task import ParameterModel, RunParameterModel
@@ -38,6 +39,8 @@ logger = logging.getLogger(__name__)
 
 _guess_sorted_slots_for_partial_mux = guess_sorted_slots_for_partial_mux
 _qid_for_sorted_slot = qid_for_sorted_slot
+_peak_positions_from_assignment_order = peak_positions_from_assignment_order
+_resolve_resonator_assignment_order = resolve_resonator_assignment_order
 
 
 class CheckResonatorSpectroscopy(QubexTask):
@@ -91,6 +94,15 @@ class CheckResonatorSpectroscopy(QubexTask):
             value_type="int",
             value=NUM_RESONATORS,
             description="Number of resonators to detect",
+        ),
+        "resonator_assignment_pattern": RunParameterModel(
+            unit="",
+            value_type="str",
+            value="default",
+            description=(
+                "Named resonator assignment pattern: default or 16q. "
+                "Use 16q for mux[0], mux[3], mux[1], mux[2]."
+            ),
         ),
         "high_power_min": RunParameterModel(
             unit="dB",
@@ -253,6 +265,10 @@ class CheckResonatorSpectroscopy(QubexTask):
             )
 
             id_in_mux = int(qid) % 4
+            assignment_order = resolve_resonator_assignment_order(
+                self.run_parameters["resonator_assignment_pattern"].get_value()
+            )
+            peak_positions = peak_positions_from_assignment_order(assignment_order)
             sorted_slots, assignment_mode = guess_sorted_slots_for_partial_mux(
                 list(trace.x),
                 frequencies,
@@ -265,7 +281,10 @@ class CheckResonatorSpectroscopy(QubexTask):
                         x=frequency,
                         y=1.02,
                         yref="paper",
-                        text=f"Q{qid_for_sorted_slot(int(qid) // NUM_RESONATORS, sorted_slot):02d} / s{sorted_slot}",
+                        text=(
+                            f"Q{qid_for_sorted_slot(int(qid) // NUM_RESONATORS, sorted_slot, peak_positions):02d} "
+                            f"/ s{sorted_slot}"
+                        ),
                         showarrow=False,
                         font={"color": "red", "size": 11},
                         align="center",
@@ -281,7 +300,7 @@ class CheckResonatorSpectroscopy(QubexTask):
                         font={"color": "red", "size": 11},
                         align="left",
                     )
-            assigned_slot = PEAK_POSITIONS[id_in_mux]
+            assigned_slot = peak_positions[id_in_mux]
             resonance_index = (
                 sorted_slots.index(assigned_slot) if assigned_slot in sorted_slots else None
             )

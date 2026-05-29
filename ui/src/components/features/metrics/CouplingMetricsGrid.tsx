@@ -629,12 +629,18 @@ export function CouplingMetricsGrid({
         </div>
 
         <div className="flex items-center gap-2">
-          {viewMode === "region" && zoomMode === "full" && isSquareGrid && (
+          <div
+            className={
+              viewMode !== "region" || zoomMode !== "full" || !isSquareGrid
+                ? "invisible pointer-events-none"
+                : ""
+            }
+          >
             <RegionZoomToggle
               enabled={regionSelectionEnabled}
               onToggle={setRegionSelectionEnabled}
             />
-          )}
+          </div>
           <button
             onClick={() => setIsDirectionReversed((prev) => !prev)}
             className={`btn btn-sm gap-1.5 ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}

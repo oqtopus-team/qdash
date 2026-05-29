@@ -36,7 +36,7 @@ def test_check_control_amplitude_floors_output_to_coarse_input(monkeypatch) -> N
         qid="0",
     )
 
-    assert result.output_parameters["control_amplitude"].value == 0.02
+    assert "control_amplitude" not in result.output_parameters
     assert result.output_parameters["coarse_control_amplitude"].value == 0.02
 
 
@@ -63,8 +63,35 @@ def test_check_control_amplitude_updates_refined_coarse_seed(monkeypatch) -> Non
         qid="0",
     )
 
-    assert result.output_parameters["control_amplitude"].value == 0.035
+    assert "control_amplitude" not in result.output_parameters
     assert result.output_parameters["coarse_control_amplitude"].value == 0.035
+
+
+def test_check_control_amplitude_caps_refined_coarse_seed(monkeypatch) -> None:
+    task = CheckControlAmplitude()
+    task.input_parameters["coarse_control_amplitude"] = ParameterModel(value=0.02, unit="a.u.")
+
+    monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
+
+    result = task.postprocess(
+        backend=cast("QubexBackend", object()),
+        execution_id="exec-1",
+        run_result=RunResult(
+            raw_result={
+                "Q00": {
+                    "estimated_amplitude": 1.2,
+                    "rabi_rate": 0.012,
+                    "f0": 4.321,
+                    "r2": 0.98,
+                    "fig": go.Figure(),
+                }
+            }
+        ),
+        qid="0",
+    )
+
+    assert "control_amplitude" not in result.output_parameters
+    assert result.output_parameters["coarse_control_amplitude"].value == 1.0
 
 
 def test_check_control_amplitude_propagates_spectroscopy_coarse_values_when_fit_is_missing(
@@ -84,7 +111,7 @@ def test_check_control_amplitude_propagates_spectroscopy_coarse_values_when_fit_
     )
 
     assert result.validation_error is None
-    assert result.output_parameters["control_amplitude"].value == 0.02
+    assert "control_amplitude" not in result.output_parameters
     assert result.output_parameters["coarse_control_amplitude"].value == 0.02
     assert result.output_parameters["coarse_qubit_frequency"].value == 4.25
 
