@@ -279,7 +279,9 @@ export function FilesPageContent() {
 
   const handleContentChange = (value: string | undefined) => {
     setFileContent(value || "");
-    setHasUnsavedChanges(true);
+    if (!isEditorLocked) {
+      setHasUnsavedChanges(true);
+    }
   };
 
   const getLanguage = (filename: string): string => {
