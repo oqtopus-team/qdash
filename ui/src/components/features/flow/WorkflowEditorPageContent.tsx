@@ -24,11 +24,15 @@ import {
 } from "@/client/flow/flow";
 import {
   ArrowLeft,
+  BookOpen,
   ChevronRight,
   Clock,
   Columns2,
   Command,
   FileCode,
+  FilePlus2,
+  FolderOpen,
+  Info,
   Lock,
   Minus,
   PanelBottom,
@@ -91,6 +95,8 @@ const EDITOR_OPTIONS = {
   scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
 };
 
+type SidePanel = "explorer" | "properties" | "helpers";
+
 export function WorkflowEditorPageContent() {
   const router = useRouter();
   const params = useParams();
@@ -115,9 +121,11 @@ export function WorkflowEditorPageContent() {
   const [originalCode, setOriginalCode] = useState("");
   const [isSplitView, setIsSplitView] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [activeSidePanel, setActiveSidePanel] = useState<SidePanel>("explorer");
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandSearch, setCommandSearch] = useState("");
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [fontSize, setFontSize] = useState(14);
   const [selection, setSelection] = useState({ lines: 0, chars: 0 });
   const [isBottomPanelOpen, setIsBottomPanelOpen] = useState(false);
@@ -430,6 +438,30 @@ export function WorkflowEditorPageContent() {
       enabled: true,
     },
     {
+      id: "focus-explorer",
+      label: "Show Explorer",
+      shortcut: "",
+      icon: FolderOpen,
+      action: () => openSidePanel("explorer"),
+      enabled: true,
+    },
+    {
+      id: "focus-properties",
+      label: "Show Properties",
+      shortcut: "",
+      icon: Info,
+      action: () => openSidePanel("properties"),
+      enabled: true,
+    },
+    {
+      id: "focus-helpers",
+      label: "Show Helpers",
+      shortcut: "",
+      icon: BookOpen,
+      action: () => openSidePanel("helpers"),
+      enabled: true,
+    },
+    {
       id: "toggle-minimap",
       label: "Toggle Minimap",
       shortcut: "",
@@ -514,10 +546,46 @@ export function WorkflowEditorPageContent() {
     cmd.label.toLowerCase().includes(commandSearch.toLowerCase()),
   );
 
+  useEffect(() => {
+    setSelectedCommandIndex(0);
+  }, [commandSearch, showCommandPalette]);
+
   const executeCommand = (cmd: (typeof commands)[0]) => {
     if (!cmd.enabled) return;
     setShowCommandPalette(false);
     cmd.action();
+  };
+
+  const filteredFlows =
+    flowsData?.data?.flows
+      ?.filter((f) =>
+        sidebarSearch ? f.name.toLowerCase().includes(sidebarSearch.toLowerCase()) : true,
+      )
+      .sort((a, b) => a.name.localeCompare(b.name)) ?? [];
+
+  const sidePanelItems = [
+    {
+      id: "explorer" as const,
+      label: "Explorer",
+      icon: FolderOpen,
+      count: flowsData?.data?.flows?.length ?? 0,
+    },
+    {
+      id: "properties" as const,
+      label: "Properties",
+      icon: Info,
+      count: activeSchedules.length,
+    },
+    {
+      id: "helpers" as const,
+      label: "Helpers",
+      icon: BookOpen,
+    },
+  ];
+
+  const openSidePanel = (panel: SidePanel) => {
+    setActiveSidePanel(panel);
+    setIsSidebarVisible(true);
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -593,13 +661,17 @@ export function WorkflowEditorPageContent() {
               }}
               className="btn btn-sm btn-ghost max-sm:hidden"
               title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
+              aria-label={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
             >
               <PanelLeft size={16} />
             </button>
             <button
+              type="button"
               onClick={() => router.push("/workflow")}
               className="btn btn-sm btn-ghost"
               disabled={saveMutation.isPending || deleteMutation.isPending}
+              title="Back to workflows"
+              aria-label="Back to workflows"
             >
               <ArrowLeft size={16} />
             </button>
@@ -625,9 +697,11 @@ export function WorkflowEditorPageContent() {
           {/* Desktop action buttons - hidden on mobile, use FAB instead */}
           <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
             <button
+              type="button"
               onClick={() => setShowPropertiesModal(true)}
               className="btn btn-sm btn-ghost"
               title="Properties"
+              aria-label="Properties"
             >
               <Settings size={16} />
             </button>
@@ -731,61 +805,269 @@ export function WorkflowEditorPageContent() {
 
         {/* Main Editor Area */}
         <div className="flex-1 flex overflow-hidden mb-4">
-          {/* Sidebar - Flow Explorer */}
+          {/* Activity Bar */}
+          <div className="max-sm:hidden flex w-12 flex-col items-center border-r border-base-300 bg-base-200">
+            <div className="flex flex-1 flex-col items-center gap-1 py-2">
+              {sidePanelItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = isSidebarVisible && activeSidePanel === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (isActive) {
+                        setIsSidebarVisible(false);
+                      } else {
+                        openSidePanel(item.id);
+                      }
+                    }}
+                    className={`btn btn-ghost btn-sm btn-square relative rounded-sm ${
+                      isActive ? "bg-base-300 text-primary" : "text-base-content/60"
+                    }`}
+                    title={item.label}
+                    aria-label={item.label}
+                  >
+                    <Icon size={18} />
+                    {item.count ? (
+                      <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-content">
+                        {item.count > 99 ? "99+" : item.count}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex flex-col items-center gap-1 py-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCommandPalette(true);
+                  setCommandSearch("");
+                }}
+                className="btn btn-ghost btn-sm btn-square rounded-sm text-base-content/60"
+                title="Command Palette"
+                aria-label="Command Palette"
+              >
+                <Command size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Side Panel */}
           {isSidebarVisible && (
-            <div className="max-sm:hidden flex flex-col w-56 min-w-56 bg-base-200 border-r border-base-300">
-              <div className="px-3 py-2 text-xs font-semibold text-base-content/50 uppercase tracking-wider">
-                Explorer
+            <div className="max-sm:hidden flex w-72 min-w-72 flex-col border-r border-base-300 bg-base-200">
+              <div className="flex h-9 items-center justify-between border-b border-base-300 px-3">
+                <span className="text-xs font-semibold uppercase tracking-wider text-base-content/60">
+                  {sidePanelItems.find((item) => item.id === activeSidePanel)?.label}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarVisible(false)}
+                  className="btn btn-ghost btn-xs btn-square"
+                  title="Close panel"
+                  aria-label="Close panel"
+                >
+                  <X size={12} />
+                </button>
               </div>
-              <div className="px-2 pb-2">
-                <div className="relative">
-                  <Search
-                    size={12}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 text-base-content/40"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Filter flows..."
-                    className="input input-xs w-full pl-6 bg-base-300 border-base-300 focus:outline-none focus:border-primary/50"
-                    value={sidebarSearch}
-                    onChange={(e) => setSidebarSearch(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {flowsData?.data?.flows
-                  ?.filter((f) =>
-                    sidebarSearch
-                      ? f.name.toLowerCase().includes(sidebarSearch.toLowerCase())
-                      : true,
-                  )
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((flow) => (
-                    <div
-                      key={flow.name}
-                      className={`flex items-center gap-1.5 px-3 py-1 text-sm cursor-pointer select-none transition-colors whitespace-nowrap ${
-                        flow.name === name
-                          ? "bg-primary/20 text-base-content"
-                          : "text-base-content/70 hover:bg-base-300"
-                      }`}
-                      onClick={() => {
-                        if (flow.name !== name) {
-                          router.push(`/workflow/${encodeURIComponent(flow.name)}`);
-                        }
-                      }}
-                      title={flow.description || flow.name}
-                    >
-                      <FileCode
-                        size={14}
-                        className={`shrink-0 ${flow.name === name ? "text-primary" : "text-info/60"}`}
+
+              {activeSidePanel === "explorer" && (
+                <>
+                  <div className="border-b border-base-300 px-2 py-2">
+                    <div className="relative">
+                      <Search
+                        size={12}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 text-base-content/40"
                       />
-                      <span className="truncate">{flow.name}.py</span>
+                      <input
+                        id="flow-explorer-filter"
+                        name="flowExplorerFilter"
+                        type="text"
+                        placeholder="Filter flows..."
+                        className="input input-xs w-full border-base-300 bg-base-300 pl-6 focus:border-primary/50 focus:outline-none"
+                        value={sidebarSearch}
+                        onChange={(e) => setSidebarSearch(e.target.value)}
+                      />
                     </div>
-                  ))}
-              </div>
-              <div className="px-3 py-1.5 border-t border-base-300 text-xs text-base-content/40 whitespace-nowrap">
-                {flowsData?.data?.flows?.length ?? 0} flows
-              </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto py-1">
+                    {filteredFlows.map((flow) => (
+                      <button
+                        key={flow.name}
+                        type="button"
+                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${
+                          flow.name === name
+                            ? "bg-primary/15 text-base-content"
+                            : "text-base-content/70 hover:bg-base-300"
+                        }`}
+                        onClick={() => {
+                          if (flow.name !== name) {
+                            router.push(`/workflow/${encodeURIComponent(flow.name)}`);
+                          }
+                        }}
+                        title={flow.description || flow.name}
+                      >
+                        <FileCode
+                          size={14}
+                          className={`shrink-0 ${flow.name === name ? "text-primary" : "text-info/60"}`}
+                        />
+                        <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                          {flow.name}.py
+                        </span>
+                        {flow.name === name && isDirty ? (
+                          <span
+                            className="h-2 w-2 rounded-full bg-warning"
+                            title="Unsaved changes"
+                          />
+                        ) : null}
+                      </button>
+                    ))}
+                    {filteredFlows.length === 0 && (
+                      <div className="px-3 py-6 text-center text-xs text-base-content/40">
+                        No flows match the filter.
+                      </div>
+                    )}
+                  </div>
+                  <div className="border-t border-base-300 p-2">
+                    <button
+                      type="button"
+                      onClick={() => router.push("/workflow/new")}
+                      className="btn btn-primary btn-xs w-full gap-1"
+                    >
+                      <FilePlus2 size={13} />
+                      New Flow
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {activeSidePanel === "properties" && (
+                <div className="flex-1 overflow-y-auto p-3">
+                  <div className="mb-3 rounded border border-base-300 bg-base-100 p-3">
+                    <div className="flex items-center gap-2">
+                      <FileCode size={16} className="text-primary" />
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold">{name}.py</div>
+                        <div className="truncate text-xs text-base-content/50">
+                          {flowFunctionName ? `${flowFunctionName}()` : "No entrypoint set"}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      <span className="badge badge-xs badge-outline">{chipId || "No chip"}</span>
+                      <span className="badge badge-xs badge-outline">
+                        {activeSchedules.length} schedules
+                      </span>
+                      <span
+                        className={`badge badge-xs ${isEditorLocked ? "badge-ghost" : "badge-warning"}`}
+                      >
+                        {isEditorLocked ? "Read-only" : "Editing"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="form-control">
+                      <span className="label py-1">
+                        <span className="label-text text-xs">Description</span>
+                      </span>
+                      <textarea
+                        id="flow-side-description"
+                        name="flowDescription"
+                        className="textarea textarea-bordered textarea-sm min-h-20"
+                        placeholder="Describe your flow..."
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                      />
+                    </label>
+                    <label className="form-control">
+                      <span className="label py-1">
+                        <span className="label-text text-xs">Entrypoint Function</span>
+                      </span>
+                      <input
+                        id="flow-side-entrypoint"
+                        name="flowEntrypoint"
+                        type="text"
+                        placeholder="simple_flow"
+                        className="input input-bordered input-sm"
+                        value={flowFunctionName}
+                        onChange={(e) => setFlowFunctionName(e.target.value)}
+                      />
+                    </label>
+                    <label className="form-control">
+                      <span className="label py-1">
+                        <span className="label-text text-xs">Username *</span>
+                      </span>
+                      <input
+                        id="flow-side-username"
+                        name="flowUsername"
+                        type="text"
+                        placeholder="your_username"
+                        className="input input-bordered input-sm"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                      />
+                    </label>
+                    <label className="form-control">
+                      <span className="label py-1">
+                        <span className="label-text text-xs">Chip ID *</span>
+                      </span>
+                      <input
+                        id="flow-side-chip-id"
+                        name="flowChipId"
+                        type="text"
+                        placeholder="64Qv3"
+                        className="input input-bordered input-sm"
+                        value={chipId}
+                        onChange={(e) => setChipId(e.target.value)}
+                      />
+                    </label>
+                    <label className="form-control">
+                      <span className="label py-1">
+                        <span className="label-text text-xs">Tags</span>
+                      </span>
+                      <input
+                        id="flow-side-tags"
+                        name="flowTags"
+                        type="text"
+                        placeholder="tag1, tag2, tag3"
+                        className="input input-bordered input-sm"
+                        value={tags}
+                        onChange={(e) => setTags(e.target.value)}
+                      />
+                    </label>
+                    <label className="form-control">
+                      <span className="label py-1">
+                        <span className="label-text text-xs">Default Interval (ns)</span>
+                      </span>
+                      <input
+                        id="flow-side-default-interval"
+                        name="flowDefaultInterval"
+                        type="text"
+                        placeholder="150 * 1024"
+                        className="input input-bordered input-sm"
+                        value={defaultInterval}
+                        onChange={(e) => setDefaultInterval(e.target.value)}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowPropertiesModal(true)}
+                      className="btn btn-outline btn-xs w-full gap-1"
+                    >
+                      <Settings size={13} />
+                      Advanced Settings
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {activeSidePanel === "helpers" && (
+                <div className="flex-1 overflow-hidden">
+                  <FlowImportsPanel compact />
+                </div>
+              )}
             </div>
           )}
           {/* Editor with Tab Switcher */}
@@ -826,21 +1108,7 @@ export function WorkflowEditorPageContent() {
                   {activeTab === "helpers" && (
                     <span className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
                   )}
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="text-secondary"
-                  >
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                  </svg>
+                  <BookOpen size={14} className="text-secondary" />
                   Helpers
                 </button>
               )}
@@ -1094,6 +1362,8 @@ export function WorkflowEditorPageContent() {
               <div className="flex items-center gap-2 px-3 py-2 border-b border-base-300">
                 <Search size={14} className="text-base-content/40 shrink-0" />
                 <input
+                  id="workflow-command-palette-search"
+                  name="workflowCommandPaletteSearch"
                   ref={commandInputRef}
                   type="text"
                   placeholder="Type a command..."
@@ -1101,8 +1371,20 @@ export function WorkflowEditorPageContent() {
                   value={commandSearch}
                   onChange={(e) => setCommandSearch(e.target.value)}
                   onKeyDown={(e) => {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      if (filteredCommands.length === 0) return;
+                      setSelectedCommandIndex((prev) =>
+                        Math.min(prev + 1, filteredCommands.length - 1),
+                      );
+                    }
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      if (filteredCommands.length === 0) return;
+                      setSelectedCommandIndex((prev) => Math.max(prev - 1, 0));
+                    }
                     if (e.key === "Enter" && filteredCommands.length > 0) {
-                      executeCommand(filteredCommands[0]);
+                      executeCommand(filteredCommands[selectedCommandIndex] || filteredCommands[0]);
                     }
                     if (e.key === "Escape") {
                       setShowCommandPalette(false);
@@ -1117,10 +1399,17 @@ export function WorkflowEditorPageContent() {
                     type="button"
                     onClick={() => executeCommand(cmd)}
                     disabled={!cmd.enabled}
+                    onMouseEnter={() =>
+                      setSelectedCommandIndex(
+                        filteredCommands.findIndex((command) => command.id === cmd.id),
+                      )
+                    }
                     className={`w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors ${
                       cmd.enabled
                         ? "text-base-content hover:bg-base-300 cursor-pointer"
                         : "text-base-content/30 cursor-not-allowed"
+                    } ${
+                      filteredCommands[selectedCommandIndex]?.id === cmd.id ? "bg-base-300" : ""
                     }`}
                   >
                     <cmd.icon size={14} className="shrink-0 opacity-60" />
