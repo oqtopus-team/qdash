@@ -270,19 +270,19 @@ task tbls-docs
 
 ## Secret Scanning Tools
 
-DevContainer users are automatically set up with Gitleaks, Trufflehog, and Lefthook. For local development outside the DevContainer, install the tools manually:
+DevContainer users are automatically set up with Betterleaks, Trufflehog, and Lefthook. For local development outside the DevContainer, install the tools manually:
 
 **macOS:**
 
 ```shell
-brew install gitleaks trufflehog lefthook
+brew install betterleaks trufflehog lefthook
 ```
 
 **Linux:**
 
 Download binaries from GitHub Releases:
 
-- [Gitleaks Releases](https://github.com/gitleaks/gitleaks/releases)
+- [Betterleaks Releases](https://github.com/betterleaks/betterleaks/releases)
 - [Trufflehog Releases](https://github.com/trufflesecurity/trufflehog/releases)
 - [Lefthook Releases](https://github.com/evilmartians/lefthook/releases)
 

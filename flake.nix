@@ -33,13 +33,13 @@
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             bashInteractive
+            betterleaks
             bun
             curl
             docker-client
             docker-compose
             gcc
             git
-            gitleaks
             gnumake
             go-task
             jq

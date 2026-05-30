@@ -1,0 +1,46 @@
+title = "QDash Betterleaks Configuration"
+
+# IMPORTANT: top-level keys (prefilter/filter) MUST appear BEFORE the [extend]
+# table below. In TOML, any key after a `[table]` header belongs to that table,
+# so placing these after [extend] would silently nest them as extend.prefilter
+# /extend.filter and disable them.
+
+# ---------------------------------------------------------------------------
+# Path-level exemptions (was: Gitleaks `[[allowlists]] paths`).
+# `prefilter` runs *before* any regex and only sees file/commit metadata, so it
+# skips whole files cheaply. These are all generation-owned or fixed-sample
+# files; see docs/development/credential-scan.md for why each is safe.
+# ---------------------------------------------------------------------------
+prefilter = '''
+matchesAny(attributes[?"path"].orValue(""), [
+  r"""\.devcontainer/requirements\.txt""",
+  r"""ui/bun\.lock""",
+  r"""docs/oas/openapi\.json""",
+  r"""ui/src/client/""",
+  r"""ui/src/schemas/""",
+  r"""\.betterleaks\.toml""",
+])
+'''
+
+# ---------------------------------------------------------------------------
+# Value-level exemptions (was: Gitleaks `[[allowlists]] regexes`).
+# `filter` runs *after* a regex match and can inspect the finding.
+# betterleaks exposes the clean value in finding["secret"]; we match the mongodb
+# URI here (Gitleaks used regexTarget="match") because betterleaks' finding["match"]
+# includes a trailing quote that would break the `$` anchor.
+# ---------------------------------------------------------------------------
+filter = '''
+matchesAny(finding["secret"], [
+  r"""^mongodb://root:example@mongo:27017(/.*)?$""",
+  r"""^ADMIN_TOKEN$""",
+  r"""^YOUR_TOKEN$""",
+  r"""^x90_gate_fidelity$""",
+  r"""^x180_gate_fidelity$""",
+  r"""^zx90_gate_fidelity$""",
+])
+'''
+
+# Inherit all built-in detection rules (AWS, GitHub, GCP, Azure, Slack, Stripe,
+# etc.). Equivalent to the previous Gitleaks `[extend] useDefault = true`.
+[extend]
+useDefault = true
