@@ -171,11 +171,11 @@ export function IssueKnowledgePageContent() {
       {/* Filter bar */}
       <div className="mb-4">
         <form onSubmit={handleFilterSubmit} className="flex gap-2 items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-base-content/40" />
+          <label className="input input-bordered input-sm flex items-center gap-2 flex-1 max-w-sm">
+            <Search className="h-4 w-4 shrink-0 text-base-content/40" />
             <input
               type="text"
-              className="input input-bordered input-sm w-full pl-9 pr-8"
+              className="grow"
               placeholder="Filter by task name..."
               value={filterInput}
               onChange={(e) => setFilterInput(e.target.value)}
@@ -184,12 +184,12 @@ export function IssueKnowledgePageContent() {
               <button
                 type="button"
                 onClick={clearFilter}
-                className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs p-0 h-auto min-h-0"
+                className="btn btn-ghost btn-xs p-0 h-auto min-h-0 shrink-0"
               >
                 <X className="h-3 w-3" />
               </button>
             )}
-          </div>
+          </label>
           <button type="submit" className="btn btn-sm btn-primary">
             Filter
           </button>
