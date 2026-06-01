@@ -50,6 +50,26 @@ class SaveFlowResponse(BaseModel):
     message: str = Field(..., description="Success message")
 
 
+class RunCodexAgentRequest(BaseModel):
+    """Request to edit a flow with the host Codex CLI."""
+
+    code: str = Field(..., description="Current Python code content")
+    prompt: str = Field(..., description="User editing request")
+    context: str = Field(default="", description="Additional workflow authoring context")
+    flow_function_name: str | None = Field(
+        None, description="Expected public flow entrypoint to preserve"
+    )
+
+
+class RunCodexAgentResponse(BaseModel):
+    """Response from the host Codex workflow editing bridge."""
+
+    code: str = Field(..., description="Edited Python code content")
+    summary: str = Field(default="", description="Codex final response or execution summary")
+    diff: str = Field(default="", description="Unified diff between original and edited code")
+    command: list[str] = Field(..., description="Codex command that was executed")
+
+
 class FlowSummary(BaseModel):
     """Summary of a Flow for listing."""
 

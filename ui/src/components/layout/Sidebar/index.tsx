@@ -452,9 +452,12 @@ export function Sidebar() {
               <span>Dark Mode</span>
             </div>
             <input
+              id="sidebar-dark-mode-toggle"
+              name="darkMode"
               type="checkbox"
               className="toggle toggle-sm"
               checked={isDarkTheme}
+              aria-label="Dark Mode"
               onChange={toggleTheme}
             />
           </label>

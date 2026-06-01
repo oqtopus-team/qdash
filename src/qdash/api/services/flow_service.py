@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -13,6 +14,13 @@ import httpx
 from fastapi import HTTPException
 from prefect.client.orchestration import get_client
 
+from qdash.agent import (
+    AgentEvent,
+    AgentRunnerError,
+    CodexAppServerRunner,
+    build_unified_diff,
+    prepare_workspace,
+)
 from qdash.api.schemas.flow import (
     ExecuteFlowRequest,
     ExecuteFlowResponse,
@@ -21,6 +29,8 @@ from qdash.api.schemas.flow import (
     FlowTemplateWithCode,
     GetFlowResponse,
     ListFlowsResponse,
+    RunCodexAgentRequest,
+    RunCodexAgentResponse,
     SaveFlowRequest,
     SaveFlowResponse,
 )
@@ -33,6 +43,7 @@ from qdash.common.config.path_resolver import (
 from qdash.config import get_settings
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from uuid import UUID
 
     from qdash.repository import MongoFlowRepository
@@ -187,6 +198,154 @@ class FlowService:
             file_path=file_path_str,
             message=message,
         )
+
+    async def run_codex_agent(
+        self,
+        name: str,
+        request: RunCodexAgentRequest,
+        project_id: str,
+    ) -> RunCodexAgentResponse:
+        """Edit a flow in an isolated temporary workspace with the host Codex CLI."""
+        settings = get_settings()
+        is_local_agent_enabled = (
+            settings.enable_local_codex_agent
+            or settings.env in {"local", "development", "dev", "dev-fake"}
+            or settings.env.startswith("dev-")
+        )
+        if not is_local_agent_enabled:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Host Codex workflow editing is only available in local development. "
+                    "Set ENABLE_LOCAL_CODEX_AGENT=true to enable it explicitly."
+                ),
+            )
+
+        self._validate_flow_name(name)
+        runner = self._create_codex_runner()
+        with tempfile.TemporaryDirectory(prefix="qdash-codex-flow-") as tmp:
+            workspace = prepare_workspace(
+                Path(tmp),
+                name=name,
+                code=request.code,
+                project_id=project_id,
+                user_prompt=request.prompt,
+                context=request.context,
+            )
+
+            summary = self._run_codex_runner(runner, workspace.root, workspace.prompt)
+
+            edited_code = workspace.flow_path.read_text(encoding="utf-8")
+            self._validate_flow_code(edited_code, request.flow_function_name or name)
+            diff = build_unified_diff(workspace.filename, request.code, edited_code)
+
+            return RunCodexAgentResponse(
+                code=edited_code,
+                summary=summary,
+                diff=diff,
+                command=runner.command,
+            )
+
+    def stream_codex_agent_events(
+        self,
+        name: str,
+        request: RunCodexAgentRequest,
+        project_id: str,
+    ) -> Iterator[AgentEvent]:
+        """Stream Codex app-server editing events for a temporary workflow copy."""
+        settings = get_settings()
+        is_local_agent_enabled = (
+            settings.enable_local_codex_agent
+            or settings.env in {"local", "development", "dev", "dev-fake"}
+            or settings.env.startswith("dev-")
+        )
+        if not is_local_agent_enabled:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Host Codex workflow editing is only available in local development. "
+                    "Set ENABLE_LOCAL_CODEX_AGENT=true to enable it explicitly."
+                ),
+            )
+
+        self._validate_flow_name(name)
+        runner = self._create_codex_runner()
+        with tempfile.TemporaryDirectory(prefix="qdash-codex-flow-") as tmp:
+            yield {
+                "type": "status",
+                "stage": "workspace",
+                "message": "Preparing temporary workflow copy",
+            }
+            workspace = prepare_workspace(
+                Path(tmp),
+                name=name,
+                code=request.code,
+                project_id=project_id,
+                user_prompt=request.prompt,
+                context=request.context,
+            )
+            yield {
+                "type": "status",
+                "stage": "workspace",
+                "message": "Temporary workflow copy prepared",
+            }
+
+            summary_parts: list[str] = []
+            last_diff = ""
+
+            for event in self._stream_codex_runner(runner, workspace.root, workspace.prompt):
+                if event["type"] == "summary_delta":
+                    summary_parts.append(cast("str", event["delta"]))
+                elif event["type"] == "diff":
+                    last_diff = cast("str", event["diff"])
+                yield event
+
+            yield {
+                "type": "status",
+                "stage": "validate",
+                "message": "Validating edited workflow entrypoint",
+            }
+            edited_code = workspace.flow_path.read_text(encoding="utf-8")
+            self._validate_flow_code(edited_code, request.flow_function_name or name)
+            final_diff = last_diff or build_unified_diff(
+                workspace.filename, request.code, edited_code
+            )
+            yield {
+                "type": "status",
+                "stage": "apply",
+                "message": "Sending validated workflow back to the editor",
+            }
+            yield {
+                "type": "complete",
+                "code": edited_code,
+                "summary": "".join(summary_parts).strip()
+                or "Codex app-server edited the workflow.",
+                "diff": final_diff,
+                "command": runner.command,
+            }
+
+    def _create_codex_runner(self) -> CodexAppServerRunner:
+        """Create the configured Codex runner and map runtime errors to HTTP errors."""
+        try:
+            return CodexAppServerRunner()
+        except AgentRunnerError as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+
+    def _run_codex_runner(self, runner: CodexAppServerRunner, workspace: Path, prompt: str) -> str:
+        """Run Codex and map runtime errors to API errors."""
+        try:
+            return runner.run(workspace, prompt)
+        except AgentRunnerError as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    def _stream_codex_runner(
+        self, runner: CodexAppServerRunner, workspace: Path, prompt: str
+    ) -> Iterator[AgentEvent]:
+        """Stream Codex events and map runtime errors to API errors."""
+        try:
+            yield from runner.stream(workspace, prompt)
+        except AgentRunnerError as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
 
     async def list_flows(self, username: str, project_id: str) -> ListFlowsResponse:
         """List all Flows for the current project.

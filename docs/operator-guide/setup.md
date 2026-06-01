@@ -30,6 +30,7 @@ Review or fill in these values before starting services:
 | `QDASH_API_TOKEN` | Optional API token for automation or service-to-service access |
 | `OPENAI_API_KEY` / `OLLAMA_BASE_URL` / `OLLAMA_API_KEY` | Optional Copilot AI provider settings |
 | `KNOWLEDGE_REPO_URL` | Optional external knowledge repository for Copilot context |
+| `ENABLE_LOCAL_CODEX_AGENT` | Optional local-only workflow editing bridge for Host Codex; keep `false` unless explicitly testing it |
 
 QDash application settings are committed under `config/app`, `config/domain`, and
 `config/copilot`; `CONFIG_PATH` is only for the Qubex backend configuration tree.
