@@ -25,6 +25,6 @@ export interface ReanalyzeQubitSpectroscopyParams {
   f12_distance_min?: ReanalyzeQubitSpectroscopyParamsF12DistanceMin;
   f12_distance_max?: ReanalyzeQubitSpectroscopyParamsF12DistanceMax;
   f12_height_min?: ReanalyzeQubitSpectroscopyParamsF12HeightMin;
-  /** If true, retry after trimming the highest-power row when no f01 is found. */
+  /** If true, retry after trimming the highest-power row when no f01 is found. If f01 is still not found, trim one additional row and retry once more. */
   retry_with_trim?: ReanalyzeQubitSpectroscopyParamsRetryWithTrim;
 }

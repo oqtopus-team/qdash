@@ -109,7 +109,9 @@ class CheckQubitSpectroscopy(QubexTask):
             value="false",
             description=(
                 "If 'true', drop the highest-power row and retry when no f01 is "
-                "detected on the first pass. Useful when the top row is noisy."
+                "detected on the first pass. If f01 is still not detected, drop "
+                "one additional highest-power row and retry once more. Useful "
+                "when the top rows are noisy."
             ),
         ),
         "seed_amplitude_headroom_db": RunParameterModel(
