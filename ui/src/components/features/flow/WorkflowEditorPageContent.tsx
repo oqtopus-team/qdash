@@ -25,10 +25,13 @@ import {
 import {
   ArrowLeft,
   BookOpen,
+  Bot,
   ChevronRight,
   Clock,
   Columns2,
   Command,
+  Copy,
+  FileDiff,
   FileCode,
   FilePlus2,
   FolderOpen,
@@ -57,6 +60,7 @@ import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteC
 import { FlowImportsPanel } from "@/components/features/flow/FlowImportsPanel";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { buildAuthHeaders } from "@/lib/auth/session";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 // Monaco Editor is only available on client side
@@ -96,6 +100,83 @@ const EDITOR_OPTIONS = {
 };
 
 type SidePanel = "explorer" | "properties" | "helpers";
+type BottomPanelTab = "output" | "agent";
+type AgentView = "terminal" | "diff" | "context";
+type AgentRunStatus = "idle" | "running" | "done" | "error";
+
+type DiffLine = {
+  id: string;
+  kind: "add" | "remove" | "meta" | "context";
+  text: string;
+};
+
+type AgentRunHistoryItem = {
+  id: string;
+  request: string;
+  summary: string;
+  changedLines: number;
+};
+
+type AgentActivityItem = {
+  id: string;
+  stage: string;
+  message: string;
+};
+
+type CodexStreamEvent =
+  | { type: "status"; stage: string; message: string }
+  | { type: "summary_delta"; delta: string }
+  | { type: "diff"; diff: string }
+  | { type: "complete"; code: string; summary: string; diff: string; command: string[] };
+
+const DEMO_AGENT_REQUEST =
+  "Add a short inline comment above the default tasks list explaining that these are starter calibration checks. Keep the workflow behavior unchanged.";
+
+const compactActivityText = (value: string): string => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= 140) return normalized;
+  return `${normalized.slice(0, 137)}...`;
+};
+
+const parseDiffLines = (diff: string): DiffLine[] =>
+  diff.split("\n").map((line, index) => {
+    let kind: DiffLine["kind"] = "context";
+    if (line.startsWith("+") && !line.startsWith("+++")) kind = "add";
+    else if (line.startsWith("-") && !line.startsWith("---")) kind = "remove";
+    else if (
+      line.startsWith("@@") ||
+      line.startsWith("+++") ||
+      line.startsWith("---") ||
+      line.startsWith("diff ")
+    ) {
+      kind = "meta";
+    }
+    return { id: `${index}-${line.slice(0, 12)}`, kind, text: line };
+  });
+
+const getChangedLineNumbersFromDiff = (diff: string): number[] => {
+  const lines = new Set<number>();
+  let nextLine = 0;
+
+  for (const line of diff.split("\n")) {
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+    if (hunk) {
+      nextLine = Number(hunk[1]);
+      continue;
+    }
+    if (!nextLine) continue;
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      lines.add(nextLine);
+      nextLine += 1;
+    } else if (line.startsWith("-") && !line.startsWith("---")) {
+      continue;
+    } else {
+      nextLine += 1;
+    }
+  }
+
+  return Array.from(lines).sort((a, b) => a - b);
+};
 
 export function WorkflowEditorPageContent() {
   const router = useRouter();
@@ -129,10 +210,27 @@ export function WorkflowEditorPageContent() {
   const [fontSize, setFontSize] = useState(14);
   const [selection, setSelection] = useState({ lines: 0, chars: 0 });
   const [isBottomPanelOpen, setIsBottomPanelOpen] = useState(false);
+  const [activeBottomPanelTab, setActiveBottomPanelTab] = useState<BottomPanelTab>("output");
+  const [agentView, setAgentView] = useState<AgentView>("terminal");
+  const [agentRequest, setAgentRequest] = useState("");
+  const [agentResponse, setAgentResponse] = useState("");
+  const [agentDiff, setAgentDiff] = useState("");
+  const [agentTerminalOutput, setAgentTerminalOutput] = useState(
+    `$ host-codex edit ${name}.py\nready`,
+  );
+  const [agentRunStatus, setAgentRunStatus] = useState<AgentRunStatus>("idle");
+  const [agentRunHistory, setAgentRunHistory] = useState<AgentRunHistoryItem[]>([]);
+  const [agentPhase, setAgentPhase] = useState("Ready");
+  const [agentActivity, setAgentActivity] = useState<AgentActivityItem[]>([]);
+  const [agentChangedLines, setAgentChangedLines] = useState<number[]>([]);
   const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
   const commandInputRef = useRef<HTMLInputElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const monacoRef = useRef<any>(null);
+  const agentDecorationIdsRef = useRef<string[]>([]);
+  const agentTerminalRef = useRef<HTMLPreElement>(null);
 
   // Fetch current user
   const { data: userData } = useGetCurrentUser();
@@ -211,7 +309,280 @@ export function WorkflowEditorPageContent() {
     },
   });
 
+  const decorateAgentChanges = useCallback((lineNumbers: number[]) => {
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editor || !monaco) return;
+
+    const model = editor.getModel();
+    const maxLine = model?.getLineCount?.() ?? 0;
+    const decorations = lineNumbers
+      .filter((line) => line >= 1 && line <= maxLine)
+      .map((line) => ({
+        range: new monaco.Range(line, 1, line, 1),
+        options: {
+          isWholeLine: true,
+          className: "bg-success/10",
+          glyphMarginClassName: "bg-success rounded-full",
+          overviewRuler: {
+            color: "var(--fallback-su,oklch(var(--su)))",
+            position: monaco.editor.OverviewRulerLane.Right,
+          },
+        },
+      }));
+
+    agentDecorationIdsRef.current = editor.deltaDecorations(
+      agentDecorationIdsRef.current,
+      decorations,
+    );
+
+    if (lineNumbers.length > 0) {
+      editor.revealLineInCenter(lineNumbers[0]);
+      editor.setPosition({ lineNumber: lineNumbers[0], column: 1 });
+    }
+  }, []);
+
+  const runCodexStream = useCallback(async () => {
+    const requestText = agentRequest.trim();
+    const runNumber = agentRunHistory.length + 1;
+    const appendActivity = (stage: string, message: string) => {
+      const compactMessage = compactActivityText(message);
+      if (!compactMessage) return;
+      setAgentPhase(compactMessage);
+      setAgentActivity((prev) =>
+        [
+          ...prev,
+          {
+            id: `${Date.now()}-${prev.length}`,
+            stage,
+            message: compactMessage,
+          },
+        ].slice(-8),
+      );
+    };
+    setAgentResponse("");
+    setAgentDiff("");
+    setAgentChangedLines([]);
+    setAgentView("terminal");
+    setAgentRunStatus("running");
+    setAgentPhase("Starting Host Codex");
+    setAgentActivity([
+      {
+        id: `${Date.now()}-start`,
+        stage: "start",
+        message: "Starting Host Codex",
+      },
+    ]);
+    setAgentTerminalOutput(
+      [
+        `$ host-codex edit ${name}.py --run ${runNumber}`,
+        `entrypoint: ${flowFunctionName || name}()`,
+        `request: ${requestText || "(no request provided)"}`,
+        "",
+        "[running] Host Codex is editing",
+        "[host] connecting to authenticated Codex CLI",
+        "[workspace] preparing temporary workflow copy",
+        "[codex] ",
+      ].join("\n"),
+    );
+
+    const response = await fetch(`/api/flows/${encodeURIComponent(name)}/agent/codex/stream`, {
+      method: "POST",
+      headers: buildAuthHeaders(),
+      body: JSON.stringify({
+        code,
+        prompt: requestText,
+        context: [
+          `Flow: ${name}.py`,
+          `Entrypoint: ${flowFunctionName || name}`,
+          `Project chip: ${chipId || "(not set)"}`,
+          `Default username: ${username || "(not set)"}`,
+          `Tags: ${tags || "(none)"}`,
+          defaultInterval
+            ? `Default interval: ${defaultInterval} ns`
+            : "Default interval: (not set)",
+          agentRunHistory.length
+            ? [
+                "Previous Host Codex requests in this editor session:",
+                ...agentRunHistory
+                  .slice(-4)
+                  .map(
+                    (item, index) =>
+                      `${index + 1}. ${item.request} (${item.changedLines} changed lines)`,
+                  ),
+              ].join("\n")
+            : "Previous Host Codex requests: (none)",
+          "Use qdash.workflow.service APIs where possible.",
+        ].join("\n"),
+        flow_function_name: flowFunctionName.trim() || name,
+      }),
+    });
+
+    if (!response.ok || !response.body) {
+      const detail = await response.text();
+      throw new Error(detail || "Failed to stream Codex edit");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let appliedEdit = false;
+    let hasDiffNotice = false;
+    let streamedSummary = "";
+
+    const handleEvent = (event: CodexStreamEvent) => {
+      if (event.type === "status") {
+        appendActivity(event.stage, event.message);
+        setAgentTerminalOutput((prev) => `${prev.trimEnd()}\n[${event.stage}] ${event.message}\n`);
+      } else if (event.type === "summary_delta") {
+        streamedSummary += event.delta;
+        appendActivity("codex", streamedSummary);
+        setAgentResponse((prev) => `${prev}${event.delta}`);
+        setAgentTerminalOutput((prev) => `${prev}${event.delta}`);
+      } else if (event.type === "diff") {
+        setAgentDiff(event.diff);
+        const changedLines = getChangedLineNumbersFromDiff(event.diff);
+        setAgentChangedLines(changedLines);
+        if (!hasDiffNotice) {
+          hasDiffNotice = true;
+          setAgentTerminalOutput(
+            (prev) =>
+              `${prev}\n\n[diff] received ${changedLines.length} changed line${
+                changedLines.length === 1 ? "" : "s"
+              }; open Diff to inspect\n[codex] `,
+          );
+        }
+      } else if (event.type === "complete") {
+        setAgentResponse((prev) => event.summary || prev || "Codex edited the workflow.");
+        setAgentDiff(event.diff || "");
+        const changedLines = getChangedLineNumbersFromDiff(event.diff || "");
+        setAgentChangedLines(changedLines);
+        const nextCode = event.code.endsWith("\n") ? event.code : `${event.code}\n`;
+        if (nextCode !== code) {
+          appliedEdit = true;
+          setCode(nextCode);
+          setIsEditorLocked(false);
+        }
+        setActiveTab("code");
+        setAgentView("terminal");
+        setAgentPhase(
+          appliedEdit
+            ? `Applied ${changedLines.length} changed line${changedLines.length === 1 ? "" : "s"}`
+            : "Completed with no code changes",
+        );
+        setAgentTerminalOutput((prev) =>
+          [
+            prev.trimEnd(),
+            "",
+            `[validate] ${flowFunctionName || name}() entrypoint ok`,
+            appliedEdit
+              ? `[apply] editor updated with ${changedLines.length} changed line${
+                  changedLines.length === 1 ? "" : "s"
+                }`
+              : "[apply] no code changes",
+            "[done]",
+          ].join("\n"),
+        );
+        setAgentRunStatus("done");
+        setAgentRunHistory((prev) => [
+          ...prev,
+          {
+            id: `${Date.now()}-${prev.length}`,
+            request: requestText,
+            summary: event.summary || "Codex edited the workflow.",
+            changedLines: changedLines.length,
+          },
+        ]);
+        setAgentRequest("");
+        requestAnimationFrame(() => decorateAgentChanges(changedLines));
+      }
+    };
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const chunks = buffer.split("\n\n");
+      buffer = chunks.pop() ?? "";
+      for (const chunk of chunks) {
+        const dataLine = chunk.split("\n").find((line) => line.startsWith("data: "));
+        if (!dataLine) continue;
+        handleEvent(JSON.parse(dataLine.slice(6)) as CodexStreamEvent);
+      }
+    }
+
+    return appliedEdit;
+  }, [
+    agentRequest,
+    agentRunHistory,
+    chipId,
+    code,
+    decorateAgentChanges,
+    defaultInterval,
+    flowFunctionName,
+    name,
+    tags,
+    username,
+  ]);
+
+  const codexAgentMutation = useMutation({
+    mutationFn: runCodexStream,
+    onSuccess: (appliedEdit) => {
+      toast.success(
+        appliedEdit ? "Applied Host Codex edit to editor" : "Host Codex returned no code changes",
+      );
+    },
+    onError: (error: unknown) => {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        (error instanceof Error ? error.message : "") ||
+        "Failed to run Host Codex";
+      setAgentRunStatus("error");
+      setAgentPhase(detail);
+      setAgentActivity((prev) =>
+        [
+          ...prev,
+          {
+            id: `${Date.now()}-error`,
+            stage: "error",
+            message: compactActivityText(detail),
+          },
+        ].slice(-8),
+      );
+      setAgentTerminalOutput((prev) => [prev.trimEnd(), "", `[error] ${detail}`].join("\n"));
+      toast.error(detail);
+    },
+  });
+
   const canCancel = !!lastExecutionId && !!lockStatus?.data.lock;
+  const agentStatusLabel =
+    agentRunStatus === "running"
+      ? "Running"
+      : agentRunStatus === "done"
+        ? "Done"
+        : agentRunStatus === "error"
+          ? "Error"
+          : "Idle";
+  const agentStatusBadgeClass =
+    agentRunStatus === "running"
+      ? "badge-info"
+      : agentRunStatus === "done"
+        ? "badge-success"
+        : agentRunStatus === "error"
+          ? "badge-error"
+          : "badge-ghost";
+  const agentTerminalDisplay =
+    agentRunStatus === "running"
+      ? `${agentTerminalOutput.trimEnd()}\n\n[running] waiting for next Host Codex event...\n▌`
+      : agentTerminalOutput;
+
+  useEffect(() => {
+    agentTerminalRef.current?.scrollTo({
+      top: agentTerminalRef.current.scrollHeight,
+      behavior: agentRunStatus === "running" ? "smooth" : "auto",
+    });
+  }, [agentRunStatus, agentTerminalOutput]);
 
   useEffect(() => {
     if (data?.data) {
@@ -438,6 +809,17 @@ export function WorkflowEditorPageContent() {
       enabled: true,
     },
     {
+      id: "agent-terminal",
+      label: "Open Agent Terminal",
+      shortcut: "",
+      icon: Bot,
+      action: () => {
+        setActiveBottomPanelTab("agent");
+        setIsBottomPanelOpen(true);
+      },
+      enabled: true,
+    },
+    {
       id: "focus-explorer",
       label: "Show Explorer",
       shortcut: "",
@@ -588,9 +970,66 @@ export function WorkflowEditorPageContent() {
     setIsSidebarVisible(true);
   };
 
+  const agentContextPrompt = [
+    "# QDash Workflow Authoring Task",
+    "",
+    `Flow: ${name}.py`,
+    `Entrypoint: ${flowFunctionName || name}`,
+    `Project chip: ${chipId || "(not set)"}`,
+    `Default username: ${username || "(not set)"}`,
+    `Tags: ${tags || "(none)"}`,
+    defaultInterval ? `Default interval: ${defaultInterval} ns` : "Default interval: (not set)",
+    "",
+    "## User request",
+    agentRequest.trim() || "(no request provided)",
+    "",
+    "You are editing a QDash calibration workflow. Keep the workflow compatible with QDash and Prefect.",
+    "",
+    "Use the public workflow API when possible:",
+    "- from qdash.workflow.service import CalibService",
+    "- from qdash.workflow.service.targets import MuxTargets, QubitTargets, CouplingTargets, Target",
+    "- from qdash.workflow.service.steps import CustomOneQubit, CustomTwoQubit, OneQubitCheck, OneQubitFineTune, TwoQubitCalibration",
+    "",
+    "Return a concise summary and a unified diff. If you provide a complete replacement file, include it in a fenced ```python code block. Do not save or execute the workflow unless explicitly asked.",
+    "",
+    "## Current workflow code",
+    "```python",
+    code,
+    "```",
+  ].join("\n");
+
+  const copyToClipboard = async (value: string, message: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(message);
+    } catch {
+      toast.error("Failed to copy to clipboard");
+    }
+  };
+
+  const applyAgentResponseCode = () => {
+    const match = agentResponse.match(/```(?:python|py)?\s*([\s\S]*?)```/i);
+    const nextCode = match?.[1]?.trim();
+
+    if (!nextCode) {
+      toast.error("Paste an agent response with a fenced Python code block first");
+      return;
+    }
+
+    setCode(nextCode.endsWith("\n") ? nextCode : `${nextCode}\n`);
+    setAgentDiff("");
+    setAgentChangedLines([]);
+    agentDecorationIdsRef.current =
+      editorRef.current?.deltaDecorations(agentDecorationIdsRef.current, []) ?? [];
+    setIsEditorLocked(false);
+    setActiveTab("code");
+    toast.success("Applied agent code block to editor");
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleEditorMount = useCallback((editor: any, monaco: any) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
     editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
       setCursorPosition({
         line: e.position.lineNumber,
@@ -1204,16 +1643,33 @@ export function WorkflowEditorPageContent() {
         {isBottomPanelOpen && (
           <div
             className="flex flex-col border-t border-base-300 bg-base-200"
-            style={{ height: "200px" }}
+            style={{ height: "260px" }}
           >
             <div className="flex items-center justify-between px-3 py-1 border-b border-base-300">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  className="text-xs font-medium text-base-content flex items-center gap-1.5 px-2 py-0.5 bg-base-300 rounded"
+                  onClick={() => setActiveBottomPanelTab("output")}
+                  className={`text-xs font-medium flex items-center gap-1.5 px-2 py-0.5 rounded ${
+                    activeBottomPanelTab === "output"
+                      ? "bg-base-300 text-base-content"
+                      : "text-base-content/50 hover:text-base-content"
+                  }`}
                 >
                   <Terminal size={12} />
                   Output
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveBottomPanelTab("agent")}
+                  className={`text-xs font-medium flex items-center gap-1.5 px-2 py-0.5 rounded ${
+                    activeBottomPanelTab === "agent"
+                      ? "bg-base-300 text-base-content"
+                      : "text-base-content/50 hover:text-base-content"
+                  }`}
+                >
+                  <Bot size={12} />
+                  Agent Terminal
                 </button>
               </div>
               <div className="flex items-center gap-1">
@@ -1226,38 +1682,334 @@ export function WorkflowEditorPageContent() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 font-mono text-xs text-base-content/70 bg-base-300">
-              {lastExecutionId ? (
-                <div className="space-y-1">
-                  <div className="text-base-content/40">
-                    <span className="text-info">[info]</span> Flow: {name}
-                  </div>
-                  <div className="text-base-content/40">
-                    <span className="text-info">[info]</span> Execution ID: {lastExecutionId}
-                  </div>
-                  <div className="text-base-content/40">
-                    <span className="text-info">[info]</span> Chip: {chipId} | User: {username}
-                  </div>
-                  {lockStatus?.data.lock ? (
-                    <div>
-                      <span className="text-warning">[running]</span> Execution in progress...
+            {activeBottomPanelTab === "output" ? (
+              <div className="flex-1 overflow-y-auto bg-base-300 p-3 font-mono text-xs text-base-content/70">
+                {lastExecutionId ? (
+                  <div className="space-y-1">
+                    <div className="text-base-content/40">
+                      <span className="text-info">[info]</span> Flow: {name}
                     </div>
-                  ) : (
-                    <div>
-                      <span className="text-success">[done]</span> Execution completed.
+                    <div className="text-base-content/40">
+                      <span className="text-info">[info]</span> Execution ID: {lastExecutionId}
+                    </div>
+                    <div className="text-base-content/40">
+                      <span className="text-info">[info]</span> Chip: {chipId} | User: {username}
+                    </div>
+                    {lockStatus?.data.lock ? (
+                      <div>
+                        <span className="text-warning">[running]</span> Execution in progress...
+                      </div>
+                    ) : (
+                      <div>
+                        <span className="text-success">[done]</span> Execution completed.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-base-content/30">
+                    <div className="text-center">
+                      <Terminal size={24} className="mx-auto mb-2 opacity-50" />
+                      <div>No execution output yet.</div>
+                      <div className="mt-1 text-xs">Execute a flow to see output here.</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div
+                className="grid min-h-0 flex-1 overflow-hidden bg-base-300 text-xs"
+                style={{ gridTemplateColumns: "minmax(260px, 340px) minmax(0, 1fr)" }}
+              >
+                <div className="overflow-y-auto border-r border-base-200 p-3 max-lg:border-b max-lg:border-r-0">
+                  <div className="mb-3 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Bot size={14} className="text-primary" />
+                        Host Codex
+                      </div>
+                      <span className={`badge badge-xs gap-1 ${agentStatusBadgeClass}`}>
+                        {agentRunStatus === "running" && (
+                          <span className="loading loading-spinner h-2.5 w-2.5" />
+                        )}
+                        {agentStatusLabel}
+                      </span>
+                    </div>
+                    <div className="text-[11px] leading-relaxed text-base-content/55">
+                      Uses the authenticated Codex CLI on this host. Edits are applied to the editor
+                      only after the temporary copy is validated.
+                    </div>
+                    {agentRunStatus !== "idle" && (
+                      <div className="rounded border border-base-200 bg-base-100 px-2 py-1.5">
+                        <div className="text-[10px] font-medium uppercase tracking-wide text-base-content/40">
+                          Current step
+                        </div>
+                        <div className="mt-0.5 flex items-start gap-2 text-[11px] leading-relaxed text-base-content/70">
+                          {agentRunStatus === "running" && (
+                            <span className="loading loading-dots loading-xs mt-0.5 shrink-0" />
+                          )}
+                          <span>{agentPhase}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mb-3">
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <label
+                        htmlFor="workflow-agent-request"
+                        className="block text-[11px] font-medium uppercase tracking-wide text-base-content/50"
+                      >
+                        Request
+                      </label>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs h-5 min-h-5 px-2 text-[11px]"
+                        onClick={() => setAgentRequest(DEMO_AGENT_REQUEST)}
+                        disabled={codexAgentMutation.isPending}
+                      >
+                        Demo
+                      </button>
+                    </div>
+                    <textarea
+                      id="workflow-agent-request"
+                      name="workflowAgentRequest"
+                      className="textarea textarea-bordered textarea-xs min-h-16 w-full resize-none bg-base-100 font-sans text-xs"
+                      placeholder={
+                        agentRunHistory.length > 0
+                          ? "Describe the next workflow edit..."
+                          : "Describe the workflow edit you want Host Codex to make..."
+                      }
+                      value={agentRequest}
+                      onChange={(event) => setAgentRequest(event.target.value)}
+                    />
+                    {agentRunHistory.length > 0 && (
+                      <div className="mt-1 text-[11px] text-base-content/45">
+                        Current editor code includes {agentRunHistory.length} Host Codex edit
+                        {agentRunHistory.length === 1 ? "" : "s"}. Add the next request above.
+                      </div>
+                    )}
+                  </div>
+                  <div className="mb-3 space-y-2">
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-xs w-full gap-1"
+                      disabled={codexAgentMutation.isPending || !agentRequest.trim()}
+                      onClick={() => {
+                        setAgentResponse("");
+                        setAgentDiff("");
+                        setAgentChangedLines([]);
+                        setAgentView("terminal");
+                        codexAgentMutation.mutate();
+                      }}
+                    >
+                      {codexAgentMutation.isPending ? (
+                        <span className="loading loading-spinner loading-xs" />
+                      ) : (
+                        <Bot size={12} />
+                      )}
+                      {codexAgentMutation.isPending
+                        ? "Running Host Codex..."
+                        : agentRunHistory.length > 0
+                          ? "Run Next Edit and Apply"
+                          : "Run Host Codex and Apply"}
+                    </button>
+                    {codexAgentMutation.isPending && (
+                      <div
+                        className="flex items-center gap-2 rounded border border-info/40 bg-info/10 px-2 py-1.5 text-[11px] font-medium text-info"
+                        aria-live="polite"
+                      >
+                        <span className="loading loading-dots loading-sm" />
+                        Running now: Host Codex is editing a temporary workflow copy.
+                      </div>
+                    )}
+                    {agentRunStatus === "done" && !codexAgentMutation.isPending && (
+                      <div className="rounded border border-success/20 bg-success/10 px-2 py-1 text-[11px] text-success">
+                        Ready for the next request. The editor now uses the latest applied code.
+                      </div>
+                    )}
+                    {agentChangedLines.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs w-full gap-1"
+                        onClick={() => decorateAgentChanges(agentChangedLines)}
+                      >
+                        <FileDiff size={12} />
+                        Show {agentChangedLines.length} changed lines
+                      </button>
+                    )}
+                  </div>
+                  {agentRunHistory.length > 0 && (
+                    <div className="mb-3 rounded border border-base-200 bg-base-100">
+                      <div className="border-b border-base-200 px-2 py-1.5 text-[11px] font-medium text-base-content/60">
+                        Session edits
+                      </div>
+                      <div className="max-h-24 overflow-auto p-2">
+                        {agentRunHistory
+                          .slice()
+                          .reverse()
+                          .map((item, index) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className="block w-full rounded px-1.5 py-1 text-left text-[11px] hover:bg-base-200"
+                              onClick={() => setAgentRequest(item.request)}
+                              disabled={codexAgentMutation.isPending}
+                            >
+                              <span className="font-medium text-base-content/70">
+                                #{agentRunHistory.length - index}
+                              </span>{" "}
+                              <span className="text-base-content/60">{item.request}</span>
+                              <span className="ml-1 text-base-content/35">
+                                ({item.changedLines} lines)
+                              </span>
+                            </button>
+                          ))}
+                      </div>
                     </div>
                   )}
+                  {agentActivity.length > 0 && (
+                    <div className="mb-3 rounded border border-base-200 bg-base-100">
+                      <div className="border-b border-base-200 px-2 py-1.5 text-[11px] font-medium text-base-content/60">
+                        Live activity
+                      </div>
+                      <div className="max-h-28 overflow-auto p-2">
+                        {agentActivity
+                          .slice()
+                          .reverse()
+                          .map((item) => (
+                            <div key={item.id} className="mb-1.5 last:mb-0">
+                              <div className="text-[10px] font-medium uppercase tracking-wide text-base-content/35">
+                                {item.stage}
+                              </div>
+                              <div className="text-[11px] leading-snug text-base-content/65">
+                                {item.message}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                  <details className="rounded border border-base-200 bg-base-100">
+                    <summary className="cursor-pointer px-2 py-1.5 text-[11px] font-medium text-base-content/60">
+                      Manual paste
+                    </summary>
+                    <div className="border-t border-base-200 p-2">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs mb-2 w-full gap-1"
+                        onClick={() =>
+                          copyToClipboard(agentContextPrompt, "Copied agent prompt to clipboard")
+                        }
+                      >
+                        <Copy size={12} />
+                        Copy full prompt
+                      </button>
+                      <label className="block">
+                        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-base-content/50">
+                          Response
+                        </span>
+                        <textarea
+                          id="workflow-agent-response"
+                          name="workflowAgentResponse"
+                          className="textarea textarea-bordered textarea-xs min-h-20 w-full resize-none bg-base-100 font-mono text-[11px]"
+                          placeholder="Paste a fenced python code block..."
+                          value={agentResponse}
+                          onChange={(event) => setAgentResponse(event.target.value)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-xs mt-2 w-full"
+                        onClick={applyAgentResponseCode}
+                      >
+                        Apply Python Code Block
+                      </button>
+                    </div>
+                  </details>
                 </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-base-content/30">
-                  <div className="text-center">
-                    <Terminal size={24} className="mx-auto mb-2 opacity-50" />
-                    <div>No execution output yet.</div>
-                    <div className="text-xs mt-1">Execute a flow to see output here.</div>
+                <div className="flex min-h-0 flex-col">
+                  <div className="flex items-center justify-between border-b border-base-200 px-3 py-2">
+                    <div className="flex items-center gap-1">
+                      {(["terminal", "diff", "context"] as const).map((view) => (
+                        <button
+                          key={view}
+                          type="button"
+                          className={`btn btn-xs ${
+                            agentView === view ? "btn-primary" : "btn-ghost"
+                          }`}
+                          onClick={() => setAgentView(view)}
+                        >
+                          {view === "terminal" && agentRunStatus === "running" && (
+                            <span className="loading loading-spinner h-2.5 w-2.5" />
+                          )}
+                          {view === "terminal" ? "Terminal" : view === "diff" ? "Diff" : "Context"}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 text-base-content/50">
+                      <span
+                        className={`flex items-center gap-1 font-medium ${
+                          agentRunStatus === "running"
+                            ? "text-info"
+                            : agentRunStatus === "done"
+                              ? "text-success"
+                              : agentRunStatus === "error"
+                                ? "text-error"
+                                : ""
+                        }`}
+                      >
+                        {agentRunStatus === "running" && (
+                          <span className="loading loading-dots loading-xs" />
+                        )}
+                        {agentStatusLabel}
+                      </span>
+                      {agentView === "diff" && agentDiff ? (
+                        <span>{agentChangedLines.length} changed lines</span>
+                      ) : (
+                        <span>{code.split("\n").length} lines</span>
+                      )}
+                      <span>{flowFunctionName || name}()</span>
+                    </div>
                   </div>
+                  {agentView === "terminal" ? (
+                    <pre
+                      ref={agentTerminalRef}
+                      className="flex-1 overflow-auto whitespace-pre-wrap bg-neutral p-3 font-mono text-[11px] leading-relaxed text-neutral-content"
+                    >
+                      {agentTerminalDisplay}
+                    </pre>
+                  ) : agentView === "diff" ? (
+                    <div className="flex-1 overflow-auto bg-base-100 font-mono text-[11px] leading-relaxed">
+                      {agentDiff ? (
+                        parseDiffLines(agentDiff).map((line) => (
+                          <div
+                            key={line.id}
+                            className={`whitespace-pre px-3 ${
+                              line.kind === "add"
+                                ? "bg-success/10 text-success"
+                                : line.kind === "remove"
+                                  ? "bg-error/10 text-error"
+                                  : line.kind === "meta"
+                                    ? "bg-base-200 text-info"
+                                    : "text-base-content/60"
+                            }`}
+                          >
+                            {line.text || " "}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-base-content/40">
+                          No diff yet.
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <pre className="flex-1 overflow-auto whitespace-pre-wrap p-3 font-mono text-[11px] leading-relaxed text-base-content/70">
+                      {agentContextPrompt}
+                    </pre>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
 

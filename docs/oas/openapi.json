@@ -8997,6 +8997,80 @@
         }
       }
     },
+    "/flows/{name}/agent/codex": {
+      "post": {
+        "tags": [
+          "flow"
+        ],
+        "summary": "Edit a flow with host Codex",
+        "description": "Run the host Codex CLI against a temporary copy of a flow.",
+        "operationId": "runCodexFlowAgent",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCodexAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunCodexAgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/{name}/schedule": {
       "post": {
         "tags": [
@@ -21277,6 +21351,18 @@
             ],
             "title": "Bare Shift Strength Limit",
             "description": "Strength cutoff for the high_frequency_strength estimator."
+          },
+          "resonator_assignment_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resonator Assignment Pattern",
+            "description": "Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2]."
           }
         },
         "type": "object",
@@ -21476,6 +21562,81 @@
         ],
         "title": "RecommendedTaskResponse",
         "description": "Response model for a recommended recalibration task.\n\nAttributes\n----------\ntask_name : str\n    Name of the task to re-run\npriority : int\n    Priority level (1=highest, larger=lower priority)\naffected_parameters : list[str]\n    Parameters that would be recalibrated by this task\naffected_qids : list[str]\n    Qubit/coupling IDs affected\nreason : str\n    Human-readable explanation"
+      },
+      "RunCodexAgentRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Current Python code content"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "description": "User editing request"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context",
+            "description": "Additional workflow authoring context",
+            "default": ""
+          },
+          "flow_function_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Function Name",
+            "description": "Expected public flow entrypoint to preserve"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "prompt"
+        ],
+        "title": "RunCodexAgentRequest",
+        "description": "Request to edit a flow with the host Codex CLI."
+      },
+      "RunCodexAgentResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Edited Python code content"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Codex final response or execution summary",
+            "default": ""
+          },
+          "diff": {
+            "type": "string",
+            "title": "Diff",
+            "description": "Unified diff between original and edited code",
+            "default": ""
+          },
+          "command": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Command",
+            "description": "Codex command that was executed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "command"
+        ],
+        "title": "RunCodexAgentResponse",
+        "description": "Response from the host Codex workflow editing bridge."
       },
       "SaveFileRequest": {
         "properties": {
@@ -22049,6 +22210,11 @@
             "type": "string",
             "title": "Timezone",
             "default": "Asia/Tokyo"
+          },
+          "enable_local_codex_agent": {
+            "type": "boolean",
+            "title": "Enable Local Codex Agent",
+            "default": false
           }
         },
         "additionalProperties": false,

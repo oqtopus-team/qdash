@@ -142,6 +142,7 @@ services:
     volumes:
       - ./src/qdash/api:/app/qdash/api
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (used by reanalysis service)
+      - ./src/qdash/agent:/app/qdash/agent
       - ./src/qdash/copilot:/app/qdash/copilot
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
@@ -172,6 +173,27 @@ services:
       - CALIB_DATA_PATH=/app/calib_data
       - PREFECT_API_URL=http://prefect-server:4200/api
       - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
+    networks:
+      - custom_net
+  agent-worker:
+    build:
+      context: .
+      dockerfile: ./src/qdash/agent/Dockerfile
+      args:
+        CODEX_INSTALL_COMMAND: ${CODEX_INSTALL_COMMAND:-}
+    restart: unless-stopped
+    env_file:
+      - .env
+    profiles:
+      - agent
+    volumes:
+      - ./src/qdash/agent:/app/qdash/agent
+      - ./src/qdash/workflow/templates:/app/qdash/workflow/templates:ro
+      - ./config:/app/config:ro
+      - ./logs/agent:/app/logs
+    environment:
+      - PYTHONPATH=/app:/app/qdash
+      - ENABLE_LOCAL_CODEX_AGENT=true
     networks:
       - custom_net
   ui:

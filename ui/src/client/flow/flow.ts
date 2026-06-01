@@ -37,6 +37,8 @@ import type {
   ListFlowSchedulesParams,
   ListFlowSchedulesResponse,
   ListFlowsResponse,
+  RunCodexAgentRequest,
+  RunCodexAgentResponse,
   SaveFlowRequest,
   SaveFlowResponse,
   ScheduleFlowRequest,
@@ -1014,6 +1016,72 @@ export const useExecuteFlow = <TError = HTTPValidationError,
       > => {
 
       const mutationOptions = getExecuteFlowMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Run the host Codex CLI against a temporary copy of a flow.
+ * @summary Edit a flow with host Codex
+ */
+export const runCodexFlowAgent = (
+    name: string,
+    runCodexAgentRequest: RunCodexAgentRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<RunCodexAgentResponse>(
+      {url: `/flows/${name}/agent/codex`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: runCodexAgentRequest, signal
+    },
+      options);
+    }
+  
+
+
+export const getRunCodexFlowAgentMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runCodexFlowAgent>>, TError,{name: string;data: RunCodexAgentRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof runCodexFlowAgent>>, TError,{name: string;data: RunCodexAgentRequest}, TContext> => {
+
+const mutationKey = ['runCodexFlowAgent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runCodexFlowAgent>>, {name: string;data: RunCodexAgentRequest}> = (props) => {
+          const {name,data} = props ?? {};
+
+          return  runCodexFlowAgent(name,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunCodexFlowAgentMutationResult = NonNullable<Awaited<ReturnType<typeof runCodexFlowAgent>>>
+    export type RunCodexFlowAgentMutationBody = RunCodexAgentRequest
+    export type RunCodexFlowAgentMutationError = HTTPValidationError
+
+    /**
+ * @summary Edit a flow with host Codex
+ */
+export const useRunCodexFlowAgent = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runCodexFlowAgent>>, TError,{name: string;data: RunCodexAgentRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof runCodexFlowAgent>>,
+        TError,
+        {name: string;data: RunCodexAgentRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getRunCodexFlowAgentMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }
