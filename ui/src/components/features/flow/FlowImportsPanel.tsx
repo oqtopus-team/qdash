@@ -8,7 +8,11 @@ import { useListFlowHelperFiles, useGetFlowHelperFile } from "@/client/flow/flow
 // Monaco Editor for viewing helper files (read-only)
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
-export function FlowImportsPanel() {
+interface FlowImportsPanelProps {
+  compact?: boolean;
+}
+
+export function FlowImportsPanel({ compact = false }: FlowImportsPanelProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
   // Fetch list of helper files using generated client
@@ -39,24 +43,32 @@ export function FlowImportsPanel() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-base-300">
       {/* File Tabs */}
-      <div className="flex items-center bg-base-200 border-b border-base-300 overflow-x-auto">
+      <div
+        className={`flex bg-base-200 border-b border-base-300 overflow-x-auto ${
+          compact ? "flex-col items-stretch" : "items-center"
+        }`}
+      >
         <div className="flex items-center px-3 py-1 border-r border-base-300">
           <span className="text-[10px] text-base-content/50 uppercase tracking-wider">
-            qdash.workflow.service
+            {compact ? "Service Helpers" : "qdash.workflow.service"}
           </span>
         </div>
         {isLoadingFiles ? (
           <div className="px-3 py-2 text-xs text-base-content/50">Loading...</div>
         ) : (
-          <div className="flex">
+          <div className={compact ? "flex flex-col" : "flex"}>
             {files?.data?.map((file) => (
               <button
                 key={file}
                 onClick={() => setSelectedFile(file)}
-                className={`px-3 py-1.5 text-xs font-mono border-r border-base-300 flex items-center gap-1.5 transition-colors ${
+                className={`px-3 py-1.5 text-xs font-mono border-base-300 flex items-center gap-1.5 transition-colors ${
                   selectedFile === file
-                    ? "bg-base-300 text-base-content border-t-2 border-t-primary"
-                    : "bg-base-200 text-base-content/60 hover:bg-base-300/50 border-t-2 border-t-transparent"
+                    ? compact
+                      ? "bg-primary/15 text-base-content border-l-2 border-l-primary"
+                      : "bg-base-300 text-base-content border-t-2 border-t-primary"
+                    : compact
+                      ? "bg-base-200 text-base-content/60 hover:bg-base-300/50 border-l-2 border-l-transparent"
+                      : "bg-base-200 text-base-content/60 hover:bg-base-300/50 border-t-2 border-t-transparent"
                 }`}
               >
                 <span className="text-info">py</span>
@@ -83,8 +95,8 @@ export function FlowImportsPanel() {
                 value={fileContent?.data || ""}
                 options={{
                   readOnly: true,
-                  minimap: { enabled: true },
-                  fontSize: 14,
+                  minimap: { enabled: !compact },
+                  fontSize: compact ? 12 : 14,
                   lineNumbers: "on",
                   scrollBeyondLastLine: true,
                   wordWrap: "on",
@@ -103,7 +115,11 @@ export function FlowImportsPanel() {
       </div>
 
       {/* Footer hint */}
-      <div className="px-4 py-2 bg-base-200 border-t border-base-300 text-xs text-base-content/50">
+      <div
+        className={`px-4 py-2 bg-base-200 border-t border-base-300 text-xs text-base-content/50 ${
+          compact ? "hidden" : ""
+        }`}
+      >
         <code className="text-secondary">from qdash.workflow.service import ...</code>
         <span className="ml-4 text-base-content/30">Read-only reference</span>
       </div>
