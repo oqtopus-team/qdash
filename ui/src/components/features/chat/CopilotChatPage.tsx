@@ -276,34 +276,32 @@ function SessionListItem({
   onDelete: () => void;
 }) {
   return (
-    <button
-      onClick={onSelect}
-      className={`w-full text-left px-3 py-2.5 rounded-xl group ${
+    <div
+      className={`w-full rounded-xl group border ${
         isActive
           ? "chat-session-active shadow-sm"
-          : "hover:bg-base-200/80 border border-transparent"
+          : "hover:bg-base-200/80 border-transparent"
       }`}
     >
-      <div className="flex items-start justify-between gap-1">
-        <div className="min-w-0 flex-1">
+      <div className="flex items-start justify-between gap-1 px-3 py-2.5">
+        <button type="button" onClick={onSelect} className="min-w-0 flex-1 text-left">
           <div className="text-sm font-medium truncate">{session.title}</div>
           <div className="flex items-center gap-2 mt-1 text-xs text-base-content/50">
             <span>{session.messages.length} msgs</span>
             <span className="text-base-content/30">{formatTime(session.updatedAt)}</span>
           </div>
-        </div>
+        </button>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 shrink-0 text-base-content/40 hover:text-error"
+          type="button"
+          onClick={onDelete}
+          className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 text-base-content/40 hover:text-error"
           title="Delete session"
+          aria-label={`Delete ${session.title}`}
         >
           <Trash2 className="w-3 h-3" />
         </button>
       </div>
-    </button>
+    </div>
   );
 }
 

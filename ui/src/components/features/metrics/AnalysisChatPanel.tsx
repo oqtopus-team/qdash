@@ -311,16 +311,15 @@ function SessionItem({
   onDelete: () => void;
 }) {
   return (
-    <button
-      onClick={onSelect}
-      className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-xs group ${
+    <div
+      className={`w-full rounded-lg transition-colors text-xs group border ${
         isActive
-          ? "bg-primary/10 border border-primary/30"
-          : "hover:bg-base-200 border border-transparent"
+          ? "bg-primary/10 border-primary/30"
+          : "hover:bg-base-200 border-transparent"
       }`}
     >
-      <div className="flex items-start justify-between gap-1">
-        <div className="min-w-0 flex-1">
+      <div className="flex items-start justify-between gap-1 px-3 py-2">
+        <button type="button" onClick={onSelect} className="min-w-0 flex-1 text-left">
           <div className="font-semibold truncate">{session.title || "Untitled"}</div>
           <div className="text-base-content/50 truncate">
             {session.context ? session.context.qid : "General"}
@@ -329,19 +328,18 @@ function SessionItem({
             <span>{session.messageCount} msgs</span>
             <span>{formatTimeAgo(session.updatedAt)}</span>
           </div>
-        </div>
+        </button>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 shrink-0"
+          type="button"
+          onClick={onDelete}
+          className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
           title="Delete session"
+          aria-label={`Delete ${session.title || "Untitled"}`}
         >
           <Trash2 className="w-3 h-3" />
         </button>
       </div>
-    </button>
+    </div>
   );
 }
 
