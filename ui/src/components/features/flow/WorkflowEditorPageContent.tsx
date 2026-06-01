@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter, useParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -19,21 +19,35 @@ import {
   saveFlow,
   deleteFlow,
   useExecuteFlow,
+  useListFlows,
   listFlowSchedules,
 } from "@/client/flow/flow";
 import {
   ArrowLeft,
+  ChevronRight,
   Clock,
+  Columns2,
+  Command,
+  FileCode,
   Lock,
+  Minus,
+  PanelBottom,
+  PanelLeft,
   Pencil,
   Play,
   Plus,
   Save,
+  Search,
   Settings,
   StopCircle,
+  Terminal,
   Trash2,
+  WrapText,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
+import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
 import { FlowImportsPanel } from "@/components/features/flow/FlowImportsPanel";
@@ -43,6 +57,39 @@ import { formatDateTime } from "@/lib/utils/datetime";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+
+const EDITOR_OPTIONS = {
+  minimap: { enabled: true, renderCharacters: false, maxColumn: 80, scale: 2 },
+  fontSize: 14,
+  fontFamily:
+    "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace",
+  fontLigatures: true,
+  lineNumbers: "on" as const,
+  automaticLayout: true,
+  scrollBeyondLastLine: true,
+  padding: { top: 16, bottom: 16 },
+  wordWrap: "on" as const,
+  folding: true,
+  foldingHighlight: true,
+  renderLineHighlight: "all" as const,
+  cursorStyle: "line" as const,
+  cursorBlinking: "smooth" as const,
+  cursorSmoothCaretAnimation: "on" as const,
+  smoothScrolling: true,
+  bracketPairColorization: { enabled: true },
+  guides: { bracketPairs: true, indentation: true, highlightActiveIndentation: true },
+  renderWhitespace: "selection" as const,
+  stickyScroll: { enabled: true },
+  suggest: { showKeywords: true, showSnippets: true },
+  quickSuggestions: { other: true, comments: false, strings: false },
+  parameterHints: { enabled: true },
+  matchBrackets: "always" as const,
+  occurrencesHighlight: "singleFile" as const,
+  selectionHighlight: true,
+  linkedEditing: true,
+  colorDecorators: true,
+  scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
+};
 
 export function WorkflowEditorPageContent() {
   const router = useRouter();
@@ -65,6 +112,19 @@ export function WorkflowEditorPageContent() {
   const [activeTab, setActiveTab] = useState<"code" | "helpers">("code");
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
+  const [originalCode, setOriginalCode] = useState("");
+  const [isSplitView, setIsSplitView] = useState(false);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [sidebarSearch, setSidebarSearch] = useState("");
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [commandSearch, setCommandSearch] = useState("");
+  const [fontSize, setFontSize] = useState(14);
+  const [selection, setSelection] = useState({ lines: 0, chars: 0 });
+  const [isBottomPanelOpen, setIsBottomPanelOpen] = useState(false);
+  const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
+  const commandInputRef = useRef<HTMLInputElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorRef = useRef<any>(null);
 
   // Fetch current user
   const { data: userData } = useGetCurrentUser();
@@ -78,6 +138,9 @@ export function WorkflowEditorPageContent() {
       refetchInterval: 5000,
     },
   });
+
+  // Fetch all flows for sidebar
+  const { data: flowsData } = useListFlows();
 
   // Fetch schedules for this flow
   const { data: schedulesData } = useQuery({
@@ -102,6 +165,7 @@ export function WorkflowEditorPageContent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flow", name] });
       queryClient.invalidateQueries({ queryKey: ["flows"] });
+      setOriginalCode(code);
       toast.success("Flow saved successfully!");
     },
   });
@@ -146,6 +210,7 @@ export function WorkflowEditorPageContent() {
       const flow = data.data;
       setDescription(flow.description);
       setCode(flow.code);
+      setOriginalCode(flow.code);
       setFlowFunctionName(flow.flow_function_name);
 
       // Set username from flow or fallback to current user
@@ -185,7 +250,10 @@ export function WorkflowEditorPageContent() {
     }
   }, [chipsData, chipId, data]);
 
-  const handleSave = () => {
+  const isDirty = code !== originalCode;
+
+  const handleSave = useCallback(() => {
+    if (isEditorLocked) return;
     if (!username.trim()) {
       toast.error("Please enter a username");
       return;
@@ -217,7 +285,278 @@ export function WorkflowEditorPageContent() {
     };
 
     saveMutation.mutate(request);
+  }, [
+    isEditorLocked,
+    username,
+    name,
+    description,
+    code,
+    flowFunctionName,
+    chipId,
+    tags,
+    defaultInterval,
+    saveMutation,
+    toast,
+  ]);
+
+  // Keep a ref to handleSave for Monaco command (avoids stale closure)
+  const handleSaveRef = useRef(handleSave);
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  }, [handleSave]);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + Shift + P → Command Palette
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "p") {
+        e.preventDefault();
+        setShowCommandPalette(true);
+        setCommandSearch("");
+      }
+      // Ctrl/Cmd + = → Zoom In
+      if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        setFontSize((prev) => Math.min(prev + 2, 32));
+      }
+      // Ctrl/Cmd + - → Zoom Out
+      if ((e.metaKey || e.ctrlKey) && e.key === "-") {
+        e.preventDefault();
+        setFontSize((prev) => Math.max(prev - 2, 8));
+      }
+      // Ctrl/Cmd + 0 → Reset Zoom
+      if ((e.metaKey || e.ctrlKey) && e.key === "0") {
+        e.preventDefault();
+        setFontSize(14);
+      }
+      // Ctrl/Cmd + ` → Toggle Bottom Panel
+      if ((e.metaKey || e.ctrlKey) && e.key === "`") {
+        e.preventDefault();
+        setIsBottomPanelOpen((prev) => !prev);
+      }
+      // Escape → close command palette
+      if (e.key === "Escape" && showCommandPalette) {
+        setShowCommandPalette(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showCommandPalette]);
+
+  // Sync fontSize and wordWrap to editor
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.updateOptions({ fontSize, wordWrap });
+    }
+  }, [fontSize, wordWrap]);
+
+  // Focus command palette input when opened
+  useEffect(() => {
+    if (showCommandPalette) {
+      requestAnimationFrame(() => commandInputRef.current?.focus());
+    }
+  }, [showCommandPalette]);
+
+  // Command palette actions
+  const commands = [
+    {
+      id: "save",
+      label: "Save Flow",
+      shortcut: "⌘S",
+      icon: Save,
+      action: () => handleSaveRef.current(),
+      enabled: !isEditorLocked,
+    },
+    {
+      id: "toggle-edit",
+      label: isEditorLocked ? "Enable Editing" : "Disable Editing",
+      shortcut: "",
+      icon: Pencil,
+      action: () => setIsEditorLocked(!isEditorLocked),
+      enabled: true,
+    },
+    {
+      id: "execute",
+      label: "Execute Flow",
+      shortcut: "",
+      icon: Play,
+      action: () => setShowExecuteConfirm(true),
+      enabled: !lockStatus?.data.lock,
+    },
+    {
+      id: "properties",
+      label: "Open Properties",
+      shortcut: "",
+      icon: Settings,
+      action: () => setShowPropertiesModal(true),
+      enabled: true,
+    },
+    {
+      id: "split-view",
+      label: isSplitView ? "Close Split View" : "Open Split View",
+      shortcut: "",
+      icon: Columns2,
+      action: () => {
+        setIsSplitView(!isSplitView);
+        if (!isSplitView) setActiveTab("code");
+      },
+      enabled: true,
+    },
+    {
+      id: "toggle-sidebar",
+      label: isSidebarVisible ? "Hide Sidebar" : "Show Sidebar",
+      shortcut: "",
+      icon: PanelLeft,
+      action: () => setIsSidebarVisible((prev) => !prev),
+      enabled: true,
+    },
+    {
+      id: "toggle-bottom",
+      label: isBottomPanelOpen ? "Hide Panel" : "Show Panel",
+      shortcut: "⌘`",
+      icon: PanelBottom,
+      action: () => setIsBottomPanelOpen((prev) => !prev),
+      enabled: true,
+    },
+    {
+      id: "toggle-minimap",
+      label: "Toggle Minimap",
+      shortcut: "",
+      icon: FileCode,
+      action: () => {
+        const ed = editorRef.current;
+        if (ed) {
+          const current = ed.getOption(72);
+          ed.updateOptions({ minimap: { enabled: !current?.enabled } });
+        }
+      },
+      enabled: true,
+    },
+    {
+      id: "toggle-wordwrap",
+      label: wordWrap === "on" ? "Disable Word Wrap" : "Enable Word Wrap",
+      shortcut: "⌥Z",
+      icon: WrapText,
+      action: () => setWordWrap((prev) => (prev === "on" ? "off" : "on")),
+      enabled: true,
+    },
+    {
+      id: "zoom-in",
+      label: "Zoom In",
+      shortcut: "⌘+",
+      icon: ZoomIn,
+      action: () => setFontSize((prev) => Math.min(prev + 2, 32)),
+      enabled: true,
+    },
+    {
+      id: "zoom-out",
+      label: "Zoom Out",
+      shortcut: "⌘-",
+      icon: ZoomOut,
+      action: () => setFontSize((prev) => Math.max(prev - 2, 8)),
+      enabled: true,
+    },
+    {
+      id: "zoom-reset",
+      label: "Reset Zoom",
+      shortcut: "⌘0",
+      icon: Minus,
+      action: () => setFontSize(14),
+      enabled: true,
+    },
+    {
+      id: "go-to-line",
+      label: "Go to Line...",
+      shortcut: "⌘G",
+      icon: ChevronRight,
+      action: () => {
+        editorRef.current?.focus();
+        editorRef.current?.getAction("editor.action.gotoLine")?.run();
+      },
+      enabled: true,
+    },
+    {
+      id: "find",
+      label: "Find and Replace",
+      shortcut: "⌘F",
+      icon: Search,
+      action: () => {
+        editorRef.current?.focus();
+        editorRef.current?.getAction("actions.find")?.run();
+      },
+      enabled: true,
+    },
+    {
+      id: "format",
+      label: "Format Document",
+      shortcut: "⇧⌥F",
+      icon: FileCode,
+      action: () => {
+        editorRef.current?.focus();
+        editorRef.current?.getAction("editor.action.formatDocument")?.run();
+      },
+      enabled: true,
+    },
+  ];
+
+  const filteredCommands = commands.filter((cmd) =>
+    cmd.label.toLowerCase().includes(commandSearch.toLowerCase()),
+  );
+
+  const executeCommand = (cmd: (typeof commands)[0]) => {
+    if (!cmd.enabled) return;
+    setShowCommandPalette(false);
+    cmd.action();
   };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleEditorMount = useCallback((editor: any, monaco: any) => {
+    editorRef.current = editor;
+    editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
+      setCursorPosition({
+        line: e.position.lineNumber,
+        column: e.position.column,
+      });
+    });
+    editor.onDidChangeCursorSelection(
+      (e: {
+        selection: {
+          startLineNumber: number;
+          endLineNumber: number;
+          startColumn: number;
+          endColumn: number;
+        };
+      }) => {
+        const sel = e.selection;
+        if (sel.startLineNumber === sel.endLineNumber && sel.startColumn === sel.endColumn) {
+          setSelection({ lines: 0, chars: 0 });
+        } else {
+          const model = editor.getModel();
+          if (model) {
+            const text = model.getValueInRange(sel);
+            const lines = sel.endLineNumber - sel.startLineNumber + 1;
+            setSelection({ lines, chars: text.length });
+          }
+        }
+      },
+    );
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => handleSaveRef.current());
+    // Alt+Z → toggle word wrap
+    editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, () =>
+      setWordWrap((prev) => (prev === "on" ? "off" : "on")),
+    );
+  }, []);
 
   const handleDelete = () => {
     deleteMutation.mutate();
@@ -246,6 +585,17 @@ export function WorkflowEditorPageContent() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsSidebarVisible((prev) => !prev);
+              }}
+              className="btn btn-sm btn-ghost max-sm:hidden"
+              title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
+            >
+              <PanelLeft size={16} />
+            </button>
             <button
               onClick={() => router.push("/workflow")}
               className="btn btn-sm btn-ghost"
@@ -381,76 +731,197 @@ export function WorkflowEditorPageContent() {
 
         {/* Main Editor Area */}
         <div className="flex-1 flex overflow-hidden mb-4">
+          {/* Sidebar - Flow Explorer */}
+          {isSidebarVisible && (
+            <div className="max-sm:hidden flex flex-col w-56 min-w-56 bg-base-200 border-r border-base-300">
+              <div className="px-3 py-2 text-xs font-semibold text-base-content/50 uppercase tracking-wider">
+                Explorer
+              </div>
+              <div className="px-2 pb-2">
+                <div className="relative">
+                  <Search
+                    size={12}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 text-base-content/40"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Filter flows..."
+                    className="input input-xs w-full pl-6 bg-base-300 border-base-300 focus:outline-none focus:border-primary/50"
+                    value={sidebarSearch}
+                    onChange={(e) => setSidebarSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {flowsData?.data?.flows
+                  ?.filter((f) =>
+                    sidebarSearch
+                      ? f.name.toLowerCase().includes(sidebarSearch.toLowerCase())
+                      : true,
+                  )
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((flow) => (
+                    <div
+                      key={flow.name}
+                      className={`flex items-center gap-1.5 px-3 py-1 text-sm cursor-pointer select-none transition-colors whitespace-nowrap ${
+                        flow.name === name
+                          ? "bg-primary/20 text-base-content"
+                          : "text-base-content/70 hover:bg-base-300"
+                      }`}
+                      onClick={() => {
+                        if (flow.name !== name) {
+                          router.push(`/workflow/${encodeURIComponent(flow.name)}`);
+                        }
+                      }}
+                      title={flow.description || flow.name}
+                    >
+                      <FileCode
+                        size={14}
+                        className={`shrink-0 ${flow.name === name ? "text-primary" : "text-info/60"}`}
+                      />
+                      <span className="truncate">{flow.name}.py</span>
+                    </div>
+                  ))}
+              </div>
+              <div className="px-3 py-1.5 border-t border-base-300 text-xs text-base-content/40 whitespace-nowrap">
+                {flowsData?.data?.flows?.length ?? 0} flows
+              </div>
+            </div>
+          )}
           {/* Editor with Tab Switcher */}
           <div className="flex-1 flex flex-col">
             {/* Tab Bar */}
-            <div className="flex bg-base-200 border-b border-base-300">
+            <div className="flex items-end bg-base-200 border-b border-base-300 h-9">
               <button
+                type="button"
                 onClick={() => setActiveTab("code")}
-                className={`px-4 py-2 text-sm font-medium flex items-center gap-2 border-r border-base-300 transition-colors ${
-                  activeTab === "code"
-                    ? "bg-base-300 text-base-content border-t-2 border-t-primary"
-                    : "bg-base-200 text-base-content/60 hover:bg-base-300/50 border-t-2 border-t-transparent"
+                className={`h-full px-4 text-sm font-medium flex items-center gap-2 border-r border-base-300 transition-colors relative ${
+                  activeTab === "code" || isSplitView
+                    ? "bg-base-300 text-base-content"
+                    : "bg-base-200 text-base-content/50 hover:text-base-content/80"
                 }`}
               >
+                {(activeTab === "code" || isSplitView) && (
+                  <span className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
+                )}
                 <span className="text-info">py</span>
                 {name}.py
+                {isDirty && (
+                  <span
+                    className="w-2 h-2 rounded-full bg-base-content/60"
+                    title="Unsaved changes"
+                  />
+                )}
               </button>
-              <button
-                onClick={() => setActiveTab("helpers")}
-                className={`px-4 py-2 text-sm font-medium flex items-center gap-2 border-r border-base-300 transition-colors ${
-                  activeTab === "helpers"
-                    ? "bg-base-300 text-base-content border-t-2 border-t-primary"
-                    : "bg-base-200 text-base-content/60 hover:bg-base-300/50 border-t-2 border-t-transparent"
-                }`}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-secondary"
+              {!isSplitView && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("helpers")}
+                  className={`h-full px-4 text-sm font-medium flex items-center gap-2 border-r border-base-300 transition-colors relative ${
+                    activeTab === "helpers"
+                      ? "bg-base-300 text-base-content"
+                      : "bg-base-200 text-base-content/50 hover:text-base-content/80"
+                  }`}
                 >
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                </svg>
-                Helpers Reference
-              </button>
+                  {activeTab === "helpers" && (
+                    <span className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
+                  )}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-secondary"
+                  >
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  </svg>
+                  Helpers
+                </button>
+              )}
+              {/* Split View Toggle */}
+              <div className="ml-auto flex items-center px-2 h-full">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSplitView(!isSplitView);
+                    if (!isSplitView) setActiveTab("code");
+                  }}
+                  className={`btn btn-xs btn-ghost ${isSplitView ? "text-primary" : "text-base-content/50"}`}
+                  title={isSplitView ? "Single view" : "Split view"}
+                >
+                  <Columns2 size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Breadcrumbs */}
+            <div className="flex items-center gap-1 px-3 py-1 bg-base-300/50 border-b border-base-300 text-xs text-base-content/50">
+              <span
+                className="hover:text-base-content cursor-pointer"
+                onClick={() => router.push("/workflow")}
+              >
+                workflows
+              </span>
+              <ChevronRight size={10} />
+              <span
+                className="hover:text-base-content cursor-pointer"
+                onClick={() => setShowPropertiesModal(true)}
+              >
+                {chipId || "chip"}
+              </span>
+              <ChevronRight size={10} />
+              <span className="text-base-content/80">{name}.py</span>
+              {flowFunctionName && (
+                <>
+                  <ChevronRight size={10} />
+                  <span className="text-base-content/60">{flowFunctionName}()</span>
+                </>
+              )}
             </div>
 
             {/* Tab Content */}
-            {activeTab === "code" ? (
+            {isSplitView ? (
+              <PanelGroup orientation="horizontal" style={{ flex: 1, overflow: "hidden" }}>
+                <Panel defaultSize="60%" minSize="20%" style={{ overflow: "hidden" }}>
+                  <Editor
+                    height="100%"
+                    language="python"
+                    theme="vs-dark"
+                    value={code}
+                    onChange={(value) => setCode(value || "")}
+                    onMount={handleEditorMount}
+                    options={{
+                      ...EDITOR_OPTIONS,
+                      fontSize,
+                      wordWrap,
+                      readOnly: isEditorLocked,
+                      domReadOnly: isEditorLocked,
+                    }}
+                  />
+                </Panel>
+                <PanelResizeHandle className="w-1 bg-base-300 hover:bg-primary/50 transition-colors cursor-col-resize" />
+                <Panel defaultSize="40%" minSize="15%" style={{ overflow: "hidden" }}>
+                  <FlowImportsPanel />
+                </Panel>
+              </PanelGroup>
+            ) : activeTab === "code" ? (
               <Editor
                 height="100%"
                 language="python"
                 theme="vs-dark"
                 value={code}
                 onChange={(value) => setCode(value || "")}
-                onMount={(editor) => {
-                  editor.onDidChangeCursorPosition((e) => {
-                    setCursorPosition({
-                      line: e.position.lineNumber,
-                      column: e.position.column,
-                    });
-                  });
-                }}
+                onMount={handleEditorMount}
                 options={{
-                  minimap: { enabled: true },
-                  fontSize: 14,
-                  lineNumbers: "on",
-                  automaticLayout: true,
-                  scrollBeyondLastLine: true,
-                  padding: { top: 16, bottom: 16 },
-                  wordWrap: "on",
-                  folding: true,
-                  renderLineHighlight: "all",
-                  cursorStyle: "line",
-                  cursorBlinking: "blink",
+                  ...EDITOR_OPTIONS,
+                  fontSize,
+                  wordWrap,
                   readOnly: isEditorLocked,
                   domReadOnly: isEditorLocked,
                 }}
@@ -461,19 +932,215 @@ export function WorkflowEditorPageContent() {
           </div>
         </div>
 
-        {/* Status Bar */}
-        <div className="flex items-center justify-between px-4 py-1 bg-primary text-primary-content text-xs">
-          <div className="flex items-center gap-4">
-            <span>
-              Ln {cursorPosition.line}, Col {cursorPosition.column}
-            </span>
-            <span>Python</span>
-            <span>UTF-8</span>
+        {/* Bottom Panel */}
+        {isBottomPanelOpen && (
+          <div
+            className="flex flex-col border-t border-base-300 bg-base-200"
+            style={{ height: "200px" }}
+          >
+            <div className="flex items-center justify-between px-3 py-1 border-b border-base-300">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="text-xs font-medium text-base-content flex items-center gap-1.5 px-2 py-0.5 bg-base-300 rounded"
+                >
+                  <Terminal size={12} />
+                  Output
+                </button>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setIsBottomPanelOpen(false)}
+                  className="btn btn-ghost btn-xs btn-square"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 font-mono text-xs text-base-content/70 bg-base-300">
+              {lastExecutionId ? (
+                <div className="space-y-1">
+                  <div className="text-base-content/40">
+                    <span className="text-info">[info]</span> Flow: {name}
+                  </div>
+                  <div className="text-base-content/40">
+                    <span className="text-info">[info]</span> Execution ID: {lastExecutionId}
+                  </div>
+                  <div className="text-base-content/40">
+                    <span className="text-info">[info]</span> Chip: {chipId} | User: {username}
+                  </div>
+                  {lockStatus?.data.lock ? (
+                    <div>
+                      <span className="text-warning">[running]</span> Execution in progress...
+                    </div>
+                  ) : (
+                    <div>
+                      <span className="text-success">[done]</span> Execution completed.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-base-content/30">
+                  <div className="text-center">
+                    <Terminal size={24} className="mx-auto mb-2 opacity-50" />
+                    <div>No execution output yet.</div>
+                    <div className="text-xs mt-1">Execute a flow to see output here.</div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <span>{code.split("\n").length} lines</span>
+        )}
+
+        {/* Status Bar */}
+        <div className="flex items-center justify-between px-2 py-1 bg-primary text-primary-content text-xs select-none">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                editorRef.current?.focus();
+                editorRef.current?.getAction("editor.action.gotoLine")?.run();
+              }}
+              className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+              title="Go to Line (⌘G)"
+            >
+              Ln {cursorPosition.line}, Col {cursorPosition.column}
+            </button>
+            {selection.chars > 0 && (
+              <span className="px-1.5 py-0.5 bg-primary-content/10 rounded">
+                {selection.lines > 1 ? `${selection.lines} lines, ` : ""}
+                {selection.chars} selected
+              </span>
+            )}
+            <span className="px-1.5 py-0.5">Spaces: 4</span>
+            <span className="px-1.5 py-0.5">Python</span>
+            <span className="px-1.5 py-0.5">UTF-8</span>
+            {isDirty && <span className="px-1.5 py-0.5 opacity-80">● Modified</span>}
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="px-1.5 py-0.5">{code.split("\n").length} lines</span>
+            <button
+              type="button"
+              onClick={() => setWordWrap((prev) => (prev === "on" ? "off" : "on"))}
+              className={`hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1 ${wordWrap === "off" ? "opacity-50" : ""}`}
+              title="Toggle Word Wrap (⌥Z)"
+            >
+              <WrapText size={10} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBottomPanelOpen((prev) => !prev)}
+              className={`hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1 ${isBottomPanelOpen ? "" : "opacity-60"}`}
+              title="Toggle Panel (⌘`)"
+            >
+              <Terminal size={10} />
+            </button>
+            {fontSize !== 14 && (
+              <button
+                type="button"
+                onClick={() => setFontSize(14)}
+                className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                title="Reset Zoom (⌘0)"
+              >
+                {Math.round((fontSize / 14) * 100)}%
+              </button>
+            )}
+            {isEditorLocked ? (
+              <button
+                type="button"
+                onClick={() => setIsEditorLocked(false)}
+                className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1 opacity-80"
+                title="Click to enable editing"
+              >
+                <Lock size={10} /> Read-only
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsEditorLocked(true)}
+                className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1"
+                title="Click to lock editor"
+              >
+                <Pencil size={10} /> Editing
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setShowCommandPalette(true);
+                setCommandSearch("");
+              }}
+              className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1 opacity-70 hover:opacity-100"
+              title="Command Palette"
+            >
+              <Command size={10} />
+              <span>⌘⇧P</span>
+            </button>
           </div>
         </div>
+
+        {/* Command Palette */}
+        {showCommandPalette && (
+          <div
+            className="fixed inset-0 z-50 flex justify-center pt-[15vh]"
+            onClick={() => setShowCommandPalette(false)}
+          >
+            <div className="absolute inset-0 bg-black/50" />
+            <div
+              className="relative w-full max-w-lg h-fit bg-base-200 rounded-lg shadow-2xl border border-base-300 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-base-300">
+                <Search size={14} className="text-base-content/40 shrink-0" />
+                <input
+                  ref={commandInputRef}
+                  type="text"
+                  placeholder="Type a command..."
+                  className="flex-1 bg-transparent text-sm text-base-content outline-none placeholder:text-base-content/40"
+                  value={commandSearch}
+                  onChange={(e) => setCommandSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && filteredCommands.length > 0) {
+                      executeCommand(filteredCommands[0]);
+                    }
+                    if (e.key === "Escape") {
+                      setShowCommandPalette(false);
+                    }
+                  }}
+                />
+              </div>
+              <div className="max-h-64 overflow-y-auto py-1">
+                {filteredCommands.map((cmd) => (
+                  <button
+                    key={cmd.id}
+                    type="button"
+                    onClick={() => executeCommand(cmd)}
+                    disabled={!cmd.enabled}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors ${
+                      cmd.enabled
+                        ? "text-base-content hover:bg-base-300 cursor-pointer"
+                        : "text-base-content/30 cursor-not-allowed"
+                    }`}
+                  >
+                    <cmd.icon size={14} className="shrink-0 opacity-60" />
+                    <span className="flex-1">{cmd.label}</span>
+                    {cmd.shortcut && (
+                      <kbd className="text-xs text-base-content/40 bg-base-300 px-1.5 py-0.5 rounded">
+                        {cmd.shortcut}
+                      </kbd>
+                    )}
+                  </button>
+                ))}
+                {filteredCommands.length === 0 && (
+                  <div className="px-3 py-4 text-sm text-base-content/40 text-center">
+                    No matching commands
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mobile FAB / Speed Dial - only visible on mobile */}
         <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">
