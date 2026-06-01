@@ -313,9 +313,7 @@ function SessionItem({
   return (
     <div
       className={`w-full rounded-lg transition-colors text-xs group border ${
-        isActive
-          ? "bg-primary/10 border-primary/30"
-          : "hover:bg-base-200 border-transparent"
+        isActive ? "bg-primary/10 border-primary/30" : "hover:bg-base-200 border-transparent"
       }`}
     >
       <div className="flex items-start justify-between gap-1 px-3 py-2">

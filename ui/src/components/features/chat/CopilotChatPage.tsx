@@ -278,9 +278,7 @@ function SessionListItem({
   return (
     <div
       className={`w-full rounded-xl group border ${
-        isActive
-          ? "chat-session-active shadow-sm"
-          : "hover:bg-base-200/80 border-transparent"
+        isActive ? "chat-session-active shadow-sm" : "hover:bg-base-200/80 border-transparent"
       }`}
     >
       <div className="flex items-start justify-between gap-1 px-3 py-2.5">

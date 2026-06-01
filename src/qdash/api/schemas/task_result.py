@@ -63,6 +63,48 @@ class TaskHistoryResponse(BaseModel):
     data: dict[str, TaskResult]
 
 
+class TaskResultListItem(BaseModel):
+    """Compact task result row for investigation lists."""
+
+    task_id: str
+    task_name: str
+    qid: str
+    chip_id: str
+    status: str
+    execution_id: str
+    user_id: str | None = None
+    username: str = ""
+    message: str = ""
+    has_stack_trace: bool = False
+    source_task_id: str | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    elapsed_time: timedelta | None = None
+    ai_review_status: str = ""
+
+    @field_validator("elapsed_time", mode="before")
+    @classmethod
+    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
+        """Parse elapsed_time from various formats."""
+        return parse_elapsed_time(v)
+
+    @field_serializer("elapsed_time")
+    @classmethod
+    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
+        """Serialize elapsed_time to H:MM:SS format."""
+        return format_elapsed_time(v) if v else None
+
+
+class TaskResultListResponse(BaseModel):
+    """Paginated task result list response."""
+
+    items: list[TaskResultListItem]
+    total: int
+    skip: int
+    limit: int
+    status_counts: dict[str, int]
+
+
 class TimeSeriesProjection(BaseModel):
     """Projection model for time series data query."""
 

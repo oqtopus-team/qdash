@@ -20,6 +20,7 @@ import {
   Inbox,
   LayoutDashboard,
   LayoutGrid,
+  ClipboardList,
   Snowflake,
   ListTodo,
   LogOut,
@@ -247,6 +248,12 @@ export function Sidebar() {
           visible: canEdit,
         },
         { href: "/execution", label: "Execution", icon: Zap },
+        {
+          href: "/task-results",
+          label: "Task Results",
+          icon: ClipboardList,
+          match: "prefix",
+        },
         {
           href: "/tasks",
           label: "Tasks",
