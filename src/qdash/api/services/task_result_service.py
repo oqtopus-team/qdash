@@ -32,6 +32,8 @@ from qdash.api.schemas.task_result import (
     LatestTaskResultResponse,
     TaskHistoryResponse,
     TaskResult,
+    TaskResultListItem,
+    TaskResultListResponse,
     TimeSeriesData,
     TimeSeriesProjection,
 )
@@ -199,6 +201,96 @@ class TaskResultService:
     ) -> None:
         self._chip_repo = chip_repository
         self._task_result_repo = task_result_repository
+
+    def list_task_results(
+        self,
+        *,
+        project_id: str,
+        status: str | None = None,
+        chip_id: str | None = None,
+        task_name: str | None = None,
+        qid: str | None = None,
+        execution_id: str | None = None,
+        username: str | None = None,
+        start_from: datetime | None = None,
+        start_to: datetime | None = None,
+        message_contains: str | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> TaskResultListResponse:
+        """List task results for cross-task investigation."""
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        query: dict[str, Any] = {"project_id": project_id}
+        if status:
+            query["status"] = status
+        if chip_id:
+            query["chip_id"] = chip_id
+        if task_name:
+            query["name"] = task_name
+        if qid:
+            query["qid"] = qid
+        if execution_id:
+            query["execution_id"] = execution_id
+        if username:
+            query["username"] = username
+        start_bounds: dict[str, datetime] = {}
+        if start_from:
+            start_bounds["$gte"] = start_from
+        if start_to:
+            start_bounds["$lte"] = start_to
+        if start_bounds:
+            query["start_at"] = start_bounds
+        if message_contains:
+            query["message"] = {"$regex": re.escape(message_contains), "$options": "i"}
+
+        total = TaskResultHistoryDocument.find(query).count()
+        docs = list(
+            TaskResultHistoryDocument.find(query)
+            .sort([("start_at", SortDirection.DESCENDING), ("task_id", SortDirection.ASCENDING)])
+            .skip(skip)
+            .limit(limit)
+            .run()
+        )
+
+        count_query = {key: value for key, value in query.items() if key != "status"}
+        status_docs = TaskResultHistoryDocument.aggregate(
+            [
+                {"$match": count_query},
+                {"$group": {"_id": "$status", "count": {"$sum": 1}}},
+            ]
+        ).run()
+        status_counts = {
+            str(row.get("_id") or "unknown"): int(row.get("count") or 0) for row in status_docs
+        }
+
+        return TaskResultListResponse(
+            items=[self._document_to_list_item(doc) for doc in docs],
+            total=total,
+            skip=skip,
+            limit=limit,
+            status_counts=dict(sorted(status_counts.items())),
+        )
+
+    @staticmethod
+    def _document_to_list_item(doc: TaskResultHistoryDocument) -> TaskResultListItem:
+        return TaskResultListItem(
+            task_id=doc.task_id,
+            task_name=doc.name,
+            qid=doc.qid,
+            chip_id=doc.chip_id,
+            status=doc.status,
+            execution_id=doc.execution_id,
+            user_id=doc.user_id,
+            username=doc.username,
+            message=doc.message,
+            has_stack_trace=bool(doc.stack_trace),
+            source_task_id=doc.source_task_id,
+            start_at=doc.start_at,
+            end_at=doc.end_at,
+            elapsed_time=parse_elapsed_time(doc.elapsed_time),
+            ai_review_status=doc.ai_review.status,
+        )
 
     def list_ai_reviews(
         self,
