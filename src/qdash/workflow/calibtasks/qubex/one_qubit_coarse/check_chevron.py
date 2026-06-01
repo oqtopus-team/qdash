@@ -1,6 +1,6 @@
 import math
 from collections.abc import Mapping
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 from qubex.contrib.experiment import estimate_qubit_frequency_from_chevron_adaptive
@@ -45,7 +45,7 @@ class CheckChevron(QubexTask):
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "qubit_frequency": ParameterModel(unit="GHz", description="Qubit bare frequency (coarse)"),
         "control_amplitude": ParameterModel(
-            unit="a.u.", description="Control pulse amplitude used for adaptive chevron"
+            unit="a.u.", description="Control pulse amplitude estimated by adaptive chevron"
         ),
     }
 
@@ -180,10 +180,37 @@ class CheckChevron(QubexTask):
             plot=False,
             save_image=False,
         )
-        result_data = cast("dict[str, Any]", dict(adaptive_result.data))
-        result_data["control_amplitude_used"] = result_data["amplitudes_used"][label]
+        result_data = self._adaptive_result_data(adaptive_result)
+        result_data["control_amplitude_used"] = self._control_amplitude_from_result(
+            result_data, label, control_amplitude
+        )
         result_data["figures"] = getattr(adaptive_result, "figures", {})
         return result_data
+
+    def _adaptive_result_data(self, adaptive_result: Any) -> dict[str, Any]:
+        data = getattr(adaptive_result, "data", adaptive_result)
+        if not isinstance(data, Mapping):
+            raise TypeError(
+                "estimate_qubit_frequency_from_chevron_adaptive returned "
+                f"unsupported data type: {type(data).__name__}"
+            )
+        return dict(data)
+
+    def _control_amplitude_from_result(
+        self, result: Mapping[str, Any], label: str, fallback: float
+    ) -> float:
+        for key in ("target_amplitudes", "amplitudes_used"):
+            values = result.get(key)
+            if isinstance(values, Mapping) and label in values:
+                return float(values[label])
+
+        results = result.get("results")
+        if isinstance(results, Mapping):
+            per_target = results.get(label)
+            if isinstance(per_target, Mapping) and "amplitude_used" in per_target:
+                return float(per_target["amplitude_used"])
+
+        return fallback
 
     def _build_figures(
         self, result: Mapping[str, Any], label: str, resonant_freq: float
@@ -193,6 +220,8 @@ class CheckChevron(QubexTask):
             preferred_keys = [
                 f"{label}_measurement",
                 f"{label}_transform",
+                f"{label}_search_measurement",
+                f"{label}_search_transform",
                 f"{label}_rough_measurement",
                 f"{label}_rough_transform",
             ]
