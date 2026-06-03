@@ -171,7 +171,7 @@ export function IssueKnowledgePageContent() {
 
       {/* Filter bar */}
       <div className="mb-4">
-        <form onSubmit={handleFilterSubmit} className="flex gap-2 items-center">
+        <form onSubmit={handleFilterSubmit} className="flex flex-wrap gap-2 items-center">
           <SearchInput
             value={filterInput}
             onChange={setFilterInput}
@@ -183,9 +183,14 @@ export function IssueKnowledgePageContent() {
             Filter
           </button>
           {taskNameFilter && (
-            <div className="flex items-center gap-1">
-              <span className="badge badge-sm badge-outline">task: {taskNameFilter}</span>
-              <button onClick={clearFilter} className="btn btn-ghost btn-xs p-0 h-auto min-h-0">
+            <div className="flex items-center gap-1 basis-full sm:basis-auto min-w-0">
+              <span className="badge badge-sm badge-outline min-w-0">
+                <span className="min-w-0 truncate">task: {taskNameFilter}</span>
+              </span>
+              <button
+                onClick={clearFilter}
+                className="btn btn-ghost btn-xs p-0 h-auto min-h-0 shrink-0"
+              >
                 <X className="h-3 w-3" />
               </button>
             </div>
