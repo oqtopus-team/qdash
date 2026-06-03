@@ -3,10 +3,11 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageSquare, Search, X, Lock, Unlock } from "lucide-react";
+import { MessageSquare, X, Lock, Unlock } from "lucide-react";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -148,25 +149,13 @@ export function IssuesPageContent() {
       {/* Filter bar */}
       <div className="mb-4">
         <form onSubmit={handleFilterSubmit} className="flex gap-2 items-center">
-          <label className="input input-bordered input-sm flex items-center gap-2 flex-1 max-w-sm">
-            <Search className="h-4 w-4 shrink-0 text-base-content/40" />
-            <input
-              type="text"
-              className="grow"
-              placeholder="Filter by task ID..."
-              value={filterInput}
-              onChange={(e) => setFilterInput(e.target.value)}
-            />
-            {filterInput && (
-              <button
-                type="button"
-                onClick={clearFilter}
-                className="btn btn-ghost btn-xs p-0 h-auto min-h-0 shrink-0"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </label>
+          <SearchInput
+            value={filterInput}
+            onChange={setFilterInput}
+            onClear={clearFilter}
+            placeholder="Filter by task ID..."
+            className="flex-1 max-w-sm"
+          />
           <button type="submit" className="btn btn-sm btn-primary">
             Filter
           </button>
