@@ -20,6 +20,7 @@ import {
   Inbox,
   LayoutDashboard,
   LayoutGrid,
+  ClipboardList,
   Snowflake,
   ListTodo,
   LogOut,
@@ -248,6 +249,12 @@ export function Sidebar() {
         },
         { href: "/execution", label: "Execution", icon: Zap },
         {
+          href: "/task-results",
+          label: "Task Results",
+          icon: ClipboardList,
+          match: "prefix",
+        },
+        {
           href: "/tasks",
           label: "Tasks",
           icon: ListTodo,
@@ -452,9 +459,12 @@ export function Sidebar() {
               <span>Dark Mode</span>
             </div>
             <input
+              id="sidebar-dark-mode-toggle"
+              name="darkMode"
               type="checkbox"
               className="toggle toggle-sm"
               checked={isDarkTheme}
+              aria-label="Dark Mode"
               onChange={toggleTheme}
             />
           </label>

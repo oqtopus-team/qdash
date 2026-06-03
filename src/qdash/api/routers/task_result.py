@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime  # noqa: TC003
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, Query
@@ -26,6 +27,7 @@ from qdash.api.schemas.task_result import (
     TaskHistoryResponse,
     TaskResultExcludeRequest,
     TaskResultExcludeResponse,
+    TaskResultListResponse,
     TimeSeriesData,
 )
 from qdash.api.services.flow_service import FlowService
@@ -34,6 +36,51 @@ from qdash.api.services.task_result_service import TaskResultService
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+
+@router.get(
+    "/task-results",
+    summary="List task results",
+    operation_id="listTaskResults",
+    response_model=TaskResultListResponse,
+    response_model_exclude_none=True,
+)
+def list_task_results(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
+    status: Annotated[str | None, Query(description="Task status filter")] = None,
+    chip_id: Annotated[str | None, Query(description="Chip ID filter")] = None,
+    task_name: Annotated[str | None, Query(description="Task name filter")] = None,
+    qid: Annotated[str | None, Query(description="Qubit or coupling ID filter")] = None,
+    execution_id: Annotated[str | None, Query(description="Execution ID filter")] = None,
+    username: Annotated[str | None, Query(description="Username filter")] = None,
+    start_from: Annotated[
+        datetime | None, Query(description="Inclusive start time lower bound")
+    ] = None,
+    start_to: Annotated[
+        datetime | None, Query(description="Inclusive start time upper bound")
+    ] = None,
+    message_contains: Annotated[
+        str | None, Query(description="Case-insensitive message search")
+    ] = None,
+    skip: Annotated[int, Query(ge=0, description="Number of rows to skip")] = 0,
+    limit: Annotated[int, Query(ge=1, le=100, description="Maximum rows to return")] = 50,
+) -> TaskResultListResponse:
+    """List task results for cross-task investigation."""
+    return service.list_task_results(
+        project_id=ctx.project_id,
+        status=status,
+        chip_id=chip_id,
+        task_name=task_name,
+        qid=qid,
+        execution_id=execution_id,
+        username=username,
+        start_from=start_from,
+        start_to=start_to,
+        message_contains=message_contains,
+        skip=skip,
+        limit=limit,
+    )
 
 
 # =============================================================================

@@ -122,6 +122,9 @@ class QubitFrequencyResult:
         return self.f12.frequency - self.f01.frequency
 
 
+RETRY_TRIM_MAX_ROWS = 2
+
+
 class QubitResponse:
     """Analyzes qubit spectroscopy data to extract frequency information.
 
@@ -386,17 +389,23 @@ def _retry_trim(
     ys: Sequence[float],
     zs: Sequence[Sequence[float]],
     config: EstimateQubitFrequencyConfig,
+    trim_rows: int = 1,
 ) -> tuple[
     Sequence[float], Sequence[float], Sequence[Sequence[float]], EstimateQubitFrequencyConfig
 ]:
-    """Drop the highest-power row and lower top_power to that row's value.
+    """Drop the highest-power rows and lower top_power to the trim boundary.
 
-    Used to recover from cases where the topmost power row carries spurious
+    Used to recover from cases where the topmost power rows carry spurious
     noise that prevents f01 detection.
     """
-    new_top_power = float(ys[-1])
-    new_ys = list(ys[:-1])
-    new_zs = list(zs[:-1])
+    if trim_rows <= 0:
+        raise ValueError("trim_rows must be positive")
+    if len(ys) - trim_rows < 2:
+        raise ValueError("trim would leave fewer than two y points")
+
+    new_top_power = float(ys[-trim_rows])
+    new_ys = list(ys[:-trim_rows])
+    new_zs = list(zs[:-trim_rows])
     new_config = EstimateQubitFrequencyConfig(
         binarize_threshold_sigma_plus=config.binarize_threshold_sigma_plus,
         binarize_threshold_sigma_minus=config.binarize_threshold_sigma_minus,
@@ -426,7 +435,8 @@ def estimate_qubit_frequency(
         config: Configuration for the estimation algorithm.
         retry_with_trim: If True and no f01 is detected on the first pass,
             drop the topmost power row (lowering ``top_power`` to that row)
-            and try again. Mitigates spurious noise on the highest-power row.
+            and try again. If f01 is still not detected, trim one additional
+            highest-power row and retry once more.
 
     Returns:
         QubitFrequencyResult containing f01 and f12 frequency information.
@@ -436,8 +446,15 @@ def estimate_qubit_frequency(
 
     qubit_response = QubitResponse(xs, ys, zs, config)
 
-    if qubit_response.f01 is None and retry_with_trim and len(ys) >= 3:
+    trimmed_rows = 0
+    while (
+        qubit_response.f01 is None
+        and retry_with_trim
+        and trimmed_rows < RETRY_TRIM_MAX_ROWS
+        and len(ys) >= 3
+    ):
         xs, ys, zs, config = _retry_trim(xs, ys, zs, config)
+        trimmed_rows += 1
         qubit_response = QubitResponse(xs, ys, zs, config)
 
     return QubitFrequencyResult(

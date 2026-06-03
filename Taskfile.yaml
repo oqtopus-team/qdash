@@ -76,6 +76,12 @@ tasks:
       - bun install
       - bun run docs:dev --host
 
+  docs-gif:
+    desc: "Record a docs user-guide GIF from a scenario (usage: task docs-gif -- login). Needs the local stack running (task dev-local)."
+    dotenv: [.env]
+    cmds:
+      - uv run --with playwright python3 docs/demos/record.py --scenario docs/demos/scenarios/{{.CLI_ARGS}}.yaml
+
   # =============================================================================
   # Lightweight local development (Nix shell + Docker services)
   # =============================================================================

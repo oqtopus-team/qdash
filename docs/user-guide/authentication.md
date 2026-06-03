@@ -107,7 +107,11 @@ curl -X POST "https://your-qdash-instance/auth/reset-password" \
 
 ### Login
 
-Authenticate with username and password to receive an access token.
+Sign in from the `/login` page with your user ID and password. On success QDash takes you to the Execution page for your default project.
+
+![Signing in to QDash](/images/guides/login.gif)
+
+For programmatic access, authenticate against the API to receive an access token.
 
 ```bash
 curl -X POST "https://your-qdash-instance/auth/login" \
