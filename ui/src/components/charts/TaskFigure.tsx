@@ -41,7 +41,6 @@ function ExpandableImage({
   }
 
   return (
-    // `shrink-0` keeps the image at its natural size inside horizontally
     <div className="relative group inline-flex h-full min-w-0 min-h-0 shrink-0">
       {/* eslint-disable-next-line @next/next/no-img-element -- dynamic API image with native sizing */}
       <img src={src} alt={alt} className={className} onError={() => setHasError(true)} />
@@ -130,9 +129,6 @@ export function TaskFigure({ path, jsonFigurePath, taskId, qid, className = "" }
     );
   }
 
-  // Multiple figures: lay them out in a horizontally scrollable row so each
-  // image keeps its natural aspect ratio instead of shrinking as more are
-  // added. Each image keeps its own expand-to-lightbox control. (#1050)
   return (
     <div className="flex h-full w-full items-center gap-2 overflow-x-auto">
       {normalizedPaths.map((p, i) => (
