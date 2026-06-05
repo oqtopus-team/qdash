@@ -22,13 +22,11 @@ function ExpandableImage({
   src,
   alt,
   className,
-  wrapperClassName = "",
   jsonFigurePath,
 }: {
   src: string;
   alt: string;
   className: string;
-  wrapperClassName?: string;
   jsonFigurePath?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,16 +34,16 @@ function ExpandableImage({
 
   if (hasError) {
     return (
-      <div
-        className={`flex items-center justify-center h-full text-base-content/40 text-xs ${wrapperClassName}`}
-      >
+      <div className="flex items-center justify-center h-full text-base-content/40 text-xs">
         Failed to load image
       </div>
     );
   }
 
   return (
-    <div className={`relative group inline-flex h-full min-w-0 min-h-0 ${wrapperClassName}`}>
+    // `shrink-0` keeps the image at its natural size inside horizontally
+    // scrollable figure rows instead of shrinking as siblings are added (#1050).
+    <div className="relative group inline-flex h-full min-w-0 min-h-0 shrink-0">
       {/* eslint-disable-next-line @next/next/no-img-element -- dynamic API image with native sizing */}
       <img src={src} alt={alt} className={className} onError={() => setHasError(true)} />
       <button
@@ -144,7 +142,6 @@ export function TaskFigure({ path, jsonFigurePath, taskId, qid, className = "" }
           src={figureUrl(p)}
           alt={`Result for QID ${qid}`}
           className={className}
-          wrapperClassName="shrink-0"
           jsonFigurePath={normalizedJsonPaths[i]}
         />
       ))}
