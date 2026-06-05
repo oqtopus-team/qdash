@@ -22,11 +22,13 @@ function ExpandableImage({
   src,
   alt,
   className,
+  wrapperClassName = "",
   jsonFigurePath,
 }: {
   src: string;
   alt: string;
   className: string;
+  wrapperClassName?: string;
   jsonFigurePath?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,14 +36,16 @@ function ExpandableImage({
 
   if (hasError) {
     return (
-      <div className="flex items-center justify-center h-full text-base-content/40 text-xs">
+      <div
+        className={`flex items-center justify-center h-full text-base-content/40 text-xs ${wrapperClassName}`}
+      >
         Failed to load image
       </div>
     );
   }
 
   return (
-    <div className="relative group inline-flex h-full min-w-0 min-h-0">
+    <div className={`relative group inline-flex h-full min-w-0 min-h-0 ${wrapperClassName}`}>
       {/* eslint-disable-next-line @next/next/no-img-element -- dynamic API image with native sizing */}
       <img src={src} alt={alt} className={className} onError={() => setHasError(true)} />
       <button
@@ -129,14 +133,18 @@ export function TaskFigure({ path, jsonFigurePath, taskId, qid, className = "" }
     );
   }
 
+  // Multiple figures: lay them out in a horizontally scrollable row so each
+  // image keeps its natural aspect ratio instead of shrinking as more are
+  // added. Each image keeps its own expand-to-lightbox control. (#1050)
   return (
-    <div className="flex flex-wrap gap-2 overflow-hidden w-full h-full">
+    <div className="flex h-full w-full items-center gap-2 overflow-x-auto">
       {normalizedPaths.map((p, i) => (
         <ExpandableImage
           key={p}
           src={figureUrl(p)}
           alt={`Result for QID ${qid}`}
-          className={`${className} max-w-full max-h-full`}
+          className={className}
+          wrapperClassName="shrink-0"
           jsonFigurePath={normalizedJsonPaths[i]}
         />
       ))}
