@@ -42,7 +42,6 @@ function ExpandableImage({
 
   return (
     // `shrink-0` keeps the image at its natural size inside horizontally
-    // scrollable figure rows instead of shrinking as siblings are added (#1050).
     <div className="relative group inline-flex h-full min-w-0 min-h-0 shrink-0">
       {/* eslint-disable-next-line @next/next/no-img-element -- dynamic API image with native sizing */}
       <img src={src} alt={alt} className={className} onError={() => setHasError(true)} />
