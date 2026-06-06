@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useCallback, useState, useEffect } from "react";
 
 import { Book, GitBranch, Moon, Sun } from "lucide-react";
@@ -15,7 +14,6 @@ export default function LoginPage() {
   const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const router = useRouter();
   const { login: authLogin, loading } = useAuth();
   const { theme, setTheme } = useTheme();
 
@@ -32,7 +30,11 @@ export default function LoginPage() {
 
     try {
       await authLogin(userName, password);
-      router.replace("/execution");
+      // Use a hard navigation (consistent with logout) so the request to the
+      // protected route carries the freshly-set access_token cookie through the
+      // server middleware. A soft router.replace() races the cookie write and
+      // bounces back to /login. See proxy.ts auth check.
+      window.location.href = "/execution";
     } catch {
       setError("Login failed. Please check your user ID and password.");
     }

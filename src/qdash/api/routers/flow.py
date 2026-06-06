@@ -1,9 +1,12 @@
 """API router for user-defined flows and scheduling."""
 
+import json
+from collections.abc import Iterator
 from logging import getLogger
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 
 from qdash.api.dependencies import (
     get_flow_schedule_service,
@@ -19,6 +22,8 @@ from qdash.api.schemas.flow import (
     GetFlowResponse,
     ListFlowSchedulesResponse,
     ListFlowsResponse,
+    RunCodexAgentRequest,
+    RunCodexAgentResponse,
     SaveFlowRequest,
     SaveFlowResponse,
     ScheduleFlowRequest,
@@ -221,6 +226,43 @@ async def execute_flow(
 ) -> ExecuteFlowResponse:
     """Execute a Flow via Prefect deployment."""
     return await service.execute_flow(name, request, ctx.user.username, ctx.project_id)
+
+
+@router.post(
+    "/flows/{name}/agent/codex",
+    response_model=RunCodexAgentResponse,
+    summary="Edit a flow with host Codex",
+    operation_id="runCodexFlowAgent",
+)
+async def run_codex_flow_agent(
+    name: str,
+    request: RunCodexAgentRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[FlowService, Depends(get_flow_service)],
+) -> RunCodexAgentResponse:
+    """Run the host Codex CLI against a temporary copy of a flow."""
+    return await service.run_codex_agent(name, request, ctx.project_id)
+
+
+@router.post(
+    "/flows/{name}/agent/codex/stream",
+    summary="Stream host Codex flow editing events",
+    operation_id="streamCodexFlowAgent",
+    include_in_schema=False,
+)
+async def stream_codex_flow_agent(
+    name: str,
+    request: RunCodexAgentRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[FlowService, Depends(get_flow_service)],
+) -> StreamingResponse:
+    """Stream host Codex app-server events as server-sent events."""
+
+    def event_stream() -> Iterator[str]:
+        for event in service.stream_codex_agent_events(name, request, ctx.project_id):
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @router.delete(

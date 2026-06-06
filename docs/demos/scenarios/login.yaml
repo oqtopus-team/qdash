@@ -1,0 +1,38 @@
+name: login
+description: Sign in to QDash from the login page and land on the dashboard.
+target:
+  url: "http://localhost:${UI_PORT}/login"
+  viewport: "1280x800"
+# No `auth` block: this scenario *demonstrates* logging in, so we record the
+# form interaction itself rather than pre-authenticating. The password is read
+# from .env and is only ever rendered as masked dots in the recording.
+steps:
+  - action: navigate
+    label: open-login
+  - action: wait
+    value: 900
+  - action: fill
+    label: type-username
+    target: "Enter your user ID"
+    value: "${QDASH_ADMIN_USERNAME}"
+  - action: wait
+    value: 300
+  - action: fill
+    label: type-password
+    target: "Enter your password"
+    value: "${QDASH_ADMIN_PASSWORD}"
+  - action: wait
+    value: 400
+  - action: click
+    label: sign-in
+    target: "Sign In"
+  # On success the app hard-navigates to /execution. Wait for a sidebar item
+  # that only exists once authenticated ("Dashboard" is avoided because it also
+  # appears in the login page hero copy).
+  - action: waitForText
+    text: "Provenance"
+    timeoutMs: 20000
+  - action: wait
+    value: 1500
+  - action: capture
+    label: "01-signed-in"
