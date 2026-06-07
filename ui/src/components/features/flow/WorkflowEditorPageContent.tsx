@@ -1490,6 +1490,11 @@ export function WorkflowEditorPageContent() {
                         onChange={(e) => setDefaultInterval(e.target.value)}
                       />
                     </label>
+
+                    <div className="divider my-1"></div>
+                    <FlowSchedulePanel flowName={name} />
+                    <div className="divider my-1"></div>
+
                     <button
                       type="button"
                       onClick={() => setShowPropertiesModal(true)}
