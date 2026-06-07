@@ -1407,7 +1407,7 @@ export function WorkflowEditorPageContent() {
                   </div>
 
                   <div className="space-y-3">
-                    <label className="form-control">
+                    <label className="form-control flex flex-col gap-1">
                       <span className="label py-1">
                         <span className="label-text text-xs">Description</span>
                       </span>
@@ -1420,7 +1420,7 @@ export function WorkflowEditorPageContent() {
                         onChange={(e) => setDescription(e.target.value)}
                       />
                     </label>
-                    <label className="form-control">
+                    <label className="form-control flex flex-col gap-1">
                       <span className="label py-1">
                         <span className="label-text text-xs">Entrypoint Function</span>
                       </span>
@@ -1434,7 +1434,7 @@ export function WorkflowEditorPageContent() {
                         onChange={(e) => setFlowFunctionName(e.target.value)}
                       />
                     </label>
-                    <label className="form-control">
+                    <label className="form-control flex flex-col gap-1">
                       <span className="label py-1">
                         <span className="label-text text-xs">Username *</span>
                       </span>
@@ -1448,7 +1448,7 @@ export function WorkflowEditorPageContent() {
                         onChange={(e) => setUsername(e.target.value)}
                       />
                     </label>
-                    <label className="form-control">
+                    <label className="form-control flex flex-col gap-1">
                       <span className="label py-1">
                         <span className="label-text text-xs">Chip ID *</span>
                       </span>
@@ -1462,7 +1462,7 @@ export function WorkflowEditorPageContent() {
                         onChange={(e) => setChipId(e.target.value)}
                       />
                     </label>
-                    <label className="form-control">
+                    <label className="form-control flex flex-col gap-1">
                       <span className="label py-1">
                         <span className="label-text text-xs">Tags</span>
                       </span>
@@ -1476,7 +1476,7 @@ export function WorkflowEditorPageContent() {
                         onChange={(e) => setTags(e.target.value)}
                       />
                     </label>
-                    <label className="form-control">
+                    <label className="form-control flex flex-col gap-1">
                       <span className="label py-1">
                         <span className="label-text text-xs">Default Interval (ns)</span>
                       </span>
