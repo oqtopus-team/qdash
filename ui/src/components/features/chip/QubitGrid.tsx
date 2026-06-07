@@ -218,8 +218,13 @@ const GridCell = memo(function GridCell({
       } ${isSelectionMode && !canBeSelected ? "opacity-40 cursor-not-allowed" : ""}`}
     >
       {task.figure_path && figurePath && (
-        <div className="absolute inset-1 [&_button]:hidden">
-          <TaskFigure path={figurePath} qid={qid} className="w-full h-full object-contain" />
+        <div className="absolute inset-1">
+          <TaskFigure
+            path={figurePath}
+            qid={qid}
+            className="w-full h-full object-contain"
+            hideExpandButton
+          />
         </div>
       )}
       {showLabels && (

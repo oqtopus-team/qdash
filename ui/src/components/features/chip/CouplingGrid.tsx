@@ -789,11 +789,12 @@ export function CouplingGrid({
               }`}
             >
               {figurePath && (
-                <div className="absolute inset-1 [&_button]:hidden">
+                <div className="absolute inset-1">
                   <TaskFigure
                     path={figurePath}
                     qid={String(task.couplingId)}
                     className="w-full h-full object-contain"
+                    hideExpandButton
                   />
                 </div>
               )}
