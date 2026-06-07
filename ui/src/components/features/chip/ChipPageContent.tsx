@@ -528,23 +528,23 @@ export function ChipPageContent() {
                     }`}
                   >
                     <div
-                      className="p-4 cursor-pointer flex justify-between items-center hover:bg-base-200/50 transition-colors"
+                      className="p-4 cursor-pointer flex flex-wrap justify-between gap-2 items-center hover:bg-base-200/50 transition-colors"
                       onClick={() => toggleMuxExpansion(muxId)}
                     >
                       <div className="text-xl font-medium flex items-center gap-2">
-                        MUX {muxDetail.mux_id}
+                        <span className="whitespace-nowrap">MUX {muxDetail.mux_id}</span>
                         {updateInfo.isRecent && (
                           <div className="badge badge-primary gap-2 rounded-lg">
                             <div className="w-2 h-2 bg-primary-content rounded-full animate-ping" />
                             New
                           </div>
                         )}
-                        <div className="badge badge-ghost gap-2 rounded-lg">
+                        <div className="badge badge-ghost gap-2 rounded-lg whitespace-nowrap">
                           {Object.keys(taskGroups).length} Tasks
                         </div>
                       </div>
                       <div
-                        className={`text-sm ${
+                        className={`text-sm whitespace-nowrap ${
                           updateInfo.isRecent ? "text-primary font-medium" : "text-base-content/60"
                         }`}
                       >
