@@ -301,12 +301,22 @@ tasks:
   scan-leaks:
     desc: Run Betterleaks scan over git history (full repository)
     cmds:
-      - betterleaks git . --verbose
+      - |
+        if command -v betterleaks >/dev/null 2>&1; then
+          betterleaks git . --verbose
+        else
+          echo "betterleaks not installed; skipping leak scan"
+        fi
 
   scan-leaks-staged:
     desc: Run Betterleaks on staged files only (same as pre-commit)
     cmds:
-      - betterleaks git . --pre-commit --staged --verbose
+      - |
+        if command -v betterleaks >/dev/null 2>&1; then
+          betterleaks git . --pre-commit --staged --verbose
+        else
+          echo "betterleaks not installed; skipping staged leak scan"
+        fi
 
   # =============================================================================
   # Local Check (run before push)
@@ -371,6 +381,7 @@ tasks:
     dir: ui
     cmds:
       - bun run test:run
+      - bunx next typegen
       - bunx tsc --noEmit
       - bun run lint
       - bun run fmt:check
