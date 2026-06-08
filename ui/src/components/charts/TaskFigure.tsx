@@ -41,7 +41,7 @@ function ExpandableImage({
   }
 
   return (
-    <div className="relative group inline-flex h-full min-w-0 min-h-0">
+    <div className="relative group inline-flex h-full min-w-0 min-h-0 shrink-0">
       {/* eslint-disable-next-line @next/next/no-img-element -- dynamic API image with native sizing */}
       <img src={src} alt={alt} className={className} onError={() => setHasError(true)} />
       <button
@@ -130,13 +130,13 @@ export function TaskFigure({ path, jsonFigurePath, taskId, qid, className = "" }
   }
 
   return (
-    <div className="flex flex-wrap gap-2 overflow-hidden w-full h-full">
+    <div className="flex h-full w-full items-center gap-2 overflow-x-auto">
       {normalizedPaths.map((p, i) => (
         <ExpandableImage
           key={p}
           src={figureUrl(p)}
           alt={`Result for QID ${qid}`}
-          className={`${className} max-w-full max-h-full`}
+          className={className}
           jsonFigurePath={normalizedJsonPaths[i]}
         />
       ))}
