@@ -1245,7 +1245,7 @@ export function WorkflowEditorPageContent() {
         {/* Main Editor Area */}
         <div className="flex-1 flex overflow-hidden mb-4">
           {/* Activity Bar */}
-          <div className="max-sm:hidden flex w-12 flex-col items-center border-r border-base-300 bg-base-200">
+          <div className="flex w-12 flex-col items-center border-r border-base-300 bg-base-200">
             <div className="flex flex-1 flex-col items-center gap-1 py-2">
               {sidePanelItems.map((item) => {
                 const Icon = item.icon;
@@ -1294,8 +1294,14 @@ export function WorkflowEditorPageContent() {
           </div>
 
           {/* Side Panel */}
-          {isSidebarVisible && (
-            <div className="max-sm:hidden flex w-72 min-w-72 flex-col border-r border-base-300 bg-base-200">
+          <div
+            className={`flex flex-col overflow-hidden bg-base-200 transition-all duration-200 ${
+              isSidebarVisible
+                ? "w-56 min-w-56 border-r border-base-300 sm:w-72 sm:min-w-72"
+                : "w-0 min-w-0"
+            }`}
+          >
+            <div className="flex h-full w-56 min-w-56 flex-col sm:w-72 sm:min-w-72">
               <div className="flex h-9 items-center justify-between border-b border-base-300 px-3">
                 <span className="text-xs font-semibold uppercase tracking-wider text-base-content/60">
                   {sidePanelItems.find((item) => item.id === activeSidePanel)?.label}
@@ -1513,7 +1519,7 @@ export function WorkflowEditorPageContent() {
                 </div>
               )}
             </div>
-          )}
+          </div>
           {/* Editor with Tab Switcher */}
           <div className="flex-1 flex flex-col">
             {/* Tab Bar */}
