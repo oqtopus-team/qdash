@@ -1,3 +1,4 @@
+\.betterleaks\.toml
 \.gitleaks\.toml
 docs/design/api-testing-guidelines\.md
 docs/development/api/testing\.md

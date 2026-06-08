@@ -83,6 +83,8 @@ from qdash.api.schemas.task_result import (
     LatestTaskResultResponse,
     TaskHistoryResponse,
     TaskResult,
+    TaskResultListItem,
+    TaskResultListResponse,
     TimeSeriesData,
     TimeSeriesProjection,
 )
@@ -156,6 +158,8 @@ __all__ = [
     "TaskHistoryResponse",
     "TaskResponse",
     "TaskResult",
+    "TaskResultListItem",
+    "TaskResultListResponse",
     "TaskResultResponse",
     "TimeSeriesData",
     "TimeSeriesProjection",

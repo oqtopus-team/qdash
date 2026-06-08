@@ -123,6 +123,7 @@ def create_chip(
             qubit_count=chip.size,  # Qubits are created based on size
             coupling_count=0,  # Will be populated by ChipInitializer
             installed_at=chip.installed_at,
+            activity_status=chip.activity_status,
         )
     except ValueError as e:
         # Handle validation errors (duplicate chip, invalid size, etc.)

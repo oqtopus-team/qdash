@@ -4783,6 +4783,252 @@
         }
       }
     },
+    "/task-results": {
+      "get": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "List task results",
+        "description": "List task results for cross-task investigation.",
+        "operationId": "listTaskResults",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Task status filter",
+              "title": "Status"
+            },
+            "description": "Task status filter"
+          },
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Chip ID filter",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID filter"
+          },
+          {
+            "name": "task_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Task name filter",
+              "title": "Task Name"
+            },
+            "description": "Task name filter"
+          },
+          {
+            "name": "qid",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Qubit or coupling ID filter",
+              "title": "Qid"
+            },
+            "description": "Qubit or coupling ID filter"
+          },
+          {
+            "name": "execution_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Execution ID filter",
+              "title": "Execution Id"
+            },
+            "description": "Execution ID filter"
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Username filter",
+              "title": "Username"
+            },
+            "description": "Username filter"
+          },
+          {
+            "name": "start_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start time lower bound",
+              "title": "Start From"
+            },
+            "description": "Inclusive start time lower bound"
+          },
+          {
+            "name": "start_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start time upper bound",
+              "title": "Start To"
+            },
+            "description": "Inclusive start time upper bound"
+          },
+          {
+            "name": "message_contains",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive message search",
+              "title": "Message Contains"
+            },
+            "description": "Case-insensitive message search"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of rows to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of rows to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum rows to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum rows to return"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResultListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task-results/qubits/latest": {
       "get": {
         "tags": [
@@ -8980,6 +9226,80 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExecuteFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flows/{name}/agent/codex": {
+      "post": {
+        "tags": [
+          "flow"
+        ],
+        "summary": "Edit a flow with host Codex",
+        "description": "Run the host Codex CLI against a temporary copy of a flow.",
+        "operationId": "runCodexFlowAgent",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCodexAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunCodexAgentResponse"
                 }
               }
             }
@@ -14835,6 +15155,15 @@
               }
             ],
             "title": "Installed At"
+          },
+          "activity_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "title": "Activity Status",
+            "default": "active"
           },
           "current_cooldown_id": {
             "anyOf": [
@@ -21171,7 +21500,7 @@
               }
             ],
             "title": "Retry With Trim",
-            "description": "If true, retry after trimming the highest-power row when no f01 is found."
+            "description": "If true, retry after trimming the highest-power row when no f01 is found. If f01 is still not found, trim one additional row and retry once more."
           }
         },
         "type": "object",
@@ -21277,6 +21606,18 @@
             ],
             "title": "Bare Shift Strength Limit",
             "description": "Strength cutoff for the high_frequency_strength estimator."
+          },
+          "resonator_assignment_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resonator Assignment Pattern",
+            "description": "Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2]."
           }
         },
         "type": "object",
@@ -21476,6 +21817,81 @@
         ],
         "title": "RecommendedTaskResponse",
         "description": "Response model for a recommended recalibration task.\n\nAttributes\n----------\ntask_name : str\n    Name of the task to re-run\npriority : int\n    Priority level (1=highest, larger=lower priority)\naffected_parameters : list[str]\n    Parameters that would be recalibrated by this task\naffected_qids : list[str]\n    Qubit/coupling IDs affected\nreason : str\n    Human-readable explanation"
+      },
+      "RunCodexAgentRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Current Python code content"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "description": "User editing request"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context",
+            "description": "Additional workflow authoring context",
+            "default": ""
+          },
+          "flow_function_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Function Name",
+            "description": "Expected public flow entrypoint to preserve"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "prompt"
+        ],
+        "title": "RunCodexAgentRequest",
+        "description": "Request to edit a flow with the host Codex CLI."
+      },
+      "RunCodexAgentResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Edited Python code content"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Codex final response or execution summary",
+            "default": ""
+          },
+          "diff": {
+            "type": "string",
+            "title": "Diff",
+            "description": "Unified diff between original and edited code",
+            "default": ""
+          },
+          "command": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Command",
+            "description": "Codex command that was executed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "command"
+        ],
+        "title": "RunCodexAgentResponse",
+        "description": "Response from the host Codex workflow editing bridge."
       },
       "SaveFileRequest": {
         "properties": {
@@ -22049,6 +22465,11 @@
             "type": "string",
             "title": "Timezone",
             "default": "Asia/Tokyo"
+          },
+          "enable_local_codex_agent": {
+            "type": "boolean",
+            "title": "Enable Local Codex Agent",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -23115,6 +23536,163 @@
         "title": "TaskResultExcludeResponse",
         "description": "Response after toggling exclusion on a task result."
       },
+      "TaskResultListItem": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
+          "has_stack_trace": {
+            "type": "boolean",
+            "title": "Has Stack Trace",
+            "default": false
+          },
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "elapsed_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "duration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Time"
+          },
+          "ai_review_status": {
+            "type": "string",
+            "title": "Ai Review Status",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "task_name",
+          "qid",
+          "chip_id",
+          "status",
+          "execution_id"
+        ],
+        "title": "TaskResultListItem",
+        "description": "Compact task result row for investigation lists."
+      },
+      "TaskResultListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TaskResultListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "status_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Status Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit",
+          "status_counts"
+        ],
+        "title": "TaskResultListResponse",
+        "description": "Paginated task result list response."
+      },
       "TaskResultResponse": {
         "properties": {
           "task_id": {
@@ -23426,6 +24004,21 @@
               }
             ],
             "title": "Topology Id"
+          },
+          "activity_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "inactive"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Status"
           },
           "note": {
             "anyOf": [

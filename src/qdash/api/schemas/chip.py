@@ -1,7 +1,7 @@
 """Schema definitions for chip router."""
 
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
@@ -32,6 +32,7 @@ class ChipResponse(BaseModel):
     qubit_count: int = 0
     coupling_count: int = 0
     installed_at: datetime | None = None
+    activity_status: Literal["active", "inactive"] = "active"
     current_cooldown_id: str | None = None
     note: NoteModel = Field(default_factory=NoteModel)
 
@@ -56,6 +57,7 @@ class UpdateChipRequest(BaseModel):
     """Body for updating chip metadata. All fields optional."""
 
     topology_id: str | None = None
+    activity_status: Literal["active", "inactive"] | None = None
     note: str | None = Field(
         default=None,
         max_length=5000,

@@ -279,7 +279,12 @@ export function FilesPageContent() {
 
   const handleContentChange = (value: string | undefined) => {
     setFileContent(value || "");
-    setHasUnsavedChanges(true);
+    // Only flag unsaved changes when the editor is unlocked (the user can actually type).
+    // @monaco-editor/react fires onChange for programmatic setValue() updates even while
+    // read-only, so loading/switching a file would otherwise mark it dirty by mistake.
+    if (!isEditorLocked) {
+      setHasUnsavedChanges(true);
+    }
   };
 
   const getLanguage = (filename: string): string => {

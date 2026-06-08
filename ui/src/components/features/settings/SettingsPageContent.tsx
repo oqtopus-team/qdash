@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Cpu } from "lucide-react";
+import { Check, Copy, Cpu } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { ApiAccessTokenPanel } from "@/components/features/settings/ApiAccessTokenPanel";
@@ -226,8 +226,9 @@ function ProfileSettingsPanel() {
 function ProjectMembersPanel() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { currentProject, projectId, isOwner } = useProject();
+  const { currentProject, projects, projectId, isOwner, switchProject } = useProject();
   const [inviteUsername, setInviteUsername] = useState("");
+  const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null);
   const [inviteRole, setInviteRole] = useState<ProjectRole>("viewer");
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -254,6 +255,12 @@ function ProjectMembersPanel() {
     queryClient.invalidateQueries({
       queryKey: getListProjectMembersQueryKey(projectId),
     });
+  };
+
+  const handleCopyProjectId = async (id: string) => {
+    await navigator.clipboard.writeText(id);
+    setCopiedProjectId(id);
+    setTimeout(() => setCopiedProjectId(null), 2000);
   };
 
   const handleInvite = async () => {
@@ -319,6 +326,81 @@ function ProjectMembersPanel() {
             </div>
             <div className={`badge ${isOwner ? "badge-secondary" : "badge-ghost"} w-fit`}>
               {isOwner ? "Owner controls" : "Read only"}
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
+            <div className="rounded-lg bg-base-100 p-4">
+              <div className="text-xs font-semibold uppercase text-base-content/50">
+                Current project ID
+              </div>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <code className="min-w-0 flex-1 rounded bg-base-300 px-3 py-2 text-sm break-all">
+                  {projectId ?? "No project selected"}
+                </code>
+                <button
+                  className={`btn btn-sm ${copiedProjectId === projectId ? "btn-success" : "btn-ghost"}`}
+                  disabled={!projectId}
+                  onClick={() => projectId && handleCopyProjectId(projectId)}
+                  type="button"
+                >
+                  {copiedProjectId === projectId ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                  {copiedProjectId === projectId ? "Copied" : "Copy"}
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-base-100 p-4">
+              <div className="text-xs font-semibold uppercase text-base-content/50">
+                Your projects
+              </div>
+              <div className="mt-2 flex max-h-48 flex-col gap-2 overflow-y-auto">
+                {projects.length === 0 ? (
+                  <span className="text-sm text-base-content/60">No projects available</span>
+                ) : (
+                  projects.map((project) => (
+                    <div
+                      className={`rounded border p-2 ${
+                        project.project_id === projectId
+                          ? "border-primary bg-primary/10"
+                          : "border-base-300"
+                      }`}
+                      key={project.project_id}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <button
+                          className="min-w-0 text-left"
+                          onClick={() => switchProject(project.project_id)}
+                          type="button"
+                        >
+                          <div className="truncate text-sm font-medium">{project.name}</div>
+                          <div className="font-mono text-xs text-base-content/60 break-all">
+                            {project.project_id}
+                          </div>
+                        </button>
+                        <button
+                          className={`btn btn-square btn-ghost btn-xs ${
+                            copiedProjectId === project.project_id ? "btn-success" : ""
+                          }`}
+                          onClick={() => handleCopyProjectId(project.project_id)}
+                          title="Copy project ID"
+                          type="button"
+                        >
+                          {copiedProjectId === project.project_id ? (
+                            <Check className="h-3 w-3" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 

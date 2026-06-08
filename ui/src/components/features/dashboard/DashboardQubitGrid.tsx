@@ -24,6 +24,8 @@ interface DashboardQubitGridProps {
   maxCellSize?: number;
   /** Set of qubit IDs that have a note for the metric this grid represents. */
   notedQids?: Set<string>;
+  /** Set of qubit IDs that have a target-level note. */
+  targetNotedQids?: Set<string>;
   /**
    * Set of qubit IDs that have notes on OTHER metrics (not this one). Used to
    * render a subtle indicator so users know to click to read the cross-metric
@@ -77,6 +79,7 @@ export function DashboardQubitGrid({
   colors,
   maxCellSize = 60,
   notedQids,
+  targetNotedQids,
   crossMetricNotedQids,
   notesByTarget,
   metricKey,
@@ -170,12 +173,24 @@ export function DashboardQubitGrid({
         const value = metric?.value ?? null;
         const bg = value !== null ? pickColor(value, autoMin, autoMax, colors) : null;
         const hasNote = notedQids?.has(qid) ?? false;
-        const hasCrossMetricNote = !hasNote && (crossMetricNotedQids?.has(qid) ?? false);
+        const hasTargetNote = targetNotedQids?.has(qid) ?? false;
+        const hasCrossMetricNote =
+          !hasNote && !hasTargetNote && (crossMetricNotedQids?.has(qid) ?? false);
         const handleClick = () => onQubitClick?.(qid);
         const titleText =
           (value !== null ? `${qid}: ${value.toFixed(4)} ${unit}` : `${qid}: No data`) +
-          (hasNote ? " · has note" : hasCrossMetricNote ? " · note on other metric" : "") +
-          (onQubitClick ? " (click to edit note)" : "");
+          (hasNote
+            ? " · has metric note"
+            : hasTargetNote
+              ? " · has target note"
+              : hasCrossMetricNote
+                ? " · note on other metric"
+                : "") +
+          (onQubitClick
+            ? value !== null
+              ? " (click to edit metric note)"
+              : " (click to edit target note)"
+            : "");
         const Tag = onQubitClick ? "button" : "div";
         return (
           <Tag
@@ -203,10 +218,10 @@ export function DashboardQubitGrid({
             >
               {qid}
             </span>
-            {hasNote && (
+            {(hasNote || hasTargetNote) && (
               <span
                 className="absolute top-1 right-1 rounded-full bg-warning/90 text-warning-content p-0.5 shadow"
-                title="Has note"
+                title={hasNote ? "Has metric note" : "Has target note"}
               >
                 <StickyNote className="h-3 w-3" />
               </span>

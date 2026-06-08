@@ -7,6 +7,6 @@
  */
 
 /**
- * If true, retry after trimming the highest-power row when no f01 is found.
+ * If true, retry after trimming the highest-power row when no f01 is found. If f01 is still not found, trim one additional row and retry once more.
  */
 export type ReanalyzeQubitSpectroscopyParamsRetryWithTrim = boolean | null;

@@ -57,6 +57,7 @@ class _TaskResultRepo:
 def _doc(task_id: str, qid: str, end_at: datetime) -> _TaskResultDoc:
     return _TaskResultDoc(
         project_id="proj-1",
+        user_id="user-1",
         username="alice",
         task_id=task_id,
         name="CheckRabi",
@@ -81,6 +82,7 @@ def _doc(task_id: str, qid: str, end_at: datetime) -> _TaskResultDoc:
         execution_id=f"exec-{task_id}",
         tags=[],
         chip_id="chip-1",
+        source_task_id=None,
         ai_review=AiReviewModel(),
         user_note=NoteModel(),
         ai_review_note=NoteModel(),
@@ -101,6 +103,90 @@ def _service(repo: _TaskResultRepo) -> TaskResultService:
         chip_repository=cast("ChipRepository", _ChipRepo()),
         task_result_repository=cast("TaskResultHistoryRepository", repo),
     )
+
+
+def test_list_task_results_filters_failed_rows_and_paginates(monkeypatch: Any) -> None:
+    now = datetime(2026, 5, 5, tzinfo=timezone.utc)
+    docs = [
+        _doc("failed-q0", "0", now),
+        _doc("failed-q1", "1", now - timedelta(minutes=5)),
+        _doc("completed-q2", "2", now - timedelta(minutes=10)),
+    ]
+    docs[0].status = "failed"
+    docs[0].message = "RuntimeError: bad calibration"
+    docs[0].stack_trace = "Traceback..."
+    docs[1].status = "failed"
+    docs[1].message = "Timeout waiting for backend"
+
+    class _Finder:
+        def __init__(self, rows: list[_TaskResultDoc]) -> None:
+            self.rows = rows
+            self.offset = 0
+            self.page_limit: int | None = None
+
+        def count(self) -> int:
+            return len(self.rows)
+
+        def sort(self, sort: list[tuple[str, Any]]) -> _Finder:
+            self.rows = sorted(
+                self.rows,
+                key=lambda doc: (doc.start_at or datetime.min, doc.task_id),
+                reverse=True,
+            )
+            return self
+
+        def skip(self, skip: int) -> _Finder:
+            self.offset = skip
+            return self
+
+        def limit(self, limit: int) -> _Finder:
+            self.page_limit = limit
+            return self
+
+        def run(self) -> list[_TaskResultDoc]:
+            end = None if self.page_limit is None else self.offset + self.page_limit
+            return self.rows[self.offset : end]
+
+    class _Aggregate:
+        def run(self) -> list[dict[str, Any]]:
+            return [{"_id": "completed", "count": 1}, {"_id": "failed", "count": 2}]
+
+    class _Document:
+        @staticmethod
+        def find(query: dict[str, Any]) -> _Finder:
+            filtered = [
+                doc
+                for doc in docs
+                if doc.project_id == query["project_id"]
+                and (not query.get("status") or doc.status == query["status"])
+                and (not query.get("chip_id") or doc.chip_id == query["chip_id"])
+                and (not query.get("message") or "calibration" in doc.message)
+            ]
+            return _Finder(filtered)
+
+        @staticmethod
+        def aggregate(pipeline: list[dict[str, Any]]) -> _Aggregate:
+            return _Aggregate()
+
+    import qdash.dbmodel.task_result_history as task_result_history
+
+    monkeypatch.setattr(task_result_history, "TaskResultHistoryDocument", _Document)
+
+    response = _service(_TaskResultRepo([])).list_task_results(
+        project_id="proj-1",
+        status="failed",
+        chip_id="chip-1",
+        message_contains="calibration",
+        skip=0,
+        limit=10,
+    )
+
+    assert response.total == 1
+    assert response.status_counts == {"completed": 1, "failed": 2}
+    assert response.items[0].task_id == "failed-q0"
+    assert response.items[0].status == "failed"
+    assert response.items[0].message == "RuntimeError: bad calibration"
+    assert response.items[0].has_stack_trace is True
 
 
 def _claim_ai_review_document(

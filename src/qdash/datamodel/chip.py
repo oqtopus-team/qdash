@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -26,6 +27,10 @@ class ChipModel(BaseModel):
     size: int = Field(..., description="The size of the chip")
     topology_id: str | None = Field(
         None, description="Topology template ID (e.g., 'square-lattice-mux-64')"
+    )
+    activity_status: Literal["active", "inactive"] = Field(
+        "active",
+        description="Whether the chip is currently used as an operational/display target",
     )
     installed_at: datetime = Field(..., description="The time when the chip was installed")
 

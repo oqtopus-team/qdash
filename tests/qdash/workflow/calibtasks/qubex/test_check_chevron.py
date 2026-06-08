@@ -50,11 +50,30 @@ def test_check_chevron_run_uses_adaptive_helper(monkeypatch) -> None:
         return SimpleNamespace(
             data={
                 "resonant_frequencies": {"Q00": 4.321},
-                "amplitudes_used": {"Q00": 0.082},
-                "omega_rabis": {"Q00": 0.011},
-                "peak_prominence_ratios": {"Q00": 1.5},
+                "target_amplitudes": {"Q00": 0.086},
+                "peak_background_rms_ratios": {"Q00": 8.5},
+                "results": {
+                    "Q00": {
+                        "omega_q": 4.321,
+                        "omega_rabi": 0.011,
+                        "peak_background_rms_ratio": 8.5,
+                        "frequency_used": 4.25,
+                        "amplitude_used": 0.082,
+                    }
+                },
+                "search_results": {
+                    "Q00": {
+                        "omega_q": 4.3,
+                        "omega_rabi": 0.0105,
+                        "peak_background_rms_ratio": 7.0,
+                        "frequency_used": 4.25,
+                        "amplitude_used": 0.07,
+                    }
+                },
             },
             figures={
+                "Q00_search_measurement": go.Figure(),
+                "Q00_search_transform": go.Figure(),
                 "Q00_measurement": go.Figure(),
                 "Q00_transform": go.Figure(),
             },
@@ -78,11 +97,11 @@ def test_check_chevron_run_uses_adaptive_helper(monkeypatch) -> None:
     assert captured["plot"] is False
     assert captured["save_image"] is False
     assert result.raw_result["resonant_frequencies"]["Q00"] == 4.321
-    assert result.raw_result["control_amplitude_used"] == 0.082
+    assert result.raw_result["control_amplitude_used"] == 0.086
     assert result.raw_result["readout_amplitude_used"] == 0.031
 
 
-def test_check_chevron_postprocess_handles_adaptive_figures(monkeypatch) -> None:
+def test_check_chevron_postprocess_handles_adaptive_search_figures(monkeypatch) -> None:
     task = CheckChevron()
     task.input_parameters["readout_amplitude"] = ParameterModel(value=0.031, unit="a.u.")
 
@@ -97,8 +116,8 @@ def test_check_chevron_postprocess_handles_adaptive_figures(monkeypatch) -> None
             "figures": {
                 "Q00_measurement": go.Figure(),
                 "Q00_transform": go.Figure(),
-                "Q00_rough_measurement": go.Figure(),
-                "Q00_rough_transform": go.Figure(),
+                "Q00_search_measurement": go.Figure(),
+                "Q00_search_transform": go.Figure(),
             },
         }
     )
@@ -114,6 +133,18 @@ def test_check_chevron_postprocess_handles_adaptive_figures(monkeypatch) -> None
     assert result.output_parameters["control_amplitude"].value == 0.082
     assert "readout_amplitude" not in result.output_parameters
     assert len(result.figures) == 5
+
+
+def test_check_chevron_extracts_legacy_adaptive_amplitude() -> None:
+    task = CheckChevron()
+
+    result = task._control_amplitude_from_result(
+        {"amplitudes_used": {"Q00": 0.082}},
+        "Q00",
+        fallback=0.07,
+    )
+
+    assert result == 0.082
 
 
 def test_check_chevron_run_requires_db_readout_amplitude(monkeypatch) -> None:

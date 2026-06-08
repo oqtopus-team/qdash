@@ -14,6 +14,7 @@ interface ChipOption {
   value: string;
   label: string;
   installed_at?: string | null;
+  activity_status: "active" | "inactive";
 }
 
 interface ChipSelectorProps {
@@ -32,15 +33,25 @@ export function ChipSelector({ selectedChip, onChipSelect }: ChipSelectorProps) 
 
     return [...chips.data.chips]
       .sort((a, b) => {
+        const statusA = a.activity_status === "inactive" ? 1 : 0;
+        const statusB = b.activity_status === "inactive" ? 1 : 0;
+        if (statusA !== statusB) return statusA - statusB;
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;
       })
-      .map((chip) => ({
-        value: chip.chip_id,
-        label: `${chip.chip_id} ${chip.installed_at ? `(${formatDate(chip.installed_at)})` : ""}`,
-        installed_at: chip.installed_at,
-      }));
+      .map((chip) => {
+        const activityStatus = chip.activity_status ?? "active";
+        const installedAt = chip.installed_at ? `(${formatDate(chip.installed_at)})` : "";
+        const inactiveLabel = activityStatus === "inactive" ? "Inactive" : "";
+
+        return {
+          value: chip.chip_id,
+          label: [chip.chip_id, installedAt, inactiveLabel].filter(Boolean).join(" "),
+          installed_at: chip.installed_at,
+          activity_status: activityStatus,
+        };
+      });
   }, [chips]);
 
   const { minWidth, styles } = useSelectStyles<ChipOption>({

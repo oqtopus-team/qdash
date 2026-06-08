@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -38,6 +38,10 @@ class ChipDocument(Document):
             "Updated by cool-down assign/unassign endpoints. None when the "
             "chip is not in any active cool-down."
         ),
+    )
+    activity_status: Literal["active", "inactive"] = Field(
+        default="active",
+        description="Whether the chip is currently used as an operational/display target.",
     )
     topology_id: str | None = Field(
         None, description="Topology template ID (e.g., 'square-lattice-mux-64')"

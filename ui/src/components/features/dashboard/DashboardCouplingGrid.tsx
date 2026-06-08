@@ -23,6 +23,7 @@ interface DashboardCouplingGridProps {
   /** Maximum cell side length in px. Cells shrink to fit narrower containers. */
   maxCellSize?: number;
   notedTargets?: Set<string>;
+  targetNotedTargets?: Set<string>;
   crossMetricNotedTargets?: Set<string>;
   notesByTarget?: Record<string, NoteEntryWithMetric[]>;
   metricKey?: string;
@@ -71,6 +72,7 @@ export function DashboardCouplingGrid({
   colors,
   maxCellSize = 60,
   notedTargets,
+  targetNotedTargets,
   crossMetricNotedTargets,
   notesByTarget,
   metricKey,
@@ -213,16 +215,27 @@ export function DashboardCouplingGrid({
           const dy = pos2.row - pos1.row;
           const arrowAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
           const hasNote = notedTargets?.has(couplingId) ?? false;
+          const hasTargetNote = targetNotedTargets?.has(couplingId) ?? false;
           const hasCrossMetricNote =
-            !hasNote && (crossMetricNotedTargets?.has(couplingId) ?? false);
+            !hasNote && !hasTargetNote && (crossMetricNotedTargets?.has(couplingId) ?? false);
           const Tag = onCouplingClick ? "button" : "div";
           const handleClick = () => onCouplingClick?.(couplingId);
           const titleText =
             (value !== null
               ? `Q${qid1}→Q${qid2}: ${value.toFixed(4)} ${unit}`
               : `Q${qid1}→Q${qid2}: No data`) +
-            (hasNote ? " · has note" : hasCrossMetricNote ? " · note on other metric" : "") +
-            (onCouplingClick ? " (click to edit note)" : "");
+            (hasNote
+              ? " · has metric note"
+              : hasTargetNote
+                ? " · has target note"
+                : hasCrossMetricNote
+                  ? " · note on other metric"
+                  : "") +
+            (onCouplingClick
+              ? value !== null
+                ? " (click to edit metric note)"
+                : " (click to edit target note)"
+              : "");
           return (
             <Tag
               key={couplingId}
@@ -280,10 +293,10 @@ export function DashboardCouplingGrid({
                   strokeLinejoin="round"
                 />
               </svg>
-              {hasNote && (
+              {(hasNote || hasTargetNote) && (
                 <span
                   className="absolute -top-1 -right-1 rounded-full bg-warning text-warning-content p-0.5 shadow"
-                  title="Has note"
+                  title={hasNote ? "Has metric note" : "Has target note"}
                 >
                   <StickyNote className="h-2.5 w-2.5" />
                 </span>

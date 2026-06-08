@@ -77,6 +77,9 @@ export function ChipPageContent() {
     ) {
       // Sort chips by installation date and select the most recent one
       const sortedChips = [...chipsData.data.chips].sort((a, b) => {
+        const statusA = a.activity_status === "inactive" ? 1 : 0;
+        const statusB = b.activity_status === "inactive" ? 1 : 0;
+        if (statusA !== statusB) return statusA - statusB;
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;
@@ -528,23 +531,23 @@ export function ChipPageContent() {
                     }`}
                   >
                     <div
-                      className="p-4 cursor-pointer flex justify-between items-center hover:bg-base-200/50 transition-colors"
+                      className="p-4 cursor-pointer flex flex-wrap justify-between gap-2 items-center hover:bg-base-200/50 transition-colors"
                       onClick={() => toggleMuxExpansion(muxId)}
                     >
                       <div className="text-xl font-medium flex items-center gap-2">
-                        MUX {muxDetail.mux_id}
+                        <span className="whitespace-nowrap">MUX {muxDetail.mux_id}</span>
                         {updateInfo.isRecent && (
                           <div className="badge badge-primary gap-2 rounded-lg">
                             <div className="w-2 h-2 bg-primary-content rounded-full animate-ping" />
                             New
                           </div>
                         )}
-                        <div className="badge badge-ghost gap-2 rounded-lg">
+                        <div className="badge badge-ghost gap-2 rounded-lg whitespace-nowrap">
                           {Object.keys(taskGroups).length} Tasks
                         </div>
                       </div>
                       <div
-                        className={`text-sm ${
+                        className={`text-sm whitespace-nowrap ${
                           updateInfo.isRecent ? "text-primary font-medium" : "text-base-content/60"
                         }`}
                       >

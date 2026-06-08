@@ -5,7 +5,7 @@ import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { AnalysisChatPanel } from "@/components/features/metrics/AnalysisChatPanel";
 
 export function AnalysisSidebar() {
-  const { isOpen, activeSession, openGeneralChat } = useAnalysisChatContext();
+  const { isOpen, activeSession, openGeneralChat, closeAnalysisChat } = useAnalysisChatContext();
 
   return (
     <>
@@ -26,14 +26,23 @@ export function AnalysisSidebar() {
         </button>
       )}
 
-      {/* Inline sidebar panel — participates in flex layout to push main content */}
+      {/* Mobile backdrop */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={closeAnalysisChat}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Full-screen overlay below lg; inline flex panel at lg+ */}
       <div
-        className={`h-screen flex-shrink-0 border-l border-base-300 bg-base-100 transition-[width] duration-300 ease-in-out overflow-hidden ${
-          isOpen ? "w-[28rem] xl:w-[32rem]" : "w-0"
+        className={`bg-base-100 overflow-hidden transition-[width] duration-300 ease-in-out max-lg:fixed max-lg:inset-y-0 max-lg:right-0 max-lg:z-50 lg:h-screen lg:flex-shrink-0 lg:border-l lg:border-base-300 ${
+          isOpen ? "max-lg:w-full lg:w-[28rem] xl:w-[32rem]" : "w-0"
         }`}
       >
         {isOpen && (
-          <div className="w-[28rem] xl:w-[32rem] h-full">
+          <div className="h-full w-screen max-w-full lg:w-[28rem] xl:w-[32rem]">
             <AnalysisChatPanel context={activeSession?.context ?? null} />
           </div>
         )}

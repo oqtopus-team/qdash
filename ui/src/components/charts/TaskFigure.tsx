@@ -12,6 +12,7 @@ interface TaskFigureProps {
   taskId?: string;
   qid: string;
   className?: string;
+  hideExpandButton?: boolean;
 }
 
 function figureUrl(path: string): string {
@@ -23,11 +24,13 @@ function ExpandableImage({
   alt,
   className,
   jsonFigurePath,
+  hideExpandButton,
 }: {
   src: string;
   alt: string;
   className: string;
   jsonFigurePath?: string;
+  hideExpandButton?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -41,20 +44,22 @@ function ExpandableImage({
   }
 
   return (
-    <div className="relative group inline-flex h-full min-w-0 min-h-0">
+    <div className="relative group inline-flex h-full min-w-0 min-h-0 shrink-0">
       {/* eslint-disable-next-line @next/next/no-img-element -- dynamic API image with native sizing */}
       <img src={src} alt={alt} className={className} onError={() => setHasError(true)} />
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(true);
-        }}
-        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity btn btn-xs btn-circle bg-base-100/80 shadow hover:bg-base-200"
-        title="Expand"
-      >
-        <ZoomIn className="h-3 w-3" />
-      </button>
+      {!hideExpandButton && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(true);
+          }}
+          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity btn btn-xs btn-circle bg-base-100/80 shadow hover:bg-base-200"
+          title="Expand"
+        >
+          <ZoomIn className="h-3 w-3" />
+        </button>
+      )}
       {isOpen && (
         <FigureLightbox
           src={src}
@@ -67,7 +72,14 @@ function ExpandableImage({
   );
 }
 
-export function TaskFigure({ path, jsonFigurePath, taskId, qid, className = "" }: TaskFigureProps) {
+export function TaskFigure({
+  path,
+  jsonFigurePath,
+  taskId,
+  qid,
+  className = "",
+  hideExpandButton,
+}: TaskFigureProps) {
   // Use generated API client hook when taskId is provided
   const {
     data: taskResultResponse,
@@ -125,19 +137,21 @@ export function TaskFigure({ path, jsonFigurePath, taskId, qid, className = "" }
         alt={`Result for QID ${qid}`}
         className={className}
         jsonFigurePath={normalizedJsonPaths[0]}
+        hideExpandButton={hideExpandButton}
       />
     );
   }
 
   return (
-    <div className="flex flex-wrap gap-2 overflow-hidden w-full h-full">
+    <div className="flex h-full w-full items-center gap-2 overflow-x-auto">
       {normalizedPaths.map((p, i) => (
         <ExpandableImage
           key={p}
           src={figureUrl(p)}
           alt={`Result for QID ${qid}`}
-          className={`${className} max-w-full max-h-full`}
+          className={className}
           jsonFigurePath={normalizedJsonPaths[i]}
+          hideExpandButton={hideExpandButton}
         />
       ))}
     </div>

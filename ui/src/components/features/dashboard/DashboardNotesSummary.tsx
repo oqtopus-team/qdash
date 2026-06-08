@@ -17,13 +17,24 @@ interface TaskNoteEntry {
   updatedAt: string;
 }
 
+interface TargetNoteEntry {
+  targetId: string;
+  content: string;
+  username: string;
+  updatedAt: string;
+}
+
 interface DashboardNotesSummaryProps {
   /** Per-(target, metric) chip notes indexed by target_id. */
   notesByTarget: Record<string, NoteEntryWithMetric[]>;
+  /** Target-level qubit/coupling notes, indexed by target_id. */
+  targetNotesByTarget: Record<string, TargetNoteEntry>;
   /** Per-task_result notes for this chip. */
   taskNotes: TaskNoteEntry[];
-  /** Triggered when a chip-note row is clicked — opens the metric modal. */
+  /** Triggered when a metric-note row is clicked — opens the metric modal. */
   onEdit: (entry: NoteEntryWithMetric) => void;
+  /** Triggered when a target-note row is clicked — opens the target note modal. */
+  onEditTarget: (targetId: string) => void;
 }
 
 function formatTarget(targetId: string): string {
@@ -58,8 +69,10 @@ function isAiGeneratedNote(content: string, username: string): boolean {
 
 export function DashboardNotesSummary({
   notesByTarget,
+  targetNotesByTarget,
   taskNotes,
   onEdit,
+  onEditTarget,
 }: DashboardNotesSummaryProps) {
   const visibleNotesByTarget = useMemo(() => {
     const entries = Object.entries(notesByTarget)
@@ -80,6 +93,14 @@ export function DashboardNotesSummary({
     [visibleNotesByTarget],
   );
 
+  const sortedTargetNotes = useMemo(
+    () =>
+      Object.values(targetNotesByTarget)
+        .filter((note) => !isAiGeneratedNote(note.content, note.username))
+        .sort((a, b) => compareTargets(a.targetId, b.targetId)),
+    [targetNotesByTarget],
+  );
+
   const totalChipNotes = useMemo(
     () => sortedTargets.reduce((sum, t) => sum + (visibleNotesByTarget[t]?.length ?? 0), 0),
     [sortedTargets, visibleNotesByTarget],
@@ -93,7 +114,11 @@ export function DashboardNotesSummary({
     [taskNotes],
   );
 
-  if (sortedTargets.length === 0 && sortedTaskNotes.length === 0) {
+  if (
+    sortedTargets.length === 0 &&
+    sortedTargetNotes.length === 0 &&
+    sortedTaskNotes.length === 0
+  ) {
     return (
       <div className="text-sm text-base-content/60 italic flex items-center gap-2">
         <StickyNote className="h-4 w-4" />
@@ -104,6 +129,40 @@ export function DashboardNotesSummary({
 
   return (
     <div className="space-y-5">
+      {/* Target-level notes */}
+      {sortedTargetNotes.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-baseline gap-2">
+            <h4 className="text-sm font-semibold">Target notes</h4>
+            <span className="text-xs text-base-content/60">
+              {sortedTargetNotes.length} target-level note
+              {sortedTargetNotes.length > 1 ? "s" : ""} — click to edit the target.
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {sortedTargetNotes.map((note) => (
+              <button
+                key={note.targetId}
+                onClick={() => onEditTarget(note.targetId)}
+                className="rounded-lg border border-base-300 bg-base-200/40 p-3 text-left hover:bg-base-300/40 transition-colors"
+                title={`Open target note for ${formatTarget(note.targetId)}`}
+                type="button"
+              >
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold">{formatTarget(note.targetId)}</span>
+                  <span className="text-base-content/50 truncate">
+                    {note.username} · {formatDate(note.updatedAt)}
+                  </span>
+                </div>
+                <p className="text-xs text-base-content/80 line-clamp-2 break-words mt-1">
+                  {note.content}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Per-(target, metric) chip notes */}
       {sortedTargets.length > 0 && (
         <div className="space-y-2">
