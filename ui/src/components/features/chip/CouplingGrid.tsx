@@ -794,6 +794,7 @@ export function CouplingGrid({
                     path={figurePath}
                     qid={String(task.couplingId)}
                     className="w-full h-full object-contain"
+                    hideExpandButton
                   />
                 </div>
               )}
