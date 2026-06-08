@@ -6,6 +6,7 @@ from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -204,6 +205,39 @@ class TestChipRouter:
         data = response.json()
         assert data["chip_id"] == "test_chip_status"
         assert data["activity_status"] == "inactive"
+
+    def test_update_chip_topology_creates_missing_target_skeletons(
+        self, test_client, test_project, auth_headers
+    ):
+        """Test topology update backfills empty qubit/coupling target rows."""
+        chip = ChipDocument(
+            chip_id="test_chip_topology",
+            username="test_user",
+            project_id="test_project",
+            size=64,
+            system_info=SystemInfoModel(),
+        )
+        chip.insert()
+
+        response = test_client.patch(
+            "/chips/test_chip_topology",
+            headers=auth_headers,
+            json={"topology_id": "square-lattice-mux-64"},
+        )
+
+        assert response.status_code == 200
+        assert (
+            QubitDocument.find(
+                {"project_id": "test_project", "chip_id": "test_chip_topology"}
+            ).count()
+            == 64
+        )
+        assert (
+            CouplingDocument.find(
+                {"project_id": "test_project", "chip_id": "test_chip_topology"}
+            ).count()
+            > 0
+        )
 
     def test_create_chip_success(self, test_client, test_project, auth_headers):
         """Test creating a new chip."""

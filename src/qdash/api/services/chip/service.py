@@ -22,6 +22,7 @@ from qdash.api.schemas.chip import (
     UpdateChipRequest,
 )
 from qdash.api.schemas.success import SuccessResponse
+from qdash.api.services.chip.initializer import ChipInitializer
 from qdash.common.config.metrics import load_metrics_config
 from qdash.common.utils.datetime import now
 from qdash.datamodel.note import NoteModel
@@ -389,6 +390,15 @@ class ChipService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Chip not found")
         if body.topology_id is not None:
+            try:
+                ChipInitializer.ensure_topology_documents(
+                    project_id=project_id,
+                    chip_id=chip_id,
+                    topology_id=body.topology_id,
+                    size=doc.size,
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e)) from e
             doc.topology_id = body.topology_id
         if body.activity_status is not None:
             doc.activity_status = body.activity_status
