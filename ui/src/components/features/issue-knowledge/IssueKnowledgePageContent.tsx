@@ -2,10 +2,11 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, GitPullRequest, XCircle, Trash2 } from "lucide-react";
+import { X, GitPullRequest, XCircle, Trash2 } from "lucide-react";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { useIssueKnowledgeList } from "@/hooks/useIssueKnowledge";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { IssueKnowledgeResponse } from "@/schemas";
@@ -170,33 +171,26 @@ export function IssueKnowledgePageContent() {
 
       {/* Filter bar */}
       <div className="mb-4">
-        <form onSubmit={handleFilterSubmit} className="flex gap-2 items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-base-content/40" />
-            <input
-              type="text"
-              className="input input-bordered input-sm w-full pl-9 pr-8"
-              placeholder="Filter by task name..."
-              value={filterInput}
-              onChange={(e) => setFilterInput(e.target.value)}
-            />
-            {filterInput && (
-              <button
-                type="button"
-                onClick={clearFilter}
-                className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs p-0 h-auto min-h-0"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
+        <form onSubmit={handleFilterSubmit} className="flex flex-wrap gap-2 items-center">
+          <SearchInput
+            value={filterInput}
+            onChange={setFilterInput}
+            onClear={clearFilter}
+            placeholder="Filter by task name..."
+            className="flex-1 max-w-sm"
+          />
           <button type="submit" className="btn btn-sm btn-primary">
             Filter
           </button>
           {taskNameFilter && (
-            <div className="flex items-center gap-1">
-              <span className="badge badge-sm badge-outline">task: {taskNameFilter}</span>
-              <button onClick={clearFilter} className="btn btn-ghost btn-xs p-0 h-auto min-h-0">
+            <div className="flex items-center gap-1 basis-full sm:basis-auto min-w-0">
+              <span className="badge badge-sm badge-outline min-w-0">
+                <span className="min-w-0 truncate">task: {taskNameFilter}</span>
+              </span>
+              <button
+                onClick={clearFilter}
+                className="btn btn-ghost btn-xs p-0 h-auto min-h-0 shrink-0"
+              >
                 <X className="h-3 w-3" />
               </button>
             </div>
