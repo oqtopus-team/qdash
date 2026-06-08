@@ -34,6 +34,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
   const impact = impactData?.data;
 
   const [topologyId, setTopologyId] = useState("");
+  const [activityStatus, setActivityStatus] = useState<"active" | "inactive">("active");
   const [note, setNote] = useState("");
   const [forceDelete, setForceDelete] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -41,6 +42,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
   useEffect(() => {
     if (chip) {
       setTopologyId(chip.topology_id ?? "");
+      setActivityStatus(chip.activity_status ?? "active");
       setNote(chip.note?.content ?? "");
     }
   }, [chip]);
@@ -58,6 +60,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
       chipId,
       data: {
         topology_id: topologyId || null,
+        activity_status: activityStatus,
         note,
       },
     });
@@ -106,7 +109,19 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
               <div>
                 <span className="opacity-60">Installed:</span> {formatDateTime(chip.installed_at)}
               </div>
-              <div className="col-span-2">
+              <div>
+                <span className="opacity-60">Status:</span>{" "}
+                <span
+                  className={
+                    chip.activity_status === "inactive"
+                      ? "badge badge-ghost badge-sm"
+                      : "badge badge-success badge-sm"
+                  }
+                >
+                  {chip.activity_status ?? "active"}
+                </span>
+              </div>
+              <div>
                 <span className="opacity-60">Current cool-down:</span>{" "}
                 {chip.current_cooldown_id ?? (
                   <span className="italic text-base-content/40">none</span>
@@ -125,6 +140,21 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
                 />
                 <p className="text-[11px] text-base-content/50 mt-1">
                   Topology template applied to qubit/coupling layout.
+                </p>
+              </Field>
+              <Field label="Activity status">
+                <select
+                  className="select select-sm select-bordered w-full"
+                  value={activityStatus}
+                  onChange={(e) =>
+                    setActivityStatus(e.target.value === "inactive" ? "inactive" : "active")
+                  }
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+                <p className="text-[11px] text-base-content/50 mt-1">
+                  Inactive chips remain available but are de-emphasized in chip selection.
                 </p>
               </Field>
               <Field label="Note">

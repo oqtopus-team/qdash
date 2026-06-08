@@ -107,6 +107,7 @@ class MongoChipRepository:
             username=chip.username,
             size=chip.size,
             topology_id=chip.topology_id,
+            activity_status=chip.activity_status,
             installed_at=chip.installed_at,
             system_info=chip.system_info,
         )
@@ -215,6 +216,7 @@ class MongoChipRepository:
             username=doc.username,
             size=doc.size,
             topology_id=doc.topology_id,
+            activity_status=doc.activity_status,
             installed_at=doc.installed_at,
             system_info=doc.system_info,
         )
@@ -295,6 +297,7 @@ class MongoChipRepository:
                 "size": doc.size,
                 "topology_id": doc.topology_id,
                 "installed_at": doc.installed_at,
+                "activity_status": getattr(doc, "activity_status", "active"),
                 "current_cooldown_id": getattr(doc, "current_cooldown_id", None),
                 "note": doc.note.model_dump(mode="json"),
                 "qubit_count": qubit_counts.get(doc.chip_id, 0),
@@ -333,6 +336,7 @@ class MongoChipRepository:
             "size": doc.size,
             "topology_id": doc.topology_id,
             "installed_at": doc.installed_at,
+            "activity_status": getattr(doc, "activity_status", "active"),
             "current_cooldown_id": getattr(doc, "current_cooldown_id", None),
             "note": doc.note.model_dump(mode="json"),
             "qubit_count": qubit_counts.get(chip_id, 0),

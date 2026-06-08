@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { UpdateChipRequestTopologyId } from './updateChipRequestTopologyId';
+import type { UpdateChipRequestActivityStatus } from './updateChipRequestActivityStatus';
 import type { UpdateChipRequestNote } from './updateChipRequestNote';
 
 /**
@@ -13,6 +14,7 @@ import type { UpdateChipRequestNote } from './updateChipRequestNote';
  */
 export interface UpdateChipRequest {
   topology_id?: UpdateChipRequestTopologyId;
+  activity_status?: UpdateChipRequestActivityStatus;
   /** Free-form note text (overwrites note.content) */
   note?: UpdateChipRequestNote;
 }
