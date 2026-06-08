@@ -2,7 +2,7 @@
   {
     "id": "bringup",
     "name": "Bring-up",
-    "description": "MUX-level bring-up calibration (resonator spectroscopy). Runs once per MUX for initial characterization.",
+    "description": "MUX-level bring-up calibration: ConfigureAll -> resonator spectroscopy. Runs once per MUX for initial characterization.",
     "category": "production",
     "filename": "bringup.py",
     "function_name": "bringup"
@@ -14,6 +14,14 @@
     "category": "advanced",
     "filename": "experimental_simultaneous_bringup.py",
     "function_name": "experimental_simultaneous_bringup"
+  },
+  {
+    "id": "check_waveform",
+    "name": "Check Waveform",
+    "description": "Readout waveform inspection using qubex CheckWaveform for selected MUXes or qubits.",
+    "category": "basic",
+    "filename": "check_waveform.py",
+    "function_name": "check_waveform"
   },
   {
     "id": "simple",
