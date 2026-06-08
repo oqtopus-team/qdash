@@ -9,7 +9,10 @@ import { useListCooldowns } from "@/client/cooldown/cooldown";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { useGetChipNotesSummary } from "@/client/note/note";
 import { useListProjectMembers } from "@/client/projects/projects";
-import type { GetChipNotesSummaryParams, TargetNoteEntry } from "@/schemas";
+import type {
+  GetChipNotesSummaryParams,
+  TargetNoteEntry as SummaryTargetNoteEntry,
+} from "@/schemas";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { Card } from "@/components/ui/Card";
@@ -34,6 +37,10 @@ import { DashboardCouplingGrid } from "./DashboardCouplingGrid";
 import { DashboardNotesSummary } from "./DashboardNotesSummary";
 import { DashboardQubitGrid } from "./DashboardQubitGrid";
 import { DashboardSummaryTable } from "./DashboardSummaryTable";
+import {
+  DashboardTargetNoteModal,
+  type TargetNoteEntry as DashboardTargetNoteEntry,
+} from "./DashboardTargetNoteModal";
 import { DashboardChipNoteModal } from "./DashboardChipNoteModal";
 import { DashboardMetricModal } from "./DashboardMetricModal";
 import { type NoteEntry, type NoteEntryWithMetric } from "./MetricNotePanel";
@@ -250,7 +257,7 @@ export function DashboardPageContent() {
 
   const notesByMetric = useMemo(() => {
     const map: Record<string, Record<string, NoteEntry>> = {};
-    const collect = (entries: TargetNoteEntry[] | undefined) => {
+    const collect = (entries: SummaryTargetNoteEntry[] | undefined) => {
       (entries ?? []).forEach((entry) => {
         Object.entries(entry.metric_notes ?? {}).forEach(([metricKey, note]) => {
           const content = stripAiGeneratedNoteSections(note?.content ?? "");
@@ -277,7 +284,7 @@ export function DashboardPageContent() {
     couplingMetrics.forEach((m) => titleByKey.set(m.key, m.title));
 
     const map: Record<string, NoteEntryWithMetric[]> = {};
-    const collect = (entries: TargetNoteEntry[] | undefined) => {
+    const collect = (entries: SummaryTargetNoteEntry[] | undefined) => {
       (entries ?? []).forEach((entry) => {
         Object.entries(entry.metric_notes ?? {}).forEach(([metricKey, note]) => {
           const content = stripAiGeneratedNoteSections(note?.content ?? "");
@@ -299,12 +306,42 @@ export function DashboardPageContent() {
     return map;
   }, [summary, qubitMetrics, couplingMetrics]);
 
+  const targetNotesByTarget = useMemo(() => {
+    const map: Record<string, DashboardTargetNoteEntry> = {};
+    const collect = (entries: SummaryTargetNoteEntry[] | undefined) => {
+      (entries ?? []).forEach((entry) => {
+        const content = stripAiGeneratedNoteSections(entry.note?.content ?? "");
+        if (!content) return;
+        map[entry.target_id] = {
+          targetId: entry.target_id,
+          content,
+          username: entry.note?.updated_by ?? "",
+          updatedAt: entry.note?.updated_at ?? "",
+        };
+      });
+    };
+    collect(summary?.qubits);
+    collect(summary?.couplings);
+    return map;
+  }, [summary]);
+
+  const targetNotedQids = useMemo(
+    () => new Set(Object.keys(targetNotesByTarget).filter((targetId) => !targetId.includes("-"))),
+    [targetNotesByTarget],
+  );
+
+  const targetNotedCouplings = useMemo(
+    () => new Set(Object.keys(targetNotesByTarget).filter((targetId) => targetId.includes("-"))),
+    [targetNotesByTarget],
+  );
+
   const [editingNote, setEditingNote] = useState<{
     targetId: string;
     metricKey: string;
     metricTitle: string;
     metricUnit: string;
   } | null>(null);
+  const [editingTargetNote, setEditingTargetNote] = useState<string | null>(null);
   const [showChipNote, setShowChipNote] = useState(false);
 
   const editingExisting =
@@ -472,7 +509,9 @@ export function DashboardPageContent() {
             >
               <DashboardNotesSummary
                 notesByTarget={notesByTarget}
+                targetNotesByTarget={targetNotesByTarget}
                 taskNotes={taskNotes}
+                onEditTarget={setEditingTargetNote}
                 onEdit={(entry) => {
                   const cfg =
                     qubitMetrics.find((m) => m.key === entry.metricKey) ??
@@ -550,17 +589,23 @@ export function DashboardPageContent() {
                               topologyId={topologyId}
                               colors={colors}
                               notedQids={noted}
+                              targetNotedQids={targetNotedQids}
                               crossMetricNotedQids={crossMetricNoted}
                               notesByTarget={notesByTarget}
                               metricKey={m.key}
-                              onQubitClick={(qid) =>
+                              onQubitClick={(qid) => {
+                                const value = qubitMetricData[m.key]?.[qid]?.value ?? null;
+                                if (value === null) {
+                                  setEditingTargetNote(qid);
+                                  return;
+                                }
                                 setEditingNote({
                                   targetId: qid,
                                   metricKey: m.key,
                                   metricTitle: m.title,
                                   metricUnit: m.unit,
-                                })
-                              }
+                                });
+                              }}
                             />
                           </div>
                           <div className="xl:col-span-1 min-w-0">
@@ -627,17 +672,24 @@ export function DashboardPageContent() {
                               topologyId={topologyId}
                               colors={colors}
                               notedTargets={noted}
+                              targetNotedTargets={targetNotedCouplings}
                               crossMetricNotedTargets={crossMetricNoted}
                               notesByTarget={notesByTarget}
                               metricKey={m.key}
-                              onCouplingClick={(couplingId) =>
+                              onCouplingClick={(couplingId) => {
+                                const value =
+                                  couplingMetricData[m.key]?.[couplingId]?.value ?? null;
+                                if (value === null) {
+                                  setEditingTargetNote(couplingId);
+                                  return;
+                                }
                                 setEditingNote({
                                   targetId: couplingId,
                                   metricKey: m.key,
                                   metricTitle: m.title,
                                   metricUnit: m.unit,
-                                })
-                              }
+                                });
+                              }}
                             />
                           </div>
                           <div className="xl:col-span-1 min-w-0">
@@ -675,6 +727,17 @@ export function DashboardPageContent() {
           otherNotes={editingOtherNotes}
           mentionCandidates={mentionCandidates}
           onClose={() => setEditingNote(null)}
+        />
+      )}
+
+      {editingTargetNote && selectedChip && (
+        <DashboardTargetNoteModal
+          chipId={selectedChip}
+          targetId={editingTargetNote}
+          noteScopeParams={noteScopeParams}
+          existing={targetNotesByTarget[editingTargetNote]}
+          mentionCandidates={mentionCandidates}
+          onClose={() => setEditingTargetNote(null)}
         />
       )}
 

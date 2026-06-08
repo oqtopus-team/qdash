@@ -17,6 +17,7 @@ from qdash.api.schemas.note import (
     TaskNoteEntry,
 )
 from qdash.api.schemas.success import SuccessResponse
+from qdash.api.services.chip.initializer import ChipInitializer
 from qdash.common.utils.datetime import ensure_timezone, format_iso, now
 from qdash.datamodel.note import NoteModel
 from qdash.dbmodel.chip import ChipDocument
@@ -326,13 +327,14 @@ class NoteService:
         content: str,
         username: str,
     ) -> NoteModel:
-        doc = QubitDocument.find_one(
-            QubitDocument.project_id == project_id,
-            QubitDocument.chip_id == chip_id,
-            QubitDocument.qid == qid,
-        ).run()
-        if doc is None:
-            raise HTTPException(status_code=404, detail="Qubit not found")
+        try:
+            doc = ChipInitializer.ensure_qubit_document(
+                project_id=project_id,
+                chip_id=chip_id,
+                qid=qid,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
         doc.note = _make_note(content, username)
         doc.system_info.update_time()
         doc.save()
@@ -521,13 +523,14 @@ class NoteService:
         content: str,
         username: str,
     ) -> NoteModel:
-        doc = CouplingDocument.find_one(
-            CouplingDocument.project_id == project_id,
-            CouplingDocument.chip_id == chip_id,
-            CouplingDocument.qid == coupling_id,
-        ).run()
-        if doc is None:
-            raise HTTPException(status_code=404, detail="Coupling not found")
+        try:
+            doc = ChipInitializer.ensure_coupling_document(
+                project_id=project_id,
+                chip_id=chip_id,
+                coupling_id=coupling_id,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
         doc.note = _make_note(content, username)
         doc.system_info.update_time()
         doc.save()

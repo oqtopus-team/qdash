@@ -354,3 +354,51 @@ def test_notes_summary_includes_task_results_with_only_ai_review_note(test_clien
     assert task_note["task_id"] == "task-ai-review-note"
     assert task_note["note"]["content"] == ""
     assert task_note["ai_review_note"]["content"].startswith("## AI review")
+
+
+def test_qubit_note_creates_missing_topology_target(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+
+    response = test_client.put(
+        "/chips/chip-1/qubits/21/note",
+        headers=headers,
+        json={"content": "No data yet; check wiring before next run."},
+    )
+
+    assert response.status_code == 200
+    doc = QubitDocument.find_one(QubitDocument.qid == "21").run()
+    assert doc is not None
+    assert doc.data == {}
+    assert doc.note.content == "No data yet; check wiring before next run."
+
+
+def test_qubit_note_rejects_target_outside_topology(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+
+    response = test_client.put(
+        "/chips/chip-1/qubits/999/note",
+        headers=headers,
+        json={"content": "invalid target"},
+    )
+
+    assert response.status_code == 404
+    assert QubitDocument.find_one(QubitDocument.qid == "999").run() is None
+
+
+def test_coupling_note_creates_missing_topology_target(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+
+    response = test_client.put(
+        "/chips/chip-1/couplings/0-1/note",
+        headers=headers,
+        json={"content": "No coupling data yet."},
+    )
+
+    assert response.status_code == 200
+    doc = CouplingDocument.find_one(CouplingDocument.qid == "0-1").run()
+    assert doc is not None
+    assert doc.data == {}
+    assert doc.note.content == "No coupling data yet."

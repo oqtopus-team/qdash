@@ -4,7 +4,7 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
-from qdash.common.config.topology import load_topology
+from qdash.common.config.topology import TopologyDefinition, load_topology
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -39,6 +39,16 @@ class ChipInitializer:
             result.append((edge[0], edge[1]))
             result.append((edge[1], edge[0]))
         return result
+
+    @staticmethod
+    def _load_topology(topology_id: str | None, size: int) -> tuple[str, TopologyDefinition]:
+        if topology_id is None:
+            topology_id = f"square-lattice-mux-{size}"
+        try:
+            return topology_id, load_topology(topology_id)
+        except FileNotFoundError as e:
+            msg = f"Topology '{topology_id}' not found"
+            raise ValueError(msg) from e
 
     @staticmethod
     def _generate_qubit_documents(
@@ -148,16 +158,8 @@ class ChipInitializer:
             FileNotFoundError: If topology file doesn't exist
 
         """
-        # Set default topology_id if not provided
-        if topology_id is None:
-            topology_id = f"square-lattice-mux-{size}"
-
         # Load topology definition
-        try:
-            topology = load_topology(topology_id)
-        except FileNotFoundError as e:
-            msg = f"Topology '{topology_id}' not found"
-            raise ValueError(msg) from e
+        topology_id, topology = cls._load_topology(topology_id, size)
 
         # Validate size matches topology
         if size != topology.num_qubits:
@@ -213,3 +215,149 @@ class ChipInitializer:
         except Exception as e:
             logger.error(f"Error creating chip {chip_id}: {e}")
             raise
+
+    @classmethod
+    def ensure_topology_documents(
+        cls,
+        *,
+        project_id: str,
+        chip_id: str,
+        topology_id: str | None,
+        size: int,
+    ) -> tuple[int, int]:
+        """Create missing qubit/coupling skeleton rows for a chip topology.
+
+        Existing rows are left untouched so calibration data and notes are preserved.
+        """
+        chip = ChipDocument.find_one(
+            ChipDocument.project_id == project_id,
+            ChipDocument.chip_id == chip_id,
+        ).run()
+        if chip is None:
+            raise ValueError(f"Chip {chip_id} not found")
+
+        topology_id, topology = cls._load_topology(topology_id, size)
+        if size != topology.num_qubits:
+            msg = f"Size {size} does not match topology num_qubits {topology.num_qubits}"
+            raise ValueError(msg)
+
+        existing_qubits = {
+            doc.qid
+            for doc in QubitDocument.find(
+                QubitDocument.project_id == project_id,
+                QubitDocument.chip_id == chip_id,
+            ).run()
+        }
+        missing_qubits = [
+            doc
+            for doc in cls._generate_qubit_documents(
+                topology.qubits,
+                chip.username,
+                chip_id,
+                project_id,
+            )
+            if doc.qid not in existing_qubits
+        ]
+        for doc in missing_qubits:
+            doc.insert()
+
+        existing_couplings = {
+            doc.qid
+            for doc in CouplingDocument.find(
+                CouplingDocument.project_id == project_id,
+                CouplingDocument.chip_id == chip_id,
+            ).run()
+        }
+        missing_couplings = [
+            doc
+            for doc in cls._generate_coupling_documents(
+                cls._bi_direction(topology.couplings),
+                chip.username,
+                chip_id,
+                project_id,
+            )
+            if doc.qid not in existing_couplings
+        ]
+        for doc in missing_couplings:
+            doc.insert()
+
+        if missing_qubits or missing_couplings:
+            logger.info(
+                "Created missing topology documents for chip %s: %d qubits, %d couplings",
+                chip_id,
+                len(missing_qubits),
+                len(missing_couplings),
+            )
+        return len(missing_qubits), len(missing_couplings)
+
+    @classmethod
+    def ensure_qubit_document(cls, *, project_id: str, chip_id: str, qid: str) -> QubitDocument:
+        """Return a qubit row, creating a topology-valid empty row when missing."""
+        doc = QubitDocument.find_one(
+            QubitDocument.project_id == project_id,
+            QubitDocument.chip_id == chip_id,
+            QubitDocument.qid == qid,
+        ).run()
+        if doc is not None:
+            return doc
+
+        chip = ChipDocument.find_one(
+            ChipDocument.project_id == project_id,
+            ChipDocument.chip_id == chip_id,
+        ).run()
+        if chip is None:
+            raise ValueError(f"Chip {chip_id} not found")
+        _, topology = cls._load_topology(chip.topology_id, chip.size)
+        try:
+            topology_qid = int(qid)
+        except ValueError as e:
+            raise ValueError(f"Qubit {qid} is not part of topology {chip.topology_id}") from e
+        if topology_qid not in topology.qubits:
+            raise ValueError(f"Qubit {qid} is not part of topology {chip.topology_id}")
+
+        new_doc = cls._generate_qubit_documents(
+            {topology_qid: topology.qubits[topology_qid]},
+            chip.username,
+            chip_id,
+            project_id,
+        )[0]
+        new_doc.insert()
+        return new_doc
+
+    @classmethod
+    def ensure_coupling_document(
+        cls, *, project_id: str, chip_id: str, coupling_id: str
+    ) -> CouplingDocument:
+        """Return a coupling row, creating a topology-valid empty row when missing."""
+        doc = CouplingDocument.find_one(
+            CouplingDocument.project_id == project_id,
+            CouplingDocument.chip_id == chip_id,
+            CouplingDocument.qid == coupling_id,
+        ).run()
+        if doc is not None:
+            return doc
+
+        chip = ChipDocument.find_one(
+            ChipDocument.project_id == project_id,
+            ChipDocument.chip_id == chip_id,
+        ).run()
+        if chip is None:
+            raise ValueError(f"Chip {chip_id} not found")
+        _, topology = cls._load_topology(chip.topology_id, chip.size)
+        try:
+            a, b = (int(part) for part in coupling_id.split("-", 1))
+        except ValueError as e:
+            raise ValueError(
+                f"Coupling {coupling_id} is not part of topology {chip.topology_id}"
+            ) from e
+        if (a, b) not in cls._bi_direction(topology.couplings):
+            raise ValueError(f"Coupling {coupling_id} is not part of topology {chip.topology_id}")
+
+        new_doc = cls._generate_coupling_documents(
+            [(a, b)],
+            chip.username,
+            chip_id,
+            project_id,
+        )[0]
+        new_doc.insert()
+        return new_doc
