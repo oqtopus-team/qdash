@@ -299,14 +299,14 @@ tasks:
       - trufflehog git file://. --fail --exclude-paths=.trufflehog-exclude-paths.txt
 
   scan-leaks:
-    desc: Run Gitleaks scan on current changes (pre-commit equivalent)
+    desc: Run Betterleaks scan over git history (full repository)
     cmds:
-      - gitleaks detect --source . --verbose
+      - betterleaks git . --verbose
 
   scan-leaks-staged:
-    desc: Run Gitleaks on staged files only
+    desc: Run Betterleaks on staged files only (same as pre-commit)
     cmds:
-      - gitleaks protect --staged --verbose
+      - betterleaks git . --pre-commit --staged --verbose
 
   # =============================================================================
   # Local Check (run before push)

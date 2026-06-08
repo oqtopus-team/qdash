@@ -3,13 +3,13 @@
 # Change frequency: Low - Most likely to be cached
 # ========================================
 ARG TRUFFLEHOG_VERSION=3.95.3
-ARG GITLEAKS_VERSION=v8.30.1
+ARG BETTERLEAKS_VERSION=v1.3.1
 ARG LEFTHOOK_VERSION=2.1.6
 ARG UV_VERSION=0.11.11
 ARG BUN_VERSION=1.3.14
 ARG CODEX_VERSION=0.130.0
 
-FROM ghcr.io/gitleaks/gitleaks:${GITLEAKS_VERSION} AS gitleaks-bin
+FROM ghcr.io/betterleaks/betterleaks:${BETTERLEAKS_VERSION} AS betterleaks-bin
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-bin
 FROM oven/bun:${BUN_VERSION} AS bun-bin
 FROM python:3.11.14-slim-bookworm AS base
@@ -82,10 +82,10 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && rm -rf /var/lib/apt/lists/*
 
 ARG TRUFFLEHOG_VERSION
-ARG GITLEAKS_VERSION
+ARG BETTERLEAKS_VERSION
 ARG LEFTHOOK_VERSION
 
-# 3.2 Secret scanning tools (gitleaks + trufflehog) and git hooks manager (lefthook)
+# 3.2 Secret scanning tools (betterleaks + trufflehog) and git hooks manager (lefthook)
 RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
       | sh -s -- -b /usr/local/bin "v${TRUFFLEHOG_VERSION}"
 
@@ -93,7 +93,7 @@ RUN curl -1sLf 'https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.deb.
     && apt-get install -y --no-install-recommends "lefthook=${LEFTHOOK_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=gitleaks-bin /usr/bin/gitleaks /usr/local/bin/gitleaks
+COPY --from=betterleaks-bin /usr/bin/betterleaks /usr/local/bin/betterleaks
 
 # 4. Editors and shells (Change frequency: Medium)
 RUN apt-get update && apt-get install -y --no-install-recommends \

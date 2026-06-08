@@ -78,11 +78,11 @@ Below is the correspondence between prefixes and labels:
 
 ## Secret Scanning
 
-Gitleaks runs on every commit via a Lefthook-managed pre-commit hook and blocks the commit on any finding. Trufflehog scans git history in CI for verified leaks. See [Credential Scanning](./credential-scan.md) for tool roles, output reading, and false-positive handling.
+Betterleaks runs on every commit via a Lefthook-managed pre-commit hook and blocks the commit on any finding. Trufflehog scans git history in CI for verified leaks. See [Credential Scanning](./credential-scan.md) for tool roles, output reading, and false-positive handling.
 
 | Command                  | Description                                              |
 | ------------------------ | -------------------------------------------------------- |
-| `task scan-leaks`        | Scan the entire repository with Gitleaks                 |
+| `task scan-leaks`        | Scan the entire repository with Betterleaks              |
 | `task scan-leaks-staged` | Scan staged files only                                   |
 | `task scan-secrets`      | Scan git history with Trufflehog (verified secrets only) |
 | `task scan-secrets-all`  | Scan git history with Trufflehog (all findings)          |
