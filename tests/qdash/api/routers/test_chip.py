@@ -103,6 +103,7 @@ class TestChipRouter:
         assert len(data["chips"]) == 1
         assert data["chips"][0]["chip_id"] == "test_chip_001"
         assert data["chips"][0]["size"] == 64
+        assert data["chips"][0]["activity_status"] == "active"
         assert data["chips"][0]["qubit_count"] == 3
 
     def test_list_chips_filters_by_project(self, test_client, test_project, auth_headers):
@@ -155,6 +156,7 @@ class TestChipRouter:
         data = response.json()
         assert data["chip_id"] == "test_chip_fetch"
         assert data["size"] == 144
+        assert data["activity_status"] == "active"
 
     def test_get_chip_not_found(self, test_client, test_project, auth_headers):
         """Test fetching a non-existent chip returns 404."""
@@ -181,6 +183,28 @@ class TestChipRouter:
         # Assert: Should not find the chip (project isolation)
         assert response.status_code == 404
 
+    def test_update_chip_activity_status(self, test_client, test_project, auth_headers):
+        """Test updating a chip's activity status."""
+        chip = ChipDocument(
+            chip_id="test_chip_status",
+            username="test_user",
+            project_id="test_project",
+            size=64,
+            system_info=SystemInfoModel(),
+        )
+        chip.insert()
+
+        response = test_client.patch(
+            "/chips/test_chip_status",
+            headers=auth_headers,
+            json={"activity_status": "inactive"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["chip_id"] == "test_chip_status"
+        assert data["activity_status"] == "inactive"
+
     def test_create_chip_success(self, test_client, test_project, auth_headers):
         """Test creating a new chip."""
         response = test_client.post(
@@ -193,6 +217,7 @@ class TestChipRouter:
         data = response.json()
         assert data["chip_id"] == "new_chip"
         assert data["size"] == 64
+        assert data["activity_status"] == "active"
 
     def test_create_chip_invalid_size(self, test_client, test_project, auth_headers):
         """Test creating a chip with invalid size returns 400."""

@@ -331,6 +331,7 @@ class ChipService:
                     "qubit_count": s.get("qubit_count", 0),
                     "coupling_count": s.get("coupling_count", 0),
                     "installed_at": s.get("installed_at"),
+                    "activity_status": s.get("activity_status", "active"),
                     "current_cooldown_id": s.get("current_cooldown_id"),
                     "note": s.get("note") or {},
                 }
@@ -365,6 +366,7 @@ class ChipService:
                 "qubit_count": summary.get("qubit_count", 0),
                 "coupling_count": summary.get("coupling_count", 0),
                 "installed_at": summary.get("installed_at"),
+                "activity_status": summary.get("activity_status", "active"),
                 "current_cooldown_id": summary.get("current_cooldown_id"),
                 "note": summary.get("note") or {},
             }
@@ -388,6 +390,8 @@ class ChipService:
             raise HTTPException(status_code=404, detail="Chip not found")
         if body.topology_id is not None:
             doc.topology_id = body.topology_id
+        if body.activity_status is not None:
+            doc.activity_status = body.activity_status
         if body.note is not None:
             doc.note = NoteModel(content=body.note, updated_by=username, updated_at=now())
         doc.system_info.update_time()

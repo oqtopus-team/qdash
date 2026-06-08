@@ -15156,6 +15156,15 @@
             ],
             "title": "Installed At"
           },
+          "activity_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "title": "Activity Status",
+            "default": "active"
+          },
           "current_cooldown_id": {
             "anyOf": [
               {
@@ -23995,6 +24004,21 @@
               }
             ],
             "title": "Topology Id"
+          },
+          "activity_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "inactive"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Status"
           },
           "note": {
             "anyOf": [

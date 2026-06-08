@@ -7,6 +7,7 @@
  */
 import type { ChipResponseTopologyId } from './chipResponseTopologyId';
 import type { ChipResponseInstalledAt } from './chipResponseInstalledAt';
+import type { ChipResponseActivityStatus } from './chipResponseActivityStatus';
 import type { ChipResponseCurrentCooldownId } from './chipResponseCurrentCooldownId';
 import type { NoteModel } from './noteModel';
 
@@ -32,6 +33,7 @@ export interface ChipResponse {
   qubit_count?: number;
   coupling_count?: number;
   installed_at?: ChipResponseInstalledAt;
+  activity_status?: ChipResponseActivityStatus;
   current_cooldown_id?: ChipResponseCurrentCooldownId;
   note?: NoteModel;
 }
