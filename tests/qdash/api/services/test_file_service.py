@@ -1,4 +1,9 @@
+import shutil
+import zipfile
 from pathlib import Path
+
+import pytest
+from fastapi import HTTPException
 
 from qdash.api.services.file_service import FileService
 
@@ -46,3 +51,44 @@ def test_explicit_config_base_path_takes_precedence(monkeypatch, tmp_path: Path)
     service = FileService(config_base_path=explicit_dir)
 
     assert service._base_path == explicit_dir
+
+
+def test_download_zip_file_maps_config_parent_to_qubex_config(tmp_path: Path) -> None:
+    config_parent = tmp_path / "config"
+    config_dir = config_parent / "qubex-config"
+    sibling_dir = config_parent / "other-config"
+    target_file = config_dir / "64Qv3" / "config" / "wiring.yaml"
+    sibling_file = sibling_dir / "secret.yaml"
+    target_file.parent.mkdir(parents=True)
+    sibling_file.parent.mkdir(parents=True)
+    target_file.write_text("wiring: test\n", encoding="utf-8")
+    sibling_file.write_text("secret: true\n", encoding="utf-8")
+
+    service = FileService(config_base_path=config_dir)
+
+    response = service.download_zip_file(str(config_parent))
+
+    try:
+        assert response.filename is not None
+        assert response.filename.startswith("qubex-config_")
+        with zipfile.ZipFile(response.path) as archive:
+            file_names = [name for name in archive.namelist() if not name.endswith("/")]
+            assert file_names == ["64Qv3/config/wiring.yaml"]
+            assert archive.read("64Qv3/config/wiring.yaml").decode() == "wiring: test\n"
+    finally:
+        shutil.rmtree(Path(response.path).parent, ignore_errors=True)
+
+
+def test_download_zip_file_rejects_paths_outside_qubex_config(tmp_path: Path) -> None:
+    config_dir = tmp_path / "config" / "qubex-config"
+    outside_dir = tmp_path / "outside"
+    config_dir.mkdir(parents=True)
+    outside_dir.mkdir()
+
+    service = FileService(config_base_path=config_dir)
+
+    with pytest.raises(HTTPException) as exc_info:
+        service.download_zip_file(str(outside_dir))
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Path outside config directory"
