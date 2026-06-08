@@ -2,10 +2,11 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, AlertTriangle, BookOpen, Image as ImageIcon, FileText } from "lucide-react";
+import { AlertTriangle, BookOpen, Image as ImageIcon, FileText } from "lucide-react";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { useListTaskKnowledge } from "@/client/task/task";
 import type { TaskKnowledgeSummaryResponse } from "@/schemas";
 
@@ -109,25 +110,7 @@ export function TaskKnowledgePageContent() {
 
       {/* Search bar */}
       <div className="mb-6">
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-base-content/40" />
-          <input
-            type="text"
-            className="input input-bordered input-sm w-full pl-9 pr-8"
-            placeholder="Search tasks..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-          {searchInput && (
-            <button
-              type="button"
-              onClick={() => setSearchInput("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs p-0 h-auto min-h-0"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
+        <SearchInput value={searchInput} onChange={setSearchInput} placeholder="Search tasks..." />
       </div>
 
       {/* Content */}

@@ -74,7 +74,7 @@ class FileService:
         import shutil
         import tempfile
 
-        source_path = Path(path)
+        source_path = self._resolve_download_path(path)
         if not source_path.exists():
             raise HTTPException(status_code=404, detail=f"Path not found: {path}")
 
@@ -118,6 +118,23 @@ class FileService:
             shutil.rmtree(temp_dir, ignore_errors=True)
             logger.error(f"Error creating zip file: {e}")
             raise HTTPException(status_code=500, detail=f"Error creating zip file: {e!s}")
+
+    def _resolve_download_path(self, path: str) -> Path:
+        """Resolve a download path to the configured qubex-config tree."""
+        base_path = self._base_path.resolve()
+        requested_path = Path(path).expanduser()
+
+        if not requested_path.is_absolute():
+            return validate_relative_path(path, base_path)
+
+        resolved_path = requested_path.resolve()
+        if resolved_path == base_path.parent:
+            return base_path
+
+        if not resolved_path.is_relative_to(base_path):
+            raise HTTPException(status_code=400, detail="Path outside config directory")
+
+        return resolved_path
 
     def get_file_tree(self) -> list[FileTreeNode]:
         """Get file tree structure for entire config directory.
