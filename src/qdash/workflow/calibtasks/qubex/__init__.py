@@ -37,6 +37,7 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
 from qdash.workflow.calibtasks.qubex.cw.check_simultaneous_qubit_spectroscopy import (
     CheckSimultaneousQubitSpectroscopy,
 )
+from qdash.workflow.calibtasks.qubex.cw.check_waveform import CheckWaveform
 from qdash.workflow.calibtasks.qubex.measurement.readout_classification import ReadoutClassification
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_chevron import CheckChevron
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_coarse_chevron import (
@@ -121,6 +122,7 @@ __all__ = [
     "CheckT1Average",
     "CheckT2Echo",
     "CheckT2EchoAverage",
+    "CheckWaveform",
     "CheckZX90",
     "ChevronPattern",  # legacy alias of CheckFineChevron — UI selector only
     "Configure",

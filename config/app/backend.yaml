@@ -43,6 +43,7 @@ backends:
       - CheckQubitSpectroscopy
       - CheckSimultaneousQubitSpectroscopy
       - CheckQubitFrequencies
+      - CheckWaveform
       - CheckControlAmplitude
       - CheckReadoutAmplitude
       - CheckElectricalDelay
@@ -124,6 +125,7 @@ categories:
     - CheckQubitSpectroscopy
     - CheckSimultaneousQubitSpectroscopy
     - CheckQubitFrequencies
+    - CheckWaveform
     - CheckControlAmplitude
     - CheckReadoutAmplitude
     - CheckElectricalDelay

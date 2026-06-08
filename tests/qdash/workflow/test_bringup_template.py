@@ -40,6 +40,18 @@ def test_bringup_injects_resonator_assignment_pattern(monkeypatch) -> None:
     }
 
 
+def test_bringup_starts_with_configure_all(monkeypatch) -> None:
+    monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
+
+    result = bringup_module.bringup(
+        username="alice",
+        chip_id="16Q-test",
+        mux_ids=[0],
+    )
+
+    assert [step.name for step in result["steps"]] == ["configure_all", "bringup"]
+
+
 def test_bringup_step_accepts_resonator_assignment_pattern() -> None:
     from qdash.workflow.service.steps import BringUp
 
