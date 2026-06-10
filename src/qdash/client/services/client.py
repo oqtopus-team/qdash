@@ -6,9 +6,10 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
+from pydantic import BaseModel, ValidationError
 
 from qdash.client.rest.api_client import ApiClient as RestApiClient
 from qdash.client.rest.api_response import ApiResponse as RestApiResponse
@@ -22,14 +23,15 @@ from qdash.client.services.errors import (
     QDashTransportError,
     QDashValidationError,
 )
+from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
     ChipMetricsResponse,
     ListChipsResponse,
-    NormalizedMetricRecord,
     TimeSeriesData,
 )
 
 PACKAGE_NAME = "qdash"
+TModel = TypeVar("TModel", bound=BaseModel)
 
 
 def _resolve_user_agent() -> str:
@@ -71,30 +73,96 @@ class QDashClient:
     def close(self) -> None:
         self._rest_client.close()
 
+    def _validate_model_or_default(
+        self,
+        model_type: type[TModel],
+        payload: Any,
+        *,
+        default: TModel,
+    ) -> TModel:
+        if isinstance(payload, dict):
+            normalized_payload = self._normalize_datetime_fields(payload)
+            try:
+                return model_type.model_validate(normalized_payload)
+            except ValidationError:
+                pass
+        return default
+
+    def _normalize_datetime_fields(self, payload: Any) -> Any:
+        if isinstance(payload, dict):
+            normalized: dict[str, Any] = {}
+            for key, value in payload.items():
+                if isinstance(value, str) and key.endswith("_at"):
+                    normalized[key] = self._normalize_datetime_string(value)
+                else:
+                    normalized[key] = self._normalize_datetime_fields(value)
+            return normalized
+        if isinstance(payload, list):
+            return [self._normalize_datetime_fields(item) for item in payload]
+        return payload
+
+    def _normalize_datetime_string(self, value: str) -> str:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return value
+        if parsed.tzinfo is None:
+            return f"{value}+00:00"
+        return value
+
+    def _empty_chip_metrics(self) -> ChipMetricsResponse:
+        return ChipMetricsResponse(
+            chip_id="",
+            username="",
+            qubit_count=0,
+            within_hours=None,
+            start_at=None,
+            end_at=None,
+            qubit_metrics={},
+            coupling_metrics={},
+        )
+
+    def _coerce_chip_metrics_payload(self, payload: dict[str, Any]) -> ChipMetricsResponse:
+        # Keep backward compatibility with looser payloads that are still useful to callers.
+        return ChipMetricsResponse.model_construct(
+            chip_id=str(payload.get("chip_id") or ""),
+            username=str(payload.get("username") or ""),
+            qubit_count=int(payload.get("qubit_count", 0) or 0),
+            within_hours=(
+                int(payload["within_hours"]) if payload.get("within_hours") is not None else None
+            ),
+            start_at=payload.get("start_at"),
+            end_at=payload.get("end_at"),
+            qubit_metrics=(
+                payload.get("qubit_metrics")
+                if isinstance(payload.get("qubit_metrics"), dict)
+                else {}
+            ),
+            coupling_metrics=(
+                payload.get("coupling_metrics")
+                if isinstance(payload.get("coupling_metrics"), dict)
+                else {}
+            ),
+        )
+
     def list_chips(self) -> ListChipsResponse:
         response = self._request("GET", "/chips")
-        payload = response.data
-        if isinstance(payload, dict):
-            return ListChipsResponse.from_dict(payload)
-        return ListChipsResponse(chips=[], total=0)
+        return self._validate_model_or_default(
+            ListChipsResponse,
+            response.data,
+            default=ListChipsResponse(chips=[], total=0),
+        )
 
     def get_chip_metrics(self, chip_id: str) -> ChipMetricsResponse:
         response = self._request("GET", f"/metrics/chips/{chip_id}/metrics")
         data = response.data
-        return (
-            ChipMetricsResponse.from_dict(data)
-            if isinstance(data, dict)
-            else ChipMetricsResponse(
-                chip_id="",
-                username="",
-                qubit_count=0,
-                within_hours=None,
-                start_at=None,
-                end_at=None,
-                qubit_metrics={},
-                coupling_metrics={},
-            )
-        )
+        if isinstance(data, dict):
+            normalized_data = self._normalize_datetime_fields(data)
+            try:
+                return ChipMetricsResponse.model_validate(normalized_data)
+            except ValidationError:
+                return self._coerce_chip_metrics_payload(normalized_data)
+        return self._empty_chip_metrics()
 
     def get_metrics_config(self) -> dict[str, Any]:
         response = self._request("GET", "/metrics/config")
@@ -123,17 +191,21 @@ class QDashClient:
             params["qid"] = qid
 
         response = self._request("GET", "/task-results/timeseries", params=params)
-        data = response.data
-        return TimeSeriesData.from_dict(data) if isinstance(data, dict) else TimeSeriesData(data={})
+        return self._validate_model_or_default(
+            TimeSeriesData,
+            response.data,
+            default=TimeSeriesData(data={}),
+        )
 
     async def list_chips_async(self) -> ListChipsResponse:
         """Async variant of list_chips using the same auth/header behavior."""
 
         response = await self._request_async("/chips")
-        payload = response.json()
-        if isinstance(payload, dict):
-            return ListChipsResponse.from_dict(payload)
-        return ListChipsResponse(chips=[], total=0)
+        return self._validate_model_or_default(
+            ListChipsResponse,
+            response.json(),
+            default=ListChipsResponse(chips=[], total=0),
+        )
 
     async def get_task_results_timeseries_async(
         self,
@@ -159,8 +231,11 @@ class QDashClient:
             params["qid"] = qid
 
         response = await self._request_async("/task-results/timeseries", params=params)
-        data = response.json()
-        return TimeSeriesData.from_dict(data) if isinstance(data, dict) else TimeSeriesData(data={})
+        return self._validate_model_or_default(
+            TimeSeriesData,
+            response.json(),
+            default=TimeSeriesData(data={}),
+        )
 
     async def get_metrics_config_async(self) -> dict[str, Any]:
         """Async variant of get_metrics_config."""

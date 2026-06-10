@@ -204,6 +204,35 @@ def test_get_chip_metrics_returns_object() -> None:
         client.close()
 
 
+def test_list_chips_accepts_naive_installed_at() -> None:
+    payload = {
+        "chips": [
+            {
+                "chip_id": "chip-a",
+                "size": 64,
+                "qubit_count": 64,
+                "coupling_count": 0,
+                "activity_status": "active",
+                "installed_at": "2025-07-23T08:57:49.799000",
+            }
+        ],
+        "total": 1,
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/chips":
+            return httpx.Response(200, json=payload)
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        chips = client.list_chips()
+        assert chips.total == 1
+        assert chips.chips[0].chip_id == "chip-a"
+    finally:
+        client.close()
+
+
 def test_get_chip_metrics_404_maps_to_not_found_error() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "GET" and request.url.path == "/metrics/chips/chip-a/metrics":

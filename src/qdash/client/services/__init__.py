@@ -14,11 +14,11 @@ from qdash.client.services.errors import (
     QDashTransportError,
     QDashValidationError,
 )
+from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
     ChipMetricsResponse,
     ChipResponse,
     ListChipsResponse,
-    NormalizedMetricRecord,
     ParameterModel,
     TimeSeriesData,
 )
