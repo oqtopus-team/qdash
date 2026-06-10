@@ -150,7 +150,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       {/* Cron Schedule Form */}
       {scheduleType === "cron" && (
         <div className="space-y-3">
-          <div className="form-control">
+          <div className="form-control flex flex-col gap-1">
             <label className="label">
               <span className="label-text text-xs">Cron Expression</span>
             </label>
@@ -166,7 +166,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
             </label>
           </div>
 
-          <div className="form-control">
+          <div className="form-control flex flex-col gap-1">
             <label className="cursor-pointer label justify-start gap-2">
               <input
                 type="checkbox"
@@ -188,7 +188,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       {/* One-time Schedule Form */}
       {scheduleType === "one-time" && (
         <div className="space-y-3">
-          <div className="form-control">
+          <div className="form-control flex flex-col gap-1">
             <label className="label">
               <span className="label-text text-xs">Date (JST)</span>
             </label>
@@ -202,7 +202,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
               }}
             />
           </div>
-          <div className="form-control">
+          <div className="form-control flex flex-col gap-1">
             <label className="label">
               <span className="label-text text-xs">Time (JST)</span>
             </label>
