@@ -231,11 +231,7 @@ export function DashboardCouplingGrid({
                 : hasCrossMetricNote
                   ? " · note on other metric"
                   : "") +
-            (onCouplingClick
-              ? value !== null
-                ? " (click to edit metric note)"
-                : " (click to edit target note)"
-              : "");
+            (onCouplingClick ? " (click to edit metric note)" : "");
           return (
             <Tag
               key={couplingId}
