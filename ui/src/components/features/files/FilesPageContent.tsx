@@ -372,13 +372,6 @@ export function FilesPageContent() {
       <div className="h-screen flex flex-col bg-base-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            <button
-              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="btn btn-sm btn-ghost hidden sm:flex"
-              title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
-            >
-              <PanelLeft size={16} />
-            </button>
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
               <span className="text-sm font-medium flex-shrink-0 hidden sm:inline">
                 Config Files
@@ -534,17 +527,33 @@ export function FilesPageContent() {
         )}
 
         <div className="flex-1 flex overflow-hidden">
-          <div
-            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-base-100 border-r border-base-300 overflow-y-auto transition-all duration-200 overflow-hidden flex-shrink-0`}
-          >
-            <div className="py-2">
-              <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
-                EXPLORER
-              </h2>
-              <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
-                Config Files
+          {/* Sidebar */}
+          <div className="bg-base-100 border-r border-base-300 flex flex-shrink-0">
+            {/* Collapsible panel */}
+            <div
+              className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} flex flex-col transition-all duration-200 overflow-hidden`}
+            >
+              <div className="flex-1 overflow-y-auto py-2">
+                <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
+                  EXPLORER
+                </h2>
+                <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
+                  Config Files
+                </div>
+                {fileTreeData && renderFileTree(fileTreeData)}
               </div>
-              {fileTreeData && renderFileTree(fileTreeData)}
+            </div>
+
+            {/* Toggle button - always visible */}
+            <div className="flex flex-col bg-transparent">
+              <button
+                onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+                className="px-2 py-2 text-base-content/50 hover:text-base-content hover:bg-base-200 transition-colors"
+                aria-label={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
+                title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
+              >
+                <PanelLeft size={16} />
+              </button>
             </div>
           </div>
 
@@ -626,17 +635,6 @@ export function FilesPageContent() {
         <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">
           <div tabIndex={0} role="button" className="btn btn-circle btn-primary shadow-lg">
             <Plus size={20} />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              Sidebar
-            </span>
-            <button
-              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className="btn btn-circle btn-outline bg-base-100 shadow-lg"
-            >
-              <Folder size={20} />
-            </button>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
