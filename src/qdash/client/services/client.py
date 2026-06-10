@@ -3,18 +3,21 @@ from __future__ import annotations
 import asyncio
 import random
 import time
-from collections.abc import Callable
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
 from qdash.client.rest.api_client import ApiClient as RestApiClient
-from qdash.client.rest.api_response import ApiResponse as RestApiResponse
 from qdash.client.rest.configuration import Configuration as RestConfiguration
 from qdash.client.rest.exceptions import ApiException as RestApiException
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from qdash.client.rest.api_response import ApiResponse as RestApiResponse
 from qdash.client.services.config import QDashConfig
 from qdash.client.services.errors import (
     QDashApiError,
@@ -462,7 +465,7 @@ class QDashClient:
         base = self.config.retry.base_delay_sec
         max_delay = self.config.retry.max_delay_sec
         delay = min(max_delay, base * (2 ** (attempt - 1)))
-        jitter = random.uniform(0.0, delay * 0.1)
+        jitter = random.uniform(0.0, delay * 0.1)  # noqa: S311
         return delay + jitter
 
     def _raise_for_response(self, response: httpx.Response) -> QDashApiError:
@@ -514,7 +517,7 @@ class QDashClient:
                     return f"{response.status_code} {endpoint}: {detail}"
             if isinstance(body, str):
                 return f"{response.status_code} {endpoint}: {body}"
-        except Exception:
+        except Exception:  # noqa: S110
             pass
         return f"{response.status_code} {endpoint}"
 

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import httpx
+
+if TYPE_CHECKING:
+    from pathlib import Path
 import pytest
 
 from qdash.client import (
@@ -64,10 +67,10 @@ def test_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     config = QDashConfig.from_env()
 
     assert config.base_url == "http://env.local"
-    assert config.api_token == "env-token"
+    assert config.api_token == "env-token"  # noqa: S105
     assert config.project_id == "project-1"
     assert config.cf_access_client_id == "cf-id"
-    assert config.cf_access_client_secret == "cf-secret"
+    assert config.cf_access_client_secret == "cf-secret"  # noqa: S105
     assert config.retry.max_attempts == 5
 
 
@@ -346,7 +349,7 @@ def test_header_population_with_api_token() -> None:
     )
     client.config.project_id = "proj"
     client.config.cf_access_client_id = "cf-id"
-    client.config.cf_access_client_secret = "cf-secret"
+    client.config.cf_access_client_secret = "cf-secret"  # noqa: S105
 
     try:
         headers = client._build_headers()

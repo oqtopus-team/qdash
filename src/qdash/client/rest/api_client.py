@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from qdash.client.rest.api_response import ApiResponse
-from qdash.client.rest.configuration import Configuration
 from qdash.client.rest.exceptions import ApiException
+
+if TYPE_CHECKING:
+    from qdash.client.rest.configuration import Configuration
 
 
 class ApiClient:
