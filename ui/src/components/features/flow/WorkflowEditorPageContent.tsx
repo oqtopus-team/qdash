@@ -2039,22 +2039,24 @@ export function WorkflowEditorPageContent() {
               Ln {cursorPosition.line}, Col {cursorPosition.column}
             </button>
             {selection.chars > 0 && (
-              <span className="px-1.5 py-0.5 bg-primary-content/10 rounded">
+              <span className="hidden sm:inline-block px-1.5 py-0.5 bg-primary-content/10 rounded">
                 {selection.lines > 1 ? `${selection.lines} lines, ` : ""}
                 {selection.chars} selected
               </span>
             )}
-            <span className="px-1.5 py-0.5">Spaces: 4</span>
+            <span className="hidden sm:inline-block px-1.5 py-0.5">Spaces: 4</span>
             <span className="px-1.5 py-0.5">Python</span>
             <span className="px-1.5 py-0.5">UTF-8</span>
-            {isDirty && <span className="px-1.5 py-0.5 opacity-80">● Modified</span>}
+            {isDirty && (
+              <span className="hidden sm:inline-block px-1.5 py-0.5 opacity-80">● Modified</span>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <span className="px-1.5 py-0.5">{code.split("\n").length} lines</span>
             <button
               type="button"
               onClick={() => setWordWrap((prev) => (prev === "on" ? "off" : "on"))}
-              className={`hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1 ${wordWrap === "off" ? "opacity-50" : ""}`}
+              className={`hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer hidden sm:flex items-center gap-1 ${wordWrap === "off" ? "opacity-50" : ""}`}
               title="Toggle Word Wrap (⌥Z)"
             >
               <WrapText size={10} />
@@ -2062,7 +2064,7 @@ export function WorkflowEditorPageContent() {
             <button
               type="button"
               onClick={() => setIsBottomPanelOpen((prev) => !prev)}
-              className={`hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1 ${isBottomPanelOpen ? "" : "opacity-60"}`}
+              className={`hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer hidden sm:flex items-center gap-1 ${isBottomPanelOpen ? "" : "opacity-60"}`}
               title="Toggle Panel (⌘`)"
             >
               <Terminal size={10} />
@@ -2071,7 +2073,7 @@ export function WorkflowEditorPageContent() {
               <button
                 type="button"
                 onClick={() => setFontSize(14)}
-                className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer hidden sm:block"
                 title="Reset Zoom (⌘0)"
               >
                 {Math.round((fontSize / 14) * 100)}%
@@ -2081,7 +2083,7 @@ export function WorkflowEditorPageContent() {
               <button
                 type="button"
                 onClick={() => setIsEditorLocked(false)}
-                className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1 opacity-80"
+                className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer hidden sm:flex items-center gap-1 opacity-80"
                 title="Click to enable editing"
               >
                 <Lock size={10} /> Read-only
@@ -2090,7 +2092,7 @@ export function WorkflowEditorPageContent() {
               <button
                 type="button"
                 onClick={() => setIsEditorLocked(true)}
-                className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1"
+                className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer hidden sm:flex items-center gap-1"
                 title="Click to lock editor"
               >
                 <Pencil size={10} /> Editing
@@ -2102,7 +2104,7 @@ export function WorkflowEditorPageContent() {
                 setShowCommandPalette(true);
                 setCommandSearch("");
               }}
-              className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1 opacity-70 hover:opacity-100"
+              className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer hidden sm:flex items-center gap-1 opacity-70 hover:opacity-100"
               title="Command Palette"
             >
               <Command size={10} />
