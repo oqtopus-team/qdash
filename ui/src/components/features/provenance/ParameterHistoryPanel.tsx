@@ -18,6 +18,7 @@ import {
 
 import { useGetParameterHistory } from "@/client/provenance/provenance";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
+import { groupMetricsByCategory } from "@/lib/metrics-grouping";
 import { getDaisySelectStyles, getDaisySelectStylesSm } from "@/lib/react-select-theme";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime } from "@/lib/utils/datetime";
@@ -83,19 +84,11 @@ export function ParameterHistoryPanel({
   // Metrics config for parameter dropdown
   const { qubitMetrics, couplingMetrics } = useMetricsConfig();
 
-  const parameterOptions = useMemo<GroupBase<ParameterOption>[]>(() => {
-    if (qubitMetrics.length === 0 && couplingMetrics.length === 0) return [];
-    return [
-      {
-        label: "1Q Metrics",
-        options: qubitMetrics.map((m) => ({ value: m.key, label: m.title })),
-      },
-      {
-        label: "2Q Metrics",
-        options: couplingMetrics.map((m) => ({ value: m.key, label: m.title })),
-      },
-    ];
-  }, [qubitMetrics, couplingMetrics]);
+  const parameterOptions = useMemo<GroupBase<ParameterOption>[]>(
+    // Group by category (qubit categories first, then coupling)
+    () => [...groupMetricsByCategory(qubitMetrics), ...groupMetricsByCategory(couplingMetrics)],
+    [qubitMetrics, couplingMetrics],
+  );
 
   const allMetricOptions = useMemo(
     () =>

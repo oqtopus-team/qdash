@@ -2,12 +2,16 @@
 # This file defines display metadata for calibration metrics.
 # Backend Pydantic models define the actual fields, this file only provides UI metadata.
 
+# The optional `category` field groups metrics in the UI dropdown menus.
+# Metrics sharing a category are displayed together under a category header.
+# Categories appear in the order their first metric is defined below.
 qubit_metrics:
   readout_frequency:
     title: Readout Frequency
     unit: GHz
     scale: 1
     description: Resonance frequency of the readout resonator
+    category: Frequency
     evaluation:
       mode: maximize
     threshold:
@@ -21,6 +25,7 @@ qubit_metrics:
     unit: GHz
     scale: 1
     description: Resonance frequency of the qubit
+    category: Frequency
     evaluation:
       mode: maximize
     threshold:
@@ -35,6 +40,7 @@ qubit_metrics:
     unit: MHz
     scale: 1000 # Convert GHz to MHz
     description: Anharmonicity of the qubit energy levels
+    category: Frequency
     evaluation:
       mode: minimize
     threshold:
@@ -49,6 +55,7 @@ qubit_metrics:
     unit: μs
     scale: 1
     description: Energy relaxation time
+    category: Coherence
     evaluation:
       mode: maximize
     threshold:
@@ -63,6 +70,7 @@ qubit_metrics:
     unit: μs
     scale: 1
     description: Mean T1 relaxation time over repeated measurements (± std)
+    category: Coherence
     evaluation:
       mode: maximize
     threshold:
@@ -77,6 +85,7 @@ qubit_metrics:
     unit: μs
     scale: 1
     description: Dephasing time measured with echo sequence
+    category: Coherence
     evaluation:
       mode: maximize
     threshold:
@@ -91,6 +100,7 @@ qubit_metrics:
     unit: μs
     scale: 1
     description: Mean T2 echo time over repeated measurements (± std)
+    category: Coherence
     evaluation:
       mode: maximize
     threshold:
@@ -105,6 +115,7 @@ qubit_metrics:
     unit: μs
     scale: 1
     description: Free induction decay time
+    category: Coherence
     evaluation:
       mode: maximize
     threshold:
@@ -119,6 +130,7 @@ qubit_metrics:
     unit: "%"
     scale: 100
     description: Average fidelity of readout operations
+    category: Readout
     evaluation:
       mode: maximize
     threshold:
@@ -137,6 +149,7 @@ qubit_metrics:
     unit: "%"
     scale: 100
     description: Fidelity of single-qubit gates
+    category: Single-Qubit Gate
     evaluation:
       mode: maximize
     threshold:
@@ -155,6 +168,7 @@ qubit_metrics:
     unit: "%"
     scale: 100
     description: Fidelity of X90 (π/2 rotation) gate
+    category: Single-Qubit Gate
     evaluation:
       mode: maximize
     threshold:
@@ -173,6 +187,7 @@ qubit_metrics:
     unit: "%"
     scale: 100
     description: Fidelity of X180 (π rotation) gate
+    category: Single-Qubit Gate
     evaluation:
       mode: maximize
     threshold:
@@ -191,6 +206,7 @@ qubit_metrics:
     unit: MHz/a.u.
     scale: 1
     description: Maximum Rabi frequency per unit control amplitude
+    category: Control
     evaluation:
       mode: none
 
@@ -199,6 +215,7 @@ qubit_metrics:
     unit: a.u.
     scale: 1
     description: Half-pi pulse amplitude for qubit control
+    category: Control
     evaluation:
       mode: none
 
@@ -207,6 +224,7 @@ qubit_metrics:
     unit: ns
     scale: 1
     description: Half-pi pulse duration
+    category: Control
     evaluation:
       mode: none
 
@@ -215,6 +233,7 @@ qubit_metrics:
     unit: "%"
     scale: 100
     description: Theoretical fidelity limit of single-qubit gates from coherence times
+    category: Single-Qubit Gate
     evaluation:
       mode: maximize
 
@@ -224,6 +243,7 @@ coupling_metrics:
     unit: "%"
     scale: 100
     description: Fidelity of two-qubit ZX90 gate
+    category: Two-Qubit Gate
     evaluation:
       mode: maximize
     threshold:
@@ -242,6 +262,7 @@ coupling_metrics:
     unit: "%"
     scale: 100
     description: Fidelity of Bell state preparation
+    category: Two-Qubit Gate
     evaluation:
       mode: maximize
     threshold:
@@ -260,6 +281,7 @@ coupling_metrics:
     unit: ns
     scale: 1
     description: Gate time of the ZX90 pulse
+    category: Two-Qubit Gate
     evaluation:
       mode: none
 
@@ -268,6 +290,7 @@ coupling_metrics:
     unit: "%"
     scale: 100
     description: Theoretical fidelity limit of two-qubit gates from coherence times
+    category: Two-Qubit Gate
     evaluation:
       mode: maximize
 
@@ -276,6 +299,7 @@ coupling_metrics:
     unit: MHz
     scale: 1000 # Convert GHz to MHz
     description: Static ZZ coupling strength between qubits
+    category: Interaction
     evaluation:
       mode: minimize
 

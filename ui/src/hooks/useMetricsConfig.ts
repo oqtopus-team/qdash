@@ -29,6 +29,7 @@ interface MetricMetadata {
   unit: string;
   scale: number;
   description?: string;
+  category?: string;
   evaluation: EvaluationConfig;
   threshold?: ThresholdConfig;
 }
@@ -67,6 +68,7 @@ export interface MetricConfig {
   unit: string;
   scale: number;
   description?: string;
+  category?: string;
   evaluationMode: "maximize" | "minimize" | "none";
   threshold?: {
     value: number;
@@ -116,6 +118,7 @@ export function useMetricsConfig() {
         unit: metadata.unit,
         scale: metadata.scale,
         description: metadata.description,
+        category: metadata.category,
         evaluationMode: metadata.evaluation?.mode || "none",
         threshold: metadata.threshold
           ? {
@@ -134,6 +137,7 @@ export function useMetricsConfig() {
         unit: metadata.unit,
         scale: metadata.scale,
         description: metadata.description,
+        category: metadata.category,
         evaluationMode: metadata.evaluation?.mode || "none",
         threshold: metadata.threshold
           ? {

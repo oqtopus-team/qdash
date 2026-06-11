@@ -24,6 +24,7 @@ import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useMetricsUrlState } from "@/hooks/useUrlState";
+import { groupMetricsByCategory } from "@/lib/metrics-grouping";
 import { getDaisySelectStyles } from "@/lib/react-select-theme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -206,13 +207,8 @@ export function MetricsPageContent() {
   );
 
   const groupedMetricOptions: GroupBase<MetricOption>[] = useMemo(
-    () => [
-      {
-        label: metricType === "qubit" ? "Qubit Metrics" : "Coupling Metrics",
-        options: metricOptions,
-      },
-    ],
-    [metricOptions, metricType],
+    () => groupMetricsByCategory(metricsConfig),
+    [metricsConfig],
   );
 
   // Use shared DaisyUI-compatible styles for React-Select

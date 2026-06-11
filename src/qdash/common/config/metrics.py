@@ -38,6 +38,7 @@ class MetricMetadata(BaseModel):
     unit: str
     scale: float
     description: str | None = None
+    category: str | None = None
     evaluation: EvaluationConfig
     threshold: ThresholdConfig | None = None
 

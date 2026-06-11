@@ -17,6 +17,7 @@ import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig, type MetricConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useCDFUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
+import { groupMetricsByCategory } from "@/lib/metrics-grouping";
 
 interface CumulativeDataPoint {
   value: number;
@@ -67,29 +68,11 @@ export function CDFView() {
   }, [couplingMetrics, selectedParameters]);
 
   // Available parameter options for selection
-  const availableParameters = useMemo(() => {
-    if (qubitMetrics.length === 0 && couplingMetrics.length === 0) {
-      return [];
-    }
-
-    // Group options by type
-    return [
-      {
-        label: "1Q Metrics",
-        options: qubitMetrics.map((metric) => ({
-          value: metric.key,
-          label: metric.title,
-        })),
-      },
-      {
-        label: "2Q Metrics",
-        options: couplingMetrics.map((metric) => ({
-          value: metric.key,
-          label: metric.title,
-        })),
-      },
-    ];
-  }, [qubitMetrics, couplingMetrics]);
+  const availableParameters = useMemo(
+    // Group options by category (qubit categories first, then coupling)
+    () => [...groupMetricsByCategory(qubitMetrics), ...groupMetricsByCategory(couplingMetrics)],
+    [qubitMetrics, couplingMetrics],
+  );
 
   // Get current metric configurations for selected parameters
   const selectedMetricConfigs = useMemo(() => {
