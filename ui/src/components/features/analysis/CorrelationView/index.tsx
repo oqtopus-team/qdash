@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useCallback } from "react";
 
-import Select, { type SingleValue, type StylesConfig } from "react-select";
+import Select, { type GroupBase, type SingleValue, type StylesConfig } from "react-select";
 
 import { useListChips } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
@@ -16,6 +16,7 @@ import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useCorrelationUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
+import { groupMetricsByCategory } from "@/lib/metrics-grouping";
 
 type MetricOption = {
   value: string;
@@ -117,6 +118,12 @@ export function CorrelationView() {
   // Select appropriate metrics options based on type
   const metricOptions = metricType === "qubit" ? qubitMetricOptions : couplingMetricOptions;
 
+  // Group options by category for the X/Y dropdowns
+  const groupedMetricOptions: GroupBase<MetricOption>[] = useMemo(
+    () => groupMetricsByCategory(metricType === "qubit" ? qubitMetrics : couplingMetrics),
+    [metricType, qubitMetrics, couplingMetrics],
+  );
+
   // Get current metric configurations
   const xMetricConfig = useMemo(() => {
     return (
@@ -140,7 +147,7 @@ export function CorrelationView() {
   }, [xMetricConfig, yMetricConfig]);
 
   // Select styles
-  const metricSelectStyles = useMemo<StylesConfig<MetricOption, false>>(
+  const metricSelectStyles = useMemo<StylesConfig<MetricOption, false, GroupBase<MetricOption>>>(
     () => ({
       control: (provided) => ({
         ...provided,
@@ -158,6 +165,14 @@ export function CorrelationView() {
       menu: (provided) => ({
         ...provided,
         zIndex: 50,
+      }),
+      groupHeading: (provided) => ({
+        ...provided,
+        color: "oklch(var(--bc) / 0.6)",
+        fontSize: "0.75rem",
+        fontWeight: 600,
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
       }),
     }),
     [],
@@ -550,10 +565,10 @@ export function CorrelationView() {
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <span className="text-xs sm:text-sm font-medium">X:</span>
                 <div className="flex-1 sm:w-56 sm:flex-none">
-                  <Select<MetricOption, false>
+                  <Select<MetricOption, false, GroupBase<MetricOption>>
                     className="text-base-content"
                     classNamePrefix="react-select"
-                    options={metricOptions}
+                    options={groupedMetricOptions}
                     value={metricOptions.find((option) => option.value === xParameter) ?? null}
                     onChange={(option: SingleValue<MetricOption>) => {
                       if (option) {
@@ -570,10 +585,10 @@ export function CorrelationView() {
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <span className="text-xs sm:text-sm font-medium">Y:</span>
                 <div className="flex-1 sm:w-56 sm:flex-none">
-                  <Select<MetricOption, false>
+                  <Select<MetricOption, false, GroupBase<MetricOption>>
                     className="text-base-content"
                     classNamePrefix="react-select"
-                    options={metricOptions}
+                    options={groupedMetricOptions}
                     value={metricOptions.find((option) => option.value === yParameter) ?? null}
                     onChange={(option: SingleValue<MetricOption>) => {
                       if (option) {

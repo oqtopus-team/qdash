@@ -21,6 +21,7 @@ import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTimeRange } from "@/hooks/useTimeRange";
 import { useAnalysisUrlState } from "@/hooks/useUrlState";
+import { groupMetricsByCategory } from "@/lib/metrics-grouping";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 // Color palette for secondary axis traces
@@ -84,29 +85,11 @@ export function TimeSeriesView() {
     isError: isConfigError,
   } = useMetricsConfig();
 
-  // Available parameter options for selection (grouped by type)
-  const availableParameters = useMemo(() => {
-    if (qubitMetrics.length === 0 && couplingMetrics.length === 0) {
-      return [];
-    }
-
-    return [
-      {
-        label: "1Q Metrics",
-        options: qubitMetrics.map((metric) => ({
-          value: metric.key,
-          label: metric.title,
-        })),
-      },
-      {
-        label: "2Q Metrics",
-        options: couplingMetrics.map((metric) => ({
-          value: metric.key,
-          label: metric.title,
-        })),
-      },
-    ];
-  }, [qubitMetrics, couplingMetrics]);
+  // Available parameter options for selection (grouped by category)
+  const availableParameters = useMemo(
+    () => [...groupMetricsByCategory(qubitMetrics), ...groupMetricsByCategory(couplingMetrics)],
+    [qubitMetrics, couplingMetrics],
+  );
 
   // Get current metric configuration for selected parameter
   const currentMetricConfig = useMemo(() => {
@@ -125,33 +108,16 @@ export function TimeSeriesView() {
     );
   }, [qubitMetrics, couplingMetrics, secondaryParameter]);
 
-  // Available parameters for secondary axis (exclude primary)
-  const availableSecondaryParameters = useMemo(() => {
-    if (qubitMetrics.length === 0 && couplingMetrics.length === 0) {
-      return [];
-    }
-
-    return [
-      {
-        label: "1Q Metrics",
-        options: qubitMetrics
-          .filter((metric) => metric.key !== selectedParameter)
-          .map((metric) => ({
-            value: metric.key,
-            label: metric.title,
-          })),
-      },
-      {
-        label: "2Q Metrics",
-        options: couplingMetrics
-          .filter((metric) => metric.key !== selectedParameter)
-          .map((metric) => ({
-            value: metric.key,
-            label: metric.title,
-          })),
-      },
-    ].filter((group) => group.options.length > 0);
-  }, [qubitMetrics, couplingMetrics, selectedParameter]);
+  // Available parameters for secondary axis (exclude primary), grouped by category
+  const availableSecondaryParameters = useMemo(
+    () => [
+      ...groupMetricsByCategory(qubitMetrics.filter((metric) => metric.key !== selectedParameter)),
+      ...groupMetricsByCategory(
+        couplingMetrics.filter((metric) => metric.key !== selectedParameter),
+      ),
+    ],
+    [qubitMetrics, couplingMetrics, selectedParameter],
+  );
 
   // Fetch chips data for default selection
   const { data: chipsResponse } = useListChips();
