@@ -105,6 +105,10 @@ export default withMermaid(
               text: "Cryostats & Cool-downs",
               link: "/user-guide/cryo",
             },
+            {
+              text: "QDash Client",
+              link: "/user-guide/qdash-client",
+            },
           ],
         },
         {
