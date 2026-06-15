@@ -82,10 +82,9 @@ from qdash.client import QDashClient, QDashConfig
 ### 2.1 From Environment Variables
 
 ```python
-from qdash.client import QDashConfig, QDashClient
+from qdash.client import QDashClient
 
-config = QDashConfig.from_env()
-client = QDashClient(config)
+client = QDashClient.from_env()
 ```
 
 Main environment variables:
@@ -112,10 +111,9 @@ For legacy username/password authentication, set:
 ### 2.2 From a Configuration File
 
 ```python
-from qdash.client import QDashConfig, QDashClient
+from qdash.client import QDashClient
 
-config = QDashConfig.from_file(profile="default")
-client = QDashClient(config)
+client = QDashClient.from_profile("default")
 ```
 
 If `path` is omitted:
@@ -182,15 +180,34 @@ finally:
     client.close()
 ```
 
-### 3.2 Time-Series Metrics
+### 3.2 Default Chip
+
+`get_default_chip()` returns the most recently installed active chip. If no chips are active, it
+falls back to the most recently installed chip returned by the API.
 
 ```python
 from qdash.client import QDashClient
 
 client = QDashClient()
 try:
+    chip = client.get_default_chip()
+    print(chip.chip_id)
+finally:
+    client.close()
+```
+
+Use `get_default_chip_id()` when an API call only needs the chip ID.
+
+### 3.3 Time-Series Metrics
+
+```python
+from qdash.client import QDashClient
+
+client = QDashClient()
+try:
+    chip_id = client.get_default_chip_id()
     series = client.get_task_results_timeseries(
-        chip_id="chip-001",
+        chip_id=chip_id,
         parameter="t1",
         tag="calibration",
         start_at="2026-06-01T00:00:00Z",
@@ -202,7 +219,7 @@ finally:
     client.close()
 ```
 
-### 3.3 Metrics Configuration
+### 3.4 Metrics Configuration
 
 ```python
 from qdash.client import QDashClient

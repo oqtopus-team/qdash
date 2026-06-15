@@ -16,6 +16,7 @@ from qdash.client.rest.exceptions import ApiException as RestApiException
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
     from qdash.client.rest.api_response import ApiResponse as RestApiResponse
 from qdash.client.services.config import QDashConfig
@@ -29,6 +30,7 @@ from qdash.client.services.errors import (
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
     ChipMetricsResponse,
+    ChipResponse,
     ListChipsResponse,
     TimeSeriesData,
 )
@@ -72,6 +74,23 @@ class QDashClient:
         self._token: str | None = self.config.api_token
         if not self.config.user_agent or self.config.user_agent == "qdash-client/dev":
             self.config.user_agent = _resolve_user_agent()
+
+    @classmethod
+    def from_env(cls) -> QDashClient:
+        """Create a client from QDash environment variables."""
+
+        return cls(QDashConfig.from_env())
+
+    @classmethod
+    def from_profile(cls, profile: str = "default", path: str | Path | None = None) -> QDashClient:
+        """Create a client from a named config file profile."""
+
+        config = (
+            QDashConfig.from_file(profile=profile)
+            if path is None
+            else QDashConfig.from_file(profile=profile, path=path)
+        )
+        return cls(config)
 
     def close(self) -> None:
         self._rest_client.close()
@@ -158,6 +177,27 @@ class QDashClient:
             ListChipsResponse,
             response.data,
         )
+
+    def get_default_chip(self) -> ChipResponse:
+        """Return the default chip, preferring the latest active chip when available."""
+
+        chips = self.list_chips().chips
+        if chips:
+            active_chips = [chip for chip in chips if str(chip.activity_status) == "active"]
+            candidates = active_chips or chips
+            return max(
+                candidates,
+                key=lambda chip: (
+                    chip.installed_at is not None,
+                    chip.installed_at or datetime.min.replace(tzinfo=UTC),
+                ),
+            )
+        raise QDashNotFoundError("No chips found.")
+
+    def get_default_chip_id(self) -> str:
+        """Return the default chip ID, preferring the latest active chip when available."""
+
+        return self.get_default_chip().chip_id
 
     def get_chip_metrics(self, chip_id: str) -> ChipMetricsResponse:
         response = self._request("GET", f"/metrics/chips/{chip_id}/metrics")
