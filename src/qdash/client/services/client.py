@@ -161,15 +161,14 @@ class QDashClient:
         )
 
     def get_default_chip(self) -> ChipResponse:
-        """Return the default chip, preferring an active chip when available."""
+        """Return the default chip, preferring the latest active chip when available."""
 
         chips = self.list_chips().chips
-        for chip in chips:
-            if str(chip.activity_status) == "active":
-                return chip
         if chips:
+            active_chips = [chip for chip in chips if str(chip.activity_status) == "active"]
+            candidates = active_chips or chips
             return max(
-                chips,
+                candidates,
                 key=lambda chip: (
                     chip.installed_at is not None,
                     chip.installed_at or datetime.min.replace(tzinfo=UTC),
@@ -178,7 +177,7 @@ class QDashClient:
         raise QDashNotFoundError("No chips found.")
 
     def get_default_chip_id(self) -> str:
-        """Return the default chip ID, preferring an active chip when available."""
+        """Return the default chip ID, preferring the latest active chip when available."""
 
         return self.get_default_chip().chip_id
 

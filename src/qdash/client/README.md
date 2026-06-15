@@ -184,8 +184,8 @@ finally:
 
 ### 3.2 Default Chip
 
-`get_default_chip()` returns the first active chip. If no chips are active, it falls back to the
-most recently installed chip returned by the API.
+`get_default_chip()` returns the most recently installed active chip. If no chips are active, it
+falls back to the most recently installed chip returned by the API.
 
 ```python
 from qdash.client import QDashClient

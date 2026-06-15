@@ -309,7 +309,7 @@ def test_list_chips_accepts_naive_installed_at() -> None:
         client.close()
 
 
-def test_get_default_chip_prefers_first_active_chip() -> None:
+def test_get_default_chip_prefers_latest_active_chip() -> None:
     payload = {
         "chips": [
             {
@@ -340,8 +340,8 @@ def test_get_default_chip_prefers_first_active_chip() -> None:
     try:
         chip = client.get_default_chip()
         assert isinstance(chip, ChipResponse)
-        assert chip.chip_id == "chip-active-old"
-        assert client.get_default_chip_id() == "chip-active-old"
+        assert chip.chip_id == "chip-active-latest"
+        assert client.get_default_chip_id() == "chip-active-latest"
     finally:
         client.close()
 
@@ -375,7 +375,7 @@ def test_get_default_chip_falls_back_to_latest_chip() -> None:
         client.close()
 
 
-def test_get_default_chip_does_not_sort_active_chips_by_installed_at() -> None:
+def test_get_default_chip_uses_undated_chip_only_when_needed() -> None:
     payload = {
         "chips": [
             {"chip_id": "chip-undated", "activity_status": "active"},
@@ -395,7 +395,7 @@ def test_get_default_chip_does_not_sort_active_chips_by_installed_at() -> None:
 
     client = _build_client(httpx.MockTransport(handler), api_token="api-token")
     try:
-        assert client.get_default_chip().chip_id == "chip-undated"
+        assert client.get_default_chip().chip_id == "chip-dated"
     finally:
         client.close()
 
