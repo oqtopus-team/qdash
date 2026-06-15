@@ -178,6 +178,7 @@ dev = [
 [tool.uv.workspace]
 members = [
     "src/qdash/api",
+    "src/qdash/client",
     "src/qdash/workflow",
 ]
 

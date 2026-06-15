@@ -1,0 +1,29 @@
+[project]
+name = "qdash-client"
+version = "0.1.0"
+description = "Python client for the QDash API"
+authors = [
+    {name = "OQTOPUS Team", email = "oqtopus-team@googlegroups.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "httpx>=0.27.0",
+    "pydantic>=2.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+]
+
+[tool.hatch.build.targets.wheel.force-include]
+"__init__.py" = "qdash/client/__init__.py"
+"py.typed" = "qdash/client/py.typed"
+"rest" = "qdash/client/rest"
+"services" = "qdash/client/services"
