@@ -369,7 +369,7 @@ export function FilesPageContent() {
 
   return (
     <>
-      <div className="h-screen flex flex-col bg-base-300">
+      <div className="h-[calc(100dvh-4rem)] flex flex-col bg-base-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
