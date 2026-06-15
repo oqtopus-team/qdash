@@ -29,6 +29,7 @@ from qdash.client.services.errors import (
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
     ChipMetricsResponse,
+    ChipResponse,
     ListChipsResponse,
     TimeSeriesData,
 )
@@ -158,6 +159,27 @@ class QDashClient:
             ListChipsResponse,
             response.data,
         )
+
+    def get_default_chip(self) -> ChipResponse:
+        """Return the default chip, preferring the latest active chip when available."""
+
+        chips = self.list_chips().chips
+        if chips:
+            active_chips = [chip for chip in chips if str(chip.activity_status) == "active"]
+            candidates = active_chips or chips
+            return max(
+                candidates,
+                key=lambda chip: (
+                    chip.installed_at is not None,
+                    chip.installed_at or datetime.min.replace(tzinfo=UTC),
+                ),
+            )
+        raise QDashNotFoundError("No chips found.")
+
+    def get_default_chip_id(self) -> str:
+        """Return the default chip ID, preferring the latest active chip when available."""
+
+        return self.get_default_chip().chip_id
 
     def get_chip_metrics(self, chip_id: str) -> ChipMetricsResponse:
         response = self._request("GET", f"/metrics/chips/{chip_id}/metrics")
