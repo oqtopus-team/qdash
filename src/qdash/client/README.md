@@ -8,6 +8,36 @@
 This package follows the same approach as `oqtopus-client`, separating the transport layer from the service layer.
 For user-facing examples, see `docs/user-guide/qdash-client.md`.
 
+## Installation
+
+Install the lightweight client package when only programmatic API access is needed.
+
+```bash
+pip install qdash-client
+```
+
+For development against this repository:
+
+```bash
+pip install ./src/qdash/client
+```
+
+The distribution name is `qdash-client`, but the Python import path is `qdash.client`.
+
+## Publishing
+
+`qdash-client` is published from this repository with PyPI Trusted Publishing. Configure the
+`qdash-client` project on PyPI to trust this GitHub repository and the
+`.github/workflows/publish-qdash-client.yml` workflow.
+
+Release tags use the `qdash-client-v<version>` format and must match the version in
+`pyproject.toml`.
+
+```bash
+git tag qdash-client-v0.1.0
+git push origin qdash-client-v0.1.0
+```
+
 ## Minimal Quick Start
 
 This is a minimal example using `/chips`, `/metrics/config`, and `/task-results/timeseries`.

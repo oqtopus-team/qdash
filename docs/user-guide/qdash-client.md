@@ -2,6 +2,26 @@
 
 `qdash.client` is a Python client for reading QDash data from scripts, notebooks, and external automation.
 
+## Installation
+
+Install the lightweight client package when only programmatic API access is needed.
+
+```bash
+pip install qdash-client
+```
+
+For development against this repository, install it from the workspace path.
+
+```bash
+pip install ./src/qdash/client
+```
+
+The distribution name is `qdash-client`, but the Python import path is `qdash.client`.
+
+```python
+from qdash.client import QDashClient
+```
+
 ## Configuration
 
 Use an API token for programmatic access. The client reads configuration from environment variables or from `config.ini`.
@@ -152,4 +172,3 @@ except QDashApiError as exc:
 finally:
     client.close()
 ```
-
