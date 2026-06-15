@@ -82,10 +82,9 @@ from qdash.client import QDashClient, QDashConfig
 ### 2.1 From Environment Variables
 
 ```python
-from qdash.client import QDashConfig, QDashClient
+from qdash.client import QDashClient
 
-config = QDashConfig.from_env()
-client = QDashClient(config)
+client = QDashClient.from_env()
 ```
 
 Main environment variables:
@@ -112,10 +111,9 @@ For legacy username/password authentication, set:
 ### 2.2 From a Configuration File
 
 ```python
-from qdash.client import QDashConfig, QDashClient
+from qdash.client import QDashClient
 
-config = QDashConfig.from_file(profile="default")
-client = QDashClient(config)
+client = QDashClient.from_profile("default")
 ```
 
 If `path` is omitted:

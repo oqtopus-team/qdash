@@ -75,6 +75,18 @@ def test_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.retry.max_attempts == 5
 
 
+def test_client_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("QDASH_BASE_URL", "http://env.local")
+    monkeypatch.setenv("QDASH_API_TOKEN", "env-token")
+
+    client = QDashClient.from_env()
+    try:
+        assert client.config.base_url == "http://env.local"
+        assert client.config.api_token == "env-token"  # noqa: S105
+    finally:
+        client.close()
+
+
 def test_config_from_file_default_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config_dir = tmp_path / "xdg" / "qdash"
     config_dir.mkdir(parents=True)
@@ -121,6 +133,24 @@ api_token = file-token
 
     assert config.base_url == "http://home.local"
     assert config.api_token == "file-token"  # noqa: S105
+
+
+def test_client_from_profile(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.ini"
+    config_file.write_text(
+        """
+[local]
+base_url = http://local.example/
+api_token = local-token
+""".strip()
+    )
+
+    client = QDashClient.from_profile("local", path=config_file)
+    try:
+        assert client.config.base_url == "http://local.example"
+        assert client.config.api_token == "local-token"  # noqa: S105
+    finally:
+        client.close()
 
 
 def test_config_save_writes_selected_section_and_preserves_others(tmp_path: Path) -> None:

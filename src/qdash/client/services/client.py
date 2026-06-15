@@ -16,6 +16,7 @@ from qdash.client.rest.exceptions import ApiException as RestApiException
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
     from qdash.client.rest.api_response import ApiResponse as RestApiResponse
 from qdash.client.services.config import QDashConfig
@@ -73,6 +74,23 @@ class QDashClient:
         self._token: str | None = self.config.api_token
         if not self.config.user_agent or self.config.user_agent == "qdash-client/dev":
             self.config.user_agent = _resolve_user_agent()
+
+    @classmethod
+    def from_env(cls) -> QDashClient:
+        """Create a client from QDash environment variables."""
+
+        return cls(QDashConfig.from_env())
+
+    @classmethod
+    def from_profile(cls, profile: str = "default", path: str | Path | None = None) -> QDashClient:
+        """Create a client from a named config file profile."""
+
+        config = (
+            QDashConfig.from_file(profile=profile)
+            if path is None
+            else QDashConfig.from_file(profile=profile, path=path)
+        )
+        return cls(config)
 
     def close(self) -> None:
         self._rest_client.close()
