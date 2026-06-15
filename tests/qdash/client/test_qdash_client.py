@@ -98,6 +98,30 @@ retry_max_attempts = 4
     assert config.retry.max_attempts == 4
 
 
+def test_config_from_file_default_home_path_expands_user(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_dir = tmp_path / ".config" / "qdash"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.ini"
+    config_file.write_text(
+        """
+[default]
+base_url = http://home.local/
+api_token = file-token
+""".strip()
+    )
+
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    config = QDashConfig.from_file()
+
+    assert config.base_url == "http://home.local"
+    assert config.api_token == "file-token"  # noqa: S105
+
+
 def test_config_from_env_missing_base_url_raises_config_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -232,6 +256,21 @@ def test_list_chips_accepts_naive_installed_at() -> None:
         chips = client.list_chips()
         assert chips.total == 1
         assert chips.chips[0].chip_id == "chip-a"
+    finally:
+        client.close()
+
+
+def test_list_chips_invalid_payload_raises_validation_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/chips":
+            return httpx.Response(200, json={"items": []})
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        with pytest.raises(QDashValidationError) as exc_info:
+            client.list_chips()
+        assert exc_info.value.payload == {"items": []}
     finally:
         client.close()
 

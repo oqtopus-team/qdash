@@ -76,20 +76,24 @@ class QDashClient:
     def close(self) -> None:
         self._rest_client.close()
 
-    def _validate_model_or_default(
+    def _validate_model_payload(
         self,
         model_type: type[TModel],
         payload: Any,
-        *,
-        default: TModel,
     ) -> TModel:
         if isinstance(payload, dict):
             normalized_payload = self._normalize_datetime_fields(payload)
             try:
                 return model_type.model_validate(normalized_payload)
-            except ValidationError:
-                pass
-        return default
+            except ValidationError as exc:
+                raise QDashValidationError(
+                    f"Response payload did not match {model_type.__name__}",
+                    payload=payload,
+                ) from exc
+        raise QDashValidationError(
+            f"Response payload did not match {model_type.__name__}",
+            payload=payload,
+        )
 
     def _normalize_datetime_fields(self, payload: Any) -> Any:
         if isinstance(payload, dict):
@@ -150,10 +154,9 @@ class QDashClient:
 
     def list_chips(self) -> ListChipsResponse:
         response = self._request("GET", "/chips")
-        return self._validate_model_or_default(
+        return self._validate_model_payload(
             ListChipsResponse,
             response.data,
-            default=ListChipsResponse(chips=[], total=0),
         )
 
     def get_chip_metrics(self, chip_id: str) -> ChipMetricsResponse:
@@ -194,20 +197,18 @@ class QDashClient:
             params["qid"] = qid
 
         response = self._request("GET", "/task-results/timeseries", params=params)
-        return self._validate_model_or_default(
+        return self._validate_model_payload(
             TimeSeriesData,
             response.data,
-            default=TimeSeriesData(data={}),
         )
 
     async def list_chips_async(self) -> ListChipsResponse:
         """Async variant of list_chips using the same auth/header behavior."""
 
         response = await self._request_async("/chips")
-        return self._validate_model_or_default(
+        return self._validate_model_payload(
             ListChipsResponse,
             response.json(),
-            default=ListChipsResponse(chips=[], total=0),
         )
 
     async def get_task_results_timeseries_async(
@@ -234,10 +235,9 @@ class QDashClient:
             params["qid"] = qid
 
         response = await self._request_async("/task-results/timeseries", params=params)
-        return self._validate_model_or_default(
+        return self._validate_model_payload(
             TimeSeriesData,
             response.json(),
-            default=TimeSeriesData(data={}),
         )
 
     async def get_metrics_config_async(self) -> dict[str, Any]:
