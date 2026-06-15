@@ -168,10 +168,15 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
         # In Prefect 3, schedules and parameters live on the deployment object, so
         # deleting + recreating it would silently drop any cron schedule the user set
         # (see issue #793). We capture them here and re-apply them to the new deployment.
+        # Note: there is a small read->delete window where a concurrent change to the
+        # old deployment could be lost; deployment edits are not expected to race in
+        # practice, so this is accepted rather than locked.
         preserved_schedules: list[DeploymentScheduleCreate] = []
         preserved_parameters: dict[str, Any] | None = None
         if request.old_deployment_id:
-            old_deployment_id = cast("uuid_module.UUID", request.old_deployment_id)
+            # Parse to UUID up front so a malformed id fails fast and validated,
+            # rather than being passed downstream as an unchecked string.
+            old_deployment_id = uuid_module.UUID(request.old_deployment_id)
 
             try:
                 preserved_schedules, preserved_parameters = await _capture_deployment_state(
