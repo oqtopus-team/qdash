@@ -6,6 +6,7 @@
 - `rest`: low-level HTTP communication
 
 This package follows the same approach as `oqtopus-client`, separating the transport layer from the service layer.
+For user-facing examples, see `docs/user-guide/qdash-client.md`.
 
 ## Minimal Quick Start
 
