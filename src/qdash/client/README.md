@@ -114,7 +114,7 @@ For legacy username/password authentication, set:
 ```python
 from qdash.client import QDashConfig, QDashClient
 
-config = QDashConfig.from_file(section="default")
+config = QDashConfig.from_file(profile="default")
 client = QDashClient(config)
 ```
 
@@ -152,7 +152,7 @@ config = QDashConfig(
     cf_access_client_id="your-cf-client-id",
     cf_access_client_secret="your-cf-client-secret",
 )
-config.save(section="prod")
+config.save(profile="prod")
 ```
 
 The saved file is created with owner-only permissions (`0600`) because it can contain API tokens

@@ -140,9 +140,9 @@ api_token = local-token
         timeout_sec=12,
     )
 
-    saved_path = config.save(section="prod", path=config_file)
-    loaded = QDashConfig.from_file(section="prod", path=config_file)
-    local = QDashConfig.from_file(section="local", path=config_file)
+    saved_path = config.save(profile="prod", path=config_file)
+    loaded = QDashConfig.from_file(profile="prod", path=config_file)
+    local = QDashConfig.from_file(profile="local", path=config_file)
 
     assert saved_path == config_file
     assert loaded.base_url == "https://prod.example/api"

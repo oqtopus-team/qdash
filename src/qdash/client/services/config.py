@@ -80,11 +80,11 @@ class QDashConfig(BaseModel):
     @classmethod
     def from_file(
         cls,
-        section: str = DEFAULT_SECTION,
+        profile: str = DEFAULT_SECTION,
         path: str | Path | object = _DEFAULT_CONFIG_PATH,
     ) -> QDashConfig:
-        if section is None:
-            raise QDashConfigError("section should not be None.")
+        if profile is None:
+            raise QDashConfigError("profile should not be None.")
         if path is None:
             raise QDashConfigError("path should not be None.")
 
@@ -92,10 +92,10 @@ class QDashConfig(BaseModel):
         parser = configparser.ConfigParser()
         if not parser.read(config_path):
             raise QDashConfigError(f"Config file not found: {config_path}")
-        if section not in parser:
-            raise QDashConfigError(f"Config section not found: {section}")
+        if profile not in parser:
+            raise QDashConfigError(f"Config profile not found: {profile}")
 
-        sec = parser[section]
+        sec = parser[profile]
         raw: dict[str, Any] = {
             "base_url": sec.get("base_url"),
             "username": sec.get("username"),
@@ -122,7 +122,7 @@ class QDashConfig(BaseModel):
         try:
             return cls.model_validate(raw)
         except ValidationError as exc:
-            raise QDashConfigError(f"Invalid config values in section '{section}'.") from exc
+            raise QDashConfigError(f"Invalid config values in profile '{profile}'.") from exc
 
     @classmethod
     def from_env(cls) -> QDashConfig:
@@ -156,11 +156,11 @@ class QDashConfig(BaseModel):
 
     def save(
         self,
-        section: str = DEFAULT_SECTION,
+        profile: str = DEFAULT_SECTION,
         path: str | Path | object = _DEFAULT_CONFIG_PATH,
     ) -> Path:
-        if section is None:
-            raise QDashConfigError("section should not be None.")
+        if profile is None:
+            raise QDashConfigError("profile should not be None.")
         if path is None:
             raise QDashConfigError("path should not be None.")
 
@@ -169,7 +169,7 @@ class QDashConfig(BaseModel):
         if config_path.exists():
             parser.read(config_path)
 
-        parser[section] = self._to_file_section()
+        parser[profile] = self._to_file_section()
         config_path.parent.mkdir(parents=True, exist_ok=True)
         with config_path.open("w") as file:
             parser.write(file)

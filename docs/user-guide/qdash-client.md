@@ -54,7 +54,7 @@ retry_backoff_seconds = 0.2
 retry_max_backoff_seconds = 5.0
 ```
 
-Use sections as profiles for different environments, and save a profile from Python when needed.
+Use profiles for different environments. Profiles are stored as sections in `config.ini`.
 
 ```python
 from qdash.client import QDashConfig
@@ -65,7 +65,7 @@ config = QDashConfig(
     cf_access_client_id="your-client-id",
     cf_access_client_secret="your-client-secret",
 )
-config.save(section="prod")
+config.save(profile="prod")
 ```
 
 Saved config files use owner-only permissions (`0600`) because they can contain API tokens and
