@@ -82,7 +82,7 @@ class QDashConfig(BaseModel):
             config_path = (
                 Path(xdg_config_home, "qdash", "config.ini")
                 if xdg_config_home
-                else Path("~/.config/qdash/config.ini")
+                else Path("~/.config/qdash/config.ini").expanduser()
             )
         else:
             config_path = Path(str(path)).expanduser()
