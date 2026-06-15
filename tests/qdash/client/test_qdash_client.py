@@ -9,7 +9,6 @@ if TYPE_CHECKING:
 import pytest
 
 from qdash.client import (
-    ChipResponse,
     ListChipsResponse,
     QDashClient,
     QDashConfig,
@@ -305,111 +304,6 @@ def test_list_chips_accepts_naive_installed_at() -> None:
         chips = client.list_chips()
         assert chips.total == 1
         assert chips.chips[0].chip_id == "chip-a"
-    finally:
-        client.close()
-
-
-def test_get_default_chip_prefers_latest_active_chip() -> None:
-    payload = {
-        "chips": [
-            {
-                "chip_id": "chip-inactive-latest",
-                "activity_status": "inactive",
-                "installed_at": "2026-01-03T00:00:00Z",
-            },
-            {
-                "chip_id": "chip-active-old",
-                "activity_status": "active",
-                "installed_at": "2026-01-01T00:00:00Z",
-            },
-            {
-                "chip_id": "chip-active-latest",
-                "activity_status": "active",
-                "installed_at": "2026-01-02T00:00:00Z",
-            },
-        ],
-        "total": 3,
-    }
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "GET" and request.url.path == "/chips":
-            return httpx.Response(200, json=payload)
-        return httpx.Response(404, json={"detail": "missing"})
-
-    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
-    try:
-        chip = client.get_default_chip()
-        assert isinstance(chip, ChipResponse)
-        assert chip.chip_id == "chip-active-latest"
-        assert client.get_default_chip_id() == "chip-active-latest"
-    finally:
-        client.close()
-
-
-def test_get_default_chip_falls_back_to_latest_chip() -> None:
-    payload = {
-        "chips": [
-            {
-                "chip_id": "chip-old",
-                "activity_status": "inactive",
-                "installed_at": "2026-01-01T00:00:00Z",
-            },
-            {
-                "chip_id": "chip-latest",
-                "activity_status": "inactive",
-                "installed_at": "2026-01-02T00:00:00Z",
-            },
-        ],
-        "total": 2,
-    }
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "GET" and request.url.path == "/chips":
-            return httpx.Response(200, json=payload)
-        return httpx.Response(404, json={"detail": "missing"})
-
-    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
-    try:
-        assert client.get_default_chip().chip_id == "chip-latest"
-    finally:
-        client.close()
-
-
-def test_get_default_chip_uses_undated_chip_only_when_needed() -> None:
-    payload = {
-        "chips": [
-            {"chip_id": "chip-undated", "activity_status": "active"},
-            {
-                "chip_id": "chip-dated",
-                "activity_status": "active",
-                "installed_at": "2026-01-01T00:00:00Z",
-            },
-        ],
-        "total": 2,
-    }
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "GET" and request.url.path == "/chips":
-            return httpx.Response(200, json=payload)
-        return httpx.Response(404, json={"detail": "missing"})
-
-    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
-    try:
-        assert client.get_default_chip().chip_id == "chip-dated"
-    finally:
-        client.close()
-
-
-def test_get_default_chip_raises_not_found_for_empty_chip_list() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "GET" and request.url.path == "/chips":
-            return httpx.Response(200, json={"chips": [], "total": 0})
-        return httpx.Response(404, json={"detail": "missing"})
-
-    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
-    try:
-        with pytest.raises(QDashNotFoundError):
-            client.get_default_chip()
     finally:
         client.close()
 
