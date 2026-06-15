@@ -25,6 +25,17 @@ DEFAULT_PROXY_ENV = "QDASH_PROXY"
 DEFAULT_USER_AGENT_ENV = "QDASH_USER_AGENT"
 
 
+def _resolve_config_path(path: str | Path | object = _DEFAULT_CONFIG_PATH) -> Path:
+    if path is _DEFAULT_CONFIG_PATH:
+        xdg_config_home = os.getenv("XDG_CONFIG_HOME")
+        return (
+            Path(xdg_config_home, "qdash", "config.ini")
+            if xdg_config_home
+            else Path("~/.config/qdash/config.ini").expanduser()
+        )
+    return Path(str(path)).expanduser()
+
+
 class QDashRetryConfig(BaseModel):
     """Retry tuning parameters for idempotent GET requests."""
 
@@ -77,16 +88,7 @@ class QDashConfig(BaseModel):
         if path is None:
             raise QDashConfigError("path should not be None.")
 
-        if path is _DEFAULT_CONFIG_PATH:
-            xdg_config_home = os.getenv("XDG_CONFIG_HOME")
-            config_path = (
-                Path(xdg_config_home, "qdash", "config.ini")
-                if xdg_config_home
-                else Path("~/.config/qdash/config.ini").expanduser()
-            )
-        else:
-            config_path = Path(str(path)).expanduser()
-
+        config_path = _resolve_config_path(path)
         parser = configparser.ConfigParser()
         if not parser.read(config_path):
             raise QDashConfigError(f"Config file not found: {config_path}")
@@ -151,3 +153,49 @@ class QDashConfig(BaseModel):
             return cls.model_validate(raw)
         except ValidationError as exc:
             raise QDashConfigError("Invalid config values loaded from environment.") from exc
+
+    def save(
+        self,
+        section: str = DEFAULT_SECTION,
+        path: str | Path | object = _DEFAULT_CONFIG_PATH,
+    ) -> Path:
+        if section is None:
+            raise QDashConfigError("section should not be None.")
+        if path is None:
+            raise QDashConfigError("path should not be None.")
+
+        config_path = _resolve_config_path(path)
+        parser = configparser.ConfigParser()
+        if config_path.exists():
+            parser.read(config_path)
+
+        parser[section] = self._to_file_section()
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with config_path.open("w") as file:
+            parser.write(file)
+        config_path.chmod(0o600)
+        return config_path
+
+    def _to_file_section(self) -> dict[str, str]:
+        values: dict[str, str] = {
+            "base_url": self.base_url,
+            "timeout_seconds": str(self.timeout_sec),
+            "max_workers": str(self.max_workers),
+            "verify_tls": str(self.verify_tls).lower(),
+            "retry_max_attempts": str(self.retry.max_attempts),
+            "retry_backoff_seconds": str(self.retry.base_delay_sec),
+            "retry_max_backoff_seconds": str(self.retry.max_delay_sec),
+        }
+
+        optional_values = {
+            "username": self.username,
+            "password_env": self.password_env,
+            "api_token": self.api_token,
+            "project_id": self.project_id,
+            "cf_access_client_id": self.cf_access_client_id,
+            "cf_access_client_secret": self.cf_access_client_secret,
+            "proxy": self.proxy,
+            "user_agent": self.user_agent,
+        }
+        values.update({key: value for key, value in optional_values.items() if value})
+        return values
