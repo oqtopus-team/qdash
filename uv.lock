@@ -3148,7 +3148,6 @@ requires-dist = [
 
 [[package]]
 name = "qdash-client"
-version = "0.1.0"
 source = { editable = "src/qdash/client" }
 dependencies = [
     { name = "httpx" },
