@@ -139,7 +139,7 @@ export function MetricsYamlDownloadButton({
       title="Download selected metric data as YAML"
     >
       <Download className="h-4 w-4" />
-      <span className="hidden sm:inline">YAML</span>
+      <span>YAML</span>
     </button>
   );
 }
