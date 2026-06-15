@@ -594,11 +594,6 @@ export function DashboardPageContent() {
                               notesByTarget={notesByTarget}
                               metricKey={m.key}
                               onQubitClick={(qid) => {
-                                const value = qubitMetricData[m.key]?.[qid]?.value ?? null;
-                                if (value === null) {
-                                  setEditingTargetNote(qid);
-                                  return;
-                                }
                                 setEditingNote({
                                   targetId: qid,
                                   metricKey: m.key,
@@ -677,12 +672,6 @@ export function DashboardPageContent() {
                               notesByTarget={notesByTarget}
                               metricKey={m.key}
                               onCouplingClick={(couplingId) => {
-                                const value =
-                                  couplingMetricData[m.key]?.[couplingId]?.value ?? null;
-                                if (value === null) {
-                                  setEditingTargetNote(couplingId);
-                                  return;
-                                }
                                 setEditingNote({
                                   targetId: couplingId,
                                   metricKey: m.key,

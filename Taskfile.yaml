@@ -28,6 +28,34 @@ tasks:
       - cd ui && bun run lint:fix
     desc: Generate the TypeScript client
 
+  generate-python-schema:
+    desc: Generate Python Pydantic schema models from OpenAPI
+    vars:
+      OPENAPI_INPUT: '{{default "docs/oas/openapi.json" .OPENAPI_INPUT}}'
+      PY_SCHEMA_OUTPUT: '{{default "scripts/generated/openapi_models/models.py" .PY_SCHEMA_OUTPUT}}'
+    cmds:
+      - mkdir -p "$(dirname {{.PY_SCHEMA_OUTPUT}})"
+      - |
+        uvx --from datamodel-code-generator datamodel-codegen \
+          --use-schema-description \
+          --target-python-version 3.12 \
+          --field-constraints \
+          --use-annotated \
+          --use-field-description \
+          --input {{.OPENAPI_INPUT}} \
+          --input-file-type openapi \
+          --collapse-root-models \
+          --enum-field-as-literal one \
+          --use-union-operator \
+          --use-subclass-enum \
+          --output-model-type pydantic_v2.BaseModel \
+          --disable-timestamp \
+          --use-standard-collections \
+          --strict-nullable \
+          --use-default \
+          --output {{.PY_SCHEMA_OUTPUT}}
+      - uv run ruff format {{.PY_SCHEMA_OUTPUT}}
+
   knowledge:
     desc: Generate task knowledge JSON from markdown files
     cmds:
@@ -301,12 +329,22 @@ tasks:
   scan-leaks:
     desc: Run Betterleaks scan over git history (full repository)
     cmds:
-      - betterleaks git . --verbose
+      - |
+        if command -v betterleaks >/dev/null 2>&1; then
+          betterleaks git . --verbose
+        else
+          echo "betterleaks not installed; skipping leak scan"
+        fi
 
   scan-leaks-staged:
     desc: Run Betterleaks on staged files only (same as pre-commit)
     cmds:
-      - betterleaks git . --pre-commit --staged --verbose
+      - |
+        if command -v betterleaks >/dev/null 2>&1; then
+          betterleaks git . --pre-commit --staged --verbose
+        else
+          echo "betterleaks not installed; skipping staged leak scan"
+        fi
 
   # =============================================================================
   # Local Check (run before push)
@@ -371,6 +409,7 @@ tasks:
     dir: ui
     cmds:
       - bun run test:run
+      - bunx next typegen
       - bunx tsc --noEmit
       - bun run lint
       - bun run fmt:check

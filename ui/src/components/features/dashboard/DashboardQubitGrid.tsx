@@ -186,11 +186,7 @@ export function DashboardQubitGrid({
               : hasCrossMetricNote
                 ? " · note on other metric"
                 : "") +
-          (onQubitClick
-            ? value !== null
-              ? " (click to edit metric note)"
-              : " (click to edit target note)"
-            : "");
+          (onQubitClick ? " (click to edit metric note)" : "");
         const Tag = onQubitClick ? "button" : "div";
         return (
           <Tag
