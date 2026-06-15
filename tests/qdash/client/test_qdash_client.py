@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 import pytest
 
 from qdash.client import (
+    ChipResponse,
     ListChipsResponse,
     QDashClient,
     QDashConfig,
@@ -304,6 +305,65 @@ def test_list_chips_accepts_naive_installed_at() -> None:
         chips = client.list_chips()
         assert chips.total == 1
         assert chips.chips[0].chip_id == "chip-a"
+    finally:
+        client.close()
+
+
+def test_get_default_chip_prefers_active_chip() -> None:
+    payload = {
+        "chips": [
+            {"chip_id": "chip-inactive", "activity_status": "inactive"},
+            {"chip_id": "chip-active", "activity_status": "active"},
+        ],
+        "total": 2,
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/chips":
+            return httpx.Response(200, json=payload)
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        chip = client.get_default_chip()
+        assert isinstance(chip, ChipResponse)
+        assert chip.chip_id == "chip-active"
+        assert client.get_default_chip_id() == "chip-active"
+    finally:
+        client.close()
+
+
+def test_get_default_chip_falls_back_to_first_chip() -> None:
+    payload = {
+        "chips": [
+            {"chip_id": "chip-a", "activity_status": "inactive"},
+            {"chip_id": "chip-b", "activity_status": "inactive"},
+        ],
+        "total": 2,
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/chips":
+            return httpx.Response(200, json=payload)
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert client.get_default_chip().chip_id == "chip-a"
+    finally:
+        client.close()
+
+
+def test_get_default_chip_raises_not_found_for_empty_chip_list() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/chips":
+            return httpx.Response(200, json={"chips": [], "total": 0})
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        with pytest.raises(QDashNotFoundError):
+            client.get_default_chip()
     finally:
         client.close()
 
