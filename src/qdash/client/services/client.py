@@ -168,7 +168,13 @@ class QDashClient:
             if str(chip.activity_status) == "active":
                 return chip
         if chips:
-            return chips[0]
+            return max(
+                chips,
+                key=lambda chip: (
+                    chip.installed_at is not None,
+                    chip.installed_at or datetime.min.replace(tzinfo=UTC),
+                ),
+            )
         raise QDashNotFoundError("No chips found.")
 
     def get_default_chip_id(self) -> str:

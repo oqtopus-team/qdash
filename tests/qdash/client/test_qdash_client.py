@@ -309,13 +309,26 @@ def test_list_chips_accepts_naive_installed_at() -> None:
         client.close()
 
 
-def test_get_default_chip_prefers_active_chip() -> None:
+def test_get_default_chip_prefers_first_active_chip() -> None:
     payload = {
         "chips": [
-            {"chip_id": "chip-inactive", "activity_status": "inactive"},
-            {"chip_id": "chip-active", "activity_status": "active"},
+            {
+                "chip_id": "chip-inactive-latest",
+                "activity_status": "inactive",
+                "installed_at": "2026-01-03T00:00:00Z",
+            },
+            {
+                "chip_id": "chip-active-old",
+                "activity_status": "active",
+                "installed_at": "2026-01-01T00:00:00Z",
+            },
+            {
+                "chip_id": "chip-active-latest",
+                "activity_status": "active",
+                "installed_at": "2026-01-02T00:00:00Z",
+            },
         ],
-        "total": 2,
+        "total": 3,
     }
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -327,17 +340,25 @@ def test_get_default_chip_prefers_active_chip() -> None:
     try:
         chip = client.get_default_chip()
         assert isinstance(chip, ChipResponse)
-        assert chip.chip_id == "chip-active"
-        assert client.get_default_chip_id() == "chip-active"
+        assert chip.chip_id == "chip-active-old"
+        assert client.get_default_chip_id() == "chip-active-old"
     finally:
         client.close()
 
 
-def test_get_default_chip_falls_back_to_first_chip() -> None:
+def test_get_default_chip_falls_back_to_latest_chip() -> None:
     payload = {
         "chips": [
-            {"chip_id": "chip-a", "activity_status": "inactive"},
-            {"chip_id": "chip-b", "activity_status": "inactive"},
+            {
+                "chip_id": "chip-old",
+                "activity_status": "inactive",
+                "installed_at": "2026-01-01T00:00:00Z",
+            },
+            {
+                "chip_id": "chip-latest",
+                "activity_status": "inactive",
+                "installed_at": "2026-01-02T00:00:00Z",
+            },
         ],
         "total": 2,
     }
@@ -349,7 +370,32 @@ def test_get_default_chip_falls_back_to_first_chip() -> None:
 
     client = _build_client(httpx.MockTransport(handler), api_token="api-token")
     try:
-        assert client.get_default_chip().chip_id == "chip-a"
+        assert client.get_default_chip().chip_id == "chip-latest"
+    finally:
+        client.close()
+
+
+def test_get_default_chip_does_not_sort_active_chips_by_installed_at() -> None:
+    payload = {
+        "chips": [
+            {"chip_id": "chip-undated", "activity_status": "active"},
+            {
+                "chip_id": "chip-dated",
+                "activity_status": "active",
+                "installed_at": "2026-01-01T00:00:00Z",
+            },
+        ],
+        "total": 2,
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/chips":
+            return httpx.Response(200, json=payload)
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert client.get_default_chip().chip_id == "chip-undated"
     finally:
         client.close()
 
