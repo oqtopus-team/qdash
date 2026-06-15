@@ -21,6 +21,7 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 COPY pyproject.toml uv.lock ./
 COPY src/qdash/api/pyproject.toml src/qdash/api/pyproject.toml
+COPY src/qdash/client/pyproject.toml src/qdash/client/pyproject.toml
 COPY src/qdash/workflow/pyproject.toml src/qdash/workflow/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --package qdash-api --no-dev
