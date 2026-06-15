@@ -54,6 +54,23 @@ retry_backoff_seconds = 0.2
 retry_max_backoff_seconds = 5.0
 ```
 
+Use profiles for different environments. Profiles are stored as sections in `config.ini`.
+
+```python
+from qdash.client import QDashConfig
+
+config = QDashConfig(
+    base_url="https://your-qdash-instance/api",
+    api_token="your-api-token",
+    cf_access_client_id="your-client-id",
+    cf_access_client_secret="your-client-secret",
+)
+config.save(profile="prod")
+```
+
+Saved config files use owner-only permissions (`0600`) because they can contain API tokens and
+Cloudflare Access secrets.
+
 ## Basic Usage
 
 Create a client, call the API, and close the HTTP session when the script exits.

@@ -122,6 +122,54 @@ api_token = file-token
     assert config.api_token == "file-token"  # noqa: S105
 
 
+def test_config_save_writes_selected_section_and_preserves_others(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.ini"
+    config_file.write_text(
+        """
+[local]
+base_url = http://local.example
+api_token = local-token
+""".strip()
+    )
+    config = QDashConfig(
+        base_url="https://prod.example/api",
+        api_token="prod-token",
+        project_id="project-1",
+        cf_access_client_id="cf-id",
+        cf_access_client_secret="cf-secret",
+        timeout_sec=12,
+    )
+
+    saved_path = config.save(profile="prod", path=config_file)
+    loaded = QDashConfig.from_file(profile="prod", path=config_file)
+    local = QDashConfig.from_file(profile="local", path=config_file)
+
+    assert saved_path == config_file
+    assert loaded.base_url == "https://prod.example/api"
+    assert loaded.api_token == "prod-token"  # noqa: S105
+    assert loaded.project_id == "project-1"
+    assert loaded.cf_access_client_id == "cf-id"
+    assert loaded.cf_access_client_secret == "cf-secret"  # noqa: S105
+    assert loaded.timeout_sec == 12
+    assert local.base_url == "http://local.example"
+
+
+def test_config_save_uses_default_path_and_restricts_permissions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    config = QDashConfig(base_url="https://default.example/api", api_token="token")
+
+    saved_path = config.save()
+    loaded = QDashConfig.from_file()
+
+    assert saved_path == tmp_path / "xdg" / "qdash" / "config.ini"
+    assert loaded.base_url == "https://default.example/api"
+    assert loaded.api_token == "token"  # noqa: S105
+    assert saved_path.stat().st_mode & 0o777 == 0o600
+
+
 def test_config_from_env_missing_base_url_raises_config_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

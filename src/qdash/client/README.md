@@ -114,7 +114,7 @@ For legacy username/password authentication, set:
 ```python
 from qdash.client import QDashConfig, QDashClient
 
-config = QDashConfig.from_file(section="default")
+config = QDashConfig.from_file(profile="default")
 client = QDashClient(config)
 ```
 
@@ -140,6 +140,23 @@ retry_max_backoff_seconds = 5.0
 
 For legacy username/password authentication from a config file, use `username` and `password_env`
 instead of `api_token`.
+
+Save a profile to `config.ini`:
+
+```python
+from qdash.client import QDashConfig
+
+config = QDashConfig(
+    base_url="https://example.qdash/api",
+    api_token="your-token",
+    cf_access_client_id="your-cf-client-id",
+    cf_access_client_secret="your-cf-client-secret",
+)
+config.save(profile="prod")
+```
+
+The saved file is created with owner-only permissions (`0600`) because it can contain API tokens
+and Cloudflare Access secrets.
 
 ### 2.3 Automatic Loading
 
