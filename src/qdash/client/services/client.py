@@ -5,7 +5,6 @@ import random
 import time
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import httpx
@@ -17,6 +16,7 @@ from qdash.client.rest.exceptions import ApiException as RestApiException
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
     from qdash.client.rest.api_response import ApiResponse as RestApiResponse
 from qdash.client.services.config import QDashConfig
