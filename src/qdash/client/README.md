@@ -30,12 +30,12 @@ The distribution name is `qdash-client`, but the Python import path is `qdash.cl
 `qdash-client` project on PyPI to trust this GitHub repository and the
 `.github/workflows/publish-qdash-client.yml` workflow.
 
-Release tags use the `qdash-client-v<version>` format and must match the version in
-`pyproject.toml`.
+Release tags use the `qdash-client-v<version>` format. Do not edit a package version in
+`pyproject.toml`; the package version is derived from the matching Git tag at build time.
 
 ```bash
-git tag qdash-client-v0.1.0
-git push origin qdash-client-v0.1.0
+git tag qdash-client-v<version>
+git push origin qdash-client-v<version>
 ```
 
 ## Minimal Quick Start
