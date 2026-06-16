@@ -99,6 +99,7 @@ async def test_capture_deployment_state_preserves_cron_and_parameters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Old deployment's cron schedule and parameters are captured for re-use (#793)."""
+
     # conftest mocks out prefect, so DeploymentScheduleCreate is not a real class here.
     # Stand in a recording factory to assert the schedule + active flag are carried over.
     def fake_schedule_create(schedule: object, active: bool) -> SimpleNamespace:
