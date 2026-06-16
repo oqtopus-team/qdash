@@ -102,8 +102,15 @@ async def test_capture_deployment_state_preserves_cron_and_parameters(
 
     # conftest mocks out prefect, so DeploymentScheduleCreate is not a real class here.
     # Stand in a recording factory to assert the schedule + active flag are carried over.
+    # Assert on the recorded calls rather than the typed return value: the declared
+    # return type's `schedule` is a prefect schedule union with no `.cron` attribute,
+    # which mypy would reject (the SimpleNamespace records type as `Any`).
+    recorded: list[SimpleNamespace] = []
+
     def fake_schedule_create(schedule: object, active: bool) -> SimpleNamespace:
-        return SimpleNamespace(schedule=schedule, active=active)
+        created = SimpleNamespace(schedule=schedule, active=active)
+        recorded.append(created)
+        return created
 
     monkeypatch.setattr(deployment_service, "DeploymentScheduleCreate", fake_schedule_create)
 
@@ -120,10 +127,11 @@ async def test_capture_deployment_state_preserves_cron_and_parameters(
 
     assert parameters == {"chip_id": "X", "username": "u"}
     assert len(schedules) == 1
-    assert schedules[0].active is True
+    assert len(recorded) == 1
+    assert recorded[0].active is True
     # The original schedule object is passed through to DeploymentScheduleCreate unchanged.
-    assert schedules[0].schedule is cron
-    assert schedules[0].schedule.cron == "0 2 * * *"
+    assert recorded[0].schedule is cron
+    assert recorded[0].schedule.cron == "0 2 * * *"
 
 
 @pytest.mark.asyncio
