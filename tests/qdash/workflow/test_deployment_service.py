@@ -3,8 +3,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from prefect.client.schemas.actions import DeploymentScheduleCreate
-from prefect.client.schemas.schedules import CronSchedule
 
 from qdash.workflow import deployment_service
 from qdash.workflow.deployment_service import (
@@ -101,14 +99,17 @@ async def test_capture_deployment_state_preserves_cron_and_parameters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Old deployment's cron schedule and parameters are captured for re-use (#793)."""
+    # conftest mocks out prefect, so DeploymentScheduleCreate is not a real class here.
+    # Stand in a recording factory to assert the schedule + active flag are carried over.
+    def fake_schedule_create(schedule: object, active: bool) -> SimpleNamespace:
+        return SimpleNamespace(schedule=schedule, active=active)
+
+    monkeypatch.setattr(deployment_service, "DeploymentScheduleCreate", fake_schedule_create)
+
+    cron = SimpleNamespace(cron="0 2 * * *", timezone="Asia/Tokyo")
     deployment = SimpleNamespace(
         parameters={"chip_id": "X", "username": "u"},
-        schedules=[
-            SimpleNamespace(
-                schedule=CronSchedule(cron="0 2 * * *", timezone="Asia/Tokyo"),
-                active=True,
-            )
-        ],
+        schedules=[SimpleNamespace(schedule=cron, active=True)],
     )
     _patch_get_client(monkeypatch, deployment)
 
@@ -118,11 +119,10 @@ async def test_capture_deployment_state_preserves_cron_and_parameters(
 
     assert parameters == {"chip_id": "X", "username": "u"}
     assert len(schedules) == 1
-    assert isinstance(schedules[0], DeploymentScheduleCreate)
     assert schedules[0].active is True
-    captured_schedule = schedules[0].schedule
-    assert isinstance(captured_schedule, CronSchedule)
-    assert captured_schedule.cron == "0 2 * * *"
+    # The original schedule object is passed through to DeploymentScheduleCreate unchanged.
+    assert schedules[0].schedule is cron
+    assert schedules[0].schedule.cron == "0 2 * * *"
 
 
 @pytest.mark.asyncio
