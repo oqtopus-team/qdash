@@ -434,7 +434,7 @@ export function MarkdownEditor({
           <div className="relative">
             <textarea
               ref={textareaRef}
-              className="textarea textarea-bordered w-full rounded-t-none border-t-0 text-sm resize-none focus:outline-none"
+              className="textarea textarea-bordered w-full rounded-t-none border-t-0 text-sm resize-y focus:outline-none"
               placeholder={placeholder}
               value={value}
               onChange={handleTextChange}
