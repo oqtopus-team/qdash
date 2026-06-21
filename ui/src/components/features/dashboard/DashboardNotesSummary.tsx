@@ -163,16 +163,19 @@ export function DashboardNotesSummary({
         </div>
       )}
 
-      {/* Per-(target, metric) chip notes */}
+      {/* Per-(target, metric) chip notes — collapsed by default */}
       {sortedTargets.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-baseline gap-2">
-            <h4 className="text-sm font-semibold">Per-metric notes</h4>
-            <span className="text-xs text-base-content/60">
-              {totalChipNotes} across {sortedTargets.length} target
-              {sortedTargets.length > 1 ? "s" : ""} — click to open the metric.
-            </span>
-          </div>
+        <details className="space-y-2">
+          <summary className="cursor-pointer list-none flex items-baseline justify-between gap-2">
+            <div className="flex items-baseline gap-2">
+              <h4 className="text-sm font-semibold">Per-metric notes</h4>
+              <span className="text-xs text-base-content/60">
+                {totalChipNotes} across {sortedTargets.length} target
+                {sortedTargets.length > 1 ? "s" : ""} — click to open the metric.
+              </span>
+            </div>
+            <span className="text-xs text-base-content/50 flex-shrink-0">click to expand</span>
+          </summary>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {sortedTargets.map((targetId) => {
               const notes = [...(visibleNotesByTarget[targetId] ?? [])].sort((a, b) =>
@@ -214,7 +217,7 @@ export function DashboardNotesSummary({
               );
             })}
           </div>
-        </div>
+        </details>
       )}
 
       {/* Per-task_result notes */}
