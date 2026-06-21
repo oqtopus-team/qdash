@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-import { toDateTimeLocal } from "@/lib/utils/datetime";
-
 interface TimeRangeSelectorProps {
   startDate: string;
   endDate: string;
@@ -19,15 +17,21 @@ export function TimeRangeSelector({
   onEndDateChange,
   onQuickRange,
 }: TimeRangeSelectorProps) {
-  const [localStart, setLocalStart] = useState(toDateTimeLocal(startDate));
-  const [localEnd, setLocalEnd] = useState(toDateTimeLocal(endDate));
+  // `startDate` / `endDate` are already datetime-local strings in the display
+  // timezone (e.g. "2026-06-21T15:30"), produced by useRangeModeUrlState /
+  // dateToDateTimeLocal. They must be shown verbatim in the
+  // <input type="datetime-local">. Do NOT pass them through toDateTimeLocal():
+  // that helper treats a timezone-less string as UTC and shifts it into the
+  // display timezone, double-applying the offset (+9h for JST). See issue #1107.
+  const [localStart, setLocalStart] = useState(startDate);
+  const [localEnd, setLocalEnd] = useState(endDate);
 
   useEffect(() => {
-    setLocalStart(toDateTimeLocal(startDate));
+    setLocalStart(startDate);
   }, [startDate]);
 
   useEffect(() => {
-    setLocalEnd(toDateTimeLocal(endDate));
+    setLocalEnd(endDate);
   }, [endDate]);
 
   return (
