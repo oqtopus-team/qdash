@@ -96,18 +96,18 @@ function PostBody({
         {canEdit && !editing && !isAi && (
           <div className="flex items-center gap-1">
             <button
-              className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/40 hover:text-primary"
+              className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-primary"
               onClick={onEdit}
               title="Edit"
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <Pencil className="h-4 w-4" />
             </button>
             <button
-              className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/40 hover:text-error"
+              className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-error"
               onClick={onDelete}
               title="Delete"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         )}
