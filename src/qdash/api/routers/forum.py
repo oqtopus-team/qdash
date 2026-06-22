@@ -377,6 +377,7 @@ def update_forum_post(
         project_id=ctx.project_id,
         post_id=post_id,
         username=ctx.user.username,
+        category=body.category,
         title=body.title,
         content=body.content,
     )

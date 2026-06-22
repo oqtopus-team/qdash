@@ -209,6 +209,7 @@ export * from './forumPostResponseParentId';
 export * from './forumPostResponseTitle';
 export * from './forumPostResponseUserId';
 export * from './forumPostUpdate';
+export * from './forumPostUpdateCategory';
 export * from './forumPostUpdateTitle';
 export * from './getChipMetricsParams';
 export * from './getChipMetricsSelectionMode';
