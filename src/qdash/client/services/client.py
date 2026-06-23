@@ -120,6 +120,8 @@ class QDashClient:
             for key, value in payload.items():
                 if isinstance(value, str) and key.endswith("_at"):
                     normalized[key] = self._normalize_datetime_string(value)
+                elif key == "error" and value is None:
+                    normalized[key] = 0
                 else:
                     normalized[key] = self._normalize_datetime_fields(value)
             return normalized

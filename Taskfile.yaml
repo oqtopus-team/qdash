@@ -236,6 +236,11 @@ tasks:
     cmds:
       - uv run pytest tests/qdash/api/ -v
 
+  test-client:
+    desc: Run client tests
+    cmds:
+      - uv run pytest tests/qdash/client/ -v
+
   test-workflow:
     desc: Run workflow engine tests
     cmds:
