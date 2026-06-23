@@ -259,6 +259,82 @@ def test_close_forum_thread_requires_author_or_owner(test_client, init_db):
     assert response.status_code == 403
 
 
+def test_author_can_update_forum_thread_category(test_client, init_db):
+    """The author can change a root thread's category along with title and content."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    root = _create_post(test_client, headers)
+    root_id = root.json()["id"]
+
+    response = test_client.patch(
+        f"/forum/posts/{root_id}",
+        headers=headers,
+        json={
+            "category": "coupling",
+            "title": "Updated title",
+            "content": "Updated content",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["category"] == "coupling"
+    assert body["title"] == "Updated title"
+    assert body["content"] == "Updated content"
+
+    fetched = test_client.get(f"/forum/posts/{root_id}", headers=headers)
+    assert fetched.json()["category"] == "coupling"
+
+
+def test_update_forum_thread_rejects_unknown_category(test_client, init_db):
+    """Updating to a non-existent category is rejected and leaves the thread unchanged."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    root = _create_post(test_client, headers)
+    root_id = root.json()["id"]
+
+    response = test_client.patch(
+        f"/forum/posts/{root_id}",
+        headers=headers,
+        json={"category": "does-not-exist", "content": "Updated content"},
+    )
+
+    assert response.status_code == 422
+    assert test_client.get(f"/forum/posts/{root_id}", headers=headers).json()["category"] == "qubit"
+
+
+def test_update_forum_reply_ignores_category(test_client, init_db):
+    """Replies inherit the root category; editing a reply never changes its category."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    root = _create_post(test_client, headers)
+    root_id = root.json()["id"]
+    reply = _create_post(
+        test_client,
+        headers,
+        title=None,
+        content="A reply",
+        parent_id=root_id,
+    )
+    reply_id = reply.json()["id"]
+
+    response = test_client.patch(
+        f"/forum/posts/{reply_id}",
+        headers=headers,
+        json={"category": "coupling", "content": "Edited reply"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["category"] == "qubit"
+    assert response.json()["content"] == "Edited reply"
+
+
 def test_upload_and_serve_forum_image(test_client, init_db, tmp_path, monkeypatch):
     """Forum images can be uploaded by members and served for markdown rendering."""
     monkeypatch.setattr(forum_service, "FORUM_IMAGE_DIR", tmp_path / "forum")

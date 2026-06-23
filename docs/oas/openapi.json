@@ -17525,6 +17525,21 @@
       },
       "ForumPostUpdate": {
         "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category",
+            "description": "Updated forum category key for root threads"
+          },
           "title": {
             "anyOf": [
               {
