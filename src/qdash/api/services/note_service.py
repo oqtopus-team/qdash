@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime  # noqa: TC003
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from starlette.exceptions import HTTPException
@@ -39,6 +39,14 @@ def _make_note(content: str, username: str) -> NoteModel:
 
 def _is_set(note: NoteModel) -> bool:
     return bool(note.content) or note.updated_at is not None
+
+
+_RECENCY_FLOOR = datetime.min.replace(tzinfo=UTC)
+
+
+def _note_recency(note: NoteModel) -> datetime:
+    """Rank notes by last-edit time, treating an unset timestamp as oldest."""
+    return ensure_timezone(note.updated_at) or _RECENCY_FLOOR
 
 
 _AI_GENERATED_NOTE_RE = re.compile(
@@ -178,6 +186,26 @@ class NoteService:
         if scope_type == "time_range":
             return f"time_range:{format_iso(started_at) or ''}:{format_iso(ended_at) or ''}"
         return "global"
+
+    @staticmethod
+    def _prefer_metric_note(
+        candidate: MetricNoteDocument,
+        current: MetricNoteDocument,
+        *,
+        exact_scope_key: str,
+    ) -> bool:
+        """Return True when ``candidate`` should win over ``current``.
+
+        A note whose scope key matches the requested scope exactly always wins;
+        otherwise the most recently edited note is kept. This keeps the summary
+        deterministic when several overlapping time-range notes exist for the
+        same (target, metric).
+        """
+        candidate_exact = candidate.scope_key == exact_scope_key
+        current_exact = current.scope_key == exact_scope_key
+        if candidate_exact != current_exact:
+            return candidate_exact
+        return _note_recency(candidate.note) > _note_recency(current.note)
 
     @staticmethod
     def _cooldown_scope(cooldown: CooldownDocument, source: str) -> MetricNoteScope:
@@ -836,13 +864,39 @@ class NoteService:
             if scope.ended_at is not None:
                 range_query["scope_ended_at"] = {"$lte": scope.ended_at}
             metric_note_docs.extend(MetricNoteDocument.find(range_query).run())
-        metric_notes_by_target: dict[str, dict[str, NoteModel]] = {}
+        elif scope.scope_type == "time_range" and scope.started_at is not None:
+            # Match every time-range note whose window overlaps the requested
+            # window, not just the one whose key is byte-identical. The
+            # dashboard's default range is relative to "now", so its bounds
+            # drift by seconds/minutes between writing a note and reading it
+            # back; an exact scope_key match would make those notes vanish
+            # (issue #1109).
+            overlap_query: dict[str, object] = {
+                "project_id": project_id,
+                "chip_id": chip_id,
+                "scope_type": "time_range",
+                "$or": [
+                    {"scope_ended_at": {"$gte": scope.started_at}},
+                    {"scope_ended_at": None},
+                ],
+            }
+            if scope.ended_at is not None:
+                overlap_query["scope_started_at"] = {"$lte": scope.ended_at}
+            metric_note_docs.extend(MetricNoteDocument.find(overlap_query).run())
+
+        chosen_metric_notes: dict[str, dict[str, MetricNoteDocument]] = {}
         for metric_note in metric_note_docs:
             key = f"{metric_note.target_type}:{metric_note.target_id}"
-            notes = metric_notes_by_target.setdefault(key, {})
-            if metric_note.metric_key in notes and metric_note.scope_key != scope.scope_key:
-                continue
-            notes[metric_note.metric_key] = metric_note.note
+            target_notes = chosen_metric_notes.setdefault(key, {})
+            current = target_notes.get(metric_note.metric_key)
+            if current is None or self._prefer_metric_note(
+                metric_note, current, exact_scope_key=scope.scope_key
+            ):
+                target_notes[metric_note.metric_key] = metric_note
+        metric_notes_by_target: dict[str, dict[str, NoteModel]] = {
+            key: {metric_key: doc.note for metric_key, doc in target_notes.items()}
+            for key, target_notes in chosen_metric_notes.items()
+        }
 
         def metric_notes_for_target(
             *, target_type: str, target_id: str, legacy: dict[str, NoteModel]
