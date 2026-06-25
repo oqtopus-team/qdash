@@ -10,25 +10,39 @@ if TYPE_CHECKING:
 import pytest
 
 from qdash.client import (
+    AiReviewListResponse,
+    AiReviewRunDetailResponse,
+    AiReviewRunListResponse,
     CancelExecutionResponse,
     ChipResponse,
+    CouplingResponse,
     ExecuteFlowResponse,
     FileTreeNode,
+    FlowTemplate,
+    FlowTemplateWithCode,
     LatestTaskResultResponse,
     ListChipsResponse,
+    ListCouplingsResponse,
     ListExecutionsResponse,
     ListFlowsResponse,
     ListIssuesResponse,
+    ListQubitsResponse,
+    ListTaskKnowledgeResponse,
+    ListTaskResponse,
+    NoteModel,
     QDashClient,
     QDashConfig,
     QDashConfigError,
     QDashNotFoundError,
     QDashTransportError,
     QDashValidationError,
+    QubitResponse,
     SaveFlowResponse,
     ScheduleFlowResponse,
+    TaskKnowledgeResponse,
     TaskResultExcludeResponse,
     TaskResultListResponse,
+    TaskResultResponse,
     TimeSeriesData,
 )
 
@@ -703,6 +717,243 @@ def test_agent_read_only_resource_methods_return_models_and_objects() -> None:
         )
         assert client.get_provenance_stats().total_entities == 0
         assert client.get_provenance_changes(parameter_names=["t1"]).total_count == 0
+    finally:
+        client.close()
+
+
+def test_chip_topology_read_helpers_return_models() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        match request.url.path:
+            case "/chips/chip-a/qubits":
+                assert request.url.params.get("qids") == "Q00"
+                assert request.url.params.get("offset") == "5"
+                assert request.url.params.get("limit") == "10"
+                return httpx.Response(
+                    200,
+                    json={
+                        "qubits": [{"qid": "Q00", "chip_id": "chip-a", "status": "ready"}],
+                        "total": 1,
+                        "offset": 5,
+                        "limit": 10,
+                    },
+                )
+            case "/chips/chip-a/qubits/Q00":
+                return httpx.Response(
+                    200,
+                    json={"qid": "Q00", "chip_id": "chip-a", "data": {"t1": 12.5}},
+                )
+            case "/chips/chip-a/couplings":
+                assert request.url.params.get("offset") == "0"
+                assert request.url.params.get("limit") == "25"
+                return httpx.Response(
+                    200,
+                    json={
+                        "couplings": [{"qid": "Q00-Q01", "chip_id": "chip-a"}],
+                        "total": 1,
+                        "offset": 0,
+                        "limit": 25,
+                    },
+                )
+            case "/chips/chip-a/couplings/Q00-Q01":
+                return httpx.Response(
+                    200,
+                    json={"qid": "Q00-Q01", "chip_id": "chip-a", "status": "ready"},
+                )
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        qubits = client.list_chip_qubits("chip-a", qids=["Q00"], offset=5, limit=10)
+        qubit = client.get_chip_qubit(chip_id="chip-a", qid="Q00")
+        couplings = client.list_chip_couplings("chip-a", limit=25)
+        coupling = client.get_chip_coupling(chip_id="chip-a", coupling_id="Q00-Q01")
+
+        assert isinstance(qubits, ListQubitsResponse)
+        assert isinstance(qubit, QubitResponse)
+        assert qubit.data["t1"] == 12.5
+        assert isinstance(couplings, ListCouplingsResponse)
+        assert isinstance(coupling, CouplingResponse)
+    finally:
+        client.close()
+
+
+def test_task_file_flow_and_ai_review_read_helpers_return_models() -> None:
+    issue_payload = {
+        "id": "issue-1",
+        "task_id": "task-1",
+        "username": "operator",
+        "title": "Bad fit",
+        "content": "Needs review",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+    }
+    task_result_payload = {
+        "task_id": "task-1",
+        "task_name": "t1",
+        "qid": "Q00",
+        "chip_id": "chip-a",
+        "status": "success",
+        "execution_id": "exec-1",
+        "figure_path": [],
+        "json_figure_path": [],
+        "input_parameters": {},
+        "output_parameters": {"t1": 12.5},
+    }
+    flow_template_payload = {
+        "id": "rabi",
+        "name": "Rabi",
+        "description": "Run Rabi calibration",
+        "category": "calibration",
+        "filename": "rabi.py",
+        "function_name": "rabi",
+    }
+    knowledge_payload = {
+        "name": "t1",
+        "category": "qubit",
+        "summary": "T1 summary",
+        "what_it_measures": "Energy relaxation",
+        "physical_principle": "Relaxation decay",
+        "expected_result": {"description": "Exponential decay"},
+        "evaluation_criteria": "Check fit quality",
+        "failure_modes": [{"severity": "warning", "description": "Noisy curve"}],
+        "tips": ["Inspect the fitted decay"],
+        "prompt_text": "Review t1",
+    }
+    review_run_payload: dict[str, object] = {
+        "review_run_id": "run-1",
+        "trigger_type": "manual_chip_bulk",
+        "chip_id": "chip-a",
+        "task_name": "t1",
+        "entity_type": "qubit",
+        "execution_ids": ["exec-1"],
+        "requested_by": "operator",
+        "requested_at": "2026-01-01T00:00:00Z",
+        "completed_at": None,
+        "model": "gpt-test",
+        "total": 0,
+        "completed_count": 0,
+        "failed_count": 0,
+        "running_count": 0,
+        "requested_count": 0,
+        "decision_counts": {},
+        "status_counts": {},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        match request.url.path:
+            case "/files/content":
+                assert request.url.params.get("path") == "flows/demo.py"
+                return httpx.Response(200, json={"path": "flows/demo.py", "content": "pass"})
+            case "/task-results/task-1/issues":
+                return httpx.Response(200, json=[issue_payload])
+            case "/flows/templates":
+                return httpx.Response(200, json=[flow_template_payload])
+            case "/flows/templates/rabi":
+                return httpx.Response(
+                    200, json={**flow_template_payload, "code": "def rabi(): pass"}
+                )
+            case "/flows/helpers":
+                return httpx.Response(200, json=["common.py"])
+            case "/flows/helpers/common.py":
+                return httpx.Response(200, text="def helper(): pass")
+            case "/tasks":
+                assert request.url.params.get("backend") == "qubex"
+                return httpx.Response(
+                    200,
+                    json={
+                        "tasks": [
+                            {
+                                "name": "t1",
+                                "description": "Measure T1",
+                                "task_type": "qubit",
+                                "input_parameters": {},
+                                "output_parameters": {},
+                            }
+                        ]
+                    },
+                )
+            case "/tasks/task-1/result":
+                return httpx.Response(200, json=task_result_payload)
+            case "/task-knowledge":
+                return httpx.Response(
+                    200,
+                    json={
+                        "items": [{"name": "t1", "category": "qubit", "summary": "T1 summary"}],
+                        "categories": {"qubit": "Qubit"},
+                    },
+                )
+            case "/tasks/t1/knowledge":
+                return httpx.Response(200, json=knowledge_payload)
+            case "/tasks/t1/knowledge/markdown":
+                return httpx.Response(200, text="# T1")
+            case "/task-results/task-1/note":
+                return httpx.Response(
+                    200,
+                    json={
+                        "content": "reviewed",
+                        "updated_by": "operator",
+                        "updated_at": "2026-01-01T00:00:00Z",
+                    },
+                )
+            case "/task-results/ai-review":
+                assert request.url.params.get("chip_id") == "chip-a"
+                assert request.url.params.get("task_name") == "t1"
+                assert request.url.params.get("status") == "completed"
+                assert request.url.params.get("decision") == "accept"
+                assert request.url.params.get("latest_only") == "true"
+                return httpx.Response(
+                    200,
+                    json={
+                        "items": [],
+                        "total": 0,
+                        "skip": 2,
+                        "limit": 5,
+                        "decision_counts": {},
+                        "status_counts": {},
+                    },
+                )
+            case "/task-results/ai-review/runs":
+                assert request.url.params.get("chip_id") == "chip-a"
+                assert request.url.params.get("task_name") == "t1"
+                return httpx.Response(
+                    200,
+                    json={"items": [review_run_payload], "total": 1, "skip": 0, "limit": 10},
+                )
+            case "/task-results/ai-review/runs/run-1":
+                return httpx.Response(200, json={"run": review_run_payload, "items": []})
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert client.get_file_content("flows/demo.py")["content"] == "pass"
+        assert client.list_task_result_issues("task-1")[0].id == "issue-1"
+        assert isinstance(client.list_flow_templates()[0], FlowTemplate)
+        assert isinstance(client.get_flow_template("rabi"), FlowTemplateWithCode)
+        assert client.list_flow_helper_files() == ["common.py"]
+        assert client.get_flow_helper_file("common.py") == "def helper(): pass"
+        assert isinstance(client.list_tasks(backend="qubex"), ListTaskResponse)
+        assert isinstance(client.get_task_result("task-1"), TaskResultResponse)
+        assert isinstance(client.list_task_knowledge(), ListTaskKnowledgeResponse)
+        assert isinstance(client.get_task_knowledge("t1"), TaskKnowledgeResponse)
+        assert client.get_task_knowledge_markdown("t1") == "# T1"
+        assert isinstance(client.get_task_note("task-1"), NoteModel)
+        assert isinstance(
+            client.list_task_result_ai_reviews(
+                chip_id="chip-a",
+                task_name="t1",
+                status="completed",
+                decision="accept",
+                latest_only=True,
+                skip=2,
+                limit=5,
+            ),
+            AiReviewListResponse,
+        )
+        assert isinstance(
+            client.list_task_result_ai_review_runs(chip_id="chip-a", task_name="t1", limit=10),
+            AiReviewRunListResponse,
+        )
+        assert isinstance(client.get_task_result_ai_review_run("run-1"), AiReviewRunDetailResponse)
     finally:
         client.close()
 

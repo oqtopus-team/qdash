@@ -29,13 +29,19 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
+    AiReviewListResponse,
+    AiReviewRunDetailResponse,
+    AiReviewRunListResponse,
     BodyReExecuteTaskResult,
     CancelExecutionResponse,
     ChipMetricsResponse,
     ChipResponse,
+    CouplingResponse,
     ExecuteFlowResponse,
     ExecutionResponseDetail,
     FileTreeNode,
+    FlowTemplate,
+    FlowTemplateWithCode,
     GetFlowResponse,
     ImpactResponse,
     IssueKnowledgeResponse,
@@ -43,23 +49,30 @@ from qdash.client.services.models import (
     LatestTaskResultResponse,
     LineageResponse,
     ListChipsResponse,
+    ListCouplingsResponse,
     ListExecutionsResponse,
     ListFlowsResponse,
     ListIssueKnowledgeResponse,
     ListIssuesResponse,
+    ListQubitsResponse,
+    ListTaskKnowledgeResponse,
+    ListTaskResponse,
     NoteModel,
     ParameterHistoryResponse,
     ParameterVersionResponse,
     ProjectResponse,
     ProvenanceStatsResponse,
     QdashApiSchemasProjectProjectListResponse,
+    QubitResponse,
     RecentChangesResponse,
     SaveFlowResponse,
     ScheduleFlowResponse,
     SuccessResponse,
     TaskHistoryResponse,
+    TaskKnowledgeResponse,
     TaskResultExcludeResponse,
     TaskResultListResponse,
+    TaskResultResponse,
     TimeSeriesData,
 )
 
@@ -264,6 +277,40 @@ class QDashClient:
         data = response.data
         return data if isinstance(data, dict) else {}
 
+    def list_chip_qubits(
+        self,
+        chip_id: str,
+        *,
+        qids: list[str] | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> ListQubitsResponse:
+        params = self._query_params(qids=qids, offset=offset, limit=limit)
+        response = self._request("GET", f"/chips/{chip_id}/qubits", params=params)
+        return self._validate_model_payload(ListQubitsResponse, response.data)
+
+    def get_chip_qubit(self, chip_id: str, qid: str) -> QubitResponse:
+        response = self._request("GET", f"/chips/{chip_id}/qubits/{qid}")
+        return self._validate_model_payload(QubitResponse, response.data)
+
+    def list_chip_couplings(
+        self,
+        chip_id: str,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> ListCouplingsResponse:
+        response = self._request(
+            "GET",
+            f"/chips/{chip_id}/couplings",
+            params={"offset": offset, "limit": limit},
+        )
+        return self._validate_model_payload(ListCouplingsResponse, response.data)
+
+    def get_chip_coupling(self, chip_id: str, coupling_id: str) -> CouplingResponse:
+        response = self._request("GET", f"/chips/{chip_id}/couplings/{coupling_id}")
+        return self._validate_model_payload(CouplingResponse, response.data)
+
     def get_task_results_timeseries(
         self,
         *,
@@ -393,6 +440,11 @@ class QDashClient:
         response = self._request("GET", "/files/tree")
         return self._validate_model_list_payload(FileTreeNode, response.data)
 
+    def get_file_content(self, path: str) -> dict[str, Any]:
+        response = self._request("GET", "/files/content", params={"path": path})
+        data = response.data
+        return data if isinstance(data, dict) else {}
+
     def get_git_status(self) -> dict[str, Any]:
         response = self._request("GET", "/files/git/status")
         data = response.data
@@ -454,6 +506,10 @@ class QDashClient:
     def get_issue(self, issue_id: str) -> IssueResponse:
         response = self._request("GET", f"/issues/{issue_id}")
         return self._validate_model_payload(IssueResponse, response.data)
+
+    def list_task_result_issues(self, task_id: str) -> list[IssueResponse]:
+        response = self._request("GET", f"/task-results/{task_id}/issues")
+        return self._validate_model_list_payload(IssueResponse, response.data)
 
     def create_task_result_issue(
         self,
@@ -546,6 +602,23 @@ class QDashClient:
         response = self._request("GET", f"/flows/{name}")
         return self._validate_model_payload(GetFlowResponse, response.data)
 
+    def list_flow_templates(self) -> list[FlowTemplate]:
+        response = self._request("GET", "/flows/templates")
+        return self._validate_model_list_payload(FlowTemplate, response.data)
+
+    def get_flow_template(self, template_id: str) -> FlowTemplateWithCode:
+        response = self._request("GET", f"/flows/templates/{template_id}")
+        return self._validate_model_payload(FlowTemplateWithCode, response.data)
+
+    def list_flow_helper_files(self) -> list[str]:
+        response = self._request("GET", "/flows/helpers")
+        data = response.data
+        return [str(item) for item in data] if isinstance(data, list) else []
+
+    def get_flow_helper_file(self, filename: str) -> str:
+        response = self._request("GET", f"/flows/helpers/{filename}")
+        return response.data if isinstance(response.data, str) else ""
+
     def save_flow(
         self,
         *,
@@ -627,6 +700,74 @@ class QDashClient:
     def get_execution(self, execution_id: str) -> ExecutionResponseDetail:
         response = self._request("GET", f"/executions/{execution_id}")
         return self._validate_model_payload(ExecutionResponseDetail, response.data)
+
+    def list_tasks(self, *, backend: str | None = None) -> ListTaskResponse:
+        response = self._request("GET", "/tasks", params=self._query_params(backend=backend))
+        return self._validate_model_payload(ListTaskResponse, response.data)
+
+    def get_task_result(self, task_id: str) -> TaskResultResponse:
+        response = self._request("GET", f"/tasks/{task_id}/result")
+        return self._validate_model_payload(TaskResultResponse, response.data)
+
+    def list_task_knowledge(self) -> ListTaskKnowledgeResponse:
+        response = self._request("GET", "/task-knowledge")
+        return self._validate_model_payload(ListTaskKnowledgeResponse, response.data)
+
+    def get_task_knowledge(self, task_name: str) -> TaskKnowledgeResponse:
+        response = self._request("GET", f"/tasks/{task_name}/knowledge")
+        return self._validate_model_payload(TaskKnowledgeResponse, response.data)
+
+    def get_task_knowledge_markdown(self, task_name: str) -> str:
+        response = self._request("GET", f"/tasks/{task_name}/knowledge/markdown")
+        return response.data if isinstance(response.data, str) else ""
+
+    def get_task_note(self, task_id: str) -> NoteModel:
+        response = self._request("GET", f"/task-results/{task_id}/note")
+        return self._validate_model_payload(NoteModel, response.data)
+
+    def list_task_result_ai_reviews(
+        self,
+        *,
+        chip_id: str | None = None,
+        task_name: str | None = None,
+        status: str | None = None,
+        decision: str | None = None,
+        latest_only: bool = False,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> AiReviewListResponse:
+        params = self._query_params(
+            chip_id=chip_id,
+            task_name=task_name,
+            status=status,
+            decision=decision,
+            latest_only=latest_only,
+            skip=skip,
+            limit=limit,
+        )
+        response = self._request("GET", "/task-results/ai-review", params=params)
+        return self._validate_model_payload(AiReviewListResponse, response.data)
+
+    def list_task_result_ai_review_runs(
+        self,
+        *,
+        chip_id: str | None = None,
+        task_name: str | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> AiReviewRunListResponse:
+        params = self._query_params(
+            chip_id=chip_id,
+            task_name=task_name,
+            skip=skip,
+            limit=limit,
+        )
+        response = self._request("GET", "/task-results/ai-review/runs", params=params)
+        return self._validate_model_payload(AiReviewRunListResponse, response.data)
+
+    def get_task_result_ai_review_run(self, review_run_id: str) -> AiReviewRunDetailResponse:
+        response = self._request("GET", f"/task-results/ai-review/runs/{review_run_id}")
+        return self._validate_model_payload(AiReviewRunDetailResponse, response.data)
 
     def cancel_execution(self, flow_run_id: str) -> CancelExecutionResponse:
         response = self._request("POST", f"/executions/{flow_run_id}/cancel", json={})

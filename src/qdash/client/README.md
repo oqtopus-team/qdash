@@ -231,6 +231,7 @@ try:
     chip_id = client.get_default_chip_id()
 
     task_results = client.list_task_results(chip_id=chip_id, status="success", limit=20)
+    q00 = client.get_chip_qubit(chip_id=chip_id, qid="Q00")
     latest_t1 = client.get_qubit_latest_task_results(chip_id=chip_id, task="t1")
     q00_history = client.get_qubit_task_history(
         chip_id=chip_id,
@@ -241,16 +242,21 @@ try:
 
     projects = client.list_projects()
     file_tree = client.get_files_tree()
+    flow_source = client.get_file_content("flows/demo.py")
     git_status = client.get_git_status()
     issues = client.list_issues(limit=20)
     knowledge = client.list_issue_knowledge(status="approved", limit=20)
+    task_knowledge = client.list_task_knowledge()
     flows = client.list_flows()
+    templates = client.list_flow_templates()
     executions = client.list_executions(chip_id=chip_id, limit=20)
+    reviews = client.list_task_result_ai_reviews(chip_id=chip_id, limit=20)
     provenance = client.get_provenance_stats()
 
-    print(task_results.total, latest_t1.task_name, q00_history.name)
-    print(projects.total, len(file_tree), git_status, len(issues.issues))
-    print(len(knowledge.items), len(flows.flows), len(executions.executions))
+    print(task_results.total, q00.qid, latest_t1.task_name, q00_history.name)
+    print(projects.total, len(file_tree), flow_source.get("path"), git_status, len(issues.issues))
+    print(len(knowledge.items), len(task_knowledge.items), len(flows.flows), len(templates))
+    print(len(executions.executions), reviews.total)
     print(provenance.total_entities)
 finally:
     client.close()
@@ -258,15 +264,23 @@ finally:
 
 Available read-only helpers include:
 
+- Chips: `list_chips()`, `get_default_chip()`, `get_default_chip_id()`,
+  `list_chip_qubits()`, `get_chip_qubit()`, `list_chip_couplings()`,
+  `get_chip_coupling()`
 - Task results: `list_task_results()`, `get_qubit_latest_task_results()`,
   `get_qubit_task_history()`, `get_coupling_latest_task_results()`,
-  `get_coupling_task_history()`
+  `get_coupling_task_history()`, `get_task_result()`, `get_task_note()`,
+  `list_task_result_issues()`, `list_task_result_ai_reviews()`,
+  `list_task_result_ai_review_runs()`, `get_task_result_ai_review_run()`
+- Tasks and task knowledge: `list_tasks()`, `list_task_knowledge()`,
+  `get_task_knowledge()`, `get_task_knowledge_markdown()`
 - Projects and files: `list_projects()`, `get_project()`, `get_files_tree()`,
-  `get_git_status()`
+  `get_file_content()`, `get_git_status()`
 - Issues and knowledge: `list_issues()`, `get_issue()`, `list_issue_knowledge()`,
   `get_issue_knowledge()`
 - Flows and executions: `list_flows()`, `get_flow()`, `list_executions()`,
-  `get_execution()`
+  `get_execution()`, `list_flow_templates()`, `get_flow_template()`,
+  `list_flow_helper_files()`, `get_flow_helper_file()`
 - Provenance: `get_provenance_entity()`, `get_provenance_lineage()`,
   `get_provenance_impact()`, `get_provenance_history()`, `get_provenance_stats()`,
   `get_provenance_changes()`
