@@ -551,10 +551,10 @@ class DashboardInsight(BaseModel):
     title: Annotated[str, Field(title="Title")]
     severity: Annotated[Severity, Field(title="Severity")]
     affected_targets: Annotated[list[str] | None, Field(title="Affected Targets")] = None
-    category: Annotated[Category, Field(title="Category")] = "other"
+    category: Annotated[Category, Field(title="Category")] = Category.other
     evidence: Annotated[list[str] | None, Field(title="Evidence")] = None
     recommended_action: Annotated[str, Field(title="Recommended Action")]
-    confidence: Annotated[Confidence, Field(title="Confidence")] = "medium"
+    confidence: Annotated[Confidence, Field(title="Confidence")] = Confidence.medium
 
 
 class DashboardInsightSuppressed(BaseModel):
@@ -1227,6 +1227,21 @@ class ForumPostResponse(BaseModel):
     """
 
 
+class Category1(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            max_length=64,
+            min_length=1,
+            pattern="^[a-z0-9][a-z0-9_-]{0,63}$",
+            title="Category",
+        ),
+    ]
+    """
+    Updated forum category key for root threads
+    """
+
+
 class Title1(RootModel[str]):
     root: Annotated[str, Field(max_length=200, title="Title")]
     """
@@ -1239,6 +1254,10 @@ class ForumPostUpdate(BaseModel):
     Request schema for updating a forum post.
     """
 
+    category: Annotated[Category1 | None, Field(title="Category")] = None
+    """
+    Updated forum category key for root threads
+    """
     title: Annotated[Title1 | None, Field(title="Title")] = None
     """
     Updated title for root threads
@@ -3367,7 +3386,7 @@ class User(BaseModel):
     disabled: Annotated[bool | None, Field(title="Disabled")] = None
     default_project_id: Annotated[str | None, Field(title="Default Project Id")] = None
     must_change_password: Annotated[bool, Field(title="Must Change Password")] = False
-    system_role: SystemRole = "user"
+    system_role: SystemRole = SystemRole.user
 
 
 class UserCreate(BaseModel):
@@ -3394,7 +3413,7 @@ class UserDetailResponse(BaseModel):
     organization: Annotated[str | None, Field(title="Organization")] = None
     avatar_key: Annotated[str | None, Field(title="Avatar Key")] = None
     disabled: Annotated[bool, Field(title="Disabled")] = False
-    system_role: SystemRole = "user"
+    system_role: SystemRole = SystemRole.user
     default_project_id: Annotated[str | None, Field(title="Default Project Id")] = None
     must_change_password: Annotated[bool, Field(title="Must Change Password")] = False
     created_at: Annotated[AwareDatetime | None, Field(title="Created At")] = None
@@ -3412,7 +3431,7 @@ class UserListItem(BaseModel):
     organization: Annotated[str | None, Field(title="Organization")] = None
     avatar_key: Annotated[str | None, Field(title="Avatar Key")] = None
     disabled: Annotated[bool, Field(title="Disabled")] = False
-    system_role: SystemRole = "user"
+    system_role: SystemRole = SystemRole.user
     default_project_id: Annotated[str | None, Field(title="Default Project Id")] = None
     must_change_password: Annotated[bool, Field(title="Must Change Password")] = False
 
@@ -3456,7 +3475,7 @@ class UserWithToken(BaseModel):
     disabled: Annotated[bool | None, Field(title="Disabled")] = None
     default_project_id: Annotated[str | None, Field(title="Default Project Id")] = None
     must_change_password: Annotated[bool, Field(title="Must Change Password")] = False
-    system_role: SystemRole = "user"
+    system_role: SystemRole = SystemRole.user
     access_token: Annotated[str, Field(title="Access Token")]
     initial_password: Annotated[str | None, Field(title="Initial Password")] = None
 
@@ -3493,7 +3512,7 @@ class AddMemberRequest(BaseModel):
     """
 
     username: Annotated[str, Field(pattern="^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$", title="Username")]
-    role: ProjectRole = "viewer"
+    role: ProjectRole = ProjectRole.viewer
 
 
 class AiReviewRunDetailResponse(BaseModel):
@@ -3584,7 +3603,7 @@ class BulkUserImportResult(BaseModel):
     username: Annotated[str, Field(title="Username")]
     display_name: Annotated[str | None, Field(title="Display Name")] = None
     organization: Annotated[str | None, Field(title="Organization")] = None
-    system_role: SystemRole = "user"
+    system_role: SystemRole = SystemRole.user
     initial_password: Annotated[str | None, Field(title="Initial Password")] = None
     status: Annotated[str, Field(title="Status")]
     message: Annotated[str | None, Field(title="Message")] = None
@@ -3639,7 +3658,9 @@ class ChipResponse(BaseModel):
     qubit_count: Annotated[int, Field(title="Qubit Count")] = 0
     coupling_count: Annotated[int, Field(title="Coupling Count")] = 0
     installed_at: Annotated[AwareDatetime | None, Field(title="Installed At")] = None
-    activity_status: Annotated[ActivityStatus, Field(title="Activity Status")] = "active"
+    activity_status: Annotated[ActivityStatus, Field(title="Activity Status")] = (
+        ActivityStatus.active
+    )
     current_cooldown_id: Annotated[str | None, Field(title="Current Cooldown Id")] = None
     note: NoteModel | None = None
 
@@ -4002,7 +4023,7 @@ class MemberInvite(BaseModel):
     """
     Username must be 3-64 characters, lowercase letters, numbers, dots, underscores, or hyphens, and start and end with a letter or number.
     """
-    role: ProjectRole = "viewer"
+    role: ProjectRole = ProjectRole.viewer
     """
     Role to assign
     """
@@ -4186,7 +4207,7 @@ class SeedImportRequest(BaseModel):
     """
     Target chip ID
     """
-    source: SeedImportSource = "qubex_params"
+    source: SeedImportSource = SeedImportSource.qubex_params
     """
     Source of parameters
     """

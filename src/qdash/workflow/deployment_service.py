@@ -14,7 +14,7 @@ from typing import Any, cast
 
 from fastapi import FastAPI, HTTPException
 from prefect.client.orchestration import get_client
-from prefect.client.schemas.actions import WorkPoolCreate
+from prefect.client.schemas.actions import DeploymentScheduleCreate, WorkPoolCreate
 from pydantic import BaseModel
 
 from qdash.workflow.logging_config import setup_logging
@@ -85,6 +85,31 @@ async def _ensure_work_pool(client: Any) -> None:
             raise
 
 
+async def _capture_deployment_state(
+    deployment_id: uuid_module.UUID,
+) -> tuple[list[DeploymentScheduleCreate], dict[str, Any] | None]:
+    """Read an existing deployment's schedules and parameters for re-use.
+
+    In Prefect 3, schedules and parameters live on the deployment object, so a
+    deploy that deletes + recreates the deployment would otherwise drop them
+    (see issue #793). This captures them so the replacement deployment can carry
+    them over.
+
+    Returns
+    -------
+    A list of ``DeploymentScheduleCreate`` (cron/interval schedule + active flag)
+    and the deployment parameters (``None`` when empty).
+    """
+    async with get_client() as client:
+        deployment = await client.read_deployment(deployment_id)
+    parameters = deployment.parameters or None
+    schedules = [
+        DeploymentScheduleCreate(schedule=sched.schedule, active=sched.active)
+        for sched in (deployment.schedules or [])
+    ]
+    return schedules, parameters
+
+
 @app.post("/register-deployment", response_model=RegisterDeploymentResponse)
 async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDeploymentResponse:
     """Register a user flow as a Prefect deployment.
@@ -139,11 +164,38 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
 
         flow_obj = getattr(module, request.flow_function_name)
 
-        # Delete old deployment if it exists
+        # Preserve existing cron schedules and parameters before replacing the deployment.
+        # In Prefect 3, schedules and parameters live on the deployment object, so
+        # deleting + recreating it would silently drop any cron schedule the user set
+        # (see issue #793). We capture them here and re-apply them to the new deployment.
+        # Note: there is a small read->delete window where a concurrent change to the
+        # old deployment could be lost; deployment edits are not expected to race in
+        # practice, so this is accepted rather than locked.
+        preserved_schedules: list[DeploymentScheduleCreate] = []
+        preserved_parameters: dict[str, Any] | None = None
         if request.old_deployment_id:
+            # Parse to UUID up front so a malformed id fails fast and validated,
+            # rather than being passed downstream as an unchecked string.
+            old_deployment_id = uuid_module.UUID(request.old_deployment_id)
+
+            try:
+                preserved_schedules, preserved_parameters = await _capture_deployment_state(
+                    old_deployment_id
+                )
+                if preserved_schedules:
+                    logger.info(
+                        f"Preserving {len(preserved_schedules)} schedule(s) and parameters "
+                        f"from old deployment {request.old_deployment_id}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to read old deployment {request.old_deployment_id} for "
+                    f"schedule preservation: {type(e).__name__}: {e}"
+                )
+
+            # Delete old deployment now that its schedules/parameters are captured.
             try:
                 logger.info(f"Attempting to delete old deployment: {request.old_deployment_id}")
-                old_deployment_id = cast("uuid_module.UUID", request.old_deployment_id)
                 async with get_client() as client:
                     await client.delete_deployment(old_deployment_id)
                     logger.info(f"Deleted old deployment: {request.old_deployment_id}")
@@ -161,13 +213,16 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
             flow_id = await client.create_flow(flow_obj)
             logger.info(f"Flow registered with ID: {flow_id}")
 
-            # Create deployment via client API
+            # Create deployment via client API, carrying over any preserved
+            # schedules and parameters from the previous deployment (issue #793).
             deployment_id = await client.create_deployment(
                 flow_id=flow_id,
                 name=deployment_name,
                 work_pool_name=WORK_POOL_NAME,
                 entrypoint=entrypoint,
                 path=str(working_dir),
+                schedules=preserved_schedules or None,
+                parameters=preserved_parameters,
             )
 
         logger.info(f"Deployment created successfully: {deployment_id}")

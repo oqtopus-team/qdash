@@ -604,6 +604,7 @@ class ForumService:
         project_id: str,
         post_id: str,
         username: str,
+        category: str | None,
         title: str | None,
         content: str,
     ) -> ForumPostResponse:
@@ -617,8 +618,12 @@ class ForumService:
         if not self._is_author(doc, user_id=user_id):
             raise HTTPException(status_code=403, detail="You can only edit your own posts")
 
-        if doc.parent_id is None and title is not None:
-            doc.title = title
+        if doc.parent_id is None:
+            if title is not None:
+                doc.title = title
+            if category is not None and category != doc.category:
+                self._ensure_active_category(project_id, category)
+                doc.category = category
         doc.content = content
         doc.system_info.update_time()
         doc.save()

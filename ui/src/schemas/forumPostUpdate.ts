@@ -5,12 +5,15 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ForumPostUpdateCategory } from './forumPostUpdateCategory';
 import type { ForumPostUpdateTitle } from './forumPostUpdateTitle';
 
 /**
  * Request schema for updating a forum post.
  */
 export interface ForumPostUpdate {
+  /** Updated forum category key for root threads */
+  category?: ForumPostUpdateCategory;
   /** Updated title for root threads */
   title?: ForumPostUpdateTitle;
   /**

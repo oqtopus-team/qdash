@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import json
+from typing import TYPE_CHECKING, cast
 
 import httpx
 
@@ -9,14 +10,39 @@ if TYPE_CHECKING:
 import pytest
 
 from qdash.client import (
+    AiReviewListResponse,
+    AiReviewRunDetailResponse,
+    AiReviewRunListResponse,
+    CancelExecutionResponse,
     ChipResponse,
+    CouplingResponse,
+    ExecuteFlowResponse,
+    FileTreeNode,
+    FlowTemplate,
+    FlowTemplateWithCode,
+    LatestTaskResultResponse,
     ListChipsResponse,
+    ListCouplingsResponse,
+    ListExecutionsResponse,
+    ListFlowsResponse,
+    ListIssuesResponse,
+    ListQubitsResponse,
+    ListTaskKnowledgeResponse,
+    ListTaskResponse,
+    NoteModel,
     QDashClient,
     QDashConfig,
     QDashConfigError,
     QDashNotFoundError,
     QDashTransportError,
     QDashValidationError,
+    QubitResponse,
+    SaveFlowResponse,
+    ScheduleFlowResponse,
+    TaskKnowledgeResponse,
+    TaskResultExcludeResponse,
+    TaskResultListResponse,
+    TaskResultResponse,
     TimeSeriesData,
 )
 
@@ -523,6 +549,649 @@ def test_get_task_results_timeseries_returns_object() -> None:
         assert isinstance(series, TimeSeriesData)
         assert "Q00" in series.data
         assert series.data["Q00"][0].parameter_name == "t1"
+    finally:
+        client.close()
+
+
+def test_list_task_results_sends_common_filters() -> None:
+    payload = {
+        "items": [
+            {
+                "task_id": "task-1",
+                "task_name": "t1",
+                "qid": "Q00",
+                "chip_id": "chip-a",
+                "status": "success",
+                "execution_id": "exec-1",
+            }
+        ],
+        "total": 1,
+        "skip": 5,
+        "limit": 10,
+        "status_counts": {"success": 1},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/task-results":
+            assert request.url.params.get("status") == "success"
+            assert request.url.params.get("chip_id") == "chip-a"
+            assert request.url.params.get("task_name") == "t1"
+            assert request.url.params.get("qid") == "Q00"
+            assert request.url.params.get("execution_id") == "exec-1"
+            assert request.url.params.get("username") == "operator"
+            assert request.url.params.get("start_from") == "2026-01-01T00:00:00Z"
+            assert request.url.params.get("start_to") == "2026-01-02T00:00:00Z"
+            assert request.url.params.get("message_contains") == "done"
+            assert request.url.params.get("skip") == "5"
+            assert request.url.params.get("limit") == "10"
+            return httpx.Response(200, json=payload)
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        results = client.list_task_results(
+            status="success",
+            chip_id="chip-a",
+            task_name="t1",
+            qid="Q00",
+            execution_id="exec-1",
+            username="operator",
+            start_from="2026-01-01T00:00:00Z",
+            start_to="2026-01-02T00:00:00Z",
+            message_contains="done",
+            skip=5,
+            limit=10,
+        )
+        assert isinstance(results, TaskResultListResponse)
+        assert results.items[0].task_id == "task-1"
+    finally:
+        client.close()
+
+
+def test_task_result_latest_and_history_methods_use_expected_paths() -> None:
+    latest_payload = {"task_name": "t1", "result": {}}
+    history_payload = {"name": "t1", "data": {}}
+    seen_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_paths.append(request.url.path)
+        assert request.url.params.get("chip_id") == "chip-a"
+        assert request.url.params.get("task") == "t1"
+        if request.url.path.endswith("/history"):
+            assert request.url.params.get("date") == "20260101"
+            return httpx.Response(200, json=history_payload)
+        return httpx.Response(200, json=latest_payload)
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        latest = client.get_qubit_latest_task_results(chip_id="chip-a", task="t1")
+        qubit_history = client.get_qubit_task_history(
+            chip_id="chip-a",
+            qid="Q00",
+            task="t1",
+            date="20260101",
+        )
+        coupling_latest = client.get_coupling_latest_task_results(
+            chip_id="chip-a",
+            task="t1",
+        )
+        coupling_history = client.get_coupling_task_history(
+            chip_id="chip-a",
+            coupling_id="Q00-Q01",
+            task="t1",
+            date="20260101",
+        )
+
+        assert isinstance(latest, LatestTaskResultResponse)
+        assert qubit_history.name == "t1"
+        assert coupling_latest.task_name == "t1"
+        assert coupling_history.name == "t1"
+        assert seen_paths == [
+            "/task-results/qubits/latest",
+            "/task-results/qubits/Q00/history",
+            "/task-results/couplings/latest",
+            "/task-results/couplings/Q00-Q01/history",
+        ]
+    finally:
+        client.close()
+
+
+def test_agent_read_only_resource_methods_return_models_and_objects() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        match request.url.path:
+            case "/projects":
+                return httpx.Response(200, json={"projects": [], "total": 0})
+            case "/files/tree":
+                return httpx.Response(
+                    200,
+                    json=[{"name": "flows", "path": "flows", "type": "directory"}],
+                )
+            case "/files/git/status":
+                return httpx.Response(200, json={"branch": "main", "dirty": False})
+            case "/issues":
+                assert request.url.params.get("task_id") == "task-1"
+                assert request.url.params.get("is_closed") == "false"
+                return httpx.Response(200, json={"issues": [], "total": 0, "skip": 0, "limit": 20})
+            case "/issue-knowledge":
+                assert request.url.params.get("status") == "approved"
+                return httpx.Response(200, json={"items": [], "total": 0, "skip": 0, "limit": 20})
+            case "/flows":
+                return httpx.Response(200, json={"flows": []})
+            case "/executions":
+                assert request.url.params.get("chip_id") == "chip-a"
+                return httpx.Response(
+                    200,
+                    json={"executions": [], "total": 0, "skip": 0, "limit": 20},
+                )
+            case "/provenance/stats":
+                return httpx.Response(
+                    200,
+                    json={
+                        "total_entities": 0,
+                        "total_activities": 0,
+                        "total_relations": 0,
+                        "relation_counts": {},
+                        "recent_entities": [],
+                    },
+                )
+            case "/provenance/changes":
+                assert request.url.params.get("parameter_names") == "t1"
+                return httpx.Response(200, json={"changes": [], "total_count": 0})
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert client.list_projects().total == 0
+        tree = client.get_files_tree()
+        assert isinstance(tree[0], FileTreeNode)
+        assert client.get_git_status()["branch"] == "main"
+        assert isinstance(
+            client.list_issues(task_id="task-1", is_closed=False, limit=20),
+            ListIssuesResponse,
+        )
+        assert client.list_issue_knowledge(status="approved", limit=20).items == []
+        assert isinstance(client.list_flows(), ListFlowsResponse)
+        assert isinstance(
+            client.list_executions(chip_id="chip-a"),
+            ListExecutionsResponse,
+        )
+        assert client.get_provenance_stats().total_entities == 0
+        assert client.get_provenance_changes(parameter_names=["t1"]).total_count == 0
+    finally:
+        client.close()
+
+
+def test_chip_topology_read_helpers_return_models() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        match request.url.path:
+            case "/chips/chip-a/qubits":
+                assert request.url.params.get("qids") == "Q00"
+                assert request.url.params.get("offset") == "5"
+                assert request.url.params.get("limit") == "10"
+                return httpx.Response(
+                    200,
+                    json={
+                        "qubits": [{"qid": "Q00", "chip_id": "chip-a", "status": "ready"}],
+                        "total": 1,
+                        "offset": 5,
+                        "limit": 10,
+                    },
+                )
+            case "/chips/chip-a/qubits/Q00":
+                return httpx.Response(
+                    200,
+                    json={"qid": "Q00", "chip_id": "chip-a", "data": {"t1": 12.5}},
+                )
+            case "/chips/chip-a/couplings":
+                assert request.url.params.get("offset") == "0"
+                assert request.url.params.get("limit") == "25"
+                return httpx.Response(
+                    200,
+                    json={
+                        "couplings": [{"qid": "Q00-Q01", "chip_id": "chip-a"}],
+                        "total": 1,
+                        "offset": 0,
+                        "limit": 25,
+                    },
+                )
+            case "/chips/chip-a/couplings/Q00-Q01":
+                return httpx.Response(
+                    200,
+                    json={"qid": "Q00-Q01", "chip_id": "chip-a", "status": "ready"},
+                )
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        qubits = client.list_chip_qubits("chip-a", qids=["Q00"], offset=5, limit=10)
+        qubit = client.get_chip_qubit(chip_id="chip-a", qid="Q00")
+        couplings = client.list_chip_couplings("chip-a", limit=25)
+        coupling = client.get_chip_coupling(chip_id="chip-a", coupling_id="Q00-Q01")
+
+        assert isinstance(qubits, ListQubitsResponse)
+        assert isinstance(qubit, QubitResponse)
+        assert qubit.data["t1"] == 12.5
+        assert isinstance(couplings, ListCouplingsResponse)
+        assert isinstance(coupling, CouplingResponse)
+    finally:
+        client.close()
+
+
+def test_task_file_flow_and_ai_review_read_helpers_return_models() -> None:
+    issue_payload = {
+        "id": "issue-1",
+        "task_id": "task-1",
+        "username": "operator",
+        "title": "Bad fit",
+        "content": "Needs review",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+    }
+    task_result_payload = {
+        "task_id": "task-1",
+        "task_name": "t1",
+        "qid": "Q00",
+        "chip_id": "chip-a",
+        "status": "success",
+        "execution_id": "exec-1",
+        "figure_path": [],
+        "json_figure_path": [],
+        "input_parameters": {},
+        "output_parameters": {"t1": 12.5},
+    }
+    flow_template_payload = {
+        "id": "rabi",
+        "name": "Rabi",
+        "description": "Run Rabi calibration",
+        "category": "calibration",
+        "filename": "rabi.py",
+        "function_name": "rabi",
+    }
+    knowledge_payload = {
+        "name": "t1",
+        "category": "qubit",
+        "summary": "T1 summary",
+        "what_it_measures": "Energy relaxation",
+        "physical_principle": "Relaxation decay",
+        "expected_result": {"description": "Exponential decay"},
+        "evaluation_criteria": "Check fit quality",
+        "failure_modes": [{"severity": "warning", "description": "Noisy curve"}],
+        "tips": ["Inspect the fitted decay"],
+        "prompt_text": "Review t1",
+    }
+    review_run_payload: dict[str, object] = {
+        "review_run_id": "run-1",
+        "trigger_type": "manual_chip_bulk",
+        "chip_id": "chip-a",
+        "task_name": "t1",
+        "entity_type": "qubit",
+        "execution_ids": ["exec-1"],
+        "requested_by": "operator",
+        "requested_at": "2026-01-01T00:00:00Z",
+        "completed_at": None,
+        "model": "gpt-test",
+        "total": 0,
+        "completed_count": 0,
+        "failed_count": 0,
+        "running_count": 0,
+        "requested_count": 0,
+        "decision_counts": {},
+        "status_counts": {},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        match request.url.path:
+            case "/files/content":
+                assert request.url.params.get("path") == "flows/demo.py"
+                return httpx.Response(200, json={"path": "flows/demo.py", "content": "pass"})
+            case "/task-results/task-1/issues":
+                return httpx.Response(200, json=[issue_payload])
+            case "/flows/templates":
+                return httpx.Response(200, json=[flow_template_payload])
+            case "/flows/templates/rabi":
+                return httpx.Response(
+                    200, json={**flow_template_payload, "code": "def rabi(): pass"}
+                )
+            case "/flows/helpers":
+                return httpx.Response(200, json=["common.py"])
+            case "/flows/helpers/common.py":
+                return httpx.Response(200, text="def helper(): pass")
+            case "/tasks":
+                assert request.url.params.get("backend") == "qubex"
+                return httpx.Response(
+                    200,
+                    json={
+                        "tasks": [
+                            {
+                                "name": "t1",
+                                "description": "Measure T1",
+                                "task_type": "qubit",
+                                "input_parameters": {},
+                                "output_parameters": {},
+                            }
+                        ]
+                    },
+                )
+            case "/tasks/task-1/result":
+                return httpx.Response(200, json=task_result_payload)
+            case "/task-knowledge":
+                return httpx.Response(
+                    200,
+                    json={
+                        "items": [{"name": "t1", "category": "qubit", "summary": "T1 summary"}],
+                        "categories": {"qubit": "Qubit"},
+                    },
+                )
+            case "/tasks/t1/knowledge":
+                return httpx.Response(200, json=knowledge_payload)
+            case "/tasks/t1/knowledge/markdown":
+                return httpx.Response(200, text="# T1")
+            case "/task-results/task-1/note":
+                return httpx.Response(
+                    200,
+                    json={
+                        "content": "reviewed",
+                        "updated_by": "operator",
+                        "updated_at": "2026-01-01T00:00:00Z",
+                    },
+                )
+            case "/task-results/ai-review":
+                assert request.url.params.get("chip_id") == "chip-a"
+                assert request.url.params.get("task_name") == "t1"
+                assert request.url.params.get("status") == "completed"
+                assert request.url.params.get("decision") == "accept"
+                assert request.url.params.get("latest_only") == "true"
+                return httpx.Response(
+                    200,
+                    json={
+                        "items": [],
+                        "total": 0,
+                        "skip": 2,
+                        "limit": 5,
+                        "decision_counts": {},
+                        "status_counts": {},
+                    },
+                )
+            case "/task-results/ai-review/runs":
+                assert request.url.params.get("chip_id") == "chip-a"
+                assert request.url.params.get("task_name") == "t1"
+                return httpx.Response(
+                    200,
+                    json={"items": [review_run_payload], "total": 1, "skip": 0, "limit": 10},
+                )
+            case "/task-results/ai-review/runs/run-1":
+                return httpx.Response(200, json={"run": review_run_payload, "items": []})
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert client.get_file_content("flows/demo.py")["content"] == "pass"
+        assert client.list_task_result_issues("task-1")[0].id == "issue-1"
+        assert isinstance(client.list_flow_templates()[0], FlowTemplate)
+        assert isinstance(client.get_flow_template("rabi"), FlowTemplateWithCode)
+        assert client.list_flow_helper_files() == ["common.py"]
+        assert client.get_flow_helper_file("common.py") == "def helper(): pass"
+        assert isinstance(client.list_tasks(backend="qubex"), ListTaskResponse)
+        assert isinstance(client.get_task_result("task-1"), TaskResultResponse)
+        assert isinstance(client.list_task_knowledge(), ListTaskKnowledgeResponse)
+        assert isinstance(client.get_task_knowledge("t1"), TaskKnowledgeResponse)
+        assert client.get_task_knowledge_markdown("t1") == "# T1"
+        assert isinstance(client.get_task_note("task-1"), NoteModel)
+        assert isinstance(
+            client.list_task_result_ai_reviews(
+                chip_id="chip-a",
+                task_name="t1",
+                status="completed",
+                decision="accept",
+                latest_only=True,
+                skip=2,
+                limit=5,
+            ),
+            AiReviewListResponse,
+        )
+        assert isinstance(
+            client.list_task_result_ai_review_runs(chip_id="chip-a", task_name="t1", limit=10),
+            AiReviewRunListResponse,
+        )
+        assert isinstance(client.get_task_result_ai_review_run("run-1"), AiReviewRunDetailResponse)
+    finally:
+        client.close()
+
+
+def test_file_and_git_write_helpers_send_json_bodies() -> None:
+    def request_json(request: httpx.Request) -> dict[str, object]:
+        return cast("dict[str, object]", json.loads(request.content.decode() or "{}"))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        match (request.method, request.url.path):
+            case ("PUT", "/files/content"):
+                assert request_json(request) == {"path": "flows/demo.py", "content": "print('ok')"}
+                return httpx.Response(200, json={"message": "saved", "path": "flows/demo.py"})
+            case ("POST", "/files/validate"):
+                assert request_json(request) == {"content": "print('ok')", "file_type": "flow"}
+                return httpx.Response(200, json={"valid": True})
+            case ("POST", "/files/git/pull"):
+                assert request_json(request) == {}
+                return httpx.Response(200, json={"status": "pulled"})
+            case ("POST", "/files/git/push"):
+                assert request_json(request) == {"commit_message": "Update flow"}
+                return httpx.Response(200, json={"status": "pushed"})
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert client.save_file_content(path="flows/demo.py", content="print('ok')")["message"] == (
+            "saved"
+        )
+        assert (
+            client.validate_file_content(content="print('ok')", file_type="flow")["valid"] is True
+        )
+        assert client.git_pull_config()["status"] == "pulled"
+        assert client.git_push_config(commit_message="Update flow")["status"] == "pushed"
+    finally:
+        client.close()
+
+
+def test_flow_and_execution_write_helpers_return_models() -> None:
+    execute_payload = {
+        "execution_id": "exec-1",
+        "flow_run_url": "https://prefect.local/runs/exec-1",
+        "qdash_ui_url": "https://qdash.local/executions/exec-1",
+        "message": "started",
+    }
+
+    def request_json(request: httpx.Request) -> dict[str, object]:
+        return cast("dict[str, object]", json.loads(request.content.decode() or "{}"))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        match (request.method, request.url.path):
+            case ("POST", "/flows"):
+                body = request_json(request)
+                assert body["name"] == "demo"
+                assert body["code"] == "def demo(): pass"
+                assert body["chip_id"] == "chip-a"
+                return httpx.Response(
+                    200,
+                    json={
+                        "name": "demo",
+                        "file_path": "flows/demo.py",
+                        "message": "saved",
+                    },
+                )
+            case ("POST", "/flows/demo/execute"):
+                assert request_json(request) == {"parameters": {"shots": 10}}
+                return httpx.Response(200, json=execute_payload)
+            case ("POST", "/flows/demo/schedule"):
+                assert request_json(request) == {
+                    "cron": "0 2 * * *",
+                    "parameters": {"shots": 10},
+                    "active": True,
+                    "timezone": "Asia/Tokyo",
+                }
+                return httpx.Response(
+                    200,
+                    json={
+                        "schedule_id": "schedule-1",
+                        "flow_name": "demo",
+                        "schedule_type": "cron",
+                        "cron": "0 2 * * *",
+                        "active": True,
+                        "message": "scheduled",
+                    },
+                )
+            case ("POST", "/executions/run-1/cancel"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "execution_id": "run-1",
+                        "status": "cancelled",
+                        "message": "cancelled",
+                    },
+                )
+            case ("POST", "/executions/exec-1/re-execute"):
+                return httpx.Response(200, json=execute_payload)
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert isinstance(
+            client.save_flow(name="demo", code="def demo(): pass", chip_id="chip-a"),
+            SaveFlowResponse,
+        )
+        assert isinstance(
+            client.execute_flow("demo", parameters={"shots": 10}),
+            ExecuteFlowResponse,
+        )
+        assert isinstance(
+            client.schedule_flow("demo", cron="0 2 * * *", parameters={"shots": 10}),
+            ScheduleFlowResponse,
+        )
+        assert isinstance(client.cancel_execution("run-1"), CancelExecutionResponse)
+        assert client.re_execute_execution("exec-1").execution_id == "exec-1"
+    finally:
+        client.close()
+
+
+def test_task_result_and_issue_write_helpers_return_models() -> None:
+    issue_payload = {
+        "id": "issue-1",
+        "task_id": "task-1",
+        "username": "operator",
+        "title": "Bad fit",
+        "content": "Needs review",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+    }
+    knowledge_payload = {
+        "id": "knowledge-1",
+        "issue_id": "issue-1",
+        "task_id": "task-1",
+        "task_name": "t1",
+        "title": "Bad fit",
+        "status": "draft",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+    }
+    execute_payload = {
+        "execution_id": "exec-1",
+        "flow_run_url": "https://prefect.local/runs/exec-1",
+        "qdash_ui_url": "https://qdash.local/executions/exec-1",
+        "message": "started",
+    }
+
+    def request_json(request: httpx.Request) -> dict[str, object]:
+        return cast("dict[str, object]", json.loads(request.content.decode() or "{}"))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        match (request.method, request.url.path):
+            case ("PUT", "/task-results/task-1/note"):
+                assert request_json(request) == {"content": "reviewed"}
+                return httpx.Response(
+                    200,
+                    json={
+                        "content": "reviewed",
+                        "updated_by": "operator",
+                        "updated_at": "2026-01-01T00:00:00Z",
+                    },
+                )
+            case ("POST", "/task-results/task-1/exclude"):
+                assert request_json(request) == {"excluded": True, "reason": "bad fit"}
+                return httpx.Response(
+                    200,
+                    json={
+                        "task_id": "task-1",
+                        "excluded": True,
+                        "excluded_reason": "bad fit",
+                        "excluded_by_user_id": "user-1",
+                        "excluded_by": "operator",
+                        "excluded_at": "2026-01-01T00:00:00Z",
+                    },
+                )
+            case ("POST", "/task-results/task-1/re-execute"):
+                assert request_json(request) == {
+                    "parameter_overrides": {"run": {"shots": 10}},
+                    "update_params": False,
+                    "reconfigure": True,
+                }
+                return httpx.Response(200, json=execute_payload)
+            case ("POST", "/task-results/task-1/issues"):
+                assert request_json(request) == {"title": "Bad fit", "content": "Needs review"}
+                return httpx.Response(201, json=issue_payload)
+            case ("PATCH", "/issues/issue-1"):
+                assert request_json(request) == {"content": "Updated"}
+                return httpx.Response(200, json={**issue_payload, "content": "Updated"})
+            case ("PATCH", "/issues/issue-1/close"):
+                return httpx.Response(200, json={"message": "closed"})
+            case ("PATCH", "/issues/issue-1/reopen"):
+                return httpx.Response(200, json={"message": "reopened"})
+            case ("PATCH", "/issue-knowledge/knowledge-1"):
+                assert request_json(request) == {"title": "Updated case"}
+                return httpx.Response(200, json={**knowledge_payload, "title": "Updated case"})
+            case ("PATCH", "/issue-knowledge/knowledge-1/approve"):
+                return httpx.Response(200, json={**knowledge_payload, "status": "approved"})
+            case ("PATCH", "/issue-knowledge/knowledge-1/reject"):
+                return httpx.Response(200, json={**knowledge_payload, "status": "rejected"})
+            case ("POST", "/issues/issue-1/extract-knowledge"):
+                return httpx.Response(201, json=knowledge_payload)
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert client.upsert_task_note("task-1", content="reviewed").content == "reviewed"
+        assert isinstance(
+            client.set_task_result_excluded("task-1", excluded=True, reason="bad fit"),
+            TaskResultExcludeResponse,
+        )
+        assert (
+            client.re_execute_task_result(
+                "task-1",
+                parameter_overrides={"run": {"shots": 10}},
+                update_params=False,
+                reconfigure=True,
+            ).execution_id
+            == "exec-1"
+        )
+        assert (
+            client.create_task_result_issue(
+                task_id="task-1",
+                title="Bad fit",
+                content="Needs review",
+            ).id
+            == "issue-1"
+        )
+        assert client.update_issue("issue-1", content="Updated").content == "Updated"
+        assert client.close_issue("issue-1").message == "closed"
+        assert client.reopen_issue("issue-1").message == "reopened"
+        assert (
+            client.update_issue_knowledge(
+                "knowledge-1",
+                fields={"title": "Updated case"},
+            ).title
+            == "Updated case"
+        )
+        assert client.approve_issue_knowledge("knowledge-1").status == "approved"
+        assert client.reject_issue_knowledge("knowledge-1").status == "rejected"
+        assert client.extract_issue_knowledge("issue-1").id == "knowledge-1"
     finally:
         client.close()
 

@@ -219,7 +219,111 @@ finally:
     client.close()
 ```
 
-### 3.4 Metrics Configuration
+### 3.4 Agent-Friendly Read-Only Queries
+
+The client exposes common read-only endpoints used by QDash agents and scripts:
+
+```python
+from qdash.client import QDashClient
+
+client = QDashClient.from_profile("local")
+try:
+    chip_id = client.get_default_chip_id()
+
+    task_results = client.list_task_results(chip_id=chip_id, status="success", limit=20)
+    q00 = client.get_chip_qubit(chip_id=chip_id, qid="Q00")
+    latest_t1 = client.get_qubit_latest_task_results(chip_id=chip_id, task="t1")
+    q00_history = client.get_qubit_task_history(
+        chip_id=chip_id,
+        qid="Q00",
+        task="t1",
+        date="20260625",
+    )
+
+    projects = client.list_projects()
+    file_tree = client.get_files_tree()
+    flow_source = client.get_file_content("flows/demo.py")
+    git_status = client.get_git_status()
+    issues = client.list_issues(limit=20)
+    knowledge = client.list_issue_knowledge(status="approved", limit=20)
+    task_knowledge = client.list_task_knowledge()
+    flows = client.list_flows()
+    templates = client.list_flow_templates()
+    executions = client.list_executions(chip_id=chip_id, limit=20)
+    reviews = client.list_task_result_ai_reviews(chip_id=chip_id, limit=20)
+    provenance = client.get_provenance_stats()
+
+    print(task_results.total, q00.qid, latest_t1.task_name, q00_history.name)
+    print(projects.total, len(file_tree), flow_source.get("path"), git_status, len(issues.issues))
+    print(len(knowledge.items), len(task_knowledge.items), len(flows.flows), len(templates))
+    print(len(executions.executions), reviews.total)
+    print(provenance.total_entities)
+finally:
+    client.close()
+```
+
+Available read-only helpers include:
+
+- Chips: `list_chips()`, `get_default_chip()`, `get_default_chip_id()`,
+  `list_chip_qubits()`, `get_chip_qubit()`, `list_chip_couplings()`,
+  `get_chip_coupling()`
+- Task results: `list_task_results()`, `get_qubit_latest_task_results()`,
+  `get_qubit_task_history()`, `get_coupling_latest_task_results()`,
+  `get_coupling_task_history()`, `get_task_result()`, `get_task_note()`,
+  `list_task_result_issues()`, `list_task_result_ai_reviews()`,
+  `list_task_result_ai_review_runs()`, `get_task_result_ai_review_run()`
+- Tasks and task knowledge: `list_tasks()`, `list_task_knowledge()`,
+  `get_task_knowledge()`, `get_task_knowledge_markdown()`
+- Projects and files: `list_projects()`, `get_project()`, `get_files_tree()`,
+  `get_file_content()`, `get_git_status()`
+- Issues and knowledge: `list_issues()`, `get_issue()`, `list_issue_knowledge()`,
+  `get_issue_knowledge()`
+- Flows and executions: `list_flows()`, `get_flow()`, `list_executions()`,
+  `get_execution()`, `list_flow_templates()`, `get_flow_template()`,
+  `list_flow_helper_files()`, `get_flow_helper_file()`
+- Provenance: `get_provenance_entity()`, `get_provenance_lineage()`,
+  `get_provenance_impact()`, `get_provenance_history()`, `get_provenance_stats()`,
+  `get_provenance_changes()`
+
+### 3.5 Explicit Write And Operational Queries
+
+Write helpers use the same profile, authentication, project headers, retries, and response
+validation as read-only helpers. Agents should ask for user confirmation before calling methods
+that mutate files, trigger executions, change issue status, push/pull git state, or alter task
+results.
+
+```python
+from qdash.client import QDashClient
+
+client = QDashClient.from_profile("local")
+try:
+    client.save_file_content(path="flows/demo.py", content="def demo(): pass")
+    client.validate_file_content(content="def demo(): pass", file_type="flow")
+    client.git_push_config(commit_message="Update demo flow")
+
+    flow = client.save_flow(name="demo", code="def demo(): pass", chip_id="chip-001")
+    execution = client.execute_flow(flow.name, parameters={"shots": 100})
+    client.upsert_task_note("task-001", content="Reviewed by operator")
+    client.set_task_result_excluded("task-001", excluded=True, reason="bad fit")
+
+    print(flow.file_path, execution.execution_id)
+finally:
+    client.close()
+```
+
+Available write and operational helpers include:
+
+- Files and git: `save_file_content()`, `validate_file_content()`, `git_pull_config()`,
+  `git_push_config()`
+- Flows and executions: `save_flow()`, `execute_flow()`, `schedule_flow()`,
+  `cancel_execution()`, `re_execute_execution()`
+- Task results: `upsert_task_note()`, `delete_task_note()`, `set_task_result_excluded()`,
+  `re_execute_task_result()`, `create_task_result_issue()`
+- Issues and knowledge: `update_issue()`, `close_issue()`, `reopen_issue()`,
+  `update_issue_knowledge()`, `approve_issue_knowledge()`, `reject_issue_knowledge()`,
+  `extract_issue_knowledge()`
+
+### 3.6 Metrics Configuration
 
 ```python
 from qdash.client import QDashClient

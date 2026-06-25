@@ -101,6 +101,13 @@ class ForumPostCreate(BaseModel):
 class ForumPostUpdate(BaseModel):
     """Request schema for updating a forum post."""
 
+    category: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=FORUM_CATEGORY_PATTERN,
+        description="Updated forum category key for root threads",
+    )
     title: str | None = Field(
         default=None, max_length=200, description="Updated title for root threads"
     )

@@ -14,7 +14,11 @@ function emojiToCodePoints(emoji: string): string {
 // https://vitepress.dev/reference/site-config
 export default withMermaid(
   defineConfig({
-    vite: {},
+    vite: {
+      build: {
+        target: "es2022",
+      },
+    },
     base: "/qdash/",
     title: "QDash",
     description: "Qubit Calibration Management Platform",

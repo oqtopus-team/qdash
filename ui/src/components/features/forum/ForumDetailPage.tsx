@@ -96,18 +96,18 @@ function PostBody({
         {canEdit && !editing && !isAi && (
           <div className="flex items-center gap-1">
             <button
-              className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/40 hover:text-primary"
+              className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-primary"
               onClick={onEdit}
               title="Edit"
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <Pencil className="h-4 w-4" />
             </button>
             <button
-              className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/40 hover:text-error"
+              className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-error"
               onClick={onDelete}
               title="Delete"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         )}
@@ -161,6 +161,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const [editingRoot, setEditingRoot] = useState(false);
   const [editRootTitle, setEditRootTitle] = useState("");
   const [editRootContent, setEditRootContent] = useState("");
+  const [editRootCategory, setEditRootCategory] = useState("");
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
   const [editReplyContent, setEditReplyContent] = useState("");
   const [replyLimit, setReplyLimit] = useState(REPLY_PAGE_SIZE);
@@ -232,6 +233,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     if (!post) return;
     setEditRootTitle(post.title ?? "");
     setEditRootContent(post.content);
+    setEditRootCategory(post.category);
     setEditingRoot(true);
   };
 
@@ -240,6 +242,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     await updateMutation.mutateAsync({
       postId: post.id,
       data: {
+        category: editRootCategory || null,
         title: editRootTitle.trim() || null,
         content: editRootContent.trim(),
       },
@@ -326,10 +329,24 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </button>
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className={`badge badge-sm ${category.badgeClass}`}>
-                <CategoryIcon className="h-3 w-3" />
-                {category.label}
-              </span>
+              {editingRoot ? (
+                <select
+                  className="select select-bordered select-xs"
+                  value={editRootCategory}
+                  onChange={(event) => setEditRootCategory(event.target.value)}
+                >
+                  {categories.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className={`badge badge-sm ${category.badgeClass}`}>
+                  <CategoryIcon className="h-3 w-3" />
+                  {category.label}
+                </span>
+              )}
               {post.is_closed && <span className="badge badge-sm badge-ghost">Closed</span>}
             </div>
             {editingRoot ? (

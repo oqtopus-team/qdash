@@ -489,6 +489,8 @@ class MetricNoteDocument(Document):
 
 When a cool-down ID is known, the note stores both `cooldown_id` and the cool-down time bounds. When no cool-down document exists, the dashboard can save a `time_range` note. If a cool-down document is added later, summary reads include matching time-range notes inside that cool-down until they are edited into the explicit cool-down scope.
 
+For `time_range` summary reads, notes are matched by **window overlap** rather than by an exact `scope_key`. The dashboard's default range is relative to "now", so its bounds drift by seconds/minutes between writing a note and reading it back; matching any `time_range` note whose `[scope_started_at, scope_ended_at]` window overlaps the requested window keeps those notes visible (issue #1109). When several overlapping notes exist for the same target metric, the one whose `scope_key` matches the request exactly wins, otherwise the most recently edited note is shown.
+
 ---
 
 ### ExecutionHistoryDocument

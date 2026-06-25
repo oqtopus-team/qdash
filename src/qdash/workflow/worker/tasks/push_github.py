@@ -58,6 +58,7 @@ def push_github(
     repo_subpath: str = "64Qv1/calibration/calib_note.json",
     commit_message: str = "Update calib_note.json",
     branch: str = "main",
+    sync_local: bool = True,
 ) -> str:
     """Push local calib_note.json to the GitHub repository.
 
@@ -67,6 +68,7 @@ def push_github(
         repo_subpath: Relative path inside the repo to replace
         commit_message: Commit message
         branch: Branch to push to
+        sync_local: Whether to sync the local qubex-config repo after a successful push
 
     Returns:
     -------
@@ -117,7 +119,8 @@ def push_github(
         repo.remotes.origin.push()
 
         commit_sha = str(repo.head.commit.hexsha[:8])
-        _sync_local_repo(branch, logger)
+        if sync_local:
+            _sync_local_repo(branch, logger)
         return commit_sha
 
     except GitCommandError as e:
@@ -136,6 +139,7 @@ def push_github_batch(
     files: list[tuple[str, str]],
     commit_message: str = "Update files",
     branch: str = "main",
+    sync_local: bool = True,
 ) -> str:
     """Push multiple files to GitHub repository in a single commit.
 
@@ -144,6 +148,7 @@ def push_github_batch(
         files: List of (source_path, repo_subpath) tuples
         commit_message: Commit message
         branch: Branch to push to
+        sync_local: Whether to sync the local qubex-config repo after a successful push
 
     Returns:
     -------
@@ -206,7 +211,8 @@ def push_github_batch(
 
         logger.info(f"Pushed {len(added_files)} files in single commit")
         commit_sha = str(repo.head.commit.hexsha[:8])
-        _sync_local_repo(branch, logger)
+        if sync_local:
+            _sync_local_repo(branch, logger)
         return commit_sha
 
     except GitCommandError as e:
