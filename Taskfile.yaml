@@ -46,6 +46,7 @@ tasks:
           --input-file-type openapi \
           --collapse-root-models \
           --enum-field-as-literal one \
+          --set-default-enum-member \
           --use-union-operator \
           --use-subclass-enum \
           --output-model-type pydantic_v2.BaseModel \

@@ -10,13 +10,19 @@ import pytest
 
 from qdash.client import (
     ChipResponse,
+    FileTreeNode,
+    LatestTaskResultResponse,
     ListChipsResponse,
+    ListExecutionsResponse,
+    ListFlowsResponse,
+    ListIssuesResponse,
     QDashClient,
     QDashConfig,
     QDashConfigError,
     QDashNotFoundError,
     QDashTransportError,
     QDashValidationError,
+    TaskResultListResponse,
     TimeSeriesData,
 )
 
@@ -523,6 +529,174 @@ def test_get_task_results_timeseries_returns_object() -> None:
         assert isinstance(series, TimeSeriesData)
         assert "Q00" in series.data
         assert series.data["Q00"][0].parameter_name == "t1"
+    finally:
+        client.close()
+
+
+def test_list_task_results_sends_common_filters() -> None:
+    payload = {
+        "items": [
+            {
+                "task_id": "task-1",
+                "task_name": "t1",
+                "qid": "Q00",
+                "chip_id": "chip-a",
+                "status": "success",
+                "execution_id": "exec-1",
+            }
+        ],
+        "total": 1,
+        "skip": 5,
+        "limit": 10,
+        "status_counts": {"success": 1},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/task-results":
+            assert request.url.params.get("status") == "success"
+            assert request.url.params.get("chip_id") == "chip-a"
+            assert request.url.params.get("task_name") == "t1"
+            assert request.url.params.get("qid") == "Q00"
+            assert request.url.params.get("execution_id") == "exec-1"
+            assert request.url.params.get("username") == "operator"
+            assert request.url.params.get("start_from") == "2026-01-01T00:00:00Z"
+            assert request.url.params.get("start_to") == "2026-01-02T00:00:00Z"
+            assert request.url.params.get("message_contains") == "done"
+            assert request.url.params.get("skip") == "5"
+            assert request.url.params.get("limit") == "10"
+            return httpx.Response(200, json=payload)
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        results = client.list_task_results(
+            status="success",
+            chip_id="chip-a",
+            task_name="t1",
+            qid="Q00",
+            execution_id="exec-1",
+            username="operator",
+            start_from="2026-01-01T00:00:00Z",
+            start_to="2026-01-02T00:00:00Z",
+            message_contains="done",
+            skip=5,
+            limit=10,
+        )
+        assert isinstance(results, TaskResultListResponse)
+        assert results.items[0].task_id == "task-1"
+    finally:
+        client.close()
+
+
+def test_task_result_latest_and_history_methods_use_expected_paths() -> None:
+    latest_payload = {"task_name": "t1", "result": {}}
+    history_payload = {"name": "t1", "data": {}}
+    seen_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_paths.append(request.url.path)
+        assert request.url.params.get("chip_id") == "chip-a"
+        assert request.url.params.get("task") == "t1"
+        if request.url.path.endswith("/history"):
+            assert request.url.params.get("date") == "20260101"
+            return httpx.Response(200, json=history_payload)
+        return httpx.Response(200, json=latest_payload)
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        latest = client.get_qubit_latest_task_results(chip_id="chip-a", task="t1")
+        qubit_history = client.get_qubit_task_history(
+            chip_id="chip-a",
+            qid="Q00",
+            task="t1",
+            date="20260101",
+        )
+        coupling_latest = client.get_coupling_latest_task_results(
+            chip_id="chip-a",
+            task="t1",
+        )
+        coupling_history = client.get_coupling_task_history(
+            chip_id="chip-a",
+            coupling_id="Q00-Q01",
+            task="t1",
+            date="20260101",
+        )
+
+        assert isinstance(latest, LatestTaskResultResponse)
+        assert qubit_history.name == "t1"
+        assert coupling_latest.task_name == "t1"
+        assert coupling_history.name == "t1"
+        assert seen_paths == [
+            "/task-results/qubits/latest",
+            "/task-results/qubits/Q00/history",
+            "/task-results/couplings/latest",
+            "/task-results/couplings/Q00-Q01/history",
+        ]
+    finally:
+        client.close()
+
+
+def test_agent_read_only_resource_methods_return_models_and_objects() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        match request.url.path:
+            case "/projects":
+                return httpx.Response(200, json={"projects": [], "total": 0})
+            case "/files/tree":
+                return httpx.Response(
+                    200,
+                    json=[{"name": "flows", "path": "flows", "type": "directory"}],
+                )
+            case "/files/git/status":
+                return httpx.Response(200, json={"branch": "main", "dirty": False})
+            case "/issues":
+                assert request.url.params.get("task_id") == "task-1"
+                assert request.url.params.get("is_closed") == "false"
+                return httpx.Response(200, json={"issues": [], "total": 0, "skip": 0, "limit": 20})
+            case "/issue-knowledge":
+                assert request.url.params.get("status") == "approved"
+                return httpx.Response(200, json={"items": [], "total": 0, "skip": 0, "limit": 20})
+            case "/flows":
+                return httpx.Response(200, json={"flows": []})
+            case "/executions":
+                assert request.url.params.get("chip_id") == "chip-a"
+                return httpx.Response(
+                    200,
+                    json={"executions": [], "total": 0, "skip": 0, "limit": 20},
+                )
+            case "/provenance/stats":
+                return httpx.Response(
+                    200,
+                    json={
+                        "total_entities": 0,
+                        "total_activities": 0,
+                        "total_relations": 0,
+                        "relation_counts": {},
+                        "recent_entities": [],
+                    },
+                )
+            case "/provenance/changes":
+                assert request.url.params.get("parameter_names") == "t1"
+                return httpx.Response(200, json={"changes": [], "total_count": 0})
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert client.list_projects().total == 0
+        tree = client.get_files_tree()
+        assert isinstance(tree[0], FileTreeNode)
+        assert client.get_git_status()["branch"] == "main"
+        assert isinstance(
+            client.list_issues(task_id="task-1", is_closed=False, limit=20),
+            ListIssuesResponse,
+        )
+        assert client.list_issue_knowledge(status="approved", limit=20).items == []
+        assert isinstance(client.list_flows(), ListFlowsResponse)
+        assert isinstance(
+            client.list_executions(chip_id="chip-a"),
+            ListExecutionsResponse,
+        )
+        assert client.get_provenance_stats().total_entities == 0
+        assert client.get_provenance_changes(parameter_names=["t1"]).total_count == 0
     finally:
         client.close()
 
