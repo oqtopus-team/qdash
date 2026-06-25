@@ -209,10 +209,12 @@ class GitHubIntegration:
             ```
         """
         results: dict[str, Any] = {}
+        pushed_any = False
+        had_error = False
 
         for file_type in push_config.file_types:
             try:
-                result: str | dict[str, str]
+                result: str | dict[str, Any]
                 if file_type == ConfigFileType.CALIB_NOTE:
                     result = self._push_calib_note(push_config)
                 elif file_type == ConfigFileType.PROPS:
@@ -225,11 +227,31 @@ class GitHubIntegration:
                     continue
 
                 results[file_type.value] = result
+                if self._push_result_has_commit(result):
+                    pushed_any = True
+                if isinstance(result, dict) and "error" in result:
+                    had_error = True
             except Exception as e:
                 self.logger.error(f"Failed to push {file_type.value}: {e}")
                 results[file_type.value] = f"Error: {e}"
+                had_error = True
+
+        if pushed_any and not had_error:
+            from qdash.workflow.worker.tasks.push_github import _sync_local_repo
+
+            _sync_local_repo(push_config.branch, self.logger)
 
         return results
+
+    @staticmethod
+    def _push_result_has_commit(result: str | dict[str, Any]) -> bool:
+        if isinstance(result, str):
+            return result not in {"No changes to commit", "No files to commit"}
+        commit = result.get("commit")
+        return isinstance(commit, str) and commit not in {
+            "No changes to commit",
+            "No files to commit",
+        }
 
     def _push_calib_note(self, config: GitHubPushConfig) -> str:
         """Push calib_note.json (fetch master note from MongoDB and write to config dir).
@@ -288,6 +310,7 @@ class GitHubIntegration:
             repo_subpath=repo_subpath,
             commit_message=commit_message,
             branch=config.branch,
+            sync_local=False,
         )
 
         self.logger.info(f"Pushed calib_note.json: {commit_sha}")
@@ -331,6 +354,7 @@ class GitHubIntegration:
             repo_subpath=repo_subpath,
             commit_message=commit_message,
             branch=config.branch,
+            sync_local=False,
         )
 
         self.logger.info(f"Pushed props.yaml: {commit_sha}")
@@ -366,6 +390,7 @@ class GitHubIntegration:
             repo_subpath=repo_subpath,
             commit_message=commit_message,
             branch=config.branch,
+            sync_local=False,
         )
 
         self.logger.info(f"Pushed params.yaml: {commit_sha}")
@@ -411,6 +436,7 @@ class GitHubIntegration:
                 files=files,
                 commit_message=commit_message,
                 branch=config.branch,
+                sync_local=False,
             )
             file_names = [Path(f[0]).name for f in files]
             self.logger.info(f"Pushed {len(files)} param files in single commit: {commit_sha}")

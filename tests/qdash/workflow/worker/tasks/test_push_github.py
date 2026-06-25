@@ -181,6 +181,74 @@ class TestGitHubPushConfigDefaults:
             GitHubPushConfig()
 
 
+class TestGitHubIntegrationPushFilesSync:
+    """Tests for deferred local repo sync during grouped GitHub pushes."""
+
+    def _make_integration(self):
+        from qdash.workflow.service.github import GitHubIntegration
+
+        integration = GitHubIntegration.__new__(GitHubIntegration)
+        integration.logger = MagicMock()
+        integration._push_calib_note = MagicMock(return_value="abc12345")
+        integration._push_all_params = MagicMock(
+            return_value={"commit": "def67890", "files": ["params.yaml"]}
+        )
+        integration._push_props = MagicMock()
+        integration._push_params_file = MagicMock()
+        return integration
+
+    def _make_config(self):
+        from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
+
+        with patch("qdash.workflow.service.github.ConfigLoader.load_workflow", return_value={}):
+            return GitHubPushConfig(
+                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
+                branch="develop",
+            )
+
+    def test_syncs_local_repo_once_after_all_pushes_succeed(self):
+        """Grouped pushes should not reset local files between calib_note and params."""
+        integration = self._make_integration()
+        config = self._make_config()
+
+        with patch("qdash.workflow.worker.tasks.push_github._sync_local_repo") as sync_local:
+            result = integration.push_files(config)
+
+        assert result == {
+            "calib_note": "abc12345",
+            "all_params": {"commit": "def67890", "files": ["params.yaml"]},
+        }
+        sync_local.assert_called_once_with("develop", integration.logger)
+
+    def test_does_not_sync_local_repo_when_later_push_fails(self):
+        """Do not discard local params changes when a grouped push reports an error."""
+        integration = self._make_integration()
+        integration._push_all_params.return_value = {"error": "push failed"}
+        config = self._make_config()
+
+        with patch("qdash.workflow.worker.tasks.push_github._sync_local_repo") as sync_local:
+            result = integration.push_files(config)
+
+        assert result["calib_note"] == "abc12345"
+        assert result["all_params"] == {"error": "push failed"}
+        sync_local.assert_not_called()
+
+    def test_does_not_sync_local_repo_when_nothing_changed(self):
+        """No-op grouped pushes do not need to reset the local repository."""
+        integration = self._make_integration()
+        integration._push_calib_note.return_value = "No changes to commit"
+        integration._push_all_params.return_value = {
+            "commit": "No changes to commit",
+            "files": ["params.yaml"],
+        }
+        config = self._make_config()
+
+        with patch("qdash.workflow.worker.tasks.push_github._sync_local_repo") as sync_local:
+            integration.push_files(config)
+
+        sync_local.assert_not_called()
+
+
 class TestSelectParamYamlFiles:
     """Tests for selecting params YAML files for ALL_PARAMS batch pushes."""
 
