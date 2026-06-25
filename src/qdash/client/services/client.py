@@ -29,8 +29,11 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
+    BodyReExecuteTaskResult,
+    CancelExecutionResponse,
     ChipMetricsResponse,
     ChipResponse,
+    ExecuteFlowResponse,
     ExecutionResponseDetail,
     FileTreeNode,
     GetFlowResponse,
@@ -44,13 +47,18 @@ from qdash.client.services.models import (
     ListFlowsResponse,
     ListIssueKnowledgeResponse,
     ListIssuesResponse,
+    NoteModel,
     ParameterHistoryResponse,
     ParameterVersionResponse,
     ProjectResponse,
     ProvenanceStatsResponse,
     QdashApiSchemasProjectProjectListResponse,
     RecentChangesResponse,
+    SaveFlowResponse,
+    ScheduleFlowResponse,
+    SuccessResponse,
     TaskHistoryResponse,
+    TaskResultExcludeResponse,
     TaskResultListResponse,
     TimeSeriesData,
 )
@@ -390,6 +398,42 @@ class QDashClient:
         data = response.data
         return data if isinstance(data, dict) else {}
 
+    def save_file_content(self, *, path: str, content: str) -> dict[str, Any]:
+        response = self._request(
+            "PUT",
+            "/files/content",
+            json={"path": path, "content": content},
+        )
+        data = response.data
+        return data if isinstance(data, dict) else {}
+
+    def validate_file_content(self, *, content: str, file_type: str) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            "/files/validate",
+            json={"content": content, "file_type": file_type},
+        )
+        data = response.data
+        return data if isinstance(data, dict) else {}
+
+    def git_pull_config(self) -> dict[str, Any]:
+        response = self._request("POST", "/files/git/pull", json={})
+        data = response.data
+        return data if isinstance(data, dict) else {}
+
+    def git_push_config(
+        self,
+        *,
+        commit_message: str = "Update config files from UI",
+    ) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            "/files/git/push",
+            json={"commit_message": commit_message},
+        )
+        data = response.data
+        return data if isinstance(data, dict) else {}
+
     def list_issues(
         self,
         *,
@@ -410,6 +454,43 @@ class QDashClient:
     def get_issue(self, issue_id: str) -> IssueResponse:
         response = self._request("GET", f"/issues/{issue_id}")
         return self._validate_model_payload(IssueResponse, response.data)
+
+    def create_task_result_issue(
+        self,
+        *,
+        task_id: str,
+        content: str,
+        title: str | None = None,
+        parent_id: str | None = None,
+    ) -> IssueResponse:
+        response = self._request(
+            "POST",
+            f"/task-results/{task_id}/issues",
+            json=self._query_params(title=title, content=content, parent_id=parent_id),
+        )
+        return self._validate_model_payload(IssueResponse, response.data)
+
+    def update_issue(
+        self,
+        issue_id: str,
+        *,
+        content: str,
+        title: str | None = None,
+    ) -> IssueResponse:
+        response = self._request(
+            "PATCH",
+            f"/issues/{issue_id}",
+            json=self._query_params(title=title, content=content),
+        )
+        return self._validate_model_payload(IssueResponse, response.data)
+
+    def close_issue(self, issue_id: str) -> SuccessResponse:
+        response = self._request("PATCH", f"/issues/{issue_id}/close", json={})
+        return self._validate_model_payload(SuccessResponse, response.data)
+
+    def reopen_issue(self, issue_id: str) -> SuccessResponse:
+        response = self._request("PATCH", f"/issues/{issue_id}/reopen", json={})
+        return self._validate_model_payload(SuccessResponse, response.data)
 
     def list_issue_knowledge(
         self,
@@ -432,6 +513,31 @@ class QDashClient:
         response = self._request("GET", f"/issue-knowledge/{knowledge_id}")
         return self._validate_model_payload(IssueKnowledgeResponse, response.data)
 
+    def update_issue_knowledge(
+        self,
+        knowledge_id: str,
+        *,
+        fields: dict[str, Any],
+    ) -> IssueKnowledgeResponse:
+        response = self._request(
+            "PATCH",
+            f"/issue-knowledge/{knowledge_id}",
+            json=fields,
+        )
+        return self._validate_model_payload(IssueKnowledgeResponse, response.data)
+
+    def approve_issue_knowledge(self, knowledge_id: str) -> IssueKnowledgeResponse:
+        response = self._request("PATCH", f"/issue-knowledge/{knowledge_id}/approve", json={})
+        return self._validate_model_payload(IssueKnowledgeResponse, response.data)
+
+    def reject_issue_knowledge(self, knowledge_id: str) -> IssueKnowledgeResponse:
+        response = self._request("PATCH", f"/issue-knowledge/{knowledge_id}/reject", json={})
+        return self._validate_model_payload(IssueKnowledgeResponse, response.data)
+
+    def extract_issue_knowledge(self, issue_id: str) -> IssueKnowledgeResponse:
+        response = self._request("POST", f"/issues/{issue_id}/extract-knowledge", json={})
+        return self._validate_model_payload(IssueKnowledgeResponse, response.data)
+
     def list_flows(self) -> ListFlowsResponse:
         response = self._request("GET", "/flows")
         return self._validate_model_payload(ListFlowsResponse, response.data)
@@ -439,6 +545,70 @@ class QDashClient:
     def get_flow(self, name: str) -> GetFlowResponse:
         response = self._request("GET", f"/flows/{name}")
         return self._validate_model_payload(GetFlowResponse, response.data)
+
+    def save_flow(
+        self,
+        *,
+        name: str,
+        code: str,
+        chip_id: str,
+        description: str = "",
+        flow_function_name: str | None = None,
+        default_parameters: dict[str, Any] | None = None,
+        default_run_parameters: dict[str, Any] | None = None,
+        tags: list[str] | None = None,
+    ) -> SaveFlowResponse:
+        response = self._request(
+            "POST",
+            "/flows",
+            json=self._query_params(
+                name=name,
+                description=description,
+                code=code,
+                flow_function_name=flow_function_name,
+                chip_id=chip_id,
+                default_parameters=default_parameters,
+                default_run_parameters=default_run_parameters,
+                tags=tags,
+            ),
+        )
+        return self._validate_model_payload(SaveFlowResponse, response.data)
+
+    def execute_flow(
+        self,
+        name: str,
+        *,
+        parameters: dict[str, Any] | None = None,
+    ) -> ExecuteFlowResponse:
+        response = self._request(
+            "POST",
+            f"/flows/{name}/execute",
+            json={"parameters": parameters},
+        )
+        return self._validate_model_payload(ExecuteFlowResponse, response.data)
+
+    def schedule_flow(
+        self,
+        name: str,
+        *,
+        cron: str | None = None,
+        scheduled_time: str | None = None,
+        parameters: dict[str, Any] | None = None,
+        active: bool = True,
+        timezone: str = "Asia/Tokyo",
+    ) -> ScheduleFlowResponse:
+        response = self._request(
+            "POST",
+            f"/flows/{name}/schedule",
+            json=self._query_params(
+                cron=cron,
+                scheduled_time=scheduled_time,
+                parameters=parameters,
+                active=active,
+                timezone=timezone,
+            ),
+        )
+        return self._validate_model_payload(ScheduleFlowResponse, response.data)
 
     def list_executions(
         self,
@@ -457,6 +627,60 @@ class QDashClient:
     def get_execution(self, execution_id: str) -> ExecutionResponseDetail:
         response = self._request("GET", f"/executions/{execution_id}")
         return self._validate_model_payload(ExecutionResponseDetail, response.data)
+
+    def cancel_execution(self, flow_run_id: str) -> CancelExecutionResponse:
+        response = self._request("POST", f"/executions/{flow_run_id}/cancel", json={})
+        return self._validate_model_payload(CancelExecutionResponse, response.data)
+
+    def re_execute_execution(self, execution_id: str) -> ExecuteFlowResponse:
+        response = self._request("POST", f"/executions/{execution_id}/re-execute", json={})
+        return self._validate_model_payload(ExecuteFlowResponse, response.data)
+
+    def upsert_task_note(self, task_id: str, *, content: str) -> NoteModel:
+        response = self._request(
+            "PUT",
+            f"/task-results/{task_id}/note",
+            json={"content": content},
+        )
+        return self._validate_model_payload(NoteModel, response.data)
+
+    def delete_task_note(self, task_id: str) -> SuccessResponse:
+        response = self._request("DELETE", f"/task-results/{task_id}/note", json={})
+        return self._validate_model_payload(SuccessResponse, response.data)
+
+    def set_task_result_excluded(
+        self,
+        task_id: str,
+        *,
+        excluded: bool,
+        reason: str = "",
+    ) -> TaskResultExcludeResponse:
+        response = self._request(
+            "POST",
+            f"/task-results/{task_id}/exclude",
+            json={"excluded": excluded, "reason": reason},
+        )
+        return self._validate_model_payload(TaskResultExcludeResponse, response.data)
+
+    def re_execute_task_result(
+        self,
+        task_id: str,
+        *,
+        parameter_overrides: dict[str, dict[str, Any]] | None = None,
+        update_params: bool = True,
+        reconfigure: bool = False,
+    ) -> ExecuteFlowResponse:
+        body = BodyReExecuteTaskResult(
+            parameter_overrides=parameter_overrides,
+            update_params=update_params,
+            reconfigure=reconfigure,
+        )
+        response = self._request(
+            "POST",
+            f"/task-results/{task_id}/re-execute",
+            json=body.model_dump(mode="json"),
+        )
+        return self._validate_model_payload(ExecuteFlowResponse, response.data)
 
     def get_provenance_entity(self, entity_id: str) -> ParameterVersionResponse:
         response = self._request("GET", f"/provenance/entities/{entity_id}")
@@ -601,6 +825,7 @@ class QDashClient:
         path: str,
         *,
         params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
     ) -> RestApiResponse[Any]:
         attempts = self.config.retry.max_attempts
 
@@ -611,6 +836,7 @@ class QDashClient:
                     method,
                     path,
                     params=params,
+                    json=json,
                     headers=headers,
                     raise_on_status=False,
                 )

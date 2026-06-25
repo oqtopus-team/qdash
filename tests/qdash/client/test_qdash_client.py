@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import json
+from typing import TYPE_CHECKING, cast
 
 import httpx
 
@@ -9,7 +10,9 @@ if TYPE_CHECKING:
 import pytest
 
 from qdash.client import (
+    CancelExecutionResponse,
     ChipResponse,
+    ExecuteFlowResponse,
     FileTreeNode,
     LatestTaskResultResponse,
     ListChipsResponse,
@@ -22,6 +25,9 @@ from qdash.client import (
     QDashNotFoundError,
     QDashTransportError,
     QDashValidationError,
+    SaveFlowResponse,
+    ScheduleFlowResponse,
+    TaskResultExcludeResponse,
     TaskResultListResponse,
     TimeSeriesData,
 )
@@ -697,6 +703,244 @@ def test_agent_read_only_resource_methods_return_models_and_objects() -> None:
         )
         assert client.get_provenance_stats().total_entities == 0
         assert client.get_provenance_changes(parameter_names=["t1"]).total_count == 0
+    finally:
+        client.close()
+
+
+def test_file_and_git_write_helpers_send_json_bodies() -> None:
+    def request_json(request: httpx.Request) -> dict[str, object]:
+        return cast("dict[str, object]", json.loads(request.content.decode() or "{}"))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        match (request.method, request.url.path):
+            case ("PUT", "/files/content"):
+                assert request_json(request) == {"path": "flows/demo.py", "content": "print('ok')"}
+                return httpx.Response(200, json={"message": "saved", "path": "flows/demo.py"})
+            case ("POST", "/files/validate"):
+                assert request_json(request) == {"content": "print('ok')", "file_type": "flow"}
+                return httpx.Response(200, json={"valid": True})
+            case ("POST", "/files/git/pull"):
+                assert request_json(request) == {}
+                return httpx.Response(200, json={"status": "pulled"})
+            case ("POST", "/files/git/push"):
+                assert request_json(request) == {"commit_message": "Update flow"}
+                return httpx.Response(200, json={"status": "pushed"})
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert client.save_file_content(path="flows/demo.py", content="print('ok')")["message"] == (
+            "saved"
+        )
+        assert (
+            client.validate_file_content(content="print('ok')", file_type="flow")["valid"] is True
+        )
+        assert client.git_pull_config()["status"] == "pulled"
+        assert client.git_push_config(commit_message="Update flow")["status"] == "pushed"
+    finally:
+        client.close()
+
+
+def test_flow_and_execution_write_helpers_return_models() -> None:
+    execute_payload = {
+        "execution_id": "exec-1",
+        "flow_run_url": "https://prefect.local/runs/exec-1",
+        "qdash_ui_url": "https://qdash.local/executions/exec-1",
+        "message": "started",
+    }
+
+    def request_json(request: httpx.Request) -> dict[str, object]:
+        return cast("dict[str, object]", json.loads(request.content.decode() or "{}"))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        match (request.method, request.url.path):
+            case ("POST", "/flows"):
+                body = request_json(request)
+                assert body["name"] == "demo"
+                assert body["code"] == "def demo(): pass"
+                assert body["chip_id"] == "chip-a"
+                return httpx.Response(
+                    200,
+                    json={
+                        "name": "demo",
+                        "file_path": "flows/demo.py",
+                        "message": "saved",
+                    },
+                )
+            case ("POST", "/flows/demo/execute"):
+                assert request_json(request) == {"parameters": {"shots": 10}}
+                return httpx.Response(200, json=execute_payload)
+            case ("POST", "/flows/demo/schedule"):
+                assert request_json(request) == {
+                    "cron": "0 2 * * *",
+                    "parameters": {"shots": 10},
+                    "active": True,
+                    "timezone": "Asia/Tokyo",
+                }
+                return httpx.Response(
+                    200,
+                    json={
+                        "schedule_id": "schedule-1",
+                        "flow_name": "demo",
+                        "schedule_type": "cron",
+                        "cron": "0 2 * * *",
+                        "active": True,
+                        "message": "scheduled",
+                    },
+                )
+            case ("POST", "/executions/run-1/cancel"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "execution_id": "run-1",
+                        "status": "cancelled",
+                        "message": "cancelled",
+                    },
+                )
+            case ("POST", "/executions/exec-1/re-execute"):
+                return httpx.Response(200, json=execute_payload)
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert isinstance(
+            client.save_flow(name="demo", code="def demo(): pass", chip_id="chip-a"),
+            SaveFlowResponse,
+        )
+        assert isinstance(
+            client.execute_flow("demo", parameters={"shots": 10}),
+            ExecuteFlowResponse,
+        )
+        assert isinstance(
+            client.schedule_flow("demo", cron="0 2 * * *", parameters={"shots": 10}),
+            ScheduleFlowResponse,
+        )
+        assert isinstance(client.cancel_execution("run-1"), CancelExecutionResponse)
+        assert client.re_execute_execution("exec-1").execution_id == "exec-1"
+    finally:
+        client.close()
+
+
+def test_task_result_and_issue_write_helpers_return_models() -> None:
+    issue_payload = {
+        "id": "issue-1",
+        "task_id": "task-1",
+        "username": "operator",
+        "title": "Bad fit",
+        "content": "Needs review",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+    }
+    knowledge_payload = {
+        "id": "knowledge-1",
+        "issue_id": "issue-1",
+        "task_id": "task-1",
+        "task_name": "t1",
+        "title": "Bad fit",
+        "status": "draft",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+    }
+    execute_payload = {
+        "execution_id": "exec-1",
+        "flow_run_url": "https://prefect.local/runs/exec-1",
+        "qdash_ui_url": "https://qdash.local/executions/exec-1",
+        "message": "started",
+    }
+
+    def request_json(request: httpx.Request) -> dict[str, object]:
+        return cast("dict[str, object]", json.loads(request.content.decode() or "{}"))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        match (request.method, request.url.path):
+            case ("PUT", "/task-results/task-1/note"):
+                assert request_json(request) == {"content": "reviewed"}
+                return httpx.Response(
+                    200,
+                    json={
+                        "content": "reviewed",
+                        "updated_by": "operator",
+                        "updated_at": "2026-01-01T00:00:00Z",
+                    },
+                )
+            case ("POST", "/task-results/task-1/exclude"):
+                assert request_json(request) == {"excluded": True, "reason": "bad fit"}
+                return httpx.Response(
+                    200,
+                    json={
+                        "task_id": "task-1",
+                        "excluded": True,
+                        "excluded_reason": "bad fit",
+                        "excluded_by_user_id": "user-1",
+                        "excluded_by": "operator",
+                        "excluded_at": "2026-01-01T00:00:00Z",
+                    },
+                )
+            case ("POST", "/task-results/task-1/re-execute"):
+                assert request_json(request) == {
+                    "parameter_overrides": {"run": {"shots": 10}},
+                    "update_params": False,
+                    "reconfigure": True,
+                }
+                return httpx.Response(200, json=execute_payload)
+            case ("POST", "/task-results/task-1/issues"):
+                assert request_json(request) == {"title": "Bad fit", "content": "Needs review"}
+                return httpx.Response(201, json=issue_payload)
+            case ("PATCH", "/issues/issue-1"):
+                assert request_json(request) == {"content": "Updated"}
+                return httpx.Response(200, json={**issue_payload, "content": "Updated"})
+            case ("PATCH", "/issues/issue-1/close"):
+                return httpx.Response(200, json={"message": "closed"})
+            case ("PATCH", "/issues/issue-1/reopen"):
+                return httpx.Response(200, json={"message": "reopened"})
+            case ("PATCH", "/issue-knowledge/knowledge-1"):
+                assert request_json(request) == {"title": "Updated case"}
+                return httpx.Response(200, json={**knowledge_payload, "title": "Updated case"})
+            case ("PATCH", "/issue-knowledge/knowledge-1/approve"):
+                return httpx.Response(200, json={**knowledge_payload, "status": "approved"})
+            case ("PATCH", "/issue-knowledge/knowledge-1/reject"):
+                return httpx.Response(200, json={**knowledge_payload, "status": "rejected"})
+            case ("POST", "/issues/issue-1/extract-knowledge"):
+                return httpx.Response(201, json=knowledge_payload)
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        assert client.upsert_task_note("task-1", content="reviewed").content == "reviewed"
+        assert isinstance(
+            client.set_task_result_excluded("task-1", excluded=True, reason="bad fit"),
+            TaskResultExcludeResponse,
+        )
+        assert (
+            client.re_execute_task_result(
+                "task-1",
+                parameter_overrides={"run": {"shots": 10}},
+                update_params=False,
+                reconfigure=True,
+            ).execution_id
+            == "exec-1"
+        )
+        assert (
+            client.create_task_result_issue(
+                task_id="task-1",
+                title="Bad fit",
+                content="Needs review",
+            ).id
+            == "issue-1"
+        )
+        assert client.update_issue("issue-1", content="Updated").content == "Updated"
+        assert client.close_issue("issue-1").message == "closed"
+        assert client.reopen_issue("issue-1").message == "reopened"
+        assert (
+            client.update_issue_knowledge(
+                "knowledge-1",
+                fields={"title": "Updated case"},
+            ).title
+            == "Updated case"
+        )
+        assert client.approve_issue_knowledge("knowledge-1").status == "approved"
+        assert client.reject_issue_knowledge("knowledge-1").status == "rejected"
+        assert client.extract_issue_knowledge("issue-1").id == "knowledge-1"
     finally:
         client.close()
 

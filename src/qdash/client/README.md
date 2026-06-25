@@ -271,7 +271,45 @@ Available read-only helpers include:
   `get_provenance_impact()`, `get_provenance_history()`, `get_provenance_stats()`,
   `get_provenance_changes()`
 
-### 3.5 Metrics Configuration
+### 3.5 Explicit Write And Operational Queries
+
+Write helpers use the same profile, authentication, project headers, retries, and response
+validation as read-only helpers. Agents should ask for user confirmation before calling methods
+that mutate files, trigger executions, change issue status, push/pull git state, or alter task
+results.
+
+```python
+from qdash.client import QDashClient
+
+client = QDashClient.from_profile("local")
+try:
+    client.save_file_content(path="flows/demo.py", content="def demo(): pass")
+    client.validate_file_content(content="def demo(): pass", file_type="flow")
+    client.git_push_config(commit_message="Update demo flow")
+
+    flow = client.save_flow(name="demo", code="def demo(): pass", chip_id="chip-001")
+    execution = client.execute_flow(flow.name, parameters={"shots": 100})
+    client.upsert_task_note("task-001", content="Reviewed by operator")
+    client.set_task_result_excluded("task-001", excluded=True, reason="bad fit")
+
+    print(flow.file_path, execution.execution_id)
+finally:
+    client.close()
+```
+
+Available write and operational helpers include:
+
+- Files and git: `save_file_content()`, `validate_file_content()`, `git_pull_config()`,
+  `git_push_config()`
+- Flows and executions: `save_flow()`, `execute_flow()`, `schedule_flow()`,
+  `cancel_execution()`, `re_execute_execution()`
+- Task results: `upsert_task_note()`, `delete_task_note()`, `set_task_result_excluded()`,
+  `re_execute_task_result()`, `create_task_result_issue()`
+- Issues and knowledge: `update_issue()`, `close_issue()`, `reopen_issue()`,
+  `update_issue_knowledge()`, `approve_issue_knowledge()`, `reject_issue_knowledge()`,
+  `extract_issue_knowledge()`
+
+### 3.6 Metrics Configuration
 
 ```python
 from qdash.client import QDashClient
