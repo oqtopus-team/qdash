@@ -93,3 +93,42 @@ __all__ = [
     # Utility
     "generate_task_instances",
 ]
+
+
+def _use_qubex_tasks_with_fake_backend() -> None:
+    """Route fake backend task names to QUBEX task implementations.
+
+    The fake backend now returns a QUBEX-compatible FakeExperiment, so running the
+    production QUBEX task logic gives local fake executions the same behavior and
+    result shape as hardware-backed runs, while still selecting backend="fake" in
+    QDash templates and UI.
+    """
+    import qdash.workflow.calibtasks.qubex  # noqa: F401
+    from qdash.workflow.calibtasks.base import BaseTask
+    from qdash.workflow.calibtasks.fake.qubex_compat import FakeCheckFineChevron
+
+    qubex_registry = BaseTask.registry.get("qubex", {})
+    fake_registry = BaseTask.registry.setdefault("fake", {})
+    fake_registry["CheckFineChevron"] = FakeCheckFineChevron
+    for task_name in (
+        "CheckRabi",
+        "CreateHPIPulse",
+        "CheckHPIPulse",
+        "CreatePIPulse",
+        "CheckPIPulse",
+        "CheckRamsey",
+        "CheckT1",
+        "CheckT1Average",
+        "CheckT2Echo",
+        "CheckT2EchoAverage",
+        "CreateDRAGHPIPulse",
+        "CheckDRAGHPIPulse",
+        "CreateDRAGPIPulse",
+        "CheckDRAGPIPulse",
+        "RandomizedBenchmarking",
+    ):
+        if task_name in qubex_registry:
+            fake_registry[task_name] = qubex_registry[task_name]
+
+
+_use_qubex_tasks_with_fake_backend()

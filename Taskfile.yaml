@@ -470,6 +470,20 @@ tasks:
       - docker compose up -d --build
     desc: Deploy the application with Docker Compose in dev mode
 
+  deploy-local-fake:
+    env:
+      DEFAULT_BACKEND: fake
+      ENV: dev-fake
+    cmds:
+      - task: knowledge-pull
+      - docker compose up -d --build
+    desc: Deploy the application locally with the fake QUBEX-compatible backend
+
+  deploy-local-fake-down:
+    cmds:
+      - docker compose down
+    desc: Stop the local fake Docker Compose stack
+
   dev-ui:
     dir: ui
     cmds:
