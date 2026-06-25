@@ -16,8 +16,10 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
+    CancelExecutionResponse,
     ChipMetricsResponse,
     ChipResponse,
+    ExecuteFlowResponse,
     ExecutionResponseDetail,
     FileTreeNode,
     GetFlowResponse,
@@ -31,12 +33,17 @@ from qdash.client.services.models import (
     ListFlowsResponse,
     ListIssueKnowledgeResponse,
     ListIssuesResponse,
+    NoteModel,
     ParameterModel,
     ProjectResponse,
     ProvenanceStatsResponse,
     QdashApiSchemasProjectProjectListResponse,
     RecentChangesResponse,
+    SaveFlowResponse,
+    ScheduleFlowResponse,
+    SuccessResponse,
     TaskHistoryResponse,
+    TaskResultExcludeResponse,
     TaskResultListResponse,
     TimeSeriesData,
 )
@@ -44,8 +51,10 @@ from qdash.client.services.models import (
 from . import rest
 
 __all__ = [
+    "CancelExecutionResponse",
     "ChipMetricsResponse",
     "ChipResponse",
+    "ExecuteFlowResponse",
     "ExecutionResponseDetail",
     "FileTreeNode",
     "GetFlowResponse",
@@ -60,6 +69,7 @@ __all__ = [
     "ListIssueKnowledgeResponse",
     "ListIssuesResponse",
     "NormalizedMetricRecord",
+    "NoteModel",
     "ParameterModel",
     "ProjectResponse",
     "ProvenanceStatsResponse",
@@ -75,7 +85,11 @@ __all__ = [
     "QDashValidationError",
     "QdashApiSchemasProjectProjectListResponse",
     "RecentChangesResponse",
+    "SaveFlowResponse",
+    "ScheduleFlowResponse",
+    "SuccessResponse",
     "TaskHistoryResponse",
+    "TaskResultExcludeResponse",
     "TaskResultListResponse",
     "TimeSeriesData",
     "rest",
