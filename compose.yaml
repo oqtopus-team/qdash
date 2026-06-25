@@ -173,6 +173,7 @@ services:
       - CALIB_DATA_PATH=/app/calib_data
       - PREFECT_API_URL=http://prefect-server:4200/api
       - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
+      - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
     networks:
       - custom_net
   agent-worker:
