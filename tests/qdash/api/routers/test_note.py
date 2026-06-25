@@ -257,6 +257,110 @@ def test_metric_notes_can_use_explicit_time_range_scope(test_client, init_db):
     assert summary.json()["qubits"][0]["metric_notes"]["t1"]["content"] == "range note"
 
 
+def test_notes_summary_returns_time_range_notes_when_range_drifts(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+    QubitDocument(
+        project_id="note_project",
+        username="note_user",
+        chip_id="chip-1",
+        qid="21",
+        data={},
+        system_info=SystemInfoModel(),
+    ).insert()
+
+    response = test_client.put(
+        "/chips/chip-1/qubits/21/metric-notes/t1",
+        headers=headers,
+        params={"start_at": "2026-02-01T00:00:00Z", "end_at": "2026-02-08T00:00:00Z"},
+        json={"content": "range note"},
+    )
+    assert response.status_code == 200
+
+    # The dashboard's relative range drifts forward between writing the note and
+    # reading it back, so both bounds shift by a minute. The note must still be
+    # returned (issue #1109).
+    summary = test_client.get(
+        "/chips/chip-1/notes-summary",
+        headers=headers,
+        params={"start_at": "2026-02-01T00:01:00Z", "end_at": "2026-02-08T00:01:00Z"},
+    )
+    assert summary.status_code == 200
+    assert summary.json()["qubits"][0]["metric_notes"]["t1"]["content"] == "range note"
+
+
+def test_notes_summary_excludes_time_range_notes_outside_window(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+    QubitDocument(
+        project_id="note_project",
+        username="note_user",
+        chip_id="chip-1",
+        qid="21",
+        data={},
+        system_info=SystemInfoModel(),
+    ).insert()
+
+    response = test_client.put(
+        "/chips/chip-1/qubits/21/metric-notes/t1",
+        headers=headers,
+        params={"start_at": "2026-01-01T00:00:00Z", "end_at": "2026-01-08T00:00:00Z"},
+        json={"content": "old range note"},
+    )
+    assert response.status_code == 200
+
+    # A window that does not overlap the note's scope should not surface it.
+    summary = test_client.get(
+        "/chips/chip-1/notes-summary",
+        headers=headers,
+        params={"start_at": "2026-02-01T00:00:00Z", "end_at": "2026-02-08T00:00:00Z"},
+    )
+    assert summary.status_code == 200
+    assert summary.json()["qubits"] == []
+
+
+def test_notes_summary_prefers_exact_scope_when_time_ranges_overlap(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+    QubitDocument(
+        project_id="note_project",
+        username="note_user",
+        chip_id="chip-1",
+        qid="21",
+        data={},
+        system_info=SystemInfoModel(),
+    ).insert()
+
+    # Two overlapping time-range notes for the same (qubit, metric) but with
+    # slightly different bounds, so they land under distinct scope keys.
+    older = test_client.put(
+        "/chips/chip-1/qubits/21/metric-notes/t1",
+        headers=headers,
+        params={"start_at": "2026-02-01T00:00:00Z", "end_at": "2026-02-08T00:00:00Z"},
+        json={"content": "overlapping note"},
+    )
+    assert older.status_code == 200
+    exact = test_client.put(
+        "/chips/chip-1/qubits/21/metric-notes/t1",
+        headers=headers,
+        params={"start_at": "2026-02-01T00:01:00Z", "end_at": "2026-02-08T00:01:00Z"},
+        json={"content": "exact scope note"},
+    )
+    assert exact.status_code == 200
+    assert len(list(MetricNoteDocument.find(MetricNoteDocument.target_id == "21").run())) == 2
+
+    # The requested window matches the second note's scope key exactly while
+    # still overlapping the first. The exact-scope note must win regardless of
+    # edit order (issue #1109 follow-up).
+    summary = test_client.get(
+        "/chips/chip-1/notes-summary",
+        headers=headers,
+        params={"start_at": "2026-02-01T00:01:00Z", "end_at": "2026-02-08T00:01:00Z"},
+    )
+    assert summary.status_code == 200
+    assert summary.json()["qubits"][0]["metric_notes"]["t1"]["content"] == "exact scope note"
+
+
 def test_time_range_scope_infers_later_cooldown_document(test_client, init_db):
     headers = _create_project_user()
     _create_chip(cooldown_id=None)
