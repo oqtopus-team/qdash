@@ -219,7 +219,59 @@ finally:
     client.close()
 ```
 
-### 3.4 Metrics Configuration
+### 3.4 Agent-Friendly Read-Only Queries
+
+The client exposes common read-only endpoints used by QDash agents and scripts:
+
+```python
+from qdash.client import QDashClient
+
+client = QDashClient.from_profile("local")
+try:
+    chip_id = client.get_default_chip_id()
+
+    task_results = client.list_task_results(chip_id=chip_id, status="success", limit=20)
+    latest_t1 = client.get_qubit_latest_task_results(chip_id=chip_id, task="t1")
+    q00_history = client.get_qubit_task_history(
+        chip_id=chip_id,
+        qid="Q00",
+        task="t1",
+        date="20260625",
+    )
+
+    projects = client.list_projects()
+    file_tree = client.get_files_tree()
+    git_status = client.get_git_status()
+    issues = client.list_issues(limit=20)
+    knowledge = client.list_issue_knowledge(status="approved", limit=20)
+    flows = client.list_flows()
+    executions = client.list_executions(chip_id=chip_id, limit=20)
+    provenance = client.get_provenance_stats()
+
+    print(task_results.total, latest_t1.task_name, q00_history.name)
+    print(projects.total, len(file_tree), git_status, len(issues.issues))
+    print(len(knowledge.items), len(flows.flows), len(executions.executions))
+    print(provenance.total_entities)
+finally:
+    client.close()
+```
+
+Available read-only helpers include:
+
+- Task results: `list_task_results()`, `get_qubit_latest_task_results()`,
+  `get_qubit_task_history()`, `get_coupling_latest_task_results()`,
+  `get_coupling_task_history()`
+- Projects and files: `list_projects()`, `get_project()`, `get_files_tree()`,
+  `get_git_status()`
+- Issues and knowledge: `list_issues()`, `get_issue()`, `list_issue_knowledge()`,
+  `get_issue_knowledge()`
+- Flows and executions: `list_flows()`, `get_flow()`, `list_executions()`,
+  `get_execution()`
+- Provenance: `get_provenance_entity()`, `get_provenance_lineage()`,
+  `get_provenance_impact()`, `get_provenance_history()`, `get_provenance_stats()`,
+  `get_provenance_changes()`
+
+### 3.5 Metrics Configuration
 
 ```python
 from qdash.client import QDashClient

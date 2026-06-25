@@ -5,7 +5,7 @@ import random
 import time
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -31,7 +31,27 @@ from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
     ChipMetricsResponse,
     ChipResponse,
+    ExecutionResponseDetail,
+    FileTreeNode,
+    GetFlowResponse,
+    ImpactResponse,
+    IssueKnowledgeResponse,
+    IssueResponse,
+    LatestTaskResultResponse,
+    LineageResponse,
     ListChipsResponse,
+    ListExecutionsResponse,
+    ListFlowsResponse,
+    ListIssueKnowledgeResponse,
+    ListIssuesResponse,
+    ParameterHistoryResponse,
+    ParameterVersionResponse,
+    ProjectResponse,
+    ProvenanceStatsResponse,
+    QdashApiSchemasProjectProjectListResponse,
+    RecentChangesResponse,
+    TaskHistoryResponse,
+    TaskResultListResponse,
     TimeSeriesData,
 )
 
@@ -114,6 +134,27 @@ class QDashClient:
             payload=payload,
         )
 
+    def _validate_model_list_payload(
+        self,
+        model_type: type[TModel],
+        payload: Any,
+    ) -> list[TModel]:
+        if isinstance(payload, list):
+            try:
+                return [
+                    item if isinstance(item, model_type) else model_type.model_validate(item)
+                    for item in self._normalize_datetime_fields(payload)
+                ]
+            except ValidationError as exc:
+                raise QDashValidationError(
+                    f"Response payload did not match list[{model_type.__name__}]",
+                    payload=payload,
+                ) from exc
+        raise QDashValidationError(
+            f"Response payload did not match list[{model_type.__name__}]",
+            payload=payload,
+        )
+
     def _normalize_datetime_fields(self, payload: Any) -> Any:
         if isinstance(payload, dict):
             normalized: dict[str, Any] = {}
@@ -152,6 +193,8 @@ class QDashClient:
 
     def _coerce_chip_metrics_payload(self, payload: dict[str, Any]) -> ChipMetricsResponse:
         # Keep backward compatibility with looser payloads that are still useful to callers.
+        qubit_metrics = payload.get("qubit_metrics")
+        coupling_metrics = payload.get("coupling_metrics")
         return ChipMetricsResponse.model_construct(
             chip_id=str(payload.get("chip_id") or ""),
             username=str(payload.get("username") or ""),
@@ -161,16 +204,12 @@ class QDashClient:
             ),
             start_at=payload.get("start_at"),
             end_at=payload.get("end_at"),
-            qubit_metrics=(
-                payload.get("qubit_metrics")
-                if isinstance(payload.get("qubit_metrics"), dict)
-                else {}
-            ),
-            coupling_metrics=(
-                payload.get("coupling_metrics")
-                if isinstance(payload.get("coupling_metrics"), dict)
-                else {}
-            ),
+            qubit_metrics=cast("dict[str, Any]", qubit_metrics)
+            if isinstance(qubit_metrics, dict)
+            else {},
+            coupling_metrics=cast("dict[str, Any]", coupling_metrics)
+            if isinstance(coupling_metrics, dict)
+            else {},
         )
 
     def list_chips(self) -> ListChipsResponse:
@@ -243,6 +282,226 @@ class QDashClient:
             TimeSeriesData,
             response.data,
         )
+
+    def list_task_results(
+        self,
+        *,
+        status: str | None = None,
+        chip_id: str | None = None,
+        task_name: str | None = None,
+        qid: str | None = None,
+        execution_id: str | None = None,
+        username: str | None = None,
+        start_from: str | None = None,
+        start_to: str | None = None,
+        message_contains: str | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> TaskResultListResponse:
+        params = self._query_params(
+            status=status,
+            chip_id=chip_id,
+            task_name=task_name,
+            qid=qid,
+            execution_id=execution_id,
+            username=username,
+            start_from=start_from,
+            start_to=start_to,
+            message_contains=message_contains,
+            skip=skip,
+            limit=limit,
+        )
+        response = self._request("GET", "/task-results", params=params)
+        return self._validate_model_payload(TaskResultListResponse, response.data)
+
+    def get_qubit_latest_task_results(
+        self,
+        *,
+        chip_id: str,
+        task: str,
+    ) -> LatestTaskResultResponse:
+        response = self._request(
+            "GET",
+            "/task-results/qubits/latest",
+            params={"chip_id": chip_id, "task": task},
+        )
+        return self._validate_model_payload(LatestTaskResultResponse, response.data)
+
+    def get_qubit_task_history(
+        self,
+        *,
+        qid: str,
+        chip_id: str,
+        task: str,
+        date: str,
+    ) -> TaskHistoryResponse:
+        response = self._request(
+            "GET",
+            f"/task-results/qubits/{qid}/history",
+            params={"chip_id": chip_id, "task": task, "date": date},
+        )
+        return self._validate_model_payload(TaskHistoryResponse, response.data)
+
+    def get_coupling_latest_task_results(
+        self,
+        *,
+        chip_id: str,
+        task: str,
+    ) -> LatestTaskResultResponse:
+        response = self._request(
+            "GET",
+            "/task-results/couplings/latest",
+            params={"chip_id": chip_id, "task": task},
+        )
+        return self._validate_model_payload(LatestTaskResultResponse, response.data)
+
+    def get_coupling_task_history(
+        self,
+        *,
+        coupling_id: str,
+        chip_id: str,
+        task: str,
+        date: str,
+    ) -> TaskHistoryResponse:
+        response = self._request(
+            "GET",
+            f"/task-results/couplings/{coupling_id}/history",
+            params={"chip_id": chip_id, "task": task, "date": date},
+        )
+        return self._validate_model_payload(TaskHistoryResponse, response.data)
+
+    def list_projects(self) -> QdashApiSchemasProjectProjectListResponse:
+        response = self._request("GET", "/projects")
+        return self._validate_model_payload(
+            QdashApiSchemasProjectProjectListResponse,
+            response.data,
+        )
+
+    def get_project(self, project_id: str) -> ProjectResponse:
+        response = self._request("GET", f"/projects/{project_id}")
+        return self._validate_model_payload(ProjectResponse, response.data)
+
+    def get_files_tree(self) -> list[FileTreeNode]:
+        response = self._request("GET", "/files/tree")
+        return self._validate_model_list_payload(FileTreeNode, response.data)
+
+    def get_git_status(self) -> dict[str, Any]:
+        response = self._request("GET", "/files/git/status")
+        data = response.data
+        return data if isinstance(data, dict) else {}
+
+    def list_issues(
+        self,
+        *,
+        task_id: str | None = None,
+        is_closed: bool | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> ListIssuesResponse:
+        params = self._query_params(
+            task_id=task_id,
+            is_closed=is_closed,
+            skip=skip,
+            limit=limit,
+        )
+        response = self._request("GET", "/issues", params=params)
+        return self._validate_model_payload(ListIssuesResponse, response.data)
+
+    def get_issue(self, issue_id: str) -> IssueResponse:
+        response = self._request("GET", f"/issues/{issue_id}")
+        return self._validate_model_payload(IssueResponse, response.data)
+
+    def list_issue_knowledge(
+        self,
+        *,
+        status: str | None = None,
+        task_name: str | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> ListIssueKnowledgeResponse:
+        params = self._query_params(
+            status=status,
+            task_name=task_name,
+            skip=skip,
+            limit=limit,
+        )
+        response = self._request("GET", "/issue-knowledge", params=params)
+        return self._validate_model_payload(ListIssueKnowledgeResponse, response.data)
+
+    def get_issue_knowledge(self, knowledge_id: str) -> IssueKnowledgeResponse:
+        response = self._request("GET", f"/issue-knowledge/{knowledge_id}")
+        return self._validate_model_payload(IssueKnowledgeResponse, response.data)
+
+    def list_flows(self) -> ListFlowsResponse:
+        response = self._request("GET", "/flows")
+        return self._validate_model_payload(ListFlowsResponse, response.data)
+
+    def get_flow(self, name: str) -> GetFlowResponse:
+        response = self._request("GET", f"/flows/{name}")
+        return self._validate_model_payload(GetFlowResponse, response.data)
+
+    def list_executions(
+        self,
+        *,
+        chip_id: str,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> ListExecutionsResponse:
+        response = self._request(
+            "GET",
+            "/executions",
+            params={"chip_id": chip_id, "skip": skip, "limit": limit},
+        )
+        return self._validate_model_payload(ListExecutionsResponse, response.data)
+
+    def get_execution(self, execution_id: str) -> ExecutionResponseDetail:
+        response = self._request("GET", f"/executions/{execution_id}")
+        return self._validate_model_payload(ExecutionResponseDetail, response.data)
+
+    def get_provenance_entity(self, entity_id: str) -> ParameterVersionResponse:
+        response = self._request("GET", f"/provenance/entities/{entity_id}")
+        return self._validate_model_payload(ParameterVersionResponse, response.data)
+
+    def get_provenance_lineage(self, entity_id: str) -> LineageResponse:
+        response = self._request("GET", f"/provenance/lineage/{entity_id}")
+        return self._validate_model_payload(LineageResponse, response.data)
+
+    def get_provenance_impact(self, entity_id: str) -> ImpactResponse:
+        response = self._request("GET", f"/provenance/impact/{entity_id}")
+        return self._validate_model_payload(ImpactResponse, response.data)
+
+    def get_provenance_history(
+        self,
+        *,
+        parameter_name: str,
+        qid: str,
+        limit: int = 50,
+    ) -> ParameterHistoryResponse:
+        response = self._request(
+            "GET",
+            "/provenance/history",
+            params={"parameter_name": parameter_name, "qid": qid, "limit": limit},
+        )
+        return self._validate_model_payload(ParameterHistoryResponse, response.data)
+
+    def get_provenance_stats(self) -> ProvenanceStatsResponse:
+        response = self._request("GET", "/provenance/stats")
+        return self._validate_model_payload(ProvenanceStatsResponse, response.data)
+
+    def get_provenance_changes(
+        self,
+        *,
+        parameter_names: list[str] | None = None,
+        within_hours: int = 24,
+        limit: int = 20,
+    ) -> RecentChangesResponse:
+        params = self._query_params(
+            parameter_names=parameter_names,
+            within_hours=within_hours,
+            limit=limit,
+        )
+        response = self._request("GET", "/provenance/changes", params=params)
+        return self._validate_model_payload(RecentChangesResponse, response.data)
 
     async def list_chips_async(self) -> ListChipsResponse:
         """Async variant of list_chips using the same auth/header behavior."""
@@ -382,6 +641,9 @@ class QDashClient:
 
         raise QDashTransportError("request exhausted all retries")
 
+    def _query_params(self, **params: Any) -> dict[str, Any]:
+        return {key: value for key, value in params.items() if value is not None}
+
     async def _request_async(
         self,
         path: str,
@@ -506,7 +768,7 @@ class QDashClient:
 
         base = self.config.retry.base_delay_sec
         max_delay = self.config.retry.max_delay_sec
-        delay = min(max_delay, base * (2 ** (attempt - 1)))
+        delay = float(min(max_delay, base * (2 ** (attempt - 1))))
         jitter = random.uniform(0.0, delay * 0.1)  # noqa: S311
         return delay + jitter
 
