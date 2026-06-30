@@ -14,6 +14,7 @@ dependencies = [
     "pendulum>=3.1.0",
     "pydantic>=2.8.0",
     "pymongo>=4.8.0",
+    "qdash-api",
 ]
 
 
@@ -183,4 +184,5 @@ members = [
 ]
 
 [tool.uv.sources]
+qdash-api = { workspace = true }
 qubex = { git = "https://github.com/amachino/qubex.git", branch = "develop" }

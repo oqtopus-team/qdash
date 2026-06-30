@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "QDash API service dependency project"
 requires-python = ">=3.11,<3.13"
 dependencies = [
+    "bcrypt>=5.0.0",
     "fastapi",
     "uvicorn[standard]",
     "gunicorn==26.0.0",
