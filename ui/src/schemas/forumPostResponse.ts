@@ -8,6 +8,7 @@
 import type { ForumPostResponseUserId } from './forumPostResponseUserId';
 import type { ForumPostResponseAvatarKey } from './forumPostResponseAvatarKey';
 import type { ForumPostResponseTitle } from './forumPostResponseTitle';
+import type { ForumPostResponseContentBlocksItem } from './forumPostResponseContentBlocksItem';
 import type { ForumPostResponseParentId } from './forumPostResponseParentId';
 
 /**
@@ -30,6 +31,8 @@ export interface ForumPostResponse {
   title?: ForumPostResponseTitle;
   /** Markdown content */
   content: string;
+  /** BlockNote document JSON. Source of truth for rich content; content is derived. */
+  content_blocks?: ForumPostResponseContentBlocksItem[];
   /** Parent forum post ID */
   parent_id?: ForumPostResponseParentId;
   /** Number of replies to this thread */

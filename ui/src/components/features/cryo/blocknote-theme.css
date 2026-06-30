@@ -75,6 +75,26 @@
   padding-block: 0;
 }
 
+/* Neutralize a globals.css leak onto the editor's FIRST block.
+   globals.css (~L1529) styles react-select group headings with:
+     [class$="-group"] > div:first-child {
+       text-transform: uppercase !important; font-size: .75rem !important;
+       font-weight: 600 !important; opacity: .7 !important; color: ... !important; }
+   `[class$="-group"]` (any class ending in "-group") also matches BlockNote's
+   `.bn-block-group`, so `> div:first-child` hits the editor's first block
+   (`.bn-block-outer`) — regardless of block type (paragraph, heading, …),
+   rendering it small, faded, bold, ALL-CAPS. Mirror the exact selector, scoped
+   under `.wiring-blocknote`, and reset to a normal block. Specificity (0,3,1)
+   + !important beats the (0,2,1) !important source rule. */
+.wiring-blocknote .bn-block-group > div:first-child {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  opacity: 1 !important;
+  color: inherit !important;
+}
+
 /* Tables: contain horizontal overflow inside the editor instead of pushing
    the whole section sideways. */
 .wiring-blocknote .tableWrapper,
@@ -121,7 +141,7 @@
 
 /* Side menu (drag / +) discoverable on hover */
 .wiring-blocknote .bn-side-menu {
-  opacity: 0.55;
+  opacity: 1;
   transition: opacity 0.15s ease;
 }
 .wiring-blocknote .bn-block-outer:hover .bn-side-menu {

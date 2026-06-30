@@ -335,6 +335,69 @@ def test_update_forum_reply_ignores_category(test_client, init_db):
     assert response.json()["content"] == "Edited reply"
 
 
+def test_forum_post_round_trips_content_blocks(test_client, init_db):
+    """BlockNote JSON is stored alongside the markdown projection and is updatable."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    blocks = [
+        {
+            "id": "b1",
+            "type": "paragraph",
+            "props": {},
+            "content": [{"type": "text", "text": "rich body", "styles": {}}],
+            "children": [],
+        }
+    ]
+    created = test_client.post(
+        "/forum/posts",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": "Rich post",
+            "content": "rich body",
+            "content_blocks": blocks,
+            "parent_id": None,
+        },
+    )
+    assert created.status_code == 201, created.text
+    post_id = created.json()["id"]
+    assert created.json()["content_blocks"] == blocks
+
+    fetched = test_client.get(f"/forum/posts/{post_id}", headers=headers)
+    assert fetched.json()["content_blocks"] == blocks
+
+    new_blocks = [
+        {
+            "id": "b1",
+            "type": "heading",
+            "props": {"level": 2},
+            "content": [{"type": "text", "text": "updated", "styles": {}}],
+            "children": [],
+        }
+    ]
+    updated = test_client.patch(
+        f"/forum/posts/{post_id}",
+        headers=headers,
+        json={"title": "Rich post", "content": "updated", "content_blocks": new_blocks},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["content_blocks"] == new_blocks
+
+
+def test_forum_post_defaults_content_blocks_to_empty(test_client, init_db):
+    """Posting plain markdown without blocks yields an empty content_blocks list."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = _create_post(test_client, headers)
+
+    assert created.status_code == 201, created.text
+    assert created.json()["content_blocks"] == []
+
+
 def test_upload_and_serve_forum_image(test_client, init_db, tmp_path, monkeypatch):
     """Forum images can be uploaded by members and served for markdown rendering."""
     monkeypatch.setattr(forum_service, "FORUM_IMAGE_DIR", tmp_path / "forum")

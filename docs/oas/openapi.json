@@ -17377,6 +17377,15 @@
             "title": "Content",
             "description": "Markdown content"
           },
+          "content_blocks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Content Blocks",
+            "description": "BlockNote document JSON. Source of truth for rich content; content is derived."
+          },
           "parent_id": {
             "anyOf": [
               {
@@ -17460,6 +17469,15 @@
             "type": "string",
             "title": "Content",
             "description": "Markdown content"
+          },
+          "content_blocks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Content Blocks",
+            "description": "BlockNote document JSON. Source of truth for rich content; content is derived."
           },
           "parent_id": {
             "anyOf": [
@@ -17559,6 +17577,15 @@
             "minLength": 1,
             "title": "Content",
             "description": "Updated content"
+          },
+          "content_blocks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Content Blocks",
+            "description": "BlockNote document JSON. Source of truth for rich content; content is derived."
           }
         },
         "type": "object",

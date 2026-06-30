@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ForumPostCreateTitle } from './forumPostCreateTitle';
+import type { ForumPostCreateContentBlocksItem } from './forumPostCreateContentBlocksItem';
 import type { ForumPostCreateParentId } from './forumPostCreateParentId';
 
 /**
@@ -27,6 +28,8 @@ export interface ForumPostCreate {
    * @maxLength 8000
    */
   content: string;
+  /** BlockNote document JSON. Source of truth for rich content; content is derived. */
+  content_blocks?: ForumPostCreateContentBlocksItem[];
   /** Parent forum post ID for replies. None for root threads. */
   parent_id?: ForumPostCreateParentId;
 }

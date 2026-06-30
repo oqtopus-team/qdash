@@ -182,6 +182,7 @@ def create_forum_post(
         category=body.category,
         title=body.title,
         content=body.content,
+        content_blocks=body.content_blocks,
         parent_id=body.parent_id,
     )
 
@@ -380,6 +381,7 @@ def update_forum_post(
         category=body.category,
         title=body.title,
         content=body.content,
+        content_blocks=body.content_blocks,
     )
 
 

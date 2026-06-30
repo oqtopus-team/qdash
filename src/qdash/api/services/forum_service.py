@@ -133,6 +133,7 @@ class ForumService:
             avatar_key=user.avatar_key if user else None,
             title=doc.title,
             content=doc.content,
+            content_blocks=list(doc.content_blocks),
             parent_id=doc.parent_id,
             reply_count=reply_count,
             is_closed=doc.is_closed,
@@ -419,6 +420,7 @@ class ForumService:
         category: str,
         title: str | None,
         content: str,
+        content_blocks: list[dict[str, Any]] | None = None,
         parent_id: str | None,
     ) -> ForumPostResponse:
         """Create a new forum thread or reply."""
@@ -447,6 +449,7 @@ class ForumService:
             username=username,
             title=title if parent_id is None else None,
             content=content,
+            content_blocks=content_blocks or [],
             parent_id=parent_id,
         )
         doc.insert()
@@ -607,6 +610,7 @@ class ForumService:
         category: str | None,
         title: str | None,
         content: str,
+        content_blocks: list[dict[str, Any]] | None = None,
     ) -> ForumPostResponse:
         """Update a forum post."""
         doc = ForumPostDocument.find_one(
@@ -625,6 +629,7 @@ class ForumService:
                 self._ensure_active_category(project_id, category)
                 doc.category = category
         doc.content = content
+        doc.content_blocks = content_blocks or []
         doc.system_info.update_time()
         doc.save()
 
