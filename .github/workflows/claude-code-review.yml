@@ -1,0 +1,43 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    name: Review PR
+    runs-on: ubuntu-latest
+    if: >
+      !github.event.pull_request.draft &&
+      github.event.pull_request.base.ref == 'develop' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this pull request for QDash.
+
+            Focus on actionable issues that could cause bugs, regressions, unsafe behavior,
+            missing tests, or maintainability problems. Prioritize repository conventions from
+            AGENTS.md and the docs under docs/development/.
+
+            Scope:
+            - Review only the changes in this pull request.
+            - Leave comments only when there is a concrete issue or a clearly useful fix.
+            - Do not block on style preferences unless they violate project conventions.
+            - If there are no significant issues, summarize that briefly.
