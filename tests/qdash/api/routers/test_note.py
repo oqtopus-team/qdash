@@ -506,3 +506,55 @@ def test_coupling_note_creates_missing_topology_target(test_client, init_db):
     assert doc is not None
     assert doc.data == {}
     assert doc.note.content == "No coupling data yet."
+
+
+def test_qubit_metric_note_creates_missing_topology_target(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+
+    response = test_client.put(
+        "/chips/chip-1/qubits/21/metric-notes/t1",
+        headers=headers,
+        json={"content": "No metric data yet; check next cooldown."},
+    )
+
+    assert response.status_code == 200
+    doc = QubitDocument.find_one(QubitDocument.qid == "21").run()
+    assert doc is not None
+    assert doc.data == {}
+    metric_note = MetricNoteDocument.find_one(MetricNoteDocument.target_id == "21").run()
+    assert metric_note is not None
+    assert metric_note.scope_key == "global"
+    assert metric_note.note.content == "No metric data yet; check next cooldown."
+
+    summary = test_client.get("/chips/chip-1/notes-summary", headers=headers)
+    assert summary.status_code == 200
+    assert summary.json()["qubits"][0]["metric_notes"]["t1"]["content"] == (
+        "No metric data yet; check next cooldown."
+    )
+
+
+def test_coupling_metric_note_creates_missing_topology_target(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+
+    response = test_client.put(
+        "/chips/chip-1/couplings/0-1/metric-notes/zx90_gate_fidelity",
+        headers=headers,
+        json={"content": "No coupling metric data yet."},
+    )
+
+    assert response.status_code == 200
+    doc = CouplingDocument.find_one(CouplingDocument.qid == "0-1").run()
+    assert doc is not None
+    assert doc.data == {}
+    metric_note = MetricNoteDocument.find_one(MetricNoteDocument.target_id == "0-1").run()
+    assert metric_note is not None
+    assert metric_note.scope_key == "global"
+    assert metric_note.note.content == "No coupling metric data yet."
+
+    summary = test_client.get("/chips/chip-1/notes-summary", headers=headers)
+    assert summary.status_code == 200
+    assert summary.json()["couplings"][0]["metric_notes"]["zx90_gate_fidelity"]["content"] == (
+        "No coupling metric data yet."
+    )
