@@ -15,6 +15,8 @@ jobs:
   review:
     name: Review PR
     runs-on: ubuntu-latest
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     if: >
       !github.event.pull_request.draft &&
       github.event.pull_request.base.ref == 'develop' &&
@@ -26,9 +28,10 @@ jobs:
           fetch-depth: 1
 
       - name: Run Claude Code review
+        if: ${{ env.CLAUDE_CODE_OAUTH_TOKEN != '' }}
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             Review this pull request for QDash.
 
@@ -41,3 +44,8 @@ jobs:
             - Leave comments only when there is a concrete issue or a clearly useful fix.
             - Do not block on style preferences unless they violate project conventions.
             - If there are no significant issues, summarize that briefly.
+
+      - name: Skip Claude Code review
+        if: ${{ env.CLAUDE_CODE_OAUTH_TOKEN == '' }}
+        run: |
+          echo "CLAUDE_CODE_OAUTH_TOKEN is not configured; skipping Claude Code review."
