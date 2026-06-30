@@ -416,13 +416,14 @@ class NoteService:
         start_at: datetime | None = None,
         end_at: datetime | None = None,
     ) -> NoteModel:
-        doc = QubitDocument.find_one(
-            QubitDocument.project_id == project_id,
-            QubitDocument.chip_id == chip_id,
-            QubitDocument.qid == qid,
-        ).run()
-        if doc is None:
-            raise HTTPException(status_code=404, detail="Qubit not found")
+        try:
+            ChipInitializer.ensure_qubit_document(
+                project_id=project_id,
+                chip_id=chip_id,
+                qid=qid,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
         note = _make_note(content, username)
         scope = self._resolve_metric_note_scope(
             project_id=project_id,
@@ -612,13 +613,14 @@ class NoteService:
         start_at: datetime | None = None,
         end_at: datetime | None = None,
     ) -> NoteModel:
-        doc = CouplingDocument.find_one(
-            CouplingDocument.project_id == project_id,
-            CouplingDocument.chip_id == chip_id,
-            CouplingDocument.qid == coupling_id,
-        ).run()
-        if doc is None:
-            raise HTTPException(status_code=404, detail="Coupling not found")
+        try:
+            ChipInitializer.ensure_coupling_document(
+                project_id=project_id,
+                chip_id=chip_id,
+                coupling_id=coupling_id,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
         note = _make_note(content, username)
         scope = self._resolve_metric_note_scope(
             project_id=project_id,
