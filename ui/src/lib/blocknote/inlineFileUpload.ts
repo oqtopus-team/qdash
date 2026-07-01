@@ -7,7 +7,7 @@
  * document must stay well under Mongo's 16 MiB ceiling, so each file is capped
  * at 5 MB *encoded* (≈ 3.7 MB raw).
  */
-export const MAX_INLINE_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_INLINE_FILE_BYTES = 5 * 1024 * 1024;
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
