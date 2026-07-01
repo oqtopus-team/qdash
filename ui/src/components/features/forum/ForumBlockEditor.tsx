@@ -7,6 +7,8 @@ import "@blocknote/mantine/style.css";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 
+import { uploadInlineFile } from "@/lib/blocknote/inlineFileUpload";
+
 // Reuse the cryo BlockNote theme (scoped to the `.wiring-blocknote` wrapper).
 import "../cryo/blocknote-theme.css";
 
@@ -45,9 +47,11 @@ interface ForumBlockEditorProps {
  * Forum rich-text editor built on BlockNote.
  *
  * Mirrors the cryo `WiringBlockEditor` (JSON source of truth + lossy markdown
- * projection) but stores images as server URLs via `onImageUpload` instead of
- * inlining base64 data URLs — forum documents stay small and the image blocks
- * keep a portable `url`.
+ * projection). Images are stored as server URLs via `onImageUpload` — forum
+ * documents stay small and the image blocks keep a portable `url`. Video,
+ * audio, and generic file blocks are inlined as base64 data URLs (capped at
+ * 5 MB) just like the cool-down editor, since the forum image endpoint only
+ * accepts images.
  */
 export function ForumBlockEditor({
   initialBlocks,
@@ -58,13 +62,17 @@ export function ForumBlockEditor({
 }: ForumBlockEditorProps) {
   const colorScheme = useThemeScheme();
   const editor = useCreateBlockNote({
-    // Use the full default schema — image, table, list, code, quote, heading, …
+    // Use the full default schema — image, video, audio, file, table, list,
+    // code, quote, heading, …
     initialContent:
       initialBlocks && initialBlocks.length > 0
         ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (initialBlocks as any)
         : undefined,
-    uploadFile: onImageUpload,
+    // Images go to the server (portable url, small documents); video / audio /
+    // file are inlined as base64 data URLs, matching the cool-down editor.
+    uploadFile: (file: File) =>
+      file.type.startsWith("image/") ? onImageUpload(file) : uploadInlineFile(file),
   });
 
   // First-time migration: import legacy markdown when a post has no blocks yet.
