@@ -256,6 +256,7 @@ async def forum_ai_reply_stream(
     """SSE endpoint that generates an AI reply in a forum thread."""
 
     async def event_generator() -> AsyncGenerator[str, None]:
+        """Yield SSE-formatted events as the AI reply is generated."""
         from qdash.copilot.config import load_copilot_config
 
         config = load_copilot_config()

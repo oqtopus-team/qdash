@@ -94,15 +94,18 @@ class ForumService:
     """Service for project forum CRUD operations."""
 
     def __init__(self, notification_service: NotificationService | None = None) -> None:
+        """Initialize the service with an optional notification dependency."""
         self._notifications = notification_service
 
     @staticmethod
     def _user_id_for_username(username: str) -> str | None:
+        """Return the user ID for *username*, or None when the user is unknown."""
         user = UserDocument.find_one({"username": username}).run()
         return user.user_id if user else None
 
     @staticmethod
     def _is_author(doc: ForumPostDocument, *, user_id: str | None) -> bool:
+        """Return whether *user_id* is the author of *doc*."""
         return bool(user_id and doc.user_id == user_id)
 
     @staticmethod
@@ -190,6 +193,7 @@ class ForumService:
                 continue
 
     def _ensure_active_category(self, project_id: str, category: str) -> None:
+        """Raise HTTP 422 unless *category* exists and is active for the project."""
         self._ensure_default_categories(project_id)
         doc = ForumCategoryDocument.find_one(
             {"project_id": project_id, "key": category, "is_archived": False}

@@ -10,6 +10,7 @@ from qdash.dbmodel.user import UserDocument
 
 
 def _create_user(username: str, token: str, role: ProjectRole) -> UserDocument:
+    """Create a user with an active membership in the test project."""
     user = UserDocument(
         username=username,
         hashed_password="hashed",
@@ -32,6 +33,7 @@ def _create_user(username: str, token: str, role: ProjectRole) -> UserDocument:
 
 
 def _create_project() -> None:
+    """Insert the shared test project owned by the ``owner`` user."""
     owner = UserDocument.find_one({"username": "owner"}).run()
     assert owner is not None
     ProjectDocument(
@@ -43,6 +45,7 @@ def _create_project() -> None:
 
 
 def _headers(token: str) -> dict[str, str]:
+    """Build auth and project headers for the given access token."""
     return {"Authorization": f"Bearer {token}", "X-Project-Id": "test_project"}
 
 
@@ -55,6 +58,7 @@ def _create_post(
     content="Tracking today's calibration notes",
     parent_id=None,
 ):
+    """Post a forum thread or reply and return the raw HTTP response."""
     body = {
         "category": category,
         "title": title,
