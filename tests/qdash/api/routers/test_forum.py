@@ -390,6 +390,55 @@ def test_forum_post_round_trips_content_blocks(test_client, init_db):
     assert updated.json()["content_blocks"] == new_blocks
 
 
+def test_forum_update_preserves_content_blocks_when_omitted(test_client, init_db):
+    """Omitting content_blocks on update leaves existing rich content untouched."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    blocks = [
+        {
+            "id": "b1",
+            "type": "paragraph",
+            "props": {},
+            "content": [{"type": "text", "text": "rich body", "styles": {}}],
+            "children": [],
+        }
+    ]
+    created = test_client.post(
+        "/forum/posts",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": "Rich post",
+            "content": "rich body",
+            "content_blocks": blocks,
+            "parent_id": None,
+        },
+    )
+    assert created.status_code == 201, created.text
+    post_id = created.json()["id"]
+
+    # Update without content_blocks: existing blocks must be preserved.
+    updated = test_client.patch(
+        f"/forum/posts/{post_id}",
+        headers=headers,
+        json={"title": "Rich post", "content": "edited body"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["content"] == "edited body"
+    assert updated.json()["content_blocks"] == blocks
+
+    # An explicit empty list clears the blocks.
+    cleared = test_client.patch(
+        f"/forum/posts/{post_id}",
+        headers=headers,
+        json={"title": "Rich post", "content": "plain body", "content_blocks": []},
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["content_blocks"] == []
+
+
 def test_forum_post_defaults_content_blocks_to_empty(test_client, init_db):
     """Posting plain markdown without blocks yields an empty content_blocks list."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)

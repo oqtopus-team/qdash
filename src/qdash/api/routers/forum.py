@@ -375,6 +375,9 @@ def update_forum_post(
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> ForumPostResponse:
     """Update a forum post. Only the author can edit."""
+    # Distinguish "content_blocks omitted" (leave unchanged) from "explicitly []"
+    # (clear); the default_factory makes both look like [] on the model otherwise.
+    content_blocks = body.content_blocks if "content_blocks" in body.model_fields_set else None
     return service.update_post(
         project_id=ctx.project_id,
         post_id=post_id,
@@ -382,7 +385,7 @@ def update_forum_post(
         category=body.category,
         title=body.title,
         content=body.content,
-        content_blocks=body.content_blocks,
+        content_blocks=content_blocks,
     )
 
 

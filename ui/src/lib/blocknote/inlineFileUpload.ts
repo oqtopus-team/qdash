@@ -9,6 +9,18 @@
  */
 const MAX_INLINE_FILE_BYTES = 5 * 1024 * 1024;
 
+/**
+ * Size in bytes of the base64 data URL {@link fileToDataUrl} produces for `file`.
+ *
+ * base64 expands 3 raw bytes into 4 characters, plus the `data:<mime>;base64,`
+ * prefix. This is what actually gets stored in Mongo, so the cap is enforced
+ * against the encoded size rather than the raw `File.size`.
+ */
+function encodedDataUrlBytes(file: File): number {
+  const prefix = `data:${file.type || "application/octet-stream"};base64,`;
+  return prefix.length + 4 * Math.ceil(file.size / 3);
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -23,8 +35,11 @@ function fileToDataUrl(file: File): Promise<string> {
  * Rejects files larger than {@link MAX_INLINE_FILE_BYTES}.
  */
 export async function uploadInlineFile(file: File): Promise<string> {
-  if (file.size > MAX_INLINE_FILE_BYTES) {
-    throw new Error(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 5 MB.`);
+  const encodedBytes = encodedDataUrlBytes(file);
+  if (encodedBytes > MAX_INLINE_FILE_BYTES) {
+    throw new Error(
+      `File is too large (${(encodedBytes / 1024 / 1024).toFixed(1)} MB encoded). Max 5 MB.`,
+    );
   }
   return fileToDataUrl(file);
 }

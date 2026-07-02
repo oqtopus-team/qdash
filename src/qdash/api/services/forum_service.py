@@ -633,7 +633,10 @@ class ForumService:
                 self._ensure_active_category(project_id, category)
                 doc.category = category
         doc.content = content
-        doc.content_blocks = content_blocks or []
+        # None means the caller omitted the field: keep existing rich content.
+        # An explicit [] clears it (e.g. a plain-Markdown edit).
+        if content_blocks is not None:
+            doc.content_blocks = content_blocks
         doc.system_info.update_time()
         doc.save()
 
