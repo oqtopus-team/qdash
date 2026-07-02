@@ -2,7 +2,14 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-import { ExternalLink, ArrowUpRight, StopCircle, UserRound } from "lucide-react";
+import {
+  ExternalLink,
+  ArrowUpRight,
+  StopCircle,
+  UserRound,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 import Link from "next/link";
 
 import { formatDate, formatDateTime } from "@/lib/utils/datetime";
@@ -78,6 +85,7 @@ export function ExecutionPageContent() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -187,6 +195,22 @@ export function ExecutionPageContent() {
     setIsSidebarOpen(false);
     setSelectedExecutionId(null);
     setExpandedTaskIndex(null);
+  };
+
+  const handleCancel = () => {
+    const flowRunId = executionDetailData?.data?.note?.flow_run_id as string | undefined;
+    if (!flowRunId) return;
+    cancelMutation.mutate(
+      { flowRunId },
+      {
+        onSuccess: () => {
+          setShowCancelConfirm(false);
+        },
+        onError: () => {
+          setShowCancelConfirm(false);
+        },
+      },
+    );
   };
 
   // Toggle task expansion on click
@@ -364,13 +388,7 @@ export function ExecutionPageContent() {
                   return (
                     isCancellable && (
                       <button
-                        onClick={() => {
-                          if (detailFlowRunId) {
-                            cancelMutation.mutate({
-                              flowRunId: detailFlowRunId,
-                            });
-                          }
-                        }}
+                        onClick={() => setShowCancelConfirm(true)}
                         disabled={cancelMutation.isPending}
                         className="btn btn-error btn-sm sm:btn-md"
                       >
@@ -493,6 +511,62 @@ export function ExecutionPageContent() {
           </>
         )}
       </div>
+      {/* Cancel Confirmation Modal */}
+      {showCancelConfirm && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Cancel Execution</h3>
+            <p className="py-4">
+              Are you sure you want to cancel this execution? This action cannot be undone.
+            </p>
+            {cancelMutation.isError && (
+              <div className="alert alert-error mb-4">
+                <XCircle size={16} />
+                <span>
+                  {(
+                    cancelMutation.error as {
+                      response?: { data?: { detail?: string } };
+                    }
+                  )?.response?.data?.detail || "Failed to cancel execution"}
+                </span>
+              </div>
+            )}
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setShowCancelConfirm(false)}
+                disabled={cancelMutation.isPending}
+              >
+                Close
+              </button>
+              <button
+                className="btn btn-error"
+                onClick={handleCancel}
+                disabled={cancelMutation.isPending}
+              >
+                {cancelMutation.isPending ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  "Cancel Execution"
+                )}
+              </button>
+            </div>
+          </div>
+          <div
+            className="modal-backdrop"
+            onClick={() => !cancelMutation.isPending && setShowCancelConfirm(false)}
+          />
+        </div>
+      )}
+      {/* Cancel success alert */}
+      {cancelMutation.isSuccess && (
+        <div className="toast toast-end">
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span>Cancellation requested successfully</span>
+          </div>
+        </div>
+      )}
     </PageContainer>
   );
 }
