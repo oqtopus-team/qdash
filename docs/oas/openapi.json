@@ -15198,12 +15198,31 @@
           "readout_fidelity": {
             "$ref": "#/components/schemas/FidelityCondition"
           },
+          "cr_direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "forward",
+                  "inverse",
+                  "mix"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cr Direction",
+            "description": "Optional CR direction filter. forward uses the topology coupling order; inverse uses the reverse order; mix returns both available calibrated directions. When omitted, mix is used.",
+            "default": "mix"
+          },
           "only_maximum_connected": {
             "type": "boolean",
             "title": "Only Maximum Connected",
             "default": true
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "coupling_fidelity",
@@ -16361,6 +16380,7 @@
             "$ref": "#/components/schemas/Condition"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "title": "DeviceTopologyRequest",
         "description": "Request model for device topology."

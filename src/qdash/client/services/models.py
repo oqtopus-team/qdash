@@ -332,6 +332,16 @@ class ActivityStatus(StrEnum):
     inactive = "inactive"
 
 
+class CrDirection(StrEnum):
+    """
+    Optional CR direction filter. forward uses the topology coupling order; inverse uses the reverse order; mix returns both available calibrated directions. When omitted, mix is used.
+    """
+
+    forward = "forward"
+    inverse = "inverse"
+    mix = "mix"
+
+
 class ConfigReloadResponse(BaseModel):
     """
     Response model for config cache reload.
@@ -1154,6 +1164,10 @@ class ForumPostCreate(BaseModel):
     """
     Markdown content
     """
+    content_blocks: Annotated[list[dict[str, Any]] | None, Field(title="Content Blocks")] = None
+    """
+    BlockNote document JSON. Source of truth for rich content; content is derived.
+    """
     parent_id: Annotated[str | None, Field(title="Parent Id")] = None
     """
     Parent forum post ID for replies. None for root threads.
@@ -1196,6 +1210,10 @@ class ForumPostResponse(BaseModel):
     content: Annotated[str, Field(title="Content")]
     """
     Markdown content
+    """
+    content_blocks: Annotated[list[dict[str, Any]] | None, Field(title="Content Blocks")] = None
+    """
+    BlockNote document JSON. Source of truth for rich content; content is derived.
     """
     parent_id: Annotated[str | None, Field(title="Parent Id")] = None
     """
@@ -1265,6 +1283,10 @@ class ForumPostUpdate(BaseModel):
     content: Annotated[str, Field(max_length=8000, min_length=1, title="Content")]
     """
     Updated content
+    """
+    content_blocks: Annotated[list[dict[str, Any]] | None, Field(title="Content Blocks")] = None
+    """
+    BlockNote document JSON. Source of truth for rich content; content is derived.
     """
 
 
@@ -3670,9 +3692,16 @@ class Condition(BaseModel):
     Condition for filtering device topology.
     """
 
+    model_config = ConfigDict(
+        extra="forbid",
+    )
     coupling_fidelity: FidelityCondition
     qubit_fidelity: FidelityCondition
     readout_fidelity: FidelityCondition
+    cr_direction: Annotated[CrDirection | None, Field(title="Cr Direction")] = CrDirection.mix
+    """
+    Optional CR direction filter. forward uses the topology coupling order; inverse uses the reverse order; mix returns both available calibrated directions. When omitted, mix is used.
+    """
     only_maximum_connected: Annotated[bool, Field(title="Only Maximum Connected")] = True
 
 
@@ -3748,6 +3777,9 @@ class DeviceTopologyRequest(BaseModel):
     Request model for device topology.
     """
 
+    model_config = ConfigDict(
+        extra="forbid",
+    )
     name: Annotated[str, Field(title="Name")] = "anemone"
     device_id: Annotated[str, Field(title="Device Id")] = "anemone"
     qubits: Annotated[list[str], Field(title="Qubits")] = ["0", "1", "2", "3", "4", "5"]

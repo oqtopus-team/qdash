@@ -54,7 +54,14 @@ def get_device_topology(
         lifetimes, gate durations, and couplings with their fidelities
 
     """
-    logger.info(f"project: {ctx.project_id}, user: {ctx.user.username}")
+    logger.info(
+        "project: %s, user: %s, cr_direction=%s, qubits=%d, exclude_couplings=%d",
+        ctx.project_id,
+        ctx.user.username,
+        request.condition.cr_direction,
+        len(request.qubits),
+        len(request.exclude_couplings),
+    )
     return service.build_device_topology(ctx.project_id, request)
 
 
