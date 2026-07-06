@@ -1,8 +1,9 @@
 """Schema definitions for device_topology router."""
 
 from datetime import datetime
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Position(BaseModel):
@@ -84,14 +85,36 @@ class FidelityCondition(BaseModel):
 class Condition(BaseModel):
     """Condition for filtering device topology."""
 
+    model_config = ConfigDict(extra="forbid")
+
     coupling_fidelity: FidelityCondition
     qubit_fidelity: FidelityCondition
     readout_fidelity: FidelityCondition
+    cr_direction: Literal["forward", "inverse", "mix"] | None = Field(
+        default="mix",
+        description=(
+            "Optional CR direction filter. "
+            "forward uses the topology coupling order; inverse uses the reverse order; "
+            "mix returns both available calibrated directions. "
+            "When omitted, mix is used."
+        ),
+    )
     only_maximum_connected: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_cr_direction_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "crDirection" in data and "cr_direction" not in data:
+            normalized = dict(data)
+            normalized["cr_direction"] = normalized.pop("crDirection")
+            return normalized
+        return data
 
 
 class DeviceTopologyRequest(BaseModel):
     """Request model for device topology."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str = "anemone"
     device_id: str = "anemone"
