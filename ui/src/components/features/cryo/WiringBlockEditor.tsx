@@ -7,27 +7,9 @@ import "@blocknote/mantine/style.css";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 
+import { uploadInlineFile } from "@/lib/blocknote/inlineFileUpload";
+
 import "./blocknote-theme.css";
-
-// Cap inline images at 5 MB *encoded* (≈ 3.7 MB raw) to keep cool-down
-// documents well under Mongo's 16 MiB ceiling.
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error("read failed"));
-    reader.onload = () => resolve(reader.result as string);
-    reader.readAsDataURL(file);
-  });
-}
-
-async function uploadAsDataUrl(file: File): Promise<string> {
-  if (file.size > MAX_IMAGE_BYTES) {
-    throw new Error(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 5 MB.`);
-  }
-  return fileToDataUrl(file);
-}
 
 interface WiringBlockEditorProps {
   /** Current document, as opaque BlockNote JSON objects. */
@@ -57,7 +39,7 @@ export function WiringBlockEditor({
           (initialBlocks as any)
         : undefined,
     // Inline base64 upload — keeps everything in the cool-down document.
-    uploadFile: uploadAsDataUrl,
+    uploadFile: uploadInlineFile,
   });
 
   // First-time migration: if no blocks but legacy markdown exists, import it.

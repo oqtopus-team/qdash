@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Lock, MessageSquare, Pencil, Trash2, Unlock } from "lucide-react";
@@ -19,9 +20,7 @@ import {
   useReopenForumPost,
   useUpdateForumPost,
 } from "@/client/forum/forum";
-import { useListProjectMembers } from "@/client/projects/projects";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
-import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
@@ -31,6 +30,11 @@ import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { ForumPostResponse } from "@/schemas";
 
 import { getForumCategory, toForumCategoryDefinition } from "./categories";
+
+const ForumBlockEditor = dynamic(
+  () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
+  { ssr: false },
+);
 
 const REPLY_PAGE_SIZE = 100;
 
@@ -46,8 +50,10 @@ function PostBody({
   editing,
   editTitle,
   editContent,
+  editInitialBlocks,
+  editLegacyMarkdown,
   onTitleChange,
-  onContentChange,
+  onEditChange,
   onCancel,
   onSave,
   saving,
@@ -59,13 +65,16 @@ function PostBody({
   onDelete: () => void;
   editing: boolean;
   editTitle?: string;
+  /** Current markdown projection — used only to gate the Save button. */
   editContent: string;
+  editInitialBlocks: Record<string, unknown>[];
+  editLegacyMarkdown: string;
   onTitleChange?: (value: string) => void;
-  onContentChange: (value: string) => void;
+  onEditChange: (blocks: Record<string, unknown>[], markdown: string) => void;
   onCancel: () => void;
   onSave: () => void;
   saving: boolean;
-  onImageUpload?: (file: File) => Promise<string>;
+  onImageUpload: (file: File) => Promise<string>;
 }) {
   const canEdit = currentUsername === post.username;
   const isAi = post.is_ai_reply || post.username === "qdash";
@@ -122,12 +131,10 @@ function PostBody({
               placeholder="Thread title"
             />
           )}
-          <MarkdownEditor
-            value={editContent}
-            onChange={onContentChange}
-            onSubmit={onSave}
-            rows={4}
-            placeholder="Edit post..."
+          <ForumBlockEditor
+            initialBlocks={editInitialBlocks}
+            legacyMarkdown={editLegacyMarkdown}
+            onChange={onEditChange}
             onImageUpload={onImageUpload}
           />
           <div className="flex justify-end gap-2">
@@ -154,16 +161,21 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { isOwner, projectId } = useProject();
+  const { isOwner } = useProject();
   const { uploadImage } = useImageUpload("forum");
   const currentUsername = user?.username;
   const [replyText, setReplyText] = useState("");
+  const [replyBlocks, setReplyBlocks] = useState<Record<string, unknown>[]>([]);
+  // Bumped after a successful reply to remount (reset) the composer editor.
+  const [replyKey, setReplyKey] = useState(0);
   const [editingRoot, setEditingRoot] = useState(false);
   const [editRootTitle, setEditRootTitle] = useState("");
   const [editRootContent, setEditRootContent] = useState("");
+  const [editRootBlocks, setEditRootBlocks] = useState<Record<string, unknown>[]>([]);
   const [editRootCategory, setEditRootCategory] = useState("");
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
   const [editReplyContent, setEditReplyContent] = useState("");
+  const [editReplyBlocks, setEditReplyBlocks] = useState<Record<string, unknown>[]>([]);
   const [replyLimit, setReplyLimit] = useState(REPLY_PAGE_SIZE);
 
   const { data: postResponse, isLoading: postLoading } = useGetForumPost(postId, {
@@ -182,29 +194,6 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const categories = useMemo(
     () => categoriesResponse?.data.categories.map(toForumCategoryDefinition) ?? [],
     [categoriesResponse?.data.categories],
-  );
-
-  const { data: membersResponse } = useListProjectMembers(projectId ?? "", {
-    query: { enabled: !!projectId },
-  });
-  const mentionCandidates = useMemo(
-    () => [
-      { id: "qdash", label: "QDash" },
-      {
-        id: "project",
-        label: "Project",
-        secondaryLabel: "Notify all project members",
-      },
-      ...(membersResponse?.data.members
-        ?.filter((member) => member.username !== currentUsername)
-        .map((member) => ({
-          id: member.username,
-          label: member.display_name || member.username,
-          secondaryLabel: member.organization ?? undefined,
-          avatarKey: member.avatar_key,
-        })) ?? []),
-    ],
-    [currentUsername, membersResponse?.data.members],
   );
 
   const createMutation = useCreateForumPost();
@@ -233,6 +222,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     if (!post) return;
     setEditRootTitle(post.title ?? "");
     setEditRootContent(post.content);
+    setEditRootBlocks((post.content_blocks ?? []) as Record<string, unknown>[]);
     setEditRootCategory(post.category);
     setEditingRoot(true);
   };
@@ -245,6 +235,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
         category: editRootCategory || null,
         title: editRootTitle.trim() || null,
         content: editRootContent.trim(),
+        content_blocks: editRootBlocks,
       },
     });
     setEditingRoot(false);
@@ -259,10 +250,13 @@ export function ForumDetailPage({ postId }: { postId: string }) {
         category: post.category,
         title: null,
         content: trimmed,
+        content_blocks: replyBlocks,
         parent_id: post.id,
       },
     });
     setReplyText("");
+    setReplyBlocks([]);
+    setReplyKey((key) => key + 1);
     invalidateThread();
     if (/@qdash\b/i.test(trimmed)) {
       triggerAiReply(post.id, trimmed, invalidateThread);
@@ -272,13 +266,18 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const handleStartEditReply = (reply: ForumPostResponse) => {
     setEditingReplyId(reply.id);
     setEditReplyContent(reply.content);
+    setEditReplyBlocks((reply.content_blocks ?? []) as Record<string, unknown>[]);
   };
 
   const handleSaveReply = async () => {
     if (!editingReplyId || !editReplyContent.trim()) return;
     await updateMutation.mutateAsync({
       postId: editingReplyId,
-      data: { title: null, content: editReplyContent.trim() },
+      data: {
+        title: null,
+        content: editReplyContent.trim(),
+        content_blocks: editReplyBlocks,
+      },
     });
     setEditingReplyId(null);
     invalidateThread();
@@ -388,8 +387,13 @@ export function ForumDetailPage({ postId }: { postId: string }) {
         editing={editingRoot}
         editTitle={editRootTitle}
         editContent={editRootContent}
+        editInitialBlocks={editRootBlocks}
+        editLegacyMarkdown={post.content}
         onTitleChange={setEditRootTitle}
-        onContentChange={setEditRootContent}
+        onEditChange={(blocks, markdown) => {
+          setEditRootBlocks(blocks);
+          setEditRootContent(markdown);
+        }}
         onCancel={() => setEditingRoot(false)}
         onSave={handleSaveRoot}
         saving={updateMutation.isPending}
@@ -417,7 +421,12 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 onDelete={() => handleDelete(reply.id, false)}
                 editing={editingReplyId === reply.id}
                 editContent={editReplyContent}
-                onContentChange={setEditReplyContent}
+                editInitialBlocks={editReplyBlocks}
+                editLegacyMarkdown={reply.content}
+                onEditChange={(blocks, markdown) => {
+                  setEditReplyBlocks(blocks);
+                  setEditReplyContent(markdown);
+                }}
                 onCancel={() => setEditingReplyId(null)}
                 onSave={handleSaveReply}
                 saving={updateMutation.isPending}
@@ -457,17 +466,34 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             This thread is closed.
           </div>
         ) : (
-          <MarkdownEditor
-            value={replyText}
-            onChange={setReplyText}
-            onSubmit={handleAddReply}
-            placeholder="Write a reply. Use @username to mention project members."
-            rows={3}
-            submitLabel="Reply"
-            isSubmitting={createMutation.isPending}
-            mentionCandidates={mentionCandidates}
-            onImageUpload={uploadImage}
-          />
+          <div>
+            <ForumBlockEditor
+              key={replyKey}
+              onChange={(blocks, markdown) => {
+                setReplyBlocks(blocks);
+                setReplyText(markdown);
+              }}
+              onImageUpload={uploadImage}
+            />
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-xs text-base-content/50">
+                Type <kbd className="kbd kbd-xs">/</kbd> for blocks. Use{" "}
+                <span className="font-mono">@username</span> to mention members.
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={handleAddReply}
+                disabled={!replyText.trim() || createMutation.isPending}
+              >
+                {createMutation.isPending ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  "Reply"
+                )}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

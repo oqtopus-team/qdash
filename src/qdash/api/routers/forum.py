@@ -182,6 +182,7 @@ def create_forum_post(
         category=body.category,
         title=body.title,
         content=body.content,
+        content_blocks=body.content_blocks,
         parent_id=body.parent_id,
     )
 
@@ -255,6 +256,7 @@ async def forum_ai_reply_stream(
     """SSE endpoint that generates an AI reply in a forum thread."""
 
     async def event_generator() -> AsyncGenerator[str, None]:
+        """Yield SSE-formatted events as the AI reply is generated."""
         from qdash.copilot.config import load_copilot_config
 
         config = load_copilot_config()
@@ -373,6 +375,9 @@ def update_forum_post(
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> ForumPostResponse:
     """Update a forum post. Only the author can edit."""
+    # Distinguish "content_blocks omitted" (leave unchanged) from "explicitly []"
+    # (clear); the default_factory makes both look like [] on the model otherwise.
+    content_blocks = body.content_blocks if "content_blocks" in body.model_fields_set else None
     return service.update_post(
         project_id=ctx.project_id,
         post_id=post_id,
@@ -380,6 +385,7 @@ def update_forum_post(
         category=body.category,
         title=body.title,
         content=body.content,
+        content_blocks=content_blocks,
     )
 
 

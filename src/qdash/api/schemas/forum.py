@@ -1,6 +1,7 @@
 """Schema definitions for forum discussions."""
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -93,6 +94,10 @@ class ForumPostCreate(BaseModel):
         description="Thread title. Required for root threads, None for replies.",
     )
     content: str = Field(..., min_length=1, max_length=8000, description="Markdown content")
+    content_blocks: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="BlockNote document JSON. Source of truth for rich content; content is derived.",
+    )
     parent_id: str | None = Field(
         default=None, description="Parent forum post ID for replies. None for root threads."
     )
@@ -112,6 +117,10 @@ class ForumPostUpdate(BaseModel):
         default=None, max_length=200, description="Updated title for root threads"
     )
     content: str = Field(..., min_length=1, max_length=8000, description="Updated content")
+    content_blocks: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="BlockNote document JSON. Source of truth for rich content; content is derived.",
+    )
 
 
 class ForumAiReplyRequest(BaseModel):
@@ -131,6 +140,10 @@ class ForumPostResponse(BaseModel):
     avatar_key: str | None = Field(default=None, description="Post author avatar preset key")
     title: str | None = Field(default=None, description="Thread title")
     content: str = Field(..., description="Markdown content")
+    content_blocks: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="BlockNote document JSON. Source of truth for rich content; content is derived.",
+    )
     parent_id: str | None = Field(default=None, description="Parent forum post ID")
     reply_count: int = Field(default=0, description="Number of replies to this thread")
     is_closed: bool = Field(default=False, description="Whether this thread is closed")

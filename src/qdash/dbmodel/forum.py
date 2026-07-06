@@ -1,6 +1,6 @@
 """Document model for project forum discussions."""
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -57,6 +57,10 @@ class ForumPostDocument(Document):
     username: str = Field(..., description="Post author username snapshot")
     title: str | None = Field(default=None, description="Thread title. Only for root posts.")
     content: str = Field(..., description="Markdown post content")
+    content_blocks: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="BlockNote document JSON. Source of truth for rich content; content is derived.",
+    )
     parent_id: str | None = Field(
         default=None, description="Parent forum post ID for replies. None for root threads."
     )

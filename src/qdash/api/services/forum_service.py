@@ -94,15 +94,18 @@ class ForumService:
     """Service for project forum CRUD operations."""
 
     def __init__(self, notification_service: NotificationService | None = None) -> None:
+        """Initialize the service with an optional notification dependency."""
         self._notifications = notification_service
 
     @staticmethod
     def _user_id_for_username(username: str) -> str | None:
+        """Return the user ID for *username*, or None when the user is unknown."""
         user = UserDocument.find_one({"username": username}).run()
         return user.user_id if user else None
 
     @staticmethod
     def _is_author(doc: ForumPostDocument, *, user_id: str | None) -> bool:
+        """Return whether *user_id* is the author of *doc*."""
         return bool(user_id and doc.user_id == user_id)
 
     @staticmethod
@@ -133,6 +136,7 @@ class ForumService:
             avatar_key=user.avatar_key if user else None,
             title=doc.title,
             content=doc.content,
+            content_blocks=list(doc.content_blocks),
             parent_id=doc.parent_id,
             reply_count=reply_count,
             is_closed=doc.is_closed,
@@ -189,6 +193,7 @@ class ForumService:
                 continue
 
     def _ensure_active_category(self, project_id: str, category: str) -> None:
+        """Raise HTTP 422 unless *category* exists and is active for the project."""
         self._ensure_default_categories(project_id)
         doc = ForumCategoryDocument.find_one(
             {"project_id": project_id, "key": category, "is_archived": False}
@@ -419,6 +424,7 @@ class ForumService:
         category: str,
         title: str | None,
         content: str,
+        content_blocks: list[dict[str, Any]] | None = None,
         parent_id: str | None,
     ) -> ForumPostResponse:
         """Create a new forum thread or reply."""
@@ -447,6 +453,7 @@ class ForumService:
             username=username,
             title=title if parent_id is None else None,
             content=content,
+            content_blocks=content_blocks or [],
             parent_id=parent_id,
         )
         doc.insert()
@@ -607,6 +614,7 @@ class ForumService:
         category: str | None,
         title: str | None,
         content: str,
+        content_blocks: list[dict[str, Any]] | None = None,
     ) -> ForumPostResponse:
         """Update a forum post."""
         doc = ForumPostDocument.find_one(
@@ -625,6 +633,10 @@ class ForumService:
                 self._ensure_active_category(project_id, category)
                 doc.category = category
         doc.content = content
+        # None means the caller omitted the field: keep existing rich content.
+        # An explicit [] clears it (e.g. a plain-Markdown edit).
+        if content_blocks is not None:
+            doc.content_blocks = content_blocks
         doc.system_info.update_time()
         doc.save()
 

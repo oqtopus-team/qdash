@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
 import { Lock, MessageSquare, Plus, Settings, Trash2, Unlock, X } from "lucide-react";
 
@@ -16,10 +17,8 @@ import {
   useListForumPosts,
   useReopenForumPost,
 } from "@/client/forum/forum";
-import { useListProjectMembers } from "@/client/projects/projects";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
-import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { UserAvatar } from "@/components/ui/UserAvatar";
@@ -36,6 +35,11 @@ import {
   toForumCategoryDefinition,
   type ForumCategoryDefinition,
 } from "./categories";
+
+const ForumBlockEditor = dynamic(
+  () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
+  { ssr: false },
+);
 
 const PAGE_SIZE = 30;
 
@@ -117,7 +121,7 @@ function ForumThreadCard({
 export function ForumPageContent() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { isOwner, projectId } = useProject();
+  const { isOwner } = useProject();
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("open");
   const [skip, setSkip] = useState(0);
@@ -126,6 +130,7 @@ export function ForumPageContent() {
   const [newCategory, setNewCategory] = useState("qubit");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [contentBlocks, setContentBlocks] = useState<Record<string, unknown>[]>([]);
   const [categoryKey, setCategoryKey] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
@@ -156,29 +161,6 @@ export function ForumPageContent() {
     [categoriesResponse?.data.categories],
   );
 
-  const { data: membersResponse } = useListProjectMembers(projectId ?? "", {
-    query: { enabled: !!projectId },
-  });
-  const mentionCandidates = useMemo(
-    () => [
-      { id: "qdash", label: "QDash" },
-      {
-        id: "project",
-        label: "Project",
-        secondaryLabel: "Notify all project members",
-      },
-      ...(membersResponse?.data.members
-        ?.filter((member) => member.username !== user?.username)
-        .map((member) => ({
-          id: member.username,
-          label: member.display_name || member.username,
-          secondaryLabel: member.organization ?? undefined,
-          avatarKey: member.avatar_key,
-        })) ?? []),
-    ],
-    [membersResponse?.data.members, user?.username],
-  );
-
   const createMutation = useCreateForumPost();
   const createCategoryMutation = useCreateForumCategory();
   const deleteCategoryMutation = useDeleteForumCategory();
@@ -206,11 +188,13 @@ export function ForumPageContent() {
         category: newCategory,
         title: trimmedTitle,
         content: trimmedContent,
+        content_blocks: contentBlocks,
         parent_id: null,
       },
     });
     setTitle("");
     setContent("");
+    setContentBlocks([]);
     setShowComposer(false);
     invalidateList();
     if (/@qdash\b/i.test(trimmedContent)) {
@@ -473,17 +457,31 @@ export function ForumPageContent() {
                 placeholder="Thread title"
               />
             </div>
-            <MarkdownEditor
-              value={content}
-              onChange={setContent}
-              onSubmit={submitThread}
-              placeholder="Start a discussion. Use @username to mention project members."
-              rows={5}
-              submitLabel="Post"
-              isSubmitting={createMutation.isPending}
-              mentionCandidates={mentionCandidates}
+            <ForumBlockEditor
+              onChange={(blocks, markdown) => {
+                setContentBlocks(blocks);
+                setContent(markdown);
+              }}
               onImageUpload={uploadImage}
             />
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-xs text-base-content/50">
+                Type <kbd className="kbd kbd-xs">/</kbd> for blocks (table, image, heading, list,
+                …). Use <span className="font-mono">@username</span> in text to mention members.
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={submitThread}
+                disabled={!title.trim() || !content.trim() || createMutation.isPending}
+              >
+                {createMutation.isPending ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  "Post"
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

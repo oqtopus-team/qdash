@@ -7,6 +7,7 @@
  */
 import type { ForumPostUpdateCategory } from './forumPostUpdateCategory';
 import type { ForumPostUpdateTitle } from './forumPostUpdateTitle';
+import type { ForumPostUpdateContentBlocksItem } from './forumPostUpdateContentBlocksItem';
 
 /**
  * Request schema for updating a forum post.
@@ -22,4 +23,6 @@ export interface ForumPostUpdate {
    * @maxLength 8000
    */
   content: string;
+  /** BlockNote document JSON. Source of truth for rich content; content is derived. */
+  content_blocks?: ForumPostUpdateContentBlocksItem[];
 }

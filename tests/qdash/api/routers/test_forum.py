@@ -10,6 +10,7 @@ from qdash.dbmodel.user import UserDocument
 
 
 def _create_user(username: str, token: str, role: ProjectRole) -> UserDocument:
+    """Create a user with an active membership in the test project."""
     user = UserDocument(
         username=username,
         hashed_password="hashed",
@@ -32,6 +33,7 @@ def _create_user(username: str, token: str, role: ProjectRole) -> UserDocument:
 
 
 def _create_project() -> None:
+    """Insert the shared test project owned by the ``owner`` user."""
     owner = UserDocument.find_one({"username": "owner"}).run()
     assert owner is not None
     ProjectDocument(
@@ -43,6 +45,7 @@ def _create_project() -> None:
 
 
 def _headers(token: str) -> dict[str, str]:
+    """Build auth and project headers for the given access token."""
     return {"Authorization": f"Bearer {token}", "X-Project-Id": "test_project"}
 
 
@@ -55,6 +58,7 @@ def _create_post(
     content="Tracking today's calibration notes",
     parent_id=None,
 ):
+    """Post a forum thread or reply and return the raw HTTP response."""
     body = {
         "category": category,
         "title": title,
@@ -333,6 +337,118 @@ def test_update_forum_reply_ignores_category(test_client, init_db):
     assert response.status_code == 200
     assert response.json()["category"] == "qubit"
     assert response.json()["content"] == "Edited reply"
+
+
+def test_forum_post_round_trips_content_blocks(test_client, init_db):
+    """BlockNote JSON is stored alongside the markdown projection and is updatable."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    blocks = [
+        {
+            "id": "b1",
+            "type": "paragraph",
+            "props": {},
+            "content": [{"type": "text", "text": "rich body", "styles": {}}],
+            "children": [],
+        }
+    ]
+    created = test_client.post(
+        "/forum/posts",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": "Rich post",
+            "content": "rich body",
+            "content_blocks": blocks,
+            "parent_id": None,
+        },
+    )
+    assert created.status_code == 201, created.text
+    post_id = created.json()["id"]
+    assert created.json()["content_blocks"] == blocks
+
+    fetched = test_client.get(f"/forum/posts/{post_id}", headers=headers)
+    assert fetched.json()["content_blocks"] == blocks
+
+    new_blocks = [
+        {
+            "id": "b1",
+            "type": "heading",
+            "props": {"level": 2},
+            "content": [{"type": "text", "text": "updated", "styles": {}}],
+            "children": [],
+        }
+    ]
+    updated = test_client.patch(
+        f"/forum/posts/{post_id}",
+        headers=headers,
+        json={"title": "Rich post", "content": "updated", "content_blocks": new_blocks},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["content_blocks"] == new_blocks
+
+
+def test_forum_update_preserves_content_blocks_when_omitted(test_client, init_db):
+    """Omitting content_blocks on update leaves existing rich content untouched."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    blocks = [
+        {
+            "id": "b1",
+            "type": "paragraph",
+            "props": {},
+            "content": [{"type": "text", "text": "rich body", "styles": {}}],
+            "children": [],
+        }
+    ]
+    created = test_client.post(
+        "/forum/posts",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": "Rich post",
+            "content": "rich body",
+            "content_blocks": blocks,
+            "parent_id": None,
+        },
+    )
+    assert created.status_code == 201, created.text
+    post_id = created.json()["id"]
+
+    # Update without content_blocks: existing blocks must be preserved.
+    updated = test_client.patch(
+        f"/forum/posts/{post_id}",
+        headers=headers,
+        json={"title": "Rich post", "content": "edited body"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["content"] == "edited body"
+    assert updated.json()["content_blocks"] == blocks
+
+    # An explicit empty list clears the blocks.
+    cleared = test_client.patch(
+        f"/forum/posts/{post_id}",
+        headers=headers,
+        json={"title": "Rich post", "content": "plain body", "content_blocks": []},
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["content_blocks"] == []
+
+
+def test_forum_post_defaults_content_blocks_to_empty(test_client, init_db):
+    """Posting plain markdown without blocks yields an empty content_blocks list."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = _create_post(test_client, headers)
+
+    assert created.status_code == 201, created.text
+    assert created.json()["content_blocks"] == []
 
 
 def test_upload_and_serve_forum_image(test_client, init_db, tmp_path, monkeypatch):
