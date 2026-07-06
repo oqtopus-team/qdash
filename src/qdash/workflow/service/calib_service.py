@@ -109,6 +109,102 @@ def _cancel_executions_by_flow_run_id(
     _logger: Any,
 ) -> None:
     """Find executions with the given flow_run_id in note and mark as cancelled."""
+    _finalize_executions_by_flow_run_id(
+        flow_run_id,
+        project_id,
+        _logger,
+        status="cancelled",
+        message="Execution was cancelled",
+        log_prefix="on_flow_cancellation",
+    )
+
+
+def on_flow_crash(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_crashed hook for flow runs.
+
+    Called by Prefect when a flow run crashes — most importantly when the flow
+    subprocess is killed by an uncatchable signal such as ``SIGKILL`` (e.g. the
+    OOM killer). Unlike a Python exception, a ``SIGKILL`` never runs the flow's
+    own ``except``/``finally`` finalizers, and unlike a cancellation it does not
+    trigger ``on_cancellation`` — so without this hook the execution stays
+    ``status: running`` / ``end_at: null`` forever (Issue #1111).
+
+    This hook runs in the Prefect *runner* process (the one that supervises the
+    flow subprocess), which survives the kill. It reads the flow_run parameters
+    and finalizes the orphaned execution directly in MongoDB, marking it and any
+    still-running tasks as ``failed``.
+
+    Usage::
+
+        @flow(on_cancellation=[on_flow_cancellation], on_crashed=[on_flow_crash])
+        def my_flow(username, chip_id, ...):
+            ...
+
+    """
+    _logger = logging.getLogger(__name__)
+    try:
+        params = flow_run.parameters or {}
+        project_id = params.get("project_id")
+        flow_run_id = str(flow_run.id)
+
+        if not project_id:
+            _logger.warning("on_flow_crash: no project_id in parameters, skipping")
+            return
+
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+
+        _fail_executions_by_flow_run_id(flow_run_id, project_id, _logger)
+    except Exception:
+        _logger.error("on_flow_crash failed", exc_info=True)
+
+
+def _fail_executions_by_flow_run_id(
+    flow_run_id: str,
+    project_id: str,
+    _logger: Any,
+) -> None:
+    """Find executions with the given flow_run_id in note and mark as failed.
+
+    Used by the ``on_crashed`` hook to finalize executions orphaned by a crash
+    (e.g. OOM SIGKILL) that never ran their own finalizers.
+    """
+    _finalize_executions_by_flow_run_id(
+        flow_run_id,
+        project_id,
+        _logger,
+        status="failed",
+        message="Execution crashed (flow process terminated unexpectedly)",
+        log_prefix="on_flow_crash",
+    )
+
+
+def _finalize_executions_by_flow_run_id(
+    flow_run_id: str,
+    project_id: str,
+    _logger: Any,
+    *,
+    status: str,
+    message: str,
+    log_prefix: str,
+) -> None:
+    """Finalize non-terminal executions for a flow_run_id to a terminal status.
+
+    Shared by the cancellation and crash hooks. Only executions still in
+    ``running``/``scheduled`` are touched, so a cancellation that already ran
+    (``status: cancelled``) is never overwritten by a later crash hook, and
+    completed executions are left alone.
+
+    Args:
+        flow_run_id: Prefect flow run id stored in the execution note.
+        project_id: Project the execution belongs to.
+        _logger: Logger instance.
+        status: Terminal status to set (``cancelled`` or ``failed``).
+        message: Message to set on the non-terminal tasks.
+        log_prefix: Hook name used in log lines.
+
+    """
     from qdash.common.utils.datetime import now
     from qdash.dbmodel.execution_history import ExecutionHistoryDocument
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -126,21 +222,28 @@ def _cancel_executions_by_flow_run_id(
 
     if not executions:
         _logger.info(
-            "on_flow_cancellation: no active executions found for flow_run_id=%s",
+            "%s: no active executions found for flow_run_id=%s",
+            log_prefix,
             flow_run_id,
         )
         return
 
     for execution in executions:
         execution_id = execution.execution_id
-        _logger.info("Cancelling execution %s (flow_run_id=%s)", execution_id, flow_run_id)
+        _logger.info(
+            "%s: finalizing execution %s to %s (flow_run_id=%s)",
+            log_prefix,
+            execution_id,
+            status,
+            flow_run_id,
+        )
 
-        # Update execution status to cancelled
+        # Update execution status to the terminal status
         ExecutionHistoryDocument.find(
             {"project_id": project_id, "execution_id": execution_id}
-        ).update_many({"$set": {"status": "cancelled", "end_at": end_time}}).run()
+        ).update_many({"$set": {"status": status, "end_at": end_time}}).run()
 
-        # Update non-terminal tasks to cancelled
+        # Update non-terminal tasks to the terminal status
         result = (
             TaskResultHistoryDocument.find(
                 {
@@ -152,8 +255,8 @@ def _cancel_executions_by_flow_run_id(
             .update_many(
                 {
                     "$set": {
-                        "status": "cancelled",
-                        "message": "Execution was cancelled",
+                        "status": status,
+                        "message": message,
                         "end_at": end_time,
                     }
                 }
@@ -163,7 +266,8 @@ def _cancel_executions_by_flow_run_id(
 
         task_count = result.modified_count if result else 0
         _logger.info(
-            "Cancelled execution %s: %d task(s) updated",
+            "%s: finalized execution %s: %d task(s) updated",
+            log_prefix,
             execution_id,
             task_count,
         )
@@ -189,6 +293,7 @@ __all__ = [
     "get_session",
     "init_calibration",
     "on_flow_cancellation",
+    "on_flow_crash",
 ]
 
 

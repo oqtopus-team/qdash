@@ -25,7 +25,7 @@ import numpy as np  # noqa: F401  # used by commented per-task overrides below
 from prefect import flow
 
 from qdash.workflow.service import CalibService
-from qdash.workflow.service.calib_service import on_flow_cancellation
+from qdash.workflow.service.calib_service import on_flow_cancellation, on_flow_crash
 from qdash.workflow.service.steps import (
     ConfigureAll,
     FilterByMetric,
@@ -38,7 +38,7 @@ from qdash.workflow.service.steps import (
 from qdash.workflow.service.targets import MuxTargets
 
 
-@flow(on_cancellation=[on_flow_cancellation])
+@flow(on_cancellation=[on_flow_cancellation], on_crashed=[on_flow_crash])
 def full_calibration(
     username: str,
     chip_id: str,

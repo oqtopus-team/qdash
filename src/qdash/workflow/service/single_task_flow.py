@@ -14,10 +14,18 @@ from typing import Any
 
 from prefect import flow, get_run_logger
 
-from qdash.workflow.service.calib_service import CalibService, on_flow_cancellation
+from qdash.workflow.service.calib_service import (
+    CalibService,
+    on_flow_cancellation,
+    on_flow_crash,
+)
 
 
-@flow(name="single-task-executor", on_cancellation=[on_flow_cancellation])
+@flow(
+    name="single-task-executor",
+    on_cancellation=[on_flow_cancellation],
+    on_crashed=[on_flow_crash],
+)
 def single_task_executor(
     username: str,
     chip_id: str,

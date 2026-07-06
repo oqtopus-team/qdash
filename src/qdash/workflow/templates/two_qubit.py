@@ -34,7 +34,7 @@ from typing import Any
 from prefect import flow
 
 from qdash.workflow.service import CalibService
-from qdash.workflow.service.calib_service import on_flow_cancellation
+from qdash.workflow.service.calib_service import on_flow_cancellation, on_flow_crash
 from qdash.workflow.service.steps import (
     CustomTwoQubit,
     GenerateCRSchedule,
@@ -44,7 +44,7 @@ from qdash.workflow.service.steps import (
 from qdash.workflow.service.targets import QubitTargets
 
 
-@flow(on_cancellation=[on_flow_cancellation])
+@flow(on_cancellation=[on_flow_cancellation], on_crashed=[on_flow_crash])
 def two_qubit(
     username: str,
     chip_id: str,
