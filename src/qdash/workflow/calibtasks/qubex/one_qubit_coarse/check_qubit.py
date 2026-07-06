@@ -8,6 +8,7 @@ from qdash.workflow.calibtasks.base import (
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -60,11 +61,22 @@ class CheckQubit(QubexTask):
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         raw_data = [result.data[label].data]
-        r2 = result.rabi_params[label].r2
-        if self.r2_is_lower_than_threshold(r2):
-            raise ValueError(f"R^2 value of Rabi oscillation is too low: {r2}")
+        validation_error = first_validation_error(
+            finite_value_error(
+                self.output_parameters["rabi_amplitude"].value,
+                f"CheckQubit rabi_amplitude for {label}",
+            ),
+            finite_value_error(
+                self.output_parameters["rabi_frequency"].value,
+                f"CheckQubit rabi_frequency for {label}",
+                minimum=0.0,
+            ),
+        )
         return PostProcessResult(
-            output_parameters=output_parameters, figures=figures, raw_data=raw_data
+            output_parameters=output_parameters,
+            figures=figures,
+            raw_data=raw_data,
+            validation_error=validation_error,
         )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:

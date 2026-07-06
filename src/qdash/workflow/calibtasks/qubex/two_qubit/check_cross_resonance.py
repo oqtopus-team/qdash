@@ -11,6 +11,7 @@ from qdash.workflow.calibtasks.base import (
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -141,8 +142,41 @@ class CheckCrossResonance(QubexTask):
             figures.append(figs["fig_c"])
             figures.append(figs["fig_t"])
         raw_data: list[Any] = []
+        validation_error = first_validation_error(
+            finite_value_error(
+                self.output_parameters["cr_amplitude"].value,
+                f"CheckCrossResonance cr_amplitude for {label}",
+            ),
+            finite_value_error(
+                self.output_parameters["cr_phase"].value,
+                f"CheckCrossResonance cr_phase for {label}",
+            ),
+            finite_value_error(
+                self.output_parameters["cancel_amplitude"].value,
+                f"CheckCrossResonance cancel_amplitude for {label}",
+            ),
+            finite_value_error(
+                self.output_parameters["cancel_phase"].value,
+                f"CheckCrossResonance cancel_phase for {label}",
+            ),
+            finite_value_error(
+                self.output_parameters["cancel_beta"].value,
+                f"CheckCrossResonance cancel_beta for {label}",
+            ),
+            finite_value_error(
+                self.output_parameters["rotary_amplitude"].value,
+                f"CheckCrossResonance rotary_amplitude for {label}",
+            ),
+            finite_value_error(
+                self.output_parameters["zx_rotation_rate"].value,
+                f"CheckCrossResonance zx_rotation_rate for {label}",
+            ),
+        )
         return PostProcessResult(
-            output_parameters=output_parameters, figures=figures, raw_data=raw_data
+            output_parameters=output_parameters,
+            figures=figures,
+            raw_data=raw_data,
+            validation_error=validation_error,
         )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:

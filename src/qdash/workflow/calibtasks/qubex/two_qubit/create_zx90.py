@@ -9,6 +9,7 @@ from qdash.workflow.calibtasks.base import (
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -133,8 +134,42 @@ class CreateZX90(QubexTask):
         output_parameters = self.attach_execution_id(execution_id)
         figures: list[Any] = [result["n1"], result["n3"], result["fig"]]
         raw_data: list[Any] = []
+        validation_error = first_validation_error(
+            finite_value_error(
+                self.output_parameters["cr_amplitude"].value, f"CreateZX90 cr_amplitude for {qid}"
+            ),
+            finite_value_error(
+                self.output_parameters["cr_phase"].value, f"CreateZX90 cr_phase for {qid}"
+            ),
+            finite_value_error(
+                self.output_parameters["cancel_amplitude"].value,
+                f"CreateZX90 cancel_amplitude for {qid}",
+            ),
+            finite_value_error(
+                self.output_parameters["cancel_phase"].value, f"CreateZX90 cancel_phase for {qid}"
+            ),
+            finite_value_error(
+                self.output_parameters["cancel_beta"].value, f"CreateZX90 cancel_beta for {qid}"
+            ),
+            finite_value_error(
+                self.output_parameters["rotary_amplitude"].value,
+                f"CreateZX90 rotary_amplitude for {qid}",
+            ),
+            finite_value_error(
+                self.output_parameters["zx_rotation_rate"].value,
+                f"CreateZX90 zx_rotation_rate for {qid}",
+            ),
+            finite_value_error(
+                self.output_parameters["zx90_gate_time"].value,
+                f"CreateZX90 zx90_gate_time for {qid}",
+                minimum=0.0,
+            ),
+        )
         return PostProcessResult(
-            output_parameters=output_parameters, figures=figures, raw_data=raw_data
+            output_parameters=output_parameters,
+            figures=figures,
+            raw_data=raw_data,
+            validation_error=validation_error,
         )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
