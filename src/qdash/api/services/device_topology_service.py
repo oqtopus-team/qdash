@@ -138,8 +138,12 @@ class DeviceTopologyService:
         if chip_model is None:
             raise ValueError(f"No chip found for user {latest.username}")
 
-        qubit_models = self._chip_repo.get_all_qubit_models(project_id, chip_model.chip_id)
-        coupling_models = self._chip_repo.get_all_coupling_models(project_id, chip_model.chip_id)
+        qubit_models = self._chip_repo.get_all_qubit_models(
+            project_id, chip_model.chip_id, username=chip_model.username
+        )
+        coupling_models = self._chip_repo.get_all_coupling_models(
+            project_id, chip_model.chip_id, username=chip_model.username
+        )
 
         topology = load_topology(chip_model.topology_id)
         sorted_physical_ids = sorted(request.qubits, key=int)

@@ -26,6 +26,7 @@ class CheckRabi(QubexTask):
 
     name: str = "CheckRabi"
     task_type: str = "qubit"
+    r2_threshold: float = 0.6
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": None,
         "control_amplitude": None,

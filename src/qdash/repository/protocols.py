@@ -427,11 +427,15 @@ class ChipRepository(Protocol):
         """Get multiple couplings by their IDs."""
         ...
 
-    def get_all_qubit_models(self, project_id: str, chip_id: str) -> dict[str, Any]:
+    def get_all_qubit_models(
+        self, project_id: str, chip_id: str, username: str | None = None
+    ) -> dict[str, Any]:
         """Get all qubit documents as a dict keyed by qubit ID."""
         ...
 
-    def get_all_coupling_models(self, project_id: str, chip_id: str) -> dict[str, Any]:
+    def get_all_coupling_models(
+        self, project_id: str, chip_id: str, username: str | None = None
+    ) -> dict[str, Any]:
         """Get all coupling documents as a dict keyed by coupling ID."""
         ...
 
