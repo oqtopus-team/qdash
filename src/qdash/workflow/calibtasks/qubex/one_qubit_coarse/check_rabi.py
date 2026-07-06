@@ -90,7 +90,9 @@ def _rabi_validation_error(result: Any, label: str) -> str | None:
         return f"CheckRabi produced non-positive frequency for {label}: {frequency}"
 
     for field_name in ("amplitude", "phase", "offset", "angle", "noise", "distance"):
-        error = _finite_rabi_validation_error(getattr(rabi_param, field_name, None), field_name, label)
+        error = _finite_rabi_validation_error(
+            getattr(rabi_param, field_name, None), field_name, label
+        )
         if error is not None:
             return error
     return None
