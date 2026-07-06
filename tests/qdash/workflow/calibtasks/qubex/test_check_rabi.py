@@ -1,5 +1,6 @@
 import math
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 import plotly.graph_objects as go
 import pytest
@@ -9,6 +10,9 @@ from qdash.datamodel.task import ParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_rabi import CheckRabi
 from qdash.workflow.engine.task.result_processor import R2ValidationError, TaskResultProcessor
+
+if TYPE_CHECKING:
+    from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
 def test_check_rabi_uses_r2_threshold_0_6() -> None:
@@ -41,7 +45,7 @@ def test_check_rabi_run_uses_data_fit_r2_for_validation(monkeypatch: pytest.Monk
     )
     backend = SimpleNamespace(get_instance=lambda: exp)
 
-    run_result = task.run(backend, "1")
+    run_result = task.run(cast("QubexBackend", backend), "1")
 
     assert run_result.r2 == {"1": 0.127}
 
@@ -96,7 +100,7 @@ def test_check_rabi_postprocess_marks_non_finite_frequency_failed_after_artifact
     )
 
     result = task.postprocess(
-        SimpleNamespace(),
+        cast("QubexBackend", SimpleNamespace()),
         "exec-1",
         RunResult(raw_result=raw_result, r2={"1": 0.95}),
         "1",

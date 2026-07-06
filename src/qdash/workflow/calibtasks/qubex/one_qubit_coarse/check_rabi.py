@@ -86,6 +86,7 @@ def _rabi_validation_error(result: Any, label: str) -> str | None:
     error = _finite_rabi_validation_error(frequency, "frequency", label)
     if error is not None:
         return error
+    assert frequency is not None
     if float(frequency) <= 0:
         return f"CheckRabi produced non-positive frequency for {label}: {frequency}"
 

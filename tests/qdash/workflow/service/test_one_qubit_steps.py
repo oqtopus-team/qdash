@@ -1,6 +1,10 @@
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 from qdash.workflow.service.steps.one_qubit import CustomOneQubit
+
+if TYPE_CHECKING:
+    from qdash.workflow.service.calib_service import CalibService
 
 
 def test_custom_one_qubit_direct_targets_create_visible_execution(monkeypatch) -> None:
@@ -56,7 +60,7 @@ def test_custom_one_qubit_direct_targets_create_visible_execution(monkeypatch) -
     )
     step = CustomOneQubit(step_name="simple_tasks", tasks=["CheckRabi"])
 
-    result = step._execute_direct(service, ["1", "2"])
+    result = step._execute_direct(cast("CalibService", service), ["1", "2"])
 
     assert result == {"direct": {"1": {"status": "success"}, "2": {"status": "success"}}}
     assert init_calls
