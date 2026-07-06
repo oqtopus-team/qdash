@@ -65,6 +65,15 @@ vi.mock("@/hooks/useUrlState", () => ({
   }),
 }));
 
+vi.mock("@/components/ui/Toast", () => ({
+  useToast: () => ({
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+  }),
+}));
+
 vi.mock("next/link", () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => (
     <a href={href}>{children}</a>

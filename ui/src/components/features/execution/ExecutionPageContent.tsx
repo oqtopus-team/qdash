@@ -2,14 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-import {
-  ExternalLink,
-  ArrowUpRight,
-  StopCircle,
-  UserRound,
-  CheckCircle,
-  XCircle,
-} from "lucide-react";
+import { ExternalLink, ArrowUpRight, StopCircle, UserRound } from "lucide-react";
 import Link from "next/link";
 
 import { formatDate, formatDateTime } from "@/lib/utils/datetime";
@@ -31,6 +24,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { useToast } from "@/components/ui/Toast";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
 
@@ -137,6 +131,7 @@ export function ExecutionPageContent() {
   );
 
   const cancelMutation = useCancelExecution();
+  const toast = useToast();
 
   // Fetch task list for the selected execution_id
   const {
@@ -204,9 +199,13 @@ export function ExecutionPageContent() {
       { flowRunId },
       {
         onSuccess: () => {
+          toast.success("Cancellation requested successfully");
           setShowCancelConfirm(false);
         },
-        onError: () => {
+        onError: (error) => {
+          const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
+            ?.detail;
+          toast.error(detail || "Failed to cancel execution");
           setShowCancelConfirm(false);
         },
       },
@@ -519,18 +518,6 @@ export function ExecutionPageContent() {
             <p className="py-4">
               Are you sure you want to cancel this execution? This action cannot be undone.
             </p>
-            {cancelMutation.isError && (
-              <div className="alert alert-error mb-4">
-                <XCircle size={16} />
-                <span>
-                  {(
-                    cancelMutation.error as {
-                      response?: { data?: { detail?: string } };
-                    }
-                  )?.response?.data?.detail || "Failed to cancel execution"}
-                </span>
-              </div>
-            )}
             <div className="modal-action">
               <button
                 className="btn btn-ghost"
@@ -556,15 +543,6 @@ export function ExecutionPageContent() {
             className="modal-backdrop"
             onClick={() => !cancelMutation.isPending && setShowCancelConfirm(false)}
           />
-        </div>
-      )}
-      {/* Cancel success alert */}
-      {cancelMutation.isSuccess && (
-        <div className="toast toast-end">
-          <div className="alert alert-success">
-            <CheckCircle size={16} />
-            <span>Cancellation requested successfully</span>
-          </div>
         </div>
       )}
     </PageContainer>

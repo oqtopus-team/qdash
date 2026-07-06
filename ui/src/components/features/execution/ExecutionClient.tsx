@@ -6,13 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Calendar,
-  CheckCircle,
   Clock,
   Download,
   ExternalLink,
   StopCircle,
   UserRound,
-  XCircle,
 } from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
@@ -25,6 +23,7 @@ import type { ExecutionResponseDetail } from "@/schemas";
 import { useGetExecution, useCancelExecution } from "@/client/execution/execution";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { useToast } from "@/components/ui/Toast";
 
 type FilterOption = {
   value: string;
@@ -90,6 +89,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
   });
 
   const cancelMutation = useCancelExecution();
+  const toast = useToast();
 
   const execution = executionDetailData?.data as
     | (ExecutionResponseDetail & {
@@ -113,9 +113,13 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
       { flowRunId },
       {
         onSuccess: () => {
+          toast.success("Cancellation requested successfully");
           setShowCancelConfirm(false);
         },
-        onError: () => {
+        onError: (error) => {
+          const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
+            ?.detail;
+          toast.error(detail || "Failed to cancel execution");
           setShowCancelConfirm(false);
         },
       },
@@ -398,18 +402,6 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
             <p className="py-4">
               Are you sure you want to cancel this execution? This action cannot be undone.
             </p>
-            {cancelMutation.isError && (
-              <div className="alert alert-error mb-4">
-                <XCircle size={16} />
-                <span>
-                  {(
-                    cancelMutation.error as {
-                      response?: { data?: { detail?: string } };
-                    }
-                  )?.response?.data?.detail || "Failed to cancel execution"}
-                </span>
-              </div>
-            )}
             <div className="modal-action">
               <button
                 className="btn btn-ghost"
@@ -435,16 +427,6 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
             className="modal-backdrop"
             onClick={() => !cancelMutation.isPending && setShowCancelConfirm(false)}
           />
-        </div>
-      )}
-
-      {/* Cancel success alert */}
-      {cancelMutation.isSuccess && (
-        <div className="toast toast-end">
-          <div className="alert alert-success">
-            <CheckCircle size={16} />
-            <span>Cancellation requested successfully</span>
-          </div>
         </div>
       )}
     </div>
