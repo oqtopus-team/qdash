@@ -23,6 +23,68 @@ if TYPE_CHECKING:
     from qdash.workflow.service.targets import Target
 
 
+def _execute_direct_one_qubit(
+    service: CalibService,
+    *,
+    qids: list[str],
+    tasks: list[str],
+    stage_name: str,
+) -> dict[str, Any]:
+    """Run explicit qubit targets under a visible parent Execution."""
+    from qdash.workflow.service._internal.scheduling_tasks import (
+        run_qubit_calibrations_parallel,
+    )
+    from qdash.workflow.service.calib_service import finish_calibration, init_calibration
+    from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
+
+    if not qids:
+        return {"direct": {}}
+
+    stage_flow_name = f"{service.flow_name}_{stage_name}" if service.flow_name else stage_name
+    session = init_calibration(
+        service.username,
+        service.chip_id,
+        qids,
+        flow_name=stage_flow_name,
+        backend_name=service.backend_name,
+        tags=service.tags or ([service.flow_name] if service.flow_name else None),
+        project_id=service.project_id,
+        use_lock=False,
+        enable_github_pull=True,
+        github_push_config=GitHubPushConfig(
+            enabled=True,
+            file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
+        ),
+        note={
+            "type": "1-qubit-direct",
+            "stage": stage_name,
+            "total_qubits": len(qids),
+        },
+    )
+
+    session_config = {
+        "username": service.username,
+        "chip_id": service.chip_id,
+        "backend_name": service.backend_name,
+        "execution_id": session.execution_id,
+        "project_id": service.project_id,
+        "default_run_parameters": service.default_run_parameters,
+        "tags": service.tags,
+        "flow_name": service.flow_name,
+        "note": service.note,
+    }
+
+    results = run_qubit_calibrations_parallel(
+        qids=qids,
+        tasks=tasks,
+        session_config=session_config,
+    )
+    wrapped_results = {"direct": results}
+    session.record_stage_result(stage_name, wrapped_results)
+    finish_calibration()
+    return wrapped_results
+
+
 @dataclass
 class CustomOneQubit(CalibrationStep):
     """Custom 1-qubit calibration step with user-defined tasks.
@@ -106,29 +168,12 @@ class CustomOneQubit(CalibrationStep):
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets using multiprocess parallelism."""
-        from qdash.workflow.service._internal.scheduling_tasks import (
-            run_qubit_calibrations_parallel,
-        )
-
-        # Build session config for multiprocess execution
-        session_config = {
-            "username": service.username,
-            "chip_id": service.chip_id,
-            "backend_name": service.backend_name,
-            "execution_id": service.execution_id,
-            "project_id": service.project_id,
-            "default_run_parameters": service.default_run_parameters,
-            "tags": service.tags,
-            "flow_name": service.flow_name,
-            "note": service.note,
-        }
-
-        results = run_qubit_calibrations_parallel(
+        return _execute_direct_one_qubit(
+            service,
             qids=qids,
             tasks=self.tasks,
-            session_config=session_config,
+            stage_name=self.step_name,
         )
-        return {"direct": results}
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
         """Build typed result from raw backend data."""
@@ -230,29 +275,12 @@ class OneQubitCheck(CalibrationStep):
         tasks: list[str],
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets using multiprocess parallelism."""
-        from qdash.workflow.service._internal.scheduling_tasks import (
-            run_qubit_calibrations_parallel,
-        )
-
-        # Build session config for multiprocess execution
-        session_config = {
-            "username": service.username,
-            "chip_id": service.chip_id,
-            "backend_name": service.backend_name,
-            "execution_id": service.execution_id,
-            "project_id": service.project_id,
-            "default_run_parameters": service.default_run_parameters,
-            "tags": service.tags,
-            "flow_name": service.flow_name,
-            "note": service.note,
-        }
-
-        results = run_qubit_calibrations_parallel(
+        return _execute_direct_one_qubit(
+            service,
             qids=qids,
             tasks=tasks,
-            session_config=session_config,
+            stage_name=self.name,
         )
-        return {"direct": results}
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
         """Build typed result from raw backend data."""
@@ -386,29 +414,12 @@ class OneQubitFineTune(CalibrationStep):
         tasks: list[str],
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets using multiprocess parallelism."""
-        from qdash.workflow.service._internal.scheduling_tasks import (
-            run_qubit_calibrations_parallel,
-        )
-
-        # Build session config for multiprocess execution
-        session_config = {
-            "username": service.username,
-            "chip_id": service.chip_id,
-            "backend_name": service.backend_name,
-            "execution_id": service.execution_id,
-            "project_id": service.project_id,
-            "default_run_parameters": service.default_run_parameters,
-            "tags": service.tags,
-            "flow_name": service.flow_name,
-            "note": service.note,
-        }
-
-        results = run_qubit_calibrations_parallel(
+        return _execute_direct_one_qubit(
+            service,
             qids=qids,
             tasks=tasks,
-            session_config=session_config,
+            stage_name=self.name,
         )
-        return {"direct": results}
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
         """Build typed result from raw backend data."""

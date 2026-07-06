@@ -11,6 +11,7 @@ from qdash.workflow.calibtasks.base import (
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -66,7 +67,23 @@ class CreateDRAGHPIPulse(QubexTask):
         self.output_parameters["drag_hpi_amplitude"].value = result["amplitude"][label]["amplitude"]
         output_parameters = self.attach_execution_id(execution_id)
         figures: list[go.Figure] = [result["amplitude"][label]["fig"]]
-        return PostProcessResult(output_parameters=output_parameters, figures=figures)
+        validation_error = first_validation_error(
+            finite_value_error(
+                self.output_parameters["drag_hpi_beta"].value,
+                f"CreateDRAGHPIPulse drag_hpi_beta for {label}",
+            ),
+            finite_value_error(
+                self.output_parameters["drag_hpi_amplitude"].value,
+                f"CreateDRAGHPIPulse drag_hpi_amplitude for {label}",
+                minimum=0.0,
+                maximum=1.0,
+            ),
+        )
+        return PostProcessResult(
+            output_parameters=output_parameters,
+            figures=figures,
+            validation_error=validation_error,
+        )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)

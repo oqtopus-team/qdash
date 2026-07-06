@@ -356,13 +356,33 @@ class TaskExecutor:
                 backend_success = True
                 r2_error_msg: str | None = None
                 if run_result.has_r2() and run_result.r2 is not None:
+                    logger.warning(
+                        "Validating R² for task=%s qid=%s threshold=%s r2=%s",
+                        task_name,
+                        qid,
+                        task.r2_threshold,
+                        run_result.r2,
+                    )
                     r2_value = run_result.r2.get(qid)
                     if r2_value is None:
+                        logger.warning(
+                            "R² validation skipped because value is missing: task=%s qid=%s r2=%s",
+                            task_name,
+                            qid,
+                            run_result.r2,
+                        )
                         backend_success = False
                     else:
                         try:
                             self.result_processor.validate_r2(run_result.r2, qid, task.r2_threshold)
                         except R2ValidationError:
+                            logger.warning(
+                                "R² validation failed for task=%s qid=%s value=%.4f threshold=%s",
+                                task_name,
+                                qid,
+                                r2_value,
+                                task.r2_threshold,
+                            )
                             if postprocess_result.output_parameters:
                                 self.state_manager.clear_output_parameters(
                                     task_name, task_type, qid
@@ -538,8 +558,21 @@ class TaskExecutor:
                     backend_success = True
                     r2_error_msg: str | None = None
                     if run_result.has_r2() and run_result.r2 is not None:
+                        logger.warning(
+                            "Validating R² for task=%s qid=%s threshold=%s r2=%s",
+                            task_name,
+                            qid,
+                            task.r2_threshold,
+                            run_result.r2,
+                        )
                         r2_value = run_result.r2.get(qid)
                         if r2_value is None:
+                            logger.warning(
+                                "R² validation skipped because value is missing: task=%s qid=%s r2=%s",
+                                task_name,
+                                qid,
+                                run_result.r2,
+                            )
                             backend_success = False
                         else:
                             try:
@@ -547,6 +580,13 @@ class TaskExecutor:
                                     run_result.r2, qid, task.r2_threshold
                                 )
                             except R2ValidationError:
+                                logger.warning(
+                                    "R² validation failed for task=%s qid=%s value=%.4f threshold=%s",
+                                    task_name,
+                                    qid,
+                                    r2_value,
+                                    task.r2_threshold,
+                                )
                                 if postprocess_result.output_parameters:
                                     self.state_manager.clear_output_parameters(
                                         task_name, task_type, qid
