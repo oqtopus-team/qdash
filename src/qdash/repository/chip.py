@@ -750,7 +750,9 @@ class MongoChipRepository:
 
     # Entity model methods for metrics extraction
 
-    def get_all_qubit_models(self, project_id: str, chip_id: str) -> dict[str, QubitDocument]:
+    def get_all_qubit_models(
+        self, project_id: str, chip_id: str, username: str | None = None
+    ) -> dict[str, QubitDocument]:
         """Get all qubit documents as a dict keyed by qubit ID.
 
         Returns documents that can be used directly with _extract_latest_metrics
@@ -769,10 +771,15 @@ class MongoChipRepository:
             Map of qubit ID to QubitDocument
 
         """
-        docs = list(QubitDocument.find({"project_id": project_id, "chip_id": chip_id}).run())
+        query = {"project_id": project_id, "chip_id": chip_id}
+        if username is not None:
+            query["username"] = username
+        docs = list(QubitDocument.find(query).run())
         return {doc.qid: doc for doc in docs}
 
-    def get_all_coupling_models(self, project_id: str, chip_id: str) -> dict[str, CouplingDocument]:
+    def get_all_coupling_models(
+        self, project_id: str, chip_id: str, username: str | None = None
+    ) -> dict[str, CouplingDocument]:
         """Get all coupling documents as a dict keyed by coupling ID.
 
         Returns documents that can be used directly with _extract_latest_metrics
@@ -791,7 +798,10 @@ class MongoChipRepository:
             Map of coupling ID to CouplingDocument
 
         """
-        docs = list(CouplingDocument.find({"project_id": project_id, "chip_id": chip_id}).run())
+        query = {"project_id": project_id, "chip_id": chip_id}
+        if username is not None:
+            query["username"] = username
+        docs = list(CouplingDocument.find(query).run())
         return {doc.qid: doc for doc in docs}
 
     def get_qubit_count(self, project_id: str, chip_id: str) -> int:
