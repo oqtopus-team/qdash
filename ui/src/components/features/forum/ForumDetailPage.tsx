@@ -130,12 +130,10 @@ function PostBody({
   onEdit,
   onDelete,
   editing,
-  editTitle,
   editContent,
   editInitialBlocks,
   editLegacyMarkdown,
   editMetaControls,
-  onTitleChange,
   onEditChange,
   onCancel,
   onSave,
@@ -149,13 +147,11 @@ function PostBody({
   onEdit: () => void;
   onDelete: () => void;
   editing: boolean;
-  editTitle?: string;
   /** Current markdown projection — used only to gate the Save button. */
   editContent: string;
   editInitialBlocks: Record<string, unknown>[];
   editLegacyMarkdown: string;
   editMetaControls?: ReactNode;
-  onTitleChange?: (value: string) => void;
   onEditChange: (blocks: Record<string, unknown>[], markdown: string) => void;
   onCancel: () => void;
   onSave: () => void;
@@ -211,14 +207,6 @@ function PostBody({
       {editing ? (
         <div className="space-y-3">
           {editMetaControls}
-          {onTitleChange && (
-            <input
-              className="input input-bordered input-sm w-full"
-              value={editTitle ?? ""}
-              onChange={(event) => onTitleChange(event.target.value)}
-              placeholder="Thread title"
-            />
-          )}
           <ForumBlockEditor
             initialBlocks={editInitialBlocks}
             legacyMarkdown={editLegacyMarkdown}
@@ -265,7 +253,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   // Bumped after a successful reply to remount (reset) the composer editor.
   const [replyKey, setReplyKey] = useState(0);
   const [editingRoot, setEditingRoot] = useState(false);
-  const [editRootTitle, setEditRootTitle] = useState("");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
   const [editRootContent, setEditRootContent] = useState("");
   const [editRootBlocks, setEditRootBlocks] = useState<Record<string, unknown>[]>([]);
   const editRootSnapshotRef = useRef<ForumBlockSnapshotGetter | null>(null);
@@ -362,10 +351,33 @@ export function ForumDetailPage({ postId }: { postId: string }) {
 
   const handleStartEditRoot = () => {
     if (!post) return;
-    setEditRootTitle(post.title ?? "");
     setEditRootContent(post.content);
     setEditRootBlocks((post.content_blocks ?? []) as Record<string, unknown>[]);
     setEditingRoot(true);
+  };
+
+  const handleStartEditTitle = () => {
+    if (!post) return;
+    setEditTitle(post.title ?? "");
+    setEditingTitle(true);
+  };
+
+  const handleSaveTitle = async () => {
+    if (!post) return;
+    const nextTitle = editTitle.trim() || null;
+    const response = await updateMutation.mutateAsync({
+      postId: post.id,
+      data: {
+        category: post.category,
+        title: nextTitle,
+        content: post.content,
+        content_blocks: (post.content_blocks ?? []) as Record<string, unknown>[],
+        labels: post.labels ?? [],
+      },
+    });
+    syncRootPostCache(response.data);
+    setEditingTitle(false);
+    invalidateThread();
   };
 
   const handleSaveRoot = async () => {
@@ -378,7 +390,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
       postId: post.id,
       data: {
         category: post.category,
-        title: editRootTitle.trim() || null,
+        title: post.title ?? null,
         content: nextContent,
         content_blocks: nextBlocks,
         labels: post.labels ?? [],
@@ -547,15 +559,53 @@ export function ForumDetailPage({ postId }: { postId: string }) {
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <div className="min-w-0">
-          <h1 className="flex min-w-0 items-center gap-2 text-xl font-bold">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-start gap-2">
             {formatForumPostNumber(post.number) && (
-              <span className="badge badge-outline shrink-0">
+              <span className="badge badge-outline mt-1 shrink-0">
                 {formatForumPostNumber(post.number)}
               </span>
             )}
-            <span className="truncate">{post.title || "Untitled topic"}</span>
-          </h1>
+            {editingTitle ? (
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                <input
+                  className="input input-bordered input-sm min-w-0 flex-1"
+                  value={editTitle}
+                  onChange={(event) => setEditTitle(event.target.value)}
+                  placeholder="Thread title"
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={handleSaveTitle}
+                  disabled={updateMutation.isPending}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setEditingTitle(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <h1 className="min-w-0 flex-1 truncate text-xl font-bold">
+                {post.title || "Untitled topic"}
+              </h1>
+            )}
+            {canManage && !editingTitle && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm btn-square shrink-0 text-base-content/40 hover:text-primary"
+                onClick={handleStartEditTitle}
+                title="Edit title"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+          </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
             <span>Opened by {post.username}</span>
             <span>{formatRelativeTime(post.created_at)}</span>
@@ -573,11 +623,9 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             onEdit={handleStartEditRoot}
             onDelete={() => handleDelete(post.id, true)}
             editing={editingRoot}
-            editTitle={editRootTitle}
             editContent={editRootContent}
             editInitialBlocks={editRootBlocks}
             editLegacyMarkdown={post.content}
-            onTitleChange={setEditRootTitle}
             onEditChange={(blocks, markdown) => {
               setEditRootBlocks(blocks);
               setEditRootContent(markdown);
