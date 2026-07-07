@@ -18,6 +18,7 @@ import {
   useCancelExecution,
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -510,41 +511,12 @@ export function ExecutionPageContent() {
           </>
         )}
       </div>
-      {/* Cancel Confirmation Modal */}
-      {showCancelConfirm && (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">Cancel Execution</h3>
-            <p className="py-4">
-              Are you sure you want to cancel this execution? This action cannot be undone.
-            </p>
-            <div className="modal-action">
-              <button
-                className="btn btn-ghost"
-                onClick={() => setShowCancelConfirm(false)}
-                disabled={cancelMutation.isPending}
-              >
-                Close
-              </button>
-              <button
-                className="btn btn-error"
-                onClick={handleCancel}
-                disabled={cancelMutation.isPending}
-              >
-                {cancelMutation.isPending ? (
-                  <span className="loading loading-spinner loading-sm" />
-                ) : (
-                  "Cancel Execution"
-                )}
-              </button>
-            </div>
-          </div>
-          <div
-            className="modal-backdrop"
-            onClick={() => !cancelMutation.isPending && setShowCancelConfirm(false)}
-          />
-        </div>
-      )}
+      <CancelExecutionModal
+        isOpen={showCancelConfirm}
+        isPending={cancelMutation.isPending}
+        onConfirm={handleCancel}
+        onClose={() => setShowCancelConfirm(false)}
+      />
     </PageContainer>
   );
 }
