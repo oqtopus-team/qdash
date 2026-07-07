@@ -19,6 +19,7 @@ import {
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
+import { getCancelErrorMessage } from "@/components/features/execution/getCancelErrorMessage";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -204,9 +205,7 @@ export function ExecutionPageContent() {
           setShowCancelConfirm(false);
         },
         onError: (error) => {
-          const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
-            ?.detail;
-          toast.error(detail || "Failed to cancel execution");
+          toast.error(getCancelErrorMessage(error));
           setShowCancelConfirm(false);
         },
       },

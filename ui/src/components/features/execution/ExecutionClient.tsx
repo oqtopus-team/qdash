@@ -22,6 +22,7 @@ import type { ExecutionResponseDetail } from "@/schemas";
 
 import { useGetExecution, useCancelExecution } from "@/client/execution/execution";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
+import { getCancelErrorMessage } from "@/components/features/execution/getCancelErrorMessage";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useToast } from "@/components/ui/Toast";
@@ -118,9 +119,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           setShowCancelConfirm(false);
         },
         onError: (error) => {
-          const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
-            ?.detail;
-          toast.error(detail || "Failed to cancel execution");
+          toast.error(getCancelErrorMessage(error));
           setShowCancelConfirm(false);
         },
       },
