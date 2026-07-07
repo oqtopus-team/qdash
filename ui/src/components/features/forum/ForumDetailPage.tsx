@@ -470,7 +470,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     cooldownId?: string | null;
   }) => {
     if (!post || !canManage) return;
-    await updateMutation.mutateAsync({
+    const response = await updateMutation.mutateAsync({
       postId: post.id,
       data: {
         category: nextCategory ?? post.category,
@@ -487,6 +487,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           : {}),
       },
     });
+    syncRootPostCache(response.data);
     invalidateThread();
   };
 
@@ -497,11 +498,18 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     updateRootMetadata({ labels: nextLabels });
   };
 
-  const saveTargetMetadata = () => {
+  const saveTargetMetadata = (
+    nextChipId = targetDraftChipId,
+    nextTargetType = targetDraftType,
+    nextTargetId = targetDraftId,
+  ) => {
+    const chipId = nextChipId.trim();
+    const targetId = nextTargetId.trim();
+    if (!chipId || !targetId) return;
     updateRootMetadata({
-      chipId: targetDraftChipId.trim(),
-      targetType: targetDraftType,
-      targetId: targetDraftId.trim(),
+      chipId,
+      targetType: nextTargetType,
+      targetId,
     });
   };
 
@@ -512,8 +520,9 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     updateRootMetadata({ chipId: "", targetType: null, targetId: "" });
   };
 
-  const saveCooldownMetadata = () => {
-    updateRootMetadata({ cooldownId: cooldownDraftId });
+  const saveCooldownMetadata = (nextCooldownId: string) => {
+    setCooldownDraftId(nextCooldownId);
+    updateRootMetadata({ cooldownId: nextCooldownId });
   };
 
   const handleDelete = async (targetPostId: string, isRoot: boolean) => {
@@ -783,7 +792,11 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 <select
                   className="select select-bordered select-xs w-full"
                   value={targetDraftChipId}
-                  onChange={(event) => setTargetDraftChipId(event.target.value)}
+                  onChange={(event) => {
+                    const nextChipId = event.target.value;
+                    setTargetDraftChipId(nextChipId);
+                    saveTargetMetadata(nextChipId, targetDraftType, targetDraftId);
+                  }}
                 >
                   <option value="">Select chip</option>
                   {chips.map((chip) => (
@@ -796,9 +809,11 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                   <select
                     className="select select-bordered select-xs w-full"
                     value={targetDraftType}
-                    onChange={(event) =>
-                      setTargetDraftType(event.target.value === "coupling" ? "coupling" : "qubit")
-                    }
+                    onChange={(event) => {
+                      const nextType = event.target.value === "coupling" ? "coupling" : "qubit";
+                      setTargetDraftType(nextType);
+                      saveTargetMetadata(targetDraftChipId, nextType, targetDraftId);
+                    }}
                   >
                     <option value="qubit">Qubit</option>
                     <option value="coupling">Coupling</option>
@@ -807,27 +822,23 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                     className="input input-bordered input-xs w-full"
                     value={targetDraftId}
                     onChange={(event) => setTargetDraftId(event.target.value)}
+                    onBlur={() => saveTargetMetadata()}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.currentTarget.blur();
+                      }
+                    }}
                     placeholder={targetDraftType === "coupling" ? "0-1" : "0"}
                   />
                 </div>
-                <div className="flex justify-end gap-1">
+                <div className="flex justify-end">
                   <button
                     type="button"
                     className="btn btn-ghost btn-xs"
                     onClick={clearTargetMetadata}
-                    disabled={updateMutation.isPending}
+                    disabled={updateMutation.isPending || !targetContext}
                   >
                     Clear
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-xs"
-                    onClick={saveTargetMetadata}
-                    disabled={
-                      updateMutation.isPending || !targetDraftChipId.trim() || !targetDraftId.trim()
-                    }
-                  >
-                    Save
                   </button>
                 </div>
               </div>
@@ -848,7 +859,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 <select
                   className="select select-bordered select-xs w-full"
                   value={cooldownDraftId}
-                  onChange={(event) => setCooldownDraftId(event.target.value)}
+                  onChange={(event) => saveCooldownMetadata(event.target.value)}
                   disabled={!targetDraftChipId || updateMutation.isPending}
                 >
                   <option value="">No cooldown</option>
@@ -864,16 +875,6 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                     {formatCooldownPeriod(selectedCooldown)}
                   </div>
                 )}
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-xs"
-                    onClick={saveCooldownMetadata}
-                    disabled={updateMutation.isPending}
-                  >
-                    Save
-                  </button>
-                </div>
               </div>
             ) : post.cooldown_id ? (
               <div className="space-y-1">
