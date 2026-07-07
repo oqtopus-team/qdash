@@ -15,6 +15,7 @@ import {
   Settings,
   Trash2,
   Unlock,
+  UserRound,
   X,
 } from "lucide-react";
 
@@ -191,6 +192,12 @@ function ForumThreadCard({
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
             <span>{post.username}</span>
             <span>{formatRelativeTime(post.created_at)}</span>
+            {post.assignee_username && (
+              <span className="inline-flex items-center gap-1">
+                <UserRound className="h-3.5 w-3.5" />
+                {post.assignee_username}
+              </span>
+            )}
             <span className="inline-flex items-center gap-1">
               <MessageSquare className="h-3.5 w-3.5" />
               {post.reply_count ?? 0}

@@ -224,6 +224,7 @@ def create_forum_post(
         target_type=body.target_type,
         target_id=body.target_id,
         cooldown_id=body.cooldown_id,
+        assignee_username=body.assignee_username,
     )
 
 
@@ -422,6 +423,7 @@ def update_forum_post(
         {"chip_id", "target_type", "target_id"}.intersection(body.model_fields_set)
     )
     update_cooldown_context = "cooldown_id" in body.model_fields_set
+    update_assignee_context = "assignee_username" in body.model_fields_set
     return service.update_post(
         project_id=ctx.project_id,
         post_id=post_id,
@@ -435,8 +437,10 @@ def update_forum_post(
         target_type=body.target_type,
         target_id=body.target_id,
         cooldown_id=body.cooldown_id,
+        assignee_username=body.assignee_username,
         update_cooldown_context=update_cooldown_context,
         update_target_context=update_target_context,
+        update_assignee_context=update_assignee_context,
         role=ctx.role,
     )
 

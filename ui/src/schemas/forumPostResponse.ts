@@ -11,6 +11,7 @@ import type { ForumPostResponseAvatarKey } from './forumPostResponseAvatarKey';
 import type { ForumPostResponseTitle } from './forumPostResponseTitle';
 import type { ForumPostResponseContentBlocksItem } from './forumPostResponseContentBlocksItem';
 import type { ForumPostResponseParentId } from './forumPostResponseParentId';
+import type { ForumPostResponseAssigneeUsername } from './forumPostResponseAssigneeUsername';
 import type { ForumPostResponseChipId } from './forumPostResponseChipId';
 import type { ForumPostResponseTargetType } from './forumPostResponseTargetType';
 import type { ForumPostResponseTargetId } from './forumPostResponseTargetId';
@@ -44,6 +45,8 @@ export interface ForumPostResponse {
   parent_id?: ForumPostResponseParentId;
   /** Operator label for root threads */
   labels?: string[];
+  /** Assigned project member username */
+  assignee_username?: ForumPostResponseAssigneeUsername;
   /** Linked chip ID */
   chip_id?: ForumPostResponseChipId;
   /** Linked target type */

@@ -6924,7 +6924,7 @@
           "forum"
         ],
         "summary": "Update a forum post",
-        "description": "Update a forum post. Only the author can edit.",
+        "description": "Update a forum post. Only the author or project owner can edit.",
         "operationId": "updateForumPost",
         "security": [
           {
@@ -17543,6 +17543,19 @@
             "title": "Labels",
             "description": "Operator label for root threads"
           },
+          "assignee_username": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Username",
+            "description": "Assigned project member username"
+          },
           "chip_id": {
             "anyOf": [
               {
@@ -17709,6 +17722,18 @@
             "title": "Labels",
             "description": "Operator label for root threads"
           },
+          "assignee_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Username",
+            "description": "Assigned project member username"
+          },
           "chip_id": {
             "anyOf": [
               {
@@ -17868,6 +17893,19 @@
             ],
             "title": "Labels",
             "description": "Updated operator label for root threads"
+          },
+          "assignee_username": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Username",
+            "description": "Updated assigned project member username"
           },
           "chip_id": {
             "anyOf": [

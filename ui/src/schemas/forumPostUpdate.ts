@@ -9,6 +9,7 @@ import type { ForumPostUpdateCategory } from './forumPostUpdateCategory';
 import type { ForumPostUpdateTitle } from './forumPostUpdateTitle';
 import type { ForumPostUpdateContentBlocksItem } from './forumPostUpdateContentBlocksItem';
 import type { ForumPostUpdateLabels } from './forumPostUpdateLabels';
+import type { ForumPostUpdateAssigneeUsername } from './forumPostUpdateAssigneeUsername';
 import type { ForumPostUpdateChipId } from './forumPostUpdateChipId';
 import type { ForumPostUpdateTargetType } from './forumPostUpdateTargetType';
 import type { ForumPostUpdateTargetId } from './forumPostUpdateTargetId';
@@ -32,6 +33,8 @@ export interface ForumPostUpdate {
   content_blocks?: ForumPostUpdateContentBlocksItem[];
   /** Updated operator label for root threads */
   labels?: ForumPostUpdateLabels;
+  /** Updated assigned project member username */
+  assignee_username?: ForumPostUpdateAssigneeUsername;
   /** Updated linked chip ID */
   chip_id?: ForumPostUpdateChipId;
   /** Updated linked target type */
