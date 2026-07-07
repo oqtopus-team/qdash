@@ -23,6 +23,30 @@ limit?: number;
  */
 category?: string | null;
 /**
+ * Filter by thread label
+ */
+label?: string | null;
+/**
+ * Filter by linked chip ID
+ */
+chip_id?: string | null;
+/**
+ * Filter by linked target type
+ */
+target_type?: string | null;
+/**
+ * Filter by linked target ID
+ */
+target_id?: string | null;
+/**
+ * Filter by linked cool-down ID
+ */
+cooldown_id?: string | null;
+/**
+ * Filter by project-scoped forum thread number
+ */
+number?: number | null;
+/**
  * Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all.
  */
 is_closed?: boolean | null;

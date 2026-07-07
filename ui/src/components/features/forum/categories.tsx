@@ -12,6 +12,58 @@ import {
 
 import type { ForumCategoryResponse } from "@/schemas";
 
+export type ForumLabelDefinition = {
+  id: string;
+  label: string;
+  badgeClass: string;
+  buttonClass: string;
+};
+
+export const FORUM_LABELS: ForumLabelDefinition[] = [
+  {
+    id: "discussion",
+    label: "Discussion",
+    badgeClass: "badge-warning",
+    buttonClass: "btn-warning",
+  },
+  { id: "info", label: "Info", badgeClass: "badge-info", buttonClass: "btn-info" },
+  { id: "resolved", label: "Resolved", badgeClass: "badge-success", buttonClass: "btn-success" },
+];
+
+const LEGACY_LABEL_ALIASES: Record<string, string> = { mtg: "discussion" };
+
+export function getForumLabel(label: string): ForumLabelDefinition {
+  const resolvedId = LEGACY_LABEL_ALIASES[label] ?? label;
+  const definition = FORUM_LABELS.find((item) => item.id === resolvedId);
+  return definition
+    ? { ...definition, id: label }
+    : {
+        id: label,
+        label,
+        badgeClass: "badge-ghost",
+        buttonClass: "btn-ghost",
+      };
+}
+
+export function forumMarkerClass(label: string | undefined): string {
+  if (label === "discussion") return "bg-warning text-warning-content";
+  if (label === "resolved") return "bg-success text-success-content";
+  return "bg-info text-info-content";
+}
+
+export function formatForumPostNumber(number: number | null | undefined): string | null {
+  return typeof number === "number" && Number.isFinite(number) ? `#${number}` : null;
+}
+
+export function formatForumPostTitle(
+  title: string | null | undefined,
+  number: number | null | undefined,
+): string {
+  const displayNumber = formatForumPostNumber(number);
+  const displayTitle = title || "Untitled topic";
+  return displayNumber ? `${displayNumber} · ${displayTitle}` : displayTitle;
+}
+
 export type ForumCategoryDefinition = {
   id: string;
   label: string;
