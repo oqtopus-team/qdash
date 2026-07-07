@@ -107,6 +107,9 @@ class ForumPostCreate(BaseModel):
         max_length=1,
         description="Operator label for root threads",
     )
+    assignee_username: str | None = Field(
+        default=None, max_length=64, description="Assigned project member username"
+    )
     chip_id: str | None = Field(default=None, max_length=128, description="Linked chip ID")
     target_type: str | None = Field(
         default=None,
@@ -139,6 +142,9 @@ class ForumPostUpdate(BaseModel):
         default=None,
         max_length=1,
         description="Updated operator label for root threads",
+    )
+    assignee_username: str | None = Field(
+        default=None, max_length=64, description="Updated assigned project member username"
     )
     chip_id: str | None = Field(default=None, max_length=128, description="Updated linked chip ID")
     target_type: str | None = Field(
@@ -182,6 +188,9 @@ class ForumPostResponse(BaseModel):
     )
     parent_id: str | None = Field(default=None, description="Parent forum post ID")
     labels: list[str] = Field(default_factory=list, description="Operator label for root threads")
+    assignee_username: str | None = Field(
+        default=None, description="Assigned project member username"
+    )
     chip_id: str | None = Field(default=None, description="Linked chip ID")
     target_type: str | None = Field(default=None, description="Linked target type")
     target_id: str | None = Field(default=None, description="Linked target ID")

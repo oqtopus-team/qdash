@@ -8,6 +8,7 @@
 import type { ForumPostCreateTitle } from './forumPostCreateTitle';
 import type { ForumPostCreateContentBlocksItem } from './forumPostCreateContentBlocksItem';
 import type { ForumPostCreateParentId } from './forumPostCreateParentId';
+import type { ForumPostCreateAssigneeUsername } from './forumPostCreateAssigneeUsername';
 import type { ForumPostCreateChipId } from './forumPostCreateChipId';
 import type { ForumPostCreateTargetType } from './forumPostCreateTargetType';
 import type { ForumPostCreateTargetId } from './forumPostCreateTargetId';
@@ -41,6 +42,8 @@ export interface ForumPostCreate {
    * @maxItems 1
    */
   labels?: string[];
+  /** Assigned project member username */
+  assignee_username?: ForumPostCreateAssigneeUsername;
   /** Linked chip ID */
   chip_id?: ForumPostCreateChipId;
   /** Linked target type */

@@ -20,6 +20,7 @@ import {
 
 import { useListChips } from "@/client/chip/chip";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
+import { useListProjectMembers } from "@/client/projects/projects";
 import {
   getGetForumPostQueryKey,
   getGetForumPostRepliesQueryKey,
@@ -245,7 +246,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { isOwner } = useProject();
+  const { isOwner, projectId } = useProject();
   const { uploadImage } = useImageUpload("forum");
   const currentUsername = user?.username;
   const [replyText, setReplyText] = useState("");
@@ -278,6 +279,9 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     { skip: 0, limit: replyLimit },
     { query: { enabled: !!post } },
   );
+  const { data: membersResponse } = useListProjectMembers(projectId ?? "", {
+    query: { enabled: !!projectId, staleTime: 60_000 },
+  });
   const replies = repliesResponse?.data ?? [];
   const { data: categoriesResponse } = useListForumCategories(undefined, {
     query: { staleTime: 60_000 },
@@ -285,6 +289,10 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const categories = useMemo(
     () => categoriesResponse?.data.categories.map(toForumCategoryDefinition) ?? [],
     [categoriesResponse?.data.categories],
+  );
+  const members = useMemo(
+    () => (membersResponse?.data.members ?? []).filter((member) => member.status === "active"),
+    [membersResponse?.data.members],
   );
   const { data: chipsResponse } = useListChips({ query: { staleTime: 60_000 } });
   const chips = chipsResponse?.data.chips ?? [];
@@ -461,6 +469,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     targetType: nextTargetType,
     targetId: nextTargetId,
     cooldownId: nextCooldownId,
+    assigneeUsername: nextAssigneeUsername,
   }: {
     category?: string;
     labels?: string[];
@@ -468,6 +477,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     targetType?: "qubit" | "coupling" | null;
     targetId?: string | null;
     cooldownId?: string | null;
+    assigneeUsername?: string | null;
   }) => {
     if (!post || !canManage) return;
     const response = await updateMutation.mutateAsync({
@@ -478,6 +488,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
         content_blocks: (post.content_blocks ?? []) as Record<string, unknown>[],
         labels: nextLabels ?? post.labels ?? [],
         ...(nextCooldownId !== undefined ? { cooldown_id: nextCooldownId } : {}),
+        ...(nextAssigneeUsername !== undefined ? { assignee_username: nextAssigneeUsername } : {}),
         ...(nextChipId !== undefined || nextTargetType !== undefined || nextTargetId !== undefined
           ? {
               chip_id: nextChipId,
@@ -523,6 +534,10 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const saveCooldownMetadata = (nextCooldownId: string) => {
     setCooldownDraftId(nextCooldownId);
     updateRootMetadata({ cooldownId: nextCooldownId });
+  };
+
+  const saveAssigneeMetadata = (nextAssigneeUsername: string) => {
+    updateRootMetadata({ assigneeUsername: nextAssigneeUsername || null });
   };
 
   const handleDelete = async (targetPostId: string, isRoot: boolean) => {
@@ -887,6 +902,37 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               </div>
             ) : (
               <span className="text-xs text-base-content/45">No cooldown</span>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+              <UserRound className="h-3.5 w-3.5" />
+              Assignee
+            </div>
+            {canManage ? (
+              <select
+                className="select select-bordered select-xs w-full"
+                value={post.assignee_username ?? ""}
+                onChange={(event) => saveAssigneeMetadata(event.target.value)}
+                disabled={updateMutation.isPending}
+              >
+                <option value="">Unassigned</option>
+                {members.map((member) => (
+                  <option key={member.username} value={member.username}>
+                    {member.display_name
+                      ? `${member.display_name} (@${member.username})`
+                      : member.username}
+                  </option>
+                ))}
+              </select>
+            ) : post.assignee_username ? (
+              <span className="inline-flex items-center gap-2 text-sm text-base-content/70">
+                <UserRound className="h-4 w-4 text-base-content/45" />
+                {post.assignee_username}
+              </span>
+            ) : (
+              <span className="text-xs text-base-content/45">Unassigned</span>
             )}
           </section>
 

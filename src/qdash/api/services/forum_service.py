@@ -25,6 +25,7 @@ from qdash.common.config.paths import CALIB_DATA_BASE
 from qdash.common.utils.datetime import now
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.forum import ForumCategoryDocument, ForumCounterDocument, ForumPostDocument
+from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
 
 if TYPE_CHECKING:
@@ -102,6 +103,15 @@ def _normalize_forum_cooldown(cooldown_id: str | None) -> str | None:
     return value[:128] if value else None
 
 
+def _normalize_forum_assignee(assignee_username: str | None) -> str | None:
+    value = (
+        assignee_username.strip()
+        if isinstance(assignee_username, str) and assignee_username.strip()
+        else None
+    )
+    return value[:64] if value else None
+
+
 def _normalize_forum_labels(labels: list[str] | None) -> list[str]:
     """Normalize user-provided labels and keep at most one label per thread."""
     for label in labels or []:
@@ -145,6 +155,19 @@ class ForumService:
     def _is_author(doc: ForumPostDocument, *, user_id: str | None) -> bool:
         """Return whether *user_id* is the author of *doc*."""
         return bool(user_id and doc.user_id == user_id)
+
+    @staticmethod
+    def _ensure_project_assignee(project_id: str, assignee_username: str | None) -> str | None:
+        """Return a normalized assignee username or raise when it is not assignable."""
+        assignee = _normalize_forum_assignee(assignee_username)
+        if assignee is None:
+            return None
+        membership = ProjectMembershipDocument.find_one(
+            {"project_id": project_id, "username": assignee, "status": "active"}
+        ).run()
+        if membership is None:
+            raise HTTPException(status_code=422, detail="Assignee must be an active project member")
+        return assignee
 
     @staticmethod
     def _thread_number_seed(project_id: str) -> int:
@@ -251,6 +274,7 @@ class ForumService:
             content_blocks=list(doc.content_blocks),
             parent_id=doc.parent_id,
             labels=list(getattr(doc, "labels", [])),
+            assignee_username=getattr(doc, "assignee_username", None),
             chip_id=getattr(doc, "chip_id", None),
             target_type=getattr(doc, "target_type", None),
             target_id=getattr(doc, "target_id", None),
@@ -567,6 +591,7 @@ class ForumService:
         target_type: str | None = None,
         target_id: str | None = None,
         cooldown_id: str | None = None,
+        assignee_username: str | None = None,
     ) -> ForumPostResponse:
         """Create a new forum thread or reply."""
         if parent_id is None and not title:
@@ -617,6 +642,9 @@ class ForumService:
             cooldown_id=root_doc.cooldown_id
             if root_doc
             else _normalize_forum_cooldown(cooldown_id),
+            assignee_username=root_doc.assignee_username
+            if root_doc
+            else self._ensure_project_assignee(project_id, assignee_username),
             parent_id=parent_id,
         )
         doc.insert()
@@ -721,6 +749,12 @@ class ForumService:
             username="qdash",
             title=None,
             content=content,
+            labels=list(root_doc.labels),
+            assignee_username=root_doc.assignee_username,
+            chip_id=root_doc.chip_id,
+            target_type=root_doc.target_type,
+            target_id=root_doc.target_id,
+            cooldown_id=root_doc.cooldown_id,
             parent_id=parent_id,
             is_ai_reply=True,
         )
@@ -784,8 +818,10 @@ class ForumService:
         target_type: str | None = None,
         target_id: str | None = None,
         cooldown_id: str | None = None,
+        assignee_username: str | None = None,
         update_cooldown_context: bool = False,
         update_target_context: bool = False,
+        update_assignee_context: bool = False,
         role: ProjectRole | None = None,
     ) -> ForumPostResponse:
         """Update a forum post."""
@@ -821,6 +857,8 @@ class ForumService:
                 doc.target_id = normalized_target_id
             if update_cooldown_context:
                 doc.cooldown_id = _normalize_forum_cooldown(cooldown_id)
+            if update_assignee_context:
+                doc.assignee_username = self._ensure_project_assignee(project_id, assignee_username)
         doc.content = content
         # None means the caller omitted the field: keep existing rich content.
         # An explicit [] clears it (e.g. a plain-Markdown edit).

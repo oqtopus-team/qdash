@@ -67,6 +67,9 @@ class ForumPostDocument(Document):
     labels: list[str] = Field(
         default_factory=list, description="Operator labels for root forum threads"
     )
+    assignee_username: str | None = Field(
+        default=None, description="Assigned project member username"
+    )
     chip_id: str | None = Field(default=None, description="Linked chip identifier")
     target_type: str | None = Field(
         default=None, description="Linked target type: qubit or coupling"
@@ -133,6 +136,15 @@ class ForumPostDocument(Document):
                     ("system_info.created_at", ASCENDING),
                 ],
                 name="project_labels_deleted_created_idx",
+            ),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("assignee_username", ASCENDING),
+                    ("is_deleted", ASCENDING),
+                    ("system_info.created_at", ASCENDING),
+                ],
+                name="project_assignee_deleted_created_idx",
             ),
             IndexModel(
                 [
