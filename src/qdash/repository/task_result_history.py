@@ -111,7 +111,12 @@ class MongoTaskResultHistoryRepository:
         qids: list[str],
         task_names: list[str],
     ) -> list[TaskResultHistoryDocument]:
-        """Find the latest task results for specified qubits and tasks.
+        """Find the latest task result for each (qid, task name) pair.
+
+        Collapses to the latest per group inside MongoDB instead of returning
+        every matching document and deduping in Python, so cost does not grow
+        with history depth. The ``$sort`` key is aligned with the
+        ``(project_id, chip_id, name, qid, end_at desc)`` index.
 
         Parameters
         ----------
@@ -127,20 +132,34 @@ class MongoTaskResultHistoryRepository:
         Returns
         -------
         list[TaskResultHistoryDocument]
-            List of task result documents, sorted by end_at descending
+            One task result document per (qid, name) — the latest by end_at.
 
         """
-        results: list[TaskResultHistoryDocument] = (
-            TaskResultHistoryDocument.find(
-                {
+        pipeline: list[dict[str, Any]] = [
+            {
+                "$match": {
                     "project_id": project_id,
                     "chip_id": chip_id,
                     "qid": {"$in": qids},
                     "name": {"$in": task_names},
                 }
-            )
-            .sort([("end_at", SortDirection.DESCENDING)])
-            .run()
+            },
+            {"$sort": {"name": 1, "qid": 1, "end_at": -1}},
+            {"$group": {"_id": {"qid": "$qid", "name": "$name"}, "doc": {"$first": "$$ROOT"}}},
+            {"$replaceRoot": {"newRoot": "$doc"}},
+            # Coerce legacy null values so historical dirty rows still parse.
+            {
+                "$set": {
+                    "upstream_id": {"$ifNull": ["$upstream_id", ""]},
+                    "message": {"$ifNull": ["$message", ""]},
+                }
+            },
+        ]
+        results: list[TaskResultHistoryDocument] = list(
+            TaskResultHistoryDocument.aggregate(
+                pipeline,
+                projection_model=TaskResultHistoryDocument,
+            ).run()
         )
         return results
 
