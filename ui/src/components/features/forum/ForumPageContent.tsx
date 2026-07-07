@@ -53,6 +53,7 @@ import {
   type ForumCategoryDefinition,
 } from "./categories";
 import { ForumLabelSelector } from "./ForumLabelSelector";
+import { ForumBlockViewer } from "./ForumBlockEditor";
 
 const ForumBlockEditor = dynamic(
   () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
@@ -360,10 +361,16 @@ function ForumThreadPreviewSidebar({
               <section>
                 <h3 className="mb-2 text-sm font-semibold">Root thread</h3>
                 <div className="rounded-lg border border-base-300 bg-base-100 p-4">
-                  <MarkdownContent
-                    content={post.content}
-                    className="text-sm text-base-content/80"
-                  />
+                  {(post.content_blocks ?? []).length > 0 ? (
+                    <ForumBlockViewer
+                      blocks={(post.content_blocks ?? []) as Record<string, unknown>[]}
+                    />
+                  ) : (
+                    <MarkdownContent
+                      content={post.content}
+                      className="text-sm text-base-content/80"
+                    />
+                  )}
                 </div>
               </section>
 
@@ -386,11 +393,17 @@ function ForumThreadPreviewSidebar({
                           <span>{reply.username}</span>
                           <span>{formatRelativeTime(reply.created_at)}</span>
                         </div>
-                        <MarkdownContent
-                          content={reply.content}
-                          preview
-                          className="line-clamp-3 text-sm text-base-content/70"
-                        />
+                        {(reply.content_blocks ?? []).length > 0 ? (
+                          <ForumBlockViewer
+                            blocks={(reply.content_blocks ?? []) as Record<string, unknown>[]}
+                          />
+                        ) : (
+                          <MarkdownContent
+                            content={reply.content}
+                            preview
+                            className="line-clamp-3 text-sm text-base-content/70"
+                          />
+                        )}
                       </div>
                     ))}
                   </div>

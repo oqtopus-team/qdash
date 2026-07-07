@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -49,6 +49,7 @@ import {
   toForumCategoryDefinition,
 } from "./categories";
 import { ForumLabelPicker } from "./ForumLabelSelector";
+import { ForumBlockViewer, type ForumBlockSnapshotGetter } from "./ForumBlockEditor";
 
 const ForumBlockEditor = dynamic(
   () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
@@ -140,6 +141,7 @@ function PostBody({
   onSave,
   saving,
   onImageUpload,
+  editorSnapshotRef,
 }: {
   post: ForumPostResponse;
   currentUsername?: string;
@@ -159,6 +161,7 @@ function PostBody({
   onSave: () => void;
   saving: boolean;
   onImageUpload: (file: File) => Promise<string>;
+  editorSnapshotRef?: MutableRefObject<ForumBlockSnapshotGetter | null>;
 }) {
   const canEdit = canEditOverride ?? currentUsername === post.username;
   const isAi = post.is_ai_reply || post.username === "qdash";
@@ -221,6 +224,7 @@ function PostBody({
             legacyMarkdown={editLegacyMarkdown}
             onChange={onEditChange}
             onImageUpload={onImageUpload}
+            snapshotRef={editorSnapshotRef}
           />
           <div className="flex justify-end gap-2">
             <button className="btn btn-ghost btn-sm" onClick={onCancel}>
@@ -236,7 +240,14 @@ function PostBody({
           </div>
         </div>
       ) : (
-        <MarkdownContent content={post.content} className="text-sm text-base-content/80" />
+        (() => {
+          const displayBlocks = (post.content_blocks ?? []) as Record<string, unknown>[];
+          return displayBlocks.length > 0 ? (
+            <ForumBlockViewer blocks={displayBlocks} />
+          ) : (
+            <MarkdownContent content={post.content} className="text-sm text-base-content/80" />
+          );
+        })()
       )}
     </div>
   );
@@ -257,6 +268,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const [editRootTitle, setEditRootTitle] = useState("");
   const [editRootContent, setEditRootContent] = useState("");
   const [editRootBlocks, setEditRootBlocks] = useState<Record<string, unknown>[]>([]);
+  const editRootSnapshotRef = useRef<ForumBlockSnapshotGetter | null>(null);
   const [targetDraftChipId, setTargetDraftChipId] = useState("");
   const [targetDraftType, setTargetDraftType] = useState<"qubit" | "coupling">("qubit");
   const [targetDraftId, setTargetDraftId] = useState("");
@@ -264,6 +276,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
   const [editReplyContent, setEditReplyContent] = useState("");
   const [editReplyBlocks, setEditReplyBlocks] = useState<Record<string, unknown>[]>([]);
+  const editReplySnapshotRef = useRef<ForumBlockSnapshotGetter | null>(null);
+  const replyComposerSnapshotRef = useRef<ForumBlockSnapshotGetter | null>(null);
   const [replyLimit, setReplyLimit] = useState(REPLY_PAGE_SIZE);
 
   const { data: postResponse, isLoading: postLoading } = useGetForumPost(postId, {
@@ -326,6 +340,26 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
   };
 
+  const syncRootPostCache = (nextPost: ForumPostResponse) => {
+    queryClient.setQueryData(getGetForumPostQueryKey(nextPost.id), (current: unknown) =>
+      current && typeof current === "object" ? { ...current, data: nextPost } : current,
+    );
+  };
+
+  const syncReplyCache = (nextReply: ForumPostResponse) => {
+    queryClient.setQueriesData(
+      { queryKey: getGetForumPostRepliesQueryKey(postId), exact: false },
+      (current: unknown) => {
+        if (!Array.isArray(current)) return current;
+        return current.map((reply) =>
+          reply && typeof reply === "object" && "id" in reply && reply.id === nextReply.id
+            ? nextReply
+            : reply,
+        );
+      },
+    );
+  };
+
   const handleStartEditRoot = () => {
     if (!post) return;
     setEditRootTitle(post.title ?? "");
@@ -335,30 +369,40 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   };
 
   const handleSaveRoot = async () => {
-    if (!post || !editRootContent.trim()) return;
-    await updateMutation.mutateAsync({
+    if (!post) return;
+    const snapshot = await editRootSnapshotRef.current?.();
+    const nextContent = (snapshot?.markdown ?? editRootContent).trim();
+    const nextBlocks = snapshot?.blocks ?? editRootBlocks;
+    if (!nextContent) return;
+    const response = await updateMutation.mutateAsync({
       postId: post.id,
       data: {
         category: post.category,
         title: editRootTitle.trim() || null,
-        content: editRootContent.trim(),
-        content_blocks: editRootBlocks,
+        content: nextContent,
+        content_blocks: nextBlocks,
         labels: post.labels ?? [],
       },
     });
+    syncRootPostCache(response.data);
+    setEditRootContent(nextContent);
+    setEditRootBlocks(nextBlocks);
     setEditingRoot(false);
     invalidateThread();
   };
 
   const handleAddReply = async () => {
-    if (!post || !replyText.trim()) return;
-    const trimmed = replyText.trim();
+    if (!post) return;
+    const snapshot = await replyComposerSnapshotRef.current?.();
+    const trimmed = (snapshot?.markdown ?? replyText).trim();
+    const nextBlocks = snapshot?.blocks ?? replyBlocks;
+    if (!trimmed) return;
     await createMutation.mutateAsync({
       data: {
         category: post.category,
         title: null,
         content: trimmed,
-        content_blocks: replyBlocks,
+        content_blocks: nextBlocks,
         parent_id: post.id,
       },
     });
@@ -378,15 +422,22 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   };
 
   const handleSaveReply = async () => {
-    if (!editingReplyId || !editReplyContent.trim()) return;
-    await updateMutation.mutateAsync({
+    if (!editingReplyId) return;
+    const snapshot = await editReplySnapshotRef.current?.();
+    const nextContent = (snapshot?.markdown ?? editReplyContent).trim();
+    const nextBlocks = snapshot?.blocks ?? editReplyBlocks;
+    if (!nextContent) return;
+    const response = await updateMutation.mutateAsync({
       postId: editingReplyId,
       data: {
         title: null,
-        content: editReplyContent.trim(),
-        content_blocks: editReplyBlocks,
+        content: nextContent,
+        content_blocks: nextBlocks,
       },
     });
+    syncReplyCache(response.data);
+    setEditReplyContent(nextContent);
+    setEditReplyBlocks(nextBlocks);
     setEditingReplyId(null);
     invalidateThread();
   };
@@ -535,6 +586,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             onSave={handleSaveRoot}
             saving={updateMutation.isPending}
             onImageUpload={uploadImage}
+            editorSnapshotRef={editRootSnapshotRef}
           />
 
           <div className="divider text-xs text-base-content/40">
@@ -568,6 +620,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                     onSave={handleSaveReply}
                     saving={updateMutation.isPending}
                     onImageUpload={uploadImage}
+                    editorSnapshotRef={editReplySnapshotRef}
                   />
                 ))}
                 {replies.length >= replyLimit && (
@@ -611,6 +664,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                     setReplyText(markdown);
                   }}
                   onImageUpload={uploadImage}
+                  snapshotRef={replyComposerSnapshotRef}
                 />
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-base-content/50">
