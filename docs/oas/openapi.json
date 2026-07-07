@@ -6618,6 +6618,122 @@
             "description": "Filter by category key"
           },
           {
+            "name": "label",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32,
+                  "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by thread label",
+              "title": "Label"
+            },
+            "description": "Filter by thread label"
+          },
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by linked chip ID",
+              "title": "Chip Id"
+            },
+            "description": "Filter by linked chip ID"
+          },
+          {
+            "name": "target_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(qubit|coupling)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by linked target type",
+              "title": "Target Type"
+            },
+            "description": "Filter by linked target type"
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by linked target ID",
+              "title": "Target Id"
+            },
+            "description": "Filter by linked target ID"
+          },
+          {
+            "name": "cooldown_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by linked cool-down ID",
+              "title": "Cooldown Id"
+            },
+            "description": "Filter by linked cool-down ID"
+          },
+          {
+            "name": "number",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by project-scoped forum thread number",
+              "title": "Number"
+            },
+            "description": "Filter by project-scoped forum thread number"
+          },
+          {
             "name": "is_closed",
             "in": "query",
             "required": false,
@@ -17417,6 +17533,67 @@
             ],
             "title": "Parent Id",
             "description": "Parent forum post ID for replies. None for root threads."
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 1,
+            "title": "Labels",
+            "description": "Operator label for root threads"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id",
+            "description": "Linked chip ID"
+          },
+          "target_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(qubit|coupling)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Type",
+            "description": "Linked target type"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id",
+            "description": "Linked target ID"
+          },
+          "cooldown_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Id",
+            "description": "Linked cool-down ID"
           }
         },
         "type": "object",
@@ -17438,6 +17615,19 @@
             "type": "string",
             "title": "Project Id",
             "description": "Owning project identifier"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number",
+            "description": "Project-scoped forum thread number. Replies share the root thread number."
           },
           "category": {
             "type": "string",
@@ -17510,6 +17700,62 @@
             ],
             "title": "Parent Id",
             "description": "Parent forum post ID"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "Operator label for root threads"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id",
+            "description": "Linked chip ID"
+          },
+          "target_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Type",
+            "description": "Linked target type"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id",
+            "description": "Linked target ID"
+          },
+          "cooldown_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Id",
+            "description": "Linked cool-down ID"
           },
           "reply_count": {
             "type": "integer",
@@ -17606,6 +17852,74 @@
             "type": "array",
             "title": "Content Blocks",
             "description": "BlockNote document JSON. Source of truth for rich content; content is derived."
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labels",
+            "description": "Updated operator label for root threads"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id",
+            "description": "Updated linked chip ID"
+          },
+          "target_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(qubit|coupling)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Type",
+            "description": "Updated linked target type"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id",
+            "description": "Updated linked target ID"
+          },
+          "cooldown_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Id",
+            "description": "Updated linked cool-down ID"
           }
         },
         "type": "object",

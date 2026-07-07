@@ -9,6 +9,7 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.cooldown import CooldownDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.metric_note import MetricNoteDocument
+from qdash.dbmodel.migration import migrate_metric_notes_to_target_notes
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -558,3 +559,81 @@ def test_coupling_metric_note_creates_missing_topology_target(test_client, init_
     assert summary.json()["couplings"][0]["metric_notes"]["zx90_gate_fidelity"]["content"] == (
         "No coupling metric data yet."
     )
+
+
+def test_migrate_metric_notes_to_target_notes_dry_run_and_execute(test_client, init_db):
+    _create_project_user()
+    _create_chip(cooldown_id="cd-1")
+    QubitDocument(
+        project_id="note_project",
+        username="note_user",
+        chip_id="chip-1",
+        qid="21",
+        data={},
+        note=NoteModel(content="Pinned summary", updated_by="note_user"),
+        system_info=SystemInfoModel(),
+    ).insert()
+    MetricNoteDocument(
+        project_id="note_project",
+        chip_id="chip-1",
+        target_type="qubit",
+        target_id="21",
+        metric_key="t1",
+        note=NoteModel(
+            content="T1 has a long-tail outlier.",
+            updated_by="alice",
+            updated_at=datetime(2026, 1, 3, tzinfo=UTC),
+        ),
+        scope_type="cooldown",
+        scope_key="cooldown:cd-1",
+        cooldown_id="cd-1",
+        scope_started_at=datetime(2026, 1, 1, tzinfo=UTC),
+        scope_ended_at=datetime(2026, 1, 2, tzinfo=UTC),
+        scope_source="current_cooldown",
+        system_info=SystemInfoModel(),
+    ).insert()
+
+    dry_run_stats = migrate_metric_notes_to_target_notes(dry_run=True)
+    assert dry_run_stats["metric_notes_found"] == 1
+    assert dry_run_stats["targets_updated"] == 1
+    doc = QubitDocument.find_one(QubitDocument.qid == "21").run()
+    assert doc is not None
+    assert doc.note.content == "Pinned summary"
+
+    execute_stats = migrate_metric_notes_to_target_notes(dry_run=False)
+    assert execute_stats["targets_updated"] == 1
+    doc = QubitDocument.find_one(QubitDocument.qid == "21").run()
+    assert doc is not None
+    assert "Pinned summary" in doc.note.content
+    assert "## Legacy metric notes" in doc.note.content
+    assert "### t1" in doc.note.content
+    assert "T1 has a long-tail outlier." in doc.note.content
+    assert doc.note.updated_by == "alice"
+
+    second_stats = migrate_metric_notes_to_target_notes(dry_run=False)
+    assert second_stats["targets_updated"] == 0
+    assert second_stats["targets_skipped_already_migrated"] == 1
+
+
+def test_migrate_metric_notes_to_target_notes_reports_missing_targets(test_client, init_db):
+    _create_project_user()
+    MetricNoteDocument(
+        project_id="note_project",
+        chip_id="chip-1",
+        target_type="coupling",
+        target_id="0-1",
+        metric_key="zx90_gate_fidelity",
+        note=NoteModel(content="Needs follow-up", updated_by="note_user"),
+        scope_type="global",
+        scope_key="global",
+        cooldown_id=None,
+        scope_started_at=None,
+        scope_ended_at=None,
+        scope_source="legacy_global",
+        system_info=SystemInfoModel(),
+    ).insert()
+
+    stats = migrate_metric_notes_to_target_notes(dry_run=False)
+    assert stats["targets_missing"] == 1
+    assert stats["targets_updated"] == 0
+    assert stats["targets"][0]["action"] == "missing_target"

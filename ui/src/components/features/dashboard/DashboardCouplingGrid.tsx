@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 
-import { StickyNote } from "lucide-react";
+import { MessageSquare, StickyNote } from "lucide-react";
 
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import { forumMarkerClass } from "../forum/categories";
 import { getQubitGridPosition } from "@/lib/utils/grid-position";
 
-import type { NoteEntryWithMetric } from "./MetricNotePanel";
+import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
 import { DashboardNoteTooltip } from "./DashboardNoteTooltip";
 
 interface MetricValue {
@@ -22,10 +23,16 @@ interface DashboardCouplingGridProps {
   colors: string[];
   /** Maximum cell side length in px. Cells shrink to fit narrower containers. */
   maxCellSize?: number;
+  /** Render the reverse direction of each topology coupling. */
+  reverseDirection?: boolean;
   notedTargets?: Set<string>;
   targetNotedTargets?: Set<string>;
+  /** Linked forum discussion label keyed by coupling ID. */
+  forumLinkedTargets?: Record<string, string>;
   crossMetricNotedTargets?: Set<string>;
   notesByTarget?: Record<string, NoteEntryWithMetric[]>;
+  /** Target-level notes keyed by qubit/coupling ID. */
+  targetNotesByTarget?: Record<string, TargetNoteEntry>;
   metricKey?: string;
   onCouplingClick?: (couplingId: string) => void;
 }
@@ -71,10 +78,13 @@ export function DashboardCouplingGrid({
   topologyId,
   colors,
   maxCellSize = 60,
+  reverseDirection = false,
   notedTargets,
   targetNotedTargets,
+  forumLinkedTargets,
   crossMetricNotedTargets,
   notesByTarget,
+  targetNotesByTarget,
   metricKey,
   onCouplingClick,
 }: DashboardCouplingGridProps) {
@@ -135,13 +145,17 @@ export function DashboardCouplingGrid({
   }, [metricData]);
 
   const couplingList: [number, number][] = useMemo(() => {
-    if (topologyCouplings && topologyCouplings.length > 0) return topologyCouplings;
-    if (!metricData) return [];
-    return Object.keys(metricData).map((key) => {
-      const [a, b] = key.split("-").map(Number);
-      return [a, b] as [number, number];
-    });
-  }, [topologyCouplings, metricData]);
+    const base =
+      topologyCouplings && topologyCouplings.length > 0
+        ? topologyCouplings
+        : metricData
+          ? Object.keys(metricData).map((key) => {
+              const [a, b] = key.split("-").map(Number);
+              return [a, b] as [number, number];
+            })
+          : [];
+    return reverseDirection ? base.map(([a, b]) => [b, a] as [number, number]) : base;
+  }, [topologyCouplings, metricData, reverseDirection]);
 
   // Fixed cell size (capped). Using pixel sizing here is simpler than
   // responsive 1fr columns because couplings need absolute positioning between
@@ -216,6 +230,8 @@ export function DashboardCouplingGrid({
           const arrowAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
           const hasNote = notedTargets?.has(couplingId) ?? false;
           const hasTargetNote = targetNotedTargets?.has(couplingId) ?? false;
+          const forumLabel = forumLinkedTargets?.[couplingId];
+          const hasForumDiscussion = !!forumLabel;
           const hasCrossMetricNote =
             !hasNote && !hasTargetNote && (crossMetricNotedTargets?.has(couplingId) ?? false);
           const Tag = onCouplingClick ? "button" : "div";
@@ -225,13 +241,14 @@ export function DashboardCouplingGrid({
               ? `Q${qid1}→Q${qid2}: ${value.toFixed(4)} ${unit}`
               : `Q${qid1}→Q${qid2}: No data`) +
             (hasNote
-              ? " · has metric note"
+              ? " · has legacy metric note"
               : hasTargetNote
-                ? " · has target note"
+                ? " · has pinned summary"
                 : hasCrossMetricNote
-                  ? " · note on other metric"
+                  ? " · legacy note on another metric"
                   : "") +
-            (onCouplingClick ? " (click to edit metric note)" : "");
+            (hasForumDiscussion ? " · has linked forum discussion" : "") +
+            (onCouplingClick ? " (click to edit pinned summary)" : "");
           return (
             <Tag
               key={couplingId}
@@ -292,7 +309,7 @@ export function DashboardCouplingGrid({
               {(hasNote || hasTargetNote) && (
                 <span
                   className="absolute -top-1 -right-1 rounded-full bg-warning text-warning-content p-0.5 shadow"
-                  title={hasNote ? "Has metric note" : "Has target note"}
+                  title={hasNote ? "Has legacy metric note" : "Has pinned summary"}
                 >
                   <StickyNote className="h-2.5 w-2.5" />
                 </span>
@@ -300,9 +317,17 @@ export function DashboardCouplingGrid({
               {hasCrossMetricNote && (
                 <span
                   className="absolute -top-1 -right-1 rounded-full bg-base-100/90 text-base-content/60 p-0.5 shadow border border-base-300"
-                  title="Note exists on another metric"
+                  title="Legacy note exists on another metric"
                 >
                   <StickyNote className="h-2.5 w-2.5" />
+                </span>
+              )}
+              {hasForumDiscussion && (
+                <span
+                  className={`absolute -bottom-1 -right-1 rounded-full p-0.5 shadow ${forumMarkerClass(forumLabel)}`}
+                  title="Linked forum discussion"
+                >
+                  <MessageSquare className="h-2.5 w-2.5" />
                 </span>
               )}
             </Tag>
@@ -312,6 +337,7 @@ export function DashboardCouplingGrid({
         {hover &&
           (() => {
             const allNotes = notesByTarget?.[hover.key] ?? [];
+            const targetNote = targetNotesByTarget?.[hover.key];
             const current = allNotes.find((n) => n.metricKey === metricKey);
             const others = allNotes.filter((n) => n.metricKey !== metricKey);
             const v = metricData?.[hover.key]?.value ?? null;
@@ -322,6 +348,7 @@ export function DashboardCouplingGrid({
               <DashboardNoteTooltip
                 position={{ x: hover.x, y: hover.y }}
                 header={header}
+                targetNote={targetNote}
                 current={current}
                 others={others}
               />

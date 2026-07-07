@@ -21,6 +21,12 @@ Run migrations with:
 
     python -m qdash.dbmodel.migration backfill-user-id          # dry-run
     python -m qdash.dbmodel.migration backfill-user-id --execute  # execute
+
+    python -m qdash.dbmodel.migration metric-notes-to-target-notes          # dry-run
+    python -m qdash.dbmodel.migration metric-notes-to-target-notes --execute  # execute
+
+    python -m qdash.dbmodel.migration backfill-forum-thread-numbers          # dry-run
+    python -m qdash.dbmodel.migration backfill-forum-thread-numbers --execute  # execute
 """
 
 import logging
@@ -71,6 +77,262 @@ USER_ID_FIELD_MIGRATIONS = {
 
 class MigrationError(Exception):
     """Raised when migration encounters an unrecoverable error."""
+
+
+MIGRATED_METRIC_NOTES_MARKER = "<!-- qdash:migrated-metric-notes -->"
+
+
+def _format_migrated_metric_note_section(notes: list[Any]) -> str:
+    """Render metric notes as a compact target summary appendix."""
+    lines = [MIGRATED_METRIC_NOTES_MARKER, "## Legacy metric notes"]
+    for note in notes:
+        updated_at = note.note.updated_at.isoformat() if note.note.updated_at else "unknown time"
+        updated_by = note.note.updated_by or "unknown user"
+        scope = note.scope_key or note.scope_type or "unknown scope"
+        content = (note.note.content or "").strip()
+        if not content:
+            continue
+        lines.extend(
+            [
+                "",
+                f"### {note.metric_key}",
+                f"- Scope: `{scope}`",
+                f"- Last edited: {updated_by} at {updated_at}",
+                "",
+                content,
+            ]
+        )
+    return "\n".join(lines).strip()
+
+
+def _merge_migrated_metric_notes(existing_content: str, section: str) -> tuple[str, bool]:
+    """Append migrated metric notes unless this target was already migrated."""
+    existing_content = (existing_content or "").strip()
+    if not section or MIGRATED_METRIC_NOTES_MARKER in existing_content:
+        return existing_content, False
+    if not existing_content:
+        return section, True
+    return f"{existing_content}\n\n---\n\n{section}", True
+
+
+def migrate_metric_notes_to_target_notes(dry_run: bool = True) -> dict[str, Any]:
+    """Copy existing per-metric dashboard notes into target-level pinned summaries.
+
+    The source ``MetricNoteDocument`` rows are preserved. Each target receives one
+    appended "Migrated metric notes" section in ``QubitDocument.note`` or
+    ``CouplingDocument.note``. The marker keeps the migration idempotent.
+    """
+    from qdash.common.utils.datetime import now
+    from qdash.datamodel.note import NoteModel
+    from qdash.dbmodel.coupling import CouplingDocument
+    from qdash.dbmodel.metric_note import MetricNoteDocument
+    from qdash.dbmodel.qubit import QubitDocument
+
+    metric_notes = [
+        note
+        for note in MetricNoteDocument.find_all().run()
+        if getattr(note, "note", None) is not None and (note.note.content or "").strip()
+    ]
+    grouped: dict[tuple[str, str, str, str], list[Any]] = {}
+    for note in metric_notes:
+        key = (note.project_id, note.chip_id, note.target_type, note.target_id)
+        grouped.setdefault(key, []).append(note)
+
+    stats: dict[str, Any] = {
+        "metric_notes_found": len(metric_notes),
+        "targets_found": len(grouped),
+        "targets_updated": 0,
+        "targets_skipped_already_migrated": 0,
+        "targets_missing": 0,
+        "targets": [],
+    }
+
+    for (project_id, chip_id, target_type, target_id), notes in sorted(grouped.items()):
+        notes.sort(
+            key=lambda item: (
+                item.metric_key,
+                item.scope_key,
+                item.note.updated_at.isoformat() if item.note.updated_at else "",
+            )
+        )
+        model = QubitDocument if target_type == "qubit" else CouplingDocument
+        target_doc = model.find_one(
+            model.project_id == project_id,
+            model.chip_id == chip_id,
+            model.qid == target_id,
+        ).run()
+        target_info = {
+            "project_id": project_id,
+            "chip_id": chip_id,
+            "target_type": target_type,
+            "target_id": target_id,
+            "metric_note_count": len(notes),
+            "action": "dry_run" if dry_run else "updated",
+        }
+        if target_doc is None:
+            stats["targets_missing"] += 1
+            target_info["action"] = "missing_target"
+            stats["targets"].append(target_info)
+            continue
+
+        existing_note = getattr(target_doc, "note", NoteModel()) or NoteModel()
+        section = _format_migrated_metric_note_section(notes)
+        merged_content, changed = _merge_migrated_metric_notes(existing_note.content, section)
+        if not changed:
+            stats["targets_skipped_already_migrated"] += 1
+            target_info["action"] = "already_migrated"
+            stats["targets"].append(target_info)
+            continue
+
+        if not dry_run:
+            last_note = max(
+                notes,
+                key=lambda item: item.note.updated_at or item.system_info.updated_at,
+            )
+            target_doc.note = NoteModel(
+                content=merged_content,
+                updated_by=last_note.note.updated_by or "migration",
+                updated_at=last_note.note.updated_at or now(),
+            )
+            target_doc.system_info.update_time()
+            target_doc.save()
+        stats["targets_updated"] += 1
+        stats["targets"].append(target_info)
+
+    return stats
+
+
+def migrate_backfill_forum_thread_numbers(dry_run: bool = True) -> dict[str, Any]:
+    """Backfill project-scoped forum thread numbers for existing posts.
+
+    Root threads receive stable ``#N`` numbers within each project. Replies share
+    their root thread number so API responses can display a single discussion ID.
+    Existing numbers are preserved and deleted root threads are included to avoid
+    future number reuse.
+    """
+    from qdash.dbmodel.forum import ForumCounterDocument, ForumPostDocument
+
+    collection = ForumPostDocument.get_motor_collection()
+    counter_collection = ForumCounterDocument.get_motor_collection()
+    project_ids = sorted(
+        project_id
+        for project_id in collection.distinct("project_id", {"parent_id": None})
+        if isinstance(project_id, str) and project_id
+    )
+    stats: dict[str, Any] = {
+        "projects_found": len(project_ids),
+        "root_threads_missing_number": 0,
+        "root_threads_updated": 0,
+        "replies_updated": 0,
+        "orphan_replies_found": 0,
+        "duplicate_root_numbers": {},
+        "counters_updated": 0,
+        "projects": [],
+    }
+
+    for project_id in project_ids:
+        roots = list(
+            collection.find({"project_id": project_id, "parent_id": None}).sort(
+                [("system_info.created_at", 1), ("_id", 1)]
+            )
+        )
+        root_ids = {str(root["_id"]) for root in roots}
+        existing_numbers: dict[int, list[str]] = {}
+        for root in roots:
+            current_number = root.get("number")
+            if isinstance(current_number, int) and current_number > 0:
+                existing_numbers.setdefault(current_number, []).append(str(root["_id"]))
+
+        duplicate_numbers = {
+            str(number): ids for number, ids in existing_numbers.items() if len(ids) > 1
+        }
+        if duplicate_numbers:
+            stats["duplicate_root_numbers"][project_id] = duplicate_numbers
+            if not dry_run:
+                raise MigrationError(
+                    "Duplicate forum root thread numbers already exist for "
+                    f"project {project_id}: {duplicate_numbers}"
+                )
+
+        used_numbers = set(existing_numbers)
+        next_number = 1
+        assignments: list[tuple[Any, int]] = []
+        root_number_by_id: dict[str, int] = {}
+        for root in roots:
+            current_number = root.get("number")
+            if isinstance(current_number, int) and current_number > 0:
+                root_number = current_number
+            else:
+                while next_number in used_numbers:
+                    next_number += 1
+                root_number = next_number
+                used_numbers.add(root_number)
+                assignments.append((root["_id"], root_number))
+                next_number += 1
+            root_number_by_id[str(root["_id"])] = root_number
+
+        reply_updates = 0
+        for root_id, root_number in root_number_by_id.items():
+            reply_filter = {
+                "project_id": project_id,
+                "parent_id": root_id,
+                "$or": [
+                    {"number": {"$exists": False}},
+                    {"number": None},
+                    {"number": {"$ne": root_number}},
+                ],
+            }
+            if dry_run:
+                reply_updates += collection.count_documents(reply_filter)
+            else:
+                result = collection.update_many(reply_filter, {"$set": {"number": root_number}})
+                reply_updates += result.modified_count
+
+        orphan_reply_filter = {
+            "project_id": project_id,
+            "parent_id": {"$nin": [None, *root_ids]},
+            "is_deleted": False,
+        }
+        orphan_replies = collection.count_documents(orphan_reply_filter)
+        stats["orphan_replies_found"] += orphan_replies
+
+        max_number = max(used_numbers) if used_numbers else 0
+        current_counter = counter_collection.find_one({"project_id": project_id})
+        current_counter_value = (
+            int(current_counter.get("value") or 0) if isinstance(current_counter, dict) else 0
+        )
+        counter_value = max(max_number, current_counter_value)
+        project_info = {
+            "project_id": project_id,
+            "root_threads": len(roots),
+            "root_threads_missing_number": len(assignments),
+            "replies_to_update": reply_updates,
+            "orphan_replies": orphan_replies,
+            "duplicate_root_numbers": duplicate_numbers,
+            "max_number": max_number,
+            "counter_value": counter_value,
+            "action": "blocked_duplicate_numbers"
+            if duplicate_numbers
+            else ("dry_run" if dry_run else "updated"),
+        }
+        stats["root_threads_missing_number"] += len(assignments)
+        stats["replies_updated"] += reply_updates
+
+        if not dry_run:
+            for root_id, root_number in assignments:
+                result = collection.update_one({"_id": root_id}, {"$set": {"number": root_number}})
+                stats["root_threads_updated"] += result.modified_count
+            counter_collection.update_one(
+                {"project_id": project_id},
+                {"$max": {"value": counter_value}, "$setOnInsert": {"project_id": project_id}},
+                upsert=True,
+            )
+            stats["counters_updated"] += 1
+
+        stats["projects"].append(project_info)
+
+    logger.info("Forum thread number migration: %s", stats)
+    return stats
 
 
 def migrate_backfill_user_id(dry_run: bool = True) -> dict[str, Any]:
@@ -855,6 +1117,26 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    metric_notes_parser = subparsers.add_parser(
+        "metric-notes-to-target-notes",
+        help="Append existing per-metric dashboard notes to target-level pinned summaries",
+    )
+    metric_notes_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
+    forum_numbers_parser = subparsers.add_parser(
+        "backfill-forum-thread-numbers",
+        help="Backfill project-scoped #numbers for existing forum threads",
+    )
+    forum_numbers_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "fix-invalid-fidelity":
@@ -899,6 +1181,18 @@ if __name__ == "__main__":
 
         initialize()
         stats = migrate_backfill_user_id(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "metric-notes-to-target-notes":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_metric_notes_to_target_notes(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "backfill-forum-thread-numbers":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_backfill_forum_thread_numbers(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
     else:
         parser.print_help()
