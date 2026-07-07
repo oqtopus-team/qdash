@@ -6,6 +6,7 @@ import { StickyNote } from "lucide-react";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
+import { useListForumPosts } from "@/client/forum/forum";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { useGetChipNotesSummary } from "@/client/note/note";
 import { useListProjectMembers } from "@/client/projects/projects";
@@ -53,6 +54,14 @@ interface MetricValueLike {
 type MetricMap = { [key: string]: MetricValueLike };
 
 const FALLBACK_COLORS = ["#440154", "#31688e", "#35b779", "#fde724"];
+
+const FORUM_LABEL_PRIORITY = ["discussion", "mtg", "info", "resolved"] as const;
+
+function representativeForumLabel(labels: string[] | undefined): string {
+  const values = new Set(labels ?? []);
+  const label = FORUM_LABEL_PRIORITY.find((item) => values.has(item)) ?? "info";
+  return label === "mtg" ? "discussion" : label;
+}
 
 function coverageOf(
   metricData: MetricMap | null,
@@ -240,6 +249,34 @@ export function DashboardPageContent() {
     query: { enabled: !!selectedChip, staleTime: 30_000 },
   });
   const summary = summaryData?.data;
+  const { data: forumPostsResponse } = useListForumPosts(
+    {
+      chip_id: selectedChip || undefined,
+      is_closed: null,
+      limit: 200,
+    },
+    { query: { enabled: !!selectedChip, staleTime: 30_000 } },
+  );
+
+  const forumLinkedQids = useMemo(() => {
+    const targets: Record<string, string> = {};
+    (forumPostsResponse?.data.posts ?? []).forEach((post) => {
+      if (post.target_type === "qubit" && post.target_id) {
+        targets[post.target_id] = representativeForumLabel(post.labels);
+      }
+    });
+    return targets;
+  }, [forumPostsResponse?.data.posts]);
+
+  const forumLinkedCouplings = useMemo(() => {
+    const targets: Record<string, string> = {};
+    (forumPostsResponse?.data.posts ?? []).forEach((post) => {
+      if (post.target_type === "coupling" && post.target_id) {
+        targets[post.target_id] = representativeForumLabel(post.labels);
+      }
+    });
+    return targets;
+  }, [forumPostsResponse?.data.posts]);
 
   const taskNotes = useMemo(
     () =>
@@ -335,6 +372,23 @@ export function DashboardPageContent() {
     [targetNotesByTarget],
   );
 
+  const noteCouplingTopologyData = useMemo<MetricMap | null>(() => {
+    const couplingIds = new Set<string>();
+    Object.values(couplingMetricData).forEach((metricMap) => {
+      Object.keys(metricMap ?? {}).forEach((targetId) => couplingIds.add(targetId));
+    });
+    Object.keys(notesByTarget).forEach((targetId) => {
+      if (targetId.includes("-")) couplingIds.add(targetId);
+    });
+    Object.keys(targetNotesByTarget).forEach((targetId) => {
+      if (targetId.includes("-")) couplingIds.add(targetId);
+    });
+    if (couplingIds.size === 0) return null;
+    return Object.fromEntries(
+      [...couplingIds].map((targetId) => [targetId, { value: null }]),
+    ) as MetricMap;
+  }, [couplingMetricData, notesByTarget, targetNotesByTarget]);
+
   const [editingNote, setEditingNote] = useState<{
     targetId: string;
     metricKey: string;
@@ -343,17 +397,21 @@ export function DashboardPageContent() {
   } | null>(null);
   const [editingTargetNote, setEditingTargetNote] = useState<string | null>(null);
   const [showChipNote, setShowChipNote] = useState(false);
+  const [couplingDirection, setCouplingDirection] = useState<"forward" | "reverse">("forward");
+  const isReverseCouplingDirection = couplingDirection === "reverse";
 
-  const editingExisting =
+  const editingLegacyMetricNote =
     editingNote && notesByMetric[editingNote.metricKey]?.[editingNote.targetId]
       ? notesByMetric[editingNote.metricKey][editingNote.targetId]
       : undefined;
 
-  const editingOtherNotes = editingNote
+  const editingLegacyMetricNotes = editingNote
     ? (notesByTarget[editingNote.targetId] ?? []).filter(
         (n) => n.metricKey !== editingNote.metricKey,
       )
     : [];
+
+  const editingTargetExisting = editingNote ? targetNotesByTarget[editingNote.targetId] : undefined;
 
   // Summary table rows
   const summaryRows = useMemo(() => {
@@ -389,7 +447,7 @@ export function DashboardPageContent() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <PageHeader
             title="Chip Dashboard"
-            description="One-page summary of every metric on the selected chip. Click any qubit on a metric to leave a note."
+            description="One-page summary of every metric on the selected chip. Click any qubit or coupling to update its pinned summary or start a forum topic."
             className="mb-0"
           />
         </div>
@@ -505,7 +563,7 @@ export function DashboardPageContent() {
               variant="default"
               padding="md"
               title="Notes"
-              description="All notes left on this chip, grouped by qubit / coupling."
+              description="Pinned summaries are the dashboard index. Use forum topics for separate notes and multi-person discussion."
             >
               <DashboardNotesSummary
                 notesByTarget={notesByTarget}
@@ -524,6 +582,72 @@ export function DashboardPageContent() {
                   });
                 }}
               />
+            </Card>
+
+            {/* Pinned summary topology */}
+            <Card
+              variant="default"
+              padding="md"
+              title="Target Summaries"
+              description="Use these empty topologies for pinned target summaries. Create forum topics for individual issues, images, and discussion."
+            >
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-semibold">Qubit summaries</h4>
+                  </div>
+                  <DashboardQubitGrid
+                    metricData={null}
+                    unit=""
+                    topologyId={topologyId}
+                    colors={colors}
+                    maxCellSize={42}
+                    targetNotedQids={targetNotedQids}
+                    forumLinkedQids={forumLinkedQids}
+                    notesByTarget={notesByTarget}
+                    targetNotesByTarget={targetNotesByTarget}
+                    metricKey=""
+                    onQubitClick={setEditingTargetNote}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-semibold">Coupling summaries</h4>
+                    </div>
+                    <div className="join">
+                      <button
+                        type="button"
+                        className={`join-item btn btn-xs ${couplingDirection === "forward" ? "btn-primary" : "btn-outline"}`}
+                        onClick={() => setCouplingDirection("forward")}
+                      >
+                        Forward
+                      </button>
+                      <button
+                        type="button"
+                        className={`join-item btn btn-xs ${couplingDirection === "reverse" ? "btn-primary" : "btn-outline"}`}
+                        onClick={() => setCouplingDirection("reverse")}
+                      >
+                        Reverse
+                      </button>
+                    </div>
+                  </div>
+                  <DashboardCouplingGrid
+                    metricData={noteCouplingTopologyData}
+                    unit=""
+                    topologyId={topologyId}
+                    colors={colors}
+                    maxCellSize={42}
+                    reverseDirection={isReverseCouplingDirection}
+                    targetNotedTargets={targetNotedCouplings}
+                    forumLinkedTargets={forumLinkedCouplings}
+                    notesByTarget={notesByTarget}
+                    targetNotesByTarget={targetNotesByTarget}
+                    metricKey=""
+                    onCouplingClick={setEditingTargetNote}
+                  />
+                </div>
+              </div>
             </Card>
 
             {/* Summary table — collapsed by default */}
@@ -550,7 +674,7 @@ export function DashboardPageContent() {
                 variant="default"
                 padding="md"
                 title="Qubit Metrics"
-                description="Click any qubit to leave a note specific to that metric."
+                description="Click any qubit to update its pinned summary while inspecting the selected metric."
               >
                 <div className="space-y-8">
                   {qubitMetrics.map((m) => {
@@ -590,8 +714,10 @@ export function DashboardPageContent() {
                               colors={colors}
                               notedQids={noted}
                               targetNotedQids={targetNotedQids}
+                              forumLinkedQids={forumLinkedQids}
                               crossMetricNotedQids={crossMetricNoted}
                               notesByTarget={notesByTarget}
+                              targetNotesByTarget={targetNotesByTarget}
                               metricKey={m.key}
                               onQubitClick={(qid) => {
                                 setEditingNote({
@@ -625,8 +751,26 @@ export function DashboardPageContent() {
                 variant="default"
                 padding="md"
                 title="Coupling Metrics"
-                description="Click any coupling to leave a note specific to that metric."
+                description="Click any coupling to update its pinned summary while inspecting the selected metric."
               >
+                <div className="mb-4 flex justify-end">
+                  <div className="join">
+                    <button
+                      type="button"
+                      className={`join-item btn btn-xs ${couplingDirection === "forward" ? "btn-primary" : "btn-outline"}`}
+                      onClick={() => setCouplingDirection("forward")}
+                    >
+                      Forward
+                    </button>
+                    <button
+                      type="button"
+                      className={`join-item btn btn-xs ${couplingDirection === "reverse" ? "btn-primary" : "btn-outline"}`}
+                      onClick={() => setCouplingDirection("reverse")}
+                    >
+                      Reverse
+                    </button>
+                  </div>
+                </div>
                 <div className="space-y-6">
                   {couplingMetrics.map((m) => {
                     const noted = new Set(Object.keys(notesByMetric[m.key] ?? {}));
@@ -666,10 +810,13 @@ export function DashboardPageContent() {
                               unit={m.unit}
                               topologyId={topologyId}
                               colors={colors}
+                              reverseDirection={isReverseCouplingDirection}
                               notedTargets={noted}
                               targetNotedTargets={targetNotedCouplings}
+                              forumLinkedTargets={forumLinkedCouplings}
                               crossMetricNotedTargets={crossMetricNoted}
                               notesByTarget={notesByTarget}
+                              targetNotesByTarget={targetNotesByTarget}
                               metricKey={m.key}
                               onCouplingClick={(couplingId) => {
                                 setEditingNote({
@@ -712,8 +859,9 @@ export function DashboardPageContent() {
           cooldownId={selectedCooldownId}
           cooldownLabel={selectedCooldownId}
           noteScopeParams={noteScopeParams}
-          chipNote={editingExisting}
-          otherNotes={editingOtherNotes}
+          targetNote={editingTargetExisting}
+          legacyMetricNote={editingLegacyMetricNote}
+          legacyMetricNotes={editingLegacyMetricNotes}
           mentionCandidates={mentionCandidates}
           onClose={() => setEditingNote(null)}
         />
@@ -723,6 +871,7 @@ export function DashboardPageContent() {
         <DashboardTargetNoteModal
           chipId={selectedChip}
           targetId={editingTargetNote}
+          cooldownId={selectedCooldownId}
           noteScopeParams={noteScopeParams}
           existing={targetNotesByTarget[editingTargetNote]}
           mentionCandidates={mentionCandidates}

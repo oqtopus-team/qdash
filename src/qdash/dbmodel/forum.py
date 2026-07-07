@@ -52,6 +52,9 @@ class ForumPostDocument(Document):
     """Project-scoped forum thread or reply."""
 
     project_id: str = Field(..., description="Owning project identifier")
+    number: int | None = Field(
+        default=None, description="Project-scoped human-readable thread number"
+    )
     category: str = Field(..., description="Forum category for root threads")
     user_id: str | None = Field(default=None, description="Post author user ID")
     username: str = Field(..., description="Post author username snapshot")
@@ -61,6 +64,18 @@ class ForumPostDocument(Document):
         default_factory=list,
         description="BlockNote document JSON. Source of truth for rich content; content is derived.",
     )
+    labels: list[str] = Field(
+        default_factory=list, description="Operator labels for root forum threads"
+    )
+    assignee_username: str | None = Field(
+        default=None, description="Assigned project member username"
+    )
+    chip_id: str | None = Field(default=None, description="Linked chip identifier")
+    target_type: str | None = Field(
+        default=None, description="Linked target type: qubit or coupling"
+    )
+    target_id: str | None = Field(default=None, description="Linked target identifier")
+    cooldown_id: str | None = Field(default=None, description="Linked cool-down identifier")
     parent_id: str | None = Field(
         default=None, description="Parent forum post ID for replies. None for root threads."
     )
@@ -79,6 +94,14 @@ class ForumPostDocument(Document):
 
         name = "forum_post"
         indexes: ClassVar = [
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("number", ASCENDING),
+                    ("parent_id", ASCENDING),
+                ],
+                name="project_number_parent_idx",
+            ),
             IndexModel(
                 [
                     ("project_id", ASCENDING),
@@ -104,6 +127,68 @@ class ForumPostDocument(Document):
                     ("system_info.created_at", ASCENDING),
                 ],
                 name="project_category_deleted_created_idx",
+            ),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("labels", ASCENDING),
+                    ("is_deleted", ASCENDING),
+                    ("system_info.created_at", ASCENDING),
+                ],
+                name="project_labels_deleted_created_idx",
+            ),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("assignee_username", ASCENDING),
+                    ("is_deleted", ASCENDING),
+                    ("system_info.created_at", ASCENDING),
+                ],
+                name="project_assignee_deleted_created_idx",
+            ),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("chip_id", ASCENDING),
+                    ("target_type", ASCENDING),
+                    ("target_id", ASCENDING),
+                    ("is_deleted", ASCENDING),
+                    ("system_info.created_at", ASCENDING),
+                ],
+                name="project_target_deleted_created_idx",
+            ),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("cooldown_id", ASCENDING),
+                    ("is_deleted", ASCENDING),
+                    ("system_info.created_at", ASCENDING),
+                ],
+                name="project_cooldown_deleted_created_idx",
+            ),
+        ]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ForumCounterDocument(Document):
+    """Project-scoped counter for forum thread numbers."""
+
+    project_id: str = Field(..., description="Owning project identifier")
+    value: int = Field(default=0, description="Last allocated forum thread number")
+    system_info: SystemInfoModel = Field(
+        default_factory=SystemInfoModel, description="System timestamps"
+    )
+
+    class Settings:
+        """Settings for the document."""
+
+        name = "forum_counter"
+        indexes: ClassVar = [
+            IndexModel(
+                [("project_id", ASCENDING)],
+                unique=True,
+                name="project_unique_idx",
             ),
         ]
 

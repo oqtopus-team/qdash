@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from bson import ObjectId
 from bunnet import SortDirection
+from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from starlette.exceptions import HTTPException
 
@@ -21,8 +22,10 @@ from qdash.api.schemas.forum import (
 )
 from qdash.api.schemas.success import SuccessResponse
 from qdash.common.config.paths import CALIB_DATA_BASE
+from qdash.common.utils.datetime import now
 from qdash.datamodel.project import ProjectRole
-from qdash.dbmodel.forum import ForumCategoryDocument, ForumPostDocument
+from qdash.dbmodel.forum import ForumCategoryDocument, ForumCounterDocument, ForumPostDocument
+from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
 
 if TYPE_CHECKING:
@@ -73,6 +76,51 @@ DEFAULT_FORUM_CATEGORIES = [
 
 CATEGORY_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 FORUM_IMAGE_DIR = CALIB_DATA_BASE / "forum"
+
+
+def _normalize_forum_target(
+    *,
+    chip_id: str | None,
+    target_type: str | None,
+    target_id: str | None,
+) -> tuple[str | None, str | None, str | None]:
+    chip = chip_id.strip() if isinstance(chip_id, str) and chip_id.strip() else None
+    kind = (
+        target_type.strip().lower()
+        if isinstance(target_type, str) and target_type.strip()
+        else None
+    )
+    target = target_id.strip() if isinstance(target_id, str) and target_id.strip() else None
+    if kind not in {"qubit", "coupling", None}:
+        kind = None
+    if not (chip and kind and target):
+        return None, None, None
+    return chip[:128], kind, target[:128]
+
+
+def _normalize_forum_cooldown(cooldown_id: str | None) -> str | None:
+    value = cooldown_id.strip() if isinstance(cooldown_id, str) and cooldown_id.strip() else None
+    return value[:128] if value else None
+
+
+def _normalize_forum_assignee(assignee_username: str | None) -> str | None:
+    value = (
+        assignee_username.strip()
+        if isinstance(assignee_username, str) and assignee_username.strip()
+        else None
+    )
+    return value[:64] if value else None
+
+
+def _normalize_forum_labels(labels: list[str] | None) -> list[str]:
+    """Normalize user-provided labels and keep at most one label per thread."""
+    for label in labels or []:
+        value = re.sub(r"[^a-z0-9_-]+", "-", label.strip().lower()).strip("-_")[:32]
+        if value:
+            return [value]
+    return []
+
+
 ALLOWED_CONTENT_TYPES = {
     "image/png",
     "image/jpeg",
@@ -109,6 +157,92 @@ class ForumService:
         return bool(user_id and doc.user_id == user_id)
 
     @staticmethod
+    def _ensure_project_assignee(project_id: str, assignee_username: str | None) -> str | None:
+        """Return a normalized assignee username or raise when it is not assignable."""
+        assignee = _normalize_forum_assignee(assignee_username)
+        if assignee is None:
+            return None
+        membership = ProjectMembershipDocument.find_one(
+            {"project_id": project_id, "username": assignee, "status": "active"}
+        ).run()
+        if membership is None:
+            raise HTTPException(status_code=422, detail="Assignee must be an active project member")
+        return assignee
+
+    @staticmethod
+    def _thread_number_seed(project_id: str) -> int:
+        """Return a safe current counter value for an existing project."""
+        root_filter = {"project_id": project_id, "parent_id": None}
+        root_count = ForumPostDocument.get_motor_collection().count_documents(root_filter)
+        max_docs = list(
+            ForumPostDocument.get_motor_collection().aggregate(
+                [
+                    {"$match": {**root_filter, "number": {"$type": "int"}}},
+                    {"$group": {"_id": None, "max_number": {"$max": "$number"}}},
+                ]
+            )
+        )
+        max_number = int(max_docs[0].get("max_number") or 0) if max_docs else 0
+        return max(max_number, root_count)
+
+    @classmethod
+    def _next_thread_number(cls, project_id: str) -> int:
+        """Allocate the next project-scoped forum thread number atomically."""
+        import time
+
+        for attempt in range(5):
+            counter = ForumCounterDocument.find_one({"project_id": project_id}).run()
+            if counter is None:
+                try:
+                    ForumCounterDocument(
+                        project_id=project_id,
+                        value=cls._thread_number_seed(project_id),
+                    ).insert()
+                except DuplicateKeyError:
+                    time.sleep(0.01 * (attempt + 1))
+                    continue
+
+            result = ForumCounterDocument.get_motor_collection().find_one_and_update(
+                {"project_id": project_id},
+                {"$inc": {"value": 1}},
+                return_document=ReturnDocument.AFTER,
+            )
+            if result is not None:
+                return int(result["value"])
+            time.sleep(0.01 * (attempt + 1))
+
+        raise RuntimeError("Failed to allocate forum thread number")
+
+    @classmethod
+    def _ensure_root_thread_number(cls, doc: ForumPostDocument) -> int:
+        """Ensure a root thread has a project-scoped display number."""
+        if doc.number is not None:
+            return doc.number
+
+        new_number = cls._next_thread_number(doc.project_id)
+        result = ForumPostDocument.get_motor_collection().find_one_and_update(
+            {
+                "_id": doc.id,
+                "project_id": doc.project_id,
+                "parent_id": None,
+                "$or": [{"number": {"$exists": False}}, {"number": None}],
+            },
+            {"$set": {"number": new_number, "system_info.updated_at": now()}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if result is not None:
+            doc.number = int(result["number"])
+            return doc.number
+
+        existing = ForumPostDocument.find_one(
+            {"_id": doc.id, "project_id": doc.project_id, "parent_id": None}
+        ).run()
+        if existing is not None and existing.number is not None:
+            doc.number = existing.number
+            return existing.number
+        raise RuntimeError("Failed to persist forum thread number")
+
+    @staticmethod
     def _category_to_response(doc: ForumCategoryDocument) -> ForumCategoryResponse:
         """Convert a category document to an API response."""
         return ForumCategoryResponse(
@@ -130,6 +264,7 @@ class ForumService:
         return ForumPostResponse(
             id=str(doc.id),
             project_id=doc.project_id,
+            number=getattr(doc, "number", None),
             category=doc.category,
             user_id=doc.user_id,
             username=doc.username,
@@ -138,6 +273,12 @@ class ForumService:
             content=doc.content,
             content_blocks=list(doc.content_blocks),
             parent_id=doc.parent_id,
+            labels=list(getattr(doc, "labels", [])),
+            assignee_username=getattr(doc, "assignee_username", None),
+            chip_id=getattr(doc, "chip_id", None),
+            target_type=getattr(doc, "target_type", None),
+            target_id=getattr(doc, "target_id", None),
+            cooldown_id=getattr(doc, "cooldown_id", None),
             reply_count=reply_count,
             is_closed=doc.is_closed,
             is_deleted=doc.is_deleted,
@@ -326,6 +467,12 @@ class ForumService:
         skip: int = 0,
         limit: int = 50,
         category: str | None = None,
+        label: str | None = None,
+        chip_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        cooldown_id: str | None = None,
+        number: int | None = None,
         is_closed: bool | None = False,
     ) -> ListForumPostsResponse:
         """List root forum threads with reply counts."""
@@ -336,6 +483,19 @@ class ForumService:
         }
         if category:
             query["category"] = category
+        if label:
+            normalized_label = _normalize_forum_labels([label])
+            query["labels"] = normalized_label[0] if normalized_label else label
+        if chip_id:
+            query["chip_id"] = chip_id
+        if target_type:
+            query["target_type"] = target_type
+        if target_id:
+            query["target_id"] = target_id
+        if cooldown_id:
+            query["cooldown_id"] = cooldown_id
+        if number is not None:
+            query["number"] = number
         if is_closed is not None:
             query["is_closed"] = is_closed
 
@@ -424,8 +584,14 @@ class ForumService:
         category: str,
         title: str | None,
         content: str,
-        content_blocks: list[dict[str, Any]] | None = None,
         parent_id: str | None,
+        content_blocks: list[dict[str, Any]] | None = None,
+        labels: list[str] | None = None,
+        chip_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        cooldown_id: str | None = None,
+        assignee_username: str | None = None,
     ) -> ForumPostResponse:
         """Create a new forum thread or reply."""
         if parent_id is None and not title:
@@ -446,14 +612,39 @@ class ForumService:
         else:
             self._ensure_active_category(project_id, category)
 
+        normalized_chip_id, normalized_target_type, normalized_target_id = (
+            (root_doc.chip_id, root_doc.target_type, root_doc.target_id)
+            if root_doc
+            else _normalize_forum_target(
+                chip_id=chip_id,
+                target_type=target_type,
+                target_id=target_id,
+            )
+        )
+        thread_number = (
+            self._ensure_root_thread_number(root_doc)
+            if root_doc
+            else self._next_thread_number(project_id)
+        )
         doc = ForumPostDocument(
             project_id=project_id,
+            number=thread_number,
             category=category,
             user_id=self._user_id_for_username(username),
             username=username,
             title=title if parent_id is None else None,
             content=content,
             content_blocks=content_blocks or [],
+            labels=list(root_doc.labels) if root_doc else _normalize_forum_labels(labels),
+            chip_id=normalized_chip_id,
+            target_type=normalized_target_type,
+            target_id=normalized_target_id,
+            cooldown_id=root_doc.cooldown_id
+            if root_doc
+            else _normalize_forum_cooldown(cooldown_id),
+            assignee_username=root_doc.assignee_username
+            if root_doc
+            else self._ensure_project_assignee(project_id, assignee_username),
             parent_id=parent_id,
         )
         doc.insert()
@@ -553,10 +744,17 @@ class ForumService:
 
         ai_doc = ForumPostDocument(
             project_id=project_id,
+            number=self._ensure_root_thread_number(root_doc),
             category=root_doc.category,
             username="qdash",
             title=None,
             content=content,
+            labels=list(root_doc.labels),
+            assignee_username=root_doc.assignee_username,
+            chip_id=root_doc.chip_id,
+            target_type=root_doc.target_type,
+            target_id=root_doc.target_id,
+            cooldown_id=root_doc.cooldown_id,
             parent_id=parent_id,
             is_ai_reply=True,
         )
@@ -615,6 +813,16 @@ class ForumService:
         title: str | None,
         content: str,
         content_blocks: list[dict[str, Any]] | None = None,
+        labels: list[str] | None = None,
+        chip_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        cooldown_id: str | None = None,
+        assignee_username: str | None = None,
+        update_cooldown_context: bool = False,
+        update_target_context: bool = False,
+        update_assignee_context: bool = False,
+        role: ProjectRole | None = None,
     ) -> ForumPostResponse:
         """Update a forum post."""
         doc = ForumPostDocument.find_one(
@@ -623,8 +831,10 @@ class ForumService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
         user_id = self._user_id_for_username(username)
-        if not self._is_author(doc, user_id=user_id):
-            raise HTTPException(status_code=403, detail="You can only edit your own posts")
+        if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
+            raise HTTPException(
+                status_code=403, detail="Only the author or project owner can edit this post"
+            )
 
         if doc.parent_id is None:
             if title is not None:
@@ -632,6 +842,23 @@ class ForumService:
             if category is not None and category != doc.category:
                 self._ensure_active_category(project_id, category)
                 doc.category = category
+            if labels is not None:
+                doc.labels = _normalize_forum_labels(labels)
+            if update_target_context:
+                normalized_chip_id, normalized_target_type, normalized_target_id = (
+                    _normalize_forum_target(
+                        chip_id=chip_id if chip_id is not None else doc.chip_id,
+                        target_type=target_type if target_type is not None else doc.target_type,
+                        target_id=target_id if target_id is not None else doc.target_id,
+                    )
+                )
+                doc.chip_id = normalized_chip_id
+                doc.target_type = normalized_target_type
+                doc.target_id = normalized_target_id
+            if update_cooldown_context:
+                doc.cooldown_id = _normalize_forum_cooldown(cooldown_id)
+            if update_assignee_context:
+                doc.assignee_username = self._ensure_project_assignee(project_id, assignee_username)
         doc.content = content
         # None means the caller omitted the field: keep existing rich content.
         # An explicit [] clears it (e.g. a plain-Markdown edit).

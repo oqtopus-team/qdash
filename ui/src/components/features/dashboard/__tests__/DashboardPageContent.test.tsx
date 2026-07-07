@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardPageContent } from "@/components/features/dashboard/DashboardPageContent";
 
@@ -34,6 +34,12 @@ vi.mock("@/client/chip/chip", () => ({
 vi.mock("@/client/cooldown/cooldown", () => ({
   useListCooldowns: () => ({
     data: { data: { cooldowns: [] } },
+  }),
+}));
+
+vi.mock("@/client/forum/forum", () => ({
+  useListForumPosts: () => ({
+    data: { data: { posts: [], total: 0, skip: 0, limit: 200 } },
   }),
 }));
 
@@ -239,19 +245,42 @@ describe("DashboardPageContent", () => {
     vi.clearAllMocks();
   });
 
-  it("opens the metric note modal for a qubit even when the metric value is missing", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("opens the pinned summary modal from the empty qubit topology", () => {
     render(<DashboardPageContent />);
 
     fireEvent.click(screen.getAllByRole("button", { name: "Open qubit" })[0]);
+
+    expect(screen.getByTestId("target-note-modal").textContent).toContain("0");
+    expect(screen.queryByTestId("metric-note-modal")).toBeNull();
+  });
+
+  it("opens the pinned summary modal from the empty coupling topology", () => {
+    render(<DashboardPageContent />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Open coupling" })[0]);
+
+    expect(screen.getByTestId("target-note-modal").textContent).toContain("0-1");
+    expect(screen.queryByTestId("metric-note-modal")).toBeNull();
+  });
+
+  it("opens the metric history modal for a qubit metric even when the metric value is missing", () => {
+    render(<DashboardPageContent />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Open qubit" })[1]);
 
     expect(screen.getByTestId("metric-note-modal").textContent).toContain("0:t1");
     expect(screen.queryByTestId("target-note-modal")).toBeNull();
   });
 
-  it("opens the metric note modal for a coupling even when the metric value is missing", () => {
+  it("opens the metric history modal for a coupling metric even when the metric value is missing", () => {
     render(<DashboardPageContent />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Open coupling" })[0]);
+    const couplingButtons = screen.getAllByRole("button", { name: "Open coupling" });
+    fireEvent.click(couplingButtons[couplingButtons.length - 1]);
 
     expect(screen.getByTestId("metric-note-modal").textContent).toContain("0-1:zx90_gate_fidelity");
     expect(screen.queryByTestId("target-note-modal")).toBeNull();

@@ -8,6 +8,12 @@
 import type { ForumPostUpdateCategory } from './forumPostUpdateCategory';
 import type { ForumPostUpdateTitle } from './forumPostUpdateTitle';
 import type { ForumPostUpdateContentBlocksItem } from './forumPostUpdateContentBlocksItem';
+import type { ForumPostUpdateLabels } from './forumPostUpdateLabels';
+import type { ForumPostUpdateAssigneeUsername } from './forumPostUpdateAssigneeUsername';
+import type { ForumPostUpdateChipId } from './forumPostUpdateChipId';
+import type { ForumPostUpdateTargetType } from './forumPostUpdateTargetType';
+import type { ForumPostUpdateTargetId } from './forumPostUpdateTargetId';
+import type { ForumPostUpdateCooldownId } from './forumPostUpdateCooldownId';
 
 /**
  * Request schema for updating a forum post.
@@ -25,4 +31,16 @@ export interface ForumPostUpdate {
   content: string;
   /** BlockNote document JSON. Source of truth for rich content; content is derived. */
   content_blocks?: ForumPostUpdateContentBlocksItem[];
+  /** Updated operator label for root threads */
+  labels?: ForumPostUpdateLabels;
+  /** Updated assigned project member username */
+  assignee_username?: ForumPostUpdateAssigneeUsername;
+  /** Updated linked chip ID */
+  chip_id?: ForumPostUpdateChipId;
+  /** Updated linked target type */
+  target_type?: ForumPostUpdateTargetType;
+  /** Updated linked target ID */
+  target_id?: ForumPostUpdateTargetId;
+  /** Updated linked cool-down ID */
+  cooldown_id?: ForumPostUpdateCooldownId;
 }
