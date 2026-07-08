@@ -48,6 +48,14 @@
     "function_name": "full_calibration"
   },
   {
+    "id": "fast_full_calibration",
+    "name": "Fast Full Calibration",
+    "description": "Shortened full calibration: ConfigureAll -> fast 1Q check -> 1Q fine-tune without T1/T2 averages -> Filter -> CR Schedule -> 2Q.",
+    "category": "production",
+    "filename": "fast_full_calibration.py",
+    "function_name": "fast_full_calibration"
+  },
+  {
     "id": "two_qubit",
     "name": "2Q Calibration",
     "description": "Two-qubit calibration from candidate qubits. Auto-generates optimal CR schedule with explicit checkerboard direction (forward/reverse). Default: forward.",
