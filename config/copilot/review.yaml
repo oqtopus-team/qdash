@@ -4,7 +4,7 @@
 # Specialized models for task result analysis (chevron patterns, Rabi, etc.).
 analysis_models:
   - provider: ollama
-    name: gemma4:26b
+    name: nvidia/Gemma-4-31B-IT-NVFP4 #gemma4:26b
     # Ollama endpoint. Set OLLAMA_BASE_URL to your Ollama server URL,
     # e.g. http://localhost:11434. QDash appends /v1 automatically.
     base_url: env:OLLAMA_BASE_URL
