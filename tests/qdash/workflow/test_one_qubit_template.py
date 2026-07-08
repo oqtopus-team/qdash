@@ -51,3 +51,21 @@ def test_one_qubit_template_defaults_to_all_muxes(monkeypatch) -> None:
 
     assert isinstance(result["targets"], MuxTargets)
     assert result["targets"].mux_ids == list(range(16))
+
+
+def test_one_qubit_template_passes_template_task_lists(monkeypatch) -> None:
+    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+
+    result = one_qubit_module.one_qubit(username="alice", chip_id="64Q")
+
+    steps = result["steps"]
+    assert steps[0].tasks == one_qubit_module.ONE_QUBIT_CHECK_TASKS
+    assert steps[2].tasks == one_qubit_module.ONE_QUBIT_FINE_TUNE_TASKS
+
+
+def test_one_qubit_template_check_only_passes_template_task_list(monkeypatch) -> None:
+    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+
+    result = one_qubit_module.one_qubit(username="alice", chip_id="64Q", check_only=True)
+
+    assert result["steps"][0].tasks == one_qubit_module.ONE_QUBIT_CHECK_TASKS

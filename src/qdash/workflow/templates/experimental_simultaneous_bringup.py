@@ -9,6 +9,13 @@ from qdash.workflow.service.calib_service import on_flow_cancellation
 from qdash.workflow.service.steps import ExperimentalSimultaneousBringUp
 from qdash.workflow.service.targets import MuxTargets
 
+EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS: list[str] = [
+    "CheckResonatorSpectroscopy",
+    "CheckSimultaneousQubitSpectroscopy",
+    "CheckControlAmplitude",
+    "CheckChevron",
+]
+
 
 @flow(on_cancellation=[on_flow_cancellation])
 def experimental_simultaneous_bringup(
@@ -56,7 +63,8 @@ def experimental_simultaneous_bringup(
         targets,
         steps=[
             ExperimentalSimultaneousBringUp(
-                simultaneous_spectroscopy_schedule_mode=simultaneous_spectroscopy_schedule_mode
+                tasks=EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS,
+                simultaneous_spectroscopy_schedule_mode=simultaneous_spectroscopy_schedule_mode,
             )
         ],
     )

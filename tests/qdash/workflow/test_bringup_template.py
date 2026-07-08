@@ -83,3 +83,25 @@ def test_experimental_simultaneous_bringup_defaults_to_all_mode(monkeypatch) -> 
 
     step = result["steps"][0]
     assert step.simultaneous_spectroscopy_schedule_mode == "all"
+
+
+def test_bringup_template_passes_template_task_list(monkeypatch) -> None:
+    monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
+
+    result = bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
+
+    assert result["steps"][1].tasks == bringup_module.BRINGUP_TASKS
+
+
+def test_experimental_simultaneous_bringup_passes_template_task_list(monkeypatch) -> None:
+    monkeypatch.setattr(experimental_bringup_module, "CalibService", FakeCalibService)
+
+    result = experimental_bringup_module.experimental_simultaneous_bringup(
+        username="alice",
+        chip_id="16Q-test",
+        mux_ids=[0],
+    )
+
+    assert result["steps"][0].tasks == (
+        experimental_bringup_module.EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS
+    )

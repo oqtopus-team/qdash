@@ -43,6 +43,16 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import QubitTargets
 
+TWO_QUBIT_TASKS: list[str] = [
+    "CheckCrossResonance",
+    "CreateZX90",
+    "CheckZX90",
+    "CheckBellState",
+    "CheckBellStateTomography",
+    "Check2QGateCoherenceLimit",
+    "ZX90InterleavedRandomizedBenchmarking",
+]
+
 
 @flow(on_cancellation=[on_flow_cancellation])
 def two_qubit(
@@ -74,6 +84,7 @@ def two_qubit(
             - CheckZX90
             - CheckBellState
             - CheckBellStateTomography
+            - Check2QGateCoherenceLimit
             - ZX90InterleavedRandomizedBenchmarking
         inverse: CR direction control based on checkerboard pattern.
             False (default): Forward direction - control qubit is at even parity
@@ -158,7 +169,7 @@ def two_qubit(
         )
     else:
         # Full 2Q calibration
-        steps.append(TwoQubitCalibration())
+        steps.append(TwoQubitCalibration(tasks=TWO_QUBIT_TASKS))
 
     # =========================================================================
     # Execute Pipeline
