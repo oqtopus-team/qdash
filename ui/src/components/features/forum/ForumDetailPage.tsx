@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -244,6 +244,7 @@ function PostBody({
 
 export function ForumDetailPage({ postId }: { postId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { isOwner, projectId } = useProject();
@@ -295,12 +296,28 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     [membersResponse?.data.members],
   );
   const { data: chipsResponse } = useListChips({ query: { staleTime: 60_000 } });
-  const chips = chipsResponse?.data.chips ?? [];
+  const chips = useMemo(
+    () =>
+      [...(chipsResponse?.data.chips ?? [])].sort((a, b) => {
+        const aTime = a.installed_at ? new Date(a.installed_at).getTime() : 0;
+        const bTime = b.installed_at ? new Date(b.installed_at).getTime() : 0;
+        return bTime - aTime || b.chip_id.localeCompare(a.chip_id);
+      }),
+    [chipsResponse?.data.chips],
+  );
   const { data: cooldownsResponse } = useListCooldowns(
     { chip_id: targetDraftChipId || undefined },
     { query: { enabled: !!targetDraftChipId || !!post?.cooldown_id, staleTime: 60_000 } },
   );
-  const cooldowns = cooldownsResponse?.data.cooldowns ?? [];
+  const cooldowns = useMemo(
+    () =>
+      [...(cooldownsResponse?.data.cooldowns ?? [])].sort((a, b) => {
+        const aTime = a.started_at ? new Date(a.started_at).getTime() : 0;
+        const bTime = b.started_at ? new Date(b.started_at).getTime() : 0;
+        return bTime - aTime || b.cooldown_id.localeCompare(a.cooldown_id);
+      }),
+    [cooldownsResponse?.data.cooldowns],
+  );
   const selectedCooldown = cooldowns.find((cooldown) => cooldown.cooldown_id === cooldownDraftId);
   const currentPostCooldown = cooldowns.find(
     (cooldown) => cooldown.cooldown_id === post?.cooldown_id,
@@ -317,6 +334,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     error: aiError,
     triggerAiReply,
   } = useForumAiReply();
+  const fromQuery = searchParams.get("from");
+  const forumReturnHref = fromQuery ? `/forum?${fromQuery.replace(/^\?/, "")}` : "/forum";
 
   useEffect(() => {
     if (!post) return;
@@ -543,7 +562,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const handleDelete = async (targetPostId: string, isRoot: boolean) => {
     await deleteMutation.mutateAsync({ postId: targetPostId });
     if (isRoot) {
-      router.push("/forum");
+      router.push(forumReturnHref);
       return;
     }
     invalidateThread();
@@ -561,7 +580,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-16">
         <p className="text-base-content/60">Forum thread not found</p>
-        <Link href="/forum" className="btn btn-sm btn-ghost">
+        <Link href={forumReturnHref} className="btn btn-sm btn-ghost">
           <ArrowLeft className="h-4 w-4" />
           Back to Forum
         </Link>
@@ -579,7 +598,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
       <div className="mb-6 flex min-w-0 items-start gap-3">
         <button
           className="btn btn-square btn-ghost btn-sm shrink-0"
-          onClick={() => router.push("/forum")}
+          onClick={() => router.push(forumReturnHref)}
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
