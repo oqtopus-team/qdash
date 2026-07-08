@@ -2,7 +2,7 @@
   {
     "id": "bringup",
     "name": "Bring-up",
-    "description": "MUX-level bring-up calibration: ConfigureAll -> resonator spectroscopy. Runs once per MUX for initial characterization.",
+    "description": "MUX-level bring-up calibration: ConfigureAll -> resonator spectroscopy. Requires explicit mux_ids and runs once per selected MUX.",
     "category": "production",
     "filename": "bringup.py",
     "function_name": "bringup"
@@ -10,7 +10,7 @@
   {
     "id": "experimental_simultaneous_bringup",
     "name": "Experimental Simultaneous Bring-up",
-    "description": "Experimental single-execution bring-up with resonator spectroscopy, all-qubit simultaneous spectroscopy, and regular bring-up follow-up tasks.",
+    "description": "Experimental single-execution bring-up with resonator spectroscopy, all-qubit simultaneous spectroscopy, and regular bring-up follow-up tasks. Requires explicit mux_ids or qids.",
     "category": "advanced",
     "filename": "experimental_simultaneous_bringup.py",
     "function_name": "experimental_simultaneous_bringup"
@@ -18,7 +18,7 @@
   {
     "id": "check_waveform",
     "name": "Check Waveform",
-    "description": "Readout waveform inspection using qubex CheckWaveform for selected MUXes or qubits.",
+    "description": "Readout waveform inspection using qubex CheckWaveform for explicitly selected MUXes or qubits.",
     "category": "basic",
     "filename": "check_waveform.py",
     "function_name": "check_waveform"
@@ -26,7 +26,7 @@
   {
     "id": "simple",
     "name": "Simple Calibration",
-    "description": "Basic calibration for learning and simple tasks. Supports MUX-based and qubit-based targeting with customizable tasks and execution modes.",
+    "description": "Basic calibration for learning and simple tasks. Requires explicit mux_ids or qids, with customizable tasks and execution modes.",
     "category": "basic",
     "filename": "simple.py",
     "function_name": "simple_calibration"
@@ -34,7 +34,7 @@
   {
     "id": "one_qubit",
     "name": "1Q Calibration",
-    "description": "1-qubit calibration using step-based pipeline. Supports check-only or full calibration with fine-tune.",
+    "description": "1-qubit calibration using step-based pipeline. Requires explicit mux_ids or qids and supports check-only or full calibration with fine-tune.",
     "category": "production",
     "filename": "one_qubit.py",
     "function_name": "one_qubit"
@@ -42,7 +42,7 @@
   {
     "id": "full_calibration",
     "name": "Full Calibration",
-    "description": "Complete calibration using step-based pipeline: ConfigureAll -> 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule (forward/reverse) -> 2Q.",
+    "description": "Complete calibration for explicitly selected mux_ids using step-based pipeline: ConfigureAll -> 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule (forward/reverse) -> 2Q.",
     "category": "production",
     "filename": "full_calibration.py",
     "function_name": "full_calibration"
@@ -50,7 +50,7 @@
   {
     "id": "fast_full_calibration",
     "name": "Fast Full Calibration",
-    "description": "Shortened full calibration: ConfigureAll -> fast 1Q check -> 1Q fine-tune without T1/T2 averages -> Filter -> CR Schedule -> 2Q.",
+    "description": "Shortened full calibration for explicitly selected mux_ids: ConfigureAll -> fast 1Q check -> 1Q fine-tune without T1/T2 averages -> Filter -> CR Schedule -> 2Q.",
     "category": "production",
     "filename": "fast_full_calibration.py",
     "function_name": "fast_full_calibration"
@@ -90,7 +90,7 @@
   {
     "id": "coherence_limit",
     "name": "Gate Coherence Limit",
-    "description": "Calculate theoretical fidelity limit of 1Q and 2Q gates from T1, T2 coherence times and gate duration.",
+    "description": "Calculate theoretical fidelity limit of 1Q and 2Q gates for explicitly selected mux_ids or qids from T1, T2 coherence times and gate duration.",
     "category": "production",
     "filename": "coherence_limit.py",
     "function_name": "coherence_limit"

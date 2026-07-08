@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
+import pytest
+
 from qdash.workflow.service.steps import (
     ConfigureAll,
     FilterByMetric,
@@ -57,3 +59,10 @@ def test_fast_full_calibration_uses_shortened_one_qubit_steps(monkeypatch) -> No
     assert "CheckT1Average" not in one_qubit_fine_tune.tasks
     assert "CheckT2EchoAverage" not in one_qubit_fine_tune.tasks
     assert "Check1QGateCoherenceLimit" not in one_qubit_fine_tune.tasks
+
+
+def test_fast_full_calibration_requires_explicit_mux_ids(monkeypatch) -> None:
+    monkeypatch.setattr(fast_full_module, "CalibService", FakeCalibService)
+
+    with pytest.raises(ValueError, match="mux_ids is required"):
+        fast_full_module.fast_full_calibration(username="alice", chip_id="64Q")

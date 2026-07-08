@@ -130,6 +130,7 @@ function PostBody({
   canEdit: canEditOverride,
   onEdit,
   onDelete,
+  postAction = "delete",
   editing,
   editContent,
   editInitialBlocks,
@@ -146,7 +147,8 @@ function PostBody({
   currentUsername?: string;
   canEdit?: boolean;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
+  postAction?: "delete" | "close";
   editing: boolean;
   /** Current markdown projection — used only to gate the Save button. */
   editContent: string;
@@ -162,6 +164,8 @@ function PostBody({
 }) {
   const canEdit = canEditOverride ?? currentUsername === post.username;
   const isAi = post.is_ai_reply || post.username === "qdash";
+  const ActionIcon = postAction === "close" ? Lock : Trash2;
+  const actionTitle = postAction === "close" ? "Close thread" : "Delete";
 
   return (
     <div
@@ -186,7 +190,7 @@ function PostBody({
             <span className="text-xs italic text-base-content/30">(edited)</span>
           )}
         </div>
-        {canEdit && !editing && !isAi && (
+        {canEdit && !editing && !isAi && onDelete && (
           <div className="flex items-center gap-1">
             <button
               className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-primary"
@@ -196,11 +200,13 @@ function PostBody({
               <Pencil className="h-4 w-4" />
             </button>
             <button
-              className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-error"
+              className={`btn btn-ghost btn-sm btn-square text-base-content/40 ${
+                postAction === "close" ? "hover:text-primary" : "hover:text-error"
+              }`}
               onClick={onDelete}
-              title="Delete"
+              title={actionTitle}
             >
-              <Trash2 className="h-4 w-4" />
+              <ActionIcon className="h-4 w-4" />
             </button>
           </div>
         )}
@@ -559,12 +565,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     updateRootMetadata({ assigneeUsername: nextAssigneeUsername || null });
   };
 
-  const handleDelete = async (targetPostId: string, isRoot: boolean) => {
+  const handleDeleteReply = async (targetPostId: string) => {
     await deleteMutation.mutateAsync({ postId: targetPostId });
-    if (isRoot) {
-      router.push(forumReturnHref);
-      return;
-    }
     invalidateThread();
   };
 
@@ -664,7 +666,12 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             currentUsername={currentUsername}
             canEdit={canManage}
             onEdit={handleStartEditRoot}
-            onDelete={() => handleDelete(post.id, true)}
+            onDelete={
+              post.is_closed
+                ? undefined
+                : () => closeMutation.mutate({ postId }, { onSuccess: invalidateThread })
+            }
+            postAction="close"
             editing={editingRoot}
             editContent={editRootContent}
             editInitialBlocks={editRootBlocks}
@@ -698,7 +705,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                     post={reply}
                     currentUsername={currentUsername}
                     onEdit={() => handleStartEditReply(reply)}
-                    onDelete={() => handleDelete(reply.id, false)}
+                    onDelete={() => handleDeleteReply(reply.id)}
                     editing={editingReplyId === reply.id}
                     editContent={editReplyContent}
                     editInitialBlocks={editReplyBlocks}

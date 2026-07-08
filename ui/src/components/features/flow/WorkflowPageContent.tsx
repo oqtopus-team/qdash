@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { useQuery } from "@tanstack/react-query";
 import type React from "react";
-import { CalendarClock, Cpu, Plus, Tags, User, Users, Workflow } from "lucide-react";
+import { AlertTriangle, CalendarClock, Cpu, Plus, Tags, User, Users, Workflow } from "lucide-react";
 
 import type { FlowSummary } from "@/schemas";
 
@@ -40,7 +40,18 @@ function FlowCard({ flow }: { flow: FlowSummary }) {
       href={`/workflow/${flow.name}`}
       className="block rounded-lg border border-base-300 bg-base-100 p-4 transition-colors hover:border-primary/50"
     >
-      <h2 className="truncate text-base font-semibold">{flow.name}</h2>
+      <div className="flex min-w-0 items-center gap-2">
+        <h2 className="truncate text-base font-semibold">{flow.name}</h2>
+        {flow.file_exists === false && (
+          <span
+            className="badge badge-warning badge-sm shrink-0 gap-1"
+            title="Source file is missing"
+          >
+            <AlertTriangle className="h-3 w-3" />
+            Missing
+          </span>
+        )}
+      </div>
       <p className="mt-1 line-clamp-2 min-h-10 text-sm text-base-content/70">
         {flow.description || "No description"}
       </p>
@@ -106,6 +117,17 @@ function FlowTable({ flows }: { flows: FlowSummary[] }) {
                 >
                   {flow.name}
                 </Link>
+                {flow.file_exists === false && (
+                  <div className="mt-1">
+                    <span
+                      className="badge badge-warning badge-xs gap-1"
+                      title="Source file is missing"
+                    >
+                      <AlertTriangle className="h-3 w-3" />
+                      Missing source file
+                    </span>
+                  </div>
+                )}
                 {flow.description && (
                   <div className="truncate text-xs text-base-content/60">{flow.description}</div>
                 )}

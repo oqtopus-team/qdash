@@ -4,44 +4,6 @@ import { Check, Tag } from "lucide-react";
 
 import { FORUM_LABELS, getForumLabel } from "./categories";
 
-type ForumLabelSelectorProps = {
-  selectedLabels: string[];
-  onToggle: (label: string) => void;
-  size?: "xs" | "sm";
-  disabled?: boolean;
-};
-
-export function ForumLabelSelector({
-  selectedLabels,
-  onToggle,
-  size = "xs",
-  disabled = false,
-}: ForumLabelSelectorProps) {
-  const sizeClass = size === "sm" ? "btn-sm h-8 min-h-8" : "btn-xs h-7 min-h-7";
-
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {FORUM_LABELS.map((item) => {
-        const selected = selectedLabels.includes(item.id);
-        return (
-          <button
-            key={item.id}
-            type="button"
-            aria-pressed={selected}
-            disabled={disabled}
-            className={`btn ${sizeClass} rounded-md border px-2 font-medium normal-case ${
-              selected ? item.buttonClass : "btn-ghost border-base-300 bg-base-100"
-            }`}
-            onClick={() => onToggle(item.id)}
-          >
-            {item.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 type ForumLabelPickerProps = {
   selectedLabels: string[];
   onToggle: (label: string) => void;

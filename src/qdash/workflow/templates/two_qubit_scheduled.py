@@ -32,6 +32,16 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import CouplingTargets
 
+TWO_QUBIT_SCHEDULED_TASKS: list[str] = [
+    "CheckCrossResonance",
+    "CreateZX90",
+    "CheckZX90",
+    "CheckBellState",
+    "CheckBellStateTomography",
+    "Check2QGateCoherenceLimit",
+    "ZX90InterleavedRandomizedBenchmarking",
+]
+
 
 @flow(on_cancellation=[on_flow_cancellation])
 def two_qubit_scheduled(
@@ -58,6 +68,7 @@ def two_qubit_scheduled(
             - CheckZX90
             - CheckBellState
             - CheckBellStateTomography
+            - Check2QGateCoherenceLimit
             - ZX90InterleavedRandomizedBenchmarking
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
@@ -127,7 +138,7 @@ def two_qubit_scheduled(
         )
     else:
         # Full 2Q calibration
-        steps.append(TwoQubitCalibration())
+        steps.append(TwoQubitCalibration(tasks=TWO_QUBIT_SCHEDULED_TASKS))
 
     # =========================================================================
     # Execute Pipeline
