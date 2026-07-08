@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
@@ -11,26 +10,32 @@ import {
   ExternalLink,
   Lock,
   MessageSquare,
+  Pencil,
   Plus,
   Settings,
+  Tag,
   Trash2,
   Unlock,
   UserRound,
   X,
 } from "lucide-react";
 
+import { useListChips } from "@/client/chip/chip";
+import { useListCooldowns } from "@/client/cooldown/cooldown";
+import { useListProjectMembers } from "@/client/projects/projects";
 import {
+  getGetForumPostQueryKey,
   getListForumCategoriesQueryKey,
   getListForumPostsQueryKey,
   useCloseForumPost,
   useCreateForumCategory,
-  useCreateForumPost,
   useDeleteForumCategory,
   useGetForumPost,
   useGetForumPostReplies,
   useListForumCategories,
   useListForumPosts,
   useReopenForumPost,
+  useUpdateForumPost,
 } from "@/client/forum/forum";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
@@ -39,9 +44,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
-import { useForumAiReply } from "@/hooks/useForumAiReply";
-import { useImageUpload } from "@/hooks/useImageUpload";
-import { formatRelativeTime } from "@/lib/utils/datetime";
+import { formatDateTimeCompact, formatRelativeTime } from "@/lib/utils/datetime";
 import type { ForumPostResponse, ListForumPostsParams } from "@/schemas";
 
 import {
@@ -53,18 +56,22 @@ import {
   toForumCategoryDefinition,
   type ForumCategoryDefinition,
 } from "./categories";
-import { ForumLabelSelector } from "./ForumLabelSelector";
+import { ForumLabelPicker } from "./ForumLabelSelector";
 import { ForumBlockViewer } from "./ForumBlockEditor";
-
-const ForumBlockEditor = dynamic(
-  () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
-  { ssr: false },
-);
 
 const PAGE_SIZE = 30;
 
 type CategoryFilter = "all" | NonNullable<ListForumPostsParams["category"]>;
 type StatusFilter = "open" | "closed" | "all";
+
+function parseForumPage(value: string | null): number {
+  const page = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(page) && page > 0 ? page : 1;
+}
+
+function parseForumStatus(value: string | null): StatusFilter {
+  return value === "closed" || value === "all" ? value : "open";
+}
 
 type ForumTargetContext = {
   chipId: string;
@@ -82,6 +89,15 @@ function formatTargetLabel(targetType: "qubit" | "coupling", targetId: string): 
     return b ? `Q${a} -> Q${b}` : targetId;
   }
   return `Q${targetId}`;
+}
+
+function formatCooldownPeriod(
+  cooldown: { started_at?: string | null; ended_at?: string | null } | undefined,
+): string {
+  if (!cooldown?.started_at) return "";
+  const start = formatDateTimeCompact(cooldown.started_at);
+  const end = cooldown.ended_at ? formatDateTimeCompact(cooldown.ended_at) : "ongoing";
+  return `${start} - ${end}`;
 }
 
 function parseTargetId(
@@ -255,12 +271,27 @@ function ForumThreadCard({
 function ForumThreadPreviewSidebar({
   postId,
   categories,
+  currentUsername,
+  isOwner,
+  projectId,
+  returnQuery,
   onClose,
 }: {
   postId: string | null;
   categories: ForumCategoryDefinition[];
+  currentUsername?: string;
+  isOwner: boolean;
+  projectId?: string | null;
+  returnQuery: string;
   onClose: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const [editingMetadata, setEditingMetadata] = useState(false);
+  const [targetDraftChipId, setTargetDraftChipId] = useState("");
+  const [targetDraftType, setTargetDraftType] = useState<"qubit" | "coupling">("qubit");
+  const [targetDraftId, setTargetDraftId] = useState("");
+  const [cooldownDraftId, setCooldownDraftId] = useState("");
+
   const {
     data: postResponse,
     isLoading,
@@ -273,12 +304,149 @@ function ForumThreadPreviewSidebar({
     { skip: 0, limit: 5 },
     { query: { enabled: !!postId, staleTime: 30_000 } },
   );
+  const { data: membersResponse } = useListProjectMembers(projectId ?? "", {
+    query: { enabled: !!projectId && editingMetadata, staleTime: 60_000 },
+  });
+  const { data: chipsResponse } = useListChips({
+    query: { enabled: editingMetadata, staleTime: 60_000 },
+  });
+
   const post = postResponse?.data;
   const replies = repliesResponse?.data ?? [];
   const isOpen = !!postId;
   const category = post ? getForumCategory(post.category, categories) : null;
+  const CategoryIcon = category?.icon;
   const label = post?.labels?.[0] ? getForumLabel(post.labels[0]) : null;
   const targetContext = post ? postTargetContext(post) : null;
+  const canManage = !!post && (isOwner || currentUsername === post.username);
+  const updateMutation = useUpdateForumPost();
+  const members = useMemo(
+    () => (membersResponse?.data.members ?? []).filter((member) => member.status === "active"),
+    [membersResponse?.data.members],
+  );
+  const chips = useMemo(
+    () =>
+      [...(chipsResponse?.data.chips ?? [])].sort((a, b) => {
+        const aTime = a.installed_at ? new Date(a.installed_at).getTime() : 0;
+        const bTime = b.installed_at ? new Date(b.installed_at).getTime() : 0;
+        return bTime - aTime || b.chip_id.localeCompare(a.chip_id);
+      }),
+    [chipsResponse?.data.chips],
+  );
+  const { data: cooldownsResponse } = useListCooldowns(
+    { chip_id: targetDraftChipId || undefined },
+    {
+      query: {
+        enabled: editingMetadata && (!!targetDraftChipId || !!post?.cooldown_id),
+        staleTime: 60_000,
+      },
+    },
+  );
+  const cooldowns = useMemo(
+    () =>
+      [...(cooldownsResponse?.data.cooldowns ?? [])].sort((a, b) => {
+        const aTime = a.started_at ? new Date(a.started_at).getTime() : 0;
+        const bTime = b.started_at ? new Date(b.started_at).getTime() : 0;
+        return bTime - aTime || b.cooldown_id.localeCompare(a.cooldown_id);
+      }),
+    [cooldownsResponse?.data.cooldowns],
+  );
+  const selectedCooldown = cooldowns.find((cooldown) => cooldown.cooldown_id === cooldownDraftId);
+
+  useEffect(() => {
+    setEditingMetadata(false);
+  }, [postId]);
+
+  useEffect(() => {
+    if (!post || editingMetadata) return;
+    const context = postTargetContext(post);
+    setTargetDraftChipId(context?.chipId ?? "");
+    setTargetDraftType(context?.targetType ?? "qubit");
+    setTargetDraftId(context?.targetId ?? "");
+    setCooldownDraftId(post.cooldown_id ?? "");
+  }, [editingMetadata, post]);
+
+  const syncPostCache = (nextPost: ForumPostResponse) => {
+    queryClient.setQueryData(getGetForumPostQueryKey(nextPost.id), (current: unknown) =>
+      current && typeof current === "object" ? { ...current, data: nextPost } : current,
+    );
+    queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
+  };
+
+  const updateMetadata = async ({
+    category: nextCategory,
+    labels: nextLabels,
+    chipId: nextChipId,
+    targetType: nextTargetType,
+    targetId: nextTargetId,
+    cooldownId: nextCooldownId,
+    assigneeUsername: nextAssigneeUsername,
+  }: {
+    category?: string;
+    labels?: string[];
+    chipId?: string | null;
+    targetType?: "qubit" | "coupling" | null;
+    targetId?: string | null;
+    cooldownId?: string | null;
+    assigneeUsername?: string | null;
+  }) => {
+    if (!post || !canManage) return;
+    const response = await updateMutation.mutateAsync({
+      postId: post.id,
+      data: {
+        category: nextCategory ?? post.category,
+        title: post.title ?? null,
+        content: post.content,
+        content_blocks: (post.content_blocks ?? []) as Record<string, unknown>[],
+        labels: nextLabels ?? post.labels ?? [],
+        ...(nextCooldownId !== undefined ? { cooldown_id: nextCooldownId } : {}),
+        ...(nextAssigneeUsername !== undefined ? { assignee_username: nextAssigneeUsername } : {}),
+        ...(nextChipId !== undefined || nextTargetType !== undefined || nextTargetId !== undefined
+          ? {
+              chip_id: nextChipId,
+              target_type: nextTargetType,
+              target_id: nextTargetId,
+            }
+          : {}),
+      },
+    });
+    syncPostCache(response.data);
+  };
+
+  const togglePostLabel = (labelId: string) => {
+    if (!post) return;
+    const currentLabels = post.labels ?? [];
+    const nextLabels = currentLabels.includes(labelId) ? [] : [labelId];
+    updateMetadata({ labels: nextLabels });
+  };
+
+  const saveTargetMetadata = (
+    nextChipId = targetDraftChipId,
+    nextTargetType = targetDraftType,
+    nextTargetId = targetDraftId,
+  ) => {
+    const chipId = nextChipId.trim();
+    const targetId = nextTargetId.trim();
+    if (!chipId || !targetId) return;
+    updateMetadata({ chipId, targetType: nextTargetType, targetId });
+  };
+
+  const clearTargetMetadata = () => {
+    setTargetDraftChipId("");
+    setTargetDraftType("qubit");
+    setTargetDraftId("");
+    setCooldownDraftId("");
+    updateMetadata({ chipId: "", targetType: null, targetId: "", cooldownId: "" });
+  };
+
+  const saveCooldownMetadata = (nextCooldownId: string) => {
+    setCooldownDraftId(nextCooldownId);
+    updateMetadata({ cooldownId: nextCooldownId });
+  };
+
+  const saveAssigneeMetadata = (nextAssigneeUsername: string) => {
+    updateMetadata({ assigneeUsername: nextAssigneeUsername || null });
+  };
 
   return (
     <div
@@ -336,21 +504,38 @@ function ForumThreadPreviewSidebar({
                   </span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Link href={`/forum/${post.id}`} className="btn btn-primary btn-sm gap-1">
+                  <Link
+                    href={
+                      returnQuery
+                        ? `/forum/${post.id}?from=${encodeURIComponent(returnQuery)}`
+                        : `/forum/${post.id}`
+                    }
+                    className="btn btn-primary btn-sm gap-1"
+                  >
                     <ExternalLink className="h-3.5 w-3.5" />
                     Open full page
                   </Link>
+                  {canManage && (
+                    <button
+                      type="button"
+                      className={`btn btn-sm gap-1 ${editingMetadata ? "btn-neutral" : "btn-outline"}`}
+                      onClick={() => setEditingMetadata((open) => !open)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit metadata
+                    </button>
+                  )}
                 </div>
               </header>
 
-              {(targetContext || post.cooldown_id) && (
+              {(targetContext || post.cooldown_id || post.assignee_username) && (
                 <div className="rounded-lg bg-base-200/60 p-3 text-xs">
                   <div className="grid gap-2 sm:grid-cols-2">
                     {targetContext && (
                       <div>
                         <div className="text-base-content/45">Target</div>
                         <div className="mt-1 font-medium">
-                          {formatTargetLabel(targetContext.targetType, targetContext.targetId)} ·{" "}
+                          {formatTargetLabel(targetContext.targetType, targetContext.targetId)} -{" "}
                           {targetContext.chipId}
                         </div>
                       </div>
@@ -361,8 +546,171 @@ function ForumThreadPreviewSidebar({
                         <div className="mt-1 font-medium">{post.cooldown_id}</div>
                       </div>
                     )}
+                    {post.assignee_username && (
+                      <div>
+                        <div className="text-base-content/45">Assignee</div>
+                        <div className="mt-1 font-medium">{post.assignee_username}</div>
+                      </div>
+                    )}
                   </div>
                 </div>
+              )}
+
+              {editingMetadata && canManage && (
+                <section className="rounded-lg border border-base-300 bg-base-200/40 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold">Metadata</h3>
+                    {updateMutation.isPending && (
+                      <span className="loading loading-spinner loading-xs" />
+                    )}
+                  </div>
+                  <div className="space-y-4">
+                    <label className="block space-y-1">
+                      <span className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+                        {CategoryIcon && <CategoryIcon className="h-3.5 w-3.5" />}
+                        Category
+                      </span>
+                      <select
+                        className="select select-bordered select-sm w-full"
+                        value={post.category}
+                        disabled={updateMutation.isPending}
+                        onChange={(event) => updateMetadata({ category: event.target.value })}
+                      >
+                        {categories.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+                        <Crosshair className="h-3.5 w-3.5" />
+                        Target
+                      </div>
+                      <select
+                        className="select select-bordered select-xs w-full"
+                        value={targetDraftChipId}
+                        disabled={updateMutation.isPending}
+                        onChange={(event) => {
+                          const nextChipId = event.target.value;
+                          setTargetDraftChipId(nextChipId);
+                          setCooldownDraftId("");
+                          saveTargetMetadata(nextChipId, targetDraftType, targetDraftId);
+                        }}
+                      >
+                        <option value="">Select chip</option>
+                        {chips.map((chip) => (
+                          <option key={chip.chip_id} value={chip.chip_id}>
+                            {chip.chip_id}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="grid grid-cols-[96px_1fr] gap-2">
+                        <select
+                          className="select select-bordered select-xs w-full"
+                          value={targetDraftType}
+                          disabled={updateMutation.isPending}
+                          onChange={(event) => {
+                            const nextType =
+                              event.target.value === "coupling" ? "coupling" : "qubit";
+                            setTargetDraftType(nextType);
+                            saveTargetMetadata(targetDraftChipId, nextType, targetDraftId);
+                          }}
+                        >
+                          <option value="qubit">Qubit</option>
+                          <option value="coupling">Coupling</option>
+                        </select>
+                        <input
+                          className="input input-bordered input-xs w-full"
+                          value={targetDraftId}
+                          disabled={updateMutation.isPending}
+                          onChange={(event) => setTargetDraftId(event.target.value)}
+                          onBlur={() => saveTargetMetadata()}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.currentTarget.blur();
+                            }
+                          }}
+                          placeholder={targetDraftType === "coupling" ? "0-1" : "0"}
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs"
+                          onClick={clearTargetMetadata}
+                          disabled={updateMutation.isPending || !targetContext}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    <label className="block space-y-1">
+                      <span className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        Cooldown
+                      </span>
+                      <select
+                        className="select select-bordered select-xs w-full"
+                        value={cooldownDraftId}
+                        onChange={(event) => saveCooldownMetadata(event.target.value)}
+                        disabled={!targetDraftChipId || updateMutation.isPending}
+                      >
+                        <option value="">No cooldown</option>
+                        {cooldowns.map((cooldown) => (
+                          <option key={cooldown.cooldown_id} value={cooldown.cooldown_id}>
+                            {cooldown.cooldown_id}
+                            {formatCooldownPeriod(cooldown)
+                              ? ` - ${formatCooldownPeriod(cooldown)}`
+                              : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedCooldown && (
+                        <span className="block text-xs text-base-content/55">
+                          {formatCooldownPeriod(selectedCooldown)}
+                        </span>
+                      )}
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+                        <UserRound className="h-3.5 w-3.5" />
+                        Assignee
+                      </span>
+                      <select
+                        className="select select-bordered select-xs w-full"
+                        value={post.assignee_username ?? ""}
+                        onChange={(event) => saveAssigneeMetadata(event.target.value)}
+                        disabled={updateMutation.isPending}
+                      >
+                        <option value="">Unassigned</option>
+                        {members.map((member) => (
+                          <option key={member.username} value={member.username}>
+                            {member.display_name
+                              ? `${member.display_name} (@${member.username})`
+                              : member.username}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+                        <Tag className="h-3.5 w-3.5" />
+                        Labels
+                      </div>
+                      <ForumLabelPicker
+                        selectedLabels={post.labels ?? []}
+                        onToggle={togglePostLabel}
+                        disabled={updateMutation.isPending}
+                      />
+                    </div>
+                  </div>
+                </section>
               )}
 
               <section>
@@ -430,67 +778,44 @@ function ForumThreadPreviewSidebar({
 
 export function ForumPageContent() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { isOwner } = useProject();
-  const [category, setCategory] = useState<CategoryFilter>("all");
-  const [labelFilter, setLabelFilter] = useState<string>("all");
-  const [status, setStatus] = useState<StatusFilter>("open");
-  const [skip, setSkip] = useState(0);
-  const [showComposer, setShowComposer] = useState(false);
+  const { isOwner, projectId } = useProject();
+  const [category, setCategory] = useState<CategoryFilter>(
+    () => (searchParams.get("forum_category") as CategoryFilter | null) ?? "all",
+  );
+  const [labelFilter, setLabelFilter] = useState<string>(
+    () => searchParams.get("forum_label") ?? "all",
+  );
+  const [status, setStatus] = useState<StatusFilter>(() =>
+    parseForumStatus(searchParams.get("forum_status")),
+  );
+  const [skip, setSkip] = useState(
+    () => (parseForumPage(searchParams.get("forum_page")) - 1) * PAGE_SIZE,
+  );
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [hasAppliedDraftParams, setHasAppliedDraftParams] = useState(false);
-  const [draftTargetContext, setDraftTargetContext] = useState<ForumTargetContext | null>(null);
-  const [draftCooldownId, setDraftCooldownId] = useState<string | null>(null);
-  const [newCategory, setNewCategory] = useState("qubit");
-  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [contentBlocks, setContentBlocks] = useState<Record<string, unknown>[]>([]);
   const [categoryKey, setCategoryKey] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
   const [categoryColor, setCategoryColor] = useState("neutral");
   const [categoryIcon, setCategoryIcon] = useState("message-square");
-  const { uploadImage } = useImageUpload("forum");
 
   useEffect(() => {
-    if (hasAppliedDraftParams) return;
-    const draftTitle = searchParams.get("title");
-    const draftContent = searchParams.get("content");
-    const draftCategory = searchParams.get("category");
-    const chipId = searchParams.get("chip_id");
-    const targetId = searchParams.get("target_id");
-    const targetType = normalizeTargetType(searchParams.get("target_type"));
-    const draftLabels = searchParams.get("labels");
-    const cooldownId = searchParams.get("cooldown_id");
-    if (!draftTitle && !draftContent && !draftCategory) {
-      setHasAppliedDraftParams(true);
-      return;
-    }
-    if (draftCategory) {
-      setNewCategory(draftCategory);
-      setCategory(draftCategory as CategoryFilter);
-    }
-    if (draftTitle) setTitle(draftTitle);
-    if (draftContent) setContent(draftContent);
-    if (draftLabels) {
-      setSelectedLabels(
-        draftLabels
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-      );
-    }
-    if (chipId && targetId && targetType) {
-      setDraftTargetContext({ chipId, targetType, targetId });
-    }
-    if (cooldownId) setDraftCooldownId(cooldownId);
-    setContentBlocks([]);
-    setShowComposer(true);
-    setHasAppliedDraftParams(true);
-  }, [hasAppliedDraftParams, searchParams]);
+    const draftKeys = [
+      "title",
+      "content",
+      "category",
+      "chip_id",
+      "target_id",
+      "target_type",
+      "cooldown_id",
+      "labels",
+    ];
+    if (!draftKeys.some((key) => searchParams.has(key))) return;
+    router.replace(`/forum/new?${searchParams.toString()}`);
+  }, [router, searchParams]);
 
   const params: ListForumPostsParams = {
     skip,
@@ -516,12 +841,10 @@ export function ForumPageContent() {
     [categoriesResponse?.data.categories],
   );
 
-  const createMutation = useCreateForumPost();
   const createCategoryMutation = useCreateForumCategory();
   const deleteCategoryMutation = useDeleteForumCategory();
   const closeMutation = useCloseForumPost();
   const reopenMutation = useReopenForumPost();
-  const { triggerAiReply } = useForumAiReply();
 
   const invalidateList = () => {
     queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
@@ -533,55 +856,68 @@ export function ForumPageContent() {
     });
   };
 
-  const submitThread = async () => {
-    const trimmedTitle = title.trim();
-    const trimmedContent = content.trim();
-    if (!trimmedTitle || !trimmedContent) return;
-
-    const response = await createMutation.mutateAsync({
-      data: {
-        category: newCategory,
-        title: trimmedTitle,
-        content: trimmedContent,
-        content_blocks: contentBlocks,
-        parent_id: null,
-        labels: selectedLabels,
-        chip_id: draftTargetContext?.chipId,
-        target_type: draftTargetContext?.targetType,
-        target_id: draftTargetContext?.targetId,
-        cooldown_id: draftCooldownId,
-      },
-    });
-    setTitle("");
-    setContent("");
-    setContentBlocks([]);
-    setSelectedLabels([]);
-    setShowComposer(false);
-    setDraftTargetContext(null);
-    setDraftCooldownId(null);
-    invalidateList();
-    if (/@qdash\b/i.test(trimmedContent)) {
-      triggerAiReply(response.data.id, trimmedContent, invalidateList);
-    }
+  const buildListQuery = (
+    nextState: {
+      category?: CategoryFilter;
+      labelFilter?: string;
+      status?: StatusFilter;
+      skip?: number;
+    } = {},
+  ) => {
+    const nextCategory = nextState.category ?? category;
+    const nextLabelFilter = nextState.labelFilter ?? labelFilter;
+    const nextStatus = nextState.status ?? status;
+    const nextSkip = nextState.skip ?? skip;
+    const next = new URLSearchParams();
+    const page = Math.floor(nextSkip / PAGE_SIZE) + 1;
+    if (page > 1) next.set("forum_page", String(page));
+    if (nextCategory !== "all") next.set("forum_category", nextCategory);
+    if (nextLabelFilter !== "all") next.set("forum_label", nextLabelFilter);
+    if (nextStatus !== "open") next.set("forum_status", nextStatus);
+    return next.toString();
   };
+
+  const replaceListQuery = (nextState: {
+    category?: CategoryFilter;
+    labelFilter?: string;
+    status?: StatusFilter;
+    skip?: number;
+  }) => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("forum_page");
+    next.delete("forum_category");
+    next.delete("forum_label");
+    next.delete("forum_status");
+    const listQuery = buildListQuery(nextState);
+    new URLSearchParams(listQuery).forEach((value, key) => next.set(key, value));
+    const query = next.toString();
+    router.replace(query ? `/forum?${query}` : "/forum", { scroll: false });
+  };
+
+  const listReturnQuery = buildListQuery();
 
   const setCategoryFilter = (nextCategory: CategoryFilter) => {
     setCategory(nextCategory);
     setSkip(0);
+    replaceListQuery({ category: nextCategory, skip: 0 });
   };
 
   const setStatusFilter = (nextStatus: StatusFilter) => {
     setStatus(nextStatus);
     setSkip(0);
-  };
-
-  const toggleSelectedLabel = (label: string) => {
-    setSelectedLabels((current) => (current.includes(label) ? [] : [label]));
+    replaceListQuery({ status: nextStatus, skip: 0 });
   };
 
   const setLabelFilterValue = (nextLabel: string) => {
     setLabelFilter(nextLabel);
     setSkip(0);
+    replaceListQuery({ labelFilter: nextLabel, skip: 0 });
+  };
+
+  const setPageSkip = (nextSkip: number) => {
+    const boundedSkip = Math.max(0, nextSkip);
+    setSkip(boundedSkip);
+    replaceListQuery({ skip: boundedSkip });
   };
 
   const submitCategory = async () => {
@@ -623,13 +959,17 @@ export function ForumPageContent() {
                 Categories
               </button>
             )}
-            <button
+            <Link
               className="btn btn-primary btn-sm gap-2"
-              onClick={() => setShowComposer((open) => !open)}
+              href={
+                listReturnQuery
+                  ? `/forum/new?from=${encodeURIComponent(listReturnQuery)}`
+                  : "/forum/new"
+              }
             >
-              {showComposer ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {showComposer ? "Close" : "New Thread"}
-            </button>
+              <Plus className="h-4 w-4" />
+              New Thread
+            </Link>
           </div>
         }
       />
@@ -818,12 +1158,6 @@ export function ForumPageContent() {
                               if (category === item.id) {
                                 setCategoryFilter("all");
                               }
-                              if (newCategory === item.id) {
-                                setNewCategory(
-                                  categories.find((candidate) => candidate.id !== item.id)?.id ??
-                                    "other",
-                                );
-                              }
                               invalidateCategories();
                             },
                           },
@@ -837,76 +1171,6 @@ export function ForumPageContent() {
                   </div>
                 );
               })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showComposer && (
-        <div className="card bg-base-200 shadow-lg mb-4">
-          <div className="card-body">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="card-title text-sm">New Thread</h2>
-              {draftTargetContext && (
-                <span className="badge badge-outline gap-1">
-                  <Crosshair className="h-3 w-3" />
-                  {formatTargetLabel(
-                    draftTargetContext.targetType,
-                    draftTargetContext.targetId,
-                  )} ·{" "}
-                  {draftTargetContext.chipId}
-                </span>
-              )}
-              {draftCooldownId && (
-                <span className="badge badge-outline">Cooldown · {draftCooldownId}</span>
-              )}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
-              <select
-                className="select select-bordered select-sm w-full"
-                value={newCategory}
-                onChange={(event) => setNewCategory(event.target.value)}
-              >
-                {categories.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="input input-bordered input-sm w-full"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Thread title"
-              />
-            </div>
-            <ForumLabelSelector selectedLabels={selectedLabels} onToggle={toggleSelectedLabel} />
-            <ForumBlockEditor
-              key={showComposer ? "composer-open" : "composer-closed"}
-              legacyMarkdown={content}
-              onChange={(blocks, markdown) => {
-                setContentBlocks(blocks);
-                setContent(markdown);
-              }}
-              onImageUpload={uploadImage}
-            />
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <span className="text-xs text-base-content/50">
-                Type <kbd className="kbd kbd-xs">/</kbd> for blocks (table, image, heading, list,
-                …). Use <span className="font-mono">@username</span> in text to mention members.
-              </span>
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                onClick={submitThread}
-                disabled={!title.trim() || !content.trim() || createMutation.isPending}
-              >
-                {createMutation.isPending ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  "Post"
-                )}
-              </button>
             </div>
           </div>
         </div>
@@ -948,7 +1212,7 @@ export function ForumPageContent() {
               <button
                 className="btn btn-sm btn-ghost"
                 disabled={currentPage === 0}
-                onClick={() => setSkip(Math.max(0, skip - PAGE_SIZE))}
+                onClick={() => setPageSkip(skip - PAGE_SIZE)}
               >
                 Previous
               </button>
@@ -958,7 +1222,7 @@ export function ForumPageContent() {
               <button
                 className="btn btn-sm btn-ghost"
                 disabled={currentPage >= totalPages - 1}
-                onClick={() => setSkip(skip + PAGE_SIZE)}
+                onClick={() => setPageSkip(skip + PAGE_SIZE)}
               >
                 Next
               </button>
@@ -969,6 +1233,10 @@ export function ForumPageContent() {
       <ForumThreadPreviewSidebar
         postId={selectedPostId}
         categories={categories}
+        currentUsername={user?.username}
+        isOwner={isOwner}
+        projectId={projectId}
+        returnQuery={listReturnQuery}
         onClose={() => setSelectedPostId(null)}
       />
     </PageContainer>

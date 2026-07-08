@@ -200,10 +200,6 @@ vi.mock("@/components/features/dashboard/DashboardSummaryTable", () => ({
   DashboardSummaryTable: () => <div>SummaryTable</div>,
 }));
 
-vi.mock("@/components/features/dashboard/DashboardNotesSummary", () => ({
-  DashboardNotesSummary: () => <div>NotesSummary</div>,
-}));
-
 vi.mock("@/components/features/dashboard/DashboardChipNoteModal", () => ({
   DashboardChipNoteModal: () => <div data-testid="chip-note-modal" />,
 }));

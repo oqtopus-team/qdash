@@ -3,14 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { ExternalLink, MessageSquarePlus, Pencil, Save, StickyNote, Trash2, X } from "lucide-react";
+import { ExternalLink, MessageSquarePlus, Pencil, Save, StickyNote, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useListForumPosts } from "@/client/forum/forum";
 import {
   getGetChipNotesSummaryQueryKey,
-  useDeleteCouplingNote,
-  useDeleteQubitNote,
   useUpsertCouplingNote,
   useUpsertQubitNote,
 } from "@/client/note/note";
@@ -80,7 +78,7 @@ function forumDraftHref(chipId: string, targetId: string, cooldownId?: string | 
     content: [`Chip: ${chipId}`, `Target: ${targetLabel}`, "", "Notes:"].join("\n"),
   });
   if (cooldownId) params.set("cooldown_id", cooldownId);
-  return `/forum?${params.toString()}`;
+  return `/forum/new?${params.toString()}`;
 }
 
 function normalizeQid(value: string): string {
@@ -152,11 +150,8 @@ export function MetricNotePanel({
   const [draft, setDraft] = useState(existing?.content ?? "");
 
   const upsertQubit = useUpsertQubitNote();
-  const deleteQubit = useDeleteQubitNote();
   const upsertCoupling = useUpsertCouplingNote();
-  const deleteCoupling = useDeleteCouplingNote();
   const upsertPending = isCoupling ? upsertCoupling.isPending : upsertQubit.isPending;
-  const deletePending = isCoupling ? deleteCoupling.isPending : deleteQubit.isPending;
   const { data: forumPostsResponse } = useListForumPosts(
     {
       chip_id: chipId,
@@ -203,28 +198,6 @@ export function MetricNotePanel({
     setMode("view");
   };
 
-  const handleDelete = async () => {
-    if (!existing) {
-      setDraft("");
-      setMode("view");
-      return;
-    }
-    if (isCoupling) {
-      await deleteCoupling.mutateAsync({
-        chipId,
-        couplingId: targetId,
-      });
-    } else {
-      await deleteQubit.mutateAsync({
-        chipId,
-        qid: targetId,
-      });
-    }
-    await invalidate();
-    setDraft("");
-    setMode("view");
-  };
-
   const handleCancel = () => {
     setDraft(existing?.content ?? "");
     setMode("view");
@@ -259,12 +232,7 @@ export function MetricNotePanel({
       {/* Body */}
       <div className="flex-1 overflow-auto p-4 space-y-3">
         {mode === "view" ? (
-          <ViewState
-            existing={existing}
-            onEdit={() => setMode("edit")}
-            onDelete={handleDelete}
-            deletePending={deletePending}
-          />
+          <ViewState existing={existing} onEdit={() => setMode("edit")} />
         ) : (
           <EditState
             existing={existing}
@@ -272,9 +240,7 @@ export function MetricNotePanel({
             onChange={setDraft}
             onSave={handleSave}
             onCancel={handleCancel}
-            onDelete={handleDelete}
             upsertPending={upsertPending}
-            deletePending={deletePending}
             mentionCandidates={mentionCandidates}
           />
         )}
@@ -383,17 +349,7 @@ export function MetricNotePanel({
   );
 }
 
-function ViewState({
-  existing,
-  onEdit,
-  onDelete,
-  deletePending,
-}: {
-  existing?: TargetNoteEntry;
-  onEdit: () => void;
-  onDelete: () => void;
-  deletePending: boolean;
-}) {
+function ViewState({ existing, onEdit }: { existing?: TargetNoteEntry; onEdit: () => void }) {
   if (!existing || !existing.content.trim()) {
     return (
       <div className="rounded-lg border border-dashed border-base-300 p-4 text-center space-y-3 bg-base-100">
@@ -426,15 +382,6 @@ function ViewState({
           <Pencil className="h-3.5 w-3.5" />
           Edit
         </button>
-        <button
-          className="btn btn-sm btn-ghost text-error gap-1"
-          onClick={onDelete}
-          disabled={deletePending}
-          type="button"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          {deletePending ? "Deleting…" : "Delete"}
-        </button>
       </div>
     </div>
   );
@@ -446,9 +393,7 @@ function EditState({
   onChange,
   onSave,
   onCancel,
-  onDelete,
   upsertPending,
-  deletePending,
   mentionCandidates,
 }: {
   existing?: TargetNoteEntry;
@@ -456,9 +401,7 @@ function EditState({
   onChange: (v: string) => void;
   onSave: () => void;
   onCancel: () => void;
-  onDelete: () => void;
   upsertPending: boolean;
-  deletePending: boolean;
   mentionCandidates?: MentionCandidate[];
 }) {
   const trimmed = draft.trim();
@@ -482,18 +425,8 @@ function EditState({
           </span>
         )}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-        <button
-          className="btn btn-sm btn-ghost text-error gap-1"
-          onClick={onDelete}
-          disabled={!existing || deletePending}
-          type="button"
-          title={existing ? "Delete this note" : "No saved note to delete"}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Delete
-        </button>
-        <div className="flex gap-2 ml-auto">
+      <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+        <div className="flex gap-2">
           <button className="btn btn-sm btn-ghost gap-1" onClick={onCancel} type="button">
             <X className="h-3.5 w-3.5" />
             Cancel

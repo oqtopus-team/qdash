@@ -379,6 +379,7 @@ class FlowService:
                     created_at=flow.created_at,
                     updated_at=flow.updated_at,
                     tags=flow.tags,
+                    file_exists=Path(flow.file_path).exists(),
                 )
                 for flow in flows
             ]

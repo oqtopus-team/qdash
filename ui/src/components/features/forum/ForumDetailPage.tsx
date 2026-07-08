@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -130,6 +130,7 @@ function PostBody({
   canEdit: canEditOverride,
   onEdit,
   onDelete,
+  postAction = "delete",
   editing,
   editContent,
   editInitialBlocks,
@@ -146,7 +147,8 @@ function PostBody({
   currentUsername?: string;
   canEdit?: boolean;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
+  postAction?: "delete" | "close";
   editing: boolean;
   /** Current markdown projection — used only to gate the Save button. */
   editContent: string;
@@ -162,6 +164,8 @@ function PostBody({
 }) {
   const canEdit = canEditOverride ?? currentUsername === post.username;
   const isAi = post.is_ai_reply || post.username === "qdash";
+  const ActionIcon = postAction === "close" ? Lock : Trash2;
+  const actionTitle = postAction === "close" ? "Close thread" : "Delete";
 
   return (
     <div
@@ -186,7 +190,7 @@ function PostBody({
             <span className="text-xs italic text-base-content/30">(edited)</span>
           )}
         </div>
-        {canEdit && !editing && !isAi && (
+        {canEdit && !editing && !isAi && onDelete && (
           <div className="flex items-center gap-1">
             <button
               className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-primary"
@@ -196,11 +200,13 @@ function PostBody({
               <Pencil className="h-4 w-4" />
             </button>
             <button
-              className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-error"
+              className={`btn btn-ghost btn-sm btn-square text-base-content/40 ${
+                postAction === "close" ? "hover:text-primary" : "hover:text-error"
+              }`}
               onClick={onDelete}
-              title="Delete"
+              title={actionTitle}
             >
-              <Trash2 className="h-4 w-4" />
+              <ActionIcon className="h-4 w-4" />
             </button>
           </div>
         )}
@@ -244,6 +250,7 @@ function PostBody({
 
 export function ForumDetailPage({ postId }: { postId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { isOwner, projectId } = useProject();
@@ -295,12 +302,28 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     [membersResponse?.data.members],
   );
   const { data: chipsResponse } = useListChips({ query: { staleTime: 60_000 } });
-  const chips = chipsResponse?.data.chips ?? [];
+  const chips = useMemo(
+    () =>
+      [...(chipsResponse?.data.chips ?? [])].sort((a, b) => {
+        const aTime = a.installed_at ? new Date(a.installed_at).getTime() : 0;
+        const bTime = b.installed_at ? new Date(b.installed_at).getTime() : 0;
+        return bTime - aTime || b.chip_id.localeCompare(a.chip_id);
+      }),
+    [chipsResponse?.data.chips],
+  );
   const { data: cooldownsResponse } = useListCooldowns(
     { chip_id: targetDraftChipId || undefined },
     { query: { enabled: !!targetDraftChipId || !!post?.cooldown_id, staleTime: 60_000 } },
   );
-  const cooldowns = cooldownsResponse?.data.cooldowns ?? [];
+  const cooldowns = useMemo(
+    () =>
+      [...(cooldownsResponse?.data.cooldowns ?? [])].sort((a, b) => {
+        const aTime = a.started_at ? new Date(a.started_at).getTime() : 0;
+        const bTime = b.started_at ? new Date(b.started_at).getTime() : 0;
+        return bTime - aTime || b.cooldown_id.localeCompare(a.cooldown_id);
+      }),
+    [cooldownsResponse?.data.cooldowns],
+  );
   const selectedCooldown = cooldowns.find((cooldown) => cooldown.cooldown_id === cooldownDraftId);
   const currentPostCooldown = cooldowns.find(
     (cooldown) => cooldown.cooldown_id === post?.cooldown_id,
@@ -317,6 +340,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     error: aiError,
     triggerAiReply,
   } = useForumAiReply();
+  const fromQuery = searchParams.get("from");
+  const forumReturnHref = fromQuery ? `/forum?${fromQuery.replace(/^\?/, "")}` : "/forum";
 
   useEffect(() => {
     if (!post) return;
@@ -540,12 +565,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     updateRootMetadata({ assigneeUsername: nextAssigneeUsername || null });
   };
 
-  const handleDelete = async (targetPostId: string, isRoot: boolean) => {
+  const handleDeleteReply = async (targetPostId: string) => {
     await deleteMutation.mutateAsync({ postId: targetPostId });
-    if (isRoot) {
-      router.push("/forum");
-      return;
-    }
     invalidateThread();
   };
 
@@ -561,7 +582,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-16">
         <p className="text-base-content/60">Forum thread not found</p>
-        <Link href="/forum" className="btn btn-sm btn-ghost">
+        <Link href={forumReturnHref} className="btn btn-sm btn-ghost">
           <ArrowLeft className="h-4 w-4" />
           Back to Forum
         </Link>
@@ -579,7 +600,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
       <div className="mb-6 flex min-w-0 items-start gap-3">
         <button
           className="btn btn-square btn-ghost btn-sm shrink-0"
-          onClick={() => router.push("/forum")}
+          onClick={() => router.push(forumReturnHref)}
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
@@ -645,7 +666,12 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             currentUsername={currentUsername}
             canEdit={canManage}
             onEdit={handleStartEditRoot}
-            onDelete={() => handleDelete(post.id, true)}
+            onDelete={
+              post.is_closed
+                ? undefined
+                : () => closeMutation.mutate({ postId }, { onSuccess: invalidateThread })
+            }
+            postAction="close"
             editing={editingRoot}
             editContent={editRootContent}
             editInitialBlocks={editRootBlocks}
@@ -679,7 +705,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                     post={reply}
                     currentUsername={currentUsername}
                     onEdit={() => handleStartEditReply(reply)}
-                    onDelete={() => handleDelete(reply.id, false)}
+                    onDelete={() => handleDeleteReply(reply.id)}
                     editing={editingReplyId === reply.id}
                     editContent={editReplyContent}
                     editInitialBlocks={editReplyBlocks}

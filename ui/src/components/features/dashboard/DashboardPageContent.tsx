@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { StickyNote } from "lucide-react";
+import { ArrowRightLeft, StickyNote } from "lucide-react";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
@@ -35,7 +35,6 @@ import { dateToDateTimeLocal } from "@/lib/utils/datetime";
 
 import { DashboardCdfChart } from "./DashboardCdfChart";
 import { DashboardCouplingGrid } from "./DashboardCouplingGrid";
-import { DashboardNotesSummary } from "./DashboardNotesSummary";
 import { DashboardQubitGrid } from "./DashboardQubitGrid";
 import { DashboardSummaryTable } from "./DashboardSummaryTable";
 import {
@@ -277,20 +276,6 @@ export function DashboardPageContent() {
     });
     return targets;
   }, [forumPostsResponse?.data.posts]);
-
-  const taskNotes = useMemo(
-    () =>
-      (summary?.task_notes ?? [])
-        .map((t) => ({
-          taskId: t.task_id,
-          qid: t.qid,
-          content: stripAiGeneratedNoteSections(t.note?.content ?? ""),
-          username: t.note?.updated_by ?? "",
-          updatedAt: t.note?.updated_at ?? "",
-        }))
-        .filter((t) => t.content.trim().length > 0),
-    [summary],
-  );
 
   const notesByMetric = useMemo(() => {
     const map: Record<string, Record<string, NoteEntry>> = {};
@@ -558,32 +543,6 @@ export function DashboardPageContent() {
           />
         ) : (
           <>
-            {/* All notes overview */}
-            <Card
-              variant="default"
-              padding="md"
-              title="Notes"
-              description="Pinned summaries are the dashboard index. Use forum topics for separate notes and multi-person discussion."
-            >
-              <DashboardNotesSummary
-                notesByTarget={notesByTarget}
-                targetNotesByTarget={targetNotesByTarget}
-                taskNotes={taskNotes}
-                onEditTarget={setEditingTargetNote}
-                onEdit={(entry) => {
-                  const cfg =
-                    qubitMetrics.find((m) => m.key === entry.metricKey) ??
-                    couplingMetrics.find((m) => m.key === entry.metricKey);
-                  setEditingNote({
-                    targetId: entry.targetId,
-                    metricKey: entry.metricKey,
-                    metricTitle: entry.metricTitle,
-                    metricUnit: cfg?.unit ?? "",
-                  });
-                }}
-              />
-            </Card>
-
             {/* Pinned summary topology */}
             <Card
               variant="default"
@@ -615,22 +574,23 @@ export function DashboardPageContent() {
                     <div className="flex items-center gap-2">
                       <h4 className="text-sm font-semibold">Coupling summaries</h4>
                     </div>
-                    <div className="join">
-                      <button
-                        type="button"
-                        className={`join-item btn btn-xs ${couplingDirection === "forward" ? "btn-primary" : "btn-outline"}`}
-                        onClick={() => setCouplingDirection("forward")}
-                      >
-                        Forward
-                      </button>
-                      <button
-                        type="button"
-                        className={`join-item btn btn-xs ${couplingDirection === "reverse" ? "btn-primary" : "btn-outline"}`}
-                        onClick={() => setCouplingDirection("reverse")}
-                      >
-                        Reverse
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCouplingDirection(isReverseCouplingDirection ? "forward" : "reverse")
+                      }
+                      className={`btn btn-sm gap-1.5 ${isReverseCouplingDirection ? "btn-secondary" : "btn-outline"}`}
+                      title={
+                        isReverseCouplingDirection
+                          ? "Showing reverse direction"
+                          : "Showing forward direction"
+                      }
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5" />
+                      <span className="text-xs">
+                        {isReverseCouplingDirection ? "Reverse" : "Forward"}
+                      </span>
+                    </button>
                   </div>
                   <DashboardCouplingGrid
                     metricData={noteCouplingTopologyData}
@@ -754,22 +714,23 @@ export function DashboardPageContent() {
                 description="Click any coupling to update its pinned summary while inspecting the selected metric."
               >
                 <div className="mb-4 flex justify-end">
-                  <div className="join">
-                    <button
-                      type="button"
-                      className={`join-item btn btn-xs ${couplingDirection === "forward" ? "btn-primary" : "btn-outline"}`}
-                      onClick={() => setCouplingDirection("forward")}
-                    >
-                      Forward
-                    </button>
-                    <button
-                      type="button"
-                      className={`join-item btn btn-xs ${couplingDirection === "reverse" ? "btn-primary" : "btn-outline"}`}
-                      onClick={() => setCouplingDirection("reverse")}
-                    >
-                      Reverse
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCouplingDirection(isReverseCouplingDirection ? "forward" : "reverse")
+                    }
+                    className={`btn btn-sm gap-1.5 ${isReverseCouplingDirection ? "btn-secondary" : "btn-outline"}`}
+                    title={
+                      isReverseCouplingDirection
+                        ? "Showing reverse direction"
+                        : "Showing forward direction"
+                    }
+                  >
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                    <span className="text-xs">
+                      {isReverseCouplingDirection ? "Reverse" : "Forward"}
+                    </span>
+                  </button>
                 </div>
                 <div className="space-y-6">
                   {couplingMetrics.map((m) => {

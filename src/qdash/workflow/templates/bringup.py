@@ -20,6 +20,13 @@ from qdash.workflow.service.calib_service import on_flow_cancellation
 from qdash.workflow.service.steps import BringUp, ConfigureAll
 from qdash.workflow.service.targets import MuxTargets
 
+BRINGUP_TASKS: list[str] = [
+    "CheckResonatorSpectroscopy",
+    "CheckQubitSpectroscopy",
+    "CheckControlAmplitude",
+    "CheckChevron",
+]
+
 
 @flow(on_cancellation=[on_flow_cancellation])
 def bringup(
@@ -44,7 +51,7 @@ def bringup(
     Args:
         username: User name (from UI)
         chip_id: Chip ID (from UI)
-        mux_ids: MUX IDs to calibrate (default: all 16)
+        mux_ids: MUX IDs to calibrate (required)
         exclude_qids: Qubit IDs to exclude
         qids: Not used (for UI compatibility)
         mode: Execution mode:
@@ -60,7 +67,7 @@ def bringup(
         Pipeline results with bring-up step outputs
     """
     if mux_ids is None:
-        mux_ids = list(range(16))
+        raise ValueError("mux_ids is required; select MUX targets before running this flow")
     if exclude_qids is None:
         exclude_qids = []
 
@@ -79,7 +86,7 @@ def bringup(
 
     steps = [
         ConfigureAll(),
-        BringUp(mode=mode),
+        BringUp(mode=mode, tasks=BRINGUP_TASKS),
     ]
 
     cal = CalibService(

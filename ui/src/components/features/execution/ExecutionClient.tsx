@@ -9,7 +9,6 @@ import {
   CheckCircle,
   Clock,
   Download,
-  ExternalLink,
   StopCircle,
   UserRound,
   XCircle,
@@ -235,20 +234,6 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                   {cancelMutation.isPending ? "Cancelling..." : "Cancel Execution"}
                 </button>
               )}
-              <a
-                href={`/execution/${executionId}/experiment`}
-                className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
-              >
-                <ExternalLink className="mr-2" size={16} />
-                Go to Experiment
-              </a>
-              <a
-                href={((execution.note as { [key: string]: unknown })?.ui_url as string) || "#"}
-                className="bg-accent text-accent-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
-              >
-                <ExternalLink className="mr-2" size={16} />
-                Go to Flow
-              </a>
             </div>
           </div>
 
