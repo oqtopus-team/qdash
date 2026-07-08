@@ -78,7 +78,7 @@ function forumDraftHref(chipId: string, targetId: string, cooldownId?: string | 
     content: [`Chip: ${chipId}`, `Target: ${targetLabel}`, "", "Notes:"].join("\n"),
   });
   if (cooldownId) params.set("cooldown_id", cooldownId);
-  return `/forum?${params.toString()}`;
+  return `/forum/new?${params.toString()}`;
 }
 
 function normalizeQid(value: string): string {

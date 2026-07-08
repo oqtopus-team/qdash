@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -30,7 +29,6 @@ import {
   getListForumPostsQueryKey,
   useCloseForumPost,
   useCreateForumCategory,
-  useCreateForumPost,
   useDeleteForumCategory,
   useGetForumPost,
   useGetForumPostReplies,
@@ -46,8 +44,6 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
-import { useForumAiReply } from "@/hooks/useForumAiReply";
-import { useImageUpload } from "@/hooks/useImageUpload";
 import { formatDateTimeCompact, formatRelativeTime } from "@/lib/utils/datetime";
 import type { ForumPostResponse, ListForumPostsParams } from "@/schemas";
 
@@ -60,13 +56,8 @@ import {
   toForumCategoryDefinition,
   type ForumCategoryDefinition,
 } from "./categories";
-import { ForumLabelPicker, ForumLabelSelector } from "./ForumLabelSelector";
+import { ForumLabelPicker } from "./ForumLabelSelector";
 import { ForumBlockViewer } from "./ForumBlockEditor";
-
-const ForumBlockEditor = dynamic(
-  () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
-  { ssr: false },
-);
 
 const PAGE_SIZE = 30;
 
@@ -803,60 +794,28 @@ export function ForumPageContent() {
   const [skip, setSkip] = useState(
     () => (parseForumPage(searchParams.get("forum_page")) - 1) * PAGE_SIZE,
   );
-  const [showComposer, setShowComposer] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [hasAppliedDraftParams, setHasAppliedDraftParams] = useState(false);
-  const [draftTargetContext, setDraftTargetContext] = useState<ForumTargetContext | null>(null);
-  const [draftCooldownId, setDraftCooldownId] = useState<string | null>(null);
-  const [newCategory, setNewCategory] = useState("qubit");
-  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [contentBlocks, setContentBlocks] = useState<Record<string, unknown>[]>([]);
   const [categoryKey, setCategoryKey] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
   const [categoryColor, setCategoryColor] = useState("neutral");
   const [categoryIcon, setCategoryIcon] = useState("message-square");
-  const { uploadImage } = useImageUpload("forum");
 
   useEffect(() => {
-    if (hasAppliedDraftParams) return;
-    const draftTitle = searchParams.get("title");
-    const draftContent = searchParams.get("content");
-    const draftCategory = searchParams.get("category");
-    const chipId = searchParams.get("chip_id");
-    const targetId = searchParams.get("target_id");
-    const targetType = normalizeTargetType(searchParams.get("target_type"));
-    const draftLabels = searchParams.get("labels");
-    const cooldownId = searchParams.get("cooldown_id");
-    if (!draftTitle && !draftContent && !draftCategory) {
-      setHasAppliedDraftParams(true);
-      return;
-    }
-    if (draftCategory) {
-      setNewCategory(draftCategory);
-      setCategory(draftCategory as CategoryFilter);
-    }
-    if (draftTitle) setTitle(draftTitle);
-    if (draftContent) setContent(draftContent);
-    if (draftLabels) {
-      setSelectedLabels(
-        draftLabels
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-      );
-    }
-    if (chipId && targetId && targetType) {
-      setDraftTargetContext({ chipId, targetType, targetId });
-    }
-    if (cooldownId) setDraftCooldownId(cooldownId);
-    setContentBlocks([]);
-    setShowComposer(true);
-    setHasAppliedDraftParams(true);
-  }, [hasAppliedDraftParams, searchParams]);
+    const draftKeys = [
+      "title",
+      "content",
+      "category",
+      "chip_id",
+      "target_id",
+      "target_type",
+      "cooldown_id",
+      "labels",
+    ];
+    if (!draftKeys.some((key) => searchParams.has(key))) return;
+    router.replace(`/forum/new?${searchParams.toString()}`);
+  }, [router, searchParams]);
 
   const params: ListForumPostsParams = {
     skip,
@@ -882,12 +841,10 @@ export function ForumPageContent() {
     [categoriesResponse?.data.categories],
   );
 
-  const createMutation = useCreateForumPost();
   const createCategoryMutation = useCreateForumCategory();
   const deleteCategoryMutation = useDeleteForumCategory();
   const closeMutation = useCloseForumPost();
   const reopenMutation = useReopenForumPost();
-  const { triggerAiReply } = useForumAiReply();
 
   const invalidateList = () => {
     queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
@@ -939,38 +896,6 @@ export function ForumPageContent() {
 
   const listReturnQuery = buildListQuery();
 
-  const submitThread = async () => {
-    const trimmedTitle = title.trim();
-    const trimmedContent = content.trim();
-    if (!trimmedTitle || !trimmedContent) return;
-
-    const response = await createMutation.mutateAsync({
-      data: {
-        category: newCategory,
-        title: trimmedTitle,
-        content: trimmedContent,
-        content_blocks: contentBlocks,
-        parent_id: null,
-        labels: selectedLabels,
-        chip_id: draftTargetContext?.chipId,
-        target_type: draftTargetContext?.targetType,
-        target_id: draftTargetContext?.targetId,
-        cooldown_id: draftCooldownId,
-      },
-    });
-    setTitle("");
-    setContent("");
-    setContentBlocks([]);
-    setSelectedLabels([]);
-    setShowComposer(false);
-    setDraftTargetContext(null);
-    setDraftCooldownId(null);
-    invalidateList();
-    if (/@qdash\b/i.test(trimmedContent)) {
-      triggerAiReply(response.data.id, trimmedContent, invalidateList);
-    }
-  };
-
   const setCategoryFilter = (nextCategory: CategoryFilter) => {
     setCategory(nextCategory);
     setSkip(0);
@@ -981,10 +906,6 @@ export function ForumPageContent() {
     setStatus(nextStatus);
     setSkip(0);
     replaceListQuery({ status: nextStatus, skip: 0 });
-  };
-
-  const toggleSelectedLabel = (label: string) => {
-    setSelectedLabels((current) => (current.includes(label) ? [] : [label]));
   };
 
   const setLabelFilterValue = (nextLabel: string) => {
@@ -1038,13 +959,17 @@ export function ForumPageContent() {
                 Categories
               </button>
             )}
-            <button
+            <Link
               className="btn btn-primary btn-sm gap-2"
-              onClick={() => setShowComposer((open) => !open)}
+              href={
+                listReturnQuery
+                  ? `/forum/new?from=${encodeURIComponent(listReturnQuery)}`
+                  : "/forum/new"
+              }
             >
-              {showComposer ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {showComposer ? "Close" : "New Thread"}
-            </button>
+              <Plus className="h-4 w-4" />
+              New Thread
+            </Link>
           </div>
         }
       />
@@ -1233,12 +1158,6 @@ export function ForumPageContent() {
                               if (category === item.id) {
                                 setCategoryFilter("all");
                               }
-                              if (newCategory === item.id) {
-                                setNewCategory(
-                                  categories.find((candidate) => candidate.id !== item.id)?.id ??
-                                    "other",
-                                );
-                              }
                               invalidateCategories();
                             },
                           },
@@ -1252,76 +1171,6 @@ export function ForumPageContent() {
                   </div>
                 );
               })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showComposer && (
-        <div className="card bg-base-200 shadow-lg mb-4">
-          <div className="card-body">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="card-title text-sm">New Thread</h2>
-              {draftTargetContext && (
-                <span className="badge badge-outline gap-1">
-                  <Crosshair className="h-3 w-3" />
-                  {formatTargetLabel(
-                    draftTargetContext.targetType,
-                    draftTargetContext.targetId,
-                  )} ·{" "}
-                  {draftTargetContext.chipId}
-                </span>
-              )}
-              {draftCooldownId && (
-                <span className="badge badge-outline">Cooldown · {draftCooldownId}</span>
-              )}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
-              <select
-                className="select select-bordered select-sm w-full"
-                value={newCategory}
-                onChange={(event) => setNewCategory(event.target.value)}
-              >
-                {categories.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="input input-bordered input-sm w-full"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Thread title"
-              />
-            </div>
-            <ForumLabelSelector selectedLabels={selectedLabels} onToggle={toggleSelectedLabel} />
-            <ForumBlockEditor
-              key={showComposer ? "composer-open" : "composer-closed"}
-              legacyMarkdown={content}
-              onChange={(blocks, markdown) => {
-                setContentBlocks(blocks);
-                setContent(markdown);
-              }}
-              onImageUpload={uploadImage}
-            />
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <span className="text-xs text-base-content/50">
-                Type <kbd className="kbd kbd-xs">/</kbd> for blocks (table, image, heading, list,
-                …). Use <span className="font-mono">@username</span> in text to mention members.
-              </span>
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                onClick={submitThread}
-                disabled={!title.trim() || !content.trim() || createMutation.isPending}
-              >
-                {createMutation.isPending ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  "Post"
-                )}
-              </button>
             </div>
           </div>
         </div>
