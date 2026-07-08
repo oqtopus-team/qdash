@@ -23,8 +23,8 @@ export const FORUM_LABELS: ForumLabelDefinition[] = [
   {
     id: "discussion",
     label: "Discussion",
-    badgeClass: "badge-warning",
-    buttonClass: "btn-warning",
+    badgeClass: "badge-secondary",
+    buttonClass: "btn-secondary",
   },
   { id: "info", label: "Info", badgeClass: "badge-info", buttonClass: "btn-info" },
   { id: "resolved", label: "Resolved", badgeClass: "badge-success", buttonClass: "btn-success" },
@@ -46,7 +46,7 @@ export function getForumLabel(label: string): ForumLabelDefinition {
 }
 
 export function forumMarkerClass(label: string | undefined): string {
-  if (label === "discussion") return "bg-warning text-warning-content";
+  if (label === "discussion") return "bg-secondary text-secondary-content";
   if (label === "resolved") return "bg-success text-success-content";
   return "bg-info text-info-content";
 }
