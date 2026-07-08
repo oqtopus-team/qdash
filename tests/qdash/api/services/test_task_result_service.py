@@ -168,6 +168,7 @@ def test_get_latest_results_coupling_uses_coupling_ids() -> None:
 
     assert resp.result["0-1"].task_id == "c01"
     # coupling ids come from the chip repo, single task name is forwarded
+    assert repo.last_latest_call is not None
     assert repo.last_latest_call["qids"] == ["0-1"]
     assert repo.last_latest_call["task_names"] == ["CheckCrossResonance"]
 
