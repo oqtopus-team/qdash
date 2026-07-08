@@ -23,7 +23,7 @@ from qdash.workflow.service.steps import (
     OneQubitFineTune,
     Step,
 )
-from qdash.workflow.service.targets import MuxTargets
+from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 
 @flow(on_cancellation=[on_flow_cancellation])
@@ -45,7 +45,7 @@ def one_qubit(
         chip_id: Chip ID (from UI)
         mux_ids: MUX IDs to calibrate (default: all 16)
         exclude_qids: Qubit IDs to exclude
-        qids: Not used (for UI compatibility)
+        qids: Qubit IDs to calibrate when mux_ids is not set
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
         check_only: If True, only run basic check (no fine-tune)
@@ -53,12 +53,16 @@ def one_qubit(
     Returns:
         Pipeline results with typed step outputs
     """
-    if mux_ids is None:
-        mux_ids = list(range(16))
     if exclude_qids is None:
         exclude_qids = []
 
-    targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
+    targets: Target
+    if mux_ids is not None:
+        targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
+    elif qids is not None:
+        targets = QubitTargets(qids=qids)
+    else:
+        targets = MuxTargets(mux_ids=list(range(16)), exclude_qids=exclude_qids)
 
     steps: list[Step]
     if check_only:

@@ -95,6 +95,28 @@ def _split_q_string(cr_label: str) -> tuple[str, str]:
     return str(int(left)), str(int(right))
 
 
+def _directional_topology_pairs(
+    topology: Any, direction: str | None
+) -> set[tuple[str, str]] | None:
+    """Return allowed physical coupling directions from topology."""
+    if direction in (None, "mix"):
+        return None
+
+    if direction == "forward":
+        return {(str(control), str(target)) for control, target in topology.couplings}
+    return {(str(target), str(control)) for control, target in topology.couplings}
+
+
+def _matches_cr_direction(
+    control: str,
+    target: str,
+    allowed_pairs: set[tuple[str, str]] | None,
+) -> bool:
+    if allowed_pairs is None:
+        return True
+    return (control, target) in allowed_pairs
+
+
 class DeviceTopologyService:
     """Service for building and filtering quantum device topologies."""
 
@@ -138,8 +160,12 @@ class DeviceTopologyService:
         if chip_model is None:
             raise ValueError(f"No chip found for user {latest.username}")
 
-        qubit_models = self._chip_repo.get_all_qubit_models(project_id, chip_model.chip_id)
-        coupling_models = self._chip_repo.get_all_coupling_models(project_id, chip_model.chip_id)
+        qubit_models = self._chip_repo.get_all_qubit_models(
+            project_id, chip_model.chip_id, username=chip_model.username
+        )
+        coupling_models = self._chip_repo.get_all_coupling_models(
+            project_id, chip_model.chip_id, username=chip_model.username
+        )
 
         topology = load_topology(chip_model.topology_id)
         sorted_physical_ids = sorted(request.qubits, key=int)
@@ -241,12 +267,26 @@ class DeviceTopologyService:
     ) -> list[Coupling]:
         """Build coupling list from calibration data."""
         couplings = []
+        allowed_direction_pairs = _directional_topology_pairs(
+            topology, request.condition.cr_direction
+        )
+        candidate_count = 0
+        direction_skipped_count = 0
+        direction_matched_samples: list[str] = []
         for qid in request.qubits:
             search_result = _search_coupling_data_by_control_qid(
                 cr_params, qid_to_label(qid, topology.num_qubits)
             )
             for cr_key, cr_value in search_result.items():
+                candidate_count += 1
                 control, target = _split_q_string(cr_key)
+                if not _matches_cr_direction(control, target, allowed_direction_pairs):
+                    direction_skipped_count += 1
+                    continue
+
+                if len(direction_matched_samples) < 8:
+                    direction_matched_samples.append(f"{control}-{target}")
+
                 cr_duration = cr_value.get("duration", 20)
 
                 coupling_key = f"{control}-{target}"
@@ -277,6 +317,14 @@ class DeviceTopologyService:
                                 gate_duration=CouplingGateDuration(rzx90=cr_duration),
                             )
                         )
+        logger.info(
+            "device_topology CR direction filter: direction=%s candidates=%d skipped_by_direction=%d built=%d sample=%s",
+            request.condition.cr_direction,
+            candidate_count,
+            direction_skipped_count,
+            len(couplings),
+            direction_matched_samples,
+        )
         return couplings
 
     def _apply_filters(

@@ -5,10 +5,17 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ForumPostResponseNumber } from './forumPostResponseNumber';
 import type { ForumPostResponseUserId } from './forumPostResponseUserId';
 import type { ForumPostResponseAvatarKey } from './forumPostResponseAvatarKey';
 import type { ForumPostResponseTitle } from './forumPostResponseTitle';
+import type { ForumPostResponseContentBlocksItem } from './forumPostResponseContentBlocksItem';
 import type { ForumPostResponseParentId } from './forumPostResponseParentId';
+import type { ForumPostResponseAssigneeUsername } from './forumPostResponseAssigneeUsername';
+import type { ForumPostResponseChipId } from './forumPostResponseChipId';
+import type { ForumPostResponseTargetType } from './forumPostResponseTargetType';
+import type { ForumPostResponseTargetId } from './forumPostResponseTargetId';
+import type { ForumPostResponseCooldownId } from './forumPostResponseCooldownId';
 
 /**
  * Response schema for a forum post.
@@ -18,6 +25,8 @@ export interface ForumPostResponse {
   id: string;
   /** Owning project identifier */
   project_id: string;
+  /** Project-scoped forum thread number. Replies share the root thread number. */
+  number?: ForumPostResponseNumber;
   /** Forum category key */
   category: string;
   /** Post author user ID */
@@ -30,8 +39,22 @@ export interface ForumPostResponse {
   title?: ForumPostResponseTitle;
   /** Markdown content */
   content: string;
+  /** BlockNote document JSON. Source of truth for rich content; content is derived. */
+  content_blocks?: ForumPostResponseContentBlocksItem[];
   /** Parent forum post ID */
   parent_id?: ForumPostResponseParentId;
+  /** Operator label for root threads */
+  labels?: string[];
+  /** Assigned project member username */
+  assignee_username?: ForumPostResponseAssigneeUsername;
+  /** Linked chip ID */
+  chip_id?: ForumPostResponseChipId;
+  /** Linked target type */
+  target_type?: ForumPostResponseTargetType;
+  /** Linked target ID */
+  target_id?: ForumPostResponseTargetId;
+  /** Linked cool-down ID */
+  cooldown_id?: ForumPostResponseCooldownId;
   /** Number of replies to this thread */
   reply_count?: number;
   /** Whether this thread is closed */

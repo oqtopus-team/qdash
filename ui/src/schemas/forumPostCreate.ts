@@ -6,7 +6,13 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ForumPostCreateTitle } from './forumPostCreateTitle';
+import type { ForumPostCreateContentBlocksItem } from './forumPostCreateContentBlocksItem';
 import type { ForumPostCreateParentId } from './forumPostCreateParentId';
+import type { ForumPostCreateAssigneeUsername } from './forumPostCreateAssigneeUsername';
+import type { ForumPostCreateChipId } from './forumPostCreateChipId';
+import type { ForumPostCreateTargetType } from './forumPostCreateTargetType';
+import type { ForumPostCreateTargetId } from './forumPostCreateTargetId';
+import type { ForumPostCreateCooldownId } from './forumPostCreateCooldownId';
 
 /**
  * Request schema for creating a forum thread or reply.
@@ -27,6 +33,23 @@ export interface ForumPostCreate {
    * @maxLength 8000
    */
   content: string;
+  /** BlockNote document JSON. Source of truth for rich content; content is derived. */
+  content_blocks?: ForumPostCreateContentBlocksItem[];
   /** Parent forum post ID for replies. None for root threads. */
   parent_id?: ForumPostCreateParentId;
+  /**
+   * Operator label for root threads
+   * @maxItems 1
+   */
+  labels?: string[];
+  /** Assigned project member username */
+  assignee_username?: ForumPostCreateAssigneeUsername;
+  /** Linked chip ID */
+  chip_id?: ForumPostCreateChipId;
+  /** Linked target type */
+  target_type?: ForumPostCreateTargetType;
+  /** Linked target ID */
+  target_id?: ForumPostCreateTargetId;
+  /** Linked cool-down ID */
+  cooldown_id?: ForumPostCreateCooldownId;
 }

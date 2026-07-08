@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 import bcrypt
 from fastapi import Depends, Header, HTTPException, status
@@ -67,7 +68,7 @@ def get_password_hash(password: str) -> str:
         logger.error(msg)
         raise ValueError(msg)
     salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS, prefix=b"2b")
-    return bcrypt.hashpw(_password_bytes(password), salt).decode("utf-8")
+    return cast("str", bcrypt.hashpw(_password_bytes(password), salt).decode("utf-8"))
 
 
 def get_user(username: str) -> UserInDB | None:

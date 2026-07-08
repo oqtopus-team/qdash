@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 from collections.abc import Collection, Mapping
 from contextlib import contextmanager
@@ -4656,10 +4657,19 @@ class FakeExperiment:
                 )
 
             def _fit(*_: Any, **__: Any) -> dict[str, Any]:
-                return {
+                fit_result = {
                     "fig": _plot(return_figure=True),
                     "r2": float(fields.get("r2", 1.0)),
                 }
+                if title == "Ramsey":
+                    fit_result.update(
+                        {
+                            "f": float(fields.get("ramsey_freq", 0.0)),
+                            "f_err": float(fields.get("ramsey_freq_err", 0.0)),
+                            "tau_err": float(fields.get("t2_err", 0.0)),
+                        }
+                    )
+                return fit_result
 
             value.plot = _plot
             value.fit = _fit
@@ -4678,15 +4688,20 @@ class FakeExperiment:
                 t1_us, t2_us = self._qubit_lifetime(index)
                 t1_ns = float(t1_us) * 1000.0
                 t2_ns = float(t2_us) * 1000.0
+                target_time_values = (
+                    self._coherence_time_values(time_values, index)
+                    if experiment in {"t1", "t2"}
+                    else time_values
+                )
                 rabi_param = self._rabi_params.get(target) or self._synthetic_rabi_param(target)
 
                 if experiment == "t1":
-                    population = np.exp(-time_values / max(t1_ns, 1.0))
+                    population = np.exp(-target_time_values / max(t1_ns, 1.0))
                     signal = 0.5 + 0.5j * (1.0 - 2.0 * population)
                     data[target] = make_value(
                         target=target,
                         data=signal,
-                        sweep_range=time_values,
+                        sweep_range=target_time_values,
                         title="T1 decay",
                         xlabel="Time (us)",
                         ylabel="Measured value",
@@ -4698,12 +4713,12 @@ class FakeExperiment:
                         r2=1.0,
                     )
                 elif experiment == "t2":
-                    envelope = np.exp(-time_values / max(t2_ns, 1.0))
+                    envelope = np.exp(-target_time_values / max(t2_ns, 1.0))
                     signal = 0.5 + 0.5j * (2.0 * envelope - 1.0)
                     data[target] = make_value(
                         target=target,
                         data=signal,
-                        sweep_range=time_values,
+                        sweep_range=target_time_values,
                         title="T2 echo",
                         xlabel="Time (us)",
                         ylabel="Measured value",
@@ -4787,13 +4802,18 @@ class FakeExperiment:
                 )
                 for target, sweep_data in sweep_result.data.items():
                     ge_target = self._ge_label(target)
-                    t1_us, _ = self._qubit_lifetime(self.qubit_labels.index(ge_target))
+                    index = self.qubit_labels.index(ge_target)
+                    t1_us, _ = self._qubit_lifetime(index)
                     t1_ns = float(t1_us) * 1000.0
+                    sweep_range = self._coherence_time_values(
+                        np.asarray(sweep_data.sweep_range, dtype=float),
+                        index,
+                    )
                     rabi_param = self._rabi_params.get(target) or self._synthetic_rabi_param(target)
                     data[target] = make_value(
                         target=target,
                         data=np.asarray(sweep_data.data, dtype=complex),
-                        sweep_range=np.asarray(sweep_data.sweep_range, dtype=float),
+                        sweep_range=sweep_range,
                         title="T1 decay",
                         xlabel="Time (us)",
                         ylabel="Measured value",
@@ -4854,13 +4874,18 @@ class FakeExperiment:
                 )
                 for target, sweep_data in sweep_result.data.items():
                     ge_target = self._ge_label(target)
-                    _, t2_us = self._qubit_lifetime(self.qubit_labels.index(ge_target))
+                    index = self.qubit_labels.index(ge_target)
+                    _, t2_us = self._qubit_lifetime(index)
                     t2_ns = float(t2_us) * 1000.0
+                    sweep_range = self._coherence_time_values(
+                        np.asarray(sweep_data.sweep_range, dtype=float),
+                        index,
+                    )
                     rabi_param = self._rabi_params.get(target) or self._synthetic_rabi_param(target)
                     data[target] = make_value(
                         target=target,
                         data=np.asarray(sweep_data.data, dtype=complex),
-                        sweep_range=np.asarray(sweep_data.sweep_range, dtype=float),
+                        sweep_range=sweep_range,
                         title="T2 echo",
                         xlabel="Time (us)",
                         ylabel="Measured value",
@@ -5339,7 +5364,18 @@ class FakeExperiment:
     def _qubit_lifetime(self, index: int) -> tuple[float, float]:
         if self.qubit_lifetimes is not None:
             return self.qubit_lifetimes[index]
-        return self.qubit_lifetime
+        t1_base, t2_base = self.qubit_lifetime
+        qid_jitter = ((index % 5) - 2) * 0.03
+        t1 = float(t1_base) * (1.0 + qid_jitter + random.uniform(-0.04, 0.04))
+        t2 = float(t2_base) * (0.88 - qid_jitter * 0.5 + random.uniform(-0.04, 0.04))
+        return (t1, t2)
+
+    def _coherence_time_values(self, time_values: Any, index: int) -> Any:
+        import numpy as np
+
+        qid_jitter = ((index % 7) - 3) * 0.01
+        scale = 1.0 + qid_jitter + random.uniform(-0.025, 0.025)
+        return np.asarray(time_values, dtype=float) * max(scale, 0.1)
 
     def _qx_system(self, *, include_decoherence: bool = True) -> Any:
         return build_qxsimulator_system(

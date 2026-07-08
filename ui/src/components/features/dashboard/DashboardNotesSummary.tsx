@@ -33,7 +33,7 @@ interface DashboardNotesSummaryProps {
   taskNotes: TaskNoteEntry[];
   /** Triggered when a metric-note row is clicked — opens the metric modal. */
   onEdit: (entry: NoteEntryWithMetric) => void;
-  /** Triggered when a target-note row is clicked — opens the target note modal. */
+  /** Triggered when a pinned-summary row is clicked — opens the pinned summary modal. */
   onEditTarget: (targetId: string) => void;
 }
 
@@ -133,10 +133,10 @@ export function DashboardNotesSummary({
       {sortedTargetNotes.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-baseline gap-2">
-            <h4 className="text-sm font-semibold">Target notes</h4>
+            <h4 className="text-sm font-semibold">Pinned summaries</h4>
             <span className="text-xs text-base-content/60">
-              {sortedTargetNotes.length} target-level note
-              {sortedTargetNotes.length > 1 ? "s" : ""} — click to edit the target.
+              {sortedTargetNotes.length} pinned summary
+              {sortedTargetNotes.length > 1 ? "s" : ""} — click to edit the summary.
             </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -145,7 +145,7 @@ export function DashboardNotesSummary({
                 key={note.targetId}
                 onClick={() => onEditTarget(note.targetId)}
                 className="rounded-lg border border-base-300 bg-base-200/40 p-3 text-left hover:bg-base-300/40 transition-colors"
-                title={`Open target note for ${formatTarget(note.targetId)}`}
+                title={`Open pinned summary for ${formatTarget(note.targetId)}`}
                 type="button"
               >
                 <div className="flex items-center justify-between gap-2 text-xs">

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { FidelityCondition } from './fidelityCondition';
+import type { ConditionCrDirection } from './conditionCrDirection';
 
 /**
  * Condition for filtering device topology.
@@ -14,5 +15,7 @@ export interface Condition {
   coupling_fidelity: FidelityCondition;
   qubit_fidelity: FidelityCondition;
   readout_fidelity: FidelityCondition;
+  /** Optional CR direction filter. forward uses the topology coupling order; inverse uses the reverse order; mix returns both available calibrated directions. When omitted, mix is used. */
+  cr_direction?: ConditionCrDirection;
   only_maximum_connected?: boolean;
 }

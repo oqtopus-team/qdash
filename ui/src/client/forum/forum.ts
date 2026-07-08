@@ -583,7 +583,7 @@ export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>
 
 
 /**
- * Update a forum post. Only the author can edit.
+ * Update a forum post. Only the author or project owner can edit.
  * @summary Update a forum post
  */
 export const updateForumPost = (

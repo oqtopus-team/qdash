@@ -12,6 +12,7 @@ from qdash.workflow.calibtasks.base import (
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -137,7 +138,31 @@ class ReadoutClassification(QubexTask):
         output_parameters = self.attach_execution_id(execution_id)
 
         figures: list[go.Figure] = [self.plot_section_from_result(backend, result, qid)]
-        return PostProcessResult(output_parameters=output_parameters, figures=figures)
+        validation_error = first_validation_error(
+            finite_value_error(
+                self.output_parameters["average_readout_fidelity"].value,
+                f"ReadoutClassification average_readout_fidelity for {label}",
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            finite_value_error(
+                self.output_parameters["readout_fidelity_0"].value,
+                f"ReadoutClassification readout_fidelity_0 for {label}",
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            finite_value_error(
+                self.output_parameters["readout_fidelity_1"].value,
+                f"ReadoutClassification readout_fidelity_1 for {label}",
+                minimum=0.0,
+                maximum=1.0,
+            ),
+        )
+        return PostProcessResult(
+            output_parameters=output_parameters,
+            figures=figures,
+            validation_error=validation_error,
+        )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)

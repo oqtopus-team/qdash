@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 
-import { StickyNote } from "lucide-react";
+import { MessageSquare, StickyNote } from "lucide-react";
 
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import { forumMarkerClass } from "../forum/categories";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 
-import type { NoteEntryWithMetric } from "./MetricNotePanel";
+import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
 import { DashboardNoteTooltip } from "./DashboardNoteTooltip";
 
 interface MetricValue {
@@ -26,6 +27,8 @@ interface DashboardQubitGridProps {
   notedQids?: Set<string>;
   /** Set of qubit IDs that have a target-level note. */
   targetNotedQids?: Set<string>;
+  /** Linked forum discussion label keyed by qubit ID. */
+  forumLinkedQids?: Record<string, string>;
   /**
    * Set of qubit IDs that have notes on OTHER metrics (not this one). Used to
    * render a subtle indicator so users know to click to read the cross-metric
@@ -34,6 +37,8 @@ interface DashboardQubitGridProps {
   crossMetricNotedQids?: Set<string>;
   /** All notes for each qubit (across metrics), keyed by qubit ID. */
   notesByTarget?: Record<string, NoteEntryWithMetric[]>;
+  /** Target-level notes keyed by qubit/coupling ID. */
+  targetNotesByTarget?: Record<string, TargetNoteEntry>;
   /** The metric_key this grid renders, used to split current vs. other notes. */
   metricKey?: string;
   /** Click handler when a qubit cell is clicked. */
@@ -80,8 +85,10 @@ export function DashboardQubitGrid({
   maxCellSize = 60,
   notedQids,
   targetNotedQids,
+  forumLinkedQids,
   crossMetricNotedQids,
   notesByTarget,
+  targetNotesByTarget,
   metricKey,
   onQubitClick,
 }: DashboardQubitGridProps) {
@@ -174,19 +181,22 @@ export function DashboardQubitGrid({
         const bg = value !== null ? pickColor(value, autoMin, autoMax, colors) : null;
         const hasNote = notedQids?.has(qid) ?? false;
         const hasTargetNote = targetNotedQids?.has(qid) ?? false;
+        const forumLabel = forumLinkedQids?.[qid];
+        const hasForumDiscussion = !!forumLabel;
         const hasCrossMetricNote =
           !hasNote && !hasTargetNote && (crossMetricNotedQids?.has(qid) ?? false);
         const handleClick = () => onQubitClick?.(qid);
         const titleText =
           (value !== null ? `${qid}: ${value.toFixed(4)} ${unit}` : `${qid}: No data`) +
           (hasNote
-            ? " · has metric note"
+            ? " · has legacy metric note"
             : hasTargetNote
-              ? " · has target note"
+              ? " · has pinned summary"
               : hasCrossMetricNote
-                ? " · note on other metric"
+                ? " · legacy note on another metric"
                 : "") +
-          (onQubitClick ? " (click to edit metric note)" : "");
+          (hasForumDiscussion ? " · has linked forum discussion" : "") +
+          (onQubitClick ? " (click to edit pinned summary)" : "");
         const Tag = onQubitClick ? "button" : "div";
         return (
           <Tag
@@ -217,7 +227,7 @@ export function DashboardQubitGrid({
             {(hasNote || hasTargetNote) && (
               <span
                 className="absolute top-1 right-1 rounded-full bg-warning/90 text-warning-content p-0.5 shadow"
-                title={hasNote ? "Has metric note" : "Has target note"}
+                title={hasNote ? "Has legacy metric note" : "Has pinned summary"}
               >
                 <StickyNote className="h-3 w-3" />
               </span>
@@ -225,9 +235,17 @@ export function DashboardQubitGrid({
             {hasCrossMetricNote && (
               <span
                 className="absolute top-1 right-1 rounded-full bg-base-100/80 text-base-content/60 p-0.5 shadow border border-base-300"
-                title="Note exists on another metric"
+                title="Legacy note exists on another metric"
               >
                 <StickyNote className="h-3 w-3" />
+              </span>
+            )}
+            {hasForumDiscussion && (
+              <span
+                className={`absolute bottom-1 right-1 rounded-full p-0.5 shadow ${forumMarkerClass(forumLabel)}`}
+                title="Linked forum discussion"
+              >
+                <MessageSquare className="h-3 w-3" />
               </span>
             )}
             {value !== null ? (
@@ -243,6 +261,7 @@ export function DashboardQubitGrid({
       {hover &&
         (() => {
           const allNotes = notesByTarget?.[hover.qid] ?? [];
+          const targetNote = targetNotesByTarget?.[hover.qid];
           const current = allNotes.find((n) => n.metricKey === metricKey);
           const others = allNotes.filter((n) => n.metricKey !== metricKey);
           const v = metricData?.[hover.qid]?.value ?? null;
@@ -252,6 +271,7 @@ export function DashboardQubitGrid({
             <DashboardNoteTooltip
               position={{ x: hover.x, y: hover.y }}
               header={header}
+              targetNote={targetNote}
               current={current}
               others={others}
             />

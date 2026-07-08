@@ -143,6 +143,35 @@ def list_forum_posts(
             description="Filter by category key",
         ),
     ] = None,
+    label: Annotated[
+        str | None,
+        Query(
+            min_length=1,
+            max_length=32,
+            pattern=r"^[a-z0-9][a-z0-9_-]{0,31}$",
+            description="Filter by thread label",
+        ),
+    ] = None,
+    chip_id: Annotated[
+        str | None,
+        Query(max_length=128, description="Filter by linked chip ID"),
+    ] = None,
+    target_type: Annotated[
+        str | None,
+        Query(pattern=r"^(qubit|coupling)$", description="Filter by linked target type"),
+    ] = None,
+    target_id: Annotated[
+        str | None,
+        Query(max_length=128, description="Filter by linked target ID"),
+    ] = None,
+    cooldown_id: Annotated[
+        str | None,
+        Query(max_length=128, description="Filter by linked cool-down ID"),
+    ] = None,
+    number: Annotated[
+        int | None,
+        Query(ge=1, description="Filter by project-scoped forum thread number"),
+    ] = None,
     is_closed: Annotated[
         bool | None,
         Query(
@@ -159,6 +188,12 @@ def list_forum_posts(
         skip=skip,
         limit=limit,
         category=category,
+        label=label,
+        chip_id=chip_id,
+        target_type=target_type,
+        target_id=target_id,
+        cooldown_id=cooldown_id,
+        number=number,
         is_closed=is_closed,
     )
 
@@ -182,7 +217,14 @@ def create_forum_post(
         category=body.category,
         title=body.title,
         content=body.content,
+        content_blocks=body.content_blocks,
         parent_id=body.parent_id,
+        labels=body.labels,
+        chip_id=body.chip_id,
+        target_type=body.target_type,
+        target_id=body.target_id,
+        cooldown_id=body.cooldown_id,
+        assignee_username=body.assignee_username,
     )
 
 
@@ -255,6 +297,7 @@ async def forum_ai_reply_stream(
     """SSE endpoint that generates an AI reply in a forum thread."""
 
     async def event_generator() -> AsyncGenerator[str, None]:
+        """Yield SSE-formatted events as the AI reply is generated."""
         from qdash.copilot.config import load_copilot_config
 
         config = load_copilot_config()
@@ -372,7 +415,15 @@ def update_forum_post(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> ForumPostResponse:
-    """Update a forum post. Only the author can edit."""
+    """Update a forum post. Only the author or project owner can edit."""
+    # Distinguish "content_blocks omitted" (leave unchanged) from "explicitly []"
+    # (clear); the default_factory makes both look like [] on the model otherwise.
+    content_blocks = body.content_blocks if "content_blocks" in body.model_fields_set else None
+    update_target_context = bool(
+        {"chip_id", "target_type", "target_id"}.intersection(body.model_fields_set)
+    )
+    update_cooldown_context = "cooldown_id" in body.model_fields_set
+    update_assignee_context = "assignee_username" in body.model_fields_set
     return service.update_post(
         project_id=ctx.project_id,
         post_id=post_id,
@@ -380,6 +431,17 @@ def update_forum_post(
         category=body.category,
         title=body.title,
         content=body.content,
+        content_blocks=content_blocks,
+        labels=body.labels,
+        chip_id=body.chip_id,
+        target_type=body.target_type,
+        target_id=body.target_id,
+        cooldown_id=body.cooldown_id,
+        assignee_username=body.assignee_username,
+        update_cooldown_context=update_cooldown_context,
+        update_target_context=update_target_context,
+        update_assignee_context=update_assignee_context,
+        role=ctx.role,
     )
 
 

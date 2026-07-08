@@ -1,9 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { Lock, MessageSquare, Plus, Settings, Trash2, Unlock, X } from "lucide-react";
+import {
+  CalendarDays,
+  Crosshair,
+  ExternalLink,
+  Lock,
+  MessageSquare,
+  Plus,
+  Settings,
+  Trash2,
+  Unlock,
+  UserRound,
+  X,
+} from "lucide-react";
 
 import {
   getListForumCategoriesQueryKey,
@@ -12,14 +26,14 @@ import {
   useCreateForumCategory,
   useCreateForumPost,
   useDeleteForumCategory,
+  useGetForumPost,
+  useGetForumPostReplies,
   useListForumCategories,
   useListForumPosts,
   useReopenForumPost,
 } from "@/client/forum/forum";
-import { useListProjectMembers } from "@/client/projects/projects";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
-import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { UserAvatar } from "@/components/ui/UserAvatar";
@@ -32,81 +46,381 @@ import type { ForumPostResponse, ListForumPostsParams } from "@/schemas";
 
 import {
   DEFAULT_FORUM_CATEGORIES,
+  FORUM_LABELS,
   getForumCategory,
+  formatForumPostNumber,
+  getForumLabel,
   toForumCategoryDefinition,
   type ForumCategoryDefinition,
 } from "./categories";
+import { ForumLabelSelector } from "./ForumLabelSelector";
+import { ForumBlockViewer } from "./ForumBlockEditor";
+
+const ForumBlockEditor = dynamic(
+  () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
+  { ssr: false },
+);
 
 const PAGE_SIZE = 30;
 
 type CategoryFilter = "all" | NonNullable<ListForumPostsParams["category"]>;
 type StatusFilter = "open" | "closed" | "all";
 
+type ForumTargetContext = {
+  chipId: string;
+  targetType: "qubit" | "coupling";
+  targetId: string;
+};
+
+function normalizeTargetType(value: string | null | undefined): "qubit" | "coupling" | null {
+  return value === "qubit" || value === "coupling" ? value : null;
+}
+
+function formatTargetLabel(targetType: "qubit" | "coupling", targetId: string): string {
+  if (targetType === "coupling") {
+    const [a, b] = targetId.split("-");
+    return b ? `Q${a} -> Q${b}` : targetId;
+  }
+  return `Q${targetId}`;
+}
+
+function parseTargetId(
+  targetLabel: string,
+): { targetType: "qubit" | "coupling"; targetId: string } | null {
+  const qids = Array.from(targetLabel.matchAll(/Q(\d+)/g)).map((match) => match[1]);
+  if (qids.length >= 2) return { targetType: "coupling", targetId: `${qids[0]}-${qids[1]}` };
+  if (qids.length === 1) return { targetType: "qubit", targetId: qids[0] };
+  return null;
+}
+
+function postTargetContext(post: ForumPostResponse): ForumTargetContext | null {
+  const targetType = normalizeTargetType(post.target_type);
+  if (post.chip_id && targetType && post.target_id) {
+    return {
+      chipId: post.chip_id,
+      targetType,
+      targetId: post.target_id,
+    };
+  }
+  const chip = post.content.match(/^Chip:\s*(.+)$/m)?.[1]?.trim();
+  const target = post.content.match(/^Target:\s*(.+)$/m)?.[1]?.trim();
+  const parsed = target ? parseTargetId(target) : null;
+  if (!chip || !target || !parsed) return null;
+  return {
+    chipId: chip,
+    targetType: parsed.targetType,
+    targetId: parsed.targetId,
+  };
+}
+
 function ForumThreadCard({
   post,
   categories,
   canManage,
+  isSelected,
+  onSelect,
   onClose,
   onReopen,
 }: {
   post: ForumPostResponse;
   categories: ForumCategoryDefinition[];
   canManage: boolean;
+  isSelected: boolean;
+  onSelect: () => void;
   onClose: (postId: string) => void;
   onReopen: (postId: string) => void;
 }) {
   const category = getForumCategory(post.category, categories);
+  const targetContext = postTargetContext(post);
   const Icon = category.icon;
+  const displayNumber = formatForumPostNumber(post.number);
+  const primaryLabel = (post.labels ?? [])[0];
+  const labelDef = primaryLabel ? getForumLabel(primaryLabel) : null;
 
   return (
-    <div
-      className={`bg-base-100 rounded-lg border border-base-300 hover:border-primary/50 transition-colors ${
-        post.is_closed ? "opacity-75" : ""
-      }`}
+    <article
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`cursor-pointer rounded-lg border bg-base-100 transition-colors hover:border-primary/40 ${
+        isSelected ? "border-primary/60 ring-1 ring-primary/20" : "border-base-300"
+      } ${post.is_closed ? "opacity-70" : ""}`}
     >
-      <Link href={`/forum/${post.id}`} className="block p-4">
-        <div className="flex items-start gap-3">
-          <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-base-200">
-            <UserAvatar username={post.username} avatarKey={post.avatar_key} size={28} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className={`badge badge-sm ${category.badgeClass}`}>
+      <div className="flex gap-3 p-3 sm:p-4">
+        <div className="hidden pt-0.5 sm:block">
+          <UserAvatar username={post.username} avatarKey={post.avatar_key} size={30} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h2 className="line-clamp-2 text-sm font-semibold leading-6 text-base-content sm:text-base">
+                {displayNumber && (
+                  <span className="mr-2 font-mono text-xs font-medium text-base-content/50">
+                    {displayNumber}
+                  </span>
+                )}
+                {post.title || "Untitled topic"}
+              </h2>
+            </div>
+
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+              <span
+                className={`badge badge-sm gap-1 ${category.badgeClass}`}
+                title={category.label}
+              >
                 <Icon className="h-3 w-3" />
                 {category.shortLabel}
               </span>
-              <span className="badge badge-sm badge-neutral">{post.username}</span>
-              <span className="text-xs text-base-content/40">
-                {formatRelativeTime(post.created_at)}
-              </span>
+              {labelDef && (
+                <span className={`badge badge-sm ${labelDef.badgeClass}`}>{labelDef.label}</span>
+              )}
               {post.is_closed && <span className="badge badge-sm badge-ghost">Closed</span>}
             </div>
-            <h2 className="mb-1 truncate text-sm font-semibold">{post.title}</h2>
-            <div className="line-clamp-2 text-sm text-base-content/75">
-              <MarkdownContent content={post.content} preview />
-            </div>
-            <div className="mt-3 flex items-center gap-3 text-xs text-base-content/50">
-              <span className="flex items-center gap-1">
-                <MessageSquare className="h-3.5 w-3.5" />
-                {post.reply_count ?? 0} replies
+          </div>
+
+          <div className="mt-1 line-clamp-1 text-sm leading-6 text-base-content/60">
+            <MarkdownContent content={post.content} preview />
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
+            <span>{post.username}</span>
+            <span>{formatRelativeTime(post.created_at)}</span>
+            {post.assignee_username && (
+              <span className="inline-flex items-center gap-1">
+                <UserRound className="h-3.5 w-3.5" />
+                {post.assignee_username}
               </span>
-              <span>{category.description}</span>
-            </div>
+            )}
+            <span className="inline-flex items-center gap-1">
+              <MessageSquare className="h-3.5 w-3.5" />
+              {post.reply_count ?? 0}
+            </span>
+            {targetContext && (
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <Crosshair className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {formatTargetLabel(targetContext.targetType, targetContext.targetId)} ·{" "}
+                  {targetContext.chipId}
+                </span>
+              </span>
+            )}
+            {post.cooldown_id && (
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="h-3.5 w-3.5" />
+                {post.cooldown_id}
+              </span>
+            )}
           </div>
         </div>
-      </Link>
+      </div>
+
       {canManage && (
-        <div className="border-t border-base-300 px-4 py-2">
+        <div className="flex justify-end border-t border-base-300 px-3 py-2 sm:px-4">
           {post.is_closed ? (
-            <button className="btn btn-ghost btn-xs gap-1" onClick={() => onReopen(post.id)}>
+            <button
+              className="btn btn-ghost btn-xs gap-1"
+              onClick={(event) => {
+                event.stopPropagation();
+                onReopen(post.id);
+              }}
+            >
               <Unlock className="h-3 w-3" />
               Reopen
             </button>
           ) : (
-            <button className="btn btn-ghost btn-xs gap-1" onClick={() => onClose(post.id)}>
+            <button
+              className="btn btn-ghost btn-xs gap-1"
+              onClick={(event) => {
+                event.stopPropagation();
+                onClose(post.id);
+              }}
+            >
               <Lock className="h-3 w-3" />
               Close
             </button>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ForumThreadPreviewSidebar({
+  postId,
+  categories,
+  onClose,
+}: {
+  postId: string | null;
+  categories: ForumCategoryDefinition[];
+  onClose: () => void;
+}) {
+  const {
+    data: postResponse,
+    isLoading,
+    isError,
+  } = useGetForumPost(postId ?? "", {
+    query: { enabled: !!postId, staleTime: 30_000 },
+  });
+  const { data: repliesResponse, isLoading: repliesLoading } = useGetForumPostReplies(
+    postId ?? "",
+    { skip: 0, limit: 5 },
+    { query: { enabled: !!postId, staleTime: 30_000 } },
+  );
+  const post = postResponse?.data;
+  const replies = repliesResponse?.data ?? [];
+  const isOpen = !!postId;
+  const category = post ? getForumCategory(post.category, categories) : null;
+  const label = post?.labels?.[0] ? getForumLabel(post.labels[0]) : null;
+  const targetContext = post ? postTargetContext(post) : null;
+
+  return (
+    <div
+      className={`fixed right-0 top-0 z-50 h-full w-full overflow-y-auto border-l border-base-300 bg-base-100 p-4 shadow-xl transition-transform duration-200 sm:w-3/4 sm:p-6 lg:w-2/5 ${
+        isOpen ? "translate-x-0" : "translate-x-full"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="btn btn-ghost btn-sm btn-circle absolute right-3 top-3 sm:right-4 sm:top-4"
+        aria-label="Close forum thread preview"
+      >
+        <X className="h-4 w-4" />
+      </button>
+
+      {postId && (
+        <div className="pr-8">
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <span className="loading loading-spinner loading-lg" />
+            </div>
+          ) : isError || !post ? (
+            <div className="alert alert-error">
+              <span>Failed to load forum thread.</span>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <header>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  {category && (
+                    <span className={`badge badge-sm ${category.badgeClass}`}>
+                      {category.shortLabel}
+                    </span>
+                  )}
+                  {label && (
+                    <span className={`badge badge-sm ${label.badgeClass}`}>{label.label}</span>
+                  )}
+                  {post.is_closed && <span className="badge badge-sm badge-ghost">Closed</span>}
+                </div>
+                <h2 className="text-xl font-bold leading-tight">
+                  {formatForumPostNumber(post.number) && (
+                    <span className="mr-2 font-mono text-sm text-base-content/50">
+                      {formatForumPostNumber(post.number)}
+                    </span>
+                  )}
+                  {post.title || "Untitled topic"}
+                </h2>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
+                  <span>Opened by {post.username}</span>
+                  <span>{formatRelativeTime(post.created_at)}</span>
+                  <span className="inline-flex items-center gap-1">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    {post.reply_count ?? 0} replies
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link href={`/forum/${post.id}`} className="btn btn-primary btn-sm gap-1">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open full page
+                  </Link>
+                </div>
+              </header>
+
+              {(targetContext || post.cooldown_id) && (
+                <div className="rounded-lg bg-base-200/60 p-3 text-xs">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {targetContext && (
+                      <div>
+                        <div className="text-base-content/45">Target</div>
+                        <div className="mt-1 font-medium">
+                          {formatTargetLabel(targetContext.targetType, targetContext.targetId)} ·{" "}
+                          {targetContext.chipId}
+                        </div>
+                      </div>
+                    )}
+                    {post.cooldown_id && (
+                      <div>
+                        <div className="text-base-content/45">Cooldown</div>
+                        <div className="mt-1 font-medium">{post.cooldown_id}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <section>
+                <h3 className="mb-2 text-sm font-semibold">Root thread</h3>
+                <div className="rounded-lg border border-base-300 bg-base-100 p-4">
+                  {(post.content_blocks ?? []).length > 0 ? (
+                    <ForumBlockViewer
+                      blocks={(post.content_blocks ?? []) as Record<string, unknown>[]}
+                    />
+                  ) : (
+                    <MarkdownContent
+                      content={post.content}
+                      className="text-sm text-base-content/80"
+                    />
+                  )}
+                </div>
+              </section>
+
+              <section>
+                <h3 className="mb-2 text-sm font-semibold">Recent replies</h3>
+                {repliesLoading ? (
+                  <div className="flex justify-center py-4">
+                    <span className="loading loading-spinner loading-sm" />
+                  </div>
+                ) : replies.length > 0 ? (
+                  <div className="space-y-2">
+                    {replies.map((reply) => (
+                      <div key={reply.id} className="rounded-lg border border-base-300 p-3">
+                        <div className="mb-2 flex items-center gap-2 text-xs text-base-content/50">
+                          <UserAvatar
+                            username={reply.username}
+                            avatarKey={reply.avatar_key}
+                            size={20}
+                          />
+                          <span>{reply.username}</span>
+                          <span>{formatRelativeTime(reply.created_at)}</span>
+                        </div>
+                        {(reply.content_blocks ?? []).length > 0 ? (
+                          <ForumBlockViewer
+                            blocks={(reply.content_blocks ?? []) as Record<string, unknown>[]}
+                          />
+                        ) : (
+                          <MarkdownContent
+                            content={reply.content}
+                            preview
+                            className="line-clamp-3 text-sm text-base-content/70"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-base-300 bg-base-200/40 p-3 text-sm text-base-content/55">
+                    No replies yet
+                  </div>
+                )}
+              </section>
+            </div>
           )}
         </div>
       )}
@@ -116,16 +430,24 @@ function ForumThreadCard({
 
 export function ForumPageContent() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { isOwner, projectId } = useProject();
+  const { isOwner } = useProject();
   const [category, setCategory] = useState<CategoryFilter>("all");
+  const [labelFilter, setLabelFilter] = useState<string>("all");
   const [status, setStatus] = useState<StatusFilter>("open");
   const [skip, setSkip] = useState(0);
   const [showComposer, setShowComposer] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [hasAppliedDraftParams, setHasAppliedDraftParams] = useState(false);
+  const [draftTargetContext, setDraftTargetContext] = useState<ForumTargetContext | null>(null);
+  const [draftCooldownId, setDraftCooldownId] = useState<string | null>(null);
   const [newCategory, setNewCategory] = useState("qubit");
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [contentBlocks, setContentBlocks] = useState<Record<string, unknown>[]>([]);
   const [categoryKey, setCategoryKey] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
@@ -133,10 +455,48 @@ export function ForumPageContent() {
   const [categoryIcon, setCategoryIcon] = useState("message-square");
   const { uploadImage } = useImageUpload("forum");
 
+  useEffect(() => {
+    if (hasAppliedDraftParams) return;
+    const draftTitle = searchParams.get("title");
+    const draftContent = searchParams.get("content");
+    const draftCategory = searchParams.get("category");
+    const chipId = searchParams.get("chip_id");
+    const targetId = searchParams.get("target_id");
+    const targetType = normalizeTargetType(searchParams.get("target_type"));
+    const draftLabels = searchParams.get("labels");
+    const cooldownId = searchParams.get("cooldown_id");
+    if (!draftTitle && !draftContent && !draftCategory) {
+      setHasAppliedDraftParams(true);
+      return;
+    }
+    if (draftCategory) {
+      setNewCategory(draftCategory);
+      setCategory(draftCategory as CategoryFilter);
+    }
+    if (draftTitle) setTitle(draftTitle);
+    if (draftContent) setContent(draftContent);
+    if (draftLabels) {
+      setSelectedLabels(
+        draftLabels
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      );
+    }
+    if (chipId && targetId && targetType) {
+      setDraftTargetContext({ chipId, targetType, targetId });
+    }
+    if (cooldownId) setDraftCooldownId(cooldownId);
+    setContentBlocks([]);
+    setShowComposer(true);
+    setHasAppliedDraftParams(true);
+  }, [hasAppliedDraftParams, searchParams]);
+
   const params: ListForumPostsParams = {
     skip,
     limit: PAGE_SIZE,
     category: category === "all" ? undefined : category,
+    label: labelFilter === "all" ? undefined : labelFilter,
     is_closed: status === "all" ? null : status === "closed" ? true : false,
   };
   const { data, isLoading } = useListForumPosts(params, {
@@ -154,29 +514,6 @@ export function ForumPageContent() {
       categoriesResponse?.data.categories.map(toForumCategoryDefinition) ??
       DEFAULT_FORUM_CATEGORIES,
     [categoriesResponse?.data.categories],
-  );
-
-  const { data: membersResponse } = useListProjectMembers(projectId ?? "", {
-    query: { enabled: !!projectId },
-  });
-  const mentionCandidates = useMemo(
-    () => [
-      { id: "qdash", label: "QDash" },
-      {
-        id: "project",
-        label: "Project",
-        secondaryLabel: "Notify all project members",
-      },
-      ...(membersResponse?.data.members
-        ?.filter((member) => member.username !== user?.username)
-        .map((member) => ({
-          id: member.username,
-          label: member.display_name || member.username,
-          secondaryLabel: member.organization ?? undefined,
-          avatarKey: member.avatar_key,
-        })) ?? []),
-    ],
-    [membersResponse?.data.members, user?.username],
   );
 
   const createMutation = useCreateForumPost();
@@ -206,12 +543,22 @@ export function ForumPageContent() {
         category: newCategory,
         title: trimmedTitle,
         content: trimmedContent,
+        content_blocks: contentBlocks,
         parent_id: null,
+        labels: selectedLabels,
+        chip_id: draftTargetContext?.chipId,
+        target_type: draftTargetContext?.targetType,
+        target_id: draftTargetContext?.targetId,
+        cooldown_id: draftCooldownId,
       },
     });
     setTitle("");
     setContent("");
+    setContentBlocks([]);
+    setSelectedLabels([]);
     setShowComposer(false);
+    setDraftTargetContext(null);
+    setDraftCooldownId(null);
     invalidateList();
     if (/@qdash\b/i.test(trimmedContent)) {
       triggerAiReply(response.data.id, trimmedContent, invalidateList);
@@ -225,6 +572,15 @@ export function ForumPageContent() {
 
   const setStatusFilter = (nextStatus: StatusFilter) => {
     setStatus(nextStatus);
+    setSkip(0);
+  };
+
+  const toggleSelectedLabel = (label: string) => {
+    setSelectedLabels((current) => (current.includes(label) ? [] : [label]));
+  };
+
+  const setLabelFilterValue = (nextLabel: string) => {
+    setLabelFilter(nextLabel);
     setSkip(0);
   };
 
@@ -278,29 +634,85 @@ export function ForumPageContent() {
         }
       />
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {categories.map((item) => {
-          const Icon = item.icon;
-          const active = category === item.id;
-          return (
+      <div className="mb-4">
+        <div className="tabs tabs-boxed w-fit">
+          {(["open", "closed", "all"] as const).map((item) => (
             <button
-              key={item.id}
-              type="button"
-              onClick={() => setCategoryFilter(active ? "all" : item.id)}
-              className={`rounded-lg border p-3 text-left transition-colors ${
-                active
-                  ? "border-primary bg-primary/10"
-                  : "border-base-300 bg-base-100 hover:border-primary/50"
-              }`}
+              key={item}
+              className={`tab tab-sm ${status === item ? "tab-active" : ""}`}
+              onClick={() => setStatusFilter(item)}
             >
-              <div className="mb-2 flex items-center gap-2">
-                <Icon className="h-4 w-4 text-base-content/70" />
-                <span className="text-sm font-semibold">{item.label}</span>
-              </div>
-              <p className="text-xs text-base-content/60">{item.description}</p>
+              {item.charAt(0).toUpperCase() + item.slice(1)}
             </button>
-          );
-        })}
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-base-300 bg-base-100 px-3 py-2">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter("all")}
+              className={`btn btn-xs ${category === "all" ? "btn-neutral" : "btn-ghost"}`}
+            >
+              All categories
+            </button>
+            {categories.map((item) => {
+              const Icon = item.icon;
+              const active = category === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setCategoryFilter(active ? "all" : item.id)}
+                  className={`btn btn-xs gap-1 ${active ? "btn-neutral" : "btn-ghost"}`}
+                  title={item.description}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.shortLabel}
+                </button>
+              );
+            })}
+          </div>
+
+          <select
+            className="select select-bordered select-xs w-36"
+            value={labelFilter}
+            onChange={(event) => setLabelFilterValue(event.target.value)}
+          >
+            <option value="all">All labels</option>
+            {FORUM_LABELS.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {(category !== "all" || labelFilter !== "all") && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-base-300 pt-2 text-xs text-base-content/55">
+            <span>Filtered by</span>
+            {category !== "all" && (
+              <button
+                className="badge badge-outline gap-1"
+                onClick={() => setCategoryFilter("all")}
+              >
+                {getForumCategory(category, categories).label}
+                <X className="h-3 w-3" />
+              </button>
+            )}
+            {labelFilter !== "all" && (
+              <button
+                className="badge badge-outline gap-1"
+                onClick={() => setLabelFilterValue("all")}
+              >
+                {getForumLabel(labelFilter).label}
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {showCategoryManager && isOwner && (
@@ -430,30 +842,25 @@ export function ForumPageContent() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="tabs tabs-boxed">
-          {(["open", "closed", "all"] as const).map((item) => (
-            <button
-              key={item}
-              className={`tab tab-sm ${status === item ? "tab-active" : ""}`}
-              onClick={() => setStatusFilter(item)}
-            >
-              {item.charAt(0).toUpperCase() + item.slice(1)}
-            </button>
-          ))}
-        </div>
-        {category !== "all" && (
-          <button className="btn btn-ghost btn-xs gap-1" onClick={() => setCategoryFilter("all")}>
-            <X className="h-3 w-3" />
-            Clear category
-          </button>
-        )}
-      </div>
-
       {showComposer && (
         <div className="card bg-base-200 shadow-lg mb-4">
           <div className="card-body">
-            <h2 className="card-title text-sm">New Thread</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="card-title text-sm">New Thread</h2>
+              {draftTargetContext && (
+                <span className="badge badge-outline gap-1">
+                  <Crosshair className="h-3 w-3" />
+                  {formatTargetLabel(
+                    draftTargetContext.targetType,
+                    draftTargetContext.targetId,
+                  )} ·{" "}
+                  {draftTargetContext.chipId}
+                </span>
+              )}
+              {draftCooldownId && (
+                <span className="badge badge-outline">Cooldown · {draftCooldownId}</span>
+              )}
+            </div>
             <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
               <select
                 className="select select-bordered select-sm w-full"
@@ -473,17 +880,34 @@ export function ForumPageContent() {
                 placeholder="Thread title"
               />
             </div>
-            <MarkdownEditor
-              value={content}
-              onChange={setContent}
-              onSubmit={submitThread}
-              placeholder="Start a discussion. Use @username to mention project members."
-              rows={5}
-              submitLabel="Post"
-              isSubmitting={createMutation.isPending}
-              mentionCandidates={mentionCandidates}
+            <ForumLabelSelector selectedLabels={selectedLabels} onToggle={toggleSelectedLabel} />
+            <ForumBlockEditor
+              key={showComposer ? "composer-open" : "composer-closed"}
+              legacyMarkdown={content}
+              onChange={(blocks, markdown) => {
+                setContentBlocks(blocks);
+                setContent(markdown);
+              }}
               onImageUpload={uploadImage}
             />
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-xs text-base-content/50">
+                Type <kbd className="kbd kbd-xs">/</kbd> for blocks (table, image, heading, list,
+                …). Use <span className="font-mono">@username</span> in text to mention members.
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={submitThread}
+                disabled={!title.trim() || !content.trim() || createMutation.isPending}
+              >
+                {createMutation.isPending ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  "Post"
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -507,6 +931,8 @@ export function ForumPageContent() {
                 post={post}
                 categories={categories}
                 canManage={isOwner || user?.username === post.username}
+                isSelected={selectedPostId === post.id}
+                onSelect={() => setSelectedPostId(post.id)}
                 onClose={(postId) =>
                   closeMutation.mutate({ postId }, { onSuccess: invalidateList })
                 }
@@ -540,6 +966,11 @@ export function ForumPageContent() {
           )}
         </>
       )}
+      <ForumThreadPreviewSidebar
+        postId={selectedPostId}
+        categories={categories}
+        onClose={() => setSelectedPostId(null)}
+      />
     </PageContainer>
   );
 }

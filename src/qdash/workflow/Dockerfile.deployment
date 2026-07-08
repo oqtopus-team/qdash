@@ -36,7 +36,7 @@ COPY src/qdash/client/pyproject.toml src/qdash/client/pyproject.toml
 COPY src/qdash/client/README.md src/qdash/client/README.md
 COPY src/qdash/workflow/pyproject.toml src/qdash/workflow/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv --no-config sync --locked --package qdash-workflow --no-dev
+    uv sync --locked --package qdash-workflow --no-dev
 
 FROM python:3.11-slim-bookworm
 

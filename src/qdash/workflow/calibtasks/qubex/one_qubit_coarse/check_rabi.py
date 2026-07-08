@@ -1,5 +1,6 @@
+import logging
 import math
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 from qubex.analysis import IQPlotter
@@ -20,12 +21,90 @@ DEFAULT_CONTROL_AMPLITUDE = 0.0125
 CONTROL_AMPLITUDE_MIN = 1e-4
 CONTROL_AMPLITUDE_MAX = 1.0
 
+logger = logging.getLogger(__name__)
+
+
+def _extract_rabi_r2_candidates(result: Any, label: str) -> dict[str, float | None]:
+    """Extract Rabi R² candidates from data/fit and rabi_params."""
+    candidates: dict[str, float | None] = {
+        "data_r2": None,
+        "fit_r2": None,
+        "rabi_params_r2": None,
+    }
+
+    data_by_label = getattr(result, "data", None) or {}
+    data = data_by_label.get(label) if hasattr(data_by_label, "get") else None
+    if data is not None:
+        data_r2 = getattr(data, "r2", None)
+        if data_r2 is not None:
+            candidates["data_r2"] = float(data_r2)
+        fit = getattr(data, "fit", None)
+        if callable(fit):
+            fit_result = fit()
+            if isinstance(fit_result, dict):
+                fit_r2 = fit_result.get("r2")
+                if fit_r2 is not None:
+                    candidates["fit_r2"] = float(fit_r2)
+
+    rabi_params = getattr(result, "rabi_params", None) or {}
+    rabi_param = rabi_params.get(label) if hasattr(rabi_params, "get") else None
+    rabi_params_r2 = getattr(rabi_param, "r2", None)
+    if rabi_params_r2 is not None:
+        candidates["rabi_params_r2"] = float(rabi_params_r2)
+
+    return candidates
+
+
+def _extract_rabi_r2(result: Any, label: str) -> float | None:
+    """Extract the Rabi fit R² used in the saved fit figure."""
+    candidates = _extract_rabi_r2_candidates(result, label)
+    return (
+        candidates["data_r2"]
+        if candidates["data_r2"] is not None
+        else candidates["fit_r2"]
+        if candidates["fit_r2"] is not None
+        else candidates["rabi_params_r2"]
+    )
+
+
+def _finite_rabi_validation_error(value: Any, field_name: str, label: str) -> str | None:
+    if value is None:
+        return f"CheckRabi produced no {field_name} for {label}"
+    numeric_value = float(value)
+    if not math.isfinite(numeric_value):
+        return f"CheckRabi produced non-finite {field_name} for {label}: {value}"
+    return None
+
+
+def _rabi_validation_error(result: Any, label: str) -> str | None:
+    rabi_params = getattr(result, "rabi_params", None) or {}
+    rabi_param = rabi_params.get(label) if hasattr(rabi_params, "get") else None
+    if rabi_param is None:
+        return f"CheckRabi produced no rabi_params for {label}"
+
+    frequency = getattr(rabi_param, "frequency", None)
+    error = _finite_rabi_validation_error(frequency, "frequency", label)
+    if error is not None:
+        return error
+    assert frequency is not None
+    if float(frequency) <= 0:
+        return f"CheckRabi produced non-positive frequency for {label}: {frequency}"
+
+    for field_name in ("amplitude", "phase", "offset", "angle", "noise", "distance"):
+        error = _finite_rabi_validation_error(
+            getattr(rabi_param, field_name, None), field_name, label
+        )
+        if error is not None:
+            return error
+    return None
+
 
 class CheckRabi(QubexTask):
     """Task to check the Rabi oscillation."""
 
     name: str = "CheckRabi"
     task_type: str = "qubit"
+    r2_threshold: float = 0.6
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": None,
         "control_amplitude": None,
@@ -141,7 +220,10 @@ class CheckRabi(QubexTask):
         figures.append(go.Figure(iq_plotter._widget.to_dict()))
         raw_data = [result.data[label].data]
         return PostProcessResult(
-            output_parameters=output_parameters, figures=figures, raw_data=raw_data
+            output_parameters=output_parameters,
+            figures=figures,
+            raw_data=raw_data,
+            validation_error=_rabi_validation_error(result, label),
         )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
@@ -177,5 +259,17 @@ class CheckRabi(QubexTask):
         )
 
         self.save_calibration(backend)
-        r2 = result.rabi_params[label].r2 if result.rabi_params else None
+        r2_candidates = _extract_rabi_r2_candidates(result, label)
+        r2 = _extract_rabi_r2(result, label)
+        logger.warning(
+            "CheckRabi R² candidates for qid=%s label=%s threshold=%.4f "
+            "selected=%s data_r2=%s fit_r2=%s rabi_params_r2=%s",
+            qid,
+            label,
+            self.r2_threshold,
+            r2,
+            r2_candidates["data_r2"],
+            r2_candidates["fit_r2"],
+            r2_candidates["rabi_params_r2"],
+        )
         return RunResult(raw_result=result, r2={qid: r2})
