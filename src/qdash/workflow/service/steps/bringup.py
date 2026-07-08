@@ -358,7 +358,7 @@ class ExperimentalSimultaneousBringUp(CalibrationStep):
                 all_qids,
                 flow_name=stage_flow_name,
                 backend_name=service.backend_name,
-                tags=service.tags or ([service.flow_name] if service.flow_name else None),
+                tags=service.tags,
                 project_id=service.project_id,
                 use_lock=False,
                 enable_github_pull=True,

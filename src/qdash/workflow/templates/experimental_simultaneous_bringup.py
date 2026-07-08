@@ -30,12 +30,12 @@ def experimental_simultaneous_bringup(
     simultaneous_spectroscopy_schedule_mode: str = "all",
 ) -> Any:
     """Run resonator, all-qubit simultaneous spectroscopy, and bring-up follow-up tasks."""
-    if mux_ids is None:
-        mux_ids = list(range(16))
+    if mux_ids is None and not qids:
+        raise ValueError("mux_ids or qids is required; select targets before running this flow")
     if exclude_qids is None:
         exclude_qids = []
 
-    targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
+    targets = MuxTargets(mux_ids=mux_ids or [], exclude_qids=exclude_qids)
     if qids:
         selected_mux_ids = sorted({int(qid) // 4 for qid in qids})
         selected_qids = {str(qid) for qid in qids}

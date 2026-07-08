@@ -17153,6 +17153,12 @@
             "type": "array",
             "title": "Tags",
             "description": "Tags"
+          },
+          "file_exists": {
+            "type": "boolean",
+            "title": "File Exists",
+            "description": "Whether the flow source file exists",
+            "default": true
           }
         },
         "type": "object",
