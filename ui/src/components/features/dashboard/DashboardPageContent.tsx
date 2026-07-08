@@ -35,7 +35,6 @@ import { dateToDateTimeLocal } from "@/lib/utils/datetime";
 
 import { DashboardCdfChart } from "./DashboardCdfChart";
 import { DashboardCouplingGrid } from "./DashboardCouplingGrid";
-import { DashboardNotesSummary } from "./DashboardNotesSummary";
 import { DashboardQubitGrid } from "./DashboardQubitGrid";
 import { DashboardSummaryTable } from "./DashboardSummaryTable";
 import {
@@ -277,20 +276,6 @@ export function DashboardPageContent() {
     });
     return targets;
   }, [forumPostsResponse?.data.posts]);
-
-  const taskNotes = useMemo(
-    () =>
-      (summary?.task_notes ?? [])
-        .map((t) => ({
-          taskId: t.task_id,
-          qid: t.qid,
-          content: stripAiGeneratedNoteSections(t.note?.content ?? ""),
-          username: t.note?.updated_by ?? "",
-          updatedAt: t.note?.updated_at ?? "",
-        }))
-        .filter((t) => t.content.trim().length > 0),
-    [summary],
-  );
 
   const notesByMetric = useMemo(() => {
     const map: Record<string, Record<string, NoteEntry>> = {};
@@ -558,32 +543,6 @@ export function DashboardPageContent() {
           />
         ) : (
           <>
-            {/* All notes overview */}
-            <Card
-              variant="default"
-              padding="md"
-              title="Notes"
-              description="Pinned summaries are the dashboard index. Use forum topics for separate notes and multi-person discussion."
-            >
-              <DashboardNotesSummary
-                notesByTarget={notesByTarget}
-                targetNotesByTarget={targetNotesByTarget}
-                taskNotes={taskNotes}
-                onEditTarget={setEditingTargetNote}
-                onEdit={(entry) => {
-                  const cfg =
-                    qubitMetrics.find((m) => m.key === entry.metricKey) ??
-                    couplingMetrics.find((m) => m.key === entry.metricKey);
-                  setEditingNote({
-                    targetId: entry.targetId,
-                    metricKey: entry.metricKey,
-                    metricTitle: entry.metricTitle,
-                    metricUnit: cfg?.unit ?? "",
-                  });
-                }}
-              />
-            </Card>
-
             {/* Pinned summary topology */}
             <Card
               variant="default"
