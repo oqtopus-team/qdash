@@ -367,3 +367,28 @@ class TestFlowTemplates:
         assert data["id"] == "full_calibration"
         assert "ConfigureAll -> 1Q Check" in data["description"]
         assert "ConfigureAll()," in data["code"]
+
+    def test_get_fast_full_calibration_template_includes_shortened_tasks(
+        self, test_client, test_project, auth_headers
+    ):
+        """Test that the fast full calibration template is registered and loadable."""
+        repo_root = Path(__file__).resolve().parents[4]
+        templates_dir = repo_root / "src/qdash/workflow/templates"
+
+        with (
+            patch("qdash.api.services.flow_service.TEMPLATES_DIR", templates_dir),
+            patch(
+                "qdash.api.services.flow_service.TEMPLATES_METADATA_FILE",
+                templates_dir / "templates.json",
+            ),
+        ):
+            response = test_client.get(
+                "/flows/templates/fast_full_calibration", headers=auth_headers
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "fast_full_calibration"
+        assert "Shortened full calibration" in data["description"]
+        fine_tune_tasks_block = data["code"].split("FAST_1Q_FINE_TUNE_TASKS", 1)[1].split("]", 1)[0]
+        assert "CheckT1Average" not in fine_tune_tasks_block
