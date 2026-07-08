@@ -99,7 +99,7 @@ def full_calibration(
     Args:
         username: User name (from UI)
         chip_id: Chip ID (from UI)
-        mux_ids: MUX IDs to calibrate (default: all 16)
+        mux_ids: MUX IDs to calibrate (required)
         exclude_qids: Qubit IDs to exclude
         qids: Not used (for UI compatibility)
         flow_name: Flow name (auto-injected)
@@ -120,7 +120,7 @@ def full_calibration(
     # =========================================================================
 
     if mux_ids is None:
-        mux_ids = list(range(16))
+        raise ValueError("mux_ids is required; select MUX targets before running this flow")
     if exclude_qids is None:
         exclude_qids = []
 

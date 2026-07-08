@@ -75,7 +75,7 @@ def one_qubit(
     Args:
         username: User name (from UI)
         chip_id: Chip ID (from UI)
-        mux_ids: MUX IDs to calibrate (default: all 16)
+        mux_ids: MUX IDs to calibrate when using MUX-based scheduling
         exclude_qids: Qubit IDs to exclude
         qids: Qubit IDs to calibrate when mux_ids is not set
         flow_name: Flow name (auto-injected)
@@ -94,7 +94,7 @@ def one_qubit(
     elif qids is not None:
         targets = QubitTargets(qids=qids)
     else:
-        targets = MuxTargets(mux_ids=list(range(16)), exclude_qids=exclude_qids)
+        raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
     steps: list[Step]
     if check_only:

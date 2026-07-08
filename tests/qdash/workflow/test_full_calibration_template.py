@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
+import pytest
+
 from qdash.workflow.service.steps import (
     ConfigureAll,
     FilterByMetric,
@@ -43,3 +45,10 @@ def test_full_calibration_passes_template_task_lists(monkeypatch) -> None:
     assert steps[1].tasks == full_module.FULL_1Q_CHECK_TASKS
     assert steps[3].tasks == full_module.FULL_1Q_FINE_TUNE_TASKS
     assert steps[6].tasks == full_module.FULL_2Q_TASKS
+
+
+def test_full_calibration_requires_explicit_mux_ids(monkeypatch) -> None:
+    monkeypatch.setattr(full_module, "CalibService", FakeCalibService)
+
+    with pytest.raises(ValueError, match="mux_ids is required"):
+        full_module.full_calibration(username="alice", chip_id="64Q")

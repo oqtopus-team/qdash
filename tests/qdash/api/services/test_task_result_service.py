@@ -53,6 +53,16 @@ class _TaskResultRepo:
         self.last_query = query
         return self.docs
 
+    def find_with_projection(
+        self,
+        query: dict[str, Any],
+        projection_model: Any,
+        sort: list[tuple[str, Any]] | None = None,
+        limit: int | None = None,
+    ) -> list[_TaskResultDoc]:
+        self.last_query = query
+        return self.docs
+
 
 def _doc(task_id: str, qid: str, end_at: datetime) -> _TaskResultDoc:
     return _TaskResultDoc(
@@ -701,3 +711,23 @@ def test_get_ai_review_run_groups_reviews_by_run_id() -> None:
     assert response.run.running_count == 1
     assert response.run.decision_counts == {"PASS": 1, "REVIEW": 1}
     assert [item.task_id for item in response.items] == ["task-1", "task-2"]
+
+
+def test_get_timeseries_filters_by_tag() -> None:
+    now = datetime(2026, 5, 5, tzinfo=timezone.utc)
+    repo = _TaskResultRepo([])
+
+    _service(repo).get_timeseries(
+        chip_id="chip-1",
+        tag="t1",
+        parameter="t1",
+        project_id="proj-1",
+        start_at=(now - timedelta(days=1)).isoformat(),
+        end_at=now.isoformat(),
+    )
+
+    assert repo.last_query is not None
+    assert repo.last_query["tags"] == "t1"
+    assert repo.last_query["project_id"] == "proj-1"
+    assert repo.last_query["chip_id"] == "chip-1"
+    assert repo.last_query["output_parameter_names"] == "t1"

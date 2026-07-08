@@ -26,4 +26,6 @@ export interface FlowSummary {
   updated_at: string;
   /** Tags */
   tags: string[];
+  /** Whether the flow source file exists */
+  file_exists?: boolean;
 }

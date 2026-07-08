@@ -128,6 +128,34 @@ class TestFlowRouter:
         assert len(data["flows"]) == 1
         assert data["flows"][0]["name"] == "test_flow"
         assert data["flows"][0]["created_by"] == "test_user"
+        assert data["flows"][0]["file_exists"] is False
+
+    def test_list_flows_marks_existing_files(
+        self, test_client, test_project, auth_headers, tmp_path
+    ):
+        """Test listing flows reports whether the source file still exists."""
+        flow_path = tmp_path / "existing_flow.py"
+        flow_path.write_text("from prefect import flow\n", encoding="utf-8")
+        flow = FlowDocument(
+            project_id="test_project",
+            name="existing_flow",
+            username="test_user",
+            chip_id="test_chip",
+            description="An existing flow",
+            flow_function_name="run_existing_flow",
+            file_path=str(flow_path),
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+            tags=[],
+        )
+        flow.insert()
+
+        response = test_client.get("/flows", headers=auth_headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["flows"][0]["name"] == "existing_flow"
+        assert data["flows"][0]["file_exists"] is True
 
     def test_list_flows_filters_by_project(self, test_client, test_project, auth_headers):
         """Test that listing flows only returns flows for the current project."""

@@ -47,7 +47,7 @@ def _execute_direct_one_qubit(
         qids,
         flow_name=stage_flow_name,
         backend_name=service.backend_name,
-        tags=service.tags or ([service.flow_name] if service.flow_name else None),
+        tags=service.tags,
         project_id=service.project_id,
         use_lock=False,
         enable_github_pull=True,
@@ -83,6 +83,34 @@ def _execute_direct_one_qubit(
     session.record_stage_result(stage_name, wrapped_results)
     finish_calibration()
     return wrapped_results
+
+
+def _execute_scheduled_one_qubit(
+    service: CalibService,
+    *,
+    qids: list[str],
+    tasks: list[str],
+    stage_name: str,
+    mode: str,
+) -> dict[str, Any]:
+    """Run explicit qubit targets through the same scheduler used by MUX targets."""
+    from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
+
+    if not qids:
+        return {}
+
+    mux_ids = sorted({int(qid) // 4 for qid in qids})
+    config = OneQubitConfig(
+        mux_ids=mux_ids,
+        exclude_qids=[],
+        qids=qids,
+        tasks=tasks,
+        flow_name=f"{service.flow_name}_{stage_name}" if service.flow_name else stage_name,
+        project_id=service.project_id,
+    )
+    strategy = get_one_qubit_strategy(mode)
+    result: dict[str, Any] = strategy.execute(service, config)
+    return result
 
 
 @dataclass
@@ -148,7 +176,7 @@ class CustomOneQubit(CalibrationStep):
             raw_results = strategy.execute(service, config)
         else:
             qids = targets.to_qids(service.chip_id)
-            raw_results = self._execute_direct(service, qids)
+            raw_results = self._execute_scheduled(service, qids)
 
         # Build typed result
         result = self._build_result(raw_results)
@@ -162,12 +190,26 @@ class CustomOneQubit(CalibrationStep):
         )
         return ctx
 
+    def _execute_scheduled(
+        self,
+        service: CalibService,
+        qids: list[str],
+    ) -> dict[str, Any]:
+        """Execute explicit QubitTargets through hardware-aware scheduling."""
+        return _execute_scheduled_one_qubit(
+            service,
+            qids=qids,
+            tasks=self.tasks,
+            stage_name=self.step_name,
+            mode=self.mode,
+        )
+
     def _execute_direct(
         self,
         service: CalibService,
         qids: list[str],
     ) -> dict[str, Any]:
-        """Direct execution for QubitTargets using multiprocess parallelism."""
+        """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
         return _execute_direct_one_qubit(
             service,
             qids=qids,
@@ -256,7 +298,7 @@ class OneQubitCheck(CalibrationStep):
             raw_results = strategy.execute(service, config)
         else:
             qids = targets.to_qids(service.chip_id)
-            raw_results = self._execute_direct(service, qids, tasks)
+            raw_results = self._execute_scheduled(service, qids, tasks)
 
         # Build typed result
         result = self._build_result(raw_results)
@@ -268,13 +310,28 @@ class OneQubitCheck(CalibrationStep):
         )
         return ctx
 
+    def _execute_scheduled(
+        self,
+        service: CalibService,
+        qids: list[str],
+        tasks: list[str],
+    ) -> dict[str, Any]:
+        """Execute explicit QubitTargets through hardware-aware scheduling."""
+        return _execute_scheduled_one_qubit(
+            service,
+            qids=qids,
+            tasks=tasks,
+            stage_name=self.name,
+            mode=self.mode,
+        )
+
     def _execute_direct(
         self,
         service: CalibService,
         qids: list[str],
         tasks: list[str],
     ) -> dict[str, Any]:
-        """Direct execution for QubitTargets using multiprocess parallelism."""
+        """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
         return _execute_direct_one_qubit(
             service,
             qids=qids,

@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
+import pytest
+
 check_waveform_module = importlib.import_module("qdash.workflow.templates.check_waveform")
 
 
@@ -46,3 +48,10 @@ def test_check_waveform_template_sets_default_interval(monkeypatch) -> None:
     assert FakeCalibService.last_kwargs["default_run_parameters"] == {
         "interval": {"value": 150 * 1024, "value_type": "int"},
     }
+
+
+def test_check_waveform_template_requires_explicit_targets(monkeypatch) -> None:
+    monkeypatch.setattr(check_waveform_module, "CalibService", FakeCalibService)
+
+    with pytest.raises(ValueError, match="mux_ids or qids is required"):
+        check_waveform_module.check_waveform(username="alice", chip_id="16Q-test")

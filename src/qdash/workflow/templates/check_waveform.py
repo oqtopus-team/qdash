@@ -57,7 +57,7 @@ def check_waveform(
     elif qids is not None:
         targets = QubitTargets(qids=qids)
     else:
-        targets = MuxTargets(mux_ids=list(range(16)), exclude_qids=exclude_qids)
+        raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
     steps = [
         CustomOneQubit(step_name="check_waveform", tasks=["CheckWaveform"], mode=mode),
