@@ -1,6 +1,15 @@
 "use client";
 
-import { Bot, Check, Download, LoaderCircle, X, Maximize2, Move } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Bot,
+  Check,
+  Download,
+  LoaderCircle,
+  X,
+  Maximize2,
+  Move,
+} from "lucide-react";
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -105,6 +114,7 @@ export function CouplingGrid({
     layoutType = "grid",
     showMuxBoundaries = false,
     qubits: topologyQubits,
+    couplings: topologyCouplings,
     gridSize: topologyGridSize,
   } = useTopologyConfig(topologyId) ?? {};
 
@@ -163,6 +173,7 @@ export function CouplingGrid({
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
   const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [isDirectionReversed, setIsDirectionReversed] = useState(false);
 
   // Region tab is only available for square grids; fall back to pan-zoom otherwise.
   useEffect(() => {
@@ -199,6 +210,11 @@ export function CouplingGrid({
     task: selectedTask,
     selectedDate,
   });
+  const taskResultMap = useMemo(
+    () => taskResponse?.data?.result ?? {},
+    [taskResponse?.data?.result],
+  );
+
   const persistedPendingAiReviewTaskIds = useMemo(
     () => getPendingAiReviewTaskIds(taskResponse?.data?.result),
     [taskResponse?.data?.result],
@@ -219,7 +235,7 @@ export function CouplingGrid({
       aiReviewReplayBundles: 0,
     };
     selectedForDownload.forEach((couplingId) => {
-      const task = taskResponse?.data?.result?.[couplingId];
+      const task = taskResultMap[couplingId];
       counts.figureImages += toPathList(task?.figure_path).length;
       counts.jsonFigures += toPathList(task?.json_figure_path).length;
       counts.rawData += toPathList(task?.raw_data_path).length;
@@ -231,7 +247,7 @@ export function CouplingGrid({
       }
     });
     return counts;
-  }, [aiReviewBadgesByTaskId, selectedForDownload, taskResponse?.data?.result]);
+  }, [aiReviewBadgesByTaskId, selectedForDownload, taskResultMap]);
 
   useEffect(() => {
     if (!aiReviewBadgesByTaskId || pendingAiReviewTaskIds.size === 0) return;
@@ -284,21 +300,38 @@ export function CouplingGrid({
 
   const initialScale = 1;
 
-  const normalizedResultMap: Record<string, ExtendedTask[]> = {};
-  if (taskResponse?.data?.result) {
-    for (const [couplingId, task] of Object.entries(taskResponse.data.result)) {
-      const [a, b] = couplingId.split("-").map(Number);
-      const normKey = a < b ? `${a}-${b}` : `${b}-${a}`;
-      if (!normalizedResultMap[normKey]) normalizedResultMap[normKey] = [];
-      normalizedResultMap[normKey].push({
-        ...task,
-        couplingId,
-      } as ExtendedTask);
-      normalizedResultMap[normKey].sort(
-        (a, b) => (b.default_view ? 1 : 0) - (a.default_view ? 1 : 0),
-      );
+  const baseCouplingPairs = useMemo(() => {
+    if (topologyCouplings && topologyCouplings.length > 0) {
+      return topologyCouplings;
     }
-  }
+
+    const pairs = new Map<string, [number, number]>();
+    Object.keys(taskResultMap).forEach((couplingId) => {
+      const [a, b] = couplingId.split("-").map(Number);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) return;
+      const pair: [number, number] = a < b ? [a, b] : [b, a];
+      pairs.set(`${pair[0]}-${pair[1]}`, pair);
+    });
+    return [...pairs.values()];
+  }, [taskResultMap, topologyCouplings]);
+
+  const displayedCouplingTasks = useMemo(() => {
+    return baseCouplingPairs
+      .map(([qid1, qid2]) => {
+        const couplingId = isDirectionReversed ? `${qid2}-${qid1}` : `${qid1}-${qid2}`;
+        const task = taskResultMap[couplingId];
+        if (!task) return null;
+        return {
+          ...task,
+          couplingId,
+          baseQid1: qid1,
+          baseQid2: qid2,
+        } as ExtendedTask & { baseQid1: number; baseQid2: number };
+      })
+      .filter((task): task is ExtendedTask & { baseQid1: number; baseQid2: number } =>
+        Boolean(task),
+      );
+  }, [baseCouplingPairs, isDirectionReversed, taskResultMap]);
 
   if (isLoading)
     return (
@@ -364,9 +397,9 @@ export function CouplingGrid({
   };
 
   const selectAllForDownload = () => {
-    const allCouplingIds = Object.entries(taskResponse?.data?.result || {})
-      .filter(([, task]) => hasDownloadableArtifacts(task))
-      .map(([couplingId]) => couplingId);
+    const allCouplingIds = displayedCouplingTasks
+      .filter((task) => hasDownloadableArtifacts(task))
+      .map((task) => task.couplingId);
     setSelectedForDownload(new Set(allCouplingIds));
   };
 
@@ -381,7 +414,7 @@ export function CouplingGrid({
     const aiReviewTaskIds: string[] = [];
     const aiReviewBundleTaskIds: string[] = [];
     selectedForDownload.forEach((couplingId) => {
-      const task = taskResponse?.data?.result?.[couplingId];
+      const task = taskResultMap[couplingId];
       if (!task) return;
       if (downloadOptions.figureImages) {
         paths.push(...toPathList(task.figure_path));
@@ -448,16 +481,11 @@ export function CouplingGrid({
     );
 
   const hasJsonFigures = (couplingId: string): boolean => {
-    const task = taskResponse?.data?.result?.[couplingId];
+    const task = taskResultMap[couplingId];
     return hasDownloadableArtifacts(task);
   };
 
-  const availableForDownloadCount = Object.entries(taskResponse?.data?.result || {}).filter(
-    ([, task]) => hasDownloadableArtifacts(task),
-  ).length;
-  const availableForAiReviewCount = Object.values(taskResponse?.data?.result || {}).filter(
-    (task) => task.task_id,
-  ).length;
+  const availableForDownloadCount = displayedCouplingTasks.filter(hasDownloadableArtifacts).length;
   const copilotConfig = copilotConfigResponse?.data as
     | {
         enabled?: boolean;
@@ -475,7 +503,11 @@ export function CouplingGrid({
   };
 
   const canAiReviewCoupling = (couplingId: string): boolean =>
-    Boolean(isAiReviewTaskConfigured && taskResponse?.data?.result?.[couplingId]?.task_id);
+    Boolean(isAiReviewTaskConfigured && taskResultMap[couplingId]?.task_id);
+
+  const availableForAiReviewCount = displayedCouplingTasks.filter((task) =>
+    canAiReviewCoupling(task.couplingId),
+  ).length;
 
   const toggleAiReviewSelection = (couplingId: string) => {
     setSelectedForAiReview((prev) => {
@@ -490,9 +522,9 @@ export function CouplingGrid({
   };
 
   const selectAllForAiReview = () => {
-    const allCouplingIds = Object.keys(taskResponse?.data?.result || {}).filter(
-      canAiReviewCoupling,
-    );
+    const allCouplingIds = displayedCouplingTasks
+      .map((task) => task.couplingId)
+      .filter(canAiReviewCoupling);
     setSelectedForAiReview(new Set(allCouplingIds));
   };
 
@@ -500,11 +532,19 @@ export function CouplingGrid({
     setSelectedForAiReview(new Set());
   };
 
+  const setCouplingDirection = (reversed: boolean) => {
+    setIsDirectionReversed(reversed);
+    setDownloadSelectionEnabled(false);
+    setAiReviewSelectionEnabled(false);
+    setSelectedForDownload(new Set());
+    setSelectedForAiReview(new Set());
+  };
+
   const handleBulkAiReview = async () => {
     if (selectedForAiReview.size === 0 || !isAiReviewTaskConfigured) return;
 
     const taskIds = Array.from(selectedForAiReview)
-      .map((couplingId) => taskResponse?.data?.result?.[couplingId]?.task_id)
+      .map((couplingId) => taskResultMap[couplingId]?.task_id)
       .filter((taskId): taskId is string => Boolean(taskId));
     if (taskIds.length === 0) return;
 
@@ -640,14 +680,11 @@ export function CouplingGrid({
       )}
 
       {/* Coupling overlays */}
-      {Object.entries(normalizedResultMap)
-        .filter(([normKey]) => {
-          const [qid1, qid2] = normKey.split("-").map(Number);
-          return isCouplingInRegion(qid1, qid2);
-        })
-        .map(([normKey, taskList]) => {
-          const [qid1, qid2] = normKey.split("-").map(Number);
-          const task = taskList[0];
+      {displayedCouplingTasks
+        .filter((task) => isCouplingInRegion(task.baseQid1, task.baseQid2))
+        .map((task) => {
+          const qid1 = task.baseQid1;
+          const qid2 = task.baseQid2;
           const figurePath = Array.isArray(task.figure_path)
             ? task.figure_path[0]
             : task.figure_path || null;
@@ -690,7 +727,7 @@ export function CouplingGrid({
           if (!showFigures) {
             return (
               <button
-                key={normKey}
+                key={task.couplingId}
                 onClick={() => {
                   if (downloadSelectionEnabled) {
                     if (canBeDownloaded) toggleDownloadSelection(task.couplingId);
@@ -750,7 +787,7 @@ export function CouplingGrid({
           // Zoomed-in: full figure
           return (
             <button
-              key={normKey}
+              key={task.couplingId}
               onClick={() => {
                 if (downloadSelectionEnabled) {
                   if (canBeDownloaded) {
@@ -947,6 +984,16 @@ export function CouplingGrid({
               onToggle={setRegionSelectionEnabled}
             />
           </div>
+
+          <button
+            type="button"
+            onClick={() => setCouplingDirection(!isDirectionReversed)}
+            className={`btn btn-sm gap-1.5 ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
+            title={isDirectionReversed ? "Showing reverse direction" : "Showing forward direction"}
+          >
+            <ArrowRightLeft className="h-3.5 w-3.5" />
+            <span className="text-xs">{isDirectionReversed ? "Reverse" : "Forward"}</span>
+          </button>
         </div>
 
         {/* Download selection controls */}

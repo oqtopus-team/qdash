@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { StickyNote } from "lucide-react";
+import { ArrowRightLeft, StickyNote } from "lucide-react";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
@@ -574,22 +574,23 @@ export function DashboardPageContent() {
                     <div className="flex items-center gap-2">
                       <h4 className="text-sm font-semibold">Coupling summaries</h4>
                     </div>
-                    <div className="join">
-                      <button
-                        type="button"
-                        className={`join-item btn btn-xs ${couplingDirection === "forward" ? "btn-primary" : "btn-outline"}`}
-                        onClick={() => setCouplingDirection("forward")}
-                      >
-                        Forward
-                      </button>
-                      <button
-                        type="button"
-                        className={`join-item btn btn-xs ${couplingDirection === "reverse" ? "btn-primary" : "btn-outline"}`}
-                        onClick={() => setCouplingDirection("reverse")}
-                      >
-                        Reverse
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCouplingDirection(isReverseCouplingDirection ? "forward" : "reverse")
+                      }
+                      className={`btn btn-sm gap-1.5 ${isReverseCouplingDirection ? "btn-secondary" : "btn-outline"}`}
+                      title={
+                        isReverseCouplingDirection
+                          ? "Showing reverse direction"
+                          : "Showing forward direction"
+                      }
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5" />
+                      <span className="text-xs">
+                        {isReverseCouplingDirection ? "Reverse" : "Forward"}
+                      </span>
+                    </button>
                   </div>
                   <DashboardCouplingGrid
                     metricData={noteCouplingTopologyData}
@@ -713,22 +714,23 @@ export function DashboardPageContent() {
                 description="Click any coupling to update its pinned summary while inspecting the selected metric."
               >
                 <div className="mb-4 flex justify-end">
-                  <div className="join">
-                    <button
-                      type="button"
-                      className={`join-item btn btn-xs ${couplingDirection === "forward" ? "btn-primary" : "btn-outline"}`}
-                      onClick={() => setCouplingDirection("forward")}
-                    >
-                      Forward
-                    </button>
-                    <button
-                      type="button"
-                      className={`join-item btn btn-xs ${couplingDirection === "reverse" ? "btn-primary" : "btn-outline"}`}
-                      onClick={() => setCouplingDirection("reverse")}
-                    >
-                      Reverse
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCouplingDirection(isReverseCouplingDirection ? "forward" : "reverse")
+                    }
+                    className={`btn btn-sm gap-1.5 ${isReverseCouplingDirection ? "btn-secondary" : "btn-outline"}`}
+                    title={
+                      isReverseCouplingDirection
+                        ? "Showing reverse direction"
+                        : "Showing forward direction"
+                    }
+                  >
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                    <span className="text-xs">
+                      {isReverseCouplingDirection ? "Reverse" : "Forward"}
+                    </span>
+                  </button>
                 </div>
                 <div className="space-y-6">
                   {couplingMetrics.map((m) => {
