@@ -3,14 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { ExternalLink, MessageSquarePlus, Pencil, Save, StickyNote, Trash2, X } from "lucide-react";
+import { ExternalLink, MessageSquarePlus, Pencil, Save, StickyNote, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useListForumPosts } from "@/client/forum/forum";
 import {
   getGetChipNotesSummaryQueryKey,
-  useDeleteCouplingNote,
-  useDeleteQubitNote,
   useUpsertCouplingNote,
   useUpsertQubitNote,
 } from "@/client/note/note";
@@ -119,11 +117,8 @@ export function DashboardTargetNoteModal({
   const queryClient = useQueryClient();
   const isCoupling = targetId.includes("-");
   const upsertQubit = useUpsertQubitNote();
-  const deleteQubit = useDeleteQubitNote();
   const upsertCoupling = useUpsertCouplingNote();
-  const deleteCoupling = useDeleteCouplingNote();
   const upsertPending = isCoupling ? upsertCoupling.isPending : upsertQubit.isPending;
-  const deletePending = isCoupling ? deleteCoupling.isPending : deleteQubit.isPending;
   const { data: forumPostsResponse } = useListForumPosts(
     {
       chip_id: chipId,
@@ -165,21 +160,6 @@ export function DashboardTargetNoteModal({
         qid: targetId,
         data: { content: draft },
       });
-    }
-    await invalidate();
-    onClose();
-  };
-
-  const handleDelete = async () => {
-    if (!existing) {
-      setDraft("");
-      onClose();
-      return;
-    }
-    if (isCoupling) {
-      await deleteCoupling.mutateAsync({ chipId, couplingId: targetId });
-    } else {
-      await deleteQubit.mutateAsync({ chipId, qid: targetId });
     }
     await invalidate();
     onClose();
@@ -299,15 +279,6 @@ export function DashboardTargetNoteModal({
                   <Pencil className="h-3.5 w-3.5" />
                   Edit
                 </button>
-                <button
-                  className="btn btn-sm btn-ghost text-error gap-1"
-                  onClick={handleDelete}
-                  disabled={deletePending}
-                  type="button"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  {deletePending ? "Deleting..." : "Delete"}
-                </button>
               </div>
             </div>
           ) : (
@@ -334,18 +305,7 @@ export function DashboardTargetNoteModal({
         </div>
 
         {mode === "edit" && (
-          <div className="px-5 py-4 border-t border-base-300 flex flex-wrap justify-between gap-2">
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="btn btn-sm btn-ghost text-error gap-1"
-                onClick={handleDelete}
-                disabled={!existing || deletePending}
-                type="button"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {deletePending ? "Deleting..." : "Delete"}
-              </button>
-            </div>
+          <div className="px-5 py-4 border-t border-base-300 flex flex-wrap justify-end gap-2">
             <div className="flex gap-2">
               <button className="btn btn-sm btn-ghost" onClick={onClose} type="button">
                 Cancel
