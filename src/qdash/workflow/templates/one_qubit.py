@@ -25,6 +25,38 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
+ONE_QUBIT_CHECK_TASKS: list[str] = [
+    "CheckRabi",
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    # "CheckOptimalReadoutFrequency",
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CheckT1",
+    "CheckT2Echo",
+    "CheckRamsey",
+]
+
+ONE_QUBIT_FINE_TUNE_TASKS: list[str] = [
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
+    "ReadoutClassification",
+    "CheckT1Average",
+    "CheckT2EchoAverage",
+    "Check1QGateCoherenceLimit",
+    "RandomizedBenchmarking",
+    "X90InterleavedRandomizedBenchmarking",
+]
+
 
 @flow(on_cancellation=[on_flow_cancellation])
 def one_qubit(
@@ -68,14 +100,14 @@ def one_qubit(
     if check_only:
         # Basic check only
         steps = [
-            OneQubitCheck(mode="synchronized"),
+            OneQubitCheck(mode="synchronized", tasks=ONE_QUBIT_CHECK_TASKS),
         ]
     else:
         # Full 1Q calibration
         steps = [
-            OneQubitCheck(mode="synchronized"),
+            OneQubitCheck(mode="synchronized", tasks=ONE_QUBIT_CHECK_TASKS),
             FilterByStatus(),  # Only proceed with successful qubits
-            OneQubitFineTune(mode="synchronized"),
+            OneQubitFineTune(mode="synchronized", tasks=ONE_QUBIT_FINE_TUNE_TASKS),
         ]
 
     cal = CalibService(

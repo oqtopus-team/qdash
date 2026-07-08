@@ -20,6 +20,13 @@ from qdash.workflow.service.calib_service import on_flow_cancellation
 from qdash.workflow.service.steps import BringUp, ConfigureAll
 from qdash.workflow.service.targets import MuxTargets
 
+BRINGUP_TASKS: list[str] = [
+    "CheckResonatorSpectroscopy",
+    "CheckQubitSpectroscopy",
+    "CheckControlAmplitude",
+    "CheckChevron",
+]
+
 
 @flow(on_cancellation=[on_flow_cancellation])
 def bringup(
@@ -79,7 +86,7 @@ def bringup(
 
     steps = [
         ConfigureAll(),
-        BringUp(mode=mode),
+        BringUp(mode=mode, tasks=BRINGUP_TASKS),
     ]
 
     cal = CalibService(
