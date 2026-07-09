@@ -14,13 +14,13 @@ import {
   Crosshair,
   Tag,
   Trash2,
-  Unlock,
   UserRound,
 } from "lucide-react";
 
 import { useListChips } from "@/client/chip/chip";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
 import { useListProjectMembers } from "@/client/projects/projects";
+import { useListTaskResults } from "@/client/task-result/task-result";
 import {
   getGetForumPostQueryKey,
   getGetForumPostRepliesQueryKey,
@@ -31,7 +31,7 @@ import {
   useGetForumPost,
   useGetForumPostReplies,
   useListForumCategories,
-  useReopenForumPost,
+  useListForumPosts,
   useUpdateForumPost,
 } from "@/client/forum/forum";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
@@ -44,9 +44,12 @@ import { formatDateTimeCompact, formatRelativeTime } from "@/lib/utils/datetime"
 import type { ForumPostResponse } from "@/schemas";
 
 import {
+  FORUM_STATUSES,
   formatForumPostNumber,
   getForumCategory,
   getForumLabel,
+  getForumStatus,
+  isForumTerminalStatus,
   toForumCategoryDefinition,
 } from "./categories";
 import { ForumLabelPicker } from "./ForumLabelSelector";
@@ -328,12 +331,38 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const currentPostCooldown = cooldowns.find(
     (cooldown) => cooldown.cooldown_id === post?.cooldown_id,
   );
+  const linkedTargetContext = post ? postTargetContext(post) : null;
+  const { data: relatedTaskResultsResponse } = useListTaskResults(
+    {
+      chip_id: linkedTargetContext?.chipId,
+      qid: linkedTargetContext?.targetId,
+      skip: 0,
+      limit: 5,
+    },
+    { query: { enabled: !!linkedTargetContext, staleTime: 30_000 } },
+  );
+  const { data: relatedThreadsResponse } = useListForumPosts(
+    {
+      chip_id: linkedTargetContext?.chipId,
+      target_type: linkedTargetContext?.targetType,
+      target_id: linkedTargetContext?.targetId,
+      status: null,
+      skip: 0,
+      limit: 6,
+    },
+    { query: { enabled: !!linkedTargetContext, staleTime: 30_000 } },
+  );
+  const relatedTaskResults = relatedTaskResultsResponse?.data.items ?? [];
+  const relatedThreads = useMemo(
+    () =>
+      (relatedThreadsResponse?.data.posts ?? []).filter((item) => item.id !== postId).slice(0, 5),
+    [postId, relatedThreadsResponse?.data.posts],
+  );
 
   const createMutation = useCreateForumPost();
   const updateMutation = useUpdateForumPost();
   const deleteMutation = useDeleteForumPost();
   const closeMutation = useCloseForumPost();
-  const reopenMutation = useReopenForumPost();
   const {
     isGenerating,
     statusMessage: aiStatus,
@@ -495,6 +524,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     targetId: nextTargetId,
     cooldownId: nextCooldownId,
     assigneeUsername: nextAssigneeUsername,
+    status: nextStatus,
   }: {
     category?: string;
     labels?: string[];
@@ -503,6 +533,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     targetId?: string | null;
     cooldownId?: string | null;
     assigneeUsername?: string | null;
+    status?: ForumPostResponse["status"];
   }) => {
     if (!post || !canManage) return;
     const response = await updateMutation.mutateAsync({
@@ -512,6 +543,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
         content: post.content,
         content_blocks: (post.content_blocks ?? []) as Record<string, unknown>[],
         labels: nextLabels ?? post.labels ?? [],
+        ...(nextStatus !== undefined ? { status: nextStatus } : {}),
         ...(nextCooldownId !== undefined ? { cooldown_id: nextCooldownId } : {}),
         ...(nextAssigneeUsername !== undefined ? { assignee_username: nextAssigneeUsername } : {}),
         ...(nextChipId !== undefined || nextTargetType !== undefined || nextTargetId !== undefined
@@ -592,8 +624,11 @@ export function ForumDetailPage({ postId }: { postId: string }) {
 
   const category = getForumCategory(post.category, categories);
   const CategoryIcon = category.icon;
-  const targetContext = postTargetContext(post);
+  const targetContext = linkedTargetContext;
   const canManage = isOwner || currentUsername === post.username;
+  const statusDef = getForumStatus(post.status);
+  const StatusIcon = statusDef.icon;
+  const isTerminal = isForumTerminalStatus(post.status);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -654,7 +689,10 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
             <span>Opened by {post.username}</span>
             <span>{formatRelativeTime(post.created_at)}</span>
-            {post.is_closed && <span className="badge badge-sm badge-ghost">Closed</span>}
+            <span className={`badge badge-sm gap-1 ${statusDef.badgeClass}`}>
+              <StatusIcon className="h-3 w-3" />
+              {statusDef.label}
+            </span>
           </div>
         </div>
       </div>
@@ -667,7 +705,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             canEdit={canManage}
             onEdit={handleStartEditRoot}
             onDelete={
-              post.is_closed
+              isTerminal
                 ? undefined
                 : () => closeMutation.mutate({ postId }, { onSuccess: invalidateThread })
             }
@@ -749,9 +787,9 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </div>
 
           <div className="ml-4 pb-8 pl-4">
-            {post.is_closed ? (
+            {isTerminal ? (
               <div className="rounded-lg border border-base-300 bg-base-200/60 p-3 text-sm text-base-content/60">
-                This thread is closed.
+                This thread is resolved.
               </div>
             ) : (
               <div>
@@ -890,6 +928,65 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             )}
           </section>
 
+          {targetContext && (
+            <section className="space-y-3 rounded-lg border border-base-300 bg-base-100 p-3">
+              <div className="text-xs font-semibold uppercase text-base-content/50">Related</div>
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-base-content/60">Recent task results</div>
+                {relatedTaskResults.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {relatedTaskResults.map((task) => (
+                      <Link
+                        key={task.task_id}
+                        href={`/task-results/${task.task_id}`}
+                        className="block rounded-md border border-base-300 px-2 py-1.5 text-xs hover:border-primary/50"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate font-mono text-primary">
+                            {task.task_id}
+                          </span>
+                          <span className="badge badge-xs badge-ghost">{task.status}</span>
+                        </div>
+                        <div className="mt-0.5 truncate text-base-content/55">{task.task_name}</div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-base-content/45">No recent task results</div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-base-content/60">Related threads</div>
+                {relatedThreads.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {relatedThreads.map((thread) => (
+                      <Link
+                        key={thread.id}
+                        href={`/forum/${thread.id}`}
+                        className="block rounded-md border border-base-300 px-2 py-1.5 text-xs hover:border-primary/50"
+                      >
+                        <div className="truncate font-medium">
+                          {formatForumPostNumber(thread.number)} {thread.title || "Untitled topic"}
+                        </div>
+                        <div className="mt-0.5 text-base-content/55">
+                          {getForumStatus(thread.status).label}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-base-content/45">No related threads</div>
+                )}
+              </div>
+              <Link
+                href={`/provenance?qid=${encodeURIComponent(targetContext.targetId)}&tab=lineage`}
+                className="btn btn-outline btn-xs w-full justify-start"
+              >
+                Open provenance
+              </Link>
+            </section>
+          )}
+
           <section className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
               <CalendarDays className="h-3.5 w-3.5" />
@@ -993,34 +1090,28 @@ export function ForumDetailPage({ postId }: { postId: string }) {
 
           <section className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
-              {post.is_closed ? (
-                <Lock className="h-3.5 w-3.5" />
-              ) : (
-                <Unlock className="h-3.5 w-3.5" />
-              )}
+              <StatusIcon className="h-3.5 w-3.5" />
               Status
             </div>
             {canManage ? (
-              post.is_closed ? (
-                <button
-                  className="btn btn-outline btn-sm w-full justify-start gap-2 rounded-md normal-case"
-                  onClick={() => reopenMutation.mutate({ postId }, { onSuccess: invalidateThread })}
-                >
-                  <Unlock className="h-3.5 w-3.5" />
-                  Reopen thread
-                </button>
-              ) : (
-                <button
-                  className="btn btn-outline btn-sm w-full justify-start gap-2 rounded-md normal-case"
-                  onClick={() => closeMutation.mutate({ postId }, { onSuccess: invalidateThread })}
-                >
-                  <Lock className="h-3.5 w-3.5" />
-                  Close thread
-                </button>
-              )
+              <select
+                className="select select-bordered select-xs w-full"
+                value={post.status ?? "open"}
+                onChange={(event) =>
+                  updateRootMetadata({ status: event.target.value as ForumPostResponse["status"] })
+                }
+                disabled={updateMutation.isPending}
+              >
+                {FORUM_STATUSES.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
             ) : (
-              <span className="text-sm text-base-content/70">
-                {post.is_closed ? "Closed" : "Open"}
+              <span className={`badge badge-sm gap-1 ${statusDef.badgeClass}`}>
+                <StatusIcon className="h-3.5 w-3.5" />
+                {statusDef.label}
               </span>
             )}
           </section>

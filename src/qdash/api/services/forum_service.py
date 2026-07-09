@@ -17,6 +17,7 @@ from starlette.exceptions import HTTPException
 from qdash.api.schemas.forum import (
     ForumCategoryResponse,
     ForumPostResponse,
+    ForumThreadStatus,
     ListForumCategoriesResponse,
     ListForumPostsResponse,
 )
@@ -24,7 +25,12 @@ from qdash.api.schemas.success import SuccessResponse
 from qdash.common.config.paths import CALIB_DATA_BASE
 from qdash.common.utils.datetime import now
 from qdash.datamodel.project import ProjectRole
-from qdash.dbmodel.forum import ForumCategoryDocument, ForumCounterDocument, ForumPostDocument
+from qdash.dbmodel.forum import (
+    FORUM_THREAD_STATUSES,
+    ForumCategoryDocument,
+    ForumCounterDocument,
+    ForumPostDocument,
+)
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
 
@@ -75,6 +81,8 @@ DEFAULT_FORUM_CATEGORIES = [
 ]
 
 CATEGORY_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+ALLOWED_FORUM_LABELS = {"review", "anomaly"}
+LEGACY_FORUM_LABEL_ALIASES = {"discussion": "review", "info": "review", "mtg": "review"}
 FORUM_IMAGE_DIR = CALIB_DATA_BASE / "forum"
 
 
@@ -113,12 +121,33 @@ def _normalize_forum_assignee(assignee_username: str | None) -> str | None:
 
 
 def _normalize_forum_labels(labels: list[str] | None) -> list[str]:
-    """Normalize user-provided labels and keep at most one label per thread."""
+    """Normalize user-provided labels and keep at most one semantic label per thread."""
     for label in labels or []:
         value = re.sub(r"[^a-z0-9_-]+", "-", label.strip().lower()).strip("-_")[:32]
-        if value:
-            return [value]
+        if not value:
+            continue
+        if value == "resolved":
+            raise HTTPException(
+                status_code=422, detail="Use thread status instead of resolved label"
+            )
+        value = LEGACY_FORUM_LABEL_ALIASES.get(value, value)
+        if value not in ALLOWED_FORUM_LABELS:
+            raise HTTPException(status_code=422, detail="Unknown forum label")
+        return [value]
     return []
+
+
+def _normalize_forum_status(
+    status: str | None, *, default: ForumThreadStatus = "open"
+) -> ForumThreadStatus:
+    value = status.strip().lower() if isinstance(status, str) and status.strip() else default
+    if value not in FORUM_THREAD_STATUSES:
+        raise HTTPException(status_code=422, detail="Unknown forum status")
+    return value  # type: ignore[return-value]
+
+
+def _forum_thread_accepts_replies(status: str | None) -> bool:
+    return (status or "open") != "resolved"
 
 
 ALLOWED_CONTENT_TYPES = {
@@ -280,7 +309,7 @@ class ForumService:
             target_id=getattr(doc, "target_id", None),
             cooldown_id=getattr(doc, "cooldown_id", None),
             reply_count=reply_count,
-            is_closed=doc.is_closed,
+            status=_normalize_forum_status(getattr(doc, "status", None)),
             is_deleted=doc.is_deleted,
             is_ai_reply=doc.is_ai_reply,
             created_at=doc.system_info.created_at,
@@ -473,7 +502,8 @@ class ForumService:
         target_id: str | None = None,
         cooldown_id: str | None = None,
         number: int | None = None,
-        is_closed: bool | None = False,
+        status: str | None = "open",
+        q: str | None = None,
     ) -> ListForumPostsResponse:
         """List root forum threads with reply counts."""
         query: dict[str, object] = {
@@ -496,8 +526,27 @@ class ForumService:
             query["cooldown_id"] = cooldown_id
         if number is not None:
             query["number"] = number
-        if is_closed is not None:
-            query["is_closed"] = is_closed
+        if status is not None:
+            normalized_status = status.strip().lower() if isinstance(status, str) else ""
+            query["status"] = _normalize_forum_status(normalized_status)
+        if q and q.strip():
+            term = q.strip()[:128]
+            regex = {"$regex": re.escape(term.lstrip("#")), "$options": "i"}
+            search_clauses: list[dict[str, object]] = [
+                {"title": regex},
+                {"content": regex},
+                {"chip_id": regex},
+                {"target_id": regex},
+                {"cooldown_id": regex},
+                {"assignee_username": regex},
+                {"status": regex},
+                {"category": regex},
+                {"labels": regex},
+            ]
+            number_text = term[1:] if term.startswith("#") else term
+            if number_text.isdigit():
+                search_clauses.append({"number": int(number_text)})
+            query["$or"] = search_clauses
 
         total = ForumPostDocument.find(query).count()
         docs = (
@@ -592,6 +641,7 @@ class ForumService:
         target_id: str | None = None,
         cooldown_id: str | None = None,
         assignee_username: str | None = None,
+        status: str | None = "open",
     ) -> ForumPostResponse:
         """Create a new forum thread or reply."""
         if parent_id is None and not title:
@@ -606,7 +656,7 @@ class ForumService:
                 raise HTTPException(status_code=404, detail="Parent forum thread not found")
             if root_doc.parent_id is not None:
                 raise HTTPException(status_code=422, detail="Replies must target a root thread")
-            if root_doc.is_closed:
+            if not _forum_thread_accepts_replies(getattr(root_doc, "status", None)):
                 raise HTTPException(status_code=409, detail="Forum thread is closed")
             category = root_doc.category
         else:
@@ -636,6 +686,7 @@ class ForumService:
             content=content,
             content_blocks=content_blocks or [],
             labels=list(root_doc.labels) if root_doc else _normalize_forum_labels(labels),
+            status=_normalize_forum_status(root_doc.status if root_doc else status),
             chip_id=normalized_chip_id,
             target_type=normalized_target_type,
             target_id=normalized_target_id,
@@ -751,6 +802,7 @@ class ForumService:
             content=content,
             labels=list(root_doc.labels),
             assignee_username=root_doc.assignee_username,
+            status=root_doc.status,
             chip_id=root_doc.chip_id,
             target_type=root_doc.target_type,
             target_id=root_doc.target_id,
@@ -819,9 +871,11 @@ class ForumService:
         target_id: str | None = None,
         cooldown_id: str | None = None,
         assignee_username: str | None = None,
+        status: str | None = None,
         update_cooldown_context: bool = False,
         update_target_context: bool = False,
         update_assignee_context: bool = False,
+        update_status_context: bool = False,
         role: ProjectRole | None = None,
     ) -> ForumPostResponse:
         """Update a forum post."""
@@ -859,6 +913,8 @@ class ForumService:
                 doc.cooldown_id = _normalize_forum_cooldown(cooldown_id)
             if update_assignee_context:
                 doc.assignee_username = self._ensure_project_assignee(project_id, assignee_username)
+            if update_status_context:
+                doc.status = _normalize_forum_status(status)
         doc.content = content
         # None means the caller omitted the field: keep existing rich content.
         # An explicit [] clears it (e.g. a plain-Markdown edit).
@@ -949,9 +1005,10 @@ class ForumService:
                 status_code=403, detail="Only the author or project owner can close this thread"
             )
 
-        doc.is_closed = True
+        doc.status = "resolved"
+        doc.system_info.update_time()
         doc.save()
-        return SuccessResponse(message="Forum thread closed")
+        return SuccessResponse(message="Forum thread resolved")
 
     def reopen_post(
         self,
@@ -978,6 +1035,7 @@ class ForumService:
                 status_code=403, detail="Only the author or project owner can reopen this thread"
             )
 
-        doc.is_closed = False
+        doc.status = "open"
+        doc.system_info.update_time()
         doc.save()
         return SuccessResponse(message="Forum thread reopened")

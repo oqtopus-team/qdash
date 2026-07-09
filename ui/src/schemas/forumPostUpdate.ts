@@ -10,6 +10,7 @@ import type { ForumPostUpdateTitle } from './forumPostUpdateTitle';
 import type { ForumPostUpdateContentBlocksItem } from './forumPostUpdateContentBlocksItem';
 import type { ForumPostUpdateLabels } from './forumPostUpdateLabels';
 import type { ForumPostUpdateAssigneeUsername } from './forumPostUpdateAssigneeUsername';
+import type { ForumPostUpdateStatus } from './forumPostUpdateStatus';
 import type { ForumPostUpdateChipId } from './forumPostUpdateChipId';
 import type { ForumPostUpdateTargetType } from './forumPostUpdateTargetType';
 import type { ForumPostUpdateTargetId } from './forumPostUpdateTargetId';
@@ -35,6 +36,8 @@ export interface ForumPostUpdate {
   labels?: ForumPostUpdateLabels;
   /** Updated assigned project member username */
   assignee_username?: ForumPostUpdateAssigneeUsername;
+  /** Updated thread workflow status */
+  status?: ForumPostUpdateStatus;
   /** Updated linked chip ID */
   chip_id?: ForumPostUpdateChipId;
   /** Updated linked target type */

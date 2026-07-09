@@ -4,7 +4,11 @@ import pytest
 from pymongo.errors import DuplicateKeyError
 
 from qdash.dbmodel.forum import ForumCounterDocument, ForumPostDocument
-from qdash.dbmodel.migration import MigrationError, migrate_backfill_forum_thread_numbers
+from qdash.dbmodel.migration import (
+    MigrationError,
+    migrate_backfill_forum_thread_numbers,
+    migrate_forum_status,
+)
 
 
 def _forum_post(post_id) -> ForumPostDocument:
@@ -110,3 +114,56 @@ def test_backfill_forum_thread_numbers_blocks_duplicate_existing_root_numbers(in
 
     with pytest.raises(MigrationError):
         migrate_backfill_forum_thread_numbers(dry_run=False)
+
+
+def test_migrate_forum_status_moves_closed_and_legacy_labels(init_db):
+    closed = ForumPostDocument(
+        project_id="project-a",
+        category="qubit",
+        username="owner",
+        title="Closed old thread",
+        content="root",
+        labels=["resolved"],
+    ).insert()
+    review = ForumPostDocument(
+        project_id="project-a",
+        category="qubit",
+        username="owner",
+        title="Weekly discussion",
+        content="root",
+        labels=["discussion"],
+    ).insert()
+    plain = ForumPostDocument(
+        project_id="project-a",
+        category="qubit",
+        username="owner",
+        title="Plain thread",
+        content="root",
+    ).insert()
+    collection = ForumPostDocument.get_motor_collection()
+    collection.update_one({"_id": closed.id}, {"$set": {"is_closed": True}})
+    collection.update_one({"_id": plain.id}, {"$unset": {"status": ""}})
+
+    dry_run = migrate_forum_status()
+
+    assert dry_run["posts_to_update"] == 3
+    assert dry_run["status_from_resolved_label"] == 1
+    assert dry_run["labels_changed"] == 2
+    dry_run_closed_doc = collection.find_one({"_id": closed.id})
+    assert dry_run_closed_doc is not None
+    assert dry_run_closed_doc.get("is_closed") is True
+
+    executed = migrate_forum_status(dry_run=False)
+
+    assert executed["posts_to_update"] == 3
+    closed_doc = collection.find_one({"_id": closed.id})
+    review_doc = collection.find_one({"_id": review.id})
+    plain_doc = collection.find_one({"_id": plain.id})
+    assert closed_doc is not None
+    assert review_doc is not None
+    assert plain_doc is not None
+    assert closed_doc["status"] == "resolved"
+    assert closed_doc["labels"] == []
+    assert "is_closed" not in closed_doc
+    assert review_doc["labels"] == ["review"]
+    assert plain_doc["status"] == "open"
