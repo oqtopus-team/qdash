@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, Suspense } from "react";
+import { useEffect, Suspense, useState } from "react";
 
-import { ArrowLeft, Clock, Eye, TrendingUp } from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock, Eye, FlaskConical, TrendingUp } from "lucide-react";
 
 import type { TaskInfo } from "@/schemas";
 
@@ -16,10 +16,12 @@ import { QubitTaskCard } from "@/components/features/qubit/QubitTaskCard";
 import { QubitTimeSeriesView } from "@/components/features/qubit/QubitTimeSeriesView";
 import { TaskHistoryViewer } from "@/components/features/qubit/TaskHistoryViewer";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
-import { DateSelector } from "@/components/selectors/DateSelector";
+import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
-import { useDateNavigation } from "@/hooks/useDateNavigation";
-import { useChipUrlState } from "@/hooks/useUrlState";
+import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
+import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
+import { useChipUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
+import { dateToDateTimeLocal, toIsoSeconds } from "@/lib/utils/datetime";
 
 function QubitDetailPageContent() {
   const params = useParams();
@@ -29,11 +31,9 @@ function QubitDetailPageContent() {
   // URL state management
   const {
     selectedChip,
-    selectedDate,
     selectedTask,
     qubitViewMode,
     setSelectedChip,
-    setSelectedDate,
     setSelectedTask,
     setQubitViewMode,
     isInitialized,
@@ -41,6 +41,11 @@ function QubitDetailPageContent() {
 
   const viewMode = qubitViewMode as "dashboard" | "timeseries" | "history";
   const setViewMode = setQubitViewMode;
+
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } = useRangeModeUrlState();
+  const [selectedCooldownId, setSelectedCooldownId] = useState<string | null>(null);
+  const startAt = toIsoSeconds(startDate);
+  const endAt = toIsoSeconds(endDate);
 
   const { data: chipData, isLoading: isChipLoading } = useGetChip(chipId);
 
@@ -59,8 +64,6 @@ function QubitDetailPageContent() {
       setSelectedChip(chipId);
     }
   }, [isInitialized, chipId, selectedChip, setSelectedChip]);
-
-  const { formatDate } = useDateNavigation(chipId, selectedDate, setSelectedDate);
 
   // Get filtered tasks for qubit type
   const filteredTasks = (taskInfoData?.data?.tasks || []).filter(
@@ -120,74 +123,106 @@ function QubitDetailPageContent() {
           </div>
 
           {/* Controls */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="w-full sm:w-auto">
-              <ChipSelector
-                selectedChip={chipId}
-                onChipSelect={(newChipId) => {
-                  // Navigate to the new chip's qubit detail page
-                  window.location.href = `/chip/${newChipId}/qubit/${qubitId}`;
-                }}
-              />
-            </div>
-
-            {viewMode !== "history" && (
-              <div className="w-full sm:w-auto">
-                <DateSelector
-                  chipId={chipId}
-                  selectedDate={selectedDate}
-                  onDateSelect={setSelectedDate}
-                  disabled={!chipId}
+          <PageFiltersBar>
+            <PageFiltersBar.Group>
+              <PageFiltersBar.Item>
+                <ChipSelector
+                  selectedChip={chipId}
+                  onChipSelect={(newChipId) => {
+                    window.location.href = `/chip/${newChipId}/qubit/${qubitId}`;
+                  }}
                 />
-              </div>
-            )}
+              </PageFiltersBar.Item>
+              <PageFiltersBar.Item>
+                <CooldownSelector
+                  chipId={chipId}
+                  selectedCooldownId={selectedCooldownId}
+                  onPick={(cooldown) => {
+                    setSelectedCooldownId(cooldown.cooldown_id);
+                    setStartDate(dateToDateTimeLocal(new Date(cooldown.started_at)));
+                    setEndDate(
+                      dateToDateTimeLocal(
+                        cooldown.ended_at ? new Date(cooldown.ended_at) : new Date(),
+                      ),
+                    );
+                  }}
+                />
+              </PageFiltersBar.Item>
+              {viewMode === "history" && (
+                <PageFiltersBar.Item>
+                  <TaskSelector
+                    tasks={filteredTasks}
+                    selectedTask={selectedTask}
+                    onTaskSelect={setSelectedTask}
+                    disabled={false}
+                  />
+                </PageFiltersBar.Item>
+              )}
+            </PageFiltersBar.Group>
+          </PageFiltersBar>
 
-            <div className="w-full sm:w-auto">
-              <TaskSelector
-                tasks={filteredTasks}
-                selectedTask={selectedTask}
-                onTaskSelect={setSelectedTask}
-                disabled={false}
-              />
-            </div>
-          </div>
+          {viewMode !== "timeseries" && (
+            <TimeRangeSelector
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={(value) => {
+                setSelectedCooldownId(null);
+                setStartDate(value);
+              }}
+              onEndDateChange={(value) => {
+                setSelectedCooldownId(null);
+                setEndDate(value);
+              }}
+              onQuickRange={(range) => {
+                setSelectedCooldownId(null);
+                setQuickRange(range);
+              }}
+            />
+          )}
         </div>
 
         {/* Content Section */}
         <div className="pt-4">
           {viewMode === "dashboard" ? (
-            <div className="space-y-6">
-              {/* Qubit Information Header */}
-              <div className="stats shadow w-full">
-                <div className="stat">
-                  <div className="stat-title">Qubit ID</div>
-                  <div className="stat-value text-primary">{qubitId}</div>
-                </div>
-                <div className="stat">
-                  <div className="stat-title">Chip</div>
-                  <div className="stat-value text-sm">{chipData?.data?.chip_id}</div>
-                </div>
-                <div className="stat">
-                  <div className="stat-title">Date</div>
-                  <div className="stat-value text-sm">
-                    {selectedDate === "latest" ? "Latest" : formatDate(selectedDate)}
+            <div className="space-y-4">
+              <div className="rounded-lg border border-base-300 bg-base-100 px-4 py-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-md bg-primary px-2 py-1 text-sm font-semibold text-primary-content">
+                        Q{qubitId}
+                      </span>
+                      <span className="truncate text-sm font-medium text-base-content">
+                        {chipData?.data?.chip_id || chipId}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-base-content/55">
+                      Latest available result for each qubit experiment in the selected range.
+                    </p>
                   </div>
-                </div>
-                <div className="stat">
-                  <div className="stat-title">Experiments</div>
-                  <div className="stat-value text-sm">{filteredTasks.length}</div>
+
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="inline-flex items-center gap-1 rounded-md border border-base-300 px-2.5 py-1.5">
+                      <CalendarDays className="h-3.5 w-3.5 text-base-content/45" />
+                      {startDate} - {endDate}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-md border border-base-300 px-2.5 py-1.5">
+                      <FlaskConical className="h-3.5 w-3.5 text-base-content/45" />
+                      {filteredTasks.length} experiments
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Experiments Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                 {filteredTasks.map((task: TaskInfo) => (
                   <QubitTaskCard
                     key={task.name}
                     task={task}
                     chipId={chipId}
                     qubitId={qubitId}
-                    selectedDate={selectedDate}
+                    startAt={startAt}
+                    endAt={endAt}
                     onViewDetails={(taskName) => {
                       setSelectedTask(taskName);
                       setViewMode("history");
@@ -203,6 +238,8 @@ function QubitDetailPageContent() {
               chipId={chipId}
               qubitId={qubitId}
               taskName={selectedTask || filteredTasks[0]?.name || ""}
+              startAt={startAt}
+              endAt={endAt}
             />
           )}
         </div>
