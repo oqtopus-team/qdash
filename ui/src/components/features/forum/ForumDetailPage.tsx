@@ -979,10 +979,12 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 )}
               </div>
               <Link
-                href={`/provenance?qid=${encodeURIComponent(targetContext.targetId)}&tab=lineage`}
+                href={dashboardTargetHref(targetContext)}
                 className="btn btn-outline btn-xs w-full justify-start"
               >
-                Open provenance
+                {targetContext.targetType === "qubit"
+                  ? "Open qubit dashboard"
+                  : "Open coupling dashboard"}
               </Link>
             </section>
           )}
