@@ -43,6 +43,7 @@ class _TaskResultRepo:
     def __init__(self, docs: list[_TaskResultDoc]) -> None:
         self.docs = docs
         self.last_query: dict[str, Any] | None = None
+        self.last_latest_call: dict[str, Any] | None = None
 
     def find(
         self,
@@ -61,6 +62,22 @@ class _TaskResultRepo:
         limit: int | None = None,
     ) -> list[_TaskResultDoc]:
         self.last_query = query
+        return self.docs
+
+    def find_latest_by_chip_and_qids(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        qids: list[str],
+        task_names: list[str],
+    ) -> list[_TaskResultDoc]:
+        self.last_latest_call = {
+            "project_id": project_id,
+            "chip_id": chip_id,
+            "qids": qids,
+            "task_names": task_names,
+        }
         return self.docs
 
 
@@ -113,6 +130,47 @@ def _service(repo: _TaskResultRepo) -> TaskResultService:
         chip_repository=cast("ChipRepository", _ChipRepo()),
         task_result_repository=cast("TaskResultHistoryRepository", repo),
     )
+
+
+def test_get_latest_results_keeps_latest_per_qid_and_fills_missing() -> None:
+    now = datetime(2026, 5, 5, tzinfo=timezone.utc)
+    # qid "0" has two rows (newest first, as the repo returns latest-per-group);
+    # qid "1" has one; qid "2" (from _ChipRepo.get_qubit_ids) has none.
+    docs = [
+        _doc("q0-new", "0", now),
+        _doc("q0-old", "0", now - timedelta(days=1)),
+        _doc("q1", "1", now),
+    ]
+    repo = _TaskResultRepo(docs)
+
+    resp = _service(repo).get_latest_results("proj-1", "chip-1", "CheckRabi", "qubit")
+
+    assert resp.task_name == "CheckRabi"
+    # latest kept per qid
+    assert resp.result["0"].task_id == "q0-new"
+    assert resp.result["1"].task_id == "q1"
+    # missing qid gets a default (qubit view) placeholder, not an error
+    assert resp.result["2"].task_id is None
+    assert resp.result["2"].name == "CheckRabi"
+    # uses the optimized DB-side path scoped to the single requested task
+    assert repo.last_latest_call is not None
+    assert repo.last_latest_call["task_names"] == ["CheckRabi"]
+    assert repo.last_latest_call["qids"] == ["0", "1", "2"]
+
+
+def test_get_latest_results_coupling_uses_coupling_ids() -> None:
+    now = datetime(2026, 5, 5, tzinfo=timezone.utc)
+    doc = _doc("c01", "0-1", now)
+    doc.task_type = "coupling"
+    repo = _TaskResultRepo([doc])
+
+    resp = _service(repo).get_latest_results("proj-1", "chip-1", "CheckCrossResonance", "coupling")
+
+    assert resp.result["0-1"].task_id == "c01"
+    # coupling ids come from the chip repo, single task name is forwarded
+    assert repo.last_latest_call is not None
+    assert repo.last_latest_call["qids"] == ["0-1"]
+    assert repo.last_latest_call["task_names"] == ["CheckCrossResonance"]
 
 
 def test_list_task_results_filters_failed_rows_and_paginates(monkeypatch: Any) -> None:
