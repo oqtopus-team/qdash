@@ -47,6 +47,8 @@ interface CouplingGridProps {
   topologyId: string;
   selectedTask: string;
   selectedDate: string;
+  startAt?: string | null;
+  endAt?: string | null;
   gridSize: number;
   onDateChange?: (date: string) => void;
   aiReviewBadgesByTaskId?: Map<string, AiReviewBadgeState>;
@@ -97,11 +99,33 @@ function getPendingAiReviewTaskIds(
   return taskIds;
 }
 
+function requestErrorMessage(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+  const response = (error as { response?: { data?: unknown } }).response;
+  const data = response?.data;
+  if (!data || typeof data !== "object") return null;
+  const detail = (data as { detail?: unknown }).detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return detail.map((item) => JSON.stringify(item)).join("; ");
+  return null;
+}
+
+function taskRangeLabel(
+  selectedDate: string,
+  startAt?: string | null,
+  endAt?: string | null,
+): string {
+  if (startAt || endAt) return `${startAt ?? "..."} - ${endAt ?? "..."}`;
+  return selectedDate;
+}
+
 export function CouplingGrid({
   chipId,
   topologyId,
   selectedTask,
   selectedDate,
+  startAt,
+  endAt,
   gridSize: defaultGridSize,
   aiReviewBadgesByTaskId,
 }: CouplingGridProps) {
@@ -203,12 +227,16 @@ export function CouplingGrid({
   const {
     data: taskResponse,
     isLoading,
+    isFetching,
     isError,
+    error,
     refetch: refetchTaskResults,
   } = useCouplingTaskResults({
     chipId,
     task: selectedTask,
     selectedDate,
+    startAt,
+    endAt,
   });
   const taskResultMap = useMemo(
     () => taskResponse?.data?.result ?? {},
@@ -332,6 +360,9 @@ export function CouplingGrid({
         Boolean(task),
       );
   }, [baseCouplingPairs, isDirectionReversed, taskResultMap]);
+
+  const rangeLabel = taskRangeLabel(selectedDate, startAt, endAt);
+  const errorDetail = requestErrorMessage(error);
 
   if (isLoading)
     return (
@@ -937,9 +968,18 @@ export function CouplingGrid({
 
   return (
     <div className="flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8">
+      {isFetching && !isLoading && (
+        <div className="alert alert-info py-2 text-sm">
+          <LoaderCircle className="h-4 w-4 animate-spin" />
+          Loading {selectedTask} data for {rangeLabel}
+        </div>
+      )}
       {isError && (
-        <div className="alert alert-error">
-          Failed to load {selectedTask} data for {selectedDate}
+        <div className="alert alert-error text-sm">
+          <span>
+            Failed to load {selectedTask} data for {rangeLabel}
+            {errorDetail ? `: ${errorDetail}` : ""}
+          </span>
         </div>
       )}
       {/* View mode toggle and Download controls */}

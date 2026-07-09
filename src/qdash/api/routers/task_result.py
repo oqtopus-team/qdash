@@ -150,6 +150,10 @@ def get_historical_qubit_task_results(
     date: Annotated[str, Query(description="Date in YYYYMMDD format")],
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
+    start_at: Annotated[
+        datetime | None, Query(description="Inclusive start time lower bound")
+    ] = None,
+    end_at: Annotated[datetime | None, Query(description="Exclusive end time upper bound")] = None,
 ) -> LatestTaskResultResponse:
     """Get historical qubit task results for a specific date.
 
@@ -184,7 +188,15 @@ def get_historical_qubit_task_results(
     logger.debug(
         f"Getting historical qubit task results for chip {chip_id}, task {task}, date {date}"
     )
-    return service.get_historical_results(ctx.project_id, chip_id, task, "qubit", date)
+    return service.get_historical_results(
+        ctx.project_id,
+        chip_id,
+        task,
+        "qubit",
+        date,
+        start_at=start_at,
+        end_at=end_at,
+    )
 
 
 @router.get(
@@ -303,6 +315,10 @@ def get_historical_coupling_task_results(
     date: Annotated[str, Query(description="Date in YYYYMMDD format")],
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
+    start_at: Annotated[
+        datetime | None, Query(description="Inclusive start time lower bound")
+    ] = None,
+    end_at: Annotated[datetime | None, Query(description="Exclusive end time upper bound")] = None,
 ) -> LatestTaskResultResponse:
     """Get historical coupling task results for a specific date.
 
@@ -337,7 +353,15 @@ def get_historical_coupling_task_results(
     logger.debug(
         f"Getting historical coupling task results for chip {chip_id}, task {task}, date {date}"
     )
-    return service.get_historical_results(ctx.project_id, chip_id, task, "coupling", date)
+    return service.get_historical_results(
+        ctx.project_id,
+        chip_id,
+        task,
+        "coupling",
+        date,
+        start_at=start_at,
+        end_at=end_at,
+    )
 
 
 @router.get(

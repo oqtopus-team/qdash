@@ -9,6 +9,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useListForumPosts } from "@/client/forum/forum";
 import {
   getGetChipNotesSummaryQueryKey,
+  useDeleteCouplingNote,
+  useDeleteQubitNote,
   useUpsertCouplingNote,
   useUpsertQubitNote,
 } from "@/client/note/note";
@@ -148,15 +150,21 @@ export function MetricNotePanel({
 
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [draft, setDraft] = useState(existing?.content ?? "");
+  const [localExisting, setLocalExisting] = useState<TargetNoteEntry | undefined>(existing);
 
   const upsertQubit = useUpsertQubitNote();
   const upsertCoupling = useUpsertCouplingNote();
-  const upsertPending = isCoupling ? upsertCoupling.isPending : upsertQubit.isPending;
+  const deleteQubit = useDeleteQubitNote();
+  const deleteCoupling = useDeleteCouplingNote();
+  const mutationPending = isCoupling
+    ? upsertCoupling.isPending || deleteCoupling.isPending
+    : upsertQubit.isPending || deleteQubit.isPending;
   const { data: forumPostsResponse } = useListForumPosts(
     {
       chip_id: chipId,
       target_type: isCoupling ? "coupling" : "qubit",
       target_id: targetId,
+      cooldown_id: cooldownId || undefined,
       status: null,
       limit: 50,
     },
@@ -167,9 +175,17 @@ export function MetricNotePanel({
     [];
 
   useEffect(() => {
+    setLocalExisting(existing);
     setDraft(existing?.content ?? "");
     setMode("view");
-  }, [existing?.content, targetId, metricKey]);
+  }, [
+    existing,
+    targetId,
+    metricKey,
+    noteScopeParams?.cooldown_id,
+    noteScopeParams?.start_at,
+    noteScopeParams?.end_at,
+  ]);
 
   const invalidate = () =>
     queryClient.invalidateQueries({
@@ -178,28 +194,64 @@ export function MetricNotePanel({
 
   const handleSave = async () => {
     const trimmed = draft.trim();
-    if (!trimmed || draft.length > 5000) {
+    if (draft.length > 5000) {
+      return;
+    }
+    if (!trimmed) {
+      if (!localExisting) return;
+      if (isCoupling) {
+        await deleteCoupling.mutateAsync({
+          chipId,
+          couplingId: targetId,
+          params: noteScopeParams,
+        });
+      } else {
+        await deleteQubit.mutateAsync({
+          chipId,
+          qid: targetId,
+          params: noteScopeParams,
+        });
+      }
+      setLocalExisting(undefined);
+      setDraft("");
+      setMode("view");
+      await invalidate();
       return;
     }
     if (isCoupling) {
-      await upsertCoupling.mutateAsync({
+      const saved = await upsertCoupling.mutateAsync({
         chipId,
         couplingId: targetId,
         data: { content: draft },
+        params: noteScopeParams,
+      });
+      setLocalExisting({
+        targetId,
+        content: saved.data.content ?? trimmed,
+        username: saved.data.updated_by ?? "",
+        updatedAt: saved.data.updated_at ?? "",
       });
     } else {
-      await upsertQubit.mutateAsync({
+      const saved = await upsertQubit.mutateAsync({
         chipId,
         qid: targetId,
         data: { content: draft },
+        params: noteScopeParams,
+      });
+      setLocalExisting({
+        targetId,
+        content: saved.data.content ?? trimmed,
+        username: saved.data.updated_by ?? "",
+        updatedAt: saved.data.updated_at ?? "",
       });
     }
-    await invalidate();
+    setDraft(trimmed);
     setMode("view");
+    await invalidate();
   };
 
   const handleCancel = () => {
-    setDraft(existing?.content ?? "");
+    setDraft(localExisting?.content ?? "");
     setMode("view");
   };
 
@@ -232,15 +284,15 @@ export function MetricNotePanel({
       {/* Body */}
       <div className="flex-1 overflow-auto p-4 space-y-3">
         {mode === "view" ? (
-          <ViewState existing={existing} onEdit={() => setMode("edit")} />
+          <ViewState existing={localExisting} onEdit={() => setMode("edit")} />
         ) : (
           <EditState
-            existing={existing}
+            existing={localExisting}
             draft={draft}
             onChange={setDraft}
             onSave={handleSave}
             onCancel={handleCancel}
-            upsertPending={upsertPending}
+            mutationPending={mutationPending}
             mentionCandidates={mentionCandidates}
           />
         )}
@@ -393,7 +445,7 @@ function EditState({
   onChange,
   onSave,
   onCancel,
-  upsertPending,
+  mutationPending,
   mentionCandidates,
 }: {
   existing?: TargetNoteEntry;
@@ -401,7 +453,7 @@ function EditState({
   onChange: (v: string) => void;
   onSave: () => void;
   onCancel: () => void;
-  upsertPending: boolean;
+  mutationPending: boolean;
   mentionCandidates?: MentionCandidate[];
 }) {
   const trimmed = draft.trim();
@@ -414,7 +466,7 @@ function EditState({
         onSubmit={onSave}
         placeholder="Pinned one-paragraph status or index. Put separate topics, images, and discussion in forum threads..."
         rows={8}
-        disabled={upsertPending}
+        disabled={mutationPending}
         mentionCandidates={mentionCandidates}
       />
       <div className="flex items-center justify-between text-[11px] text-base-content/50">
@@ -434,11 +486,11 @@ function EditState({
           <button
             className="btn btn-sm btn-primary gap-1"
             onClick={onSave}
-            disabled={upsertPending || !trimmed || isTooLong}
+            disabled={mutationPending || (!trimmed && !existing) || isTooLong}
             type="button"
           >
             <Save className="h-3.5 w-3.5" />
-            {upsertPending ? "Saving…" : "Save summary"}
+            {mutationPending ? "Saving…" : trimmed ? "Save summary" : "Clear summary"}
           </button>
         </div>
       </div>

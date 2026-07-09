@@ -27,7 +27,9 @@ QDash uses MongoDB via the Bunnet ODM with a project-centric multi-tenant model.
 | `execution_counter`   | ExecutionCounterDocument  | Execution ID counter                            |
 | `calibration_note`    | CalibrationNoteDocument   | Calibration notes (workflow internal)           |
 | `flows`               | FlowDocument              | User-defined flows                              |
-| `metric_note`         | MetricNoteDocument        | Dashboard metric notes scoped by cooldown/range |
+| `metric_note`         | MetricNoteDocument        | Legacy dashboard metric notes scoped by cooldown/range |
+| `chip_note`           | ChipNoteDocument          | Dashboard chip notes scoped by cooldown/range          |
+| `target_note`         | TargetNoteDocument        | Dashboard pinned target summaries scoped by cooldown/range |
 | `note_event`          | NoteEventDocument         | Audit log for every note edit (write-through)   |
 | `cryostat`            | CryostatDocument          | Cryostat (dilution refrigerator) entity         |
 | `cooldown`            | CooldownDocument          | One cool-down cycle of one cryostat             |
@@ -379,11 +381,11 @@ class ChipDocument(Document):
     qubits: dict[str, QubitModel] = {}
     couplings: dict[str, CouplingModel] = {}
     installed_at: str  # ISO8601
-    note: NoteModel              # Free-form note (serial #, fab batch, design doc link…)
+    note: NoteModel              # Legacy global chip note
     system_info: SystemInfoModel
 ```
 
-**Editable via** `PATCH /chips/{chip_id}` (topology_id, note). **Deletable via** `DELETE /chips/{chip_id}` (refuses if qubits/couplings exist; `?force=true` cascades). Use `GET /chips/{chip_id}/deletion-impact` for a preflight count before deleting.
+**Editable via** `PATCH /chips/{chip_id}` (topology_id, legacy global note). Dashboard-scoped chip notes are edited via `GET/PUT/DELETE /chips/{chip_id}/note` with `cooldown_id` or a time range. **Deletable via** `DELETE /chips/{chip_id}` (refuses if qubits/couplings exist; `?force=true` cascades). Use `GET /chips/{chip_id}/deletion-impact` for a preflight count before deleting.
 
 **Key Methods:**
 
@@ -423,8 +425,8 @@ class QubitDocument(Document):
 
 **Note Fields:**
 
-- `note` - General free-form note about the qubit itself (e.g. "used in paper X", "replaced 2026-04-15"). Edited via `PUT /chips/{chip}/qubits/{qid}/note`.
-- `metric_notes[metric_key]` - Legacy global per-metric annotations. New dashboard metric notes are stored in `MetricNoteDocument` so they can be scoped by cool-down or time range. Edited via `PUT /chips/{chip}/qubits/{qid}/metric-notes/{metric_key}`.
+- `note` - Legacy global free-form note about the qubit itself. Scoped dashboard pinned summaries are stored in `TargetNoteDocument` when `PUT /chips/{chip}/qubits/{qid}/note` includes `cooldown_id` or a time range.
+- `metric_notes[metric_key]` - Legacy global per-metric annotations. Existing scoped per-metric notes are stored in `MetricNoteDocument`; new dashboard notes should use pinned summaries or forum discussions.
 
 ---
 
@@ -452,8 +454,8 @@ class CouplingDocument(Document):
 
 **Note Fields:**
 
-- `note` - General free-form note about the coupling. Edited via `PUT /chips/{chip}/couplings/{coupling_id}/note`.
-- `metric_notes[metric_key]` - Legacy global per-metric annotations. New dashboard metric notes are stored in `MetricNoteDocument`. Edited via `PUT /chips/{chip}/couplings/{coupling_id}/metric-notes/{metric_key}`.
+- `note` - Legacy global free-form note about the coupling. Scoped dashboard pinned summaries are stored in `TargetNoteDocument` when `PUT /chips/{chip}/couplings/{coupling_id}/note` includes `cooldown_id` or a time range.
+- `metric_notes[metric_key]` - Legacy global per-metric annotations. Existing scoped per-metric notes are stored in `MetricNoteDocument`; new dashboard notes should use pinned summaries or forum discussions.
 
 ---
 
@@ -488,6 +490,65 @@ class MetricNoteDocument(Document):
 ```
 
 When a cool-down ID is known, the note stores both `cooldown_id` and the cool-down time bounds. When no cool-down document exists, the dashboard can save a `time_range` note. If a cool-down document is added later, summary reads include matching time-range notes inside that cool-down until they are edited into the explicit cool-down scope.
+
+---
+
+### ChipNoteDocument
+
+**Collection:** `chip_note`
+
+Stores the current dashboard chip note in one operational scope. This is the writable dashboard chip-note store; the legacy global note remains on `ChipDocument.note`.
+
+**Indexes:**
+
+- `(project_id, chip_id, scope_key)` - Unique current chip note per scope
+- `(project_id, chip_id, scope_started_at, scope_ended_at)` - Time-range fallback when cool-down docs are added later
+
+```python
+class ChipNoteDocument(Document):
+    project_id: str
+    chip_id: str
+    note: NoteModel
+
+    scope_type: str                  # "cooldown" | "time_range" | "global"
+    scope_key: str                   # "cooldown:<id>", "time_range:<start>:<end>", or "global"
+    cooldown_id: str | None
+    scope_started_at: datetime | None
+    scope_ended_at: datetime | None
+    scope_source: str
+    system_info: SystemInfoModel
+```
+
+When the dashboard has a selected cool-down, chip notes are stored under `scope_key = "cooldown:<id>"`, so each cool-down can carry a different chip-level summary.
+
+### TargetNoteDocument
+
+**Collection:** `target_note`
+
+Stores the current dashboard pinned summary for one qubit/coupling target in one operational scope. This is the writable dashboard summary-note store; legacy global notes remain on `QubitDocument.note` and `CouplingDocument.note`.
+
+**Indexes:**
+
+- `(project_id, chip_id, target_type, target_id, scope_key)` - Unique current summary per target and scope
+- `(project_id, chip_id, scope_key, target_type, target_id)` - Dashboard notes summary
+- `(project_id, chip_id, scope_started_at, scope_ended_at)` - Time-range fallback when cool-down docs are added later
+
+```python
+class TargetNoteDocument(Document):
+    project_id: str
+    chip_id: str
+    target_type: str                 # "qubit" | "coupling"
+    target_id: str                   # qid or coupling id
+    note: NoteModel
+
+    scope_type: str                  # "cooldown" | "time_range" | "global"
+    scope_key: str                   # "cooldown:<id>", "time_range:<start>:<end>", or "global"
+    cooldown_id: str | None
+    scope_started_at: datetime | None
+    scope_ended_at: datetime | None
+    scope_source: str
+    system_info: SystemInfoModel
+```
 
 For `time_range` summary reads, notes are matched by **window overlap** rather than by an exact `scope_key`. The dashboard's default range is relative to "now", so its bounds drift by seconds/minutes between writing a note and reading it back; matching any `time_range` note whose `[scope_started_at, scope_ended_at]` window overlaps the requested window keeps those notes visible (issue #1109). When several overlapping notes exist for the same target metric, the one whose `scope_key` matches the request exactly wins, otherwise the most recently edited note is shown.
 
