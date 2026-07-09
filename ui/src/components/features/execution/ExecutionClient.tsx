@@ -3,14 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  ArrowLeft,
-  Calendar,
-  Clock,
-  Download,
-  StopCircle,
-  UserRound,
-} from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Download, StopCircle, UserRound } from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
