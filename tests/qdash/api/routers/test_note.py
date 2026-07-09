@@ -9,10 +9,14 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.cooldown import CooldownDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.metric_note import MetricNoteDocument
-from qdash.dbmodel.migration import migrate_metric_notes_to_target_notes
+from qdash.dbmodel.migration import (
+    migrate_metric_notes_to_latest_cooldown_target_notes,
+    migrate_metric_notes_to_target_notes,
+)
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
+from qdash.dbmodel.target_note import TargetNoteDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
 
@@ -106,6 +110,61 @@ def _create_cooldown(
         chip_ids=["chip-1"],
         system_info=SystemInfoModel(),
     ).insert()
+
+
+def test_qubit_summary_notes_are_scoped_to_cooldown(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id="cd-1")
+    _create_cooldown(cooldown_id="cd-1")
+    _create_cooldown(cooldown_id="cd-2", started_at=datetime(2026, 1, 3, tzinfo=UTC))
+    QubitDocument(
+        project_id="note_project",
+        username="note_user",
+        chip_id="chip-1",
+        qid="21",
+        data={},
+        system_info=SystemInfoModel(),
+    ).insert()
+
+    response = test_client.put(
+        "/chips/chip-1/qubits/21/note",
+        headers=headers,
+        params={"cooldown_id": "cd-1"},
+        json={"content": "first cooldown summary"},
+    )
+    assert response.status_code == 200
+
+    response = test_client.put(
+        "/chips/chip-1/qubits/21/note",
+        headers=headers,
+        params={"cooldown_id": "cd-2"},
+        json={"content": "second cooldown summary"},
+    )
+    assert response.status_code == 200
+
+    doc = QubitDocument.find_one(QubitDocument.qid == "21").run()
+    assert doc is not None
+    assert doc.note.content == ""
+    notes = {
+        note.scope_key: note.note.content
+        for note in TargetNoteDocument.find(TargetNoteDocument.target_id == "21").run()
+    }
+    assert notes == {
+        "cooldown:cd-1": "first cooldown summary",
+        "cooldown:cd-2": "second cooldown summary",
+    }
+
+    summary = test_client.get(
+        "/chips/chip-1/notes-summary", headers=headers, params={"cooldown_id": "cd-1"}
+    )
+    assert summary.status_code == 200
+    assert summary.json()["qubits"][0]["note"]["content"] == "first cooldown summary"
+
+    summary = test_client.get(
+        "/chips/chip-1/notes-summary", headers=headers, params={"cooldown_id": "cd-2"}
+    )
+    assert summary.status_code == 200
+    assert summary.json()["qubits"][0]["note"]["content"] == "second cooldown summary"
 
 
 def test_qubit_metric_notes_are_scoped_to_current_cooldown_fallback(test_client, init_db):
@@ -613,6 +672,127 @@ def test_migrate_metric_notes_to_target_notes_dry_run_and_execute(test_client, i
     second_stats = migrate_metric_notes_to_target_notes(dry_run=False)
     assert second_stats["targets_updated"] == 0
     assert second_stats["targets_skipped_already_migrated"] == 1
+
+
+def test_migrate_metric_notes_to_latest_cooldown_target_notes(test_client, init_db):
+    _create_project_user()
+    _create_chip(cooldown_id="cd-2")
+    _create_cooldown(
+        cooldown_id="cd-1",
+        started_at=datetime(2026, 1, 1, tzinfo=UTC),
+        ended_at=datetime(2026, 1, 2, tzinfo=UTC),
+    )
+    _create_cooldown(
+        cooldown_id="cd-2",
+        started_at=datetime(2026, 1, 3, tzinfo=UTC),
+        ended_at=None,
+    )
+    QubitDocument(
+        project_id="note_project",
+        username="note_user",
+        chip_id="chip-1",
+        qid="21",
+        data={},
+        system_info=SystemInfoModel(),
+    ).insert()
+    TargetNoteDocument(
+        project_id="note_project",
+        chip_id="chip-1",
+        target_type="qubit",
+        target_id="21",
+        note=NoteModel(content="Latest CD summary", updated_by="note_user"),
+        scope_type="cooldown",
+        scope_key="cooldown:cd-2",
+        cooldown_id="cd-2",
+        scope_started_at=datetime(2026, 1, 3, tzinfo=UTC),
+        scope_ended_at=None,
+        scope_source="explicit_cooldown",
+        system_info=SystemInfoModel(),
+    ).insert()
+    MetricNoteDocument(
+        project_id="note_project",
+        chip_id="chip-1",
+        target_type="qubit",
+        target_id="21",
+        metric_key="t1",
+        note=NoteModel(
+            content="Old T1 note",
+            updated_by="alice",
+            updated_at=datetime(2026, 1, 2, tzinfo=UTC),
+        ),
+        scope_type="cooldown",
+        scope_key="cooldown:cd-1",
+        cooldown_id="cd-1",
+        scope_started_at=datetime(2026, 1, 1, tzinfo=UTC),
+        scope_ended_at=datetime(2026, 1, 2, tzinfo=UTC),
+        scope_source="explicit_cooldown",
+        system_info=SystemInfoModel(),
+    ).insert()
+
+    dry_run_stats = migrate_metric_notes_to_latest_cooldown_target_notes(dry_run=True)
+    assert dry_run_stats["targets_updated"] == 1
+    target_note = TargetNoteDocument.find_one(TargetNoteDocument.scope_key == "cooldown:cd-2").run()
+    assert target_note is not None
+    assert target_note.note.content == "Latest CD summary"
+
+    execute_stats = migrate_metric_notes_to_latest_cooldown_target_notes(dry_run=False)
+    assert execute_stats["targets_updated"] == 1
+    assert execute_stats["metric_notes_deleted"] == 0
+    target_note = TargetNoteDocument.find_one(TargetNoteDocument.scope_key == "cooldown:cd-2").run()
+    assert target_note is not None
+    assert target_note.note.content.startswith("Latest CD summary")
+    assert "## Migrated legacy metric notes" in target_note.note.content
+    assert "### t1" in target_note.note.content
+    assert "- Scope: `cooldown:cd-1`" in target_note.note.content
+    assert "Old T1 note" in target_note.note.content
+    assert target_note.note.updated_by == "alice"
+
+    second_stats = migrate_metric_notes_to_latest_cooldown_target_notes(dry_run=False)
+    assert second_stats["targets_updated"] == 0
+    assert second_stats["targets_skipped_already_migrated"] == 1
+
+
+def test_migrate_metric_notes_to_latest_cooldown_target_notes_can_delete_source(
+    test_client, init_db
+):
+    _create_project_user()
+    _create_chip(cooldown_id="cd-1")
+    _create_cooldown(cooldown_id="cd-1")
+    QubitDocument(
+        project_id="note_project",
+        username="note_user",
+        chip_id="chip-1",
+        qid="21",
+        data={},
+        system_info=SystemInfoModel(),
+    ).insert()
+    MetricNoteDocument(
+        project_id="note_project",
+        chip_id="chip-1",
+        target_type="qubit",
+        target_id="21",
+        metric_key="t1",
+        note=NoteModel(content="Delete after migration", updated_by="alice"),
+        scope_type="global",
+        scope_key="global",
+        cooldown_id=None,
+        scope_started_at=None,
+        scope_ended_at=None,
+        scope_source="legacy_global",
+        system_info=SystemInfoModel(),
+    ).insert()
+
+    stats = migrate_metric_notes_to_latest_cooldown_target_notes(
+        dry_run=False,
+        delete_source=True,
+    )
+
+    assert stats["targets_updated"] == 1
+    assert stats["metric_notes_deleted"] == 1
+    assert list(MetricNoteDocument.find(MetricNoteDocument.target_id == "21").run()) == []
+    target_note = TargetNoteDocument.find_one(TargetNoteDocument.target_id == "21").run()
+    assert target_note is not None
+    assert "Delete after migration" in target_note.note.content
 
 
 def test_migrate_metric_notes_to_target_notes_reports_missing_targets(test_client, init_db):

@@ -27,7 +27,9 @@ import type {
 import type {
   ChipNotesSummaryResponse,
   DeleteCouplingMetricNoteParams,
+  DeleteCouplingNoteParams,
   DeleteQubitMetricNoteParams,
+  DeleteQubitNoteParams,
   GetChipNotesSummaryParams,
   HTTPValidationError,
   ListChipNoteEventsParams,
@@ -38,7 +40,9 @@ import type {
   SearchNoteEventsParams,
   SuccessResponse,
   UpsertCouplingMetricNoteParams,
-  UpsertQubitMetricNoteParams
+  UpsertCouplingNoteParams,
+  UpsertQubitMetricNoteParams,
+  UpsertQubitNoteParams
 } from '../../schemas';
 
 import { customInstance } from '../../lib/custom-instance';
@@ -55,13 +59,15 @@ export const upsertQubitNote = (
     chipId: string,
     qid: string,
     noteUpsertRequest: NoteUpsertRequest,
+    params?: UpsertQubitNoteParams,
  options?: SecondParameter<typeof customInstance>,) => {
       
       
       return customInstance<NoteModel>(
       {url: `/chips/${chipId}/qubits/${qid}/note`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: noteUpsertRequest
+      data: noteUpsertRequest,
+        params
     },
       options);
     }
@@ -69,8 +75,8 @@ export const upsertQubitNote = (
 
 
 export const getUpsertQubitNoteMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest;params?: UpsertQubitNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest;params?: UpsertQubitNoteParams}, TContext> => {
 
 const mutationKey = ['upsertQubitNote'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -82,10 +88,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertQubitNote>>, {chipId: string;qid: string;data: NoteUpsertRequest}> = (props) => {
-          const {chipId,qid,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertQubitNote>>, {chipId: string;qid: string;data: NoteUpsertRequest;params?: UpsertQubitNoteParams}> = (props) => {
+          const {chipId,qid,data,params} = props ?? {};
 
-          return  upsertQubitNote(chipId,qid,data,requestOptions)
+          return  upsertQubitNote(chipId,qid,data,params,requestOptions)
         }
 
         
@@ -101,11 +107,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Upsert the general note for a qubit
  */
 export const useUpsertQubitNote = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest;params?: UpsertQubitNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof upsertQubitNote>>,
         TError,
-        {chipId: string;qid: string;data: NoteUpsertRequest},
+        {chipId: string;qid: string;data: NoteUpsertRequest;params?: UpsertQubitNoteParams},
         TContext
       > => {
 
@@ -119,11 +125,13 @@ export const useUpsertQubitNote = <TError = HTTPValidationError,
 export const deleteQubitNote = (
     chipId: string,
     qid: string,
+    params?: DeleteQubitNoteParams,
  options?: SecondParameter<typeof customInstance>,) => {
       
       
       return customInstance<SuccessResponse>(
-      {url: `/chips/${chipId}/qubits/${qid}/note`, method: 'DELETE'
+      {url: `/chips/${chipId}/qubits/${qid}/note`, method: 'DELETE',
+        params
     },
       options);
     }
@@ -131,8 +139,8 @@ export const deleteQubitNote = (
 
 
 export const getDeleteQubitNoteMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string;params?: DeleteQubitNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string;params?: DeleteQubitNoteParams}, TContext> => {
 
 const mutationKey = ['deleteQubitNote'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -144,10 +152,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteQubitNote>>, {chipId: string;qid: string}> = (props) => {
-          const {chipId,qid} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteQubitNote>>, {chipId: string;qid: string;params?: DeleteQubitNoteParams}> = (props) => {
+          const {chipId,qid,params} = props ?? {};
 
-          return  deleteQubitNote(chipId,qid,requestOptions)
+          return  deleteQubitNote(chipId,qid,params,requestOptions)
         }
 
         
@@ -163,11 +171,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Clear the general note for a qubit
  */
 export const useDeleteQubitNote = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string;params?: DeleteQubitNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteQubitNote>>,
         TError,
-        {chipId: string;qid: string},
+        {chipId: string;qid: string;params?: DeleteQubitNoteParams},
         TContext
       > => {
 
@@ -315,13 +323,15 @@ export const upsertCouplingNote = (
     chipId: string,
     couplingId: string,
     noteUpsertRequest: NoteUpsertRequest,
+    params?: UpsertCouplingNoteParams,
  options?: SecondParameter<typeof customInstance>,) => {
       
       
       return customInstance<NoteModel>(
       {url: `/chips/${chipId}/couplings/${couplingId}/note`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: noteUpsertRequest
+      data: noteUpsertRequest,
+        params
     },
       options);
     }
@@ -329,8 +339,8 @@ export const upsertCouplingNote = (
 
 
 export const getUpsertCouplingNoteMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest;params?: UpsertCouplingNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest;params?: UpsertCouplingNoteParams}, TContext> => {
 
 const mutationKey = ['upsertCouplingNote'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -342,10 +352,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertCouplingNote>>, {chipId: string;couplingId: string;data: NoteUpsertRequest}> = (props) => {
-          const {chipId,couplingId,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertCouplingNote>>, {chipId: string;couplingId: string;data: NoteUpsertRequest;params?: UpsertCouplingNoteParams}> = (props) => {
+          const {chipId,couplingId,data,params} = props ?? {};
 
-          return  upsertCouplingNote(chipId,couplingId,data,requestOptions)
+          return  upsertCouplingNote(chipId,couplingId,data,params,requestOptions)
         }
 
         
@@ -361,11 +371,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Upsert the general note for a coupling
  */
 export const useUpsertCouplingNote = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest;params?: UpsertCouplingNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof upsertCouplingNote>>,
         TError,
-        {chipId: string;couplingId: string;data: NoteUpsertRequest},
+        {chipId: string;couplingId: string;data: NoteUpsertRequest;params?: UpsertCouplingNoteParams},
         TContext
       > => {
 
@@ -379,11 +389,13 @@ export const useUpsertCouplingNote = <TError = HTTPValidationError,
 export const deleteCouplingNote = (
     chipId: string,
     couplingId: string,
+    params?: DeleteCouplingNoteParams,
  options?: SecondParameter<typeof customInstance>,) => {
       
       
       return customInstance<SuccessResponse>(
-      {url: `/chips/${chipId}/couplings/${couplingId}/note`, method: 'DELETE'
+      {url: `/chips/${chipId}/couplings/${couplingId}/note`, method: 'DELETE',
+        params
     },
       options);
     }
@@ -391,8 +403,8 @@ export const deleteCouplingNote = (
 
 
 export const getDeleteCouplingNoteMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string;params?: DeleteCouplingNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string;params?: DeleteCouplingNoteParams}, TContext> => {
 
 const mutationKey = ['deleteCouplingNote'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -404,10 +416,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCouplingNote>>, {chipId: string;couplingId: string}> = (props) => {
-          const {chipId,couplingId} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCouplingNote>>, {chipId: string;couplingId: string;params?: DeleteCouplingNoteParams}> = (props) => {
+          const {chipId,couplingId,params} = props ?? {};
 
-          return  deleteCouplingNote(chipId,couplingId,requestOptions)
+          return  deleteCouplingNote(chipId,couplingId,params,requestOptions)
         }
 
         
@@ -423,11 +435,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Clear the general note for a coupling
  */
 export const useDeleteCouplingNote = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string;params?: DeleteCouplingNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteCouplingNote>>,
         TError,
-        {chipId: string;couplingId: string},
+        {chipId: string;couplingId: string;params?: DeleteCouplingNoteParams},
         TContext
       > => {
 

@@ -9,7 +9,7 @@ import { forumMarkerClass } from "../forum/categories";
 import { getQubitGridPosition } from "@/lib/utils/grid-position";
 
 import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
-import { DashboardNoteTooltip } from "./DashboardNoteTooltip";
+import { DashboardNoteTooltip, type ForumLinkEntry } from "./DashboardNoteTooltip";
 
 interface MetricValue {
   value: number | null;
@@ -29,6 +29,8 @@ interface DashboardCouplingGridProps {
   targetNotedTargets?: Set<string>;
   /** Linked forum discussion label keyed by coupling ID. */
   forumLinkedTargets?: Record<string, string>;
+  /** Linked forum discussion details keyed by coupling ID. */
+  forumLinksByTarget?: Record<string, ForumLinkEntry[]>;
   crossMetricNotedTargets?: Set<string>;
   notesByTarget?: Record<string, NoteEntryWithMetric[]>;
   /** Target-level notes keyed by qubit/coupling ID. */
@@ -82,6 +84,7 @@ export function DashboardCouplingGrid({
   notedTargets,
   targetNotedTargets,
   forumLinkedTargets,
+  forumLinksByTarget,
   crossMetricNotedTargets,
   notesByTarget,
   targetNotesByTarget,
@@ -338,6 +341,7 @@ export function DashboardCouplingGrid({
           (() => {
             const allNotes = notesByTarget?.[hover.key] ?? [];
             const targetNote = targetNotesByTarget?.[hover.key];
+            const forumLinks = forumLinksByTarget?.[hover.key] ?? [];
             const current = allNotes.find((n) => n.metricKey === metricKey);
             const others = allNotes.filter((n) => n.metricKey !== metricKey);
             const v = metricData?.[hover.key]?.value ?? null;
@@ -351,6 +355,7 @@ export function DashboardCouplingGrid({
                 targetNote={targetNote}
                 current={current}
                 others={others}
+                forumLinks={forumLinks}
               />
             );
           })()}

@@ -20,6 +20,8 @@ interface CooldownSelectorProps {
   selectedCooldownId?: string | null;
   /** Called with the picked cool-down. */
   onPick: (cooldown: CooldownResponse) => void;
+  /** Automatically pick the active cool-down when no value is selected. */
+  autoPickActive?: boolean;
   placeholder?: string;
 }
 
@@ -34,6 +36,7 @@ export function CooldownSelector({
   chipId,
   selectedCooldownId,
   onPick,
+  autoPickActive = true,
   placeholder = DEFAULT_PLACEHOLDER,
 }: CooldownSelectorProps) {
   const { data, isLoading, isError } = useListCooldowns(
@@ -70,7 +73,7 @@ export function CooldownSelector({
   }, [chipId, isControlled]);
 
   useEffect(() => {
-    if (!chipId) return;
+    if (!chipId || !autoPickActive) return;
     if (effectiveSelectedCooldownId) {
       autoPickedKeyRef.current = chipId + ":" + effectiveSelectedCooldownId;
       return;
@@ -85,7 +88,7 @@ export function CooldownSelector({
     autoPickedKeyRef.current = autoPickKey;
     if (!isControlled) setInternalSelectedCooldownId(activeCooldown.cooldown_id);
     onPick(activeCooldown);
-  }, [chipId, cooldowns, effectiveSelectedCooldownId, isControlled, onPick]);
+  }, [autoPickActive, chipId, cooldowns, effectiveSelectedCooldownId, isControlled, onPick]);
 
   if (!chipId) return null;
   if (isLoading) {

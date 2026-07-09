@@ -6,6 +6,7 @@ Business logic is delegated to ChipService for better testability.
 
 from __future__ import annotations
 
+import datetime as dt  # noqa: TC003 - FastAPI resolves route annotations at runtime.
 import logging
 from typing import Annotated
 
@@ -36,6 +37,7 @@ from qdash.api.schemas.chip import (
     QubitResponse,
     UpdateChipRequest,
 )
+from qdash.api.schemas.note import NoteUpsertRequest
 from qdash.api.schemas.reanalysis import (
     ReanalyzeQubitSpectroscopyRequest,
     ReanalyzeResonatorSpectroscopyRequest,
@@ -44,6 +46,7 @@ from qdash.api.schemas.reanalysis import (
 from qdash.api.schemas.success import SuccessResponse
 from qdash.api.services.chip import ChipInitializer, ChipService
 from qdash.api.services.reanalysis_service import ReanalysisService
+from qdash.datamodel.note import NoteModel
 
 router = APIRouter()
 
@@ -353,6 +356,78 @@ def get_chip(
     if summary is None:
         raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
     return summary
+
+
+@router.get(
+    "/chips/{chip_id}/note",
+    response_model=NoteModel,
+    summary="Get chip note",
+    operation_id="getChipNote",
+)
+def get_chip_note(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+    cooldown_id: Annotated[str | None, Query()] = None,
+    start_at: Annotated[dt.datetime | None, Query()] = None,
+    end_at: Annotated[dt.datetime | None, Query()] = None,
+) -> NoteModel:
+    return chip_service.get_chip_note(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        cooldown_id=cooldown_id,
+        start_at=start_at,
+        end_at=end_at,
+    )
+
+
+@router.put(
+    "/chips/{chip_id}/note",
+    response_model=NoteModel,
+    summary="Upsert chip note",
+    operation_id="upsertChipNote",
+)
+def upsert_chip_note(
+    chip_id: str,
+    body: NoteUpsertRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+    cooldown_id: Annotated[str | None, Query()] = None,
+    start_at: Annotated[dt.datetime | None, Query()] = None,
+    end_at: Annotated[dt.datetime | None, Query()] = None,
+) -> NoteModel:
+    return chip_service.upsert_chip_note(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        content=body.content,
+        username=ctx.user.username,
+        cooldown_id=cooldown_id,
+        start_at=start_at,
+        end_at=end_at,
+    )
+
+
+@router.delete(
+    "/chips/{chip_id}/note",
+    response_model=SuccessResponse,
+    summary="Clear chip note",
+    operation_id="deleteChipNote",
+)
+def delete_chip_note(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+    cooldown_id: Annotated[str | None, Query()] = None,
+    start_at: Annotated[dt.datetime | None, Query()] = None,
+    end_at: Annotated[dt.datetime | None, Query()] = None,
+) -> SuccessResponse:
+    return chip_service.delete_chip_note(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        cooldown_id=cooldown_id,
+        start_at=start_at,
+        end_at=end_at,
+    )
 
 
 @router.get(

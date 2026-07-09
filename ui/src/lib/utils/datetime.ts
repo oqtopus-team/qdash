@@ -22,6 +22,10 @@ export function dateToDateInput(date: Date, timezone: string = DEFAULT_TIMEZONE)
   return formatInTimeZone(date, timezone, "yyyy-MM-dd");
 }
 
+export function dateToDateKey(date: Date, timezone: string = DEFAULT_TIMEZONE): string {
+  return formatInTimeZone(date, timezone, "yyyyMMdd");
+}
+
 export function toDateTimeLocal(
   isoString: string | null | undefined,
   timezone: string = DEFAULT_TIMEZONE,

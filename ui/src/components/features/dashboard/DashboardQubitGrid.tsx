@@ -9,7 +9,7 @@ import { forumMarkerClass } from "../forum/categories";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 
 import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
-import { DashboardNoteTooltip } from "./DashboardNoteTooltip";
+import { DashboardNoteTooltip, type ForumLinkEntry } from "./DashboardNoteTooltip";
 
 interface MetricValue {
   value: number | null;
@@ -29,6 +29,8 @@ interface DashboardQubitGridProps {
   targetNotedQids?: Set<string>;
   /** Linked forum discussion label keyed by qubit ID. */
   forumLinkedQids?: Record<string, string>;
+  /** Linked forum discussion details keyed by qubit ID. */
+  forumLinksByTarget?: Record<string, ForumLinkEntry[]>;
   /**
    * Set of qubit IDs that have notes on OTHER metrics (not this one). Used to
    * render a subtle indicator so users know to click to read the cross-metric
@@ -86,6 +88,7 @@ export function DashboardQubitGrid({
   notedQids,
   targetNotedQids,
   forumLinkedQids,
+  forumLinksByTarget,
   crossMetricNotedQids,
   notesByTarget,
   targetNotesByTarget,
@@ -262,6 +265,7 @@ export function DashboardQubitGrid({
         (() => {
           const allNotes = notesByTarget?.[hover.qid] ?? [];
           const targetNote = targetNotesByTarget?.[hover.qid];
+          const forumLinks = forumLinksByTarget?.[hover.qid] ?? [];
           const current = allNotes.find((n) => n.metricKey === metricKey);
           const others = allNotes.filter((n) => n.metricKey !== metricKey);
           const v = metricData?.[hover.qid]?.value ?? null;
@@ -274,6 +278,7 @@ export function DashboardQubitGrid({
               targetNote={targetNote}
               current={current}
               others={others}
+              forumLinks={forumLinks}
             />
           );
         })()}

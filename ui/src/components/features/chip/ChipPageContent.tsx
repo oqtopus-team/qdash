@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { Bot } from "lucide-react";
 
-import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
+import { dateToDateTimeLocal, formatDateTime, toIsoSeconds } from "@/lib/utils/datetime";
 
 import { CouplingGrid } from "./CouplingGrid";
 import { QubitGrid } from "./QubitGrid";
@@ -23,11 +23,11 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { CooldownSelector } from "@/components/selectors/CooldownSelector";
-import { DateSelector } from "@/components/selectors/DateSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useProject } from "@/contexts/ProjectContext";
@@ -40,23 +40,47 @@ interface SelectedTaskInfo {
   task: Task;
 }
 
+function dateTimeLocalToDateKey(value: string): string {
+  return value.slice(0, 10).replace(/-/g, "");
+}
+
+function dateKeyToRange(dateKey: string): { start: string; end: string } {
+  const formatted = `${dateKey.slice(0, 4)}-${dateKey.slice(4, 6)}-${dateKey.slice(6, 8)}`;
+  return { start: `${formatted}T00:00`, end: `${formatted}T23:59` };
+}
+
 export function ChipPageContent() {
   const router = useRouter();
   const { canEdit } = useProject();
   // URL state management
   const {
     selectedChip,
-    selectedDate,
+    selectedDate: legacySelectedDate,
     selectedTask,
+    selectedCooldownId,
+    startDate,
+    endDate,
+    hasTimeRangeParams,
     viewMode,
     setSelectedChip,
     setSelectedDate,
     setSelectedTask,
+    setSelectedCooldownId,
+    setStartDate,
+    setEndDate,
+    setQuickRange,
     setViewMode,
     isInitialized,
   } = useChipUrlState();
 
   const [gridSize, setGridSize] = useState<number>(8);
+  const selectedDate = useMemo(() => {
+    if (selectedCooldownId || hasTimeRangeParams) return dateTimeLocalToDateKey(endDate);
+    return legacySelectedDate;
+  }, [endDate, hasTimeRangeParams, legacySelectedDate, selectedCooldownId]);
+  const taskResultStartAt =
+    selectedCooldownId || hasTimeRangeParams ? toIsoSeconds(startDate) : null;
+  const taskResultEndAt = selectedCooldownId || hasTimeRangeParams ? toIsoSeconds(endDate) : null;
 
   // Use lightweight endpoints (~0.3KB vs ~300KB with embedded data)
   const { data: chipData } = useGetChip(selectedChip);
@@ -141,7 +165,7 @@ export function ChipPageContent() {
     canNavigatePrevious,
     canNavigateNext,
     formatDate,
-  } = useDateNavigation(selectedChip, selectedDate, setSelectedDate);
+  } = useDateNavigation(selectedChip, selectedDate, handleDateNavigation);
 
   // Navigation functions - modal state is tracked elsewhere, these just navigate
   const navigateToPreviousDay = originalNavigateToPreviousDay;
@@ -333,6 +357,39 @@ export function ChipPageContent() {
     return task.task_type === "qubit";
   });
 
+  const handleChipSelect = (chipId: string) => {
+    setSelectedChip(chipId);
+    setSelectedCooldownId(null);
+  };
+
+  function handleDateNavigation(date: string) {
+    setSelectedCooldownId(null);
+    if (date === "latest") {
+      setStartDate("");
+      setEndDate("");
+      setSelectedDate("latest");
+      return;
+    }
+    const range = dateKeyToRange(date);
+    setStartDate(range.start);
+    setEndDate(range.end);
+  }
+
+  const handleStartDateChange = (value: string) => {
+    setSelectedCooldownId(null);
+    setStartDate(value);
+  };
+
+  const handleEndDateChange = (value: string) => {
+    setSelectedCooldownId(null);
+    setEndDate(value);
+  };
+
+  const handleQuickRange = (days: number) => {
+    setSelectedCooldownId(null);
+    setQuickRange(days);
+  };
+
   // Show skeleton during initial loading
   if (!isInitialized || isChipsLoading) {
     return <ChipPageSkeleton />;
@@ -412,24 +469,20 @@ export function ChipPageContent() {
           <PageFiltersBar>
             <PageFiltersBar.Group>
               <PageFiltersBar.Item className="sm:min-w-48">
-                <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
-              </PageFiltersBar.Item>
-              <PageFiltersBar.Item className="sm:min-w-48">
-                <DateSelector
-                  chipId={selectedChip}
-                  selectedDate={selectedDate}
-                  onDateSelect={setSelectedDate}
-                  disabled={!selectedChip}
-                />
+                <ChipSelector selectedChip={selectedChip} onChipSelect={handleChipSelect} />
               </PageFiltersBar.Item>
               <PageFiltersBar.Item className="sm:min-w-48">
                 <CooldownSelector
                   chipId={selectedChip}
+                  selectedCooldownId={selectedCooldownId}
+                  autoPickActive={!selectedCooldownId && !hasTimeRangeParams}
                   onPick={(cd) => {
                     // Jump to the most recent day within the cool-down so the
                     // chip page shows its end-of-cool-down state.
                     const target = cd.ended_at ? new Date(cd.ended_at) : new Date();
-                    setSelectedDate(dateToDateInput(target));
+                    setSelectedCooldownId(cd.cooldown_id);
+                    setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
+                    setEndDate(dateToDateTimeLocal(target));
                   }}
                 />
               </PageFiltersBar.Item>
@@ -443,6 +496,14 @@ export function ChipPageContent() {
               </PageFiltersBar.Item>
             </PageFiltersBar.Group>
           </PageFiltersBar>
+
+          <TimeRangeSelector
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={handleStartDateChange}
+            onEndDateChange={handleEndDateChange}
+            onQuickRange={handleQuickRange}
+          />
         </div>
 
         {/* Content Section */}
@@ -493,6 +554,8 @@ export function ChipPageContent() {
               }
               selectedTask={selectedTask}
               selectedDate={selectedDate}
+              startAt={taskResultStartAt}
+              endAt={taskResultEndAt}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
               aiReviewBadgesByTaskId={aiReviewBadgesByTaskId}
@@ -505,6 +568,8 @@ export function ChipPageContent() {
               }
               selectedTask={selectedTask}
               selectedDate={selectedDate}
+              startAt={taskResultStartAt}
+              endAt={taskResultEndAt}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
               aiReviewBadgesByTaskId={aiReviewBadgesByTaskId}

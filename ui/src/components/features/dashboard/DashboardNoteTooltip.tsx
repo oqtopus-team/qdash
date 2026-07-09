@@ -6,6 +6,15 @@ import { formatDateTime } from "@/lib/utils/datetime";
 
 import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
 
+export interface ForumLinkEntry {
+  id: string;
+  number?: number | null;
+  title?: string | null;
+  labels?: string[];
+  status?: string | null;
+  replyCount?: number | null;
+}
+
 interface DashboardNoteTooltipProps {
   /** Anchor position in viewport coordinates (top-center of the source cell). */
   position: { x: number; y: number };
@@ -17,6 +26,8 @@ interface DashboardNoteTooltipProps {
   current?: NoteEntryWithMetric;
   /** Notes for the same target on other metrics. Renders as a list. */
   others?: NoteEntryWithMetric[];
+  /** Linked forum discussions for this target in the selected context. */
+  forumLinks?: ForumLinkEntry[];
 }
 
 /**
@@ -29,9 +40,11 @@ export function DashboardNoteTooltip({
   targetNote,
   current,
   others,
+  forumLinks,
 }: DashboardNoteTooltipProps) {
   if (typeof document === "undefined") return null;
-  if (!targetNote && !current && (!others || others.length === 0)) {
+  const hasForumLinks = !!forumLinks && forumLinks.length > 0;
+  if (!targetNote && !current && (!others || others.length === 0) && !hasForumLinks) {
     // No notes at all — render only the header so users still get value/unit info.
     return createPortal(
       <div
@@ -82,6 +95,27 @@ export function DashboardNoteTooltip({
           <div className="text-[10px] text-base-content/50 mt-0.5">
             {current.username} · {formatDateTime(current.updatedAt)}
           </div>
+        </div>
+      )}
+      {hasForumLinks && (
+        <div className="space-y-1.5 border-l-2 border-info pl-2">
+          <div className="text-[10px] uppercase tracking-wide text-info">
+            linked forum discussions ({forumLinks.length})
+          </div>
+          <ul className="space-y-1.5">
+            {forumLinks.slice(0, 4).map((post) => (
+              <li key={post.id}>
+                <div className="font-semibold text-[11px]">
+                  {post.number ? `#${post.number} ` : ""}
+                  {post.title?.trim() || "Untitled discussion"}
+                </div>
+                <div className="text-[10px] text-base-content/50">
+                  {post.status || "open"} · {post.replyCount ?? 0} replies
+                  {post.labels && post.labels.length > 0 ? ` · ${post.labels.join(", ")}` : ""}
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {others && others.length > 0 && (

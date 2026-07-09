@@ -14,6 +14,10 @@ describe("useChipUrlState", () => {
     expect(result.current.selectedChip).toBe("");
     expect(result.current.selectedDate).toBe(URL_DEFAULTS.DATE);
     expect(result.current.selectedTask).toBe(URL_DEFAULTS.TASK);
+    expect(result.current.selectedCooldownId).toBeNull();
+    expect(result.current.startDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect(result.current.endDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect(result.current.hasTimeRangeParams).toBe(false);
     expect(result.current.viewMode).toBe(URL_DEFAULTS.VIEW);
     expect(result.current.qubitViewMode).toBe("dashboard");
   });
@@ -21,13 +25,18 @@ describe("useChipUrlState", () => {
   it("reads initial values from URL params", () => {
     const { result } = renderHook(() => useChipUrlState(), {
       wrapper: withNuqsTestingAdapter({
-        searchParams: "chip=CHIP01&date=2024-01-01&task=CheckT1&view=2q&qview=table",
+        searchParams:
+          "chip=CHIP01&date=20240101&task=CheckT1&cooldown=cd-1&start=2024-01-01T00:00&end=2024-01-02T12:30&view=2q&qview=table",
       }),
     });
 
     expect(result.current.selectedChip).toBe("CHIP01");
-    expect(result.current.selectedDate).toBe("2024-01-01");
+    expect(result.current.selectedDate).toBe("20240101");
     expect(result.current.selectedTask).toBe("CheckT1");
+    expect(result.current.selectedCooldownId).toBe("cd-1");
+    expect(result.current.startDate).toBe("2024-01-01T00:00");
+    expect(result.current.endDate).toBe("2024-01-02T12:30");
+    expect(result.current.hasTimeRangeParams).toBe(true);
     expect(result.current.viewMode).toBe("2q");
     expect(result.current.qubitViewMode).toBe("table");
   });
@@ -44,6 +53,35 @@ describe("useChipUrlState", () => {
 
     // The hook returns the default value when URL param is null
     expect(result.current.selectedDate).toBe(URL_DEFAULTS.DATE);
+  });
+
+  it("setSelectedCooldownId updates and clears cooldown URL state", () => {
+    const { result } = renderHook(() => useChipUrlState(), {
+      wrapper: withNuqsTestingAdapter({ searchParams: "cooldown=cd-1" }),
+    });
+
+    expect(result.current.selectedCooldownId).toBe("cd-1");
+
+    act(() => {
+      result.current.setSelectedCooldownId(null);
+    });
+
+    expect(result.current.selectedCooldownId).toBeNull();
+  });
+
+  it("setStartDate and setEndDate update time range URL state", () => {
+    const { result } = renderHook(() => useChipUrlState(), {
+      wrapper: withNuqsTestingAdapter({ searchParams: "" }),
+    });
+
+    act(() => {
+      result.current.setStartDate("2024-01-01T00:00");
+      result.current.setEndDate("2024-01-02T12:30");
+    });
+
+    expect(result.current.startDate).toBe("2024-01-01T00:00");
+    expect(result.current.endDate).toBe("2024-01-02T12:30");
+    expect(result.current.hasTimeRangeParams).toBe(true);
   });
 
   it("setSelectedTask cleans default value from URL", () => {
