@@ -8,6 +8,7 @@ const mockSetSelectionMode = vi.fn();
 const mockSetStartDate = vi.fn();
 const mockSetEndDate = vi.fn();
 const mockSetQuickRange = vi.fn();
+const mockForumPosts = vi.hoisted(() => vi.fn<() => unknown[]>(() => []));
 
 vi.mock("@/client/chip/chip", () => ({
   useListChips: () => ({
@@ -39,7 +40,7 @@ vi.mock("@/client/cooldown/cooldown", () => ({
 
 vi.mock("@/client/forum/forum", () => ({
   useListForumPosts: () => ({
-    data: { data: { posts: [], total: 0, skip: 0, limit: 200 } },
+    data: { data: { posts: mockForumPosts(), total: 0, skip: 0, limit: 200 } },
   }),
 }));
 
@@ -217,32 +218,79 @@ vi.mock("@/components/features/dashboard/DashboardMetricModal", () => ({
 }));
 
 vi.mock("@/components/features/dashboard/DashboardQubitGrid", () => ({
-  DashboardQubitGrid: ({ onQubitClick }: { onQubitClick?: (qid: string) => void }) => (
-    <button type="button" onClick={() => onQubitClick?.("0")}>
-      Open qubit
-    </button>
+  DashboardQubitGrid: ({
+    forumLinkedQids,
+    onQubitClick,
+  }: {
+    forumLinkedQids?: Record<string, string>;
+    onQubitClick?: (qid: string) => void;
+  }) => (
+    <div>
+      <span data-testid="qubit-forum-label">{forumLinkedQids?.["0"] ?? "none"}</span>
+      <button type="button" onClick={() => onQubitClick?.("0")}>
+        Open qubit
+      </button>
+    </div>
   ),
 }));
 
 vi.mock("@/components/features/dashboard/DashboardCouplingGrid", () => ({
   DashboardCouplingGrid: ({
+    forumLinkedTargets,
     onCouplingClick,
   }: {
+    forumLinkedTargets?: Record<string, string>;
     onCouplingClick?: (couplingId: string) => void;
   }) => (
-    <button type="button" onClick={() => onCouplingClick?.("0-1")}>
-      Open coupling
-    </button>
+    <div>
+      <span data-testid="coupling-forum-label">{forumLinkedTargets?.["0-1"] ?? "none"}</span>
+      <button type="button" onClick={() => onCouplingClick?.("0-1")}>
+        Open coupling
+      </button>
+    </div>
   ),
 }));
 
 describe("DashboardPageContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockForumPosts.mockReturnValue([]);
   });
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("maps forum labels to dashboard marker labels", () => {
+    mockForumPosts.mockReturnValue([
+      {
+        id: "forum-0",
+        target_type: "qubit",
+        target_id: "0",
+        labels: ["anomaly"],
+      },
+      {
+        id: "forum-1",
+        target_type: "qubit",
+        target_id: "0",
+        labels: ["review"],
+      },
+      {
+        id: "forum-2",
+        target_type: "coupling",
+        target_id: "0-1",
+        labels: ["anomaly"],
+      },
+    ]);
+
+    render(<DashboardPageContent />);
+
+    expect(screen.getAllByTestId("qubit-forum-label").map((item) => item.textContent)).toContain(
+      "anomaly",
+    );
+    expect(screen.getAllByTestId("coupling-forum-label").map((item) => item.textContent)).toContain(
+      "anomaly",
+    );
   });
 
   it("opens the pinned summary modal from the empty qubit topology", () => {
