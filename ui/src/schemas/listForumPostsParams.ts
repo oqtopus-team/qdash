@@ -47,7 +47,11 @@ cooldown_id?: string | null;
  */
 number?: number | null;
 /**
- * Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all.
+ * Filter by workflow status. Default open. Use null/omit at the client layer for all.
  */
-is_closed?: boolean | null;
+status?: string | null;
+/**
+ * Search title, content, number, target, assignee, or status
+ */
+q?: string | null;
 };

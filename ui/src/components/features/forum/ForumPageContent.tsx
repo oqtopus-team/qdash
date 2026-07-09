@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Pencil,
   Plus,
+  Search,
   Settings,
   Tag,
   Trash2,
@@ -50,9 +51,12 @@ import type { ForumPostResponse, ListForumPostsParams } from "@/schemas";
 import {
   DEFAULT_FORUM_CATEGORIES,
   FORUM_LABELS,
+  FORUM_STATUSES,
   getForumCategory,
   formatForumPostNumber,
   getForumLabel,
+  getForumStatus,
+  isForumTerminalStatus,
   toForumCategoryDefinition,
   type ForumCategoryDefinition,
 } from "./categories";
@@ -62,7 +66,7 @@ import { ForumBlockViewer } from "./ForumBlockEditor";
 const PAGE_SIZE = 30;
 
 type CategoryFilter = "all" | NonNullable<ListForumPostsParams["category"]>;
-type StatusFilter = "open" | "closed" | "all";
+type StatusFilter = "open" | "investigating" | "identified" | "resolved" | "all";
 
 function parseForumPage(value: string | null): number {
   const page = Number.parseInt(value ?? "1", 10);
@@ -70,7 +74,16 @@ function parseForumPage(value: string | null): number {
 }
 
 function parseForumStatus(value: string | null): StatusFilter {
-  return value === "closed" || value === "all" ? value : "open";
+  if (
+    value === "open" ||
+    value === "investigating" ||
+    value === "identified" ||
+    value === "resolved" ||
+    value === "all"
+  ) {
+    return value;
+  }
+  return "open";
 }
 
 type ForumTargetContext = {
@@ -152,6 +165,9 @@ function ForumThreadCard({
   const displayNumber = formatForumPostNumber(post.number);
   const primaryLabel = (post.labels ?? [])[0];
   const labelDef = primaryLabel ? getForumLabel(primaryLabel) : null;
+  const statusDef = getForumStatus(post.status);
+  const StatusIcon = statusDef.icon;
+  const isTerminal = isForumTerminalStatus(post.status);
 
   return (
     <article
@@ -166,7 +182,7 @@ function ForumThreadCard({
       }}
       className={`cursor-pointer rounded-lg border bg-base-100 transition-colors hover:border-primary/40 ${
         isSelected ? "border-primary/60 ring-1 ring-primary/20" : "border-base-300"
-      } ${post.is_closed ? "opacity-70" : ""}`}
+      } ${isTerminal ? "opacity-70" : ""}`}
     >
       <div className="flex gap-3 p-3 sm:p-4">
         <div className="hidden pt-0.5 sm:block">
@@ -197,7 +213,10 @@ function ForumThreadCard({
               {labelDef && (
                 <span className={`badge badge-sm ${labelDef.badgeClass}`}>{labelDef.label}</span>
               )}
-              {post.is_closed && <span className="badge badge-sm badge-ghost">Closed</span>}
+              <span className={`badge badge-sm gap-1 ${statusDef.badgeClass}`}>
+                <StatusIcon className="h-3 w-3" />
+                {statusDef.label}
+              </span>
             </div>
           </div>
 
@@ -239,7 +258,7 @@ function ForumThreadCard({
 
       {canManage && (
         <div className="flex justify-end border-t border-base-300 px-3 py-2 sm:px-4">
-          {post.is_closed ? (
+          {isTerminal ? (
             <button
               className="btn btn-ghost btn-xs gap-1"
               onClick={(event) => {
@@ -317,6 +336,8 @@ function ForumThreadPreviewSidebar({
   const category = post ? getForumCategory(post.category, categories) : null;
   const CategoryIcon = category?.icon;
   const label = post?.labels?.[0] ? getForumLabel(post.labels[0]) : null;
+  const statusDef = getForumStatus(post?.status);
+  const StatusIcon = statusDef.icon;
   const targetContext = post ? postTargetContext(post) : null;
   const canManage = !!post && (isOwner || currentUsername === post.username);
   const updateMutation = useUpdateForumPost();
@@ -485,7 +506,10 @@ function ForumThreadPreviewSidebar({
                   {label && (
                     <span className={`badge badge-sm ${label.badgeClass}`}>{label.label}</span>
                   )}
-                  {post.is_closed && <span className="badge badge-sm badge-ghost">Closed</span>}
+                  <span className={`badge badge-sm gap-1 ${statusDef.badgeClass}`}>
+                    <StatusIcon className="h-3 w-3" />
+                    {statusDef.label}
+                  </span>
                 </div>
                 <h2 className="text-xl font-bold leading-tight">
                   {formatForumPostNumber(post.number) && (
@@ -791,6 +815,7 @@ export function ForumPageContent() {
   const [status, setStatus] = useState<StatusFilter>(() =>
     parseForumStatus(searchParams.get("forum_status")),
   );
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("forum_q") ?? "");
   const [skip, setSkip] = useState(
     () => (parseForumPage(searchParams.get("forum_page")) - 1) * PAGE_SIZE,
   );
@@ -822,7 +847,8 @@ export function ForumPageContent() {
     limit: PAGE_SIZE,
     category: category === "all" ? undefined : category,
     label: labelFilter === "all" ? undefined : labelFilter,
-    is_closed: status === "all" ? null : status === "closed" ? true : false,
+    status: status === "all" ? null : status,
+    q: searchQuery.trim() || undefined,
   };
   const { data, isLoading } = useListForumPosts(params, {
     query: { staleTime: 30_000 },
@@ -861,12 +887,14 @@ export function ForumPageContent() {
       category?: CategoryFilter;
       labelFilter?: string;
       status?: StatusFilter;
+      searchQuery?: string;
       skip?: number;
     } = {},
   ) => {
     const nextCategory = nextState.category ?? category;
     const nextLabelFilter = nextState.labelFilter ?? labelFilter;
     const nextStatus = nextState.status ?? status;
+    const nextSearchQuery = nextState.searchQuery ?? searchQuery;
     const nextSkip = nextState.skip ?? skip;
     const next = new URLSearchParams();
     const page = Math.floor(nextSkip / PAGE_SIZE) + 1;
@@ -874,6 +902,7 @@ export function ForumPageContent() {
     if (nextCategory !== "all") next.set("forum_category", nextCategory);
     if (nextLabelFilter !== "all") next.set("forum_label", nextLabelFilter);
     if (nextStatus !== "open") next.set("forum_status", nextStatus);
+    if (nextSearchQuery.trim()) next.set("forum_q", nextSearchQuery.trim());
     return next.toString();
   };
 
@@ -881,6 +910,7 @@ export function ForumPageContent() {
     category?: CategoryFilter;
     labelFilter?: string;
     status?: StatusFilter;
+    searchQuery?: string;
     skip?: number;
   }) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -888,6 +918,7 @@ export function ForumPageContent() {
     next.delete("forum_category");
     next.delete("forum_label");
     next.delete("forum_status");
+    next.delete("forum_q");
     const listQuery = buildListQuery(nextState);
     new URLSearchParams(listQuery).forEach((value, key) => next.set(key, value));
     const query = next.toString();
@@ -912,6 +943,12 @@ export function ForumPageContent() {
     setLabelFilter(nextLabel);
     setSkip(0);
     replaceListQuery({ labelFilter: nextLabel, skip: 0 });
+  };
+
+  const setSearchFilter = (nextSearchQuery: string) => {
+    setSearchQuery(nextSearchQuery);
+    setSkip(0);
+    replaceListQuery({ searchQuery: nextSearchQuery, skip: 0 });
   };
 
   const setPageSkip = (nextSkip: number) => {
@@ -974,23 +1011,29 @@ export function ForumPageContent() {
         }
       />
 
-      <div className="mb-4">
-        <div className="tabs tabs-boxed w-fit">
-          {(["open", "closed", "all"] as const).map((item) => (
+      <div className="mb-4 overflow-x-auto">
+        <div className="tabs tabs-boxed w-fit whitespace-nowrap">
+          {FORUM_STATUSES.map((item) => (
             <button
-              key={item}
-              className={`tab tab-sm ${status === item ? "tab-active" : ""}`}
-              onClick={() => setStatusFilter(item)}
+              key={item.id}
+              className={`tab tab-sm ${status === item.id ? "tab-active" : ""}`}
+              onClick={() => setStatusFilter(item.id as StatusFilter)}
             >
-              {item.charAt(0).toUpperCase() + item.slice(1)}
+              {item.label}
             </button>
           ))}
+          <button
+            className={`tab tab-sm ${status === "all" ? "tab-active" : ""}`}
+            onClick={() => setStatusFilter("all")}
+          >
+            All
+          </button>
         </div>
       </div>
 
       <div className="mb-4 rounded-lg border border-base-300 bg-base-100 px-3 py-2">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => setCategoryFilter("all")}
@@ -1016,21 +1059,32 @@ export function ForumPageContent() {
             })}
           </div>
 
-          <select
-            className="select select-bordered select-xs w-36"
-            value={labelFilter}
-            onChange={(event) => setLabelFilterValue(event.target.value)}
-          >
-            <option value="all">All labels</option>
-            {FORUM_LABELS.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex min-w-0 items-center gap-2">
+            <label className="input input-bordered input-xs flex min-w-[220px] items-center gap-2">
+              <Search className="h-3.5 w-3.5 text-base-content/40" />
+              <input
+                className="min-w-0 grow"
+                value={searchQuery}
+                onChange={(event) => setSearchFilter(event.target.value)}
+                placeholder="Search threads"
+              />
+            </label>
+            <select
+              className="select select-bordered select-xs w-36"
+              value={labelFilter}
+              onChange={(event) => setLabelFilterValue(event.target.value)}
+            >
+              <option value="all">All labels</option>
+              {FORUM_LABELS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {(category !== "all" || labelFilter !== "all") && (
+        {(category !== "all" || labelFilter !== "all" || searchQuery.trim()) && (
           <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-base-300 pt-2 text-xs text-base-content/55">
             <span>Filtered by</span>
             {category !== "all" && (
@@ -1048,6 +1102,12 @@ export function ForumPageContent() {
                 onClick={() => setLabelFilterValue("all")}
               >
                 {getForumLabel(labelFilter).label}
+                <X className="h-3 w-3" />
+              </button>
+            )}
+            {searchQuery.trim() && (
+              <button className="badge badge-outline gap-1" onClick={() => setSearchFilter("")}>
+                search: {searchQuery.trim()}
                 <X className="h-3 w-3" />
               </button>
             )}

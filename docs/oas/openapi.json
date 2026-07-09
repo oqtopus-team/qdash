@@ -6734,23 +6734,43 @@
             "description": "Filter by project-scoped forum thread number"
           },
           {
-            "name": "is_closed",
+            "name": "status",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "boolean"
+                  "type": "string",
+                  "pattern": "^(open|investigating|identified|resolved)$"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all.",
-              "default": false,
-              "title": "Is Closed"
+              "description": "Filter by workflow status. Default open. Use null/omit at the client layer for all.",
+              "default": "open",
+              "title": "Status"
             },
-            "description": "Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all."
+            "description": "Filter by workflow status. Default open. Use null/omit at the client layer for all."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search title, content, number, target, assignee, or status",
+              "title": "Q"
+            },
+            "description": "Search title, content, number, target, assignee, or status"
           },
           {
             "name": "X-Project-Id",
@@ -17562,6 +17582,18 @@
             "title": "Assignee Username",
             "description": "Assigned project member username"
           },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "investigating",
+              "identified",
+              "resolved"
+            ],
+            "title": "Status",
+            "description": "Thread workflow status",
+            "default": "open"
+          },
           "chip_id": {
             "anyOf": [
               {
@@ -17740,6 +17772,18 @@
             "title": "Assignee Username",
             "description": "Assigned project member username"
           },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "investigating",
+              "identified",
+              "resolved"
+            ],
+            "title": "Status",
+            "description": "Thread workflow status",
+            "default": "open"
+          },
           "chip_id": {
             "anyOf": [
               {
@@ -17793,12 +17837,6 @@
             "title": "Reply Count",
             "description": "Number of replies to this thread",
             "default": 0
-          },
-          "is_closed": {
-            "type": "boolean",
-            "title": "Is Closed",
-            "description": "Whether this thread is closed",
-            "default": false
           },
           "is_deleted": {
             "type": "boolean",
@@ -17912,6 +17950,24 @@
             ],
             "title": "Assignee Username",
             "description": "Updated assigned project member username"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "investigating",
+                  "identified",
+                  "resolved"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Updated thread workflow status"
           },
           "chip_id": {
             "anyOf": [

@@ -251,7 +251,7 @@ export function DashboardPageContent() {
   const { data: forumPostsResponse } = useListForumPosts(
     {
       chip_id: selectedChip || undefined,
-      is_closed: null,
+      status: null,
       limit: 200,
     },
     { query: { enabled: !!selectedChip, staleTime: 30_000 } },

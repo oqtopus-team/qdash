@@ -125,24 +125,22 @@ def test_forum_thread_labels_round_trip_filter_and_update(test_client, init_db):
     _create_project()
     headers = _headers("owner_token")
 
-    root = _create_post(test_client, headers, labels=["discussion"])
+    root = _create_post(test_client, headers, labels=["review"])
 
     assert root.status_code == 201
     root_body = root.json()
-    assert root_body["labels"] == ["discussion"]
+    assert root_body["labels"] == ["review"]
 
-    listed = test_client.get("/forum/posts?label=discussion", headers=headers)
+    listed = test_client.get("/forum/posts?label=review", headers=headers)
     assert listed.status_code == 200
     assert listed.json()["total"] == 1
-    assert listed.json()["posts"][0]["labels"] == ["discussion"]
+    assert listed.json()["posts"][0]["labels"] == ["review"]
 
-    hidden = test_client.get("/forum/posts?label=resolved", headers=headers)
+    hidden = test_client.get("/forum/posts?label=anomaly", headers=headers)
     assert hidden.status_code == 200
     assert hidden.json()["total"] == 0
 
-    rejected = _create_post(
-        test_client, headers, title="multi label", labels=["discussion", "info"]
-    )
+    rejected = _create_post(test_client, headers, title="multi label", labels=["review", "anomaly"])
     assert rejected.status_code == 422
 
     updated = test_client.patch(
@@ -152,14 +150,26 @@ def test_forum_thread_labels_round_trip_filter_and_update(test_client, init_db):
             "category": "qubit",
             "title": root_body["title"],
             "content": root_body["content"],
-            "labels": ["resolved"],
+            "labels": ["anomaly"],
         },
     )
     assert updated.status_code == 200
-    assert updated.json()["labels"] == ["resolved"]
+    assert updated.json()["labels"] == ["anomaly"]
 
     fetched = test_client.get(f"/forum/posts/{root_body['id']}", headers=headers)
-    assert fetched.json()["labels"] == ["resolved"]
+    assert fetched.json()["labels"] == ["anomaly"]
+
+    rejected_status_label = test_client.patch(
+        f"/forum/posts/{root_body['id']}",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": root_body["title"],
+            "content": root_body["content"],
+            "labels": ["resolved"],
+        },
+    )
+    assert rejected_status_label.status_code == 422
 
 
 def test_forum_thread_assignee_round_trip_update_and_reply_inherit(test_client, init_db):
@@ -474,6 +484,31 @@ def test_close_forum_thread_requires_author_or_owner(test_client, init_db):
     response = test_client.patch(f"/forum/posts/{root_id}/close", headers=_headers("member_token"))
 
     assert response.status_code == 403
+
+
+def test_close_and_reopen_forum_thread_updates_status(test_client, init_db):
+    """Close/reopen compatibility endpoints map to resolved/open status."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    root = _create_post(test_client, headers)
+    root_id = root.json()["id"]
+
+    closed = test_client.patch(f"/forum/posts/{root_id}/close", headers=headers)
+    assert closed.status_code == 200
+    fetched = test_client.get(f"/forum/posts/{root_id}", headers=headers)
+    assert fetched.json()["status"] == "resolved"
+
+    blocked_reply = _create_post(
+        test_client, headers, title=None, content="reply", parent_id=root_id
+    )
+    assert blocked_reply.status_code == 409
+
+    reopened = test_client.patch(f"/forum/posts/{root_id}/reopen", headers=headers)
+    assert reopened.status_code == 200
+    fetched = test_client.get(f"/forum/posts/{root_id}", headers=headers)
+    assert fetched.json()["status"] == "open"
 
 
 def test_author_can_update_forum_thread_category(test_client, init_db):

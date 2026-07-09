@@ -157,7 +157,7 @@ export function MetricNotePanel({
       chip_id: chipId,
       target_type: isCoupling ? "coupling" : "qubit",
       target_id: targetId,
-      is_closed: null,
+      status: null,
       limit: 50,
     },
     { query: { staleTime: 30_000 } },

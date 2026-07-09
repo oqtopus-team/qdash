@@ -27,6 +27,9 @@ Run migrations with:
 
     python -m qdash.dbmodel.migration backfill-forum-thread-numbers          # dry-run
     python -m qdash.dbmodel.migration backfill-forum-thread-numbers --execute  # execute
+
+    python -m qdash.dbmodel.migration migrate-forum-status          # dry-run
+    python -m qdash.dbmodel.migration migrate-forum-status --execute  # execute
 """
 
 import logging
@@ -332,6 +335,98 @@ def migrate_backfill_forum_thread_numbers(dry_run: bool = True) -> dict[str, Any
         stats["projects"].append(project_info)
 
     logger.info("Forum thread number migration: %s", stats)
+    return stats
+
+
+def migrate_forum_status(dry_run: bool = True) -> dict[str, Any]:
+    """Migrate forum threads from ``is_closed`` and legacy labels to ``status``.
+
+    The forum workflow now uses a dedicated status field. Existing closed
+    threads and threads with a ``resolved`` label become ``status=resolved``.
+    Legacy topic labels are collapsed to a small allowed set:
+    ``discussion``/``info``/``mtg`` become ``review`` and ``resolved`` is removed.
+    The deprecated ``is_closed`` field is unset when executing the migration.
+    """
+    from qdash.dbmodel.forum import FORUM_THREAD_STATUSES, ForumPostDocument
+
+    allowed_labels = {"review", "anomaly"}
+    label_aliases = {"discussion": "review", "info": "review", "mtg": "review"}
+    collection = ForumPostDocument.get_motor_collection()
+    docs = list(collection.find({}))
+    stats: dict[str, Any] = {
+        "posts_found": len(docs),
+        "posts_to_update": 0,
+        "status_from_is_closed": 0,
+        "status_from_resolved_label": 0,
+        "status_defaulted_open": 0,
+        "labels_changed": 0,
+        "is_closed_removed": 0,
+    }
+
+    for doc in docs:
+        current_status = doc.get("status")
+        labels = doc.get("labels") if isinstance(doc.get("labels"), list) else []
+        normalized_labels: list[str] = []
+        has_resolved_label = False
+        labels_changed = False
+
+        for raw_label in labels:
+            if not isinstance(raw_label, str):
+                labels_changed = True
+                continue
+            label = raw_label.strip().lower()
+            if label == "resolved":
+                has_resolved_label = True
+                labels_changed = True
+                continue
+            label = label_aliases.get(label, label)
+            if label not in allowed_labels:
+                label = "review"
+                labels_changed = True
+            if label not in normalized_labels:
+                normalized_labels.append(label)
+            if label != raw_label:
+                labels_changed = True
+
+        if len(normalized_labels) > 1:
+            normalized_labels = normalized_labels[:1]
+            labels_changed = True
+
+        next_status = current_status if current_status in FORUM_THREAD_STATUSES else None
+        if has_resolved_label:
+            if next_status != "resolved":
+                stats["status_from_resolved_label"] += 1
+            next_status = "resolved"
+        elif doc.get("is_closed") is True:
+            if next_status != "resolved":
+                stats["status_from_is_closed"] += 1
+            next_status = "resolved"
+        elif next_status is None:
+            next_status = "open"
+            stats["status_defaulted_open"] += 1
+
+        update: dict[str, Any] = {}
+        unset: dict[str, str] = {}
+        if current_status != next_status:
+            update["status"] = next_status
+        if labels_changed or labels != normalized_labels:
+            update["labels"] = normalized_labels
+            stats["labels_changed"] += 1
+        if "is_closed" in doc:
+            unset["is_closed"] = ""
+            stats["is_closed_removed"] += 1
+
+        if update or unset:
+            stats["posts_to_update"] += 1
+            if not dry_run:
+                operation: dict[str, Any] = {}
+                if update:
+                    operation["$set"] = update
+                if unset:
+                    operation["$unset"] = unset
+                collection.update_one({"_id": doc["_id"]}, operation)
+
+    logger.info("Forum status migration: %s", stats)
     return stats
 
 
@@ -1137,6 +1232,16 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    forum_status_parser = subparsers.add_parser(
+        "migrate-forum-status",
+        help="Migrate forum is_closed and legacy labels to status",
+    )
+    forum_status_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "fix-invalid-fidelity":
@@ -1193,6 +1298,12 @@ if __name__ == "__main__":
 
         initialize()
         stats = migrate_backfill_forum_thread_numbers(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "migrate-forum-status":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_forum_status(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
     else:
         parser.print_help()
