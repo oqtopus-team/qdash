@@ -40,8 +40,11 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
   { key: "planet", label: "Planet" },
 ];
 
+const AVATAR_PRESET_KEYS = new Set(AVATAR_PRESETS.map((preset) => preset.key));
+
 function resolveAvatarKey(username: string, avatarKey?: string | null) {
-  return avatarKey || getAvatarEmoji(username);
+  if (avatarKey && AVATAR_PRESET_KEYS.has(avatarKey)) return avatarKey;
+  return getAvatarEmoji(username);
 }
 
 export function UserAvatar({
