@@ -590,7 +590,7 @@ export function DashboardPageContent() {
                     unit=""
                     topologyId={topologyId}
                     colors={colors}
-                    maxCellSize={42}
+                    presentation="summary"
                     targetNotedQids={targetNotedQids}
                     forumLinkedQids={forumLinkedQids}
                     forumLinksByTarget={forumLinksByTarget}
@@ -628,7 +628,7 @@ export function DashboardPageContent() {
                     unit=""
                     topologyId={topologyId}
                     colors={colors}
-                    maxCellSize={42}
+                    presentation="summary"
                     reverseDirection={isReverseCouplingDirection}
                     targetNotedTargets={targetNotedCouplings}
                     forumLinkedTargets={forumLinkedCouplings}
