@@ -30,7 +30,9 @@ import type {
   ChipResponse,
   CouplingResponse,
   CreateChipRequest,
+  DeleteChipNoteParams,
   DeleteChipParams,
+  GetChipNoteParams,
   HTTPValidationError,
   ListChipCouplingsParams,
   ListChipQubitsParams,
@@ -41,12 +43,15 @@ import type {
   MetricHeatmapResponse,
   MetricsSummaryResponse,
   MuxDetailResponse,
+  NoteModel,
+  NoteUpsertRequest,
   QubitResponse,
   ReanalyzeQubitSpectroscopyRequest,
   ReanalyzeResonatorSpectroscopyRequest,
   ReanalyzeResponse,
   SuccessResponse,
-  UpdateChipRequest
+  UpdateChipRequest,
+  UpsertChipNoteParams
 } from '../../schemas';
 
 import { customInstance } from '../../lib/custom-instance';
@@ -888,6 +893,234 @@ export function useListChipMuxes<TData = Awaited<ReturnType<typeof listChipMuxes
 
 
 /**
+ * @summary Get chip note
+ */
+export const getChipNote = (
+    chipId: string,
+    params?: GetChipNoteParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<NoteModel>(
+      {url: `/chips/${chipId}/note`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
+
+
+
+export const getGetChipNoteQueryKey = (chipId?: string,
+    params?: GetChipNoteParams,) => {
+    return [
+    `/chips/${chipId}/note`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetChipNoteQueryOptions = <TData = Awaited<ReturnType<typeof getChipNote>>, TError = HTTPValidationError>(chipId: string,
+    params?: GetChipNoteParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipNote>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChipNoteQueryKey(chipId,params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipNote>>> = ({ signal }) => getChipNote(chipId,params, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChipNote>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetChipNoteQueryResult = NonNullable<Awaited<ReturnType<typeof getChipNote>>>
+export type GetChipNoteQueryError = HTTPValidationError
+
+
+export function useGetChipNote<TData = Awaited<ReturnType<typeof getChipNote>>, TError = HTTPValidationError>(
+ chipId: string,
+    params: undefined |  GetChipNoteParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipNote>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getChipNote>>,
+          TError,
+          Awaited<ReturnType<typeof getChipNote>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipNote<TData = Awaited<ReturnType<typeof getChipNote>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: GetChipNoteParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipNote>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getChipNote>>,
+          TError,
+          Awaited<ReturnType<typeof getChipNote>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipNote<TData = Awaited<ReturnType<typeof getChipNote>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: GetChipNoteParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipNote>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+/**
+ * @summary Get chip note
+ */
+
+export function useGetChipNote<TData = Awaited<ReturnType<typeof getChipNote>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: GetChipNoteParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipNote>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+
+  const queryOptions = getGetChipNoteQueryOptions(chipId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+/**
+ * @summary Upsert chip note
+ */
+export const upsertChipNote = (
+    chipId: string,
+    noteUpsertRequest: NoteUpsertRequest,
+    params?: UpsertChipNoteParams,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<NoteModel>(
+      {url: `/chips/${chipId}/note`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: noteUpsertRequest,
+        params
+    },
+      options);
+    }
+  
+
+
+export const getUpsertChipNoteMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertChipNote>>, TError,{chipId: string;data: NoteUpsertRequest;params?: UpsertChipNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertChipNote>>, TError,{chipId: string;data: NoteUpsertRequest;params?: UpsertChipNoteParams}, TContext> => {
+
+const mutationKey = ['upsertChipNote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertChipNote>>, {chipId: string;data: NoteUpsertRequest;params?: UpsertChipNoteParams}> = (props) => {
+          const {chipId,data,params} = props ?? {};
+
+          return  upsertChipNote(chipId,data,params,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertChipNoteMutationResult = NonNullable<Awaited<ReturnType<typeof upsertChipNote>>>
+    export type UpsertChipNoteMutationBody = NoteUpsertRequest
+    export type UpsertChipNoteMutationError = HTTPValidationError
+
+    /**
+ * @summary Upsert chip note
+ */
+export const useUpsertChipNote = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertChipNote>>, TError,{chipId: string;data: NoteUpsertRequest;params?: UpsertChipNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof upsertChipNote>>,
+        TError,
+        {chipId: string;data: NoteUpsertRequest;params?: UpsertChipNoteParams},
+        TContext
+      > => {
+
+      const mutationOptions = getUpsertChipNoteMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * @summary Clear chip note
+ */
+export const deleteChipNote = (
+    chipId: string,
+    params?: DeleteChipNoteParams,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<SuccessResponse>(
+      {url: `/chips/${chipId}/note`, method: 'DELETE',
+        params
+    },
+      options);
+    }
+  
+
+
+export const getDeleteChipNoteMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChipNote>>, TError,{chipId: string;params?: DeleteChipNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteChipNote>>, TError,{chipId: string;params?: DeleteChipNoteParams}, TContext> => {
+
+const mutationKey = ['deleteChipNote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteChipNote>>, {chipId: string;params?: DeleteChipNoteParams}> = (props) => {
+          const {chipId,params} = props ?? {};
+
+          return  deleteChipNote(chipId,params,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteChipNoteMutationResult = NonNullable<Awaited<ReturnType<typeof deleteChipNote>>>
+    
+    export type DeleteChipNoteMutationError = HTTPValidationError
+
+    /**
+ * @summary Clear chip note
+ */
+export const useDeleteChipNote = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChipNote>>, TError,{chipId: string;params?: DeleteChipNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteChipNote>>,
+        TError,
+        {chipId: string;params?: DeleteChipNoteParams},
+        TContext
+      > => {
+
+      const mutationOptions = getDeleteChipNoteMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * List qubits for a chip with pagination.
 
 Retrieves qubit data from the separate QubitDocument collection.

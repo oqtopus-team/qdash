@@ -9,6 +9,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useListForumPosts } from "@/client/forum/forum";
 import {
   getGetChipNotesSummaryQueryKey,
+  useDeleteCouplingNote,
+  useDeleteQubitNote,
   useUpsertCouplingNote,
   useUpsertQubitNote,
 } from "@/client/note/note";
@@ -118,12 +120,17 @@ export function DashboardTargetNoteModal({
   const isCoupling = targetId.includes("-");
   const upsertQubit = useUpsertQubitNote();
   const upsertCoupling = useUpsertCouplingNote();
-  const upsertPending = isCoupling ? upsertCoupling.isPending : upsertQubit.isPending;
+  const deleteQubit = useDeleteQubitNote();
+  const deleteCoupling = useDeleteCouplingNote();
+  const mutationPending = isCoupling
+    ? upsertCoupling.isPending || deleteCoupling.isPending
+    : upsertQubit.isPending || deleteQubit.isPending;
   const { data: forumPostsResponse } = useListForumPosts(
     {
       chip_id: chipId,
       target_type: isCoupling ? "coupling" : "qubit",
       target_id: targetId,
+      cooldown_id: cooldownId || undefined,
       status: null,
       limit: 50,
     },
@@ -147,18 +154,40 @@ export function DashboardTargetNoteModal({
     });
 
   const handleSave = async () => {
-    if (!draft.trim() || draft.length > 5000) return;
+    const trimmed = draft.trim();
+    if (draft.length > 5000) return;
+    if (!trimmed) {
+      if (!existing) return;
+      if (isCoupling) {
+        await deleteCoupling.mutateAsync({
+          chipId,
+          couplingId: targetId,
+          params: noteScopeParams,
+        });
+      } else {
+        await deleteQubit.mutateAsync({
+          chipId,
+          qid: targetId,
+          params: noteScopeParams,
+        });
+      }
+      await invalidate();
+      onClose();
+      return;
+    }
     if (isCoupling) {
       await upsertCoupling.mutateAsync({
         chipId,
         couplingId: targetId,
         data: { content: draft },
+        params: noteScopeParams,
       });
     } else {
       await upsertQubit.mutateAsync({
         chipId,
         qid: targetId,
         data: { content: draft },
+        params: noteScopeParams,
       });
     }
     await invalidate();
@@ -179,7 +208,10 @@ export function DashboardTargetNoteModal({
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-lg font-bold">
               <StickyNote className="h-5 w-5 text-warning" />
-              <span className="truncate">Pinned summary · {formatTarget(targetId)}</span>
+              <span className="truncate">
+                Pinned summary · {formatTarget(targetId)}
+                {cooldownId ? ` · ${cooldownId}` : ""}
+              </span>
             </div>
             <p className="text-sm text-base-content/60 mt-1">
               Keep this as a short index. Use forum topics for separate issues, images, and
@@ -289,7 +321,7 @@ export function DashboardTargetNoteModal({
                 onSubmit={handleSave}
                 placeholder="Pinned one-paragraph status or index. Put separate topics, images, and discussion in forum threads..."
                 rows={8}
-                disabled={upsertPending}
+                disabled={mutationPending}
                 mentionCandidates={mentionCandidates}
               />
               <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-base-content/50">
@@ -313,11 +345,11 @@ export function DashboardTargetNoteModal({
               <button
                 className="btn btn-sm btn-primary gap-1"
                 onClick={handleSave}
-                disabled={!draft.trim() || isTooLong || upsertPending}
+                disabled={(!draft.trim() && !existing) || isTooLong || mutationPending}
                 type="button"
               >
                 <Save className="h-4 w-4" />
-                {upsertPending ? "Saving..." : "Save summary"}
+                {mutationPending ? "Saving..." : draft.trim() ? "Save summary" : "Clear summary"}
               </button>
             </div>
           </div>

@@ -25,6 +25,10 @@ Run migrations with:
     python -m qdash.dbmodel.migration metric-notes-to-target-notes          # dry-run
     python -m qdash.dbmodel.migration metric-notes-to-target-notes --execute  # execute
 
+    python -m qdash.dbmodel.migration metric-notes-to-latest-cooldown-target-notes          # dry-run
+    python -m qdash.dbmodel.migration metric-notes-to-latest-cooldown-target-notes --execute  # execute
+    python -m qdash.dbmodel.migration metric-notes-to-latest-cooldown-target-notes --execute --delete-source  # migrate then delete source metric notes
+
     python -m qdash.dbmodel.migration backfill-forum-thread-numbers          # dry-run
     python -m qdash.dbmodel.migration backfill-forum-thread-numbers --execute  # execute
 
@@ -83,11 +87,19 @@ class MigrationError(Exception):
 
 
 MIGRATED_METRIC_NOTES_MARKER = "<!-- qdash:migrated-metric-notes -->"
+MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER = (
+    "<!-- qdash:migrated-metric-notes-to-latest-cooldown -->"
+)
 
 
-def _format_migrated_metric_note_section(notes: list[Any]) -> str:
+def _format_migrated_metric_note_section(
+    notes: list[Any],
+    *,
+    marker: str = MIGRATED_METRIC_NOTES_MARKER,
+    title: str = "Legacy metric notes",
+) -> str:
     """Render metric notes as a compact target summary appendix."""
-    lines = [MIGRATED_METRIC_NOTES_MARKER, "## Legacy metric notes"]
+    lines = [marker, f"## {title}"]
     for note in notes:
         updated_at = note.note.updated_at.isoformat() if note.note.updated_at else "unknown time"
         updated_by = note.note.updated_by or "unknown user"
@@ -108,14 +120,53 @@ def _format_migrated_metric_note_section(notes: list[Any]) -> str:
     return "\n".join(lines).strip()
 
 
-def _merge_migrated_metric_notes(existing_content: str, section: str) -> tuple[str, bool]:
+def _merge_migrated_metric_notes(
+    existing_content: str,
+    section: str,
+    *,
+    marker: str = MIGRATED_METRIC_NOTES_MARKER,
+) -> tuple[str, bool]:
     """Append migrated metric notes unless this target was already migrated."""
     existing_content = (existing_content or "").strip()
-    if not section or MIGRATED_METRIC_NOTES_MARKER in existing_content:
+    if not section or marker in existing_content:
         return existing_content, False
     if not existing_content:
         return section, True
     return f"{existing_content}\n\n---\n\n{section}", True
+
+
+def _latest_cooldown_for_chip(*, project_id: str, chip_id: str) -> Any | None:
+    """Return the current or most recent cool-down containing ``chip_id``."""
+    from qdash.dbmodel.chip import ChipDocument
+    from qdash.dbmodel.cooldown import CooldownDocument
+
+    chip = ChipDocument.find_one(
+        ChipDocument.project_id == project_id,
+        ChipDocument.chip_id == chip_id,
+    ).run()
+    current_cooldown_id = getattr(chip, "current_cooldown_id", None)
+    if current_cooldown_id:
+        current = CooldownDocument.find_one(
+            {
+                "project_id": project_id,
+                "cooldown_id": current_cooldown_id,
+                "chip_ids": chip_id,
+            }
+        ).run()
+        if current is not None:
+            return current
+
+    cooldowns = list(
+        CooldownDocument.find(
+            {
+                "project_id": project_id,
+                "chip_ids": chip_id,
+            }
+        ).run()
+    )
+    if not cooldowns:
+        return None
+    return max(cooldowns, key=lambda cooldown: cooldown.started_at)
 
 
 def migrate_metric_notes_to_target_notes(dry_run: bool = True) -> dict[str, Any]:
@@ -199,6 +250,166 @@ def migrate_metric_notes_to_target_notes(dry_run: bool = True) -> dict[str, Any]
             )
             target_doc.system_info.update_time()
             target_doc.save()
+        stats["targets_updated"] += 1
+        stats["targets"].append(target_info)
+
+    return stats
+
+
+def migrate_metric_notes_to_latest_cooldown_target_notes(
+    dry_run: bool = True,
+    delete_source: bool = False,
+) -> dict[str, Any]:
+    """Copy legacy per-metric dashboard notes into latest-CD target summaries.
+
+    This migration intentionally collapses all existing ``MetricNoteDocument`` rows
+    for one target into that chip's current or most recent cool-down. The source
+    metric notes are preserved; the resulting target note carries each note's
+    original scope in the migrated appendix for manual follow-up. When
+    ``delete_source`` is true, successfully migrated ``MetricNoteDocument`` rows
+    are deleted after the target summary is written.
+    """
+    from qdash.common.utils.datetime import ensure_timezone, now
+    from qdash.datamodel.note import NoteModel
+    from qdash.dbmodel.coupling import CouplingDocument
+    from qdash.dbmodel.metric_note import MetricNoteDocument
+    from qdash.dbmodel.qubit import QubitDocument
+    from qdash.dbmodel.target_note import TargetNoteDocument
+
+    metric_notes = [
+        note
+        for note in MetricNoteDocument.find_all().run()
+        if getattr(note, "note", None) is not None and (note.note.content or "").strip()
+    ]
+    grouped: dict[tuple[str, str, str, str], list[Any]] = {}
+    for note in metric_notes:
+        key = (note.project_id, note.chip_id, note.target_type, note.target_id)
+        grouped.setdefault(key, []).append(note)
+
+    cooldown_cache: dict[tuple[str, str], Any | None] = {}
+    stats: dict[str, Any] = {
+        "metric_notes_found": len(metric_notes),
+        "targets_found": len(grouped),
+        "targets_updated": 0,
+        "targets_skipped_already_migrated": 0,
+        "targets_missing": 0,
+        "targets_without_cooldown": 0,
+        "metric_notes_deleted": 0,
+        "targets": [],
+    }
+
+    for (project_id, chip_id, target_type, target_id), notes in sorted(grouped.items()):
+        notes.sort(
+            key=lambda item: (
+                item.metric_key,
+                item.scope_key,
+                item.note.updated_at.isoformat() if item.note.updated_at else "",
+            )
+        )
+        model = QubitDocument if target_type == "qubit" else CouplingDocument
+        target_doc = model.find_one(
+            model.project_id == project_id,
+            model.chip_id == chip_id,
+            model.qid == target_id,
+        ).run()
+        target_info = {
+            "project_id": project_id,
+            "chip_id": chip_id,
+            "target_type": target_type,
+            "target_id": target_id,
+            "metric_note_count": len(notes),
+            "action": "dry_run" if dry_run else "updated",
+        }
+        if target_doc is None:
+            stats["targets_missing"] += 1
+            target_info["action"] = "missing_target"
+            stats["targets"].append(target_info)
+            continue
+
+        cooldown_key = (project_id, chip_id)
+        if cooldown_key not in cooldown_cache:
+            cooldown_cache[cooldown_key] = _latest_cooldown_for_chip(
+                project_id=project_id,
+                chip_id=chip_id,
+            )
+        cooldown = cooldown_cache[cooldown_key]
+        if cooldown is None:
+            stats["targets_without_cooldown"] += 1
+            target_info["action"] = "missing_cooldown"
+            stats["targets"].append(target_info)
+            continue
+
+        target_info["cooldown_id"] = cooldown.cooldown_id
+        scope_key = f"cooldown:{cooldown.cooldown_id}"
+        existing_target_note = TargetNoteDocument.find_one(
+            TargetNoteDocument.project_id == project_id,
+            TargetNoteDocument.chip_id == chip_id,
+            TargetNoteDocument.target_type == target_type,
+            TargetNoteDocument.target_id == target_id,
+            TargetNoteDocument.scope_key == scope_key,
+        ).run()
+        existing_note = (
+            existing_target_note.note if existing_target_note is not None else NoteModel()
+        )
+        section = _format_migrated_metric_note_section(
+            notes,
+            marker=MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER,
+            title="Migrated legacy metric notes",
+        )
+        merged_content, changed = _merge_migrated_metric_notes(
+            existing_note.content,
+            section,
+            marker=MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER,
+        )
+        if not changed:
+            stats["targets_skipped_already_migrated"] += 1
+            target_info["action"] = "already_migrated"
+            if delete_source and not dry_run:
+                for metric_note in notes:
+                    metric_note.delete()
+                    stats["metric_notes_deleted"] += 1
+                target_info["metric_notes_deleted"] = len(notes)
+            stats["targets"].append(target_info)
+            continue
+
+        if not dry_run:
+            last_note = max(
+                notes,
+                key=lambda item: item.note.updated_at or item.system_info.updated_at,
+            )
+            note = NoteModel(
+                content=merged_content,
+                updated_by=last_note.note.updated_by or "migration",
+                updated_at=last_note.note.updated_at or now(),
+            )
+            if existing_target_note is None:
+                TargetNoteDocument(
+                    project_id=project_id,
+                    chip_id=chip_id,
+                    target_type=target_type,
+                    target_id=target_id,
+                    note=note,
+                    scope_type="cooldown",
+                    scope_key=scope_key,
+                    cooldown_id=cooldown.cooldown_id,
+                    scope_started_at=ensure_timezone(cooldown.started_at),
+                    scope_ended_at=ensure_timezone(cooldown.ended_at),
+                    scope_source="explicit_cooldown",
+                ).insert()
+            else:
+                existing_target_note.note = note
+                existing_target_note.scope_type = "cooldown"
+                existing_target_note.cooldown_id = cooldown.cooldown_id
+                existing_target_note.scope_started_at = ensure_timezone(cooldown.started_at)
+                existing_target_note.scope_ended_at = ensure_timezone(cooldown.ended_at)
+                existing_target_note.scope_source = "explicit_cooldown"
+                existing_target_note.system_info.update_time()
+                existing_target_note.save()
+            if delete_source:
+                for metric_note in notes:
+                    metric_note.delete()
+                    stats["metric_notes_deleted"] += 1
+                target_info["metric_notes_deleted"] = len(notes)
         stats["targets_updated"] += 1
         stats["targets"].append(target_info)
 
@@ -1222,6 +1433,24 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    latest_cd_metric_notes_parser = subparsers.add_parser(
+        "metric-notes-to-latest-cooldown-target-notes",
+        help=(
+            "Append existing per-metric dashboard notes to each target's latest "
+            "cool-down pinned summary"
+        ),
+    )
+    latest_cd_metric_notes_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+    latest_cd_metric_notes_parser.add_argument(
+        "--delete-source",
+        action="store_true",
+        help="Delete MetricNoteDocument rows after successfully migrating them",
+    )
+
     forum_numbers_parser = subparsers.add_parser(
         "backfill-forum-thread-numbers",
         help="Backfill project-scoped #numbers for existing forum threads",
@@ -1292,6 +1521,15 @@ if __name__ == "__main__":
 
         initialize()
         stats = migrate_metric_notes_to_target_notes(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "metric-notes-to-latest-cooldown-target-notes":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_metric_notes_to_latest_cooldown_target_notes(
+            dry_run=not args.execute,
+            delete_source=args.delete_source,
+        )
         logger.info(f"Migration complete: {stats}")
     elif args.command == "backfill-forum-thread-numbers":
         from qdash.dbmodel.initialize import initialize

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { ArrowRightLeft, StickyNote } from "lucide-react";
+import { ArrowRightLeft } from "lucide-react";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
@@ -41,8 +41,9 @@ import {
   DashboardTargetNoteModal,
   type TargetNoteEntry as DashboardTargetNoteEntry,
 } from "./DashboardTargetNoteModal";
-import { DashboardChipNoteModal } from "./DashboardChipNoteModal";
+import { DashboardChipNoteCard } from "./DashboardChipNoteCard";
 import { DashboardMetricModal } from "./DashboardMetricModal";
+import type { ForumLinkEntry } from "./DashboardNoteTooltip";
 import { type NoteEntry, type NoteEntryWithMetric } from "./MetricNotePanel";
 
 interface MetricValueLike {
@@ -53,6 +54,8 @@ interface MetricValueLike {
 type MetricMap = { [key: string]: MetricValueLike };
 
 const FALLBACK_COLORS = ["#440154", "#31688e", "#35b779", "#fde724"];
+const MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER =
+  "<!-- qdash:migrated-metric-notes-to-latest-cooldown -->";
 
 const FORUM_LABEL_PRIORITY = [
   "anomaly",
@@ -141,7 +144,6 @@ export function DashboardPageContent() {
     () => chipData?.data?.topology_id ?? `square-lattice-mux-${chipData?.data?.size ?? 64}`,
     [chipData?.data?.topology_id, chipData?.data?.size],
   );
-  const chipHasNote = !!chipData?.data?.note?.content?.trim();
   const currentCooldownId = chipData?.data?.current_cooldown_id ?? null;
   const cooldowns = cooldownsData?.data?.cooldowns ?? [];
   const activeCooldown =
@@ -150,6 +152,7 @@ export function DashboardPageContent() {
   const qubitCount = chipData?.data?.size ?? 64;
   const [selectedCooldownId, setSelectedCooldownId] = useState<string | null>(null);
   const [hasInitializedCooldownSelection, setHasInitializedCooldownSelection] = useState(false);
+  const forumCooldownId = selectedCooldownId ?? activeCooldown?.cooldown_id ?? null;
 
   const mentionCandidates: MentionCandidate[] = useMemo(
     () => [
@@ -266,6 +269,7 @@ export function DashboardPageContent() {
   const { data: forumPostsResponse } = useListForumPosts(
     {
       chip_id: selectedChip || undefined,
+      cooldown_id: forumCooldownId || undefined,
       status: null,
       limit: 200,
     },
@@ -292,10 +296,31 @@ export function DashboardPageContent() {
     return targets;
   }, [forumPostsResponse?.data.posts]);
 
+  const forumLinksByTarget = useMemo(() => {
+    const targets: Record<string, ForumLinkEntry[]> = {};
+    (forumPostsResponse?.data.posts ?? []).forEach((post) => {
+      if (!post.target_id || (post.target_type !== "qubit" && post.target_type !== "coupling")) {
+        return;
+      }
+      const entries = targets[post.target_id] ?? [];
+      entries.push({
+        id: post.id,
+        number: post.number,
+        title: post.title,
+        labels: post.labels ?? [],
+        status: post.status,
+        replyCount: post.reply_count ?? 0,
+      });
+      targets[post.target_id] = entries;
+    });
+    return targets;
+  }, [forumPostsResponse?.data.posts]);
+
   const notesByMetric = useMemo(() => {
     const map: Record<string, Record<string, NoteEntry>> = {};
     const collect = (entries: SummaryTargetNoteEntry[] | undefined) => {
       (entries ?? []).forEach((entry) => {
+        if (entry.note?.content?.includes(MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER)) return;
         Object.entries(entry.metric_notes ?? {}).forEach(([metricKey, note]) => {
           const content = stripAiGeneratedNoteSections(note?.content ?? "");
           if (!content) return;
@@ -323,6 +348,7 @@ export function DashboardPageContent() {
     const map: Record<string, NoteEntryWithMetric[]> = {};
     const collect = (entries: SummaryTargetNoteEntry[] | undefined) => {
       (entries ?? []).forEach((entry) => {
+        if (entry.note?.content?.includes(MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER)) return;
         Object.entries(entry.metric_notes ?? {}).forEach(([metricKey, note]) => {
           const content = stripAiGeneratedNoteSections(note?.content ?? "");
           if (!content) return;
@@ -396,7 +422,6 @@ export function DashboardPageContent() {
     metricUnit: string;
   } | null>(null);
   const [editingTargetNote, setEditingTargetNote] = useState<string | null>(null);
-  const [showChipNote, setShowChipNote] = useState(false);
   const [couplingDirection, setCouplingDirection] = useState<"forward" | "reverse">("forward");
   const isReverseCouplingDirection = couplingDirection === "reverse";
 
@@ -477,18 +502,6 @@ export function DashboardPageContent() {
                 }}
               />
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item>
-              <button
-                className={`btn btn-sm gap-1 ${chipHasNote ? "btn-warning" : "btn-outline"}`}
-                onClick={() => setShowChipNote(true)}
-                disabled={!selectedChip}
-                type="button"
-                title="Edit chip-level note"
-              >
-                <StickyNote className="h-4 w-4" />
-                Chip note
-              </button>
-            </PageFiltersBar.Item>
           </PageFiltersBar.Group>
 
           <PageFiltersBar.Group>
@@ -558,6 +571,8 @@ export function DashboardPageContent() {
           />
         ) : (
           <>
+            <DashboardChipNoteCard chipId={selectedChip} noteScopeParams={noteScopeParams} />
+
             {/* Pinned summary topology */}
             <Card
               variant="default"
@@ -578,6 +593,7 @@ export function DashboardPageContent() {
                     maxCellSize={42}
                     targetNotedQids={targetNotedQids}
                     forumLinkedQids={forumLinkedQids}
+                    forumLinksByTarget={forumLinksByTarget}
                     notesByTarget={notesByTarget}
                     targetNotesByTarget={targetNotesByTarget}
                     metricKey=""
@@ -616,6 +632,7 @@ export function DashboardPageContent() {
                     reverseDirection={isReverseCouplingDirection}
                     targetNotedTargets={targetNotedCouplings}
                     forumLinkedTargets={forumLinkedCouplings}
+                    forumLinksByTarget={forumLinksByTarget}
                     notesByTarget={notesByTarget}
                     targetNotesByTarget={targetNotesByTarget}
                     metricKey=""
@@ -690,6 +707,7 @@ export function DashboardPageContent() {
                               notedQids={noted}
                               targetNotedQids={targetNotedQids}
                               forumLinkedQids={forumLinkedQids}
+                              forumLinksByTarget={forumLinksByTarget}
                               crossMetricNotedQids={crossMetricNoted}
                               notesByTarget={notesByTarget}
                               targetNotesByTarget={targetNotesByTarget}
@@ -790,6 +808,7 @@ export function DashboardPageContent() {
                               notedTargets={noted}
                               targetNotedTargets={targetNotedCouplings}
                               forumLinkedTargets={forumLinkedCouplings}
+                              forumLinksByTarget={forumLinksByTarget}
                               crossMetricNotedTargets={crossMetricNoted}
                               notesByTarget={notesByTarget}
                               targetNotesByTarget={targetNotesByTarget}
@@ -853,10 +872,6 @@ export function DashboardPageContent() {
           mentionCandidates={mentionCandidates}
           onClose={() => setEditingTargetNote(null)}
         />
-      )}
-
-      {showChipNote && selectedChip && (
-        <DashboardChipNoteModal chipId={selectedChip} onClose={() => setShowChipNote(false)} />
       )}
     </PageContainer>
   );

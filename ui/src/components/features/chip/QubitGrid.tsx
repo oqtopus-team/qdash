@@ -38,6 +38,8 @@ interface QubitGridProps {
   topologyId: string;
   selectedTask: string;
   selectedDate: string;
+  startAt?: string | null;
+  endAt?: string | null;
   gridSize: number;
   onDateChange?: (date: string) => void;
   aiReviewBadgesByTaskId?: Map<string, AiReviewBadgeState>;
@@ -99,6 +101,26 @@ function getPendingAiReviewTaskIds(
 function toPathList(paths: string[] | string | null | undefined): string[] {
   if (!paths) return [];
   return Array.isArray(paths) ? paths : [paths];
+}
+
+function requestErrorMessage(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+  const response = (error as { response?: { data?: unknown } }).response;
+  const data = response?.data;
+  if (!data || typeof data !== "object") return null;
+  const detail = (data as { detail?: unknown }).detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return detail.map((item) => JSON.stringify(item)).join("; ");
+  return null;
+}
+
+function taskRangeLabel(
+  selectedDate: string,
+  startAt?: string | null,
+  endAt?: string | null,
+): string {
+  if (startAt || endAt) return `${startAt ?? "..."} - ${endAt ?? "..."}`;
+  return selectedDate;
 }
 
 // Memoized grid cell component for performance
@@ -277,6 +299,8 @@ export function QubitGrid({
   topologyId,
   selectedTask,
   selectedDate,
+  startAt,
+  endAt,
   gridSize: defaultGridSize,
   aiReviewBadgesByTaskId,
 }: QubitGridProps) {
@@ -348,13 +372,16 @@ export function QubitGrid({
   const {
     data: taskResponse,
     isLoading: isLoadingTask,
+    isFetching: isFetchingTask,
     isError: isTaskError,
+    error: taskError,
     refetch: refetchTaskResults,
   } = useQubitTaskResults({
     chipId,
     task: selectedTask,
     selectedDate,
-    keepPrevious: true,
+    startAt,
+    endAt,
   });
   const persistedPendingAiReviewTaskIds = useMemo(
     () => getPendingAiReviewTaskIds(taskResponse?.data?.result),
@@ -470,6 +497,9 @@ export function QubitGrid({
   }, []);
 
   const initialScale = 1;
+
+  const rangeLabel = taskRangeLabel(selectedDate, startAt, endAt);
+  const errorDetail = requestErrorMessage(taskError);
 
   if (isLoadingTask)
     return (
@@ -895,7 +925,20 @@ export function QubitGrid({
 
   return (
     <div className="flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8">
-      {isTaskError && <div className="alert alert-error">Failed to load data</div>}
+      {isFetchingTask && !isLoadingTask && (
+        <div className="alert alert-info py-2 text-sm">
+          <LoaderCircle className="h-4 w-4 animate-spin" />
+          Loading {selectedTask} data for {rangeLabel}
+        </div>
+      )}
+      {isTaskError && (
+        <div className="alert alert-error text-sm">
+          <span>
+            Failed to load {selectedTask} data for {rangeLabel}
+            {errorDetail ? `: ${errorDetail}` : ""}
+          </span>
+        </div>
+      )}
       {/* View Mode Toggle and Download Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg py-2">
         <div className="flex items-center gap-4">

@@ -5,6 +5,7 @@ abstracting away the repository layer from the routers.
 """
 
 import logging
+from datetime import datetime
 from functools import lru_cache
 from typing import Any
 
@@ -27,6 +28,7 @@ from qdash.common.config.metrics import load_metrics_config
 from qdash.common.utils.datetime import now
 from qdash.datamodel.note import NoteModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.chip_note import ChipNoteDocument
 from qdash.dbmodel.cooldown import CooldownDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
@@ -410,6 +412,140 @@ class ChipService:
         if result is None:  # pragma: no cover - we just saved it
             raise HTTPException(status_code=500, detail="Failed to reload chip")
         return result
+
+    # ---------- chip note edit ----------
+
+    @staticmethod
+    def _get_chip_document(*, project_id: str, chip_id: str) -> ChipDocument:
+        doc = ChipDocument.find_one(
+            ChipDocument.project_id == project_id,
+            ChipDocument.chip_id == chip_id,
+        ).run()
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Chip not found")
+        return doc
+
+    def get_chip_note(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        cooldown_id: str | None = None,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+    ) -> NoteModel:
+        from qdash.api.services.note_service import NoteService
+
+        doc = self._get_chip_document(project_id=project_id, chip_id=chip_id)
+        scope = NoteService._resolve_metric_note_scope(
+            project_id=project_id,
+            chip_id=chip_id,
+            cooldown_id=cooldown_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
+        if scope.scope_type == "global":
+            return doc.note
+
+        scoped_doc = ChipNoteDocument.find_one(
+            ChipNoteDocument.project_id == project_id,
+            ChipNoteDocument.chip_id == chip_id,
+            ChipNoteDocument.scope_key == scope.scope_key,
+        ).run()
+        if scoped_doc is None:
+            return NoteModel()
+        return scoped_doc.note
+
+    def upsert_chip_note(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        content: str,
+        username: str,
+        cooldown_id: str | None = None,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+    ) -> NoteModel:
+        from qdash.api.services.note_service import NoteService
+
+        doc = self._get_chip_document(project_id=project_id, chip_id=chip_id)
+        scope = NoteService._resolve_metric_note_scope(
+            project_id=project_id,
+            chip_id=chip_id,
+            cooldown_id=cooldown_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
+        note = NoteModel(content=content, updated_by=username, updated_at=now())
+        if scope.scope_type == "global":
+            doc.note = note
+            doc.system_info.update_time()
+            doc.save()
+            return note
+
+        scoped_doc = ChipNoteDocument.find_one(
+            ChipNoteDocument.project_id == project_id,
+            ChipNoteDocument.chip_id == chip_id,
+            ChipNoteDocument.scope_key == scope.scope_key,
+        ).run()
+        if scoped_doc is None:
+            scoped_doc = ChipNoteDocument(
+                project_id=project_id,
+                chip_id=chip_id,
+                note=note,
+                scope_type=scope.scope_type,
+                scope_key=scope.scope_key,
+                cooldown_id=scope.cooldown_id,
+                scope_started_at=scope.started_at,
+                scope_ended_at=scope.ended_at,
+                scope_source=scope.source,
+            )
+            scoped_doc.insert()
+        else:
+            scoped_doc.note = note
+            scoped_doc.scope_type = scope.scope_type
+            scoped_doc.cooldown_id = scope.cooldown_id
+            scoped_doc.scope_started_at = scope.started_at
+            scoped_doc.scope_ended_at = scope.ended_at
+            scoped_doc.scope_source = scope.source
+            scoped_doc.system_info.update_time()
+            scoped_doc.save()
+        return note
+
+    def delete_chip_note(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        cooldown_id: str | None = None,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+    ) -> SuccessResponse:
+        from qdash.api.services.note_service import NoteService
+
+        doc = self._get_chip_document(project_id=project_id, chip_id=chip_id)
+        scope = NoteService._resolve_metric_note_scope(
+            project_id=project_id,
+            chip_id=chip_id,
+            cooldown_id=cooldown_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
+        if scope.scope_type == "global":
+            doc.note = NoteModel()
+            doc.system_info.update_time()
+            doc.save()
+            return SuccessResponse(message="Chip note cleared")
+
+        scoped_doc = ChipNoteDocument.find_one(
+            ChipNoteDocument.project_id == project_id,
+            ChipNoteDocument.chip_id == chip_id,
+            ChipNoteDocument.scope_key == scope.scope_key,
+        ).run()
+        if scoped_doc is not None:
+            scoped_doc.delete()
+        return SuccessResponse(message="Chip note cleared")
 
     # ---------- chip deletion ----------
 

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardPageContent } from "@/components/features/dashboard/DashboardPageContent";
@@ -9,6 +9,9 @@ const mockSetStartDate = vi.fn();
 const mockSetEndDate = vi.fn();
 const mockSetQuickRange = vi.fn();
 const mockForumPosts = vi.hoisted(() => vi.fn<() => unknown[]>(() => []));
+const mockCurrentCooldownId = vi.hoisted(() => vi.fn<() => string | null>(() => null));
+const mockCooldowns = vi.hoisted(() => vi.fn<() => unknown[]>(() => []));
+const mockListForumPosts = vi.hoisted(() => vi.fn());
 
 vi.mock("@/client/chip/chip", () => ({
   useListChips: () => ({
@@ -25,7 +28,7 @@ vi.mock("@/client/chip/chip", () => ({
         chip_id: "chip-1",
         size: 1,
         topology_id: "test-topology",
-        current_cooldown_id: null,
+        current_cooldown_id: mockCurrentCooldownId(),
         note: null,
       },
     },
@@ -34,14 +37,17 @@ vi.mock("@/client/chip/chip", () => ({
 
 vi.mock("@/client/cooldown/cooldown", () => ({
   useListCooldowns: () => ({
-    data: { data: { cooldowns: [] } },
+    data: { data: { cooldowns: mockCooldowns() } },
   }),
 }));
 
 vi.mock("@/client/forum/forum", () => ({
-  useListForumPosts: () => ({
-    data: { data: { posts: mockForumPosts(), total: 0, skip: 0, limit: 200 } },
-  }),
+  useListForumPosts: (params: unknown, options: unknown) => {
+    mockListForumPosts(params, options);
+    return {
+      data: { data: { posts: mockForumPosts(), total: 0, skip: 0, limit: 200 } },
+    };
+  },
 }));
 
 vi.mock("@/client/metrics/metrics", () => ({
@@ -201,8 +207,8 @@ vi.mock("@/components/features/dashboard/DashboardSummaryTable", () => ({
   DashboardSummaryTable: () => <div>SummaryTable</div>,
 }));
 
-vi.mock("@/components/features/dashboard/DashboardChipNoteModal", () => ({
-  DashboardChipNoteModal: () => <div data-testid="chip-note-modal" />,
+vi.mock("@/components/features/dashboard/DashboardChipNoteCard", () => ({
+  DashboardChipNoteCard: () => <div data-testid="chip-note-card" />,
 }));
 
 vi.mock("@/components/features/dashboard/DashboardTargetNoteModal", () => ({
@@ -255,10 +261,37 @@ describe("DashboardPageContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockForumPosts.mockReturnValue([]);
+    mockCurrentCooldownId.mockReturnValue(null);
+    mockCooldowns.mockReturnValue([]);
   });
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("filters dashboard forum markers by the active cool-down", async () => {
+    mockCurrentCooldownId.mockReturnValue("cd-active");
+    mockCooldowns.mockReturnValue([
+      {
+        cooldown_id: "cd-active",
+        started_at: "2026-06-01T00:00:00Z",
+        ended_at: null,
+      },
+    ]);
+
+    render(<DashboardPageContent />);
+
+    await waitFor(() => {
+      expect(mockListForumPosts).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          chip_id: "chip-1",
+          cooldown_id: "cd-active",
+          status: null,
+          limit: 200,
+        }),
+        expect.anything(),
+      );
+    });
   });
 
   it("maps forum labels to dashboard marker labels", () => {

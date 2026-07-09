@@ -19,4 +19,12 @@ task: string;
  * Date in YYYYMMDD format
  */
 date: string;
+/**
+ * Inclusive start time lower bound
+ */
+start_at?: string | null;
+/**
+ * Exclusive end time upper bound
+ */
+end_at?: string | null;
 };
