@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExecutionPageContent } from "@/components/features/execution/ExecutionPageContent";
 
 const mockCancelMutate = vi.fn();
+const mockToastSuccess = vi.fn();
+const mockToastError = vi.fn();
 
 vi.mock("@/client/chip/chip", () => ({
   useListChips: () => ({
@@ -65,6 +67,15 @@ vi.mock("@/hooks/useUrlState", () => ({
   }),
 }));
 
+vi.mock("@/components/ui/Toast", () => ({
+  useToast: () => ({
+    success: mockToastSuccess,
+    error: mockToastError,
+    info: vi.fn(),
+    warning: vi.fn(),
+  }),
+}));
+
 vi.mock("next/link", () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => (
     <a href={href}>{children}</a>
@@ -119,6 +130,8 @@ function openSidebarAndClickCancel() {
 describe("ExecutionPageContent cancel confirmation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset the mutate implementation so callback-driven tests don't leak into others.
+    mockCancelMutate.mockReset();
   });
 
   afterEach(() => {
@@ -163,5 +176,39 @@ describe("ExecutionPageContent cancel confirmation", () => {
       ),
     ).toBeNull();
     expect(mockCancelMutate).not.toHaveBeenCalled();
+  });
+
+  it("shows a success toast when the cancellation request succeeds", () => {
+    mockCancelMutate.mockImplementation((_vars, { onSuccess }) => onSuccess());
+    render(<ExecutionPageContent />);
+
+    openSidebarAndClickCancel();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Execution" }));
+
+    expect(mockToastSuccess).toHaveBeenCalledWith("Cancellation requested successfully");
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("shows an error toast with the server detail when cancellation fails", () => {
+    mockCancelMutate.mockImplementation((_vars, { onError }) =>
+      onError({ response: { data: { detail: "Execution already finished" } } }),
+    );
+    render(<ExecutionPageContent />);
+
+    openSidebarAndClickCancel();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Execution" }));
+
+    expect(mockToastError).toHaveBeenCalledWith("Execution already finished");
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("shows a fallback error toast when the server provides no detail", () => {
+    mockCancelMutate.mockImplementation((_vars, { onError }) => onError({}));
+    render(<ExecutionPageContent />);
+
+    openSidebarAndClickCancel();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Execution" }));
+
+    expect(mockToastError).toHaveBeenCalledWith("Failed to cancel execution");
   });
 });
