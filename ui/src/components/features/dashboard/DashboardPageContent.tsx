@@ -54,12 +54,27 @@ type MetricMap = { [key: string]: MetricValueLike };
 
 const FALLBACK_COLORS = ["#440154", "#31688e", "#35b779", "#fde724"];
 
-const FORUM_LABEL_PRIORITY = ["discussion", "mtg", "info", "resolved"] as const;
+const FORUM_LABEL_PRIORITY = [
+  "anomaly",
+  "review",
+  "discussion",
+  "mtg",
+  "info",
+  "resolved",
+] as const;
 
 function representativeForumLabel(labels: string[] | undefined): string {
   const values = new Set(labels ?? []);
-  const label = FORUM_LABEL_PRIORITY.find((item) => values.has(item)) ?? "info";
-  return label === "mtg" ? "discussion" : label;
+  const label = FORUM_LABEL_PRIORITY.find((item) => values.has(item));
+  if (label === "discussion" || label === "mtg" || label === "info" || label === "resolved") {
+    return "review";
+  }
+  return label ?? "review";
+}
+
+function mergeForumMarkerLabel(current: string | undefined, labels: string[] | undefined): string {
+  const next = representativeForumLabel(labels);
+  return current === "anomaly" || next === "anomaly" ? "anomaly" : next;
 }
 
 function coverageOf(
@@ -261,7 +276,7 @@ export function DashboardPageContent() {
     const targets: Record<string, string> = {};
     (forumPostsResponse?.data.posts ?? []).forEach((post) => {
       if (post.target_type === "qubit" && post.target_id) {
-        targets[post.target_id] = representativeForumLabel(post.labels);
+        targets[post.target_id] = mergeForumMarkerLabel(targets[post.target_id], post.labels);
       }
     });
     return targets;
@@ -271,7 +286,7 @@ export function DashboardPageContent() {
     const targets: Record<string, string> = {};
     (forumPostsResponse?.data.posts ?? []).forEach((post) => {
       if (post.target_type === "coupling" && post.target_id) {
-        targets[post.target_id] = representativeForumLabel(post.labels);
+        targets[post.target_id] = mergeForumMarkerLabel(targets[post.target_id], post.labels);
       }
     });
     return targets;
