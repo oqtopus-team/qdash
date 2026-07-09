@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import { ExternalLink, MessageSquarePlus, Pencil, Save, StickyNote, X } from "lucide-react";
@@ -142,11 +142,23 @@ export function DashboardTargetNoteModal({
 
   const [mode, setMode] = useState<"view" | "edit">(existing ? "view" : "edit");
   const [draft, setDraft] = useState(existing?.content ?? "");
+  const previousTargetIdRef = useRef(targetId);
 
   useEffect(() => {
-    setDraft(existing?.content ?? "");
-    setMode(existing ? "view" : "edit");
-  }, [existing, targetId]);
+    const targetChanged = previousTargetIdRef.current !== targetId;
+    previousTargetIdRef.current = targetId;
+
+    if (targetChanged) {
+      setDraft(existing?.content ?? "");
+      setMode(existing ? "view" : "edit");
+      return;
+    }
+
+    if (mode === "view") {
+      setDraft(existing?.content ?? "");
+      setMode(existing ? "view" : "edit");
+    }
+  }, [existing, mode, targetId]);
 
   const invalidate = () =>
     queryClient.invalidateQueries({
@@ -200,7 +212,7 @@ export function DashboardTargetNoteModal({
     <div
       className="modal modal-open"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (mode === "view" && e.target === e.currentTarget) onClose();
       }}
     >
       <div className="modal-box w-full max-w-2xl p-0 overflow-hidden">
