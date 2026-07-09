@@ -172,15 +172,22 @@ def list_forum_posts(
         int | None,
         Query(ge=1, description="Filter by project-scoped forum thread number"),
     ] = None,
-    is_closed: Annotated[
-        bool | None,
+    status: Annotated[
+        str | None,
         Query(
+            pattern=r"^(open|investigating|identified|resolved)$",
             description=(
-                "Filter by closed status. Default false (open only). "
-                "Set to true for closed, or omit/null for all."
-            )
+                "Filter by workflow status. Default open. "
+                "Use null/omit at the client layer for all."
+            ),
         ),
-    ] = False,
+    ] = "open",
+    q: Annotated[
+        str | None,
+        Query(
+            max_length=128, description="Search title, content, number, target, assignee, or status"
+        ),
+    ] = None,
 ) -> ListForumPostsResponse:
     """List root forum threads for the active project."""
     return service.list_posts(
@@ -194,7 +201,8 @@ def list_forum_posts(
         target_id=target_id,
         cooldown_id=cooldown_id,
         number=number,
-        is_closed=is_closed,
+        status=status,
+        q=q,
     )
 
 
@@ -225,6 +233,7 @@ def create_forum_post(
         target_id=body.target_id,
         cooldown_id=body.cooldown_id,
         assignee_username=body.assignee_username,
+        status=body.status,
     )
 
 
@@ -424,6 +433,7 @@ def update_forum_post(
     )
     update_cooldown_context = "cooldown_id" in body.model_fields_set
     update_assignee_context = "assignee_username" in body.model_fields_set
+    update_status_context = "status" in body.model_fields_set
     return service.update_post(
         project_id=ctx.project_id,
         post_id=post_id,
@@ -438,9 +448,11 @@ def update_forum_post(
         target_id=body.target_id,
         cooldown_id=body.cooldown_id,
         assignee_username=body.assignee_username,
+        status=body.status,
         update_cooldown_context=update_cooldown_context,
         update_target_context=update_target_context,
         update_assignee_context=update_assignee_context,
+        update_status_context=update_status_context,
         role=ctx.role,
     )
 
