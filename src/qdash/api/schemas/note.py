@@ -4,13 +4,19 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from qdash.datamodel.note import NoteModel
+from qdash.datamodel.note import NoteCommentModel, NoteModel
 
 
 class NoteUpsertRequest(BaseModel):
     """Body for upserting a note."""
 
     content: str = Field(..., max_length=5000, description="Note text content")
+
+
+class NoteCommentRequest(BaseModel):
+    """Body for creating or updating a note comment."""
+
+    content: str = Field(..., max_length=5000, description="Comment text content")
 
 
 class TaskNoteEntry(BaseModel):
@@ -30,6 +36,7 @@ class TargetNoteEntry(BaseModel):
 
     target_id: str
     note: NoteModel = Field(default_factory=NoteModel)
+    comments: list[NoteCommentModel] = Field(default_factory=list)
     metric_notes: dict[str, NoteModel] = Field(default_factory=dict)
 
 

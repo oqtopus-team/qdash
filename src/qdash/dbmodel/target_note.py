@@ -12,7 +12,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 
-from qdash.datamodel.note import NoteModel
+from qdash.datamodel.note import NoteCommentModel, NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 TargetNoteTargetType = Literal["qubit", "coupling"]
@@ -34,6 +34,9 @@ class TargetNoteDocument(Document):
     target_type: str = Field(..., description="qubit | coupling")
     target_id: str = Field(..., description="Qubit id or coupling id")
     note: NoteModel = Field(default_factory=NoteModel, description="Current note value")
+    comments: list[NoteCommentModel] = Field(
+        default_factory=list, description="User-authored comments on this target summary"
+    )
 
     scope_type: str = Field(..., description="cooldown | time_range | global")
     scope_key: str = Field(..., description="Stable key unique within the scope")

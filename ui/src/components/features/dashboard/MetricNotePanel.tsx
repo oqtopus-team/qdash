@@ -14,7 +14,7 @@ import {
   useUpsertCouplingNote,
   useUpsertQubitNote,
 } from "@/client/note/note";
-import type { GetChipNotesSummaryParams } from "@/schemas";
+import type { GetChipNotesSummaryParams, NoteCommentModel } from "@/schemas";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor, type MentionCandidate } from "@/components/ui/MarkdownEditor";
 import { formatDateTime } from "@/lib/utils/datetime";
@@ -34,6 +34,7 @@ export interface TargetNoteEntry {
   content: string;
   username: string;
   updatedAt: string;
+  comments?: NoteCommentModel[];
 }
 
 export interface NoteEntryWithMetric extends NoteEntry {

@@ -17,11 +17,12 @@ from qdash.api.lib.project import (
 from qdash.api.schemas.note import (
     ChipNotesSummaryResponse,
     ListNoteEventsResponse,
+    NoteCommentRequest,
     NoteUpsertRequest,
 )
 from qdash.api.schemas.success import SuccessResponse
 from qdash.api.services.note_service import NoteService
-from qdash.datamodel.note import NoteModel
+from qdash.datamodel.note import NoteCommentModel, NoteModel
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -98,6 +99,121 @@ def delete_qubit_note(
         chip_id=chip_id,
         qid=qid,
         username=ctx.user.username,
+        cooldown_id=cooldown_id,
+        start_at=start_at,
+        end_at=end_at,
+    )
+
+
+@router.post(
+    "/chips/{chip_id}/qubits/{qid}/note/comments",
+    summary="Create a target summary note entry for a qubit",
+    operation_id="createQubitNoteComment",
+    response_model=NoteCommentModel,
+)
+def create_qubit_note_comment(
+    chip_id: str,
+    qid: str,
+    body: NoteCommentRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[NoteService, Depends(get_note_service)],
+    cooldown_id: Annotated[
+        str | None,
+        Query(description="Optional explicit cool-down scope identifier"),
+    ] = None,
+    start_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope start"),
+    ] = None,
+    end_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope end"),
+    ] = None,
+) -> NoteCommentModel:
+    return service.create_qubit_note_comment(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        qid=qid,
+        content=body.content,
+        username=ctx.user.username,
+        cooldown_id=cooldown_id,
+        start_at=start_at,
+        end_at=end_at,
+    )
+
+
+@router.put(
+    "/chips/{chip_id}/qubits/{qid}/note/comments/{comment_id}",
+    summary="Update a target summary note entry for a qubit",
+    operation_id="updateQubitNoteComment",
+    response_model=NoteCommentModel,
+)
+def update_qubit_note_comment(
+    chip_id: str,
+    qid: str,
+    comment_id: str,
+    body: NoteCommentRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[NoteService, Depends(get_note_service)],
+    cooldown_id: Annotated[
+        str | None,
+        Query(description="Optional explicit cool-down scope identifier"),
+    ] = None,
+    start_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope start"),
+    ] = None,
+    end_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope end"),
+    ] = None,
+) -> NoteCommentModel:
+    return service.update_qubit_note_comment(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        qid=qid,
+        comment_id=comment_id,
+        content=body.content,
+        username=ctx.user.username,
+        actor_system_role=ctx.user.system_role,
+        cooldown_id=cooldown_id,
+        start_at=start_at,
+        end_at=end_at,
+    )
+
+
+@router.delete(
+    "/chips/{chip_id}/qubits/{qid}/note/comments/{comment_id}",
+    summary="Delete a target summary note entry for a qubit",
+    operation_id="deleteQubitNoteComment",
+    response_model=SuccessResponse,
+)
+def delete_qubit_note_comment(
+    chip_id: str,
+    qid: str,
+    comment_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[NoteService, Depends(get_note_service)],
+    cooldown_id: Annotated[
+        str | None,
+        Query(description="Optional explicit cool-down scope identifier"),
+    ] = None,
+    start_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope start"),
+    ] = None,
+    end_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope end"),
+    ] = None,
+) -> SuccessResponse:
+    return service.delete_qubit_note_comment(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        qid=qid,
+        comment_id=comment_id,
+        username=ctx.user.username,
+        actor_system_role=ctx.user.system_role,
         cooldown_id=cooldown_id,
         start_at=start_at,
         end_at=end_at,
@@ -251,6 +367,121 @@ def delete_coupling_note(
         chip_id=chip_id,
         coupling_id=coupling_id,
         username=ctx.user.username,
+        cooldown_id=cooldown_id,
+        start_at=start_at,
+        end_at=end_at,
+    )
+
+
+@router.post(
+    "/chips/{chip_id}/couplings/{coupling_id}/note/comments",
+    summary="Create a target summary note entry for a coupling",
+    operation_id="createCouplingNoteComment",
+    response_model=NoteCommentModel,
+)
+def create_coupling_note_comment(
+    chip_id: str,
+    coupling_id: str,
+    body: NoteCommentRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[NoteService, Depends(get_note_service)],
+    cooldown_id: Annotated[
+        str | None,
+        Query(description="Optional explicit cool-down scope identifier"),
+    ] = None,
+    start_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope start"),
+    ] = None,
+    end_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope end"),
+    ] = None,
+) -> NoteCommentModel:
+    return service.create_coupling_note_comment(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        coupling_id=coupling_id,
+        content=body.content,
+        username=ctx.user.username,
+        cooldown_id=cooldown_id,
+        start_at=start_at,
+        end_at=end_at,
+    )
+
+
+@router.put(
+    "/chips/{chip_id}/couplings/{coupling_id}/note/comments/{comment_id}",
+    summary="Update a target summary note entry for a coupling",
+    operation_id="updateCouplingNoteComment",
+    response_model=NoteCommentModel,
+)
+def update_coupling_note_comment(
+    chip_id: str,
+    coupling_id: str,
+    comment_id: str,
+    body: NoteCommentRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[NoteService, Depends(get_note_service)],
+    cooldown_id: Annotated[
+        str | None,
+        Query(description="Optional explicit cool-down scope identifier"),
+    ] = None,
+    start_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope start"),
+    ] = None,
+    end_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope end"),
+    ] = None,
+) -> NoteCommentModel:
+    return service.update_coupling_note_comment(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        coupling_id=coupling_id,
+        comment_id=comment_id,
+        content=body.content,
+        username=ctx.user.username,
+        actor_system_role=ctx.user.system_role,
+        cooldown_id=cooldown_id,
+        start_at=start_at,
+        end_at=end_at,
+    )
+
+
+@router.delete(
+    "/chips/{chip_id}/couplings/{coupling_id}/note/comments/{comment_id}",
+    summary="Delete a target summary note entry for a coupling",
+    operation_id="deleteCouplingNoteComment",
+    response_model=SuccessResponse,
+)
+def delete_coupling_note_comment(
+    chip_id: str,
+    coupling_id: str,
+    comment_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[NoteService, Depends(get_note_service)],
+    cooldown_id: Annotated[
+        str | None,
+        Query(description="Optional explicit cool-down scope identifier"),
+    ] = None,
+    start_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope start"),
+    ] = None,
+    end_at: Annotated[
+        datetime | None,
+        Query(description="Optional time-range scope end"),
+    ] = None,
+) -> SuccessResponse:
+    return service.delete_coupling_note_comment(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        coupling_id=coupling_id,
+        comment_id=comment_id,
+        username=ctx.user.username,
+        actor_system_role=ctx.user.system_role,
         cooldown_id=cooldown_id,
         start_at=start_at,
         end_at=end_at,
