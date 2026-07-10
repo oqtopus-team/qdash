@@ -24,6 +24,9 @@ interface ChipSelectorProps {
 
 const PLACEHOLDER = "Select a chip";
 
+/**
+ * Component for selecting a chip from available chips
+ */
 export function ChipSelector({ selectedChip, onChipSelect }: ChipSelectorProps) {
   // Use lightweight endpoint (~0.2KB vs ~300KB with embedded data)
   const { data: chips, isLoading, isError } = useListChips();
