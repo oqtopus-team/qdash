@@ -12,13 +12,13 @@ import {
   MessageSquare,
   Pencil,
   Plus,
-  Search,
   Settings,
   Tag,
   Trash2,
   Unlock,
   UserRound,
   X,
+  XCircle,
 } from "lucide-react";
 
 import { useListChips } from "@/client/chip/chip";
@@ -41,7 +41,9 @@ import {
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { PageContainer } from "@/components/ui/PageContainer";
+import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
@@ -812,6 +814,9 @@ export function ForumPageContent() {
   const [labelFilter, setLabelFilter] = useState<string>(
     () => searchParams.get("forum_label") ?? "all",
   );
+  const [cooldownFilter, setCooldownFilter] = useState(
+    () => searchParams.get("forum_cooldown") ?? "all",
+  );
   const [status, setStatus] = useState<StatusFilter>(() =>
     parseForumStatus(searchParams.get("forum_status")),
   );
@@ -847,6 +852,7 @@ export function ForumPageContent() {
     limit: PAGE_SIZE,
     category: category === "all" ? undefined : category,
     label: labelFilter === "all" ? undefined : labelFilter,
+    cooldown_id: cooldownFilter === "all" ? undefined : cooldownFilter,
     status: status === "all" ? null : status,
     q: searchQuery.trim() || undefined,
   };
@@ -865,6 +871,19 @@ export function ForumPageContent() {
       categoriesResponse?.data.categories.map(toForumCategoryDefinition) ??
       DEFAULT_FORUM_CATEGORIES,
     [categoriesResponse?.data.categories],
+  );
+
+  const { data: cooldownsResponse } = useListCooldowns(undefined, {
+    query: { staleTime: 60_000 },
+  });
+  const cooldowns = useMemo(
+    () =>
+      [...(cooldownsResponse?.data.cooldowns ?? [])].sort((a, b) => {
+        const aTime = a.started_at ? new Date(a.started_at).getTime() : 0;
+        const bTime = b.started_at ? new Date(b.started_at).getTime() : 0;
+        return bTime - aTime || b.cooldown_id.localeCompare(a.cooldown_id);
+      }),
+    [cooldownsResponse?.data.cooldowns],
   );
 
   const createCategoryMutation = useCreateForumCategory();
@@ -886,6 +905,7 @@ export function ForumPageContent() {
     nextState: {
       category?: CategoryFilter;
       labelFilter?: string;
+      cooldownFilter?: string;
       status?: StatusFilter;
       searchQuery?: string;
       skip?: number;
@@ -893,6 +913,7 @@ export function ForumPageContent() {
   ) => {
     const nextCategory = nextState.category ?? category;
     const nextLabelFilter = nextState.labelFilter ?? labelFilter;
+    const nextCooldownFilter = nextState.cooldownFilter ?? cooldownFilter;
     const nextStatus = nextState.status ?? status;
     const nextSearchQuery = nextState.searchQuery ?? searchQuery;
     const nextSkip = nextState.skip ?? skip;
@@ -901,6 +922,7 @@ export function ForumPageContent() {
     if (page > 1) next.set("forum_page", String(page));
     if (nextCategory !== "all") next.set("forum_category", nextCategory);
     if (nextLabelFilter !== "all") next.set("forum_label", nextLabelFilter);
+    if (nextCooldownFilter !== "all") next.set("forum_cooldown", nextCooldownFilter);
     if (nextStatus !== "open") next.set("forum_status", nextStatus);
     if (nextSearchQuery.trim()) next.set("forum_q", nextSearchQuery.trim());
     return next.toString();
@@ -909,6 +931,7 @@ export function ForumPageContent() {
   const replaceListQuery = (nextState: {
     category?: CategoryFilter;
     labelFilter?: string;
+    cooldownFilter?: string;
     status?: StatusFilter;
     searchQuery?: string;
     skip?: number;
@@ -917,6 +940,7 @@ export function ForumPageContent() {
     next.delete("forum_page");
     next.delete("forum_category");
     next.delete("forum_label");
+    next.delete("forum_cooldown");
     next.delete("forum_status");
     next.delete("forum_q");
     const listQuery = buildListQuery(nextState);
@@ -945,11 +969,35 @@ export function ForumPageContent() {
     replaceListQuery({ labelFilter: nextLabel, skip: 0 });
   };
 
+  const setCooldownFilterValue = (nextCooldown: string) => {
+    setCooldownFilter(nextCooldown);
+    setSkip(0);
+    replaceListQuery({ cooldownFilter: nextCooldown, skip: 0 });
+  };
+
   const setSearchFilter = (nextSearchQuery: string) => {
     setSearchQuery(nextSearchQuery);
     setSkip(0);
     replaceListQuery({ searchQuery: nextSearchQuery, skip: 0 });
   };
+
+  const clearFilters = () => {
+    setCategory("all");
+    setLabelFilter("all");
+    setCooldownFilter("all");
+    setSearchQuery("");
+    setSkip(0);
+    replaceListQuery({
+      category: "all",
+      labelFilter: "all",
+      cooldownFilter: "all",
+      searchQuery: "",
+      skip: 0,
+    });
+  };
+
+  const hasListFilters =
+    category !== "all" || labelFilter !== "all" || cooldownFilter !== "all" || !!searchQuery.trim();
 
   const setPageSkip = (nextSkip: number) => {
     const boundedSkip = Math.max(0, nextSkip);
@@ -1031,46 +1079,35 @@ export function ForumPageContent() {
         </div>
       </div>
 
-      <div className="mb-4 rounded-lg border border-base-300 bg-base-100 px-3 py-2">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setCategoryFilter("all")}
-              className={`btn btn-xs ${category === "all" ? "btn-neutral" : "btn-ghost"}`}
-            >
-              All categories
-            </button>
-            {categories.map((item) => {
-              const Icon = item.icon;
-              const active = category === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setCategoryFilter(active ? "all" : item.id)}
-                  className={`btn btn-xs gap-1 ${active ? "btn-neutral" : "btn-ghost"}`}
-                  title={item.description}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {item.shortLabel}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex min-w-0 items-center gap-2">
-            <label className="input input-bordered input-xs flex min-w-[220px] items-center gap-2">
-              <Search className="h-3.5 w-3.5 text-base-content/40" />
-              <input
-                className="min-w-0 grow"
-                value={searchQuery}
-                onChange={(event) => setSearchFilter(event.target.value)}
-                placeholder="Search threads"
-              />
-            </label>
+      <PageFiltersBar className="mb-4 sm:mb-6">
+        <PageFiltersBar.Group className="flex-1">
+          <PageFiltersBar.Item label="Search" className="sm:min-w-64 sm:flex-1">
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchFilter}
+              placeholder="Search threads"
+              className="w-full"
+            />
+          </PageFiltersBar.Item>
+          <PageFiltersBar.Item label="Category" className="sm:min-w-44">
             <select
-              className="select select-bordered select-xs w-36"
+              aria-label="Filter by category"
+              className="select select-bordered select-sm w-full"
+              value={category}
+              onChange={(event) => setCategoryFilter(event.target.value as CategoryFilter)}
+            >
+              <option value="all">All categories</option>
+              {categories.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </PageFiltersBar.Item>
+          <PageFiltersBar.Item label="Label" className="sm:min-w-40">
+            <select
+              aria-label="Filter by label"
+              className="select select-bordered select-sm w-full"
               value={labelFilter}
               onChange={(event) => setLabelFilterValue(event.target.value)}
             >
@@ -1081,39 +1118,33 @@ export function ForumPageContent() {
                 </option>
               ))}
             </select>
-          </div>
-        </div>
-
-        {(category !== "all" || labelFilter !== "all" || searchQuery.trim()) && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-base-300 pt-2 text-xs text-base-content/55">
-            <span>Filtered by</span>
-            {category !== "all" && (
-              <button
-                className="badge badge-outline gap-1"
-                onClick={() => setCategoryFilter("all")}
-              >
-                {getForumCategory(category, categories).label}
-                <X className="h-3 w-3" />
-              </button>
-            )}
-            {labelFilter !== "all" && (
-              <button
-                className="badge badge-outline gap-1"
-                onClick={() => setLabelFilterValue("all")}
-              >
-                {getForumLabel(labelFilter).label}
-                <X className="h-3 w-3" />
-              </button>
-            )}
-            {searchQuery.trim() && (
-              <button className="badge badge-outline gap-1" onClick={() => setSearchFilter("")}>
-                search: {searchQuery.trim()}
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
+          </PageFiltersBar.Item>
+          <PageFiltersBar.Item label="Cool-down" className="sm:min-w-52">
+            <select
+              aria-label="Filter by cool-down"
+              className="select select-bordered select-sm w-full"
+              value={cooldownFilter}
+              onChange={(event) => setCooldownFilterValue(event.target.value)}
+            >
+              <option value="all">All cool-downs</option>
+              {cooldowns.map((cooldown) => (
+                <option key={cooldown.cooldown_id} value={cooldown.cooldown_id}>
+                  {cooldown.cooldown_id}
+                  {cooldown.ended_at ? "" : " (active)"}
+                </option>
+              ))}
+            </select>
+          </PageFiltersBar.Item>
+        </PageFiltersBar.Group>
+        {hasListFilters && (
+          <PageFiltersBar.Group position="end">
+            <button type="button" className="btn btn-ghost btn-sm gap-1" onClick={clearFilters}>
+              <XCircle className="h-4 w-4" />
+              Clear
+            </button>
+          </PageFiltersBar.Group>
         )}
-      </div>
+      </PageFiltersBar>
 
       {showCategoryManager && isOwner && (
         <div className="card bg-base-200 shadow-lg mb-4">
