@@ -3,21 +3,32 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import { ExternalLink, MessageSquarePlus, Pencil, Save, StickyNote, X } from "lucide-react";
+import {
+  ExternalLink,
+  MessageSquarePlus,
+  Pencil,
+  Save,
+  Send,
+  StickyNote,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useListForumPosts } from "@/client/forum/forum";
 import {
   getGetChipNotesSummaryQueryKey,
-  useDeleteCouplingNote,
-  useDeleteQubitNote,
-  useUpsertCouplingNote,
-  useUpsertQubitNote,
+  useCreateCouplingNoteComment,
+  useCreateQubitNoteComment,
+  useDeleteCouplingNoteComment,
+  useDeleteQubitNoteComment,
+  useUpdateCouplingNoteComment,
+  useUpdateQubitNoteComment,
 } from "@/client/note/note";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor, type MentionCandidate } from "@/components/ui/MarkdownEditor";
 import { formatDateTime } from "@/lib/utils/datetime";
-import type { GetChipNotesSummaryParams } from "@/schemas";
+import type { GetChipNotesSummaryParams, NoteCommentModel, SystemRole } from "@/schemas";
 
 import { formatForumPostTitle, getForumLabel } from "../forum/categories";
 
@@ -26,6 +37,7 @@ export interface TargetNoteEntry {
   content: string;
   username: string;
   updatedAt: string;
+  comments?: NoteCommentModel[];
 }
 
 interface DashboardTargetNoteModalProps {
@@ -35,6 +47,8 @@ interface DashboardTargetNoteModalProps {
   noteScopeParams?: GetChipNotesSummaryParams;
   existing?: TargetNoteEntry;
   mentionCandidates?: MentionCandidate[];
+  currentUsername?: string | null;
+  currentSystemRole?: SystemRole | null;
   onClose: () => void;
 }
 
@@ -113,18 +127,24 @@ export function DashboardTargetNoteModal({
   cooldownId,
   noteScopeParams,
   existing,
-  mentionCandidates,
+  mentionCandidates = [],
+  currentUsername,
+  currentSystemRole,
   onClose,
 }: DashboardTargetNoteModalProps) {
   const queryClient = useQueryClient();
   const isCoupling = targetId.includes("-");
-  const upsertQubit = useUpsertQubitNote();
-  const upsertCoupling = useUpsertCouplingNote();
-  const deleteQubit = useDeleteQubitNote();
-  const deleteCoupling = useDeleteCouplingNote();
+  const createQubitComment = useCreateQubitNoteComment();
+  const createCouplingComment = useCreateCouplingNoteComment();
+  const updateQubitComment = useUpdateQubitNoteComment();
+  const updateCouplingComment = useUpdateCouplingNoteComment();
+  const deleteQubitComment = useDeleteQubitNoteComment();
+  const deleteCouplingComment = useDeleteCouplingNoteComment();
   const mutationPending = isCoupling
-    ? upsertCoupling.isPending || deleteCoupling.isPending
-    : upsertQubit.isPending || deleteQubit.isPending;
+    ? createCouplingComment.isPending ||
+      updateCouplingComment.isPending ||
+      deleteCouplingComment.isPending
+    : createQubitComment.isPending || updateQubitComment.isPending || deleteQubitComment.isPending;
   const { data: forumPostsResponse } = useListForumPosts(
     {
       chip_id: chipId,
@@ -140,8 +160,9 @@ export function DashboardTargetNoteModal({
     forumPostsResponse?.data.posts.filter((post) => matchesForumTarget(post, chipId, targetId)) ??
     [];
 
-  const [mode, setMode] = useState<"view" | "edit">(existing ? "view" : "edit");
-  const [draft, setDraft] = useState(existing?.content ?? "");
+  const [entryDraft, setEntryDraft] = useState("");
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editingEntryDraft, setEditingEntryDraft] = useState("");
   const previousTargetIdRef = useRef(targetId);
 
   useEffect(() => {
@@ -149,85 +170,113 @@ export function DashboardTargetNoteModal({
     previousTargetIdRef.current = targetId;
 
     if (targetChanged) {
-      setDraft(existing?.content ?? "");
-      setMode(existing ? "view" : "edit");
-      return;
+      setEntryDraft("");
+      setEditingEntryId(null);
+      setEditingEntryDraft("");
     }
-
-    if (mode === "view") {
-      setDraft(existing?.content ?? "");
-      setMode(existing ? "view" : "edit");
-    }
-  }, [existing, mode, targetId]);
+  }, [targetId]);
 
   const invalidate = () =>
     queryClient.invalidateQueries({
       queryKey: getGetChipNotesSummaryQueryKey(chipId, noteScopeParams),
     });
 
-  const handleSave = async () => {
-    const trimmed = draft.trim();
-    if (draft.length > 5000) return;
-    if (!trimmed) {
-      if (!existing) return;
-      if (isCoupling) {
-        await deleteCoupling.mutateAsync({
-          chipId,
-          couplingId: targetId,
-          params: noteScopeParams,
-        });
-      } else {
-        await deleteQubit.mutateAsync({
-          chipId,
-          qid: targetId,
-          params: noteScopeParams,
-        });
-      }
-      await invalidate();
-      onClose();
-      return;
-    }
+  const handleCreateEntry = async () => {
+    const trimmed = entryDraft.trim();
+    if (!trimmed || entryDraft.length > 5000) return;
     if (isCoupling) {
-      await upsertCoupling.mutateAsync({
+      await createCouplingComment.mutateAsync({
         chipId,
         couplingId: targetId,
-        data: { content: draft },
+        data: { content: entryDraft },
         params: noteScopeParams,
       });
     } else {
-      await upsertQubit.mutateAsync({
+      await createQubitComment.mutateAsync({
         chipId,
         qid: targetId,
-        data: { content: draft },
+        data: { content: entryDraft },
         params: noteScopeParams,
       });
     }
+    setEntryDraft("");
     await invalidate();
-    onClose();
   };
 
-  const isTooLong = draft.length > 5000;
+  const handleUpdateEntry = async (entryId: string) => {
+    const trimmed = editingEntryDraft.trim();
+    if (!trimmed || editingEntryDraft.length > 5000) return;
+    if (isCoupling) {
+      await updateCouplingComment.mutateAsync({
+        chipId,
+        couplingId: targetId,
+        commentId: entryId,
+        data: { content: editingEntryDraft },
+        params: noteScopeParams,
+      });
+    } else {
+      await updateQubitComment.mutateAsync({
+        chipId,
+        qid: targetId,
+        commentId: entryId,
+        data: { content: editingEntryDraft },
+        params: noteScopeParams,
+      });
+    }
+    setEditingEntryId(null);
+    setEditingEntryDraft("");
+    await invalidate();
+  };
+
+  const handleDeleteEntry = async (entryId: string) => {
+    if (isCoupling) {
+      await deleteCouplingComment.mutateAsync({
+        chipId,
+        couplingId: targetId,
+        commentId: entryId,
+        params: noteScopeParams,
+      });
+    } else {
+      await deleteQubitComment.mutateAsync({
+        chipId,
+        qid: targetId,
+        commentId: entryId,
+        params: noteScopeParams,
+      });
+    }
+    if (editingEntryId === entryId) {
+      setEditingEntryId(null);
+      setEditingEntryDraft("");
+    }
+    await invalidate();
+  };
+
+  const entries = existing?.comments ?? [];
+  const isEntryTooLong = entryDraft.length > 5000;
+  const isEditingEntryTooLong = editingEntryDraft.length > 5000;
 
   return (
     <div
       className="modal modal-open"
       onClick={(e) => {
-        if (mode === "view" && e.target === e.currentTarget) onClose();
+        if (!entryDraft.trim() && !editingEntryId && e.target === e.currentTarget) {
+          onClose();
+        }
       }}
     >
-      <div className="modal-box w-full max-w-2xl p-0 overflow-hidden">
+      <div className="modal-box w-full max-w-3xl p-0 overflow-hidden">
         <div className="px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-lg font-bold">
               <StickyNote className="h-5 w-5 text-warning" />
               <span className="truncate">
-                Pinned summary · {formatTarget(targetId)}
+                Summary notes · {formatTarget(targetId)}
                 {cooldownId ? ` · ${cooldownId}` : ""}
               </span>
             </div>
             <p className="text-sm text-base-content/60 mt-1">
-              Keep this as a short index. Use forum topics for separate issues, images, and
-              discussion.
+              Post target-level observations with author history. Use forum topics for separate
+              discussions and images.
             </p>
           </div>
           <button
@@ -240,7 +289,7 @@ export function DashboardTargetNoteModal({
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="max-h-[calc(100vh-9rem)] overflow-y-auto p-5 space-y-5">
           <div className="rounded-md bg-base-200/60 border border-base-300 p-3 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -300,72 +349,162 @@ export function DashboardTargetNoteModal({
             )}
           </div>
 
-          {mode === "view" && existing ? (
-            <div className="space-y-3">
-              <div className="rounded-md bg-base-100 border border-base-300 p-3">
-                <MarkdownContent content={existing.content} />
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold">Note entries</h3>
+                <p className="mt-0.5 text-xs text-base-content/55">
+                  Each entry keeps its original author and latest editor.
+                </p>
               </div>
-              <div className="text-[11px] text-base-content/60 flex flex-wrap gap-x-2">
-                <span>
-                  Last edited by{" "}
-                  <span className="font-medium text-base-content/80">
-                    {existing.username || "-"}
-                  </span>
-                </span>
-                {existing.updatedAt && <span>· {formatDateTime(existing.updatedAt)}</span>}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className="btn btn-sm btn-primary gap-1"
-                  onClick={() => setMode("edit")}
-                  type="button"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  Edit
-                </button>
-              </div>
+              <span className="badge badge-outline">{entries.length}</span>
             </div>
-          ) : (
-            <>
-              <MarkdownEditor
-                value={draft}
-                onChange={setDraft}
-                onSubmit={handleSave}
-                placeholder="Pinned one-paragraph status or index. Put separate topics, images, and discussion in forum threads..."
-                rows={8}
-                disabled={mutationPending}
-                mentionCandidates={mentionCandidates}
-              />
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-base-content/50">
-                <span className={isTooLong ? "text-error" : undefined}>{draft.length} / 5000</span>
-                {existing?.updatedAt && (
-                  <span>
-                    Last edited {formatDateTime(existing.updatedAt)} by {existing.username || "-"}
-                  </span>
-                )}
-              </div>
-            </>
-          )}
-        </div>
 
-        {mode === "edit" && (
-          <div className="px-5 py-4 border-t border-base-300 flex flex-wrap justify-end gap-2">
-            <div className="flex gap-2">
-              <button className="btn btn-sm btn-ghost" onClick={onClose} type="button">
-                Cancel
-              </button>
+            {entries.length > 0 ? (
+              <ul className="space-y-3">
+                {entries.map((entry) => {
+                  const entryId = entry.comment_id ?? "";
+                  const isEditing = editingEntryId === entryId;
+                  const canModifyEntry =
+                    currentSystemRole === "admin" || entry.created_by === currentUsername;
+                  return (
+                    <li
+                      key={entryId || `${entry.created_by}-${entry.created_at}`}
+                      className="rounded-md border border-base-300 bg-base-100 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 text-xs text-base-content/60">
+                          <span className="font-medium text-base-content/80">
+                            {entry.created_by || "-"}
+                          </span>
+                          {entry.created_at && <span> · {formatDateTime(entry.created_at)}</span>}
+                          {entry.updated_at && (
+                            <span>
+                              {" "}
+                              · edited by {entry.updated_by || "-"}{" "}
+                              {formatDateTime(entry.updated_at)}
+                            </span>
+                          )}
+                        </div>
+                        {canModifyEntry && (
+                          <div className="flex shrink-0 gap-1">
+                            <button
+                              className="btn btn-ghost btn-xs btn-square"
+                              onClick={() => {
+                                setEditingEntryId(entryId);
+                                setEditingEntryDraft(entry.content ?? "");
+                              }}
+                              disabled={!entryId || mutationPending}
+                              type="button"
+                              aria-label="Edit entry"
+                              title="Edit entry"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              className="btn btn-ghost btn-xs btn-square text-error"
+                              onClick={() => handleDeleteEntry(entryId)}
+                              disabled={!entryId || mutationPending}
+                              type="button"
+                              aria-label="Delete entry"
+                              title="Delete entry"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {isEditing ? (
+                        <div className="mt-3 space-y-2">
+                          <MarkdownEditor
+                            value={editingEntryDraft}
+                            onChange={setEditingEntryDraft}
+                            onSubmit={() => handleUpdateEntry(entryId)}
+                            placeholder="Update this summary note entry..."
+                            rows={5}
+                            disabled={mutationPending}
+                            mentionCandidates={mentionCandidates}
+                          />
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-base-content/50">
+                            <span className={isEditingEntryTooLong ? "text-error" : undefined}>
+                              {editingEntryDraft.length} / 5000
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                className="btn btn-xs btn-ghost"
+                                onClick={() => {
+                                  setEditingEntryId(null);
+                                  setEditingEntryDraft("");
+                                }}
+                                type="button"
+                                disabled={mutationPending}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                className="btn btn-xs btn-primary gap-1"
+                                onClick={() => handleUpdateEntry(entryId)}
+                                disabled={
+                                  !editingEntryDraft.trim() ||
+                                  isEditingEntryTooLong ||
+                                  mutationPending
+                                }
+                                type="button"
+                              >
+                                <Save className="h-3.5 w-3.5" />
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-sm">
+                          <MarkdownContent content={entry.content ?? ""} />
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="rounded-md border border-dashed border-base-300 bg-base-100 p-4 text-sm text-base-content/55">
+                No summary note entries yet.
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-md border border-base-300 bg-base-100 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold">Post entry</span>
+              <span
+                className={isEntryTooLong ? "text-xs text-error" : "text-xs text-base-content/50"}
+              >
+                {entryDraft.length} / 5000
+              </span>
+            </div>
+            <MarkdownEditor
+              value={entryDraft}
+              onChange={setEntryDraft}
+              onSubmit={handleCreateEntry}
+              placeholder="Post a target-level summary note entry..."
+              rows={5}
+              disabled={mutationPending}
+              mentionCandidates={mentionCandidates}
+            />
+            <div className="flex justify-end">
               <button
                 className="btn btn-sm btn-primary gap-1"
-                onClick={handleSave}
-                disabled={(!draft.trim() && !existing) || isTooLong || mutationPending}
+                onClick={handleCreateEntry}
+                disabled={!entryDraft.trim() || isEntryTooLong || mutationPending}
                 type="button"
               >
-                <Save className="h-4 w-4" />
-                {mutationPending ? "Saving..." : draft.trim() ? "Save summary" : "Clear summary"}
+                <Send className="h-3.5 w-3.5" />
+                Post
               </button>
             </div>
-          </div>
-        )}
+          </section>
+        </div>
       </div>
     </div>
   );
