@@ -54,6 +54,8 @@ interface MetricValueLike {
 type MetricMap = { [key: string]: MetricValueLike };
 
 const FALLBACK_COLORS = ["#440154", "#31688e", "#35b779", "#fde724"];
+const SUMMARY_TOPOLOGY_SCROLL_CLASS =
+  "max-h-[min(62vh,34rem)] overflow-auto overscroll-contain rounded-md border border-base-300 bg-base-100/60 p-3";
 const MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER =
   "<!-- qdash:migrated-metric-notes-to-latest-cooldown -->";
 
@@ -587,20 +589,23 @@ export function DashboardPageContent() {
                   <div className="flex items-center justify-between gap-2">
                     <h4 className="text-sm font-semibold">Qubit summaries</h4>
                   </div>
-                  <DashboardQubitGrid
-                    metricData={null}
-                    unit=""
-                    topologyId={topologyId}
-                    colors={colors}
-                    presentation="summary"
-                    targetNotedQids={targetNotedQids}
-                    forumLinkedQids={forumLinkedQids}
-                    forumLinksByTarget={forumLinksByTarget}
-                    notesByTarget={notesByTarget}
-                    targetNotesByTarget={targetNotesByTarget}
-                    metricKey=""
-                    onQubitClick={setEditingTargetNote}
-                  />
+                  <div className={SUMMARY_TOPOLOGY_SCROLL_CLASS}>
+                    <DashboardQubitGrid
+                      metricData={null}
+                      unit=""
+                      topologyId={topologyId}
+                      colors={colors}
+                      maxCellSize={48}
+                      presentation="summary"
+                      targetNotedQids={targetNotedQids}
+                      forumLinkedQids={forumLinkedQids}
+                      forumLinksByTarget={forumLinksByTarget}
+                      notesByTarget={notesByTarget}
+                      targetNotesByTarget={targetNotesByTarget}
+                      metricKey=""
+                      onQubitClick={setEditingTargetNote}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -625,21 +630,24 @@ export function DashboardPageContent() {
                       </span>
                     </button>
                   </div>
-                  <DashboardCouplingGrid
-                    metricData={noteCouplingTopologyData}
-                    unit=""
-                    topologyId={topologyId}
-                    colors={colors}
-                    presentation="summary"
-                    reverseDirection={isReverseCouplingDirection}
-                    targetNotedTargets={targetNotedCouplings}
-                    forumLinkedTargets={forumLinkedCouplings}
-                    forumLinksByTarget={forumLinksByTarget}
-                    notesByTarget={notesByTarget}
-                    targetNotesByTarget={targetNotesByTarget}
-                    metricKey=""
-                    onCouplingClick={setEditingTargetNote}
-                  />
+                  <div className={SUMMARY_TOPOLOGY_SCROLL_CLASS}>
+                    <DashboardCouplingGrid
+                      metricData={noteCouplingTopologyData}
+                      unit=""
+                      topologyId={topologyId}
+                      colors={colors}
+                      maxCellSize={48}
+                      presentation="summary"
+                      reverseDirection={isReverseCouplingDirection}
+                      targetNotedTargets={targetNotedCouplings}
+                      forumLinkedTargets={forumLinkedCouplings}
+                      forumLinksByTarget={forumLinksByTarget}
+                      notesByTarget={notesByTarget}
+                      targetNotesByTarget={targetNotesByTarget}
+                      metricKey=""
+                      onCouplingClick={setEditingTargetNote}
+                    />
+                  </div>
                 </div>
               </div>
             </Card>
