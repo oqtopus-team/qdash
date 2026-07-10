@@ -15,6 +15,14 @@ export interface ForumLinkEntry {
   replyCount?: number | null;
 }
 
+function targetNoteComments(targetNote: TargetNoteEntry) {
+  return (targetNote.comments ?? []).filter((comment) => comment.content?.trim());
+}
+
+function hasTargetNoteContent(targetNote: TargetNoteEntry): boolean {
+  return !!targetNote.content.trim() || targetNoteComments(targetNote).length > 0;
+}
+
 interface DashboardNoteTooltipProps {
   /** Anchor position in viewport coordinates (top-center of the source cell). */
   position: { x: number; y: number };
@@ -44,7 +52,9 @@ export function DashboardNoteTooltip({
 }: DashboardNoteTooltipProps) {
   if (typeof document === "undefined") return null;
   const hasForumLinks = !!forumLinks && forumLinks.length > 0;
-  if (!targetNote && !current && (!others || others.length === 0) && !hasForumLinks) {
+  const hasTargetNote = targetNote ? hasTargetNoteContent(targetNote) : false;
+  const targetComments = targetNote ? targetNoteComments(targetNote) : [];
+  if (!hasTargetNote && !current && (!others || others.length === 0) && !hasForumLinks) {
     // No notes at all — render only the header so users still get value/unit info.
     return createPortal(
       <div
@@ -67,7 +77,7 @@ export function DashboardNoteTooltip({
   return createPortal(
     <div
       role="tooltip"
-      className="px-3 py-2 bg-base-100 text-base-content text-xs rounded-lg shadow-lg pointer-events-none border border-base-300 max-w-sm space-y-2"
+      className="px-3 py-2 bg-base-100 text-base-content text-xs rounded-lg shadow-lg pointer-events-none border border-base-300 max-w-md max-h-[min(28rem,calc(100vh-2rem))] overflow-hidden space-y-2"
       style={{
         position: "fixed",
         left: position.x,
@@ -77,13 +87,39 @@ export function DashboardNoteTooltip({
       }}
     >
       <div className="font-semibold tabular-nums">{header}</div>
-      {targetNote && (
-        <div className="border-l-2 border-warning pl-2">
-          <div className="text-[10px] uppercase tracking-wide text-warning">pinned summary</div>
-          <p className="whitespace-pre-wrap break-words">{targetNote.content}</p>
-          <div className="text-[10px] text-base-content/50 mt-0.5">
-            {targetNote.username} · {formatDateTime(targetNote.updatedAt)}
+      {hasTargetNote && targetNote && (
+        <div className="space-y-1.5 border-l-2 border-warning pl-2">
+          <div className="text-[10px] uppercase tracking-wide text-warning">
+            pinned summary
+            {targetComments.length > 0 ? ` (${targetComments.length})` : ""}
           </div>
+          {targetNote.content.trim() && (
+            <div>
+              <p className="whitespace-pre-wrap break-words">{targetNote.content}</p>
+              <div className="text-[10px] text-base-content/50 mt-0.5">
+                {targetNote.username || "-"}
+                {targetNote.updatedAt ? ` · ${formatDateTime(targetNote.updatedAt)}` : ""}
+              </div>
+            </div>
+          )}
+          {targetComments.length > 0 && (
+            <ul className="space-y-1.5">
+              {targetComments.slice(-3).map((comment) => (
+                <li key={comment.comment_id || `${comment.created_by}-${comment.created_at}`}>
+                  <p className="whitespace-pre-wrap break-words">{comment.content}</p>
+                  <div className="text-[10px] text-base-content/50 mt-0.5">
+                    {comment.created_by || "-"}
+                    {comment.created_at ? ` · ${formatDateTime(comment.created_at)}` : ""}
+                  </div>
+                </li>
+              ))}
+              {targetComments.length > 3 && (
+                <li className="text-[10px] text-base-content/50">
+                  +{targetComments.length - 3} earlier entries
+                </li>
+              )}
+            </ul>
+          )}
         </div>
       )}
       {current && (
@@ -103,7 +139,7 @@ export function DashboardNoteTooltip({
             linked forum discussions ({forumLinks.length})
           </div>
           <ul className="space-y-1.5">
-            {forumLinks.slice(0, 4).map((post) => (
+            {forumLinks.slice(0, 6).map((post) => (
               <li key={post.id}>
                 <div className="font-semibold text-[11px]">
                   {post.number ? `#${post.number} ` : ""}
@@ -115,6 +151,11 @@ export function DashboardNoteTooltip({
                 </div>
               </li>
             ))}
+            {forumLinks.length > 6 && (
+              <li className="text-[10px] text-base-content/50">
+                +{forumLinks.length - 6} more discussions
+              </li>
+            )}
           </ul>
         </div>
       )}

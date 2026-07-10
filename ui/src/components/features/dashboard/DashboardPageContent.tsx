@@ -374,12 +374,14 @@ export function DashboardPageContent() {
     const collect = (entries: SummaryTargetNoteEntry[] | undefined) => {
       (entries ?? []).forEach((entry) => {
         const content = stripAiGeneratedNoteSections(entry.note?.content ?? "");
-        if (!content) return;
+        const comments = entry.comments ?? [];
+        if (!content && comments.length === 0) return;
         map[entry.target_id] = {
           targetId: entry.target_id,
           content,
           username: entry.note?.updated_by ?? "",
           updatedAt: entry.note?.updated_at ?? "",
+          comments,
         };
       });
     };
@@ -590,7 +592,7 @@ export function DashboardPageContent() {
                     unit=""
                     topologyId={topologyId}
                     colors={colors}
-                    maxCellSize={42}
+                    presentation="summary"
                     targetNotedQids={targetNotedQids}
                     forumLinkedQids={forumLinkedQids}
                     forumLinksByTarget={forumLinksByTarget}
@@ -628,7 +630,7 @@ export function DashboardPageContent() {
                     unit=""
                     topologyId={topologyId}
                     colors={colors}
-                    maxCellSize={42}
+                    presentation="summary"
                     reverseDirection={isReverseCouplingDirection}
                     targetNotedTargets={targetNotedCouplings}
                     forumLinkedTargets={forumLinkedCouplings}
@@ -870,6 +872,8 @@ export function DashboardPageContent() {
           noteScopeParams={noteScopeParams}
           existing={targetNotesByTarget[editingTargetNote]}
           mentionCandidates={mentionCandidates}
+          currentUsername={user?.username ?? null}
+          currentSystemRole={user?.system_role ?? null}
           onClose={() => setEditingTargetNote(null)}
         />
       )}

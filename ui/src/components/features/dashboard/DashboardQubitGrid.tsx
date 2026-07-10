@@ -43,6 +43,8 @@ interface DashboardQubitGridProps {
   targetNotesByTarget?: Record<string, TargetNoteEntry>;
   /** The metric_key this grid renders, used to split current vs. other notes. */
   metricKey?: string;
+  /** Presentation optimized for metric heatmaps or note summary topology. */
+  presentation?: "metric" | "summary";
   /** Click handler when a qubit cell is clicked. */
   onQubitClick?: (qid: string) => void;
 }
@@ -93,6 +95,7 @@ export function DashboardQubitGrid({
   notesByTarget,
   targetNotesByTarget,
   metricKey,
+  presentation = "metric",
   onQubitClick,
 }: DashboardQubitGridProps) {
   const [hover, setHover] = useState<{
@@ -100,6 +103,7 @@ export function DashboardQubitGrid({
     x: number;
     y: number;
   } | null>(null);
+  const isSummaryPresentation = presentation === "summary";
   const {
     muxSize = 2,
     hasMux = false,
@@ -177,7 +181,16 @@ export function DashboardQubitGrid({
     >
       {cells.map(({ row, col, qid }) => {
         if (qid === undefined) {
-          return <div key={`${row}-${col}`} className="rounded-md bg-base-300/30 aspect-square" />;
+          return (
+            <div
+              key={`${row}-${col}`}
+              className={`rounded-md aspect-square ${
+                isSummaryPresentation
+                  ? "bg-base-200/40 border border-base-300/50"
+                  : "bg-base-300/30"
+              }`}
+            />
+          );
         }
         const metric = metricData?.[qid];
         const value = metric?.value ?? null;
@@ -189,8 +202,17 @@ export function DashboardQubitGrid({
         const hasCrossMetricNote =
           !hasNote && !hasTargetNote && (crossMetricNotedQids?.has(qid) ?? false);
         const handleClick = () => onQubitClick?.(qid);
+        const summaryTileClass = hasTargetNote
+          ? "bg-warning/10 border-warning/50 text-base-content"
+          : hasForumDiscussion
+            ? "bg-info/10 border-info/40 text-base-content"
+            : "bg-base-100 border-base-300 text-base-content";
         const titleText =
-          (value !== null ? `${qid}: ${value.toFixed(4)} ${unit}` : `${qid}: No data`) +
+          (isSummaryPresentation
+            ? `Q${qid}: pinned summary target`
+            : value !== null
+              ? `${qid}: ${value.toFixed(4)} ${unit}`
+              : `${qid}: No data`) +
           (hasNote
             ? " · has legacy metric note"
             : hasTargetNote
@@ -214,18 +236,22 @@ export function DashboardQubitGrid({
               });
             }}
             onMouseLeave={() => setHover(null)}
-            className={`aspect-square rounded-md flex flex-col items-center justify-center relative shadow-sm text-left ${
-              onQubitClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""
-            }`}
-            style={{ backgroundColor: bg ?? undefined }}
+            className={`aspect-square rounded-md flex flex-col items-center justify-center relative shadow-sm text-left transition-all ${
+              isSummaryPresentation ? `border ${summaryTileClass}` : ""
+            } ${onQubitClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""}`}
+            style={{ backgroundColor: isSummaryPresentation ? undefined : (bg ?? undefined) }}
             aria-label={titleText}
           >
             <span
-              className={`absolute top-0.5 left-0.5 text-[10px] font-semibold px-1 rounded leading-tight ${
-                bg ? "bg-black/30 text-white" : "bg-base-200 text-base-content"
-              }`}
+              className={
+                isSummaryPresentation
+                  ? "text-sm font-bold leading-none"
+                  : `absolute top-0.5 left-0.5 text-[10px] font-semibold px-1 rounded leading-tight ${
+                      bg ? "bg-black/30 text-white" : "bg-base-200 text-base-content"
+                    }`
+              }
             >
-              {qid}
+              {isSummaryPresentation ? `Q${qid}` : qid}
             </span>
             {(hasNote || hasTargetNote) && (
               <span
@@ -251,13 +277,14 @@ export function DashboardQubitGrid({
                 <MessageSquare className="h-3 w-3" />
               </span>
             )}
-            {value !== null ? (
-              <span className="text-[11px] font-bold text-white drop-shadow leading-tight mt-1.5">
-                {value.toFixed(2)}
-              </span>
-            ) : (
-              <span className="text-[10px] text-base-content/40 mt-1.5">N/A</span>
-            )}
+            {!isSummaryPresentation &&
+              (value !== null ? (
+                <span className="text-[11px] font-bold text-white drop-shadow leading-tight mt-1.5">
+                  {value.toFixed(2)}
+                </span>
+              ) : (
+                <span className="text-[10px] text-base-content/40 mt-1.5">N/A</span>
+              ))}
           </Tag>
         );
       })}

@@ -29,6 +29,9 @@ Run migrations with:
     python -m qdash.dbmodel.migration metric-notes-to-latest-cooldown-target-notes --execute  # execute
     python -m qdash.dbmodel.migration metric-notes-to-latest-cooldown-target-notes --execute --delete-source  # migrate then delete source metric notes
 
+    python -m qdash.dbmodel.migration legacy-target-notes-to-comments          # dry-run
+    python -m qdash.dbmodel.migration legacy-target-notes-to-comments --execute  # execute
+
     python -m qdash.dbmodel.migration backfill-forum-thread-numbers          # dry-run
     python -m qdash.dbmodel.migration backfill-forum-thread-numbers --execute  # execute
 
@@ -167,6 +170,273 @@ def _latest_cooldown_for_chip(*, project_id: str, chip_id: str) -> Any | None:
     if not cooldowns:
         return None
     return max(cooldowns, key=lambda cooldown: cooldown.started_at)
+
+
+def _legacy_target_note_comment_id(*, source: str, target_type: str, scope_key: str) -> str:
+    return f"legacy-{source}-{target_type}-{scope_key}"
+
+
+def migrate_legacy_target_notes_to_comments(dry_run: bool = True) -> dict[str, Any]:
+    """Move single target summaries into author-tracked target note comments.
+
+    Legacy target summaries lived either on ``QubitDocument.note`` /
+    ``CouplingDocument.note`` or in ``TargetNoteDocument.note``. The dashboard now
+    treats the target summary note as a collection of entries, so this migration
+    converts each non-empty single summary into one comment attributed to the
+    note's last editor and then clears the single-summary field.
+    """
+    from qdash.common.utils.datetime import now
+    from qdash.datamodel.note import NoteCommentModel, NoteModel
+    from qdash.dbmodel.coupling import CouplingDocument
+    from qdash.dbmodel.qubit import QubitDocument
+    from qdash.dbmodel.target_note import TargetNoteDocument
+
+    current_time = now()
+    stats: dict[str, Any] = {
+        "legacy_notes_found": 0,
+        "comments_created": 0,
+        "comments_relocated": 0,
+        "notes_cleared": 0,
+        "notes_skipped_already_migrated": 0,
+        "targets": [],
+    }
+
+    def add_comment(
+        *,
+        target_note: Any,
+        note: Any,
+        source: str,
+        target_info: dict[str, Any],
+    ) -> bool:
+        content = (note.content or "").strip()
+        if not content:
+            return False
+        comment_id = _legacy_target_note_comment_id(
+            source=source,
+            target_type=target_note.target_type,
+            scope_key=target_note.scope_key,
+        )
+        created_by = note.updated_by or "migration"
+        if any(comment.comment_id == comment_id for comment in target_note.comments) or any(
+            (comment.content or "").strip() == content and comment.created_by == created_by
+            for comment in target_note.comments
+        ):
+            stats["notes_skipped_already_migrated"] += 1
+            target_info["action"] = "already_migrated"
+            return True
+        created_at = note.updated_at or current_time
+        if not dry_run:
+            target_note.comments.append(
+                NoteCommentModel(
+                    comment_id=comment_id,
+                    content=content,
+                    created_by=created_by,
+                    created_at=created_at,
+                    updated_by=created_by,
+                    updated_at=None,
+                )
+            )
+        stats["comments_created"] += 1
+        target_info["action"] = "dry_run" if dry_run else "migrated"
+        return True
+
+    def scope_fields_for_legacy_target(*, project_id: str, chip_id: str) -> dict[str, Any]:
+        cooldown = _latest_cooldown_for_chip(project_id=project_id, chip_id=chip_id)
+        if cooldown is None:
+            return {
+                "scope_type": "global",
+                "scope_key": "global",
+                "cooldown_id": None,
+                "scope_started_at": None,
+                "scope_ended_at": None,
+                "scope_source": "legacy_global",
+            }
+        return {
+            "scope_type": "cooldown",
+            "scope_key": f"cooldown:{cooldown.cooldown_id}",
+            "cooldown_id": cooldown.cooldown_id,
+            "scope_started_at": cooldown.started_at,
+            "scope_ended_at": cooldown.ended_at,
+            "scope_source": "current_cooldown",
+        }
+
+    def get_or_create_target_note(
+        *,
+        project_id: str,
+        chip_id: str,
+        target_type: str,
+        target_id: str,
+        scope_fields: dict[str, Any],
+    ) -> Any:
+        target_note = TargetNoteDocument.find_one(
+            TargetNoteDocument.project_id == project_id,
+            TargetNoteDocument.chip_id == chip_id,
+            TargetNoteDocument.target_type == target_type,
+            TargetNoteDocument.target_id == target_id,
+            TargetNoteDocument.scope_key == scope_fields["scope_key"],
+        ).run()
+        if target_note is not None:
+            return target_note
+        target_note = TargetNoteDocument(
+            project_id=project_id,
+            chip_id=chip_id,
+            target_type=target_type,
+            target_id=target_id,
+            note=NoteModel(),
+            comments=[],
+            **scope_fields,
+        )
+        if not dry_run:
+            target_note.insert()
+        return target_note
+
+    target_note_docs = [
+        doc
+        for doc in TargetNoteDocument.find_all().run()
+        if getattr(doc, "note", None) is not None and (doc.note.content or "").strip()
+    ]
+    for target_note in target_note_docs:
+        stats["legacy_notes_found"] += 1
+        target_info = {
+            "project_id": target_note.project_id,
+            "chip_id": target_note.chip_id,
+            "target_type": target_note.target_type,
+            "target_id": target_note.target_id,
+            "scope_key": target_note.scope_key,
+            "source": "target_note",
+        }
+        changed = add_comment(
+            target_note=target_note,
+            note=target_note.note,
+            source="target-note",
+            target_info=target_info,
+        )
+        if changed and not dry_run:
+            target_note.note = NoteModel()
+            target_note.system_info.update_time()
+            target_note.save()
+            stats["notes_cleared"] += 1
+        stats["targets"].append(target_info)
+
+    for model, target_type, source in (
+        (QubitDocument, "qubit", "qubit"),
+        (CouplingDocument, "coupling", "coupling"),
+    ):
+        docs = [
+            doc
+            for doc in model.find_all().run()
+            if getattr(doc, "note", None) is not None and (doc.note.content or "").strip()
+        ]
+        for doc in docs:
+            stats["legacy_notes_found"] += 1
+            scope_fields = scope_fields_for_legacy_target(
+                project_id=doc.project_id,
+                chip_id=doc.chip_id,
+            )
+            target_note = get_or_create_target_note(
+                project_id=doc.project_id,
+                chip_id=doc.chip_id,
+                target_type=target_type,
+                target_id=doc.qid,
+                scope_fields=scope_fields,
+            )
+            target_info = {
+                "project_id": doc.project_id,
+                "chip_id": doc.chip_id,
+                "target_type": target_type,
+                "target_id": doc.qid,
+                "scope_key": scope_fields["scope_key"],
+                "source": source,
+            }
+            changed = add_comment(
+                target_note=target_note,
+                note=doc.note,
+                source=source,
+                target_info=target_info,
+            )
+            if changed and not dry_run:
+                doc.note = NoteModel()
+                doc.system_info.update_time()
+                doc.save()
+                target_note.system_info.update_time()
+                target_note.save()
+                stats["notes_cleared"] += 1
+            stats["targets"].append(target_info)
+
+    for global_note in TargetNoteDocument.find(
+        TargetNoteDocument.scope_key == "global",
+        TargetNoteDocument.scope_source == "legacy_global",
+    ).run():
+        scope_fields = scope_fields_for_legacy_target(
+            project_id=global_note.project_id,
+            chip_id=global_note.chip_id,
+        )
+        if scope_fields["scope_key"] == "global":
+            continue
+        migrated_comments = [
+            comment
+            for comment in global_note.comments
+            if comment.comment_id.startswith(
+                f"legacy-{global_note.target_type}-{global_note.target_type}-global"
+            )
+        ]
+        if not migrated_comments:
+            continue
+        target_note = get_or_create_target_note(
+            project_id=global_note.project_id,
+            chip_id=global_note.chip_id,
+            target_type=global_note.target_type,
+            target_id=global_note.target_id,
+            scope_fields=scope_fields,
+        )
+        moved = False
+        for comment in migrated_comments:
+            target_info = {
+                "project_id": global_note.project_id,
+                "chip_id": global_note.chip_id,
+                "target_type": global_note.target_type,
+                "target_id": global_note.target_id,
+                "scope_key": scope_fields["scope_key"],
+                "source": "relocated_global",
+            }
+            if any(
+                (existing.content or "").strip() == (comment.content or "").strip()
+                and existing.created_by == comment.created_by
+                for existing in target_note.comments
+            ):
+                target_info["action"] = "already_migrated"
+                stats["notes_skipped_already_migrated"] += 1
+                stats["targets"].append(target_info)
+                continue
+            if not dry_run:
+                relocated = comment.model_copy(
+                    update={
+                        "comment_id": _legacy_target_note_comment_id(
+                            source=global_note.target_type,
+                            target_type=global_note.target_type,
+                            scope_key=scope_fields["scope_key"],
+                        )
+                    }
+                )
+                target_note.comments.append(relocated)
+            moved = True
+            stats["comments_relocated"] += 1
+            target_info["action"] = "dry_run" if dry_run else "relocated"
+            stats["targets"].append(target_info)
+        if moved and not dry_run:
+            target_note.system_info.update_time()
+            target_note.save()
+            remaining = [
+                comment for comment in global_note.comments if comment not in migrated_comments
+            ]
+            global_note.comments = remaining
+            global_note.system_info.update_time()
+            if global_note.comments or (global_note.note.content or "").strip():
+                global_note.save()
+            else:
+                global_note.delete()
+
+    return stats
 
 
 def migrate_metric_notes_to_target_notes(dry_run: bool = True) -> dict[str, Any]:
@@ -1451,6 +1721,16 @@ if __name__ == "__main__":
         help="Delete MetricNoteDocument rows after successfully migrating them",
     )
 
+    legacy_target_notes_parser = subparsers.add_parser(
+        "legacy-target-notes-to-comments",
+        help="Move legacy target summaries into author-tracked note entries",
+    )
+    legacy_target_notes_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
     forum_numbers_parser = subparsers.add_parser(
         "backfill-forum-thread-numbers",
         help="Backfill project-scoped #numbers for existing forum threads",
@@ -1530,6 +1810,12 @@ if __name__ == "__main__":
             dry_run=not args.execute,
             delete_source=args.delete_source,
         )
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "legacy-target-notes-to-comments":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_legacy_target_notes_to_comments(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
     elif args.command == "backfill-forum-thread-numbers":
         from qdash.dbmodel.initialize import initialize

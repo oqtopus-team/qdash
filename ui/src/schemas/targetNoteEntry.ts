@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { NoteModel } from './noteModel';
+import type { NoteCommentModel } from './noteCommentModel';
 import type { TargetNoteEntryMetricNotes } from './targetNoteEntryMetricNotes';
 
 /**
@@ -14,5 +15,6 @@ import type { TargetNoteEntryMetricNotes } from './targetNoteEntryMetricNotes';
 export interface TargetNoteEntry {
   target_id: string;
   note?: NoteModel;
+  comments?: NoteCommentModel[];
   metric_notes?: TargetNoteEntryMetricNotes;
 }

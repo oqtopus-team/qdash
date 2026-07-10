@@ -36,6 +36,8 @@ interface DashboardCouplingGridProps {
   /** Target-level notes keyed by qubit/coupling ID. */
   targetNotesByTarget?: Record<string, TargetNoteEntry>;
   metricKey?: string;
+  /** Presentation optimized for metric heatmaps or note summary topology. */
+  presentation?: "metric" | "summary";
   onCouplingClick?: (couplingId: string) => void;
 }
 
@@ -89,6 +91,7 @@ export function DashboardCouplingGrid({
   notesByTarget,
   targetNotesByTarget,
   metricKey,
+  presentation = "metric",
   onCouplingClick,
 }: DashboardCouplingGridProps) {
   const [hover, setHover] = useState<{
@@ -96,6 +99,7 @@ export function DashboardCouplingGrid({
     x: number;
     y: number;
   } | null>(null);
+  const isSummaryPresentation = presentation === "summary";
 
   const {
     muxSize = 2,
@@ -191,7 +195,11 @@ export function DashboardCouplingGrid({
             return (
               <div
                 key={`bg-${row}-${col}`}
-                className="absolute rounded-md bg-base-300/20"
+                className={`absolute rounded-md ${
+                  isSummaryPresentation
+                    ? "bg-base-200/25 border border-base-300/40"
+                    : "bg-base-300/20"
+                }`}
                 style={{
                   top: y,
                   left: x,
@@ -204,7 +212,11 @@ export function DashboardCouplingGrid({
           return (
             <div
               key={`qubit-${qid}`}
-              className="absolute rounded-md bg-base-300/40 flex items-start justify-start text-base-content/40"
+              className={`absolute rounded-md flex items-start justify-start ${
+                isSummaryPresentation
+                  ? "bg-base-100/60 border border-base-300/60 text-base-content/35"
+                  : "bg-base-300/40 text-base-content/40"
+              }`}
               style={{
                 top: y,
                 left: x,
@@ -239,10 +251,17 @@ export function DashboardCouplingGrid({
             !hasNote && !hasTargetNote && (crossMetricNotedTargets?.has(couplingId) ?? false);
           const Tag = onCouplingClick ? "button" : "div";
           const handleClick = () => onCouplingClick?.(couplingId);
+          const summaryChipClass = hasTargetNote
+            ? "bg-warning border-warning shadow-md opacity-95"
+            : hasForumDiscussion
+              ? "bg-info border-info shadow-md opacity-95"
+              : "bg-base-content/25 border-base-content/20 opacity-70 hover:opacity-100";
           const titleText =
-            (value !== null
-              ? `Q${qid1}→Q${qid2}: ${value.toFixed(4)} ${unit}`
-              : `Q${qid1}→Q${qid2}: No data`) +
+            (isSummaryPresentation
+              ? `Q${qid1}→Q${qid2}: pinned summary target`
+              : value !== null
+                ? `Q${qid1}→Q${qid2}: ${value.toFixed(4)} ${unit}`
+                : `Q${qid1}→Q${qid2}: No data`) +
             (hasNote
               ? " · has legacy metric note"
               : hasTargetNote
@@ -265,53 +284,66 @@ export function DashboardCouplingGrid({
                 });
               }}
               onMouseLeave={() => setHover(null)}
-              className={`absolute rounded-md shadow-sm flex flex-col items-center justify-center -translate-x-1/2 -translate-y-1/2 transition-all ${
-                onCouplingClick
-                  ? "cursor-pointer hover:ring-2 hover:ring-primary/60 hover:scale-105"
-                  : ""
-              } ${!bg ? "bg-base-300/60" : ""}`}
+              className={`absolute flex items-center justify-center transition-all ${
+                isSummaryPresentation
+                  ? "rounded-full"
+                  : "rounded-md shadow-sm flex-col -translate-x-1/2 -translate-y-1/2"
+              } ${onCouplingClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60 hover:scale-105" : ""} ${
+                isSummaryPresentation ? `border ${summaryChipClass}` : !bg ? "bg-base-300/60" : ""
+              }`}
               style={{
                 top: centerY,
                 left: centerX,
-                width: cellSize * 0.72,
-                height: cellSize * 0.5,
-                backgroundColor: bg ?? undefined,
+                width: isSummaryPresentation ? cellSize * 0.74 : cellSize * 0.72,
+                height: isSummaryPresentation ? Math.max(6, cellSize * 0.12) : cellSize * 0.5,
+                backgroundColor: isSummaryPresentation ? undefined : (bg ?? undefined),
+                transform: isSummaryPresentation
+                  ? `translate(-50%, -50%) rotate(${arrowAngle}deg)`
+                  : undefined,
               }}
               aria-label={titleText}
             >
-              {value !== null ? (
+              {isSummaryPresentation ? (
+                <span className="sr-only">
+                  Q{qid1}→Q{qid2}
+                </span>
+              ) : value !== null ? (
                 <span className="text-[10px] font-bold text-white drop-shadow leading-none">
                   {value.toFixed(2)}
                 </span>
               ) : (
                 <span className="text-[9px] text-base-content/50 leading-none">—</span>
               )}
-              <svg
-                width="12"
-                height="5"
-                viewBox="0 0 18 7"
-                className="mt-px drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
-                style={{ transform: `rotate(${arrowAngle}deg)` }}
-              >
-                <line
-                  x1="1"
-                  y1="3.5"
-                  x2="14"
-                  y2="3.5"
-                  stroke={bg ? "white" : "currentColor"}
-                  strokeWidth="1.5"
-                />
-                <polyline
-                  points="11,0.5 16,3.5 11,6.5"
-                  fill="none"
-                  stroke={bg ? "white" : "currentColor"}
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              {!isSummaryPresentation && (
+                <svg
+                  width="12"
+                  height="5"
+                  viewBox="0 0 18 7"
+                  className="mt-px drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                  style={{ transform: `rotate(${arrowAngle}deg)` }}
+                >
+                  <line
+                    x1="1"
+                    y1="3.5"
+                    x2="14"
+                    y2="3.5"
+                    stroke={bg ? "white" : "currentColor"}
+                    strokeWidth="1.5"
+                  />
+                  <polyline
+                    points="11,0.5 16,3.5 11,6.5"
+                    fill="none"
+                    stroke={bg ? "white" : "currentColor"}
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
               {(hasNote || hasTargetNote) && (
                 <span
-                  className="absolute -top-1 -right-1 rounded-full bg-warning text-warning-content p-0.5 shadow"
+                  className={`absolute rounded-full bg-warning text-warning-content p-0.5 shadow ${
+                    isSummaryPresentation ? "-top-2 -right-2" : "-top-1 -right-1"
+                  }`}
                   title={hasNote ? "Has legacy metric note" : "Has pinned summary"}
                 >
                   <StickyNote className="h-2.5 w-2.5" />
@@ -319,7 +351,9 @@ export function DashboardCouplingGrid({
               )}
               {hasCrossMetricNote && (
                 <span
-                  className="absolute -top-1 -right-1 rounded-full bg-base-100/90 text-base-content/60 p-0.5 shadow border border-base-300"
+                  className={`absolute rounded-full bg-base-100/90 text-base-content/60 p-0.5 shadow border border-base-300 ${
+                    isSummaryPresentation ? "-top-2 -right-2" : "-top-1 -right-1"
+                  }`}
                   title="Legacy note exists on another metric"
                 >
                   <StickyNote className="h-2.5 w-2.5" />
@@ -327,7 +361,9 @@ export function DashboardCouplingGrid({
               )}
               {hasForumDiscussion && (
                 <span
-                  className={`absolute -bottom-1 -right-1 rounded-full p-0.5 shadow ${forumMarkerClass(forumLabel)}`}
+                  className={`absolute rounded-full p-0.5 shadow ${
+                    isSummaryPresentation ? "-bottom-2 -right-2" : "-bottom-1 -right-1"
+                  } ${forumMarkerClass(forumLabel)}`}
                   title="Linked forum discussion"
                 >
                   <MessageSquare className="h-2.5 w-2.5" />
