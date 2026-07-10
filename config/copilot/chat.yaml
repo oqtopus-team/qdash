@@ -5,7 +5,7 @@
 # the default. The configured model in config.yaml is also offered as a fallback.
 chat_models:
   - provider: ollama
-    name: gemma4:26b
+    name: nvidia/Gemma-4-31B-IT-NVFP4
     # Ollama endpoint. Set OLLAMA_BASE_URL to your Ollama server URL,
     # e.g. http://localhost:11434. QDash appends /v1 automatically.
     base_url: env:OLLAMA_BASE_URL

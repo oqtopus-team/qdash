@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   dateToDateInput,
+  dateToDateKey,
   dateToDateTimeLocal,
   formatDateTime,
   formatRelativeTime,
@@ -76,6 +77,12 @@ describe("formatRelativeTime", () => {
 describe("dateToDateInput", () => {
   it("formats a Date in the configured timezone", () => {
     expect(dateToDateInput(new Date("2024-06-14T15:00:00.000Z"), "Asia/Tokyo")).toBe("2024-06-15");
+  });
+});
+
+describe("dateToDateKey", () => {
+  it("formats a Date as the task-result API date key in the configured timezone", () => {
+    expect(dateToDateKey(new Date("2024-06-14T15:00:00.000Z"), "Asia/Tokyo")).toBe("20240615");
   });
 });
 

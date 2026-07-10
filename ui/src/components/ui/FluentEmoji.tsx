@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 
 /**
@@ -67,36 +68,36 @@ const EMOJI_MAP: Record<string, string> = {
   compress: "Collision/3D/collision_3d.png",
 
   // Avatar - Animals
-  fox: "Fox/3D/fox_3d.png",
-  cat: "Cat/3D/cat_3d.png",
-  dog: "Dog%20face/3D/dog_face_3d.png",
-  rabbit: "Rabbit%20face/3D/rabbit_face_3d.png",
-  bear: "Bear/3D/bear_3d.png",
-  panda: "Panda/3D/panda_3d.png",
-  koala: "Koala/3D/koala_3d.png",
-  tiger: "Tiger%20face/3D/tiger_face_3d.png",
-  lion: "Lion/3D/lion_3d.png",
-  unicorn: "Unicorn/3D/unicorn_3d.png",
-  owl: "Owl/3D/owl_3d.png",
-  octopus: "Octopus/3D/octopus_3d.png",
-  butterfly: "Butterfly/3D/butterfly_3d.png",
-  dolphin: "Dolphin/3D/dolphin_3d.png",
-  whale: "Spouting%20whale/3D/spouting_whale_3d.png",
-  penguin: "Penguin/3D/penguin_3d.png",
+  fox: "/avatars/fox.png",
+  cat: "/avatars/cat.png",
+  dog: "/avatars/dog.png",
+  rabbit: "/avatars/rabbit.png",
+  bear: "/avatars/bear.png",
+  panda: "/avatars/panda.png",
+  koala: "/avatars/koala.png",
+  tiger: "/avatars/tiger.png",
+  lion: "/avatars/lion.png",
+  unicorn: "/avatars/unicorn.png",
+  owl: "/avatars/owl.png",
+  octopus: "/avatars/octopus.png",
+  butterfly: "/avatars/butterfly.png",
+  dolphin: "/avatars/dolphin.png",
+  whale: "/avatars/whale.png",
+  penguin: "/avatars/penguin.png",
 
   // Avatar - Nature & Objects
-  sun: "Sun/3D/sun_3d.png",
-  moon: "Full%20moon/3D/full_moon_3d.png",
-  star: "Star/3D/star_3d.png",
-  rainbow: "Rainbow/3D/rainbow_3d.png",
-  cloud: "Cloud/3D/cloud_3d.png",
-  snowflake: "Snowflake/3D/snowflake_3d.png",
-  cherry: "Cherry%20blossom/3D/cherry_blossom_3d.png",
-  tulip: "Tulip/3D/tulip_3d.png",
-  sunflower: "Sunflower/3D/sunflower_3d.png",
-  mushroom: "Mushroom/3D/mushroom_3d.png",
-  crystal: "Gem%20stone/3D/gem_stone_3d.png",
-  planet: "Ringed%20planet/3D/ringed_planet_3d.png",
+  sun: "/avatars/sun.png",
+  moon: "/avatars/moon.png",
+  star: "/avatars/star.png",
+  rainbow: "/avatars/rainbow.png",
+  cloud: "/avatars/cloud.png",
+  snowflake: "/avatars/snowflake.png",
+  cherry: "/avatars/cherry.png",
+  tulip: "/avatars/tulip.png",
+  sunflower: "/avatars/sunflower.png",
+  mushroom: "/avatars/mushroom.png",
+  crystal: "/avatars/crystal.png",
+  planet: "/avatars/planet.png",
 };
 
 // Avatar emoji keys for random selection
@@ -160,9 +161,37 @@ interface FluentEmojiProps {
   alt?: string;
 }
 
-export function FluentEmoji({ name, size = 24, className = "", alt }: FluentEmojiProps) {
+function emojiAssetSrc(name: keyof typeof EMOJI_MAP | string): string {
   const assetPath = EMOJI_MAP[name] || name;
-  const src = `${CDN_BASE}/${assetPath}`;
+  if (
+    assetPath.startsWith("/") ||
+    assetPath.startsWith("http://") ||
+    assetPath.startsWith("https://")
+  ) {
+    return assetPath;
+  }
+  return CDN_BASE + "/" + assetPath;
+}
+
+export function FluentEmoji({ name, size = 24, className = "", alt }: FluentEmojiProps) {
+  const [hasImageError, setHasImageError] = useState(false);
+  const src = emojiAssetSrc(name);
+
+  if (hasImageError) {
+    return (
+      <span
+        aria-label={alt || name}
+        className={
+          "inline-flex items-center justify-center rounded-full bg-base-300 text-base-content/70 " +
+          className
+        }
+        role="img"
+        style={{ width: size, height: size, fontSize: Math.max(10, Math.round(size * 0.5)) }}
+      >
+        {(alt || name).slice(0, 1).toUpperCase()}
+      </span>
+    );
+  }
 
   return (
     <Image
@@ -170,8 +199,9 @@ export function FluentEmoji({ name, size = 24, className = "", alt }: FluentEmoj
       alt={alt || name}
       width={size}
       height={size}
-      className={`inline-block ${className}`}
-      unoptimized // CDN images don't need Next.js optimization
+      className={"inline-block " + className}
+      onError={() => setHasImageError(true)}
+      unoptimized
     />
   );
 }

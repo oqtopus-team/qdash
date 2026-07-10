@@ -23,7 +23,35 @@ limit?: number;
  */
 category?: string | null;
 /**
- * Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all.
+ * Filter by thread label
  */
-is_closed?: boolean | null;
+label?: string | null;
+/**
+ * Filter by linked chip ID
+ */
+chip_id?: string | null;
+/**
+ * Filter by linked target type
+ */
+target_type?: string | null;
+/**
+ * Filter by linked target ID
+ */
+target_id?: string | null;
+/**
+ * Filter by linked cool-down ID
+ */
+cooldown_id?: string | null;
+/**
+ * Filter by project-scoped forum thread number
+ */
+number?: number | null;
+/**
+ * Filter by workflow status. Default open. Use null/omit at the client layer for all.
+ */
+status?: string | null;
+/**
+ * Search title, content, number, target, assignee, or status
+ */
+q?: string | null;
 };

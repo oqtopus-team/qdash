@@ -23,6 +23,7 @@ import {
   listFlowSchedules,
 } from "@/client/flow/flow";
 import {
+  AlertTriangle,
   ArrowLeft,
   BookOpen,
   Bot,
@@ -1077,11 +1078,66 @@ export function WorkflowEditorPageContent() {
     return (
       <div className="container mx-auto p-6">
         <div className="alert alert-error">
-          <span>Failed to load flow: {(error as Error)?.message}</span>
+          <AlertTriangle className="h-5 w-5" />
+          <div>
+            <div className="font-semibold">Failed to load flow</div>
+            <div className="text-sm">{(error as Error)?.message}</div>
+          </div>
         </div>
-        <button onClick={() => router.push("/workflow")} className="btn btn-ghost mt-4">
-          ← Back to Flows
-        </button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button onClick={() => router.push("/workflow")} className="btn btn-ghost">
+            ← Back to Flows
+          </button>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="btn btn-error"
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 size={16} />
+            Delete Flow Metadata
+          </button>
+        </div>
+        {deleteMutation.isError && (
+          <div className="alert alert-error mt-4">
+            <span>
+              Failed to delete flow: {(deleteMutation.error as Error)?.message || "Unknown error"}
+            </span>
+          </div>
+        )}
+        {showDeleteConfirm && (
+          <div className="modal modal-open">
+            <div className="modal-box">
+              <h3 className="font-bold text-lg">Delete Flow</h3>
+              <p className="py-4">
+                Are you sure you want to delete <strong>{name}</strong>? The source file could not
+                be loaded, so this will remove the remaining flow metadata.
+              </p>
+              <div className="modal-action">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="btn btn-ghost"
+                  disabled={deleteMutation.isPending}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    handleDelete();
+                  }}
+                  className="btn btn-error"
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? (
+                    <span className="loading loading-spinner"></span>
+                  ) : (
+                    "Delete"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1360,6 +1416,13 @@ export function WorkflowEditorPageContent() {
                         <span className="min-w-0 flex-1 truncate font-mono text-xs">
                           {flow.name}.py
                         </span>
+                        {flow.file_exists === false && (
+                          <AlertTriangle
+                            size={13}
+                            className="shrink-0 text-warning"
+                            aria-label="Missing source file"
+                          />
+                        )}
                         {flow.name === name && isDirty ? (
                           <span
                             className="h-2 w-2 rounded-full bg-warning"
@@ -2512,6 +2575,10 @@ export function WorkflowEditorPageContent() {
                   parameters: {
                     username: username,
                     chip_id: chipId,
+                    tags: tags
+                      .split(",")
+                      .map((tag) => tag.trim())
+                      .filter(Boolean),
                   },
                 },
               });

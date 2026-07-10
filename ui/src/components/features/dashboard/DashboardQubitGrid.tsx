@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react";
 
-import { StickyNote } from "lucide-react";
+import { MessageSquare, StickyNote } from "lucide-react";
 
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import { forumMarkerClass } from "../forum/categories";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 
-import type { NoteEntryWithMetric } from "./MetricNotePanel";
-import { DashboardNoteTooltip } from "./DashboardNoteTooltip";
+import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
+import { DashboardNoteTooltip, type ForumLinkEntry } from "./DashboardNoteTooltip";
 
 interface MetricValue {
   value: number | null;
@@ -26,6 +27,10 @@ interface DashboardQubitGridProps {
   notedQids?: Set<string>;
   /** Set of qubit IDs that have a target-level note. */
   targetNotedQids?: Set<string>;
+  /** Linked forum discussion label keyed by qubit ID. */
+  forumLinkedQids?: Record<string, string>;
+  /** Linked forum discussion details keyed by qubit ID. */
+  forumLinksByTarget?: Record<string, ForumLinkEntry[]>;
   /**
    * Set of qubit IDs that have notes on OTHER metrics (not this one). Used to
    * render a subtle indicator so users know to click to read the cross-metric
@@ -34,8 +39,12 @@ interface DashboardQubitGridProps {
   crossMetricNotedQids?: Set<string>;
   /** All notes for each qubit (across metrics), keyed by qubit ID. */
   notesByTarget?: Record<string, NoteEntryWithMetric[]>;
+  /** Target-level notes keyed by qubit/coupling ID. */
+  targetNotesByTarget?: Record<string, TargetNoteEntry>;
   /** The metric_key this grid renders, used to split current vs. other notes. */
   metricKey?: string;
+  /** Presentation optimized for metric heatmaps or note summary topology. */
+  presentation?: "metric" | "summary";
   /** Click handler when a qubit cell is clicked. */
   onQubitClick?: (qid: string) => void;
 }
@@ -80,9 +89,13 @@ export function DashboardQubitGrid({
   maxCellSize = 60,
   notedQids,
   targetNotedQids,
+  forumLinkedQids,
+  forumLinksByTarget,
   crossMetricNotedQids,
   notesByTarget,
+  targetNotesByTarget,
   metricKey,
+  presentation = "metric",
   onQubitClick,
 }: DashboardQubitGridProps) {
   const [hover, setHover] = useState<{
@@ -90,6 +103,7 @@ export function DashboardQubitGrid({
     x: number;
     y: number;
   } | null>(null);
+  const isSummaryPresentation = presentation === "summary";
   const {
     muxSize = 2,
     hasMux = false,
@@ -167,26 +181,47 @@ export function DashboardQubitGrid({
     >
       {cells.map(({ row, col, qid }) => {
         if (qid === undefined) {
-          return <div key={`${row}-${col}`} className="rounded-md bg-base-300/30 aspect-square" />;
+          return (
+            <div
+              key={`${row}-${col}`}
+              className={`rounded-md aspect-square ${
+                isSummaryPresentation
+                  ? "bg-base-200/40 border border-base-300/50"
+                  : "bg-base-300/30"
+              }`}
+            />
+          );
         }
         const metric = metricData?.[qid];
         const value = metric?.value ?? null;
         const bg = value !== null ? pickColor(value, autoMin, autoMax, colors) : null;
         const hasNote = notedQids?.has(qid) ?? false;
         const hasTargetNote = targetNotedQids?.has(qid) ?? false;
+        const forumLabel = forumLinkedQids?.[qid];
+        const hasForumDiscussion = !!forumLabel;
         const hasCrossMetricNote =
           !hasNote && !hasTargetNote && (crossMetricNotedQids?.has(qid) ?? false);
         const handleClick = () => onQubitClick?.(qid);
+        const summaryTileClass = hasTargetNote
+          ? "bg-warning/10 border-warning/50 text-base-content"
+          : hasForumDiscussion
+            ? "bg-info/10 border-info/40 text-base-content"
+            : "bg-base-100 border-base-300 text-base-content";
         const titleText =
-          (value !== null ? `${qid}: ${value.toFixed(4)} ${unit}` : `${qid}: No data`) +
+          (isSummaryPresentation
+            ? `Q${qid}: pinned summary target`
+            : value !== null
+              ? `${qid}: ${value.toFixed(4)} ${unit}`
+              : `${qid}: No data`) +
           (hasNote
-            ? " · has metric note"
+            ? " · has legacy metric note"
             : hasTargetNote
-              ? " · has target note"
+              ? " · has pinned summary"
               : hasCrossMetricNote
-                ? " · note on other metric"
+                ? " · legacy note on another metric"
                 : "") +
-          (onQubitClick ? " (click to edit metric note)" : "");
+          (hasForumDiscussion ? " · has linked forum discussion" : "") +
+          (onQubitClick ? " (click to edit pinned summary)" : "");
         const Tag = onQubitClick ? "button" : "div";
         return (
           <Tag
@@ -201,23 +236,27 @@ export function DashboardQubitGrid({
               });
             }}
             onMouseLeave={() => setHover(null)}
-            className={`aspect-square rounded-md flex flex-col items-center justify-center relative shadow-sm text-left ${
-              onQubitClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""
-            }`}
-            style={{ backgroundColor: bg ?? undefined }}
+            className={`aspect-square rounded-md flex flex-col items-center justify-center relative shadow-sm text-left transition-all ${
+              isSummaryPresentation ? `border ${summaryTileClass}` : ""
+            } ${onQubitClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""}`}
+            style={{ backgroundColor: isSummaryPresentation ? undefined : (bg ?? undefined) }}
             aria-label={titleText}
           >
             <span
-              className={`absolute top-0.5 left-0.5 text-[10px] font-semibold px-1 rounded leading-tight ${
-                bg ? "bg-black/30 text-white" : "bg-base-200 text-base-content"
-              }`}
+              className={
+                isSummaryPresentation
+                  ? "text-sm font-bold leading-none"
+                  : `absolute top-0.5 left-0.5 text-[10px] font-semibold px-1 rounded leading-tight ${
+                      bg ? "bg-black/30 text-white" : "bg-base-200 text-base-content"
+                    }`
+              }
             >
-              {qid}
+              {isSummaryPresentation ? `Q${qid}` : qid}
             </span>
             {(hasNote || hasTargetNote) && (
               <span
                 className="absolute top-1 right-1 rounded-full bg-warning/90 text-warning-content p-0.5 shadow"
-                title={hasNote ? "Has metric note" : "Has target note"}
+                title={hasNote ? "Has legacy metric note" : "Has pinned summary"}
               >
                 <StickyNote className="h-3 w-3" />
               </span>
@@ -225,24 +264,35 @@ export function DashboardQubitGrid({
             {hasCrossMetricNote && (
               <span
                 className="absolute top-1 right-1 rounded-full bg-base-100/80 text-base-content/60 p-0.5 shadow border border-base-300"
-                title="Note exists on another metric"
+                title="Legacy note exists on another metric"
               >
                 <StickyNote className="h-3 w-3" />
               </span>
             )}
-            {value !== null ? (
-              <span className="text-[11px] font-bold text-white drop-shadow leading-tight mt-1.5">
-                {value.toFixed(2)}
+            {hasForumDiscussion && (
+              <span
+                className={`absolute bottom-1 right-1 rounded-full p-0.5 shadow ${forumMarkerClass(forumLabel)}`}
+                title="Linked forum discussion"
+              >
+                <MessageSquare className="h-3 w-3" />
               </span>
-            ) : (
-              <span className="text-[10px] text-base-content/40 mt-1.5">N/A</span>
             )}
+            {!isSummaryPresentation &&
+              (value !== null ? (
+                <span className="text-[11px] font-bold text-white drop-shadow leading-tight mt-1.5">
+                  {value.toFixed(2)}
+                </span>
+              ) : (
+                <span className="text-[10px] text-base-content/40 mt-1.5">N/A</span>
+              ))}
           </Tag>
         );
       })}
       {hover &&
         (() => {
           const allNotes = notesByTarget?.[hover.qid] ?? [];
+          const targetNote = targetNotesByTarget?.[hover.qid];
+          const forumLinks = forumLinksByTarget?.[hover.qid] ?? [];
           const current = allNotes.find((n) => n.metricKey === metricKey);
           const others = allNotes.filter((n) => n.metricKey !== metricKey);
           const v = metricData?.[hover.qid]?.value ?? null;
@@ -252,8 +302,10 @@ export function DashboardQubitGrid({
             <DashboardNoteTooltip
               position={{ x: hover.x, y: hover.y }}
               header={header}
+              targetNote={targetNote}
               current={current}
               others={others}
+              forumLinks={forumLinks}
             />
           );
         })()}

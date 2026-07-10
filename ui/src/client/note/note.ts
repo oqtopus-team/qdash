@@ -26,19 +26,31 @@ import type {
 
 import type {
   ChipNotesSummaryResponse,
+  CreateCouplingNoteCommentParams,
+  CreateQubitNoteCommentParams,
   DeleteCouplingMetricNoteParams,
+  DeleteCouplingNoteCommentParams,
+  DeleteCouplingNoteParams,
   DeleteQubitMetricNoteParams,
+  DeleteQubitNoteCommentParams,
+  DeleteQubitNoteParams,
   GetChipNotesSummaryParams,
   HTTPValidationError,
   ListChipNoteEventsParams,
   ListNoteEventsResponse,
   ListTargetNoteEventsParams,
+  NoteCommentModel,
+  NoteCommentRequest,
   NoteModel,
   NoteUpsertRequest,
   SearchNoteEventsParams,
   SuccessResponse,
+  UpdateCouplingNoteCommentParams,
+  UpdateQubitNoteCommentParams,
   UpsertCouplingMetricNoteParams,
-  UpsertQubitMetricNoteParams
+  UpsertCouplingNoteParams,
+  UpsertQubitMetricNoteParams,
+  UpsertQubitNoteParams
 } from '../../schemas';
 
 import { customInstance } from '../../lib/custom-instance';
@@ -55,13 +67,15 @@ export const upsertQubitNote = (
     chipId: string,
     qid: string,
     noteUpsertRequest: NoteUpsertRequest,
+    params?: UpsertQubitNoteParams,
  options?: SecondParameter<typeof customInstance>,) => {
       
       
       return customInstance<NoteModel>(
       {url: `/chips/${chipId}/qubits/${qid}/note`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: noteUpsertRequest
+      data: noteUpsertRequest,
+        params
     },
       options);
     }
@@ -69,8 +83,8 @@ export const upsertQubitNote = (
 
 
 export const getUpsertQubitNoteMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest;params?: UpsertQubitNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest;params?: UpsertQubitNoteParams}, TContext> => {
 
 const mutationKey = ['upsertQubitNote'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -82,10 +96,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertQubitNote>>, {chipId: string;qid: string;data: NoteUpsertRequest}> = (props) => {
-          const {chipId,qid,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertQubitNote>>, {chipId: string;qid: string;data: NoteUpsertRequest;params?: UpsertQubitNoteParams}> = (props) => {
+          const {chipId,qid,data,params} = props ?? {};
 
-          return  upsertQubitNote(chipId,qid,data,requestOptions)
+          return  upsertQubitNote(chipId,qid,data,params,requestOptions)
         }
 
         
@@ -101,11 +115,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Upsert the general note for a qubit
  */
 export const useUpsertQubitNote = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertQubitNote>>, TError,{chipId: string;qid: string;data: NoteUpsertRequest;params?: UpsertQubitNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof upsertQubitNote>>,
         TError,
-        {chipId: string;qid: string;data: NoteUpsertRequest},
+        {chipId: string;qid: string;data: NoteUpsertRequest;params?: UpsertQubitNoteParams},
         TContext
       > => {
 
@@ -119,11 +133,13 @@ export const useUpsertQubitNote = <TError = HTTPValidationError,
 export const deleteQubitNote = (
     chipId: string,
     qid: string,
+    params?: DeleteQubitNoteParams,
  options?: SecondParameter<typeof customInstance>,) => {
       
       
       return customInstance<SuccessResponse>(
-      {url: `/chips/${chipId}/qubits/${qid}/note`, method: 'DELETE'
+      {url: `/chips/${chipId}/qubits/${qid}/note`, method: 'DELETE',
+        params
     },
       options);
     }
@@ -131,8 +147,8 @@ export const deleteQubitNote = (
 
 
 export const getDeleteQubitNoteMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string;params?: DeleteQubitNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string;params?: DeleteQubitNoteParams}, TContext> => {
 
 const mutationKey = ['deleteQubitNote'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -144,10 +160,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteQubitNote>>, {chipId: string;qid: string}> = (props) => {
-          const {chipId,qid} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteQubitNote>>, {chipId: string;qid: string;params?: DeleteQubitNoteParams}> = (props) => {
+          const {chipId,qid,params} = props ?? {};
 
-          return  deleteQubitNote(chipId,qid,requestOptions)
+          return  deleteQubitNote(chipId,qid,params,requestOptions)
         }
 
         
@@ -163,15 +179,216 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Clear the general note for a qubit
  */
 export const useDeleteQubitNote = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNote>>, TError,{chipId: string;qid: string;params?: DeleteQubitNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteQubitNote>>,
         TError,
-        {chipId: string;qid: string},
+        {chipId: string;qid: string;params?: DeleteQubitNoteParams},
         TContext
       > => {
 
       const mutationOptions = getDeleteQubitNoteMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * @summary Create a target summary note entry for a qubit
+ */
+export const createQubitNoteComment = (
+    chipId: string,
+    qid: string,
+    noteCommentRequest: NoteCommentRequest,
+    params?: CreateQubitNoteCommentParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<NoteCommentModel>(
+      {url: `/chips/${chipId}/qubits/${qid}/note/comments`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: noteCommentRequest,
+        params, signal
+    },
+      options);
+    }
+  
+
+
+export const getCreateQubitNoteCommentMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createQubitNoteComment>>, TError,{chipId: string;qid: string;data: NoteCommentRequest;params?: CreateQubitNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createQubitNoteComment>>, TError,{chipId: string;qid: string;data: NoteCommentRequest;params?: CreateQubitNoteCommentParams}, TContext> => {
+
+const mutationKey = ['createQubitNoteComment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createQubitNoteComment>>, {chipId: string;qid: string;data: NoteCommentRequest;params?: CreateQubitNoteCommentParams}> = (props) => {
+          const {chipId,qid,data,params} = props ?? {};
+
+          return  createQubitNoteComment(chipId,qid,data,params,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateQubitNoteCommentMutationResult = NonNullable<Awaited<ReturnType<typeof createQubitNoteComment>>>
+    export type CreateQubitNoteCommentMutationBody = NoteCommentRequest
+    export type CreateQubitNoteCommentMutationError = HTTPValidationError
+
+    /**
+ * @summary Create a target summary note entry for a qubit
+ */
+export const useCreateQubitNoteComment = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createQubitNoteComment>>, TError,{chipId: string;qid: string;data: NoteCommentRequest;params?: CreateQubitNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createQubitNoteComment>>,
+        TError,
+        {chipId: string;qid: string;data: NoteCommentRequest;params?: CreateQubitNoteCommentParams},
+        TContext
+      > => {
+
+      const mutationOptions = getCreateQubitNoteCommentMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * @summary Update a target summary note entry for a qubit
+ */
+export const updateQubitNoteComment = (
+    chipId: string,
+    qid: string,
+    commentId: string,
+    noteCommentRequest: NoteCommentRequest,
+    params?: UpdateQubitNoteCommentParams,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<NoteCommentModel>(
+      {url: `/chips/${chipId}/qubits/${qid}/note/comments/${commentId}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: noteCommentRequest,
+        params
+    },
+      options);
+    }
+  
+
+
+export const getUpdateQubitNoteCommentMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateQubitNoteComment>>, TError,{chipId: string;qid: string;commentId: string;data: NoteCommentRequest;params?: UpdateQubitNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateQubitNoteComment>>, TError,{chipId: string;qid: string;commentId: string;data: NoteCommentRequest;params?: UpdateQubitNoteCommentParams}, TContext> => {
+
+const mutationKey = ['updateQubitNoteComment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateQubitNoteComment>>, {chipId: string;qid: string;commentId: string;data: NoteCommentRequest;params?: UpdateQubitNoteCommentParams}> = (props) => {
+          const {chipId,qid,commentId,data,params} = props ?? {};
+
+          return  updateQubitNoteComment(chipId,qid,commentId,data,params,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateQubitNoteCommentMutationResult = NonNullable<Awaited<ReturnType<typeof updateQubitNoteComment>>>
+    export type UpdateQubitNoteCommentMutationBody = NoteCommentRequest
+    export type UpdateQubitNoteCommentMutationError = HTTPValidationError
+
+    /**
+ * @summary Update a target summary note entry for a qubit
+ */
+export const useUpdateQubitNoteComment = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateQubitNoteComment>>, TError,{chipId: string;qid: string;commentId: string;data: NoteCommentRequest;params?: UpdateQubitNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateQubitNoteComment>>,
+        TError,
+        {chipId: string;qid: string;commentId: string;data: NoteCommentRequest;params?: UpdateQubitNoteCommentParams},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateQubitNoteCommentMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * @summary Delete a target summary note entry for a qubit
+ */
+export const deleteQubitNoteComment = (
+    chipId: string,
+    qid: string,
+    commentId: string,
+    params?: DeleteQubitNoteCommentParams,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<SuccessResponse>(
+      {url: `/chips/${chipId}/qubits/${qid}/note/comments/${commentId}`, method: 'DELETE',
+        params
+    },
+      options);
+    }
+  
+
+
+export const getDeleteQubitNoteCommentMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNoteComment>>, TError,{chipId: string;qid: string;commentId: string;params?: DeleteQubitNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNoteComment>>, TError,{chipId: string;qid: string;commentId: string;params?: DeleteQubitNoteCommentParams}, TContext> => {
+
+const mutationKey = ['deleteQubitNoteComment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteQubitNoteComment>>, {chipId: string;qid: string;commentId: string;params?: DeleteQubitNoteCommentParams}> = (props) => {
+          const {chipId,qid,commentId,params} = props ?? {};
+
+          return  deleteQubitNoteComment(chipId,qid,commentId,params,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteQubitNoteCommentMutationResult = NonNullable<Awaited<ReturnType<typeof deleteQubitNoteComment>>>
+    
+    export type DeleteQubitNoteCommentMutationError = HTTPValidationError
+
+    /**
+ * @summary Delete a target summary note entry for a qubit
+ */
+export const useDeleteQubitNoteComment = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteQubitNoteComment>>, TError,{chipId: string;qid: string;commentId: string;params?: DeleteQubitNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteQubitNoteComment>>,
+        TError,
+        {chipId: string;qid: string;commentId: string;params?: DeleteQubitNoteCommentParams},
+        TContext
+      > => {
+
+      const mutationOptions = getDeleteQubitNoteCommentMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }
@@ -315,13 +532,15 @@ export const upsertCouplingNote = (
     chipId: string,
     couplingId: string,
     noteUpsertRequest: NoteUpsertRequest,
+    params?: UpsertCouplingNoteParams,
  options?: SecondParameter<typeof customInstance>,) => {
       
       
       return customInstance<NoteModel>(
       {url: `/chips/${chipId}/couplings/${couplingId}/note`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
-      data: noteUpsertRequest
+      data: noteUpsertRequest,
+        params
     },
       options);
     }
@@ -329,8 +548,8 @@ export const upsertCouplingNote = (
 
 
 export const getUpsertCouplingNoteMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest;params?: UpsertCouplingNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest;params?: UpsertCouplingNoteParams}, TContext> => {
 
 const mutationKey = ['upsertCouplingNote'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -342,10 +561,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertCouplingNote>>, {chipId: string;couplingId: string;data: NoteUpsertRequest}> = (props) => {
-          const {chipId,couplingId,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertCouplingNote>>, {chipId: string;couplingId: string;data: NoteUpsertRequest;params?: UpsertCouplingNoteParams}> = (props) => {
+          const {chipId,couplingId,data,params} = props ?? {};
 
-          return  upsertCouplingNote(chipId,couplingId,data,requestOptions)
+          return  upsertCouplingNote(chipId,couplingId,data,params,requestOptions)
         }
 
         
@@ -361,11 +580,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Upsert the general note for a coupling
  */
 export const useUpsertCouplingNote = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertCouplingNote>>, TError,{chipId: string;couplingId: string;data: NoteUpsertRequest;params?: UpsertCouplingNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof upsertCouplingNote>>,
         TError,
-        {chipId: string;couplingId: string;data: NoteUpsertRequest},
+        {chipId: string;couplingId: string;data: NoteUpsertRequest;params?: UpsertCouplingNoteParams},
         TContext
       > => {
 
@@ -379,11 +598,13 @@ export const useUpsertCouplingNote = <TError = HTTPValidationError,
 export const deleteCouplingNote = (
     chipId: string,
     couplingId: string,
+    params?: DeleteCouplingNoteParams,
  options?: SecondParameter<typeof customInstance>,) => {
       
       
       return customInstance<SuccessResponse>(
-      {url: `/chips/${chipId}/couplings/${couplingId}/note`, method: 'DELETE'
+      {url: `/chips/${chipId}/couplings/${couplingId}/note`, method: 'DELETE',
+        params
     },
       options);
     }
@@ -391,8 +612,8 @@ export const deleteCouplingNote = (
 
 
 export const getDeleteCouplingNoteMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string;params?: DeleteCouplingNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string;params?: DeleteCouplingNoteParams}, TContext> => {
 
 const mutationKey = ['deleteCouplingNote'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -404,10 +625,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCouplingNote>>, {chipId: string;couplingId: string}> = (props) => {
-          const {chipId,couplingId} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCouplingNote>>, {chipId: string;couplingId: string;params?: DeleteCouplingNoteParams}> = (props) => {
+          const {chipId,couplingId,params} = props ?? {};
 
-          return  deleteCouplingNote(chipId,couplingId,requestOptions)
+          return  deleteCouplingNote(chipId,couplingId,params,requestOptions)
         }
 
         
@@ -423,15 +644,216 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Clear the general note for a coupling
  */
 export const useDeleteCouplingNote = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNote>>, TError,{chipId: string;couplingId: string;params?: DeleteCouplingNoteParams}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteCouplingNote>>,
         TError,
-        {chipId: string;couplingId: string},
+        {chipId: string;couplingId: string;params?: DeleteCouplingNoteParams},
         TContext
       > => {
 
       const mutationOptions = getDeleteCouplingNoteMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * @summary Create a target summary note entry for a coupling
+ */
+export const createCouplingNoteComment = (
+    chipId: string,
+    couplingId: string,
+    noteCommentRequest: NoteCommentRequest,
+    params?: CreateCouplingNoteCommentParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<NoteCommentModel>(
+      {url: `/chips/${chipId}/couplings/${couplingId}/note/comments`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: noteCommentRequest,
+        params, signal
+    },
+      options);
+    }
+  
+
+
+export const getCreateCouplingNoteCommentMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCouplingNoteComment>>, TError,{chipId: string;couplingId: string;data: NoteCommentRequest;params?: CreateCouplingNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCouplingNoteComment>>, TError,{chipId: string;couplingId: string;data: NoteCommentRequest;params?: CreateCouplingNoteCommentParams}, TContext> => {
+
+const mutationKey = ['createCouplingNoteComment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCouplingNoteComment>>, {chipId: string;couplingId: string;data: NoteCommentRequest;params?: CreateCouplingNoteCommentParams}> = (props) => {
+          const {chipId,couplingId,data,params} = props ?? {};
+
+          return  createCouplingNoteComment(chipId,couplingId,data,params,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCouplingNoteCommentMutationResult = NonNullable<Awaited<ReturnType<typeof createCouplingNoteComment>>>
+    export type CreateCouplingNoteCommentMutationBody = NoteCommentRequest
+    export type CreateCouplingNoteCommentMutationError = HTTPValidationError
+
+    /**
+ * @summary Create a target summary note entry for a coupling
+ */
+export const useCreateCouplingNoteComment = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCouplingNoteComment>>, TError,{chipId: string;couplingId: string;data: NoteCommentRequest;params?: CreateCouplingNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createCouplingNoteComment>>,
+        TError,
+        {chipId: string;couplingId: string;data: NoteCommentRequest;params?: CreateCouplingNoteCommentParams},
+        TContext
+      > => {
+
+      const mutationOptions = getCreateCouplingNoteCommentMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * @summary Update a target summary note entry for a coupling
+ */
+export const updateCouplingNoteComment = (
+    chipId: string,
+    couplingId: string,
+    commentId: string,
+    noteCommentRequest: NoteCommentRequest,
+    params?: UpdateCouplingNoteCommentParams,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<NoteCommentModel>(
+      {url: `/chips/${chipId}/couplings/${couplingId}/note/comments/${commentId}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: noteCommentRequest,
+        params
+    },
+      options);
+    }
+  
+
+
+export const getUpdateCouplingNoteCommentMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCouplingNoteComment>>, TError,{chipId: string;couplingId: string;commentId: string;data: NoteCommentRequest;params?: UpdateCouplingNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCouplingNoteComment>>, TError,{chipId: string;couplingId: string;commentId: string;data: NoteCommentRequest;params?: UpdateCouplingNoteCommentParams}, TContext> => {
+
+const mutationKey = ['updateCouplingNoteComment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCouplingNoteComment>>, {chipId: string;couplingId: string;commentId: string;data: NoteCommentRequest;params?: UpdateCouplingNoteCommentParams}> = (props) => {
+          const {chipId,couplingId,commentId,data,params} = props ?? {};
+
+          return  updateCouplingNoteComment(chipId,couplingId,commentId,data,params,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCouplingNoteCommentMutationResult = NonNullable<Awaited<ReturnType<typeof updateCouplingNoteComment>>>
+    export type UpdateCouplingNoteCommentMutationBody = NoteCommentRequest
+    export type UpdateCouplingNoteCommentMutationError = HTTPValidationError
+
+    /**
+ * @summary Update a target summary note entry for a coupling
+ */
+export const useUpdateCouplingNoteComment = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCouplingNoteComment>>, TError,{chipId: string;couplingId: string;commentId: string;data: NoteCommentRequest;params?: UpdateCouplingNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateCouplingNoteComment>>,
+        TError,
+        {chipId: string;couplingId: string;commentId: string;data: NoteCommentRequest;params?: UpdateCouplingNoteCommentParams},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateCouplingNoteCommentMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * @summary Delete a target summary note entry for a coupling
+ */
+export const deleteCouplingNoteComment = (
+    chipId: string,
+    couplingId: string,
+    commentId: string,
+    params?: DeleteCouplingNoteCommentParams,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<SuccessResponse>(
+      {url: `/chips/${chipId}/couplings/${couplingId}/note/comments/${commentId}`, method: 'DELETE',
+        params
+    },
+      options);
+    }
+  
+
+
+export const getDeleteCouplingNoteCommentMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNoteComment>>, TError,{chipId: string;couplingId: string;commentId: string;params?: DeleteCouplingNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNoteComment>>, TError,{chipId: string;couplingId: string;commentId: string;params?: DeleteCouplingNoteCommentParams}, TContext> => {
+
+const mutationKey = ['deleteCouplingNoteComment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCouplingNoteComment>>, {chipId: string;couplingId: string;commentId: string;params?: DeleteCouplingNoteCommentParams}> = (props) => {
+          const {chipId,couplingId,commentId,params} = props ?? {};
+
+          return  deleteCouplingNoteComment(chipId,couplingId,commentId,params,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCouplingNoteCommentMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCouplingNoteComment>>>
+    
+    export type DeleteCouplingNoteCommentMutationError = HTTPValidationError
+
+    /**
+ * @summary Delete a target summary note entry for a coupling
+ */
+export const useDeleteCouplingNoteComment = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCouplingNoteComment>>, TError,{chipId: string;couplingId: string;commentId: string;params?: DeleteCouplingNoteCommentParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCouplingNoteComment>>,
+        TError,
+        {chipId: string;couplingId: string;commentId: string;params?: DeleteCouplingNoteCommentParams},
+        TContext
+      > => {
+
+      const mutationOptions = getDeleteCouplingNoteCommentMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

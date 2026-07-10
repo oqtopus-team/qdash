@@ -81,6 +81,7 @@ class FlowSummary(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     tags: list[str] = Field(..., description="Tags")
+    file_exists: bool = Field(True, description="Whether the flow source file exists")
 
 
 class ListFlowsResponse(BaseModel):

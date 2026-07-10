@@ -1,11 +1,15 @@
 """Tests for chip router endpoints."""
 
+from datetime import UTC, datetime
+
 import pytest
 
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.chip_note import ChipNoteDocument
+from qdash.dbmodel.cooldown import CooldownDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
@@ -205,6 +209,88 @@ class TestChipRouter:
         data = response.json()
         assert data["chip_id"] == "test_chip_status"
         assert data["activity_status"] == "inactive"
+
+    def test_chip_note_is_scoped_by_cooldown(self, test_client, test_project, auth_headers):
+        chip = ChipDocument(
+            chip_id="test_chip_note_scope",
+            username="test_user",
+            project_id="test_project",
+            size=64,
+            system_info=SystemInfoModel(),
+        )
+        chip.insert()
+        CooldownDocument(
+            project_id="test_project",
+            cooldown_id="cd-a",
+            cryo_id="cryo-1",
+            started_at=datetime(2026, 1, 1, tzinfo=UTC),
+            ended_at=datetime(2026, 1, 15, tzinfo=UTC),
+            chip_ids=["test_chip_note_scope"],
+        ).insert()
+        CooldownDocument(
+            project_id="test_project",
+            cooldown_id="cd-b",
+            cryo_id="cryo-1",
+            started_at=datetime(2026, 2, 1, tzinfo=UTC),
+            ended_at=None,
+            chip_ids=["test_chip_note_scope"],
+        ).insert()
+
+        first = test_client.put(
+            "/chips/test_chip_note_scope/note",
+            headers=auth_headers,
+            params={"cooldown_id": "cd-a"},
+            json={"content": "first cooldown note"},
+        )
+        second = test_client.put(
+            "/chips/test_chip_note_scope/note",
+            headers=auth_headers,
+            params={"cooldown_id": "cd-b"},
+            json={"content": "second cooldown note"},
+        )
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert first.json()["content"] == "first cooldown note"
+        assert second.json()["content"] == "second cooldown note"
+
+        cd_a = test_client.get(
+            "/chips/test_chip_note_scope/note",
+            headers=auth_headers,
+            params={"cooldown_id": "cd-a"},
+        )
+        cd_b = test_client.get(
+            "/chips/test_chip_note_scope/note",
+            headers=auth_headers,
+            params={"cooldown_id": "cd-b"},
+        )
+
+        assert cd_a.status_code == 200
+        assert cd_a.json()["content"] == "first cooldown note"
+        assert cd_b.status_code == 200
+        assert cd_b.json()["content"] == "second cooldown note"
+        assert ChipNoteDocument.find({"project_id": "test_project"}).count() == 2
+
+        reloaded_chip = ChipDocument.find_one(
+            {"project_id": "test_project", "chip_id": "test_chip_note_scope"}
+        ).run()
+        assert reloaded_chip is not None
+        assert reloaded_chip.note.content == ""
+
+        deleted = test_client.delete(
+            "/chips/test_chip_note_scope/note",
+            headers=auth_headers,
+            params={"cooldown_id": "cd-a"},
+        )
+        assert deleted.status_code == 200
+        cleared = test_client.get(
+            "/chips/test_chip_note_scope/note",
+            headers=auth_headers,
+            params={"cooldown_id": "cd-a"},
+        )
+        assert cleared.status_code == 200
+        assert cleared.json()["content"] == ""
+        assert ChipNoteDocument.find({"project_id": "test_project"}).count() == 1
 
     def test_update_chip_topology_creates_missing_target_skeletons(
         self, test_client, test_project, auth_headers

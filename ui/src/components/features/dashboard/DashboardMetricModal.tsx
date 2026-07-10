@@ -6,7 +6,12 @@ import Link from "next/link";
 import { CouplingMetricHistoryModal } from "@/components/features/metrics/CouplingMetricHistoryModal";
 import { QubitMetricHistoryModal } from "@/components/features/metrics/QubitMetricHistoryModal";
 
-import { MetricNotePanel, type NoteEntry, type NoteEntryWithMetric } from "./MetricNotePanel";
+import {
+  MetricNotePanel,
+  type NoteEntry,
+  type NoteEntryWithMetric,
+  type TargetNoteEntry,
+} from "./MetricNotePanel";
 import type { GetChipNotesSummaryParams } from "@/schemas";
 import type { MentionCandidate } from "@/components/ui/MarkdownEditor";
 
@@ -23,10 +28,12 @@ interface DashboardMetricModalProps {
   cooldownId?: string | null;
   cooldownLabel?: string | null;
   noteScopeParams?: GetChipNotesSummaryParams;
-  /** The metric note for this exact (target, metric) pair, if any. */
-  chipNote?: NoteEntry;
-  /** Notes for the same target on OTHER metrics (read-only context). */
-  otherNotes?: NoteEntryWithMetric[];
+  /** Target-level note for this qubit/coupling, if any. */
+  targetNote?: TargetNoteEntry;
+  /** Legacy metric note for this exact (target, metric) pair, if any. */
+  legacyMetricNote?: NoteEntry;
+  /** Legacy metric notes for the same target. */
+  legacyMetricNotes?: NoteEntryWithMetric[];
   mentionCandidates?: MentionCandidate[];
   onClose: () => void;
 }
@@ -41,8 +48,8 @@ function formatTarget(targetId: string): string {
 
 /**
  * Full-screen modal that opens from a dashboard cell click. The body is split
- * between the metric-history view and an inline metric-note panel so that
- * users can inspect history and edit the note in the same context.
+ * between the metric-history view and an inline target-note panel so that
+ * users can inspect history and edit shared qubit/coupling context.
  */
 export function DashboardMetricModal({
   chipId,
@@ -55,8 +62,9 @@ export function DashboardMetricModal({
   cooldownId,
   cooldownLabel,
   noteScopeParams,
-  chipNote,
-  otherNotes,
+  targetNote,
+  legacyMetricNote,
+  legacyMetricNotes,
   mentionCandidates,
   onClose,
 }: DashboardMetricModalProps) {
@@ -80,7 +88,7 @@ export function DashboardMetricModal({
               {formatTarget(targetId)} · {metricTitle}
             </h2>
             <p className="text-sm text-base-content/70 mt-0.5">
-              Metric history, per-task notes, and a per-cooldown metric note.
+              Metric history, per-task notes, and shared target context.
             </p>
           </div>
           <button
@@ -125,8 +133,9 @@ export function DashboardMetricModal({
               cooldownId={cooldownId}
               cooldownLabel={cooldownLabel}
               noteScopeParams={noteScopeParams}
-              existing={chipNote}
-              otherNotes={otherNotes}
+              existing={targetNote}
+              legacyMetricNote={legacyMetricNote}
+              legacyMetricNotes={legacyMetricNotes}
               mentionCandidates={mentionCandidates}
             />
           </div>

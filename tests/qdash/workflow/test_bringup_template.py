@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
+import pytest
+
 bringup_module = importlib.import_module("qdash.workflow.templates.bringup")
 experimental_bringup_module = importlib.import_module(
     "qdash.workflow.templates.experimental_simultaneous_bringup"
@@ -83,3 +85,42 @@ def test_experimental_simultaneous_bringup_defaults_to_all_mode(monkeypatch) -> 
 
     step = result["steps"][0]
     assert step.simultaneous_spectroscopy_schedule_mode == "all"
+
+
+def test_bringup_template_passes_template_task_list(monkeypatch) -> None:
+    monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
+
+    result = bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
+
+    assert result["steps"][1].tasks == bringup_module.BRINGUP_TASKS
+
+
+def test_experimental_simultaneous_bringup_passes_template_task_list(monkeypatch) -> None:
+    monkeypatch.setattr(experimental_bringup_module, "CalibService", FakeCalibService)
+
+    result = experimental_bringup_module.experimental_simultaneous_bringup(
+        username="alice",
+        chip_id="16Q-test",
+        mux_ids=[0],
+    )
+
+    assert result["steps"][0].tasks == (
+        experimental_bringup_module.EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS
+    )
+
+
+def test_bringup_template_requires_explicit_mux_ids(monkeypatch) -> None:
+    monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
+
+    with pytest.raises(ValueError, match="mux_ids is required"):
+        bringup_module.bringup(username="alice", chip_id="16Q-test")
+
+
+def test_experimental_simultaneous_bringup_requires_explicit_targets(monkeypatch) -> None:
+    monkeypatch.setattr(experimental_bringup_module, "CalibService", FakeCalibService)
+
+    with pytest.raises(ValueError, match="mux_ids or qids is required"):
+        experimental_bringup_module.experimental_simultaneous_bringup(
+            username="alice",
+            chip_id="16Q-test",
+        )
