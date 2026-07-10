@@ -6,6 +6,9 @@ on:
 
 jobs:
   claude-review:
+    if: >
+      github.event.pull_request.head.ref != 'develop' &&
+      github.event.pull_request.head.ref != 'main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
