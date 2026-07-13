@@ -811,3 +811,23 @@ class TestSnapshotOverrides:
         result = executor.execute_task(task, session, "0")
 
         assert result["success"] is True
+
+    def test_execute_batch_assigns_r2_per_qid(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        task = MockTask()
+        task.batch_run = MagicMock(  # type: ignore[method-assign]
+            return_value=RunResult(
+                raw_result={"0": {}, "4": {}},
+                r2={"0": 0.91, "4": 0.87},
+            )
+        )
+        mock_snapshot_loader.get_snapshot.return_value = ({}, {})
+        session: Any = MockSession()
+
+        _, results = executor_with_snapshot.execute_batch(task, session, ["0", "4"])
+
+        assert results["0"].r2 == {"0": 0.91}
+        assert results["4"].r2 == {"4": 0.87}

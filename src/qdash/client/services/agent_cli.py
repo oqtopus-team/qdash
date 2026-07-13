@@ -79,10 +79,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Apply the committed candidate on a worker and verify mapped backend files",
     )
     step.add_argument(
-        "--no-github-push",
-        action="store_false",
+        "--github-push",
+        action="store_true",
         dest="push_to_github",
-        help="Skip versioning changed backend files in GitHub",
+        help="Version changed backend files in GitHub",
     )
     step.add_argument("--action-idempotency-key")
     step.add_argument("--commit-idempotency-key")

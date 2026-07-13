@@ -26,3 +26,15 @@ def test_system_flow_registration_can_enable_agent_candidate_apply() -> None:
         "flow_function_name": "agent_candidate_apply",
         "deployment_name": "system-candidate-apply",
     }
+
+
+def test_system_flow_registration_uses_shared_setting(monkeypatch) -> None:
+    settings = type("Settings", (), {"enable_agent_calibration": True})()
+    monkeypatch.setattr(
+        "qdash.workflow.register_system_flows.get_settings",
+        lambda: settings,
+    )
+
+    names = {item["deployment_name"] for item in get_system_flows()}
+
+    assert "system-candidate-apply" in names

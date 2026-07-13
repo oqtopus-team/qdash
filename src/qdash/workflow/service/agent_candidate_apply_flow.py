@@ -40,7 +40,7 @@ def agent_candidate_apply(
     project_id: str,
     session_id: str,
     commit_id: str,
-    push_to_github: bool = True,
+    push_to_github: bool = False,
 ) -> dict[str, Any]:
     """Apply one already-gated candidate to worker-side backend parameter files."""
     initialize()
@@ -56,7 +56,7 @@ def agent_candidate_apply(
     if commit is None:
         raise ValueError(f"Committed agent candidate '{commit_id}' not found")
 
-    AgentCandidateCommitDocument.get_motor_collection().update_one(
+    transition = AgentCandidateCommitDocument.get_motor_collection().update_one(
         {
             "project_id": project_id,
             "commit_id": commit_id,
@@ -65,6 +65,13 @@ def agent_candidate_apply(
         {"$set": {"backend_status": "applying", "backend_error": ""}},
     )
 
+    if transition.modified_count != 1:
+        raise RuntimeError(
+            f"Agent candidate '{commit_id}' is no longer queued for backend application"
+        )
+
+    updater = None
+    params_snapshot: dict[str, bytes] | None = None
     try:
         if commit.after_snapshot is None:
             raise ValueError("Candidate commit has no authoritative after snapshot")
@@ -106,6 +113,7 @@ def agent_candidate_apply(
             raise ValueError(
                 f"Parameter '{commit.parameter_name}' has no configured params YAML mapping"
             )
+        params_snapshot = updater.snapshot(commit.qid, parameters)
         changed_files = updater.update(commit.qid, parameters)
         verified_files = updater.verify(commit.qid, parameters)
         if verified_files != target_files:
@@ -181,12 +189,21 @@ def agent_candidate_apply(
     except Exception as exc:
         from qdash.common.utils.datetime import now
 
+        rollback_error = ""
+        if updater is not None and params_snapshot is not None:
+            try:
+                updater.restore(params_snapshot)
+            except Exception as restore_exc:
+                rollback_error = f"; backend rollback failed: {restore_exc}"
+                logger.exception("Agent candidate backend rollback failed")
+
         AgentCandidateCommitDocument.get_motor_collection().update_one(
             {"project_id": project_id, "commit_id": commit_id},
             {
                 "$set": {
                     "backend_status": "failed",
-                    "backend_error": str(exc),
+                    "backend_verified": False,
+                    "backend_error": f"{exc}{rollback_error}",
                     "backend_applied_at": now(),
                 }
             },

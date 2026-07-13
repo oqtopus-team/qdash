@@ -17554,7 +17554,7 @@
           "push_to_github": {
             "type": "boolean",
             "title": "Push To Github",
-            "default": true
+            "default": false
           }
         },
         "type": "object",

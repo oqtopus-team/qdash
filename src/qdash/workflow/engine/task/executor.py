@@ -520,12 +520,11 @@ class TaskExecutor:
 
             run_result = self._run_batch_task(task, backend, qids)
             for qid, result in results.items():
-                result.r2 = run_result.r2 if run_result else None
-                if run_result is not None and run_result.r2 is not None:
-                    r2_value = run_result.r2.get(qid)
-                    if r2_value is not None:
-                        task_model = self.state_manager.get_task(task_name, task_type, qid)
-                        task_model.quality_metrics["r2"] = float(r2_value)
+                r2_value = run_result.r2.get(qid) if run_result and run_result.r2 else None
+                result.r2 = {qid: r2_value} if r2_value is not None else None
+                if r2_value is not None:
+                    task_model = self.state_manager.get_task(task_name, task_type, qid)
+                    task_model.quality_metrics["r2"] = float(r2_value)
 
             if run_result is None:
                 for qid, result in results.items():

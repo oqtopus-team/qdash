@@ -42,6 +42,10 @@ class BackendSaver:
         Calibration data directory
     task_manager_id : str
         The unique TaskManager ID (used for note files)
+    force_update_params : bool, default=False
+        Whether to update backend parameters when R² validation fails
+    persist_output_parameters : bool, default=True
+        Whether to persist output parameters to the database and backend
     """
 
     def __init__(

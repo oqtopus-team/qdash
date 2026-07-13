@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime  # noqa: TC003 - Pydantic resolves this runtime annotation
+from typing import Annotated
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -54,7 +55,9 @@ class SubmitAgentActionRequest(BaseModel):
     action_type: AgentActionType
     task_name: str | None = Field(default=None, max_length=200)
     qids: list[str] = Field(default_factory=list)
-    parameter_overrides: dict[str, float] = Field(default_factory=dict)
+    parameter_overrides: dict[str, Annotated[float, Field(allow_inf_nan=False)]] = Field(
+        default_factory=dict
+    )
     diagnosis: str = Field(default="", max_length=5000)
 
     @model_validator(mode="after")
@@ -175,7 +178,7 @@ class ApplyAgentCandidateRequest(BaseModel):
 
     idempotency_key: str = Field(min_length=1, max_length=128)
     expected_state_version: int = Field(ge=0)
-    push_to_github: bool = True
+    push_to_github: bool = False
 
 
 class AgentCandidateCommitResponse(BaseModel):

@@ -163,5 +163,5 @@ def test_run_step_prints_typed_transition(
     assert step_kwargs["reconfigure_before_task"] is False
     assert step_kwargs["commit_candidate"] is True
     assert step_kwargs["apply_backend"] is True
-    assert step_kwargs["push_to_github"] is True
+    assert step_kwargs["push_to_github"] is False
     client.close.assert_called_once()

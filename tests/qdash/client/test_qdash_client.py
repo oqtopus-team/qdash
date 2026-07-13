@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Any, cast
+from unittest.mock import MagicMock
 
 import httpx
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 import pytest
 
@@ -69,6 +71,7 @@ def _build_client(
     *,
     max_attempts: int = 3,
     api_token: str | None = None,
+    sleep_fn: Callable[[float], None] | None = None,
 ) -> QDashClient:
     config = _build_config(
         api_token=api_token,
@@ -80,7 +83,11 @@ def _build_client(
         timeout=config.timeout_sec,
         verify=config.verify_tls,
     )
-    return QDashClient(config, http_client=http_client, sleep_fn=lambda _sec: None)
+    return QDashClient(
+        config,
+        http_client=http_client,
+        sleep_fn=sleep_fn or (lambda _sec: None),
+    )
 
 
 def test_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1590,7 +1597,7 @@ def test_agent_session_client_methods() -> None:
             assert json.loads(request.read()) == {
                 "idempotency_key": "apply-key-1",
                 "expected_state_version": 2,
-                "push_to_github": True,
+                "push_to_github": False,
             }
             return httpx.Response(200, json=applied_commit_payload)
         if (
@@ -1722,7 +1729,12 @@ def test_agent_polling_helpers_handle_eventual_consistency() -> None:
             return httpx.Response(200, json=execution_payload)
         return httpx.Response(404, json={"detail": "missing"})
 
-    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    sleep = MagicMock()
+    client = _build_client(
+        httpx.MockTransport(handler),
+        api_token="api-token",
+        sleep_fn=sleep,
+    )
     try:
         action = client.wait_for_agent_action(
             "session-1",
@@ -1748,6 +1760,7 @@ def test_agent_polling_helpers_handle_eventual_consistency() -> None:
         assert action_calls == 3
         assert execution.status == "completed"
         assert execution_calls == 3
+        assert sleep.call_count == 3
     finally:
         client.close()
 
@@ -1782,7 +1795,12 @@ def test_wait_for_agent_candidate_apply_reaches_verified_terminal_state() -> Non
             json={**base, "backend_status": status, "backend_verified": status == "applied"},
         )
 
-    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    sleep = MagicMock()
+    client = _build_client(
+        httpx.MockTransport(handler),
+        api_token="api-token",
+        sleep_fn=sleep,
+    )
     try:
         result = client.wait_for_agent_candidate_apply(
             "session-1",
@@ -1794,6 +1812,7 @@ def test_wait_for_agent_candidate_apply_reaches_verified_terminal_state() -> Non
         assert result.backend_verified is True
         assert calls == 2
     finally:
+        sleep.assert_called_once_with(0)
         client.close()
 
 

@@ -734,7 +734,7 @@ class QDashClient:
                     f"Execution '{execution_id}' did not reach a terminal state "
                     f"within {timeout_seconds} seconds"
                 )
-            time.sleep(poll_interval_seconds)
+            self._sleep(poll_interval_seconds)
 
     def create_agent_session(
         self,
@@ -861,7 +861,7 @@ class QDashClient:
                     f"Agent action '{action_id}' did not produce an operation "
                     f"within {timeout_seconds} seconds"
                 )
-            time.sleep(poll_interval_seconds)
+            self._sleep(poll_interval_seconds)
 
     def wait_for_agent_action_execution(
         self,
@@ -887,7 +887,7 @@ class QDashClient:
                     f"Agent action {action_id} did not produce a QDash execution "
                     f"within {timeout_seconds} seconds"
                 )
-            time.sleep(poll_interval_seconds)
+            self._sleep(poll_interval_seconds)
 
     def list_agent_action_candidates(
         self,
@@ -946,7 +946,7 @@ class QDashClient:
         *,
         idempotency_key: str,
         expected_state_version: int,
-        push_to_github: bool = True,
+        push_to_github: bool = False,
     ) -> AgentCandidateCommitResponse:
         """Dispatch one committed candidate for worker-side backend application."""
         response = self._request(
@@ -981,7 +981,7 @@ class QDashClient:
                     f"Agent candidate commit '{commit_id}' was not applied "
                     f"within {timeout_seconds} seconds"
                 )
-            time.sleep(poll_interval_seconds)
+            self._sleep(poll_interval_seconds)
 
     def list_agent_actions(self, session_id: str) -> list[AgentActionResponse]:
         """List the audit trail for a local-agent session."""

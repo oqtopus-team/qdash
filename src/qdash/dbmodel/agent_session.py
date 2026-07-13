@@ -91,7 +91,7 @@ class AgentCandidateCommitDocument(Document):
     backend_error: str = ""
     backend_apply_idempotency_key: str | None = None
     backend_apply_request_hash: str | None = None
-    backend_push_to_github: bool = True
+    backend_push_to_github: bool = False
     backend_requested_at: datetime | None = None
     backend_applied_at: datetime | None = None
 

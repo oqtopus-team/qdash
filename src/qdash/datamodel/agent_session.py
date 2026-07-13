@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from enum import Enum
 
 from pydantic import BaseModel, Field, model_validator
@@ -49,6 +50,8 @@ class NumericBounds(BaseModel):
 
     def contains(self, value: float) -> bool:
         """Return whether a value is within the configured interval."""
+        if not math.isfinite(value):
+            return False
         if self.minimum is not None and value < self.minimum:
             return False
         return not (self.maximum is not None and value > self.maximum)

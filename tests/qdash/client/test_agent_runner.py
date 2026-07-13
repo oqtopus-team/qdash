@@ -8,6 +8,10 @@ from qdash.client.services.agent_runner import (
     AgentCalibrationRunner,
     AgentSkillTransition,
 )
+from qdash.client.services.errors import (
+    QDashTransportError,
+    QDashValidationError,
+)
 from qdash.client.services.models import (
     AgentActionResponse,
     AgentCandidateCommitResponse,
@@ -230,7 +234,7 @@ def test_run_step_applies_and_verifies_backend_after_commit() -> None:
         "commit-1",
         idempotency_key="apply-key",
         expected_state_version=2,
-        push_to_github=True,
+        push_to_github=False,
     )
     client.wait_for_agent_candidate_apply.assert_called_once()
 
@@ -264,7 +268,7 @@ def test_run_step_escalates_policy_rejection() -> None:
     client = MagicMock()
     client.get_agent_session.return_value = _session(0)
     client.submit_agent_action.return_value = _action(decision="rejected")
-    runner = AgentCalibrationRunner(client)
+    runner = AgentCalibrationRunner(client, poll_interval_seconds=0)
 
     outcome = runner.run_step(
         session_id="session-1",
@@ -276,3 +280,111 @@ def test_run_step_escalates_policy_rejection() -> None:
 
     assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
     client.execute_agent_action.assert_not_called()
+
+
+def _client_ready_for_candidate() -> MagicMock:
+    client = MagicMock()
+    client.get_agent_session.return_value = _session(0)
+    client.submit_agent_action.return_value = _action()
+    client.execute_agent_action.return_value = _action()
+    client.wait_for_agent_action.return_value = _action()
+    client.wait_for_agent_action_execution.return_value = _action()
+    client.wait_for_execution.return_value = _execution()
+    client.list_agent_action_candidates.return_value = [_candidate(accepted=True)]
+    return client
+
+
+def test_run_step_retries_transient_api_error() -> None:
+    client = MagicMock()
+    client.get_agent_session.side_effect = QDashTransportError("network unavailable")
+    runner = AgentCalibrationRunner(client, poll_interval_seconds=0)
+
+    outcome = runner.run_step(
+        session_id="session-1",
+        task_name="CheckT1",
+        qid="Q00",
+        source_execution_id="source-1",
+        candidate_parameter="t1",
+    )
+
+    assert outcome.transition == AgentSkillTransition.RETRY
+    assert outcome.action_id is None
+    assert "network unavailable" in outcome.reason
+
+
+def test_run_step_escalates_commit_validation_error_with_provenance() -> None:
+    client = _client_ready_for_candidate()
+    client.get_agent_session.side_effect = [_session(0), _session(1)]
+    client.commit_agent_action_candidate.side_effect = QDashValidationError(
+        "state version conflict",
+        status_code=409,
+    )
+    runner = AgentCalibrationRunner(client, poll_interval_seconds=0)
+
+    outcome = runner.run_step(
+        session_id="session-1",
+        task_name="CheckT1",
+        qid="Q00",
+        source_execution_id="source-1",
+        candidate_parameter="t1",
+        commit_candidate=True,
+    )
+
+    assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
+    assert outcome.action_id == "action-1"
+    assert outcome.operation_id == "operation-1"
+    assert outcome.execution_id == "execution-1"
+    assert outcome.candidate is not None
+
+
+def test_run_step_backend_timeout_preserves_execution_id() -> None:
+    client = _client_ready_for_candidate()
+    client.get_agent_session.side_effect = [_session(0), _session(1), _session(2)]
+    client.commit_agent_action_candidate.return_value = _commit()
+    client.apply_agent_candidate_commit.return_value = _commit().model_copy(
+        update={"backend_status": "queued"}
+    )
+    client.wait_for_agent_candidate_apply.side_effect = TimeoutError("apply timed out")
+    runner = AgentCalibrationRunner(client, poll_interval_seconds=0)
+
+    outcome = runner.run_step(
+        session_id="session-1",
+        task_name="CheckT1",
+        qid="Q00",
+        source_execution_id="source-1",
+        candidate_parameter="t1",
+        commit_candidate=True,
+        apply_backend=True,
+    )
+
+    assert outcome.transition == AgentSkillTransition.RETRY
+    assert outcome.execution_id == "execution-1"
+
+
+def test_run_step_backend_verification_failure_preserves_execution_id() -> None:
+    client = _client_ready_for_candidate()
+    client.get_agent_session.side_effect = [_session(0), _session(1), _session(2)]
+    client.commit_agent_action_candidate.return_value = _commit()
+    queued = _commit().model_copy(update={"backend_status": "queued"})
+    client.apply_agent_candidate_commit.return_value = queued
+    client.wait_for_agent_candidate_apply.return_value = queued.model_copy(
+        update={
+            "backend_status": "failed",
+            "backend_verified": False,
+            "backend_error": "verification failed",
+        }
+    )
+    runner = AgentCalibrationRunner(client, poll_interval_seconds=0)
+
+    outcome = runner.run_step(
+        session_id="session-1",
+        task_name="CheckT1",
+        qid="Q00",
+        source_execution_id="source-1",
+        candidate_parameter="t1",
+        commit_candidate=True,
+        apply_backend=True,
+    )
+
+    assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
+    assert outcome.execution_id == "execution-1"

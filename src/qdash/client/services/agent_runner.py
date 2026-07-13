@@ -7,6 +7,8 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+from qdash.client.services.errors import QDashApiError, QDashTransportError
+
 if TYPE_CHECKING:
     from qdash.client.services.client import QDashClient
     from qdash.client.services.models import (
@@ -40,6 +42,37 @@ class AgentStepOutcome:
     commit: AgentCandidateCommitResponse | None = None
 
 
+def _api_error_outcome(
+    exc: QDashApiError,
+    *,
+    session_id: str,
+    action_id: str | None = None,
+    operation_id: str | None = None,
+    execution_id: str | None = None,
+    action: AgentActionResponse | None = None,
+    candidate: AgentCandidateResponse | None = None,
+    commit: AgentCandidateCommitResponse | None = None,
+) -> AgentStepOutcome:
+    status = exc.status_code
+    is_transient = isinstance(exc, QDashTransportError) and (
+        status is None or status in {408, 429} or status >= 500
+    )
+    transition = (
+        AgentSkillTransition.RETRY if is_transient else AgentSkillTransition.HUMAN_ESCALATION
+    )
+    return AgentStepOutcome(
+        transition=transition,
+        reason=f"QDash API request failed: {exc}",
+        session_id=session_id,
+        action_id=action_id,
+        operation_id=operation_id,
+        execution_id=execution_id,
+        action=action,
+        candidate=candidate,
+        commit=commit,
+    )
+
+
 class AgentCalibrationRunner:
     """Run bounded single-task calibration steps through QDash safety gates."""
 
@@ -71,7 +104,7 @@ class AgentCalibrationRunner:
         reconfigure_before_task: bool = False,
         commit_candidate: bool = False,
         apply_backend: bool = False,
-        push_to_github: bool = True,
+        push_to_github: bool = False,
         action_idempotency_key: str | None = None,
         commit_idempotency_key: str | None = None,
         backend_apply_idempotency_key: str | None = None,
@@ -79,17 +112,20 @@ class AgentCalibrationRunner:
         """Run one staged measurement and return a typed Skill transition."""
         if apply_backend and not commit_candidate:
             raise ValueError("apply_backend requires commit_candidate=true")
-        session = self._client.get_agent_session(session_id)
-        action = self._client.submit_agent_action(
-            session_id,
-            idempotency_key=action_idempotency_key or f"action-{uuid4()}",
-            expected_state_version=session.state_version,
-            action_type="run_task",
-            task_name=task_name,
-            qids=[qid],
-            parameter_overrides=parameter_overrides,
-            diagnosis=diagnosis,
-        )
+        try:
+            session = self._client.get_agent_session(session_id)
+            action = self._client.submit_agent_action(
+                session_id,
+                idempotency_key=action_idempotency_key or f"action-{uuid4()}",
+                expected_state_version=session.state_version,
+                action_type="run_task",
+                task_name=task_name,
+                qids=[qid],
+                parameter_overrides=parameter_overrides,
+                diagnosis=diagnosis,
+            )
+        except QDashApiError as exc:
+            return _api_error_outcome(exc, session_id=session_id)
         if action.decision != "authorized":
             return AgentStepOutcome(
                 transition=AgentSkillTransition.HUMAN_ESCALATION,
@@ -99,13 +135,21 @@ class AgentCalibrationRunner:
                 action=action,
             )
 
-        dispatched = self._client.execute_agent_action(
-            session_id,
-            action.action_id,
-            source_execution_id=source_execution_id,
-            update_params=False,
-            reconfigure=reconfigure_before_task,
-        )
+        try:
+            dispatched = self._client.execute_agent_action(
+                session_id,
+                action.action_id,
+                source_execution_id=source_execution_id,
+                update_params=False,
+                reconfigure=reconfigure_before_task,
+            )
+        except QDashApiError as exc:
+            return _api_error_outcome(
+                exc,
+                session_id=session_id,
+                action_id=action.action_id,
+                action=action,
+            )
         if dispatched.execution_status == "failed":
             return AgentStepOutcome(
                 transition=AgentSkillTransition.RETRY,
@@ -131,6 +175,13 @@ class AgentCalibrationRunner:
                 action=action,
             )
 
+        except QDashApiError as exc:
+            return _api_error_outcome(
+                exc,
+                session_id=session_id,
+                action_id=action.action_id,
+                action=action,
+            )
         operation_id = dispatched.operation_id
         if dispatched.execution_status == "failed" or operation_id is None:
             return AgentStepOutcome(
@@ -152,6 +203,14 @@ class AgentCalibrationRunner:
             return AgentStepOutcome(
                 transition=AgentSkillTransition.RETRY,
                 reason=str(exc),
+                session_id=session_id,
+                action_id=action.action_id,
+                operation_id=operation_id,
+                action=dispatched,
+            )
+        except QDashApiError as exc:
+            return _api_error_outcome(
+                exc,
                 session_id=session_id,
                 action_id=action.action_id,
                 operation_id=operation_id,
@@ -185,6 +244,15 @@ class AgentCalibrationRunner:
                 execution_id=execution_id,
                 action=dispatched,
             )
+        except QDashApiError as exc:
+            return _api_error_outcome(
+                exc,
+                session_id=session_id,
+                action_id=action.action_id,
+                operation_id=operation_id,
+                execution_id=execution_id,
+                action=dispatched,
+            )
         if execution.status.lower() != "completed":
             return AgentStepOutcome(
                 transition=AgentSkillTransition.RETRY,
@@ -196,7 +264,17 @@ class AgentCalibrationRunner:
                 action=dispatched,
             )
 
-        candidates = self._client.list_agent_action_candidates(session_id, action.action_id)
+        try:
+            candidates = self._client.list_agent_action_candidates(session_id, action.action_id)
+        except QDashApiError as exc:
+            return _api_error_outcome(
+                exc,
+                session_id=session_id,
+                action_id=action.action_id,
+                operation_id=operation_id,
+                execution_id=execution_id,
+                action=dispatched,
+            )
         matches = [
             candidate for candidate in candidates if candidate.parameter_name == candidate_parameter
         ]
@@ -229,24 +307,49 @@ class AgentCalibrationRunner:
 
         committed = None
         if commit_candidate:
-            current_session = self._client.get_agent_session(session_id)
-            committed = self._client.commit_agent_action_candidate(
-                session_id,
-                action.action_id,
-                candidate.parameter_name,
-                idempotency_key=commit_idempotency_key or f"commit-{uuid4()}",
-                expected_state_version=current_session.state_version,
-                task_id=candidate.task_id,
-            )
-            if apply_backend:
-                apply_session = self._client.get_agent_session(session_id)
-                committed = self._client.apply_agent_candidate_commit(
+            try:
+                current_session = self._client.get_agent_session(session_id)
+                committed = self._client.commit_agent_action_candidate(
                     session_id,
-                    committed.commit_id,
-                    idempotency_key=(backend_apply_idempotency_key or f"backend-apply-{uuid4()}"),
-                    expected_state_version=apply_session.state_version,
-                    push_to_github=push_to_github,
+                    action.action_id,
+                    candidate.parameter_name,
+                    idempotency_key=commit_idempotency_key or f"commit-{uuid4()}",
+                    expected_state_version=current_session.state_version,
+                    task_id=candidate.task_id,
                 )
+            except QDashApiError as exc:
+                return _api_error_outcome(
+                    exc,
+                    session_id=session_id,
+                    action_id=action.action_id,
+                    operation_id=operation_id,
+                    execution_id=execution_id,
+                    action=dispatched,
+                    candidate=candidate,
+                )
+            if apply_backend:
+                try:
+                    apply_session = self._client.get_agent_session(session_id)
+                    committed = self._client.apply_agent_candidate_commit(
+                        session_id,
+                        committed.commit_id,
+                        idempotency_key=(
+                            backend_apply_idempotency_key or f"backend-apply-{uuid4()}"
+                        ),
+                        expected_state_version=apply_session.state_version,
+                        push_to_github=push_to_github,
+                    )
+                except QDashApiError as exc:
+                    return _api_error_outcome(
+                        exc,
+                        session_id=session_id,
+                        action_id=action.action_id,
+                        operation_id=operation_id,
+                        execution_id=execution_id,
+                        action=dispatched,
+                        candidate=candidate,
+                        commit=committed,
+                    )
                 try:
                     committed = self._client.wait_for_agent_candidate_apply(
                         session_id,
@@ -261,12 +364,25 @@ class AgentCalibrationRunner:
                         session_id=session_id,
                         action_id=action.action_id,
                         operation_id=operation_id,
+                        execution_id=execution_id,
+                        action=dispatched,
+                        candidate=candidate,
+                        commit=committed,
+                    )
+                except QDashApiError as exc:
+                    return _api_error_outcome(
+                        exc,
+                        session_id=session_id,
+                        action_id=action.action_id,
+                        operation_id=operation_id,
+                        execution_id=execution_id,
                         action=dispatched,
                         candidate=candidate,
                         commit=committed,
                     )
                 if committed.backend_status != "applied" or not committed.backend_verified:
                     return AgentStepOutcome(
+                        execution_id=execution_id,
                         transition=AgentSkillTransition.HUMAN_ESCALATION,
                         reason=(
                             committed.backend_error
