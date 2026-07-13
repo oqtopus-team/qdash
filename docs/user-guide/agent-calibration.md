@@ -97,6 +97,41 @@ snapshot. After a node passes, its authoritative candidate is carried into later
 parameter override. An explicit `parameter_overrides` value on a later node takes precedence over a
 carried value. Every override is checked against the immutable session bounds before dispatch.
 
+Nodes may define `id`, `on_pass`, and `on_rollback` to form a bounded decision graph. An omitted
+`on_pass` advances to the next array item, `$complete` ends successfully, and an omitted
+`on_rollback` stops with `rollback`. A rollback transition means that QDash rejected the measured
+candidate; it does not carry that candidate into the recovery node.
+
+~~~bash
+qdash-agent --profile local run-campaign \
+  --session-id SESSION_ID \
+  --qid Q00 \
+  --source-execution-id SOURCE_EXECUTION_ID \
+  --max-node-executions 3 \
+  --plan '[
+    {
+      "id":"calibrate-rabi",
+      "task_name":"CheckRabi",
+      "candidate_parameter":"control_amplitude",
+      "on_pass":"$complete",
+      "on_rollback":"recover-rabi"
+    },
+    {
+      "id":"recover-rabi",
+      "task_name":"CheckRabi",
+      "candidate_parameter":"control_amplitude",
+      "parameter_overrides":{"control_amplitude":0.084},
+      "on_pass":"$complete",
+      "on_rollback":"calibrate-rabi"
+    }
+  ]'
+~~~
+
+`--max-node-executions` bounds all graph visits, including loops, and must fit within the session's
+remaining action budget before dispatch. If the graph does not finish within the bound, the runner
+returns `human_escalation`. The output `node_path` records every visited node. Revisited nodes use a
+new deterministic idempotency key while transport retries before dispatch reuse the same key.
+
 The example leaves all candidates staged. A node may explicitly set `commit_candidate`,
 `apply_backend`, and `push_to_github` to `true`; `apply_backend` requires `commit_candidate`, and
 `push_to_github` requires both. Hardware reconfiguration remains opt-in per node through

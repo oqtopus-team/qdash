@@ -19,6 +19,8 @@ if TYPE_CHECKING:
         AgentSessionResponse,
     )
 
+_CAMPAIGN_COMPLETE = "$complete"
+
 
 class AgentSkillTransition(StrEnum):
     """Deterministic transitions exposed to a Skill-orchestrating agent."""
@@ -50,6 +52,9 @@ class AgentCampaignNode:
 
     task_name: str
     candidate_parameter: str
+    node_id: str | None = None
+    on_pass: str | None = None
+    on_rollback: str | None = None
     parameter_overrides: dict[str, float] = field(default_factory=dict)
     diagnosis: str = ""
     reconfigure_before_task: bool = False
@@ -66,6 +71,13 @@ class AgentCampaignNode:
             raise ValueError("campaign apply_backend requires commit_candidate=true")
         if self.push_to_github and not self.apply_backend:
             raise ValueError("campaign push_to_github requires apply_backend=true")
+        for field_name, value in (
+            ("node_id", self.node_id),
+            ("on_pass", self.on_pass),
+            ("on_rollback", self.on_rollback),
+        ):
+            if value is not None and not value:
+                raise ValueError(f"campaign {field_name} must not be empty")
         if any(not math.isfinite(value) for value in self.parameter_overrides.values()):
             raise ValueError("campaign parameter overrides must be finite")
 
@@ -83,6 +95,7 @@ class AgentCampaignOutcome:
     attempts: int
     outcomes: tuple[AgentStepOutcome, ...]
     carried_overrides: dict[str, float] = field(default_factory=dict)
+    node_path: tuple[str, ...] = ()
 
 
 def _api_error_outcome(
@@ -483,10 +496,36 @@ class AgentCampaignRunner:
         )
 
     @staticmethod
+    def _validate_graph(nodes: list[AgentCampaignNode]) -> tuple[list[str], str | None]:
+        node_ids = [node.node_id or f"node-{index}" for index, node in enumerate(nodes)]
+        if _CAMPAIGN_COMPLETE in node_ids:
+            return node_ids, f"Campaign node ID '{_CAMPAIGN_COMPLETE}' is reserved"
+        if len(set(node_ids)) != len(node_ids):
+            return node_ids, "Campaign node IDs must be unique"
+
+        known_ids = set(node_ids)
+        for index, node in enumerate(nodes):
+            for transition, target in (
+                ("on_pass", node.on_pass),
+                ("on_rollback", node.on_rollback),
+            ):
+                if (
+                    target is not None
+                    and not (transition == "on_pass" and target == _CAMPAIGN_COMPLETE)
+                    and target not in known_ids
+                ):
+                    return (
+                        node_ids,
+                        f"Node {index} {transition} target '{target}' does not exist",
+                    )
+        return node_ids, None
+
+    @staticmethod
     def _policy_error(
         session: AgentSessionResponse,
         qid: str,
         nodes: list[AgentCampaignNode],
+        required_actions: int,
     ) -> str | None:
         policy = session.policy
         if session.status != "active":
@@ -494,9 +533,9 @@ class AgentCampaignRunner:
         if qid not in policy.qids:
             return f"Qid '{qid}' is outside the session scope"
         remaining_actions = policy.max_actions - session.action_count
-        if len(nodes) > remaining_actions:
+        if required_actions > remaining_actions:
             return (
-                f"Campaign requires {len(nodes)} actions but the session has "
+                f"Campaign requires {required_actions} actions but the session has "
                 f"{remaining_actions} remaining"
             )
 
@@ -530,17 +569,35 @@ class AgentCampaignRunner:
         source_execution_id: str,
         nodes: list[AgentCampaignNode],
         max_pre_dispatch_retries: int = 1,
+        max_node_executions: int | None = None,
         idempotency_prefix: str | None = None,
     ) -> AgentCampaignOutcome:
-        """Run campaign nodes sequentially while preserving a fixed source snapshot."""
+        """Run a bounded decision graph while preserving a fixed source snapshot."""
         if not nodes:
             raise ValueError("campaign requires at least one node")
         if max_pre_dispatch_retries < 0:
             raise ValueError("max_pre_dispatch_retries must be non-negative")
+        execution_limit = len(nodes) if max_node_executions is None else max_node_executions
+        if execution_limit <= 0:
+            raise ValueError("max_node_executions must be positive")
         if idempotency_prefix is not None and (
             not idempotency_prefix or len(idempotency_prefix) > 96
         ):
             raise ValueError("idempotency_prefix must contain 1 to 96 characters")
+
+        node_ids, graph_error = self._validate_graph(nodes)
+        if graph_error is not None:
+            return AgentCampaignOutcome(
+                transition=AgentSkillTransition.HUMAN_ESCALATION,
+                reason=graph_error,
+                session_id=session_id,
+                qid=qid,
+                source_execution_id=source_execution_id,
+                completed_nodes=0,
+                attempts=0,
+                outcomes=(),
+            )
+        node_indexes = {node_id: index for index, node_id in enumerate(node_ids)}
 
         try:
             session = self._client.get_agent_session(session_id)
@@ -557,7 +614,7 @@ class AgentCampaignRunner:
                 outcomes=(),
             )
 
-        policy_error = self._policy_error(session, qid, nodes)
+        policy_error = self._policy_error(session, qid, nodes, execution_limit)
         if policy_error is not None:
             return AgentCampaignOutcome(
                 transition=AgentSkillTransition.HUMAN_ESCALATION,
@@ -574,10 +631,35 @@ class AgentCampaignRunner:
         carried: dict[str, float] = {}
         outcomes: list[AgentStepOutcome] = []
         completed_nodes = 0
+        node_path: list[str] = []
+        visit_counts: dict[int, int] = {}
+        current_index = 0
 
-        for index, node in enumerate(nodes):
+        while True:
+            if len(node_path) >= execution_limit:
+                return AgentCampaignOutcome(
+                    transition=AgentSkillTransition.HUMAN_ESCALATION,
+                    reason=f"Campaign reached the {execution_limit} node execution limit",
+                    session_id=session_id,
+                    qid=qid,
+                    source_execution_id=source_execution_id,
+                    completed_nodes=completed_nodes,
+                    attempts=len(outcomes),
+                    outcomes=tuple(outcomes),
+                    carried_overrides=dict(carried),
+                    node_path=tuple(node_path),
+                )
+
+            node = nodes[current_index]
+            node_id = node_ids[current_index]
+            visit = visit_counts.get(current_index, 0)
+            visit_counts[current_index] = visit + 1
+            node_path.append(node_id)
             overrides = {**carried, **node.parameter_overrides}
             retries = 0
+            key_base = f"{prefix}-node-{current_index}"
+            if visit:
+                key_base = f"{key_base}-visit-{visit}"
             while True:
                 outcome = self._step_runner.run_step(
                     session_id=session_id,
@@ -591,9 +673,9 @@ class AgentCampaignRunner:
                     commit_candidate=node.commit_candidate,
                     apply_backend=node.apply_backend,
                     push_to_github=node.push_to_github,
-                    action_idempotency_key=f"{prefix}-node-{index}-action",
-                    commit_idempotency_key=f"{prefix}-node-{index}-commit",
-                    backend_apply_idempotency_key=f"{prefix}-node-{index}-apply",
+                    action_idempotency_key=f"{key_base}-action",
+                    commit_idempotency_key=f"{key_base}-commit",
+                    backend_apply_idempotency_key=f"{key_base}-apply",
                 )
                 outcomes.append(outcome)
                 safe_to_retry = (
@@ -608,10 +690,13 @@ class AgentCampaignRunner:
                     continue
                 break
 
-            if outcome.transition != AgentSkillTransition.PASS:
+            if outcome.transition not in {AgentSkillTransition.PASS, AgentSkillTransition.ROLLBACK}:
                 return AgentCampaignOutcome(
                     transition=outcome.transition,
-                    reason=f"Campaign stopped at node {index} ({node.task_name}): {outcome.reason}",
+                    reason=(
+                        f"Campaign stopped at node {current_index} "
+                        f"({node.task_name}): {outcome.reason}"
+                    ),
                     session_id=session_id,
                     qid=qid,
                     source_execution_id=source_execution_id,
@@ -619,12 +704,35 @@ class AgentCampaignRunner:
                     attempts=len(outcomes),
                     outcomes=tuple(outcomes),
                     carried_overrides=dict(carried),
+                    node_path=tuple(node_path),
                 )
+
+            if outcome.transition == AgentSkillTransition.ROLLBACK:
+                if node.on_rollback is None:
+                    return AgentCampaignOutcome(
+                        transition=outcome.transition,
+                        reason=(
+                            f"Campaign stopped at node {current_index} "
+                            f"({node.task_name}): {outcome.reason}"
+                        ),
+                        session_id=session_id,
+                        qid=qid,
+                        source_execution_id=source_execution_id,
+                        completed_nodes=completed_nodes,
+                        attempts=len(outcomes),
+                        outcomes=tuple(outcomes),
+                        carried_overrides=dict(carried),
+                        node_path=tuple(node_path),
+                    )
+                current_index = node_indexes[node.on_rollback]
+                continue
 
             if outcome.candidate is None:
                 return AgentCampaignOutcome(
                     transition=AgentSkillTransition.HUMAN_ESCALATION,
-                    reason=f"Campaign node {index} passed without an authoritative candidate",
+                    reason=(
+                        f"Campaign node {current_index} passed without an authoritative candidate"
+                    ),
                     session_id=session_id,
                     qid=qid,
                     source_execution_id=source_execution_id,
@@ -632,9 +740,20 @@ class AgentCampaignRunner:
                     attempts=len(outcomes),
                     outcomes=tuple(outcomes),
                     carried_overrides=dict(carried),
+                    node_path=tuple(node_path),
                 )
             carried[outcome.candidate.parameter_name] = outcome.candidate.value
             completed_nodes += 1
+
+            if node.on_pass is not None:
+                if node.on_pass == _CAMPAIGN_COMPLETE:
+                    break
+                current_index = node_indexes[node.on_pass]
+                continue
+            if current_index + 1 < len(nodes):
+                current_index += 1
+                continue
+            break
 
         return AgentCampaignOutcome(
             transition=AgentSkillTransition.PASS,
@@ -646,4 +765,5 @@ class AgentCampaignRunner:
             attempts=len(outcomes),
             outcomes=tuple(outcomes),
             carried_overrides=dict(carried),
+            node_path=tuple(node_path),
         )

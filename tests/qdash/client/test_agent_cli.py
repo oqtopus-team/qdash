@@ -193,6 +193,7 @@ def test_run_campaign_parses_plan_and_prints_audit_outcome(
                 attempts=2,
                 outcomes=(),
                 carried_overrides={"t1": 95.0, "t2": 130.0},
+                node_path=("calibrate", "verify"),
             )
 
     monkeypatch.setattr(agent_cli, "AgentCampaignRunner", FakeCampaignRunner)
@@ -212,18 +213,24 @@ def test_run_campaign_parses_plan_and_prints_audit_outcome(
             json.dumps(
                 [
                     {
+                        "id": "calibrate",
                         "task_name": "CheckT1",
                         "candidate_parameter": "t1",
                         "commit_candidate": True,
+                        "on_rollback": "verify",
                     },
                     {
+                        "id": "verify",
                         "task_name": "CheckT2",
                         "candidate_parameter": "t2",
+                        "on_pass": "$complete",
                     },
                 ]
             ),
             "--idempotency-prefix",
             "campaign-key",
+            "--max-node-executions",
+            "4",
         ]
     )
 
@@ -231,12 +238,17 @@ def test_run_campaign_parses_plan_and_prints_audit_outcome(
     assert exit_code == 0
     assert payload["transition"] == "pass"
     assert payload["completed_nodes"] == 2
+    assert payload["node_path"] == ["calibrate", "verify"]
     campaign_kwargs = captured["campaign_kwargs"]
     assert isinstance(campaign_kwargs, dict)
     assert campaign_kwargs["idempotency_prefix"] == "campaign-key"
+    assert campaign_kwargs["max_node_executions"] == 4
     nodes = campaign_kwargs["nodes"]
     assert isinstance(nodes, list)
     assert [node.task_name for node in nodes] == ["CheckT1", "CheckT2"]
+    assert nodes[0].node_id == "calibrate"
+    assert nodes[0].on_rollback == "verify"
+    assert nodes[1].on_pass == "$complete"  # noqa: S105 - transition target
     assert nodes[0].commit_candidate is True
     assert nodes[1].apply_backend is False
     client.close.assert_called_once()

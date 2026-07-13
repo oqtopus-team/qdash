@@ -459,6 +459,7 @@ def test_campaign_propagates_accepted_candidates_with_fixed_source() -> None:
 
     assert outcome.transition == AgentSkillTransition.PASS
     assert outcome.completed_nodes == 2
+    assert outcome.node_path == ("node-0", "node-1")
     assert outcome.carried_overrides == {"t1": 95.0, "t2": 130.0}
     first_call, second_call = step_runner.run_step.call_args_list
     assert first_call.kwargs["source_execution_id"] == "source-1"
@@ -594,4 +595,129 @@ def test_campaign_preflight_rejects_insufficient_action_budget() -> None:
 
     assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
     assert "1 remaining" in outcome.reason
+    step_runner.run_step.assert_not_called()
+
+
+def test_campaign_routes_rollback_through_recovery_and_revisits_node() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _campaign_session(max_actions=3)
+    step_runner = MagicMock()
+    step_runner.run_step.side_effect = [
+        _campaign_step("t1", 900.0, transition=AgentSkillTransition.ROLLBACK),
+        _campaign_step("t2", 130.0),
+        _campaign_step("t1", 95.0),
+    ]
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[
+            AgentCampaignNode(
+                node_id="calibrate",
+                task_name="CheckT1",
+                candidate_parameter="t1",
+                on_pass="$complete",
+                on_rollback="diagnose",
+            ),
+            AgentCampaignNode(
+                node_id="diagnose",
+                task_name="CheckT2",
+                candidate_parameter="t2",
+                on_pass="calibrate",
+            ),
+        ],
+        max_node_executions=3,
+        idempotency_prefix="graph",
+    )
+
+    assert outcome.transition == AgentSkillTransition.PASS
+    assert outcome.completed_nodes == 2
+    assert outcome.node_path == ("calibrate", "diagnose", "calibrate")
+    assert outcome.carried_overrides == {"t2": 130.0, "t1": 95.0}
+    calls = step_runner.run_step.call_args_list
+    assert calls[0].kwargs["action_idempotency_key"] == "graph-node-0-action"
+    assert calls[2].kwargs["action_idempotency_key"] == "graph-node-0-visit-1-action"
+    assert calls[2].kwargs["parameter_overrides"] == {"t2": 130.0}
+
+
+def test_campaign_escalates_when_graph_reaches_execution_limit() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _campaign_session(max_actions=2)
+    step_runner = MagicMock()
+    step_runner.run_step.return_value = _campaign_step(
+        "t1",
+        900.0,
+        transition=AgentSkillTransition.ROLLBACK,
+    )
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[
+            AgentCampaignNode(
+                node_id="calibrate",
+                task_name="CheckT1",
+                candidate_parameter="t1",
+                on_rollback="calibrate",
+            )
+        ],
+        max_node_executions=2,
+    )
+
+    assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
+    assert "2 node execution limit" in outcome.reason
+    assert outcome.node_path == ("calibrate", "calibrate")
+    assert step_runner.run_step.call_count == 2
+
+
+def test_campaign_rejects_unknown_graph_target_before_session_lookup() -> None:
+    client = MagicMock()
+    step_runner = MagicMock()
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[
+            AgentCampaignNode(
+                node_id="calibrate",
+                task_name="CheckT1",
+                candidate_parameter="t1",
+                on_rollback="missing",
+            )
+        ],
+    )
+
+    assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
+    assert "target 'missing' does not exist" in outcome.reason
+    client.get_agent_session.assert_not_called()
+    step_runner.run_step.assert_not_called()
+
+
+def test_campaign_rejects_reserved_complete_node_id() -> None:
+    client = MagicMock()
+    step_runner = MagicMock()
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[
+            AgentCampaignNode(
+                node_id="$complete",
+                task_name="CheckT1",
+                candidate_parameter="t1",
+            )
+        ],
+    )
+
+    assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
+    assert "is reserved" in outcome.reason
+    client.get_agent_session.assert_not_called()
     step_runner.run_step.assert_not_called()

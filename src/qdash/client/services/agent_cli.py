@@ -31,6 +31,9 @@ def _campaign_plan(value: str) -> list[AgentCampaignNode]:
     allowed_keys = {
         "task_name",
         "candidate_parameter",
+        "id",
+        "on_pass",
+        "on_rollback",
         "parameter_overrides",
         "diagnosis",
         "reconfigure_before_task",
@@ -53,6 +56,14 @@ def _campaign_plan(value: str) -> list[AgentCampaignNode]:
             raise argparse.ArgumentTypeError(
                 f"campaign node {index} requires string task_name and candidate_parameter"
             )
+        node_id = item.get("id")
+        on_pass = item.get("on_pass")
+        on_rollback = item.get("on_rollback")
+        if any(
+            value is not None and not isinstance(value, str)
+            for value in (node_id, on_pass, on_rollback)
+        ):
+            raise argparse.ArgumentTypeError(f"campaign node {index} graph fields must be strings")
         diagnosis = item.get("diagnosis", "")
         overrides = item.get("parameter_overrides", {})
         if not isinstance(diagnosis, str) or not isinstance(overrides, dict):
@@ -80,6 +91,9 @@ def _campaign_plan(value: str) -> list[AgentCampaignNode]:
                 AgentCampaignNode(
                     task_name=task_name,
                     candidate_parameter=candidate_parameter,
+                    node_id=node_id,
+                    on_pass=on_pass,
+                    on_rollback=on_rollback,
                     parameter_overrides=numeric_overrides,
                     diagnosis=diagnosis,
                     **{name: item.get(name, False) for name in bool_fields},
@@ -179,6 +193,7 @@ def _build_parser() -> argparse.ArgumentParser:
     campaign.add_argument("--source-execution-id", required=True)
     campaign.add_argument("--plan", required=True, type=_campaign_plan)
     campaign.add_argument("--max-pre-dispatch-retries", type=int, default=1)
+    campaign.add_argument("--max-node-executions", type=int)
     campaign.add_argument("--idempotency-prefix")
     campaign.add_argument("--action-timeout-seconds", type=float, default=120.0)
     campaign.add_argument("--execution-timeout-seconds", type=float, default=600.0)
@@ -212,6 +227,7 @@ def _campaign_outcome_payload(outcome: AgentCampaignOutcome) -> dict[str, Any]:
         "completed_nodes": outcome.completed_nodes,
         "attempts": outcome.attempts,
         "carried_overrides": outcome.carried_overrides,
+        "node_path": outcome.node_path,
         "outcomes": [_outcome_payload(step) for step in outcome.outcomes],
     }
 
@@ -262,6 +278,7 @@ def run(argv: list[str] | None = None) -> int:
                 source_execution_id=args.source_execution_id,
                 nodes=args.plan,
                 max_pre_dispatch_retries=args.max_pre_dispatch_retries,
+                max_node_executions=args.max_node_executions,
                 idempotency_prefix=args.idempotency_prefix,
             )
             print(json.dumps(_campaign_outcome_payload(campaign_outcome), sort_keys=True))
