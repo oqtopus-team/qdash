@@ -938,7 +938,7 @@ class AgentSessionService:
                 username=session.created_by,
                 project_id=project_id,
                 tags=[f"agent-session:{session_id}"],
-                parameter_overrides={"run": action.parameter_overrides}
+                parameter_overrides={"input": action.parameter_overrides}
                 if action.parameter_overrides
                 else None,
                 update_params=body.update_params,

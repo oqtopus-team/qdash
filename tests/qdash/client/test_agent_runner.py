@@ -6,7 +6,10 @@ from unittest.mock import MagicMock
 
 from qdash.client.services.agent_runner import (
     AgentCalibrationRunner,
+    AgentCampaignNode,
+    AgentCampaignRunner,
     AgentSkillTransition,
+    AgentStepOutcome,
 )
 from qdash.client.services.errors import (
     QDashTransportError,
@@ -388,3 +391,207 @@ def test_run_step_backend_verification_failure_preserves_execution_id() -> None:
 
     assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
     assert outcome.execution_id == "execution-1"
+
+
+def _campaign_session(*, max_actions: int = 4, action_count: int = 0) -> AgentSessionResponse:
+    session = _session(action_count)
+    return session.model_copy(
+        update={
+            "action_count": action_count,
+            "policy": session.policy.model_copy(
+                update={
+                    "allowed_tasks": ["CheckT1", "CheckT2"],
+                    "allowed_overrides": {
+                        "t1": {"minimum": 1.0, "maximum": 500.0},
+                        "t2": {"minimum": 1.0, "maximum": 700.0},
+                    },
+                    "max_actions": max_actions,
+                }
+            ),
+        }
+    )
+
+
+def _campaign_step(
+    parameter_name: str,
+    value: float,
+    *,
+    transition: AgentSkillTransition = AgentSkillTransition.PASS,
+    operation_id: str | None = "operation-1",
+) -> AgentStepOutcome:
+    candidate = _candidate(accepted=transition == AgentSkillTransition.PASS).model_copy(
+        update={
+            "parameter_name": parameter_name,
+            "source_parameter_name": parameter_name,
+            "value": value,
+        }
+    )
+    return AgentStepOutcome(
+        transition=transition,
+        reason="step result",
+        session_id="session-1",
+        operation_id=operation_id,
+        execution_id="execution-1" if operation_id else None,
+        candidate=candidate if transition != AgentSkillTransition.RETRY else None,
+    )
+
+
+def test_campaign_propagates_accepted_candidates_with_fixed_source() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _campaign_session()
+    step_runner = MagicMock()
+    step_runner.run_step.side_effect = [
+        _campaign_step("t1", 95.0),
+        _campaign_step("t2", 130.0),
+    ]
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[
+            AgentCampaignNode(task_name="CheckT1", candidate_parameter="t1"),
+            AgentCampaignNode(task_name="CheckT2", candidate_parameter="t2"),
+        ],
+        idempotency_prefix="campaign-key",
+    )
+
+    assert outcome.transition == AgentSkillTransition.PASS
+    assert outcome.completed_nodes == 2
+    assert outcome.carried_overrides == {"t1": 95.0, "t2": 130.0}
+    first_call, second_call = step_runner.run_step.call_args_list
+    assert first_call.kwargs["source_execution_id"] == "source-1"
+    assert second_call.kwargs["source_execution_id"] == "source-1"
+    assert first_call.kwargs["parameter_overrides"] == {}
+    assert second_call.kwargs["parameter_overrides"] == {"t1": 95.0}
+    assert second_call.kwargs["action_idempotency_key"] == "campaign-key-node-1-action"
+
+
+def test_campaign_explicit_node_override_wins_over_carried_candidate() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _campaign_session()
+    step_runner = MagicMock()
+    step_runner.run_step.side_effect = [
+        _campaign_step("t1", 95.0),
+        _campaign_step("t2", 130.0),
+    ]
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[
+            AgentCampaignNode(task_name="CheckT1", candidate_parameter="t1"),
+            AgentCampaignNode(
+                task_name="CheckT2",
+                candidate_parameter="t2",
+                parameter_overrides={"t1": 100.0},
+            ),
+        ],
+    )
+
+    second_call = step_runner.run_step.call_args_list[1]
+    assert second_call.kwargs["parameter_overrides"] == {"t1": 100.0}
+
+
+def test_campaign_stops_immediately_on_rollback() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _campaign_session()
+    step_runner = MagicMock()
+    step_runner.run_step.return_value = _campaign_step(
+        "t1",
+        900.0,
+        transition=AgentSkillTransition.ROLLBACK,
+    )
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[
+            AgentCampaignNode(task_name="CheckT1", candidate_parameter="t1"),
+            AgentCampaignNode(task_name="CheckT2", candidate_parameter="t2"),
+        ],
+    )
+
+    assert outcome.transition == AgentSkillTransition.ROLLBACK
+    assert outcome.completed_nodes == 0
+    step_runner.run_step.assert_called_once()
+
+
+def test_campaign_retries_only_before_an_operation_exists() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _campaign_session()
+    step_runner = MagicMock()
+    step_runner.run_step.side_effect = [
+        AgentStepOutcome(
+            transition=AgentSkillTransition.RETRY,
+            reason="temporary dispatch error",
+            session_id="session-1",
+        ),
+        _campaign_step("t1", 95.0),
+    ]
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[AgentCampaignNode(task_name="CheckT1", candidate_parameter="t1")],
+        max_pre_dispatch_retries=1,
+        idempotency_prefix="stable",
+    )
+
+    assert outcome.transition == AgentSkillTransition.PASS
+    assert outcome.attempts == 2
+    calls = step_runner.run_step.call_args_list
+    assert calls[0].kwargs["action_idempotency_key"] == "stable-node-0-action"
+    assert calls[1].kwargs["action_idempotency_key"] == "stable-node-0-action"
+
+
+def test_campaign_does_not_retry_after_hardware_operation_exists() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _campaign_session()
+    step_runner = MagicMock()
+    step_runner.run_step.return_value = AgentStepOutcome(
+        transition=AgentSkillTransition.RETRY,
+        reason="execution timed out",
+        session_id="session-1",
+        operation_id="operation-1",
+    )
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[AgentCampaignNode(task_name="CheckT1", candidate_parameter="t1")],
+        max_pre_dispatch_retries=3,
+    )
+
+    assert outcome.transition == AgentSkillTransition.RETRY
+    step_runner.run_step.assert_called_once()
+
+
+def test_campaign_preflight_rejects_insufficient_action_budget() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _campaign_session(max_actions=1)
+    step_runner = MagicMock()
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[
+            AgentCampaignNode(task_name="CheckT1", candidate_parameter="t1"),
+            AgentCampaignNode(task_name="CheckT2", candidate_parameter="t2"),
+        ],
+    )
+
+    assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
+    assert "1 remaining" in outcome.reason
+    step_runner.run_step.assert_not_called()

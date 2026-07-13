@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
         AgentActionResponse,
         AgentCandidateCommitResponse,
         AgentCandidateResponse,
+        AgentSessionResponse,
     )
 
 
@@ -40,6 +42,47 @@ class AgentStepOutcome:
     action: AgentActionResponse | None = None
     candidate: AgentCandidateResponse | None = None
     commit: AgentCandidateCommitResponse | None = None
+
+
+@dataclass(frozen=True)
+class AgentCampaignNode:
+    """One policy-bounded node in an autonomous single-qubit campaign."""
+
+    task_name: str
+    candidate_parameter: str
+    parameter_overrides: dict[str, float] = field(default_factory=dict)
+    diagnosis: str = ""
+    reconfigure_before_task: bool = False
+    commit_candidate: bool = False
+    apply_backend: bool = False
+    push_to_github: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.task_name:
+            raise ValueError("campaign task_name must not be empty")
+        if not self.candidate_parameter:
+            raise ValueError("campaign candidate_parameter must not be empty")
+        if self.apply_backend and not self.commit_candidate:
+            raise ValueError("campaign apply_backend requires commit_candidate=true")
+        if self.push_to_github and not self.apply_backend:
+            raise ValueError("campaign push_to_github requires apply_backend=true")
+        if any(not math.isfinite(value) for value in self.parameter_overrides.values()):
+            raise ValueError("campaign parameter overrides must be finite")
+
+
+@dataclass(frozen=True)
+class AgentCampaignOutcome:
+    """Terminal campaign result with every attempted Skill transition."""
+
+    transition: AgentSkillTransition
+    reason: str
+    session_id: str
+    qid: str
+    source_execution_id: str
+    completed_nodes: int
+    attempts: int
+    outcomes: tuple[AgentStepOutcome, ...]
+    carried_overrides: dict[str, float] = field(default_factory=dict)
 
 
 def _api_error_outcome(
@@ -414,4 +457,193 @@ class AgentCalibrationRunner:
             action=dispatched,
             candidate=candidate,
             commit=committed,
+        )
+
+
+class AgentCampaignRunner:
+    """Advance a declarative single-qubit campaign through typed transitions."""
+
+    def __init__(
+        self,
+        client: QDashClient,
+        *,
+        step_runner: AgentCalibrationRunner | None = None,
+        action_timeout_seconds: float = 120.0,
+        execution_timeout_seconds: float = 600.0,
+        backend_apply_timeout_seconds: float = 300.0,
+        poll_interval_seconds: float = 1.0,
+    ) -> None:
+        self._client = client
+        self._step_runner = step_runner or AgentCalibrationRunner(
+            client,
+            action_timeout_seconds=action_timeout_seconds,
+            execution_timeout_seconds=execution_timeout_seconds,
+            backend_apply_timeout_seconds=backend_apply_timeout_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+        )
+
+    @staticmethod
+    def _policy_error(
+        session: AgentSessionResponse,
+        qid: str,
+        nodes: list[AgentCampaignNode],
+    ) -> str | None:
+        policy = session.policy
+        if session.status != "active":
+            return f"Agent session is not active: {session.status}"
+        if qid not in policy.qids:
+            return f"Qid '{qid}' is outside the session scope"
+        remaining_actions = policy.max_actions - session.action_count
+        if len(nodes) > remaining_actions:
+            return (
+                f"Campaign requires {len(nodes)} actions but the session has "
+                f"{remaining_actions} remaining"
+            )
+
+        for index, node in enumerate(nodes):
+            if node.task_name not in policy.allowed_tasks:
+                return f"Node {index} task '{node.task_name}' is outside the session scope"
+            if node.candidate_parameter not in policy.allowed_overrides:
+                return (
+                    f"Node {index} candidate '{node.candidate_parameter}' "
+                    "is outside the session scope"
+                )
+            if node.reconfigure_before_task and not policy.allow_reconfigure:
+                return f"Node {index} requests hardware reconfiguration outside the session scope"
+            for name, value in node.parameter_overrides.items():
+                bounds = policy.allowed_overrides.get(name)
+                if bounds is None:
+                    return f"Node {index} override '{name}' is outside the session scope"
+                minimum = bounds.get("minimum")
+                maximum = bounds.get("maximum")
+                if minimum is not None and value < minimum:
+                    return f"Node {index} override '{name}' is below the session minimum"
+                if maximum is not None and value > maximum:
+                    return f"Node {index} override '{name}' is above the session maximum"
+        return None
+
+    def run_campaign(
+        self,
+        *,
+        session_id: str,
+        qid: str,
+        source_execution_id: str,
+        nodes: list[AgentCampaignNode],
+        max_pre_dispatch_retries: int = 1,
+        idempotency_prefix: str | None = None,
+    ) -> AgentCampaignOutcome:
+        """Run campaign nodes sequentially while preserving a fixed source snapshot."""
+        if not nodes:
+            raise ValueError("campaign requires at least one node")
+        if max_pre_dispatch_retries < 0:
+            raise ValueError("max_pre_dispatch_retries must be non-negative")
+        if idempotency_prefix is not None and (
+            not idempotency_prefix or len(idempotency_prefix) > 96
+        ):
+            raise ValueError("idempotency_prefix must contain 1 to 96 characters")
+
+        try:
+            session = self._client.get_agent_session(session_id)
+        except QDashApiError as exc:
+            step = _api_error_outcome(exc, session_id=session_id)
+            return AgentCampaignOutcome(
+                transition=step.transition,
+                reason=step.reason,
+                session_id=session_id,
+                qid=qid,
+                source_execution_id=source_execution_id,
+                completed_nodes=0,
+                attempts=0,
+                outcomes=(),
+            )
+
+        policy_error = self._policy_error(session, qid, nodes)
+        if policy_error is not None:
+            return AgentCampaignOutcome(
+                transition=AgentSkillTransition.HUMAN_ESCALATION,
+                reason=policy_error,
+                session_id=session_id,
+                qid=qid,
+                source_execution_id=source_execution_id,
+                completed_nodes=0,
+                attempts=0,
+                outcomes=(),
+            )
+
+        prefix = idempotency_prefix or f"campaign-{uuid4()}"
+        carried: dict[str, float] = {}
+        outcomes: list[AgentStepOutcome] = []
+        completed_nodes = 0
+
+        for index, node in enumerate(nodes):
+            overrides = {**carried, **node.parameter_overrides}
+            retries = 0
+            while True:
+                outcome = self._step_runner.run_step(
+                    session_id=session_id,
+                    task_name=node.task_name,
+                    qid=qid,
+                    source_execution_id=source_execution_id,
+                    candidate_parameter=node.candidate_parameter,
+                    parameter_overrides=overrides,
+                    diagnosis=node.diagnosis,
+                    reconfigure_before_task=node.reconfigure_before_task,
+                    commit_candidate=node.commit_candidate,
+                    apply_backend=node.apply_backend,
+                    push_to_github=node.push_to_github,
+                    action_idempotency_key=f"{prefix}-node-{index}-action",
+                    commit_idempotency_key=f"{prefix}-node-{index}-commit",
+                    backend_apply_idempotency_key=f"{prefix}-node-{index}-apply",
+                )
+                outcomes.append(outcome)
+                safe_to_retry = (
+                    outcome.transition == AgentSkillTransition.RETRY
+                    and outcome.operation_id is None
+                    and outcome.execution_id is None
+                    and outcome.candidate is None
+                    and outcome.commit is None
+                )
+                if safe_to_retry and retries < max_pre_dispatch_retries:
+                    retries += 1
+                    continue
+                break
+
+            if outcome.transition != AgentSkillTransition.PASS:
+                return AgentCampaignOutcome(
+                    transition=outcome.transition,
+                    reason=f"Campaign stopped at node {index} ({node.task_name}): {outcome.reason}",
+                    session_id=session_id,
+                    qid=qid,
+                    source_execution_id=source_execution_id,
+                    completed_nodes=completed_nodes,
+                    attempts=len(outcomes),
+                    outcomes=tuple(outcomes),
+                    carried_overrides=dict(carried),
+                )
+
+            if outcome.candidate is None:
+                return AgentCampaignOutcome(
+                    transition=AgentSkillTransition.HUMAN_ESCALATION,
+                    reason=f"Campaign node {index} passed without an authoritative candidate",
+                    session_id=session_id,
+                    qid=qid,
+                    source_execution_id=source_execution_id,
+                    completed_nodes=completed_nodes,
+                    attempts=len(outcomes),
+                    outcomes=tuple(outcomes),
+                    carried_overrides=dict(carried),
+                )
+            carried[outcome.candidate.parameter_name] = outcome.candidate.value
+            completed_nodes += 1
+
+        return AgentCampaignOutcome(
+            transition=AgentSkillTransition.PASS,
+            reason=f"Campaign completed {completed_nodes} nodes",
+            session_id=session_id,
+            qid=qid,
+            source_execution_id=source_execution_id,
+            completed_nodes=completed_nodes,
+            attempts=len(outcomes),
+            outcomes=tuple(outcomes),
+            carried_overrides=dict(carried),
         )

@@ -6,7 +6,13 @@ import argparse
 import json
 from typing import Any
 
-from qdash.client.services.agent_runner import AgentCalibrationRunner, AgentStepOutcome
+from qdash.client.services.agent_runner import (
+    AgentCalibrationRunner,
+    AgentCampaignNode,
+    AgentCampaignOutcome,
+    AgentCampaignRunner,
+    AgentStepOutcome,
+)
 from qdash.client.services.client import QDashClient as QDashClient  # noqa: PLC0414
 
 
@@ -15,6 +21,73 @@ def _json_object(value: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise argparse.ArgumentTypeError("value must be a JSON object")
     return parsed
+
+
+def _campaign_plan(value: str) -> list[AgentCampaignNode]:
+    parsed = json.loads(value)
+    if not isinstance(parsed, list) or not parsed:
+        raise argparse.ArgumentTypeError("campaign plan must be a non-empty JSON array")
+
+    allowed_keys = {
+        "task_name",
+        "candidate_parameter",
+        "parameter_overrides",
+        "diagnosis",
+        "reconfigure_before_task",
+        "commit_candidate",
+        "apply_backend",
+        "push_to_github",
+    }
+    nodes: list[AgentCampaignNode] = []
+    for index, item in enumerate(parsed):
+        if not isinstance(item, dict):
+            raise argparse.ArgumentTypeError(f"campaign node {index} must be a JSON object")
+        unknown = sorted(set(item) - allowed_keys)
+        if unknown:
+            raise argparse.ArgumentTypeError(
+                f"campaign node {index} has unknown fields: {', '.join(unknown)}"
+            )
+        task_name = item.get("task_name")
+        candidate_parameter = item.get("candidate_parameter")
+        if not isinstance(task_name, str) or not isinstance(candidate_parameter, str):
+            raise argparse.ArgumentTypeError(
+                f"campaign node {index} requires string task_name and candidate_parameter"
+            )
+        diagnosis = item.get("diagnosis", "")
+        overrides = item.get("parameter_overrides", {})
+        if not isinstance(diagnosis, str) or not isinstance(overrides, dict):
+            raise argparse.ArgumentTypeError(
+                f"campaign node {index} diagnosis must be a string and overrides an object"
+            )
+        bool_fields = (
+            "reconfigure_before_task",
+            "commit_candidate",
+            "apply_backend",
+            "push_to_github",
+        )
+        if any(not isinstance(item.get(name, False), bool) for name in bool_fields):
+            raise argparse.ArgumentTypeError(f"campaign node {index} flags must be booleans")
+        try:
+            if any(
+                not isinstance(key, str)
+                or isinstance(raw, bool)
+                or not isinstance(raw, (int, float))
+                for key, raw in overrides.items()
+            ):
+                raise ValueError("parameter overrides must contain numeric values")
+            numeric_overrides = {str(key): float(raw) for key, raw in overrides.items()}
+            nodes.append(
+                AgentCampaignNode(
+                    task_name=task_name,
+                    candidate_parameter=candidate_parameter,
+                    parameter_overrides=numeric_overrides,
+                    diagnosis=diagnosis,
+                    **{name: item.get(name, False) for name in bool_fields},
+                )
+            )
+        except (TypeError, ValueError) as exc:
+            raise argparse.ArgumentTypeError(f"invalid campaign node {index}: {exc}") from exc
+    return nodes
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -65,7 +138,12 @@ def _build_parser() -> argparse.ArgumentParser:
     step.add_argument("--qid", required=True)
     step.add_argument("--source-execution-id", required=True)
     step.add_argument("--candidate-parameter", required=True)
-    step.add_argument("--parameter-overrides", type=_json_object, default={})
+    step.add_argument(
+        "--parameter-overrides",
+        type=_json_object,
+        default={},
+        help="JSON calibration input parameter overrides",
+    )
     step.add_argument("--diagnosis", default="")
     step.add_argument(
         "--reconfigure-before-task",
@@ -92,6 +170,21 @@ def _build_parser() -> argparse.ArgumentParser:
     step.add_argument("--backend-apply-timeout-seconds", type=float, default=300.0)
     step.add_argument("--poll-interval-seconds", type=float, default=1.0)
 
+    campaign = commands.add_parser(
+        "run-campaign",
+        help="Run an autonomous bounded single-qubit campaign",
+    )
+    campaign.add_argument("--session-id", required=True)
+    campaign.add_argument("--qid", required=True)
+    campaign.add_argument("--source-execution-id", required=True)
+    campaign.add_argument("--plan", required=True, type=_campaign_plan)
+    campaign.add_argument("--max-pre-dispatch-retries", type=int, default=1)
+    campaign.add_argument("--idempotency-prefix")
+    campaign.add_argument("--action-timeout-seconds", type=float, default=120.0)
+    campaign.add_argument("--execution-timeout-seconds", type=float, default=600.0)
+    campaign.add_argument("--backend-apply-timeout-seconds", type=float, default=300.0)
+    campaign.add_argument("--poll-interval-seconds", type=float, default=1.0)
+
     return parser
 
 
@@ -106,6 +199,20 @@ def _outcome_payload(outcome: AgentStepOutcome) -> dict[str, Any]:
         "action": outcome.action.model_dump(mode="json") if outcome.action else None,
         "candidate": (outcome.candidate.model_dump(mode="json") if outcome.candidate else None),
         "commit": outcome.commit.model_dump(mode="json") if outcome.commit else None,
+    }
+
+
+def _campaign_outcome_payload(outcome: AgentCampaignOutcome) -> dict[str, Any]:
+    return {
+        "transition": outcome.transition.value,
+        "reason": outcome.reason,
+        "session_id": outcome.session_id,
+        "qid": outcome.qid,
+        "source_execution_id": outcome.source_execution_id,
+        "completed_nodes": outcome.completed_nodes,
+        "attempts": outcome.attempts,
+        "carried_overrides": outcome.carried_overrides,
+        "outcomes": [_outcome_payload(step) for step in outcome.outcomes],
     }
 
 
@@ -140,6 +247,25 @@ def run(argv: list[str] | None = None) -> int:
             )
             print(json.dumps(session.model_dump(mode="json"), sort_keys=True))
             return 0
+
+        if args.command == "run-campaign":
+            campaign_runner = AgentCampaignRunner(
+                client,
+                action_timeout_seconds=args.action_timeout_seconds,
+                execution_timeout_seconds=args.execution_timeout_seconds,
+                backend_apply_timeout_seconds=args.backend_apply_timeout_seconds,
+                poll_interval_seconds=args.poll_interval_seconds,
+            )
+            campaign_outcome = campaign_runner.run_campaign(
+                session_id=args.session_id,
+                qid=args.qid,
+                source_execution_id=args.source_execution_id,
+                nodes=args.plan,
+                max_pre_dispatch_retries=args.max_pre_dispatch_retries,
+                idempotency_prefix=args.idempotency_prefix,
+            )
+            print(json.dumps(_campaign_outcome_payload(campaign_outcome), sort_keys=True))
+            return 0 if campaign_outcome.transition.value == "pass" else 2
 
         runner = AgentCalibrationRunner(
             client,

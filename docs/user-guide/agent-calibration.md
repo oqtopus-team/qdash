@@ -72,6 +72,45 @@ The CLI emits one typed transition:
 
 An AI agent must branch only on this transition and must never substitute its own numeric candidate.
 
+## Run an autonomous single-qubit campaign
+
+`run-campaign` advances an ordered, declarative plan inside one previously approved session. It
+preflights the qid, tasks, candidate parameters, reconfiguration permission, and remaining action
+budget before the first hardware operation. A rollback or human escalation stops the campaign
+immediately.
+
+~~~bash
+qdash-agent --profile local run-campaign \
+  --session-id SESSION_ID \
+  --qid Q00 \
+  --source-execution-id SOURCE_EXECUTION_ID \
+  --idempotency-prefix operator-approved-campaign-001 \
+  --plan '[
+    {"task_name":"CheckRabi","candidate_parameter":"control_amplitude"},
+    {"task_name":"CreateHPIPulse","candidate_parameter":"hpi_amplitude"},
+    {"task_name":"CheckT1","candidate_parameter":"t1"}
+  ]'
+~~~
+
+The campaign keeps the approved source execution fixed so every node retains its complete task
+snapshot. After a node passes, its authoritative candidate is carried into later nodes as an input
+parameter override. An explicit `parameter_overrides` value on a later node takes precedence over a
+carried value. Every override is checked against the immutable session bounds before dispatch.
+
+The example leaves all candidates staged. A node may explicitly set `commit_candidate`,
+`apply_backend`, and `push_to_github` to `true`; `apply_backend` requires `commit_candidate`, and
+`push_to_github` requires both. Hardware reconfiguration remains opt-in per node through
+`reconfigure_before_task` and must also be authorized by the session.
+
+The runner automatically retries only failures that occur before QDash returns a Prefect operation
+or QDash execution ID. It reuses the same action idempotency key during that recovery. Once a
+hardware operation exists, a timeout returns `retry` to the operator instead of autonomously
+dispatching another measurement.
+
+The session action budget must cover every plan node. Recovery with the same idempotency key does
+not consume another action. The result contains every attempted step, execution ID, candidate,
+commit, and the final carried parameter set.
+
 ## Python API
 
 ~~~python

@@ -2,6 +2,9 @@
 
 from qdash.client.services.agent_runner import (
     AgentCalibrationRunner,
+    AgentCampaignNode,
+    AgentCampaignOutcome,
+    AgentCampaignRunner,
     AgentSkillTransition,
     AgentStepOutcome,
 )
@@ -40,6 +43,9 @@ __all__ = [
     "AgentActionListResponse",
     "AgentActionResponse",
     "AgentCalibrationRunner",
+    "AgentCampaignNode",
+    "AgentCampaignOutcome",
+    "AgentCampaignRunner",
     "AgentCandidateCommitResponse",
     "AgentCandidateListResponse",
     "AgentCandidateResponse",
