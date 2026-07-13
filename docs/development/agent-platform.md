@@ -11,7 +11,7 @@ An agent must create a bounded session before proposing an action. A session fix
 ## Implementation phases
 
 1. Session contract: policy, typed actions, state versioning, idempotency, and audit records.
-2. Operation dispatch: execute an authorized single-task action through the existing system Prefect deployment. The action stores the Prefect flow-run UUID as `operation_id` and resolves the independently allocated QDash execution identifier through `execution.note.flow_run_id`. This preserves the existing `YYYYMMDD-NNN` execution contract used by single-task re-execution while giving agents both identifiers for polling and provenance.
+2. Operation dispatch: execute an authorized single-task action through the existing system Prefect deployment. The action stores the Prefect flow-run UUID as `operation_id` and resolves the independently allocated QDash execution identifier through `execution.note.flow_run_id`. This preserves the existing `YYYYMMDD-NNN` execution contract used by single-task re-execution while giving agents both identifiers for polling and provenance. Agent executions use the display name `agent:<task>`; manual single-task runs retain `re-execute:<task>`.
 3. Candidate commit: keep task output parameters staged until deterministic parameter bounds and session-owned task-result quality gates accept them; backend application is a separate worker operation with file/version verification.
 4. Skill runner: add declarative transitions for pass, retry, rollback, and human escalation.
 5. Agent SDK: provide observation and operation-watching helpers for local agents.

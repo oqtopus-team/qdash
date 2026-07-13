@@ -678,6 +678,7 @@ class FlowService:
         parameter_overrides: dict[str, dict[str, Any]] | None = None,
         update_params: bool = True,
         reconfigure: bool = False,
+        execution_name: str | None = None,
     ) -> ExecuteFlowResponse:
         """Execute a single task via the system single-task-executor deployment.
 
@@ -700,6 +701,8 @@ class FlowService:
             The project ID
         tags : list[str] | None
             Tags for categorization
+        execution_name : str | None
+            QDash execution display name. Defaults to the manual re-execution label.
 
         Returns
         -------
@@ -720,7 +723,7 @@ class FlowService:
                 detail=("System deployment not available. The worker may not have started yet."),
             )
 
-        flow_name = f"re-execute:{task_name}"
+        flow_name = execution_name or f"re-execute:{task_name}"
         parameters: dict[str, Any] = {
             "username": username,
             "chip_id": chip_id,

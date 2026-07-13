@@ -734,6 +734,7 @@ async def test_execute_authorized_action_dispatches_single_task(
             assert kwargs["task_name"] == "CheckQubitSpectroscopy"
             assert kwargs["qid"] == "Q00"
             assert kwargs["source_execution_id"] == "execution-1"
+            assert kwargs["execution_name"] == "agent:CheckQubitSpectroscopy"
             assert kwargs["parameter_overrides"] == {"input": {"drive_amplitude": 0.1}}
             return type("Operation", (), {"execution_id": "operation-1"})()
 

@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -55,3 +56,50 @@ async def test_list_templates_uses_resolved_templates_metadata(
     templates = await FlowService(flow_repository=MagicMock()).list_templates()
 
     assert any(template.id == "full_calibration" for template in templates)
+
+
+@pytest.mark.parametrize(
+    ("execution_name", "expected_flow_name"),
+    [
+        (None, "re-execute:CheckRabi"),
+        ("agent:CheckRabi", "agent:CheckRabi"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_execute_single_task_uses_requested_execution_name(
+    monkeypatch: pytest.MonkeyPatch,
+    execution_name: str | None,
+    expected_flow_name: str,
+) -> None:
+    captured_parameters: list[dict[str, object]] = []
+
+    class FakeClient:
+        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
+            return SimpleNamespace(id="deployment-1")
+
+        async def create_flow_run_from_deployment(self, **kwargs: object) -> SimpleNamespace:
+            parameters = kwargs["parameters"]
+            assert isinstance(parameters, dict)
+            captured_parameters.append(parameters)
+            return SimpleNamespace(id="flow-run-1")
+
+    class FakeClientContext:
+        async def __aenter__(self) -> FakeClient:
+            return FakeClient()
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    monkeypatch.setattr(flow_service, "get_client", FakeClientContext)
+
+    await FlowService(flow_repository=MagicMock()).execute_single_task_from_snapshot(
+        task_name="CheckRabi",
+        qid="Q00",
+        chip_id="chip-1",
+        source_execution_id="execution-1",
+        username="operator",
+        project_id="project-1",
+        execution_name=execution_name,
+    )
+
+    assert captured_parameters[0]["flow_name"] == expected_flow_name
