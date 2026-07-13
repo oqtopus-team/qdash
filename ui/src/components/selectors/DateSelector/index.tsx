@@ -86,26 +86,30 @@ export function DateSelector({
   // Show error state but keep "latest" option available
   if (isError) {
     return (
-      <Select<DateOption>
-        options={[{ value: "latest", label: "Latest" }]}
-        value={{ value: "latest", label: "Latest" }}
-        onChange={handleChange}
-        isDisabled={disabled}
-        className="text-base-content"
-        styles={styles}
-      />
+      <div style={{ minWidth }}>
+        <Select<DateOption>
+          options={[{ value: "latest", label: "Latest" }]}
+          value={{ value: "latest", label: "Latest" }}
+          onChange={handleChange}
+          isDisabled={disabled}
+          className="text-base-content"
+          styles={styles}
+        />
+      </div>
     );
   }
 
   return (
-    <Select<DateOption>
-      options={dateOptions}
-      value={dateOptions.find((option) => option.value === selectedDate)}
-      onChange={handleChange}
-      placeholder={PLACEHOLDER}
-      className="text-base-content"
-      isDisabled={disabled}
-      styles={styles}
-    />
+    <div style={{ minWidth }}>
+      <Select<DateOption>
+        options={dateOptions}
+        value={dateOptions.find((option) => option.value === selectedDate)}
+        onChange={handleChange}
+        placeholder={PLACEHOLDER}
+        className="text-base-content"
+        isDisabled={disabled}
+        styles={styles}
+      />
+    </div>
   );
 }
