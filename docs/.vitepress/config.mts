@@ -113,6 +113,10 @@ export default withMermaid(
               text: "QDash Client",
               link: "/user-guide/qdash-client",
             },
+            {
+              text: "Agent Calibration",
+              link: "/user-guide/agent-calibration",
+            },
           ],
         },
         {

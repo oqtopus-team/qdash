@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 
@@ -245,6 +245,8 @@ def test_token_cache_and_401_reauth(monkeypatch: pytest.MonkeyPatch) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal login_count, chips_count
         if request.method == "POST" and request.url.path == "/auth/login":
+            assert request.headers["Content-Type"].startswith("application/x-www-form-urlencoded")
+            assert request.content == b"username=tester&password=secret"
             login_count += 1
             token = "token-1" if login_count == 1 else "token-2"
             return httpx.Response(200, json={"access_token": token})
@@ -1448,5 +1450,392 @@ async def test_async_methods_with_monkeypatched_async_client(
         assert "qubit_metrics" in metrics_config
         assert "coupling_metrics" in metrics_config
         assert "color_scale" in metrics_config
+    finally:
+        client.close()
+
+
+def test_agent_session_client_methods() -> None:
+    session_payload = {
+        "session_id": "session-1",
+        "project_id": "project-1",
+        "chip_id": "chip-a",
+        "created_by": "tester",
+        "policy": {
+            "qids": ["Q00"],
+            "allowed_tasks": ["CheckT1"],
+            "allowed_actions": ["run_task"],
+            "allowed_overrides": {"shots": {"minimum": 1000, "maximum": 5000}},
+            "max_actions": 10,
+        },
+        "skill_name": "bringup",
+        "skill_version": "1",
+        "skill_hash": "sha256:test",
+        "model_name": "local",
+        "status": "active",
+        "state_version": 0,
+        "action_count": 0,
+        "created_at": "2026-07-13T00:00:00Z",
+        "updated_at": "2026-07-13T00:00:00Z",
+        "expires_at": "2026-07-13T01:00:00Z",
+    }
+    action_payload = {
+        "action_id": "action-1",
+        "session_id": "session-1",
+        "idempotency_key": "key-1",
+        "action_type": "run_task",
+        "task_name": "CheckT1",
+        "qids": ["Q00"],
+        "parameter_overrides": {"shots": 2000},
+        "diagnosis": "retry",
+        "decision": "authorized",
+        "reason": "allowed",
+        "execution_status": "not_started",
+        "state_version_before": 0,
+        "state_version_after": 1,
+        "created_at": "2026-07-13T00:00:01Z",
+    }
+    gate_payload = {
+        "session_id": "session-1",
+        "parameter_name": "shots",
+        "value": 2000,
+        "accepted": True,
+        "reason": "candidate passed deterministic bounds gate",
+        "minimum": 1000,
+        "maximum": 5000,
+    }
+    candidate_payload = {
+        "session_id": "session-1",
+        "action_id": "action-1",
+        "execution_id": "operation-1",
+        "task_id": "task-1",
+        "task_name": "CheckT1",
+        "qid": "Q00",
+        "source_parameter_name": "shots",
+        "parameter_name": "shots",
+        "value": 2000,
+        "error": 0,
+        "unit": "",
+        "value_type": "int",
+        "accepted": True,
+        "reason": "candidate passed deterministic bounds gate",
+        "minimum": 1000,
+        "maximum": 5000,
+    }
+    commit_payload = {
+        "commit_id": "commit-1",
+        "session_id": "session-1",
+        "action_id": "action-1",
+        "idempotency_key": "commit-key-1",
+        "execution_id": "operation-1",
+        "task_id": "task-1",
+        "task_name": "CheckT1",
+        "qid": "Q00",
+        "parameter_name": "shots",
+        "value": 2000,
+        "status": "committed",
+        "reason": "committed",
+        "before_snapshot": None,
+        "after_snapshot": {"value": 2000},
+        "committed_by": "tester",
+        "state_version_before": 1,
+        "state_version_after": 2,
+        "created_at": "2026-07-13T00:00:02Z",
+        "committed_at": "2026-07-13T00:00:02Z",
+    }
+
+    applied_commit_payload = {
+        **commit_payload,
+        "backend_status": "applied",
+        "backend_operation_id": "backend-operation-1",
+        "backend_name": "fake",
+        "backend_target_files": ["shots.yaml"],
+        "backend_changed_files": ["shots.yaml"],
+        "backend_verified": True,
+        "backend_git_commit": "abc12345",
+        "backend_error": "",
+        "backend_requested_at": "2026-07-13T00:00:03Z",
+        "backend_applied_at": "2026-07-13T00:00:04Z",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST" and request.url.path == "/agent-sessions":
+            assert request.read()
+            return httpx.Response(201, json=session_payload)
+        if request.method == "GET" and request.url.path == "/agent-sessions/session-1":
+            return httpx.Response(200, json=session_payload)
+        if (
+            request.method == "POST"
+            and request.url.path == "/agent-sessions/session-1/candidate-gate"
+        ):
+            assert json.loads(request.read()) == {"parameter_name": "shots", "value": 2000}
+            return httpx.Response(200, json=gate_payload)
+        if request.method == "POST" and request.url.path == "/agent-sessions/session-1/actions":
+            assert request.read()
+            return httpx.Response(201, json=action_payload)
+        if (
+            request.method == "POST"
+            and request.url.path
+            == "/agent-sessions/session-1/actions/action-1/candidates/shots/commit"
+        ):
+            assert json.loads(request.read()) == {
+                "idempotency_key": "commit-key-1",
+                "expected_state_version": 1,
+                "task_id": "task-1",
+            }
+            return httpx.Response(201, json=commit_payload)
+        if (
+            request.method == "POST"
+            and request.url.path == "/agent-sessions/session-1/commits/commit-1/apply"
+        ):
+            assert json.loads(request.read()) == {
+                "idempotency_key": "apply-key-1",
+                "expected_state_version": 2,
+                "push_to_github": True,
+            }
+            return httpx.Response(200, json=applied_commit_payload)
+        if (
+            request.method == "GET"
+            and request.url.path == "/agent-sessions/session-1/commits/commit-1"
+        ):
+            return httpx.Response(200, json=applied_commit_payload)
+        if (
+            request.method == "GET"
+            and request.url.path == "/agent-sessions/session-1/actions/action-1/candidates"
+        ):
+            return httpx.Response(
+                200,
+                json={"items": [candidate_payload], "total": 1},
+            )
+        if (
+            request.method == "GET"
+            and request.url.path == "/agent-sessions/session-1/actions/action-1"
+        ):
+            return httpx.Response(200, json=action_payload)
+        if request.method == "GET" and request.url.path == "/agent-sessions/session-1/actions":
+            return httpx.Response(200, json={"items": [action_payload], "total": 1})
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        session = client.create_agent_session(
+            chip_id="chip-a",
+            policy=cast("dict[str, Any]", session_payload["policy"]),
+        )
+        assert session.session_id == "session-1"
+        assert client.get_agent_session("session-1").state_version == 0
+        gate = client.evaluate_agent_candidate_gate(
+            "session-1",
+            parameter_name="shots",
+            value=2000,
+        )
+        assert gate.accepted
+        assert gate.minimum == 1000
+        action = client.submit_agent_action(
+            "session-1",
+            idempotency_key="key-1",
+            expected_state_version=0,
+            action_type="run_task",
+            task_name="CheckT1",
+            qids=["Q00"],
+            parameter_overrides={"shots": 2000},
+        )
+        assert action.action_id == "action-1"
+        assert client.get_agent_action("session-1", "action-1").action_id == "action-1"
+        candidates = client.list_agent_action_candidates("session-1", "action-1")
+        assert candidates[0].execution_id == "operation-1"
+        assert candidates[0].parameter_name == "shots"
+        commit = client.commit_agent_action_candidate(
+            "session-1",
+            "action-1",
+            "shots",
+            idempotency_key="commit-key-1",
+            expected_state_version=1,
+            task_id="task-1",
+        )
+        assert commit.status == "committed"
+        assert commit.state_version_after == 2
+        applied = client.apply_agent_candidate_commit(
+            "session-1",
+            "commit-1",
+            idempotency_key="apply-key-1",
+            expected_state_version=2,
+        )
+        assert applied.backend_verified is True
+        assert (
+            client.get_agent_candidate_commit("session-1", "commit-1").backend_git_commit
+            == "abc12345"
+        )
+        assert [item.action_id for item in client.list_agent_actions("session-1")] == ["action-1"]
+    finally:
+        client.close()
+
+
+def test_agent_polling_helpers_handle_eventual_consistency() -> None:
+    action_calls = 0
+    execution_calls = 0
+    action_payload: dict[str, Any] = {
+        "action_id": "action-1",
+        "session_id": "session-1",
+        "idempotency_key": "key-1",
+        "action_type": "run_task",
+        "task_name": "CheckT1",
+        "qids": ["Q00"],
+        "parameter_overrides": {},
+        "diagnosis": "",
+        "decision": "authorized",
+        "reason": "allowed",
+        "execution_status": "dispatching",
+        "operation_id": None,
+        "state_version_before": 0,
+        "state_version_after": 1,
+        "created_at": "2026-07-13T00:00:01Z",
+    }
+    execution_payload = {
+        "name": "agent-execution",
+        "status": "completed",
+        "flow_name": "re-execute:CheckT1",
+        "username": "tester",
+        "task": [],
+        "note": {},
+        "tags": ["agent-session:session-1"],
+        "chip_id": "chip-a",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal action_calls, execution_calls
+        if request.url.path == "/agent-sessions/session-1/actions/action-1":
+            action_calls += 1
+            payload = dict(action_payload)
+            if action_calls >= 2:
+                payload["execution_status"] = "queued"
+                payload["operation_id"] = "operation-1"
+            if action_calls >= 3:
+                payload["execution_status"] = "completed"
+                payload["execution_id"] = "execution-1"
+            return httpx.Response(200, json=payload)
+        if request.url.path == "/executions/execution-1":
+            execution_calls += 1
+            if execution_calls == 1:
+                return httpx.Response(404, json={"detail": "not indexed yet"})
+            if execution_calls == 2:
+                return httpx.Response(200, json={**execution_payload, "status": "running"})
+            return httpx.Response(200, json=execution_payload)
+        return httpx.Response(404, json={"detail": "missing"})
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        action = client.wait_for_agent_action(
+            "session-1",
+            "action-1",
+            timeout_seconds=1,
+            poll_interval_seconds=0,
+        )
+        linked = client.wait_for_agent_action_execution(
+            "session-1",
+            "action-1",
+            timeout_seconds=1,
+            poll_interval_seconds=0,
+        )
+        execution = client.wait_for_execution(
+            "execution-1",
+            timeout_seconds=1,
+            poll_interval_seconds=0,
+        )
+
+        assert action.operation_id == "operation-1"
+        assert linked.operation_id == "operation-1"
+        assert linked.execution_id == "execution-1"
+        assert action_calls == 3
+        assert execution.status == "completed"
+        assert execution_calls == 3
+    finally:
+        client.close()
+
+
+def test_wait_for_agent_candidate_apply_reaches_verified_terminal_state() -> None:
+    calls = 0
+    base = {
+        "commit_id": "commit-1",
+        "session_id": "session-1",
+        "action_id": "action-1",
+        "idempotency_key": "commit-key",
+        "execution_id": "operation-1",
+        "task_id": "task-1",
+        "task_name": "CheckT1",
+        "qid": "Q00",
+        "parameter_name": "t1",
+        "value": 95.0,
+        "status": "committed",
+        "reason": "committed",
+        "committed_by": "tester",
+        "state_version_before": 1,
+        "state_version_after": 2,
+        "created_at": "2026-07-13T00:00:02Z",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        status = "queued" if calls == 1 else "applied"
+        return httpx.Response(
+            200,
+            json={**base, "backend_status": status, "backend_verified": status == "applied"},
+        )
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        result = client.wait_for_agent_candidate_apply(
+            "session-1",
+            "commit-1",
+            timeout_seconds=1,
+            poll_interval_seconds=0,
+        )
+        assert result.backend_status == "applied"
+        assert result.backend_verified is True
+        assert calls == 2
+    finally:
+        client.close()
+
+
+def test_agent_polling_helpers_timeout() -> None:
+    action_payload: dict[str, Any] = {
+        "action_id": "action-1",
+        "session_id": "session-1",
+        "idempotency_key": "key-1",
+        "action_type": "run_task",
+        "task_name": "CheckT1",
+        "qids": ["Q00"],
+        "parameter_overrides": {},
+        "diagnosis": "",
+        "decision": "authorized",
+        "reason": "allowed",
+        "execution_status": "dispatching",
+        "operation_id": None,
+        "state_version_before": 0,
+        "state_version_after": 1,
+        "created_at": "2026-07-13T00:00:01Z",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=action_payload)
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        with pytest.raises(TimeoutError):
+            client.wait_for_agent_action(
+                "session-1",
+                "action-1",
+                timeout_seconds=0,
+                poll_interval_seconds=0,
+            )
+        action_payload["operation_id"] = "operation-1"
+        action_payload["execution_status"] = "queued"
+        with pytest.raises(TimeoutError):
+            client.wait_for_agent_action_execution(
+                "session-1",
+                "action-1",
+                timeout_seconds=0,
+                poll_interval_seconds=0,
+            )
     finally:
         client.close()

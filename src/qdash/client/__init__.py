@@ -1,5 +1,10 @@
 """QDash exporter client package."""
 
+from qdash.client.services.agent_runner import (
+    AgentCalibrationRunner,
+    AgentSkillTransition,
+    AgentStepOutcome,
+)
 from qdash.client.services.client import QDashClient
 from qdash.client.services.config import (
     QDashConfig,
@@ -16,10 +21,18 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
+    AgentActionListResponse,
+    AgentActionResponse,
+    AgentCandidateCommitResponse,
+    AgentCandidateListResponse,
+    AgentCandidateResponse,
+    AgentSessionPolicy,
+    AgentSessionResponse,
     AiReviewListResponse,
     AiReviewRunDetailResponse,
     AiReviewRunListResponse,
     CancelExecutionResponse,
+    CandidateGateResponse,
     ChipMetricsResponse,
     ChipResponse,
     CouplingResponse,
@@ -64,10 +77,21 @@ from qdash.client.services.models import (
 from . import rest
 
 __all__ = [
+    "AgentActionListResponse",
+    "AgentActionResponse",
+    "AgentCalibrationRunner",
+    "AgentCandidateCommitResponse",
+    "AgentCandidateListResponse",
+    "AgentCandidateResponse",
+    "AgentSessionPolicy",
+    "AgentSessionResponse",
+    "AgentSkillTransition",
+    "AgentStepOutcome",
     "AiReviewListResponse",
     "AiReviewRunDetailResponse",
     "AiReviewRunListResponse",
     "CancelExecutionResponse",
+    "CandidateGateResponse",
     "ChipMetricsResponse",
     "ChipResponse",
     "CouplingResponse",

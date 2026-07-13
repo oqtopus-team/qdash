@@ -81,6 +81,8 @@ class ParamsUpdater(Protocol):
 
     def update(self, qid: str, output_parameters: dict[str, Any]) -> set[str]: ...
 
+    def verify(self, qid: str, output_parameters: dict[str, Any]) -> set[str]: ...
+
 
 def resolve_param_yaml_file_names(output_parameters: dict[str, Any]) -> set[str]:
     """Resolve params YAML files addressed by output parameter names.
@@ -184,6 +186,46 @@ class _QubexParamsUpdater:
                     updated_files.add(extra_file)
 
         return updated_files
+
+    def verify(self, qid: str, output_parameters: dict[str, Any]) -> set[str]:
+        """Read back every mapped YAML value and return verified file names."""
+        params_dir = self._resolve_params_dir()
+        if params_dir is None:
+            raise ValueError("Qubex params directory is not available")
+        label = self._resolve_qubit_label(qid)
+        if label is None:
+            raise ValueError(f"Could not resolve Qubex label for qid={qid}")
+
+        verified: set[str] = set()
+        for key, param in output_parameters.items():
+            expected = self._extract_value(param)
+            if expected is None:
+                raise ValueError(f"Parameter '{key}' has no verifiable value")
+            file_names: list[str] = []
+            mapped = self._param_file_map.get(key)
+            if mapped is not None:
+                file_names.append(mapped)
+            file_names.extend(self._extra_file_map.get(key, []))
+            if not file_names:
+                raise ValueError(f"Parameter '{key}' has no params YAML mapping")
+
+            for file_name in file_names:
+                file_path = params_dir / file_name
+                if not file_path.exists():
+                    raise ValueError(f"Mapped params file does not exist: {file_name}")
+                lock_path = file_path.with_suffix(file_path.suffix + ".lock")
+                lock_path.touch(exist_ok=True)
+                with FileLock(lock_path), file_path.open("r") as fp:
+                    data = self._yaml.load(fp) or {}
+                section = data.get("data") if isinstance(data, dict) else None
+                actual = section.get(label) if isinstance(section, dict) else None
+                if not self._values_equal(actual, expected):
+                    raise ValueError(
+                        f"Backend verification failed for {file_name}:{label}: "
+                        f"expected {expected!r}, got {actual!r}"
+                    )
+                verified.add(file_name)
+        return verified
 
     def _resolve_params_dir(self) -> Path | None:
         config_dir = getattr(self._backend, "config", {}).get("params_dir")

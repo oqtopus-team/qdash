@@ -72,6 +72,7 @@ def single_task_executor(
         parameter_overrides=parameter_overrides,
         source_task_id=source_task_id,
         force_update_params=update_params,
+        persist_output_parameters=update_params,
     )
 
     try:

@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     timezone: str = "Asia/Tokyo"
     # Local agent integrations
     enable_local_codex_agent: bool = False
+    enable_agent_calibration: bool = False
 
 
 def resolve_api_cors_origins(settings: Settings) -> list[str]:

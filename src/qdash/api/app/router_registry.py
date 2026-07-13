@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.routers import (
     admin,
+    agent_session,
     auth,
     backend,
     calibration,
@@ -71,6 +72,7 @@ PUBLIC_ROUTERS: tuple[RouterRegistration, ...] = (
 )
 
 PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
+    RouterRegistration(agent_session.router, tags=("agent-session",)),
     RouterRegistration(calibration.router, tags=("calibration",)),
     RouterRegistration(copilot.router, prefix="/copilot", tags=("copilot",)),
     RouterRegistration(settings.router, tags=("settings",)),

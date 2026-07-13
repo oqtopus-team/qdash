@@ -4424,3 +4424,139 @@ class ListMuxResponse(BaseModel):
 
 FileTreeNode.model_rebuild()
 TaskFileTreeNode.model_rebuild()
+
+
+class AgentSessionPolicy(BaseModel):
+    """Client representation of an authorized agent session policy."""
+
+    qids: list[str]
+    allowed_tasks: list[str]
+    allowed_actions: list[str]
+    allowed_overrides: dict[str, dict[str, float | None]]
+    quality_gates: dict[str, dict[str, float | None]] = Field(default_factory=dict)
+    allow_reconfigure: bool = False
+    max_actions: int
+
+
+class AgentSessionResponse(BaseModel):
+    """Client representation of a bounded agent session."""
+
+    session_id: str
+    project_id: str
+    chip_id: str
+    created_by: str
+    policy: AgentSessionPolicy
+    skill_name: str
+    skill_version: str
+    skill_hash: str
+    model_name: str
+    status: str
+    state_version: int
+    action_count: int
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+    expires_at: AwareDatetime
+
+
+class AgentActionResponse(BaseModel):
+    """Client representation of an authorized or rejected agent action."""
+
+    action_id: str
+    session_id: str
+    idempotency_key: str
+    action_type: str
+    task_name: str | None
+    qids: list[str]
+    parameter_overrides: dict[str, float]
+    diagnosis: str
+    decision: str
+    reason: str
+    execution_status: str
+    operation_id: str | None = None
+    execution_id: str | None = None
+    state_version_before: int
+    state_version_after: int
+    created_at: AwareDatetime
+
+
+class AgentActionListResponse(BaseModel):
+    """Client representation of a session action audit list."""
+
+    items: list[AgentActionResponse]
+    total: int
+
+
+class CandidateGateResponse(BaseModel):
+    """Client representation of a deterministic candidate gate decision."""
+
+    session_id: str
+    parameter_name: str
+    value: float
+    accepted: bool
+    reason: str
+    minimum: float | None = None
+    maximum: float | None = None
+
+
+class AgentCandidateResponse(BaseModel):
+    """Client representation of a server-derived task-result candidate."""
+
+    session_id: str
+    action_id: str
+    execution_id: str
+    task_id: str
+    task_name: str
+    qid: str
+    source_parameter_name: str
+    parameter_name: str
+    value: float
+    error: float = 0.0
+    unit: str = ""
+    value_type: str = "float"
+    quality_metrics: dict[str, float] = Field(default_factory=dict)
+    accepted: bool
+    reason: str
+    minimum: float | None = None
+    maximum: float | None = None
+
+
+class AgentCandidateListResponse(BaseModel):
+    """Client representation of action candidates and gate decisions."""
+
+    items: list[AgentCandidateResponse]
+    total: int
+
+
+class AgentCandidateCommitResponse(BaseModel):
+    """Client representation of an audited candidate commit."""
+
+    commit_id: str
+    session_id: str
+    action_id: str
+    idempotency_key: str
+    execution_id: str
+    task_id: str
+    task_name: str
+    qid: str
+    parameter_name: str
+    value: float
+    status: str
+    reason: str
+    before_snapshot: dict[str, Any] | None = None
+    after_snapshot: dict[str, Any] | None = None
+    committed_by: str
+    state_version_before: int
+    state_version_after: int
+    created_at: AwareDatetime
+    committed_at: AwareDatetime | None = None
+    backend_status: str = "not_started"
+    backend_operation_id: str | None = None
+    backend_name: str = ""
+    backend_target_files: list[str] = Field(default_factory=list)
+    backend_changed_files: list[str] = Field(default_factory=list)
+    backend_verified: bool = False
+    backend_base_git_commit: str | None = None
+    backend_git_commit: str | None = None
+    backend_error: str = ""
+    backend_requested_at: AwareDatetime | None = None
+    backend_applied_at: AwareDatetime | None = None

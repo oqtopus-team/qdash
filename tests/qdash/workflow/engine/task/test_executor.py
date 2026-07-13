@@ -425,14 +425,19 @@ class TestTaskExecutorExecuteTask:
         mock_state_manager.put_output_parameters.assert_called_once()
         assert "output_parameters" in result
 
-    def test_execute_task_returns_r2_in_result(self, executor: TaskExecutor) -> None:
-        """Test execute_task returns R² value in result."""
+    def test_execute_task_returns_r2_in_result(
+        self,
+        executor: TaskExecutor,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test execute_task returns and persists R² as a quality metric."""
         task = MockTask()
         session: Any = MockSession()
 
         result = executor.execute_task(task, session, "0")
 
         assert result["r2"] == {"0": 0.95}
+        assert mock_state_manager.get_task.return_value.quality_metrics == {"r2": 0.95}
 
     def test_execute_task_records_run_parameters(
         self, executor: TaskExecutor, mock_state_manager: MagicMock

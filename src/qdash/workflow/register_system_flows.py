@@ -17,33 +17,54 @@ logger = getLogger(__name__)
 
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
 
-# The flow file lives at /app/qdash/workflow/service/single_task_flow.py
-# inside both the worker and deployment-service containers (shared volume).
-FLOW_FILE_PATH = "/app/qdash/workflow/service/single_task_flow.py"
-FLOW_FUNCTION_NAME = "single_task_executor"
-DEPLOYMENT_NAME = "system-single-task"
+SYSTEM_FLOWS = [
+    {
+        "file_path": "/app/qdash/workflow/service/single_task_flow.py",
+        "flow_function_name": "single_task_executor",
+        "deployment_name": "system-single-task",
+    },
+]
+
+
+AGENT_SYSTEM_FLOWS = [
+    {
+        "file_path": "/app/qdash/workflow/service/agent_candidate_apply_flow.py",
+        "flow_function_name": "agent_candidate_apply",
+        "deployment_name": "system-candidate-apply",
+    },
+]
+
+
+def get_system_flows(*, agent_calibration_enabled: bool | None = None) -> list[dict[str, str]]:
+    """Return deployments enabled for this worker, preserving legacy defaults."""
+    if agent_calibration_enabled is None:
+        agent_calibration_enabled = os.getenv("ENABLE_AGENT_CALIBRATION", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+    if agent_calibration_enabled:
+        return [*SYSTEM_FLOWS, *AGENT_SYSTEM_FLOWS]
+    return list(SYSTEM_FLOWS)
 
 
 async def register_system_flows() -> None:
-    """Register the single-task-executor deployment via deployment-service."""
-    logger.info(f"Registering system deployment '{DEPLOYMENT_NAME}' via {DEPLOYMENT_SERVICE_URL}")
-
+    """Register built-in worker deployments via deployment-service."""
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{DEPLOYMENT_SERVICE_URL}/register-deployment",
-            json={
-                "file_path": FLOW_FILE_PATH,
-                "flow_function_name": FLOW_FUNCTION_NAME,
-                "deployment_name": DEPLOYMENT_NAME,
-            },
-            timeout=30.0,
-        )
-        response.raise_for_status()
-        data = response.json()
-        logger.info(
-            f"System deployment '{DEPLOYMENT_NAME}' registered: "
-            f"deployment_id={data['deployment_id']}"
-        )
+        for deployment in get_system_flows():
+            name = deployment["deployment_name"]
+            logger.info(f"Registering system deployment '{name}' via {DEPLOYMENT_SERVICE_URL}")
+            response = await client.post(
+                f"{DEPLOYMENT_SERVICE_URL}/register-deployment",
+                json=deployment,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+            logger.info(
+                f"System deployment '{name}' registered: deployment_id={data['deployment_id']}"
+            )
 
 
 if __name__ == "__main__":
