@@ -8,14 +8,12 @@ import {
   CalendarDays,
   Crosshair,
   ExternalLink,
-  Lock,
   MessageSquare,
   Pencil,
   Plus,
   Settings,
   Tag,
   Trash2,
-  Unlock,
   UserRound,
   X,
   XCircle,
@@ -28,14 +26,12 @@ import {
   getGetForumPostQueryKey,
   getListForumCategoriesQueryKey,
   getListForumPostsQueryKey,
-  useCloseForumPost,
   useCreateForumCategory,
   useDeleteForumCategory,
   useGetForumPost,
   useGetForumPostReplies,
   useListForumCategories,
   useListForumPosts,
-  useReopenForumPost,
   useUpdateForumPost,
 } from "@/client/forum/forum";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -147,19 +143,13 @@ function postTargetContext(post: ForumPostResponse): ForumTargetContext | null {
 function ForumThreadCard({
   post,
   categories,
-  canManage,
   isSelected,
   onSelect,
-  onClose,
-  onReopen,
 }: {
   post: ForumPostResponse;
   categories: ForumCategoryDefinition[];
-  canManage: boolean;
   isSelected: boolean;
   onSelect: () => void;
-  onClose: (postId: string) => void;
-  onReopen: (postId: string) => void;
 }) {
   const category = getForumCategory(post.category, categories);
   const targetContext = postTargetContext(post);
@@ -257,34 +247,6 @@ function ForumThreadCard({
           </div>
         </div>
       </div>
-
-      {canManage && (
-        <div className="flex justify-end border-t border-base-300 px-3 py-2 sm:px-4">
-          {isTerminal ? (
-            <button
-              className="btn btn-ghost btn-xs gap-1"
-              onClick={(event) => {
-                event.stopPropagation();
-                onReopen(post.id);
-              }}
-            >
-              <Unlock className="h-3 w-3" />
-              Reopen
-            </button>
-          ) : (
-            <button
-              className="btn btn-ghost btn-xs gap-1"
-              onClick={(event) => {
-                event.stopPropagation();
-                onClose(post.id);
-              }}
-            >
-              <Lock className="h-3 w-3" />
-              Close
-            </button>
-          )}
-        </div>
-      )}
     </article>
   );
 }
@@ -888,13 +850,6 @@ export function ForumPageContent() {
 
   const createCategoryMutation = useCreateForumCategory();
   const deleteCategoryMutation = useDeleteForumCategory();
-  const closeMutation = useCloseForumPost();
-  const reopenMutation = useReopenForumPost();
-
-  const invalidateList = () => {
-    queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
-  };
-
   const invalidateCategories = () => {
     queryClient.invalidateQueries({
       queryKey: getListForumCategoriesQueryKey(),
@@ -1285,15 +1240,8 @@ export function ForumPageContent() {
                 key={post.id}
                 post={post}
                 categories={categories}
-                canManage={isOwner || user?.username === post.username}
                 isSelected={selectedPostId === post.id}
                 onSelect={() => setSelectedPostId(post.id)}
-                onClose={(postId) =>
-                  closeMutation.mutate({ postId }, { onSuccess: invalidateList })
-                }
-                onReopen={(postId) =>
-                  reopenMutation.mutate({ postId }, { onSuccess: invalidateList })
-                }
               />
             ))}
           </div>
