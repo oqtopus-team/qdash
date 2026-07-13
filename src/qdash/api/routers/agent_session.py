@@ -18,10 +18,12 @@ from qdash.api.lib.project import (
 )
 from qdash.api.schemas.agent_session import (
     AgentActionResponse,
+    AgentCampaignCommitResponse,
     AgentCandidateCommitResponse,
     AgentSessionResponse,
     ApplyAgentCandidateRequest,
     CandidateGateResponse,
+    CommitAgentCampaignRequest,
     CommitAgentCandidateRequest,
     CreateAgentSessionRequest,
     EvaluateCandidateGateRequest,
@@ -173,6 +175,48 @@ def commit_agent_action_candidate(
         parameter_name=parameter_name,
         username=ctx.user.username,
         body=body,
+    )
+
+
+@router.post(
+    "/{session_id}/campaign-commits",
+    response_model=AgentCampaignCommitResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Commit final agent campaign candidates",
+    operation_id="commitAgentCampaignCandidates",
+)
+def commit_agent_campaign_candidates(
+    session_id: str,
+    body: CommitAgentCampaignRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
+) -> AgentCampaignCommitResponse:
+    """Validate a final candidate set and persist it with one Qubit save."""
+    return service.commit_campaign_candidates(
+        project_id=ctx.project_id,
+        session_id=session_id,
+        username=ctx.user.username,
+        body=body,
+    )
+
+
+@router.get(
+    "/{session_id}/campaign-commits/{commit_id}",
+    response_model=AgentCampaignCommitResponse,
+    summary="Get an agent campaign commit",
+    operation_id="getAgentCampaignCommit",
+)
+def get_agent_campaign_commit(
+    session_id: str,
+    commit_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
+) -> AgentCampaignCommitResponse:
+    """Get one audited final campaign candidate-set commit."""
+    return service.get_campaign_commit(
+        project_id=ctx.project_id,
+        session_id=session_id,
+        commit_id=commit_id,
     )
 
 

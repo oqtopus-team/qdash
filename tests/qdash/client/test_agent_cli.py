@@ -216,7 +216,6 @@ def test_run_campaign_parses_plan_and_prints_audit_outcome(
                         "id": "calibrate",
                         "task_name": "CheckT1",
                         "candidate_parameter": "t1",
-                        "commit_candidate": True,
                         "on_rollback": "verify",
                     },
                     {
@@ -231,6 +230,7 @@ def test_run_campaign_parses_plan_and_prints_audit_outcome(
             "campaign-key",
             "--max-node-executions",
             "4",
+            "--commit-on-success",
         ]
     )
 
@@ -239,16 +239,19 @@ def test_run_campaign_parses_plan_and_prints_audit_outcome(
     assert payload["transition"] == "pass"
     assert payload["completed_nodes"] == 2
     assert payload["node_path"] == ["calibrate", "verify"]
+    assert payload["campaign_commit"] is None
+    assert payload["planner_decisions"] == []
     campaign_kwargs = captured["campaign_kwargs"]
     assert isinstance(campaign_kwargs, dict)
     assert campaign_kwargs["idempotency_prefix"] == "campaign-key"
     assert campaign_kwargs["max_node_executions"] == 4
+    assert campaign_kwargs["commit_on_success"] is True
     nodes = campaign_kwargs["nodes"]
     assert isinstance(nodes, list)
     assert [node.task_name for node in nodes] == ["CheckT1", "CheckT2"]
     assert nodes[0].node_id == "calibrate"
     assert nodes[0].on_rollback == "verify"
     assert nodes[1].on_pass == "$complete"  # noqa: S105 - transition target
-    assert nodes[0].commit_candidate is True
+    assert nodes[0].commit_candidate is False
     assert nodes[1].apply_backend is False
     client.close.assert_called_once()

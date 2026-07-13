@@ -12,7 +12,9 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from qdash.api.schemas.agent_session import (
+    AgentCampaignCandidateReference,
     ApplyAgentCandidateRequest,
+    CommitAgentCampaignRequest,
     CommitAgentCandidateRequest,
     CreateAgentSessionRequest,
     EvaluateCandidateGateRequest,
@@ -69,7 +71,10 @@ def _create_session(
             policy=AgentSessionPolicy(
                 qids=["Q00", "Q01"],
                 allowed_tasks=["CheckQubitSpectroscopy"],
-                allowed_overrides={"drive_amplitude": NumericBounds(minimum=0.01, maximum=0.2)},
+                allowed_overrides={
+                    "drive_amplitude": NumericBounds(minimum=0.01, maximum=0.2),
+                    "qubit_frequency": NumericBounds(minimum=3.0, maximum=6.0),
+                },
                 quality_gates=quality_gates or {},
                 max_actions=max_actions,
             ),
@@ -240,18 +245,19 @@ def _attach_completed_task_result(
     action_id: str,
     output_parameters: dict[str, object],
     quality_metrics: dict[str, float] | None = None,
+    sequence: int = 1,
 ) -> None:
     action = AgentActionDocument.find_one({"session_id": session_id, "action_id": action_id}).run()
     assert action is not None
-    action.operation_id = "operation-1"
-    action.execution_id = "execution-1"
+    action.operation_id = f"operation-{sequence}"
+    action.execution_id = f"execution-{sequence}"
     action.execution_status = "completed"
     action.save()
 
     TaskResultHistoryDocument(
         project_id="project-1",
         username="tester",
-        task_id="task-result-1",
+        task_id=f"task-result-{sequence}",
         name="CheckQubitSpectroscopy",
         upstream_id="",
         status="completed",
@@ -271,7 +277,7 @@ def _attach_completed_task_result(
         task_type="qubit",
         system_info=SystemInfoModel(),
         qid="Q00",
-        execution_id="execution-1",
+        execution_id=f"execution-{sequence}",
         tags=["agent-session:" + session_id],
         chip_id="chip-001",
     ).insert()
@@ -432,6 +438,150 @@ def test_commit_action_candidate_revalidates_and_audits_parameter_write(
     assert qubit is not None
     assert qubit.data["drive_amplitude"]["value"] == 0.12
     assert qubit.data["drive_amplitude"]["execution_id"] == "execution-1"
+
+
+def test_commit_campaign_candidates_updates_final_set_once(
+    service: AgentSessionService,
+) -> None:
+    """All accepted final candidates are persisted in one audited campaign commit."""
+    session = _create_session(service, max_actions=2)
+    first = service.submit_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        body=_run_task_action(),
+    )
+    second = service.submit_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        body=_run_task_action(idempotency_key="action-2", expected_state_version=1),
+    )
+    _attach_completed_task_result(
+        session_id=session.session_id,
+        action_id=first.action_id,
+        output_parameters={"drive_amplitude": {"value": 0.12, "unit": "a.u."}},
+    )
+    _attach_completed_task_result(
+        session_id=session.session_id,
+        action_id=second.action_id,
+        output_parameters={"qubit_frequency": {"value": 4.8, "unit": "GHz"}},
+        sequence=2,
+    )
+    body = CommitAgentCampaignRequest(
+        idempotency_key="campaign-commit-1",
+        expected_state_version=2,
+        candidates=[
+            AgentCampaignCandidateReference(
+                action_id=first.action_id,
+                parameter_name="drive_amplitude",
+                task_id="task-result-1",
+            ),
+            AgentCampaignCandidateReference(
+                action_id=second.action_id,
+                parameter_name="qubit_frequency",
+                task_id="task-result-2",
+            ),
+        ],
+    )
+
+    committed = service.commit_campaign_candidates(
+        project_id="project-1",
+        session_id=session.session_id,
+        username="reviewer",
+        body=body,
+    )
+    retried = service.commit_campaign_candidates(
+        project_id="project-1",
+        session_id=session.session_id,
+        username="reviewer",
+        body=body,
+    )
+    updated_session = service.get_session(
+        project_id="project-1",
+        session_id=session.session_id,
+    )
+    qubit = QubitDocument.find_one(
+        {"project_id": "project-1", "chip_id": "chip-001", "qid": "Q00"}
+    ).run()
+
+    assert committed.status == "committed"
+    assert retried.commit_id == committed.commit_id
+    assert [candidate.parameter_name for candidate in committed.candidates] == [
+        "drive_amplitude",
+        "qubit_frequency",
+    ]
+    assert committed.before_snapshot == {
+        "drive_amplitude": None,
+        "qubit_frequency": None,
+    }
+    drive_snapshot = cast("dict[str, object]", committed.after_snapshot["drive_amplitude"])
+    frequency_snapshot = cast("dict[str, object]", committed.after_snapshot["qubit_frequency"])
+    assert drive_snapshot["value"] == 0.12
+    assert frequency_snapshot["value"] == 4.8
+    assert updated_session.state_version == 3
+    assert qubit is not None
+    assert qubit.data["drive_amplitude"]["value"] == 0.12
+    assert qubit.data["qubit_frequency"]["value"] == 4.8
+
+
+def test_commit_campaign_candidates_rejects_set_before_any_write(
+    service: AgentSessionService,
+) -> None:
+    """One rejected candidate prevents the complete final set from being persisted."""
+    session = _create_session(service, max_actions=2)
+    first = service.submit_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        body=_run_task_action(),
+    )
+    second = service.submit_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        body=_run_task_action(idempotency_key="action-2", expected_state_version=1),
+    )
+    _attach_completed_task_result(
+        session_id=session.session_id,
+        action_id=first.action_id,
+        output_parameters={"drive_amplitude": {"value": 0.12}},
+    )
+    _attach_completed_task_result(
+        session_id=session.session_id,
+        action_id=second.action_id,
+        output_parameters={"qubit_frequency": {"value": 8.0}},
+        sequence=2,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        service.commit_campaign_candidates(
+            project_id="project-1",
+            session_id=session.session_id,
+            username="reviewer",
+            body=CommitAgentCampaignRequest(
+                idempotency_key="campaign-commit-rejected",
+                expected_state_version=2,
+                candidates=[
+                    AgentCampaignCandidateReference(
+                        action_id=first.action_id,
+                        parameter_name="drive_amplitude",
+                        task_id="task-result-1",
+                    ),
+                    AgentCampaignCandidateReference(
+                        action_id=second.action_id,
+                        parameter_name="qubit_frequency",
+                        task_id="task-result-2",
+                    ),
+                ],
+            ),
+        )
+
+    unchanged = service.get_session(project_id="project-1", session_id=session.session_id)
+    qubit = QubitDocument.find_one(
+        {"project_id": "project-1", "chip_id": "chip-001", "qid": "Q00"}
+    ).run()
+    assert exc_info.value.status_code == 409
+    assert unchanged.state_version == 2
+    assert qubit is not None
+    assert "drive_amplitude" not in qubit.data
+    assert "qubit_frequency" not in qubit.data
 
 
 @pytest.mark.asyncio

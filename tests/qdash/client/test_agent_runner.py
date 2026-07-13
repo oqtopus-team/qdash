@@ -8,6 +8,7 @@ from qdash.client.services.agent_runner import (
     AgentCalibrationRunner,
     AgentCampaignNode,
     AgentCampaignRunner,
+    AgentPlannerDecision,
     AgentSkillTransition,
     AgentStepOutcome,
 )
@@ -17,6 +18,7 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.models import (
     AgentActionResponse,
+    AgentCampaignCommitResponse,
     AgentCandidateCommitResponse,
     AgentCandidateResponse,
     AgentSessionResponse,
@@ -135,6 +137,32 @@ def _commit() -> AgentCandidateCommitResponse:
             "state_version_after": 2,
             "created_at": "2026-07-13T00:00:02Z",
             "committed_at": "2026-07-13T00:00:02Z",
+        }
+    )
+
+
+def _campaign_commit() -> AgentCampaignCommitResponse:
+    return AgentCampaignCommitResponse.model_validate(
+        {
+            "commit_id": "campaign-commit-1",
+            "session_id": "session-1",
+            "idempotency_key": "campaign-key-campaign-commit",
+            "chip_id": "chip-1",
+            "qid": "Q00",
+            "candidates": [
+                _candidate(accepted=True).model_copy(
+                    update={"parameter_name": "t1", "source_parameter_name": "t1"}
+                )
+            ],
+            "status": "committed",
+            "reason": "committed",
+            "before_snapshot": {"t1": None},
+            "after_snapshot": {"t1": {"value": 95.0}},
+            "committed_by": "tester",
+            "state_version_before": 2,
+            "state_version_after": 3,
+            "created_at": "2026-07-13T00:00:03Z",
+            "committed_at": "2026-07-13T00:00:03Z",
         }
     )
 
@@ -721,3 +749,129 @@ def test_campaign_rejects_reserved_complete_node_id() -> None:
     assert "is reserved" in outcome.reason
     client.get_agent_session.assert_not_called()
     step_runner.run_step.assert_not_called()
+
+
+def test_campaign_commits_latest_candidate_set_only_after_success() -> None:
+    client = MagicMock()
+    client.get_agent_session.side_effect = [
+        _campaign_session(max_actions=2),
+        _campaign_session(max_actions=2, action_count=2),
+    ]
+    client.commit_agent_campaign_candidates.return_value = _campaign_commit()
+    step_runner = MagicMock()
+    step_runner.run_step.side_effect = [
+        _campaign_step("t1", 90.0),
+        _campaign_step("t1", 95.0),
+    ]
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[
+            AgentCampaignNode(task_name="CheckT1", candidate_parameter="t1"),
+            AgentCampaignNode(task_name="CheckT1", candidate_parameter="t1"),
+        ],
+        commit_on_success=True,
+        idempotency_prefix="campaign-key",
+    )
+
+    assert outcome.transition == AgentSkillTransition.PASS
+    assert outcome.campaign_commit is not None
+    assert outcome.campaign_commit.commit_id == "campaign-commit-1"
+    client.commit_agent_campaign_candidates.assert_called_once_with(
+        "session-1",
+        [
+            {
+                "action_id": "action-1",
+                "parameter_name": "t1",
+                "task_id": "task-1",
+            }
+        ],
+        idempotency_key="campaign-key-campaign-commit",
+        expected_state_version=2,
+    )
+
+
+def test_campaign_does_not_commit_after_rollback() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _campaign_session()
+    step_runner = MagicMock()
+    step_runner.run_step.return_value = _campaign_step(
+        "t1",
+        900.0,
+        transition=AgentSkillTransition.ROLLBACK,
+    )
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[AgentCampaignNode(task_name="CheckT1", candidate_parameter="t1")],
+        commit_on_success=True,
+    )
+
+    assert outcome.transition == AgentSkillTransition.ROLLBACK
+    client.commit_agent_campaign_candidates.assert_not_called()
+
+
+def test_campaign_planner_selects_only_pre_authorized_nodes() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _campaign_session(max_actions=2)
+    step_runner = MagicMock()
+    step_runner.run_step.side_effect = [
+        _campaign_step("t1", 900.0, transition=AgentSkillTransition.ROLLBACK),
+        _campaign_step("t2", 130.0),
+    ]
+    planner = MagicMock()
+    planner.choose_next.side_effect = [
+        AgentPlannerDecision(target_node_id="diagnose", reason="inspect coherence"),
+        AgentPlannerDecision(target_node_id="$complete", reason="recovery accepted"),
+    ]
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[
+            AgentCampaignNode(node_id="calibrate", task_name="CheckT1", candidate_parameter="t1"),
+            AgentCampaignNode(node_id="diagnose", task_name="CheckT2", candidate_parameter="t2"),
+        ],
+        max_node_executions=2,
+        planner=planner,
+    )
+
+    assert outcome.transition == AgentSkillTransition.PASS
+    assert outcome.node_path == ("calibrate", "diagnose")
+    assert outcome.planner_decisions == (
+        AgentPlannerDecision(target_node_id="diagnose", reason="inspect coherence"),
+        AgentPlannerDecision(target_node_id="$complete", reason="recovery accepted"),
+    )
+    first_observation = planner.choose_next.call_args_list[0].args[0]
+    assert first_observation.available_node_ids == ("calibrate", "diagnose")
+    assert first_observation.remaining_node_executions == 1
+
+
+def test_campaign_planner_unknown_node_escalates_without_dispatch() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _campaign_session()
+    step_runner = MagicMock()
+    step_runner.run_step.return_value = _campaign_step("t1", 95.0)
+    planner = MagicMock()
+    planner.choose_next.return_value = AgentPlannerDecision(target_node_id="outside-policy")
+    runner = AgentCampaignRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_campaign(
+        session_id="session-1",
+        qid="Q00",
+        source_execution_id="source-1",
+        nodes=[AgentCampaignNode(task_name="CheckT1", candidate_parameter="t1")],
+        planner=planner,
+    )
+
+    assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
+    assert "unknown node 'outside-policy'" in outcome.reason
+    step_runner.run_step.assert_called_once()

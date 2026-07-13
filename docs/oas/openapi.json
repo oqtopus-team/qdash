@@ -2756,6 +2756,153 @@
         }
       }
     },
+    "/agent-sessions/{session_id}/campaign-commits": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Commit final agent campaign candidates",
+        "description": "Validate a final candidate set and persist it with one Qubit save.",
+        "operationId": "commitAgentCampaignCandidates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitAgentCampaignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCampaignCommitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/campaign-commits/{commit_id}": {
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Get an agent campaign commit",
+        "description": "Get one audited final campaign candidate-set commit.",
+        "operationId": "getAgentCampaignCommit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "commit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Commit Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCampaignCommitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/agent-sessions/{session_id}/commits/{commit_id}": {
       "get": {
         "tags": [
@@ -16445,6 +16592,131 @@
         "title": "AgentActionType",
         "description": "Actions that a local agent may propose to QDash."
       },
+      "AgentCampaignCandidateReference": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Action Id"
+          },
+          "parameter_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Parameter Name"
+          },
+          "task_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Task Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_id",
+          "parameter_name",
+          "task_id"
+        ],
+        "title": "AgentCampaignCandidateReference",
+        "description": "Identify one authoritative accepted candidate for campaign finalization."
+      },
+      "AgentCampaignCommitResponse": {
+        "properties": {
+          "commit_id": {
+            "type": "string",
+            "title": "Commit Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCandidateResponse"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "before_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Before Snapshot"
+          },
+          "after_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "After Snapshot"
+          },
+          "committed_by": {
+            "type": "string",
+            "title": "Committed By"
+          },
+          "state_version_before": {
+            "type": "integer",
+            "title": "State Version Before"
+          },
+          "state_version_after": {
+            "type": "integer",
+            "title": "State Version After"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "commit_id",
+          "session_id",
+          "idempotency_key",
+          "chip_id",
+          "qid",
+          "candidates",
+          "status",
+          "reason",
+          "committed_by",
+          "state_version_before",
+          "state_version_after",
+          "created_at"
+        ],
+        "title": "AgentCampaignCommitResponse",
+        "description": "Audited all-at-once QDash commit of final campaign candidates."
+      },
       "AgentCandidateCommitResponse": {
         "properties": {
           "commit_id": {
@@ -18321,6 +18593,38 @@
         ],
         "title": "ChipResponse",
         "description": "Chip response model.\n\nQubit and coupling data are stored in separate collections for scalability\nand should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubit_count (int): Number of qubits in the chip.\n    coupling_count (int): Number of couplings in the chip.\n    installed_at (datetime | None): Installation timestamp."
+      },
+      "CommitAgentCampaignRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "expected_state_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected State Version"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCampaignCandidateReference"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_state_version",
+          "candidates"
+        ],
+        "title": "CommitAgentCampaignRequest",
+        "description": "Commit the final accepted candidate set for one same-qubit campaign."
       },
       "CommitAgentCandidateRequest": {
         "properties": {

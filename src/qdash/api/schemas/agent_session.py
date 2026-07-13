@@ -173,6 +173,22 @@ class CommitAgentCandidateRequest(BaseModel):
     task_id: str = Field(min_length=1, max_length=200)
 
 
+class AgentCampaignCandidateReference(BaseModel):
+    """Identify one authoritative accepted candidate for campaign finalization."""
+
+    action_id: str = Field(min_length=1, max_length=200)
+    parameter_name: str = Field(min_length=1, max_length=200)
+    task_id: str = Field(min_length=1, max_length=200)
+
+
+class CommitAgentCampaignRequest(BaseModel):
+    """Commit the final accepted candidate set for one same-qubit campaign."""
+
+    idempotency_key: str = Field(min_length=1, max_length=128)
+    expected_state_version: int = Field(ge=0)
+    candidates: list[AgentCampaignCandidateReference] = Field(min_length=1, max_length=100)
+
+
 class ApplyAgentCandidateRequest(BaseModel):
     """Dispatch a committed candidate for worker-side backend application."""
 
@@ -214,3 +230,23 @@ class AgentCandidateCommitResponse(BaseModel):
     backend_error: str = ""
     backend_requested_at: datetime | None = None
     backend_applied_at: datetime | None = None
+
+
+class AgentCampaignCommitResponse(BaseModel):
+    """Audited all-at-once QDash commit of final campaign candidates."""
+
+    commit_id: str
+    session_id: str
+    idempotency_key: str
+    chip_id: str
+    qid: str
+    candidates: list[AgentCandidateResponse]
+    status: str
+    reason: str
+    before_snapshot: dict[str, object] = Field(default_factory=dict)
+    after_snapshot: dict[str, object] = Field(default_factory=dict)
+    committed_by: str
+    state_version_before: int
+    state_version_after: int
+    created_at: datetime
+    committed_at: datetime | None = None

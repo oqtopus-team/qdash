@@ -1677,6 +1677,78 @@ def test_agent_session_client_methods() -> None:
         client.close()
 
 
+def test_agent_campaign_commit_client_methods() -> None:
+    payload = {
+        "commit_id": "campaign-commit-1",
+        "session_id": "session-1",
+        "idempotency_key": "campaign-key",
+        "chip_id": "chip-a",
+        "qid": "Q00",
+        "candidates": [
+            {
+                "session_id": "session-1",
+                "action_id": "action-1",
+                "execution_id": "execution-1",
+                "task_id": "task-1",
+                "task_name": "CheckT1",
+                "qid": "Q00",
+                "source_parameter_name": "t1",
+                "parameter_name": "t1",
+                "value": 95.0,
+                "accepted": True,
+                "reason": "accepted",
+            }
+        ],
+        "status": "committed",
+        "reason": "committed",
+        "before_snapshot": {"t1": None},
+        "after_snapshot": {"t1": {"value": 95.0}},
+        "committed_by": "tester",
+        "state_version_before": 1,
+        "state_version_after": 2,
+        "created_at": "2026-07-13T00:00:02Z",
+        "committed_at": "2026-07-13T00:00:02Z",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            assert request.url.path == "/agent-sessions/session-1/campaign-commits"
+            assert json.loads(request.read()) == {
+                "idempotency_key": "campaign-key",
+                "expected_state_version": 1,
+                "candidates": [
+                    {
+                        "action_id": "action-1",
+                        "parameter_name": "t1",
+                        "task_id": "task-1",
+                    }
+                ],
+            }
+            return httpx.Response(201, json=payload)
+        assert request.url.path == ("/agent-sessions/session-1/campaign-commits/campaign-commit-1")
+        return httpx.Response(200, json=payload)
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        committed = client.commit_agent_campaign_candidates(
+            "session-1",
+            [
+                {
+                    "action_id": "action-1",
+                    "parameter_name": "t1",
+                    "task_id": "task-1",
+                }
+            ],
+            idempotency_key="campaign-key",
+            expected_state_version=1,
+        )
+        assert committed.candidates[0].parameter_name == "t1"
+        fetched = client.get_agent_campaign_commit("session-1", "campaign-commit-1")
+        assert fetched.commit_id == committed.commit_id
+    finally:
+        client.close()
+
+
 def test_agent_polling_helpers_handle_eventual_consistency() -> None:
     action_calls = 0
     execution_calls = 0

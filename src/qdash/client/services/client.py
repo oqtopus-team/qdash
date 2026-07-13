@@ -31,6 +31,7 @@ from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
     AgentActionListResponse,
     AgentActionResponse,
+    AgentCampaignCommitResponse,
     AgentCandidateCommitResponse,
     AgentCandidateListResponse,
     AgentCandidateResponse,
@@ -926,6 +927,38 @@ class QDashClient:
             },
         )
         return self._validate_model_payload(AgentCandidateCommitResponse, response.data)
+
+    def commit_agent_campaign_candidates(
+        self,
+        session_id: str,
+        candidates: list[dict[str, str]],
+        *,
+        idempotency_key: str,
+        expected_state_version: int,
+    ) -> AgentCampaignCommitResponse:
+        """Commit the final accepted same-qubit candidate set after campaign success."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/campaign-commits",
+            json={
+                "idempotency_key": idempotency_key,
+                "expected_state_version": expected_state_version,
+                "candidates": candidates,
+            },
+        )
+        return self._validate_model_payload(AgentCampaignCommitResponse, response.data)
+
+    def get_agent_campaign_commit(
+        self,
+        session_id: str,
+        commit_id: str,
+    ) -> AgentCampaignCommitResponse:
+        """Get one audited final campaign candidate-set commit."""
+        response = self._request(
+            "GET",
+            f"/agent-sessions/{session_id}/campaign-commits/{commit_id}",
+        )
+        return self._validate_model_payload(AgentCampaignCommitResponse, response.data)
 
     def get_agent_candidate_commit(
         self,

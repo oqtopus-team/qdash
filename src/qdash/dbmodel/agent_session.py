@@ -122,6 +122,46 @@ class AgentCandidateCommitDocument(Document):
         ]
 
 
+class AgentCampaignCommitDocument(Document):
+    """Audit record for one same-qubit campaign candidate-set commit."""
+
+    commit_id: str
+    session_id: str
+    project_id: str
+    idempotency_key: str
+    request_hash: str
+    chip_id: str
+    qid: str
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
+    status: str = "committing"
+    reason: str = ""
+    before_snapshot: dict[str, Any] = Field(default_factory=dict)
+    after_snapshot: dict[str, Any] = Field(default_factory=dict)
+    committed_by: str
+    state_version_before: int
+    state_version_after: int
+    created_at: datetime = Field(default_factory=now)
+    committed_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+    class Settings:
+        """MongoDB collection settings."""
+
+        name = "agent_campaign_commits"
+        indexes: ClassVar = [
+            IndexModel([("commit_id", ASCENDING)], unique=True),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("session_id", ASCENDING),
+                    ("idempotency_key", ASCENDING),
+                ],
+                unique=True,
+            ),
+        ]
+
+
 class AgentActionDocument(Document):
     """Immutable audit record for one local-agent action proposal."""
 

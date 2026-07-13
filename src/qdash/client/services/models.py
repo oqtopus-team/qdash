@@ -4560,3 +4560,23 @@ class AgentCandidateCommitResponse(BaseModel):
     backend_error: str = ""
     backend_requested_at: AwareDatetime | None = None
     backend_applied_at: AwareDatetime | None = None
+
+
+class AgentCampaignCommitResponse(BaseModel):
+    """Client representation of an audited final campaign candidate-set commit."""
+
+    commit_id: str
+    session_id: str
+    idempotency_key: str
+    chip_id: str
+    qid: str
+    candidates: list[AgentCandidateResponse]
+    status: str
+    reason: str
+    before_snapshot: dict[str, Any] = Field(default_factory=dict)
+    after_snapshot: dict[str, Any] = Field(default_factory=dict)
+    committed_by: str
+    state_version_before: int
+    state_version_after: int
+    created_at: AwareDatetime
+    committed_at: AwareDatetime | None = None

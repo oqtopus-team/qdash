@@ -194,6 +194,7 @@ def _build_parser() -> argparse.ArgumentParser:
     campaign.add_argument("--plan", required=True, type=_campaign_plan)
     campaign.add_argument("--max-pre-dispatch-retries", type=int, default=1)
     campaign.add_argument("--max-node-executions", type=int)
+    campaign.add_argument("--commit-on-success", action="store_true")
     campaign.add_argument("--idempotency-prefix")
     campaign.add_argument("--action-timeout-seconds", type=float, default=120.0)
     campaign.add_argument("--execution-timeout-seconds", type=float, default=600.0)
@@ -228,6 +229,16 @@ def _campaign_outcome_payload(outcome: AgentCampaignOutcome) -> dict[str, Any]:
         "attempts": outcome.attempts,
         "carried_overrides": outcome.carried_overrides,
         "node_path": outcome.node_path,
+        "campaign_commit": (
+            outcome.campaign_commit.model_dump(mode="json") if outcome.campaign_commit else None
+        ),
+        "planner_decisions": [
+            {
+                "target_node_id": decision.target_node_id,
+                "reason": decision.reason,
+            }
+            for decision in outcome.planner_decisions
+        ],
         "outcomes": [_outcome_payload(step) for step in outcome.outcomes],
     }
 
@@ -279,6 +290,7 @@ def run(argv: list[str] | None = None) -> int:
                 nodes=args.plan,
                 max_pre_dispatch_retries=args.max_pre_dispatch_retries,
                 max_node_executions=args.max_node_executions,
+                commit_on_success=args.commit_on_success,
                 idempotency_prefix=args.idempotency_prefix,
             )
             print(json.dumps(_campaign_outcome_payload(campaign_outcome), sort_keys=True))

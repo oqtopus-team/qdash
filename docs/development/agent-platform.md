@@ -12,8 +12,8 @@ An agent must create a bounded session before proposing an action. A session fix
 
 1. Session contract: policy, typed actions, state versioning, idempotency, and audit records.
 2. Operation dispatch: execute an authorized single-task action through the existing system Prefect deployment. The action stores the Prefect flow-run UUID as `operation_id` and resolves the independently allocated QDash execution identifier through `execution.note.flow_run_id`. This preserves the existing `YYYYMMDD-NNN` execution contract used by single-task re-execution while giving agents both identifiers for polling and provenance. Agent executions use the display name `agent:<task>`; manual single-task runs retain `re-execute:<task>`.
-3. Candidate commit: keep task output parameters staged until deterministic parameter bounds and session-owned task-result quality gates accept them; backend application is a separate worker operation with file/version verification.
-4. Skill runner: execute declarative pass and rollback branches with a pre-authorized node-execution bound; retry and human escalation remain terminal after a hardware operation exists.
+3. Candidate commit: keep task output parameters staged until deterministic parameter bounds and session-owned task-result quality gates accept them. A successful campaign can revalidate the latest candidate for each parameter and persist the same-qid set with one Qubit save and one audit record. Backend application is a separate worker operation with file/version verification.
+4. Skill runner: execute declarative pass and rollback branches with a pre-authorized node-execution bound. A user-operated planner may dynamically choose only among those pre-authorized nodes or complete after a passing gate; retry and human escalation remain terminal after a hardware operation exists.
 5. Agent SDK: provide observation and operation-watching helpers for local agents.
 6. Evaluation: replay historical results, inject failures, compare multiple models, and validate a hardware canary.
 
@@ -30,6 +30,8 @@ Agent calibration is opt-in through `ENABLE_AGENT_CALIBRATION=true`. The API alw
 - Parameter write-back requires deterministic parameter and result-quality gates; an LLM proposal alone cannot commit a value. R² is persisted as normalized task-result provenance, and missing required metrics reject the candidate.
 - Each action records its Skill hash, model identity, evidence references, decision, and resulting operation.
 - Decision-graph references are validated before dispatch, every node visit is audited, and the maximum visits must fit within the session's remaining action budget.
+- Dynamic planner choices cannot expand the graph or action budget. Invalid choices, planner failures, and attempts to complete after rollback require human escalation.
+- Campaign finalization re-resolves every referenced task result and validates the complete set before writing calibration data. It does not provide a multi-document MongoDB transaction or campaign-wide backend file application.
 
 ## Evaluation questions
 
