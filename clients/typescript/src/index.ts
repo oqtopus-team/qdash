@@ -1,11 +1,13 @@
 export { QDashClient } from "./client.js";
 export type {
   CreateAgentSessionOptions,
+  DownloadedFile,
   ListTaskResultsOptions,
   PaginationOptions,
   PollOptions,
   QDashClientOptions,
   SubmitAgentActionOptions,
+  TaskResultFigureOptions,
   TaskResultsTimeseriesOptions,
 } from "./client.js";
 export { QDashConfig, defaultConfigPath } from "./config.js";
