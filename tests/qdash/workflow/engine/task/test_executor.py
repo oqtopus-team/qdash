@@ -425,14 +425,19 @@ class TestTaskExecutorExecuteTask:
         mock_state_manager.put_output_parameters.assert_called_once()
         assert "output_parameters" in result
 
-    def test_execute_task_returns_r2_in_result(self, executor: TaskExecutor) -> None:
-        """Test execute_task returns R² value in result."""
+    def test_execute_task_returns_r2_in_result(
+        self,
+        executor: TaskExecutor,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test execute_task returns and persists R² as a quality metric."""
         task = MockTask()
         session: Any = MockSession()
 
         result = executor.execute_task(task, session, "0")
 
         assert result["r2"] == {"0": 0.95}
+        assert mock_state_manager.get_task.return_value.quality_metrics == {"r2": 0.95}
 
     def test_execute_task_records_run_parameters(
         self, executor: TaskExecutor, mock_state_manager: MagicMock
@@ -806,3 +811,23 @@ class TestSnapshotOverrides:
         result = executor.execute_task(task, session, "0")
 
         assert result["success"] is True
+
+    def test_execute_batch_assigns_r2_per_qid(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        task = MockTask()
+        task.batch_run = MagicMock(  # type: ignore[method-assign]
+            return_value=RunResult(
+                raw_result={"0": {}, "4": {}},
+                r2={"0": 0.91, "4": 0.87},
+            )
+        )
+        mock_snapshot_loader.get_snapshot.return_value = ({}, {})
+        session: Any = MockSession()
+
+        _, results = executor_with_snapshot.execute_batch(task, session, ["0", "4"])
+
+        assert results["0"].r2 == {"0": 0.91}
+        assert results["4"].r2 == {"4": 0.87}

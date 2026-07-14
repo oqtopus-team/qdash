@@ -2252,6 +2252,969 @@
         ]
       }
     },
+    "/agent-sessions": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Create an agent session",
+        "description": "Create a bounded authorization scope for a user-operated local agent.",
+        "operationId": "createAgentSession",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Get an agent session",
+        "description": "Get authoritative state for an agent session.",
+        "operationId": "getAgentSession",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/candidate-gate": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Evaluate an agent candidate",
+        "description": "Evaluate a numeric candidate against session-owned bounds without writing it.",
+        "operationId": "evaluateAgentCandidateGate",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluateCandidateGateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateGateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/actions": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Submit an agent action",
+        "description": "Authorize and audit an action proposal without executing it.",
+        "operationId": "submitAgentAction",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitAgentActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "List agent actions",
+        "description": "List the ordered audit trail for an agent session.",
+        "operationId": "listAgentActions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAgentActionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/actions/{action_id}/candidates": {
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "List agent action candidates",
+        "description": "Read candidates and provenance from an action's authoritative task result.",
+        "operationId": "listAgentActionCandidates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Action Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAgentCandidatesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/actions/{action_id}/candidates/{parameter_name}/commit": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Commit an agent action candidate",
+        "description": "Commit a revalidated task-result candidate into QDash calibration state.",
+        "operationId": "commitAgentActionCandidate",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Action Id"
+            }
+          },
+          {
+            "name": "parameter_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Parameter Name"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitAgentCandidateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCandidateCommitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/campaign-commits": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Commit final agent campaign candidates",
+        "description": "Validate a final candidate set and persist it with one Qubit save.",
+        "operationId": "commitAgentCampaignCandidates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitAgentCampaignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCampaignCommitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/campaign-commits/{commit_id}": {
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Get an agent campaign commit",
+        "description": "Get one audited final campaign candidate-set commit.",
+        "operationId": "getAgentCampaignCommit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "commit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Commit Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCampaignCommitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/commits/{commit_id}": {
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Get an agent candidate commit",
+        "description": "Get commit persistence and worker-side backend apply state.",
+        "operationId": "getAgentCandidateCommit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "commit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Commit Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCandidateCommitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/commits/{commit_id}/apply": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Apply an agent candidate commit to the backend",
+        "description": "Dispatch a committed, gated candidate to the worker-side backend.",
+        "operationId": "applyAgentCandidateCommit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "commit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Commit Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyAgentCandidateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCandidateCommitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/actions/{action_id}": {
+      "get": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Get an agent action",
+        "description": "Get one action and its current dispatch status.",
+        "operationId": "getAgentAction",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Action Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-sessions/{session_id}/actions/{action_id}/execute": {
+      "post": {
+        "tags": [
+          "agent-session"
+        ],
+        "summary": "Execute an authorized agent action",
+        "description": "Dispatch one authorized run-task action to the system workflow.",
+        "operationId": "executeAgentAction",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Action Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteAgentActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/calibrations/note": {
       "get": {
         "tags": [
@@ -15497,6 +16460,746 @@
         "title": "AddMemberRequest",
         "description": "Request to add a member to a project."
       },
+      "AgentActionDecision": {
+        "type": "string",
+        "enum": [
+          "authorized",
+          "rejected"
+        ],
+        "title": "AgentActionDecision",
+        "description": "Platform authorization decision for an action proposal."
+      },
+      "AgentActionResponse": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "action_type": {
+            "$ref": "#/components/schemas/AgentActionType"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name"
+          },
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qids"
+          },
+          "parameter_overrides": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Parameter Overrides"
+          },
+          "diagnosis": {
+            "type": "string",
+            "title": "Diagnosis"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/AgentActionDecision"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "execution_status": {
+            "type": "string",
+            "title": "Execution Status"
+          },
+          "operation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Id"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          },
+          "state_version_before": {
+            "type": "integer",
+            "title": "State Version Before"
+          },
+          "state_version_after": {
+            "type": "integer",
+            "title": "State Version After"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_id",
+          "session_id",
+          "idempotency_key",
+          "action_type",
+          "task_name",
+          "qids",
+          "parameter_overrides",
+          "diagnosis",
+          "decision",
+          "reason",
+          "execution_status",
+          "state_version_before",
+          "state_version_after",
+          "created_at"
+        ],
+        "title": "AgentActionResponse",
+        "description": "Platform authorization result for an action proposal."
+      },
+      "AgentActionType": {
+        "type": "string",
+        "enum": [
+          "run_task",
+          "request_human",
+          "complete_session"
+        ],
+        "title": "AgentActionType",
+        "description": "Actions that a local agent may propose to QDash."
+      },
+      "AgentCampaignCandidateReference": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Action Id"
+          },
+          "parameter_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Parameter Name"
+          },
+          "task_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Task Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_id",
+          "parameter_name",
+          "task_id"
+        ],
+        "title": "AgentCampaignCandidateReference",
+        "description": "Identify one authoritative accepted candidate for campaign finalization."
+      },
+      "AgentCampaignCommitResponse": {
+        "properties": {
+          "commit_id": {
+            "type": "string",
+            "title": "Commit Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCandidateResponse"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "before_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Before Snapshot"
+          },
+          "after_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "After Snapshot"
+          },
+          "committed_by": {
+            "type": "string",
+            "title": "Committed By"
+          },
+          "state_version_before": {
+            "type": "integer",
+            "title": "State Version Before"
+          },
+          "state_version_after": {
+            "type": "integer",
+            "title": "State Version After"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "commit_id",
+          "session_id",
+          "idempotency_key",
+          "chip_id",
+          "qid",
+          "candidates",
+          "status",
+          "reason",
+          "committed_by",
+          "state_version_before",
+          "state_version_after",
+          "created_at"
+        ],
+        "title": "AgentCampaignCommitResponse",
+        "description": "Audited all-at-once QDash commit of final campaign candidates."
+      },
+      "AgentCandidateCommitResponse": {
+        "properties": {
+          "commit_id": {
+            "type": "string",
+            "title": "Commit Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "before_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Snapshot"
+          },
+          "after_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Snapshot"
+          },
+          "committed_by": {
+            "type": "string",
+            "title": "Committed By"
+          },
+          "state_version_before": {
+            "type": "integer",
+            "title": "State Version Before"
+          },
+          "state_version_after": {
+            "type": "integer",
+            "title": "State Version After"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          },
+          "backend_status": {
+            "type": "string",
+            "title": "Backend Status",
+            "default": "not_started"
+          },
+          "backend_operation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Operation Id"
+          },
+          "backend_name": {
+            "type": "string",
+            "title": "Backend Name",
+            "default": ""
+          },
+          "backend_target_files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Backend Target Files"
+          },
+          "backend_changed_files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Backend Changed Files"
+          },
+          "backend_verified": {
+            "type": "boolean",
+            "title": "Backend Verified",
+            "default": false
+          },
+          "backend_base_git_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Base Git Commit"
+          },
+          "backend_git_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Git Commit"
+          },
+          "backend_error": {
+            "type": "string",
+            "title": "Backend Error",
+            "default": ""
+          },
+          "backend_requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Requested At"
+          },
+          "backend_applied_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Applied At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "commit_id",
+          "session_id",
+          "action_id",
+          "idempotency_key",
+          "execution_id",
+          "task_id",
+          "task_name",
+          "qid",
+          "parameter_name",
+          "value",
+          "status",
+          "reason",
+          "committed_by",
+          "state_version_before",
+          "state_version_after",
+          "created_at"
+        ],
+        "title": "AgentCandidateCommitResponse",
+        "description": "Audited result of committing a gated candidate."
+      },
+      "AgentCandidateResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "source_parameter_name": {
+            "type": "string",
+            "title": "Source Parameter Name"
+          },
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "error": {
+            "type": "number",
+            "title": "Error",
+            "default": 0.0
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type",
+            "default": "float"
+          },
+          "quality_metrics": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Quality Metrics"
+          },
+          "accepted": {
+            "type": "boolean",
+            "title": "Accepted"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "action_id",
+          "execution_id",
+          "task_id",
+          "task_name",
+          "qid",
+          "source_parameter_name",
+          "parameter_name",
+          "value",
+          "accepted",
+          "reason"
+        ],
+        "title": "AgentCandidateResponse",
+        "description": "A numeric candidate derived from an authoritative task result."
+      },
+      "AgentSessionPolicy": {
+        "properties": {
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Qids"
+          },
+          "allowed_tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Allowed Tasks"
+          },
+          "allowed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/AgentActionType"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Allowed Actions"
+          },
+          "allowed_overrides": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/NumericBounds"
+            },
+            "type": "object",
+            "title": "Allowed Overrides"
+          },
+          "quality_gates": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/NumericBounds"
+            },
+            "type": "object",
+            "title": "Quality Gates"
+          },
+          "allow_reconfigure": {
+            "type": "boolean",
+            "title": "Allow Reconfigure",
+            "default": false
+          },
+          "max_actions": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Max Actions",
+            "default": 100
+          }
+        },
+        "type": "object",
+        "required": [
+          "qids",
+          "allowed_tasks"
+        ],
+        "title": "AgentSessionPolicy",
+        "description": "Immutable scope authorized by a user for one agent session."
+      },
+      "AgentSessionResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/AgentSessionPolicy"
+          },
+          "skill_name": {
+            "type": "string",
+            "title": "Skill Name"
+          },
+          "skill_version": {
+            "type": "string",
+            "title": "Skill Version"
+          },
+          "skill_hash": {
+            "type": "string",
+            "title": "Skill Hash"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AgentSessionStatus"
+          },
+          "state_version": {
+            "type": "integer",
+            "title": "State Version"
+          },
+          "action_count": {
+            "type": "integer",
+            "title": "Action Count"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "project_id",
+          "chip_id",
+          "created_by",
+          "policy",
+          "skill_name",
+          "skill_version",
+          "skill_hash",
+          "model_name",
+          "status",
+          "state_version",
+          "action_count",
+          "created_at",
+          "updated_at",
+          "expires_at"
+        ],
+        "title": "AgentSessionResponse",
+        "description": "Authoritative state returned for an agent session."
+      },
+      "AgentSessionStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "waiting_for_human",
+          "completed",
+          "cancelled",
+          "expired"
+        ],
+        "title": "AgentSessionStatus",
+        "description": "Lifecycle state of an agent session."
+      },
       "AiReviewListItem": {
         "properties": {
           "task_id": {
@@ -16107,6 +17810,33 @@
         "title": "AnalyzeRequest",
         "description": "Request body for POST /copilot/analyze."
       },
+      "ApplyAgentCandidateRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "expected_state_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected State Version"
+          },
+          "push_to_github": {
+            "type": "boolean",
+            "title": "Push To Github",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_state_version"
+        ],
+        "title": "ApplyAgentCandidateRequest",
+        "description": "Dispatch a committed candidate for worker-side backend application."
+      },
       "BackendConfigResponse": {
         "properties": {
           "default_backend": {
@@ -16541,6 +18271,62 @@
         "title": "CancelExecutionResponse",
         "description": "Response model for cancelling an execution."
       },
+      "CandidateGateResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "accepted": {
+            "type": "boolean",
+            "title": "Accepted"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "parameter_name",
+          "value",
+          "accepted",
+          "reason"
+        ],
+        "title": "CandidateGateResponse",
+        "description": "Side-effect-free deterministic decision for one candidate value."
+      },
       "ChipDatesResponse": {
         "properties": {
           "data": {
@@ -16807,6 +18593,67 @@
         ],
         "title": "ChipResponse",
         "description": "Chip response model.\n\nQubit and coupling data are stored in separate collections for scalability\nand should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubit_count (int): Number of qubits in the chip.\n    coupling_count (int): Number of couplings in the chip.\n    installed_at (datetime | None): Installation timestamp."
+      },
+      "CommitAgentCampaignRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "expected_state_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected State Version"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCampaignCandidateReference"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_state_version",
+          "candidates"
+        ],
+        "title": "CommitAgentCampaignRequest",
+        "description": "Commit the final accepted candidate set for one same-qubit campaign."
+      },
+      "CommitAgentCandidateRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "expected_state_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected State Version"
+          },
+          "task_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Task Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_state_version",
+          "task_id"
+        ],
+        "title": "CommitAgentCandidateRequest",
+        "description": "Commit one server-derived candidate into authoritative calibration state."
       },
       "Condition": {
         "properties": {
@@ -17363,6 +19210,57 @@
         ],
         "title": "CouplingResponse",
         "description": "Response model for a single coupling."
+      },
+      "CreateAgentSessionRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Chip Id"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/AgentSessionPolicy"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 60.0,
+            "title": "Expires In Seconds",
+            "default": 21600
+          },
+          "skill_name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Skill Name",
+            "default": ""
+          },
+          "skill_version": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Skill Version",
+            "default": ""
+          },
+          "skill_hash": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Skill Hash",
+            "default": ""
+          },
+          "model_name": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Model Name",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "policy"
+        ],
+        "title": "CreateAgentSessionRequest",
+        "description": "Create a bounded authorization session for a local agent."
       },
       "CreateChipRequest": {
         "properties": {
@@ -18041,6 +19939,53 @@
         "type": "object",
         "title": "DownloadFiguresAsZipRequest",
         "description": "Request body for downloading task-result artifacts as a ZIP archive."
+      },
+      "EvaluateCandidateGateRequest": {
+        "properties": {
+          "parameter_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Parameter Name"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameter_name",
+          "value"
+        ],
+        "title": "EvaluateCandidateGateRequest",
+        "description": "Evaluate one numeric candidate against session-owned parameter bounds."
+      },
+      "ExecuteAgentActionRequest": {
+        "properties": {
+          "source_execution_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source Execution Id"
+          },
+          "update_params": {
+            "type": "boolean",
+            "title": "Update Params",
+            "default": false
+          },
+          "reconfigure": {
+            "type": "boolean",
+            "title": "Reconfigure",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_execution_id"
+        ],
+        "title": "ExecuteAgentActionRequest",
+        "description": "Dispatch one authorized run-task action as a staged measurement."
       },
       "ExecuteFlowRequest": {
         "properties": {
@@ -20657,6 +22602,50 @@
         "title": "LineageResponse",
         "description": "Response model for lineage query.\n\nAttributes\n----------\norigin : LineageNodeResponse\n    The queried entity\nnodes : list[LineageNodeResponse]\n    All nodes in the lineage graph\nedges : list[LineageEdgeResponse]\n    All edges in the lineage graph\nmax_depth : int\n    Maximum depth traversed"
       },
+      "ListAgentActionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentActionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ListAgentActionsResponse",
+        "description": "Ordered audit records for one agent session."
+      },
+      "ListAgentCandidatesResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCandidateResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ListAgentCandidatesResponse",
+        "description": "Task-result candidates and their deterministic gate decisions."
+      },
       "ListBackendsResponse": {
         "properties": {
           "backends": {
@@ -22435,6 +24424,35 @@
         ],
         "title": "NotificationResponse",
         "description": "Single notification row."
+      },
+      "NumericBounds": {
+        "properties": {
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          }
+        },
+        "type": "object",
+        "title": "NumericBounds",
+        "description": "Inclusive numeric bounds for one agent-controlled parameter."
       },
       "OutputParameterInfoResponse": {
         "properties": {
@@ -24509,6 +26527,64 @@
         ],
         "title": "Settings",
         "description": "Settings for the QDash application."
+      },
+      "SubmitAgentActionRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "expected_state_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected State Version"
+          },
+          "action_type": {
+            "$ref": "#/components/schemas/AgentActionType"
+          },
+          "task_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Name"
+          },
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qids"
+          },
+          "parameter_overrides": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Parameter Overrides"
+          },
+          "diagnosis": {
+            "type": "string",
+            "maxLength": 5000,
+            "title": "Diagnosis",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_state_version",
+          "action_type"
+        ],
+        "title": "SubmitAgentActionRequest",
+        "description": "Submit an action proposal for platform-side authorization."
       },
       "SuccessResponse": {
         "properties": {

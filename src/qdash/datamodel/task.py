@@ -235,6 +235,7 @@ class BaseTaskResultModel(BaseModel):
     output_parameters: dict[str, Any] = {}
     output_parameter_names: list[str] = []
     run_parameters: dict[str, Any] = {}
+    quality_metrics: dict[str, float] = {}
     note: dict[str, Any] = {}
     figure_path: list[str] = []
     json_figure_path: list[str] = []

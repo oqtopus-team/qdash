@@ -79,7 +79,13 @@ def _load_extra_file_map() -> dict[str, list[str]]:
 class ParamsUpdater(Protocol):
     """Protocol for backend-specific parameter updaters."""
 
+    def snapshot(self, qid: str, output_parameters: dict[str, Any]) -> dict[str, bytes]: ...
+
     def update(self, qid: str, output_parameters: dict[str, Any]) -> set[str]: ...
+
+    def verify(self, qid: str, output_parameters: dict[str, Any]) -> set[str]: ...
+
+    def restore(self, snapshot: dict[str, bytes]) -> None: ...
 
 
 def resolve_param_yaml_file_names(output_parameters: dict[str, Any]) -> set[str]:
@@ -155,6 +161,23 @@ class _QubexParamsUpdater:
         self._yaml.indent(mapping=2, sequence=4, offset=2)
         self._yaml.representer.add_representer(type(None), represent_none)
 
+    def snapshot(self, _qid: str, output_parameters: dict[str, Any]) -> dict[str, bytes]:
+        """Capture mapped parameter files before a multi-file update."""
+        params_dir = self._resolve_params_dir()
+        if params_dir is None:
+            raise ValueError("Qubex params directory is not available")
+
+        snapshots: dict[str, bytes] = {}
+        for file_name in sorted(self._resolve_file_names(output_parameters)):
+            file_path = params_dir / file_name
+            if not file_path.exists():
+                raise ValueError(f"Mapped params file does not exist: {file_name}")
+            lock_path = file_path.with_suffix(file_path.suffix + ".lock")
+            lock_path.touch(exist_ok=True)
+            with FileLock(lock_path):
+                snapshots[file_name] = file_path.read_bytes()
+        return snapshots
+
     def update(self, qid: str, output_parameters: dict[str, Any]) -> set[str]:
         updated_files: set[str] = set()
         params_dir = self._resolve_params_dir()
@@ -184,6 +207,80 @@ class _QubexParamsUpdater:
                     updated_files.add(extra_file)
 
         return updated_files
+
+    def verify(self, qid: str, output_parameters: dict[str, Any]) -> set[str]:
+        """Read back every mapped YAML value and return verified file names."""
+        params_dir = self._resolve_params_dir()
+        if params_dir is None:
+            raise ValueError("Qubex params directory is not available")
+        label = self._resolve_qubit_label(qid)
+        if label is None:
+            raise ValueError(f"Could not resolve Qubex label for qid={qid}")
+
+        verified: set[str] = set()
+        for key, param in output_parameters.items():
+            expected = self._extract_value(param)
+            if expected is None:
+                raise ValueError(f"Parameter '{key}' has no verifiable value")
+            file_names: list[str] = []
+            mapped = self._param_file_map.get(key)
+            if mapped is not None:
+                file_names.append(mapped)
+            file_names.extend(self._extra_file_map.get(key, []))
+            if not file_names:
+                raise ValueError(f"Parameter '{key}' has no params YAML mapping")
+
+            for file_name in file_names:
+                file_path = params_dir / file_name
+                if not file_path.exists():
+                    raise ValueError(f"Mapped params file does not exist: {file_name}")
+                lock_path = file_path.with_suffix(file_path.suffix + ".lock")
+                lock_path.touch(exist_ok=True)
+                with FileLock(lock_path), file_path.open("r") as fp:
+                    data = self._yaml.load(fp) or {}
+                section = data.get("data") if isinstance(data, dict) else None
+                actual = section.get(label) if isinstance(section, dict) else None
+                if not self._values_equal(actual, expected):
+                    raise ValueError(
+                        f"Backend verification failed for {file_name}:{label}: "
+                        f"expected {expected!r}, got {actual!r}"
+                    )
+                verified.add(file_name)
+        return verified
+
+    def restore(self, snapshot: dict[str, bytes]) -> None:
+        """Atomically restore parameter files captured before an update."""
+        params_dir = self._resolve_params_dir()
+        if params_dir is None:
+            raise ValueError("Qubex params directory is not available")
+
+        for file_name, content in snapshot.items():
+            file_path = params_dir / file_name
+            lock_path = file_path.with_suffix(file_path.suffix + ".lock")
+            lock_path.touch(exist_ok=True)
+            with FileLock(lock_path):
+                with tempfile.NamedTemporaryFile(
+                    mode="wb",
+                    dir=params_dir,
+                    suffix=".tmp",
+                    delete=False,
+                ) as tmp_fp:
+                    tmp_path = Path(tmp_fp.name)
+                    tmp_fp.write(content)
+                try:
+                    os.replace(tmp_path, file_path)
+                finally:
+                    with contextlib.suppress(FileNotFoundError):
+                        tmp_path.unlink()
+
+    def _resolve_file_names(self, output_parameters: dict[str, Any]) -> set[str]:
+        file_names: set[str] = set()
+        for parameter_name in output_parameters:
+            mapped = self._param_file_map.get(parameter_name)
+            if mapped is not None:
+                file_names.add(mapped)
+            file_names.update(self._extra_file_map.get(parameter_name, []))
+        return file_names
 
     def _resolve_params_dir(self) -> Path | None:
         config_dir = getattr(self._backend, "config", {}).get("params_dir")
