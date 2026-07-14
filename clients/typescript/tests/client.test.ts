@@ -14,6 +14,17 @@ function jsonResponse(payload: unknown, status = 200): Response {
   });
 }
 
+function binaryResponse(payload: Uint8Array, mediaType = "image/png"): Response {
+  const body = payload.buffer.slice(
+    payload.byteOffset,
+    payload.byteOffset + payload.byteLength,
+  ) as ArrayBuffer;
+  return new Response(body, {
+    status: 200,
+    headers: { "Content-Type": mediaType },
+  });
+}
+
 describe("QDashClient", () => {
   it("binds authentication headers to Orval-generated operations", async () => {
     const requests: Request[] = [];
@@ -90,6 +101,60 @@ describe("QDashClient", () => {
       skill_name: "pi-extension",
       expires_in_seconds: 21600,
     });
+  });
+
+  it("downloads execution figures as binary files", async () => {
+    let request: Request | undefined;
+    const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      request = new Request(input);
+      return binaryResponse(bytes);
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    const file = await client.getExecutionFigure("/app/calib_data/run/fig/result.png");
+
+    expect(request?.url).toBe(
+      "https://qdash.example/api/executions/figure?path=%2Fapp%2Fcalib_data%2Frun%2Ffig%2Fresult.png",
+    );
+    expect(file.mediaType).toBe("image/png");
+    expect(file.filename).toBe("result.png");
+    expect([...new Uint8Array(file.data)]).toEqual([...bytes]);
+  });
+
+  it("downloads a figure selected from a task result", async () => {
+    const requests: Request[] = [];
+    const bytes = new Uint8Array([1, 2, 3]);
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const request = new Request(input);
+      requests.push(request);
+      if (request.url.endsWith("/tasks/task-1/result")) {
+        return jsonResponse({
+          task_id: "task-1",
+          figure_path: ["/fig/a.png"],
+          json_figure_path: ["/fig/a.json"],
+        });
+      }
+      return binaryResponse(bytes, "application/json");
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    const file = await client.getTaskResultFigure("task-1", { preferJson: true });
+
+    expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
+      "/api/tasks/task-1/result",
+      "/api/executions/figure",
+    ]);
+    expect(file.path).toBe("/fig/a.json");
+    expect(file.mediaType).toBe("application/json");
+    expect(file.figurePaths).toEqual(["/fig/a.png"]);
+    expect(file.jsonFigurePaths).toEqual(["/fig/a.json"]);
   });
 
   it("maps validation responses to typed errors", async () => {
