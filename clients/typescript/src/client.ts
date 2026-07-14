@@ -105,6 +105,17 @@ export interface PollOptions {
   pollIntervalSeconds?: number;
 }
 
+export interface DownloadedFile {
+  data: ArrayBuffer;
+  mediaType: string;
+  filename?: string;
+}
+
+export interface TaskResultFigureOptions {
+  index?: number;
+  preferJson?: boolean;
+}
+
 export interface QDashClientOptions extends TransportOptions {}
 
 function pathPart(value: string): string {
@@ -113,6 +124,20 @@ function pathPart(value: string): string {
 
 function query(values: Record<string, QueryValue>): Query {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value != null));
+}
+
+function filenameFromPath(path: string): string | undefined {
+  return path.split("/").filter(Boolean).at(-1);
+}
+
+function mediaTypeForPath(path: string): string {
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".json")) return "application/json";
+  return "application/octet-stream";
 }
 
 export class QDashClient {
@@ -318,6 +343,51 @@ export class QDashClient {
 
   async getExecution(executionId: string): Promise<ExecutionResponseDetail> {
     return this.get(`/executions/${pathPart(executionId)}`);
+  }
+
+  async getExecutionFigure(path: string): Promise<DownloadedFile> {
+    const data = await this.transport.request<ArrayBuffer>({
+      method: "GET",
+      url: "/executions/figure",
+      params: { path },
+      responseType: "arraybuffer",
+    });
+    return {
+      data,
+      mediaType: mediaTypeForPath(path),
+      filename: filenameFromPath(path),
+    };
+  }
+
+  async downloadRawDataFile(path: string): Promise<DownloadedFile> {
+    const data = await this.transport.request<ArrayBuffer>({
+      method: "GET",
+      url: "/files/raw-data",
+      params: { path },
+      responseType: "arraybuffer",
+    });
+    return {
+      data,
+      mediaType: mediaTypeForPath(path),
+      filename: filenameFromPath(path),
+    };
+  }
+
+  async getTaskResultFigure(
+    taskId: string,
+    options: TaskResultFigureOptions = {},
+  ): Promise<DownloadedFile & { path: string; figurePaths: string[]; jsonFigurePaths: string[] }> {
+    const task = await this.getTaskResult(taskId);
+    const figurePaths = task.figure_path ?? [];
+    const jsonFigurePaths = task.json_figure_path ?? [];
+    const paths = options.preferJson && jsonFigurePaths.length > 0 ? jsonFigurePaths : figurePaths;
+    const index = options.index ?? 0;
+    const path = paths[index];
+    if (!path) {
+      throw new QDashNotFoundError(`No figure at index ${index} for task result '${taskId}'`);
+    }
+    const file = await this.getExecutionFigure(path);
+    return { ...file, path, figurePaths, jsonFigurePaths };
   }
 
   async waitForExecution(
