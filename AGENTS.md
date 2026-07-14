@@ -42,9 +42,10 @@ Do not manually edit generated files:
 
 - `ui/src/client/`
 - `ui/src/schemas/`
+- `clients/typescript/src/generated/`
 - `docs/oas/openapi.json`
 
-When backend API schemas or routes change, run `task generate` from the repository root to regenerate the OpenAPI document and TypeScript client.
+When backend API schemas or routes change, run `task generate` from the repository root to regenerate the OpenAPI document and TypeScript clients.
 
 ## Common Commands
 
@@ -62,6 +63,7 @@ Run commands from the repository root unless a directory is specified.
 - API tests: `task test-api`
 - Workflow tests: `task test-workflow`
 - UI tests: `task test-ui`
+- TypeScript client checks: `task test-client-ts`
 - Python CI checks: `task ci`
 - Full local checks including UI: `task check-all`
 - Python lint/format with fixes: `task lint-python`
