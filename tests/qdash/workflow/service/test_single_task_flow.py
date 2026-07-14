@@ -52,4 +52,4 @@ def test_single_task_executor_pulls_config_before_reexecute(monkeypatch):
     )
 
     assert captured["kwargs"]["enable_github"] is False
-    assert captured["kwargs"]["persist_output_parameters"] is False
+    assert captured["kwargs"]["persist_output_parameters"] is True

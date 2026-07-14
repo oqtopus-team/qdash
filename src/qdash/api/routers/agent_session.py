@@ -6,11 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from qdash.api.dependencies import (
-    get_agent_session_service,
-    get_flow_service,
-    require_agent_calibration_enabled,
-)
+from qdash.api.dependencies import get_agent_session_service, get_flow_service
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
@@ -35,10 +31,7 @@ from qdash.api.schemas.agent_session import (
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.flow_service import FlowService
 
-router = APIRouter(
-    prefix="/agent-sessions",
-    dependencies=[Depends(require_agent_calibration_enabled)],
-)
+router = APIRouter(prefix="/agent-sessions")
 
 
 @router.post(

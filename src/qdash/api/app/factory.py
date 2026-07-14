@@ -29,7 +29,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app_settings = settings or get_settings()
-    app.state.settings = app_settings
     app.add_middleware(
         CORSMiddleware,
         allow_origins=resolve_api_cors_origins(app_settings),

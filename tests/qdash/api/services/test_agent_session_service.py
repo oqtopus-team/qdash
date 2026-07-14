@@ -886,6 +886,7 @@ async def test_execute_authorized_action_dispatches_single_task(
             assert kwargs["source_execution_id"] == "execution-1"
             assert kwargs["execution_name"] == "agent:CheckQubitSpectroscopy"
             assert kwargs["parameter_overrides"] == {"input": {"drive_amplitude": 0.1}}
+            assert kwargs["persist_output_parameters"] is False
             return type("Operation", (), {"execution_id": "operation-1"})()
 
     result = await service.execute_action(

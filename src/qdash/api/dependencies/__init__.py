@@ -10,9 +10,6 @@ if TYPE_CHECKING:
     from qdash.api.services.flow_schedule_service import FlowScheduleService
     from qdash.api.services.flow_service import FlowService
 
-from qdash.api.dependencies.agent_calibration import (
-    require_agent_calibration_enabled as require_agent_calibration_enabled,
-)
 from qdash.api.dependencies.cache import (
     cached_dependency_provider,
 )

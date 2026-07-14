@@ -26514,11 +26514,6 @@
             "type": "boolean",
             "title": "Enable Local Codex Agent",
             "default": false
-          },
-          "enable_agent_calibration": {
-            "type": "boolean",
-            "title": "Enable Agent Calibration",
-            "default": false
           }
         },
         "additionalProperties": false,

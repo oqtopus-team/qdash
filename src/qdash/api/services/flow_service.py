@@ -677,6 +677,7 @@ class FlowService:
         source_task_id: str | None = None,
         parameter_overrides: dict[str, dict[str, Any]] | None = None,
         update_params: bool = True,
+        persist_output_parameters: bool = True,
         reconfigure: bool = False,
         execution_name: str | None = None,
     ) -> ExecuteFlowResponse:
@@ -703,6 +704,8 @@ class FlowService:
             Tags for categorization
         execution_name : str | None
             QDash execution display name. Defaults to the manual re-execution label.
+        persist_output_parameters : bool
+            Whether task outputs update authoritative QDash calibration state.
 
         Returns
         -------
@@ -735,6 +738,7 @@ class FlowService:
             "tags": tags or [],
             "source_task_id": source_task_id,
             "parameter_overrides": parameter_overrides,
+            "persist_output_parameters": persist_output_parameters,
             "update_params": update_params,
             "reconfigure": reconfigure,
         }

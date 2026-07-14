@@ -29,5 +29,4 @@ export interface Settings {
   log_level?: string;
   timezone?: string;
   enable_local_codex_agent?: boolean;
-  enable_agent_calibration?: boolean;
 }

@@ -30,6 +30,7 @@ def single_task_executor(
     source_task_id: str | None = None,
     parameter_overrides: dict[str, dict[str, Any]] | None = None,
     update_params: bool = True,
+    persist_output_parameters: bool = True,
     reconfigure: bool = False,
 ) -> Any:
     """Execute a single calibration task.
@@ -72,7 +73,7 @@ def single_task_executor(
         parameter_overrides=parameter_overrides,
         source_task_id=source_task_id,
         force_update_params=update_params,
-        persist_output_parameters=update_params,
+        persist_output_parameters=persist_output_parameters,
     )
 
     try:

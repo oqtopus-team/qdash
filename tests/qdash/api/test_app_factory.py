@@ -46,7 +46,6 @@ def test_create_app_applies_api_metadata() -> None:
     assert app.title == "QDash API"
     assert openapi_schema["info"]["license"]["name"] == "Apache 2.0"
     assert "/agent-sessions" in openapi_schema["paths"]
-    assert app.state.settings.enable_agent_calibration is False
 
 
 def test_openapi_extra_defines_bearer_auth() -> None:

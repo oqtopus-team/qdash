@@ -1163,6 +1163,7 @@ class AgentSessionService:
                 if action.parameter_overrides
                 else None,
                 update_params=body.update_params,
+                persist_output_parameters=False,
                 reconfigure=body.reconfigure,
             )
         except Exception as exc:

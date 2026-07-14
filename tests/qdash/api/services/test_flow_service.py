@@ -103,3 +103,4 @@ async def test_execute_single_task_uses_requested_execution_name(
     )
 
     assert captured_parameters[0]["flow_name"] == expected_flow_name
+    assert captured_parameters[0]["persist_output_parameters"] is True

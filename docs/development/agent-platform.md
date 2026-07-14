@@ -17,10 +17,6 @@ An agent must create a bounded session before proposing an action. A session fix
 5. Agent SDK: provide observation and operation-watching helpers for local agents.
 6. Evaluation: replay historical results, inject failures, compare multiple models, and validate a hardware canary.
 
-## Deployment gate
-
-Agent calibration is opt-in through `ENABLE_AGENT_CALIBRATION=true`. The API always publishes the Agent endpoints in OpenAPI so released clients have a stable contract, but returns HTTP 503 for every Agent request while the flag is disabled. Worker startup always registers the existing `system-single-task` deployment and registers `system-candidate-apply` only when the same flag is enabled. This permits a QDash release with the feature dormant, followed by a controlled canary without changing legacy single-task execution.
-
 ## Safety invariants
 
 - The agent cannot expand its target or task scope during a session.

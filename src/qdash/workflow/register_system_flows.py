@@ -13,8 +13,6 @@ from logging import getLogger
 
 import httpx
 
-from qdash.config import get_settings
-
 logger = getLogger(__name__)
 
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
@@ -37,13 +35,9 @@ AGENT_SYSTEM_FLOWS = [
 ]
 
 
-def get_system_flows(*, agent_calibration_enabled: bool | None = None) -> list[dict[str, str]]:
-    """Return deployments enabled for this worker, preserving legacy defaults."""
-    if agent_calibration_enabled is None:
-        agent_calibration_enabled = get_settings().enable_agent_calibration
-    if agent_calibration_enabled:
-        return [*SYSTEM_FLOWS, *AGENT_SYSTEM_FLOWS]
-    return list(SYSTEM_FLOWS)
+def get_system_flows() -> list[dict[str, str]]:
+    """Return all built-in deployments registered by the worker."""
+    return [*SYSTEM_FLOWS, *AGENT_SYSTEM_FLOWS]
 
 
 async def register_system_flows() -> None:

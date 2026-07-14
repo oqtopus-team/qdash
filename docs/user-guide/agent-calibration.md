@@ -20,7 +20,7 @@ uv tool install ./src/qdash/client
 
 Configure a named QDash profile as described in the [QDash Client guide](./qdash-client.md). The CLI reads credentials from that profile and does not print them. In a secret-managed environment, set the documented `QDASH_*` variables and replace `--profile local` below with `--from-env`. Agent instructions are distributed separately from [oqtopus-team/skills](https://github.com/oqtopus-team/skills).
 
-A QDash operator must set `ENABLE_AGENT_CALIBRATION=true` for both the API and worker environment, then restart them. With the default `false`, Agent endpoints remain visible in the API contract but return HTTP 503, and the Agent-only `system-candidate-apply` deployment is not registered. The existing `system-single-task` deployment remains enabled in either mode. Versioned backend application also requires the existing GitHub configuration credentials and a parameter-to-YAML mapping in `workflow.params_updater.parameter_file_map`.
+Agent endpoints are available to authenticated project members, mutations require editor permission, and workers register the required system deployments at startup. Versioned backend application also requires the existing GitHub configuration credentials and a parameter-to-YAML mapping in `workflow.params_updater.parameter_file_map`.
 
 ## Create a bounded session
 
