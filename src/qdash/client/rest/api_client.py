@@ -34,6 +34,7 @@ class ApiClient:
         *,
         headers: dict[str, str] | None = None,
         params: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
         raise_on_status: bool = False,
     ) -> ApiResponse[Any]:
@@ -43,6 +44,7 @@ class ApiClient:
                 path,
                 headers=headers,
                 params=params,
+                data=data,
                 json=json,
             )
         except httpx.HTTPError as exc:

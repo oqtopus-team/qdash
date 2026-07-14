@@ -233,6 +233,47 @@ data:
         assert updated_files == {"control_amplitude.yaml"}
         assert "Q047: 0.25" in (params_dir / "control_amplitude.yaml").read_text()
 
+    def test_verify_reads_back_all_mapped_yaml_values(self, tmp_path):
+        """Verification covers primary and mirrored YAML mappings without connecting."""
+        params_dir = tmp_path / "params"
+        params_dir.mkdir()
+        (params_dir / "custom_amplitude.yaml").write_text("data:\n  Q047: 0.25\n")
+        (params_dir / "mirrored_amplitude.yaml").write_text("data:\n  Q047: 0.25\n")
+        backend = MagicMock()
+        backend.config = {
+            "project_id": "project-1",
+            "chip_id": "144Qv1",
+            "params_dir": str(params_dir),
+        }
+        backend.get_instance.side_effect = AssertionError("should not connect")
+
+        with patch(
+            "qdash.workflow.engine.params_updater.ConfigLoader.load_workflow",
+            return_value={
+                "params_updater": {
+                    "parameter_file_map": {
+                        "control_amplitude": "custom_amplitude.yaml",
+                    },
+                    "extra_file_map": {
+                        "control_amplitude": ["mirrored_amplitude.yaml"],
+                    },
+                }
+            },
+        ):
+            updater = _QubexParamsUpdater(backend, chip_id="144Qv1")
+
+        with patch("qdash.common.domain.qubit._get_chip_size", return_value=144):
+            verified = updater.verify("47", {"control_amplitude": {"value": 0.25}})
+
+        assert verified == {"custom_amplitude.yaml", "mirrored_amplitude.yaml"}
+
+        (params_dir / "mirrored_amplitude.yaml").write_text("data:\n  Q047: 0.5\n")
+        with (
+            patch("qdash.common.domain.qubit._get_chip_size", return_value=144),
+            pytest.raises(ValueError, match="Backend verification failed"),
+        ):
+            updater.verify("47", {"control_amplitude": {"value": 0.25}})
+
     def test_update_returns_only_changed_yaml_file_names(self, tmp_path):
         """Update should report the params files that were actually changed."""
         params_dir = tmp_path / "params"

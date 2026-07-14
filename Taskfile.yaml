@@ -24,9 +24,10 @@ tasks:
         ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
         mv "$OPENAPI_TMP" docs/oas/openapi.json
       - cd ui && bunx orval@7.14.0 --config ./orval.config.cjs
+      - cd clients/typescript && bunx orval@7.14.0 --config ./orval.config.cjs
       - cd ui && bun run fmt
       - cd ui && bun run lint:fix
-    desc: Generate the TypeScript client
+    desc: Generate the TypeScript clients
 
   generate-python-schema:
     desc: Generate Python Pydantic schema models from OpenAPI
@@ -238,9 +239,15 @@ tasks:
       - uv run pytest tests/qdash/api/ -v
 
   test-client:
-    desc: Run client tests
+    desc: Run Python client tests
     cmds:
       - uv run pytest tests/qdash/client/ -v
+
+  test-client-ts:
+    desc: Run TypeScript client checks
+    dir: clients/typescript
+    cmds:
+      - bun run check
 
   test-workflow:
     desc: Run workflow engine tests

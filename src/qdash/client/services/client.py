@@ -29,11 +29,19 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
+    AgentActionListResponse,
+    AgentActionResponse,
+    AgentCampaignCommitResponse,
+    AgentCandidateCommitResponse,
+    AgentCandidateListResponse,
+    AgentCandidateResponse,
+    AgentSessionResponse,
     AiReviewListResponse,
     AiReviewRunDetailResponse,
     AiReviewRunListResponse,
     BodyReExecuteTaskResult,
     CancelExecutionResponse,
+    CandidateGateResponse,
     ChipMetricsResponse,
     ChipResponse,
     CouplingResponse,
@@ -701,6 +709,319 @@ class QDashClient:
         response = self._request("GET", f"/executions/{execution_id}")
         return self._validate_model_payload(ExecutionResponseDetail, response.data)
 
+    def wait_for_execution(
+        self,
+        execution_id: str,
+        *,
+        timeout_seconds: float = 600.0,
+        poll_interval_seconds: float = 1.0,
+        terminal_statuses: set[str] | None = None,
+    ) -> ExecutionResponseDetail:
+        """Poll an execution until it reaches a terminal state or times out."""
+        if timeout_seconds < 0 or poll_interval_seconds < 0:
+            raise ValueError("Polling timeout and interval must be non-negative")
+        terminal = terminal_statuses or {"completed", "failed", "cancelled"}
+        deadline = time.monotonic() + timeout_seconds
+
+        while True:
+            try:
+                execution = self.get_execution(execution_id)
+            except QDashNotFoundError:
+                execution = None
+            if execution is not None and execution.status.lower() in terminal:
+                return execution
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Execution '{execution_id}' did not reach a terminal state "
+                    f"within {timeout_seconds} seconds"
+                )
+            self._sleep(poll_interval_seconds)
+
+    def create_agent_session(
+        self,
+        *,
+        chip_id: str,
+        policy: dict[str, Any],
+        expires_in_seconds: int = 21_600,
+        skill_name: str = "",
+        skill_version: str = "",
+        skill_hash: str = "",
+        model_name: str = "",
+    ) -> AgentSessionResponse:
+        """Create a bounded authorization session for a local agent."""
+        response = self._request(
+            "POST",
+            "/agent-sessions",
+            json={
+                "chip_id": chip_id,
+                "policy": policy,
+                "expires_in_seconds": expires_in_seconds,
+                "skill_name": skill_name,
+                "skill_version": skill_version,
+                "skill_hash": skill_hash,
+                "model_name": model_name,
+            },
+        )
+        return self._validate_model_payload(AgentSessionResponse, response.data)
+
+    def get_agent_session(self, session_id: str) -> AgentSessionResponse:
+        """Get authoritative state for a local-agent session."""
+        response = self._request("GET", f"/agent-sessions/{session_id}")
+        return self._validate_model_payload(AgentSessionResponse, response.data)
+
+    def evaluate_agent_candidate_gate(
+        self,
+        session_id: str,
+        *,
+        parameter_name: str,
+        value: float,
+    ) -> CandidateGateResponse:
+        """Evaluate a candidate using the immutable bounds owned by the session."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/candidate-gate",
+            json={"parameter_name": parameter_name, "value": value},
+        )
+        return self._validate_model_payload(CandidateGateResponse, response.data)
+
+    def submit_agent_action(
+        self,
+        session_id: str,
+        *,
+        idempotency_key: str,
+        expected_state_version: int,
+        action_type: str,
+        task_name: str | None = None,
+        qids: list[str] | None = None,
+        parameter_overrides: dict[str, float] | None = None,
+        diagnosis: str = "",
+    ) -> AgentActionResponse:
+        """Submit a policy-checked action proposal for a local-agent session."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/actions",
+            json={
+                "idempotency_key": idempotency_key,
+                "expected_state_version": expected_state_version,
+                "action_type": action_type,
+                "task_name": task_name,
+                "qids": qids or [],
+                "parameter_overrides": parameter_overrides or {},
+                "diagnosis": diagnosis,
+            },
+        )
+        return self._validate_model_payload(AgentActionResponse, response.data)
+
+    def execute_agent_action(
+        self,
+        session_id: str,
+        action_id: str,
+        *,
+        source_execution_id: str,
+        update_params: bool = False,
+        reconfigure: bool = False,
+    ) -> AgentActionResponse:
+        """Dispatch one authorized agent action to the system workflow."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/actions/{action_id}/execute",
+            json={
+                "source_execution_id": source_execution_id,
+                "update_params": update_params,
+                "reconfigure": reconfigure,
+            },
+        )
+        return self._validate_model_payload(AgentActionResponse, response.data)
+
+    def get_agent_action(self, session_id: str, action_id: str) -> AgentActionResponse:
+        """Get one action for polling dispatch status and operation ID."""
+        response = self._request("GET", f"/agent-sessions/{session_id}/actions/{action_id}")
+        return self._validate_model_payload(AgentActionResponse, response.data)
+
+    def wait_for_agent_action(
+        self,
+        session_id: str,
+        action_id: str,
+        *,
+        timeout_seconds: float = 120.0,
+        poll_interval_seconds: float = 0.5,
+    ) -> AgentActionResponse:
+        """Poll until action dispatch produces an operation ID or fails."""
+        if timeout_seconds < 0 or poll_interval_seconds < 0:
+            raise ValueError("Polling timeout and interval must be non-negative")
+        deadline = time.monotonic() + timeout_seconds
+
+        while True:
+            action = self.get_agent_action(session_id, action_id)
+            if action.execution_status == "failed":
+                return action
+            if action.operation_id is not None:
+                return action
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Agent action '{action_id}' did not produce an operation "
+                    f"within {timeout_seconds} seconds"
+                )
+            self._sleep(poll_interval_seconds)
+
+    def wait_for_agent_action_execution(
+        self,
+        session_id: str,
+        action_id: str,
+        *,
+        timeout_seconds: float = 600.0,
+        poll_interval_seconds: float = 0.5,
+    ) -> AgentActionResponse:
+        """Poll until a Prefect operation is linked to its QDash execution."""
+        if timeout_seconds < 0 or poll_interval_seconds < 0:
+            raise ValueError("Polling timeout and interval must be non-negative")
+        deadline = time.monotonic() + timeout_seconds
+
+        while True:
+            action = self.get_agent_action(session_id, action_id)
+            if action.execution_status == "failed":
+                return action
+            if action.execution_id is not None:
+                return action
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Agent action {action_id} did not produce a QDash execution "
+                    f"within {timeout_seconds} seconds"
+                )
+            self._sleep(poll_interval_seconds)
+
+    def list_agent_action_candidates(
+        self,
+        session_id: str,
+        action_id: str,
+    ) -> list[AgentCandidateResponse]:
+        """List candidates derived from an action's authoritative task result."""
+        response = self._request(
+            "GET",
+            f"/agent-sessions/{session_id}/actions/{action_id}/candidates",
+        )
+        payload = self._validate_model_payload(AgentCandidateListResponse, response.data)
+        return payload.items
+
+    def commit_agent_action_candidate(
+        self,
+        session_id: str,
+        action_id: str,
+        parameter_name: str,
+        *,
+        idempotency_key: str,
+        expected_state_version: int,
+        task_id: str,
+    ) -> AgentCandidateCommitResponse:
+        """Commit a revalidated task-result candidate into QDash calibration state."""
+        response = self._request(
+            "POST",
+            (
+                f"/agent-sessions/{session_id}/actions/{action_id}"
+                f"/candidates/{parameter_name}/commit"
+            ),
+            json={
+                "idempotency_key": idempotency_key,
+                "expected_state_version": expected_state_version,
+                "task_id": task_id,
+            },
+        )
+        return self._validate_model_payload(AgentCandidateCommitResponse, response.data)
+
+    def commit_agent_campaign_candidates(
+        self,
+        session_id: str,
+        candidates: list[dict[str, str]],
+        *,
+        idempotency_key: str,
+        expected_state_version: int,
+    ) -> AgentCampaignCommitResponse:
+        """Commit the final accepted same-qubit candidate set after campaign success."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/campaign-commits",
+            json={
+                "idempotency_key": idempotency_key,
+                "expected_state_version": expected_state_version,
+                "candidates": candidates,
+            },
+        )
+        return self._validate_model_payload(AgentCampaignCommitResponse, response.data)
+
+    def get_agent_campaign_commit(
+        self,
+        session_id: str,
+        commit_id: str,
+    ) -> AgentCampaignCommitResponse:
+        """Get one audited final campaign candidate-set commit."""
+        response = self._request(
+            "GET",
+            f"/agent-sessions/{session_id}/campaign-commits/{commit_id}",
+        )
+        return self._validate_model_payload(AgentCampaignCommitResponse, response.data)
+
+    def get_agent_candidate_commit(
+        self,
+        session_id: str,
+        commit_id: str,
+    ) -> AgentCandidateCommitResponse:
+        """Get candidate persistence and worker-side backend apply state."""
+        response = self._request(
+            "GET",
+            f"/agent-sessions/{session_id}/commits/{commit_id}",
+        )
+        return self._validate_model_payload(AgentCandidateCommitResponse, response.data)
+
+    def apply_agent_candidate_commit(
+        self,
+        session_id: str,
+        commit_id: str,
+        *,
+        idempotency_key: str,
+        expected_state_version: int,
+        push_to_github: bool = False,
+    ) -> AgentCandidateCommitResponse:
+        """Dispatch one committed candidate for worker-side backend application."""
+        response = self._request(
+            "POST",
+            f"/agent-sessions/{session_id}/commits/{commit_id}/apply",
+            json={
+                "idempotency_key": idempotency_key,
+                "expected_state_version": expected_state_version,
+                "push_to_github": push_to_github,
+            },
+        )
+        return self._validate_model_payload(AgentCandidateCommitResponse, response.data)
+
+    def wait_for_agent_candidate_apply(
+        self,
+        session_id: str,
+        commit_id: str,
+        *,
+        timeout_seconds: float = 300.0,
+        poll_interval_seconds: float = 0.5,
+    ) -> AgentCandidateCommitResponse:
+        """Poll until backend application reaches applied or failed."""
+        if timeout_seconds < 0 or poll_interval_seconds < 0:
+            raise ValueError("Polling timeout and interval must be non-negative")
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            commit = self.get_agent_candidate_commit(session_id, commit_id)
+            if commit.backend_status in {"applied", "failed"}:
+                return commit
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Agent candidate commit '{commit_id}' was not applied "
+                    f"within {timeout_seconds} seconds"
+                )
+            self._sleep(poll_interval_seconds)
+
+    def list_agent_actions(self, session_id: str) -> list[AgentActionResponse]:
+        """List the audit trail for a local-agent session."""
+        response = self._request("GET", f"/agent-sessions/{session_id}/actions")
+        payload = self._validate_model_payload(AgentActionListResponse, response.data)
+        return payload.items
+
     def list_tasks(self, *, backend: str | None = None) -> ListTaskResponse:
         response = self._request("GET", "/tasks", params=self._query_params(backend=backend))
         return self._validate_model_payload(ListTaskResponse, response.data)
@@ -1099,7 +1420,7 @@ class QDashClient:
             response = self._rest_client.request(
                 "POST",
                 "/auth/login",
-                json={"username": self.config.username, "password": password},
+                data={"username": self.config.username, "password": password},
                 headers={"Accept": "application/json", "User-Agent": self.config.user_agent},
                 raise_on_status=False,
             )

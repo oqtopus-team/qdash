@@ -47,6 +47,9 @@ class TaskResultHistoryDocument(Document):
     output_parameters: dict[str, Any] = Field(..., description="The output parameters")
     output_parameter_names: list[str] = Field(..., description="The output parameter names")
     run_parameters: dict[str, Any] = Field(default_factory=dict, description="The run parameters")
+    quality_metrics: dict[str, float] = Field(
+        default_factory=dict, description="Normalized quantitative result-quality metrics"
+    )
     note: dict[str, Any] = Field(..., description="The note")
     # NOTE: ``note`` above is the workflow's calibration metadata.
     # ``user_note`` is the dashboard-facing free-form note attached to this task result.
@@ -269,6 +272,7 @@ class TaskResultHistoryDocument(Document):
             output_parameters=task.output_parameters,
             output_parameter_names=task.output_parameter_names,
             run_parameters=task.run_parameters,
+            quality_metrics=task.quality_metrics,
             note=task.note,
             figure_path=task.figure_path,
             json_figure_path=task.json_figure_path,
@@ -311,6 +315,7 @@ class TaskResultHistoryDocument(Document):
         doc.output_parameters = task.output_parameters
         doc.output_parameter_names = task.output_parameter_names
         doc.run_parameters = task.run_parameters
+        doc.quality_metrics = task.quality_metrics
         doc.note = task.note
         doc.figure_path = task.figure_path
         doc.json_figure_path = task.json_figure_path

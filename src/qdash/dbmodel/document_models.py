@@ -1,5 +1,11 @@
 from typing import Any
 
+from qdash.dbmodel.agent_session import (
+    AgentActionDocument,
+    AgentCampaignCommitDocument,
+    AgentCandidateCommitDocument,
+    AgentSessionDocument,
+)
 from qdash.dbmodel.backend import BackendDocument
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
@@ -40,6 +46,10 @@ from qdash.dbmodel.user import UserDocument
 def document_models() -> list[Any]:
     """Initialize the repository and create initial data if needed."""
     return [
+        AgentSessionDocument,
+        AgentActionDocument,
+        AgentCandidateCommitDocument,
+        AgentCampaignCommitDocument,
         ExecutionHistoryDocument,
         TaskResultHistoryDocument,
         QubitDocument,

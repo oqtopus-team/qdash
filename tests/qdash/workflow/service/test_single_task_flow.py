@@ -37,4 +37,19 @@ def test_single_task_executor_pulls_config_before_reexecute(monkeypatch):
     assert result == {"task_name": "CheckRabi", "qid": "0"}
     assert captured["kwargs"]["enable_github_pull"] is True
     assert captured["kwargs"]["enable_github"] is True
+    assert captured["kwargs"]["persist_output_parameters"] is True
+    assert "execution_id" not in captured["kwargs"]
     assert captured["finished"] is True
+
+    single_task_executor(
+        username="alice",
+        chip_id="chip-1",
+        qid="0",
+        task_name="CheckRabi",
+        source_execution_id="exec-001",
+        project_id="project-1",
+        update_params=False,
+    )
+
+    assert captured["kwargs"]["enable_github"] is False
+    assert captured["kwargs"]["persist_output_parameters"] is True

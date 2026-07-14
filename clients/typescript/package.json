@@ -1,0 +1,58 @@
+{
+  "name": "@oqtopus-team/qdash-client",
+  "version": "0.0.0",
+  "description": "TypeScript client for the QDash API",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "OQTOPUS Team <oqtopus-team@googlegroups.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oqtopus-team/qdash.git",
+    "directory": "clients/typescript"
+  },
+  "homepage": "https://oqtopus-team.github.io/qdash/",
+  "bugs": "https://github.com/oqtopus-team/qdash/issues",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./openapi": {
+      "types": "./dist/generated/api.d.ts",
+      "import": "./dist/generated/api.js"
+    },
+    "./models": {
+      "types": "./dist/models.d.ts",
+      "import": "./dist/models.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/models.ts src/generated/api.ts --format esm --dts --sourcemap --clean --out-dir dist",
+    "check": "tsc --noEmit && vitest run",
+    "generate": "orval --config ./orval.config.cjs",
+    "prepack": "bun run build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "ini": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/ini": "^4.1.1",
+    "@types/node": "^24.0.0",
+    "orval": "7.14.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}

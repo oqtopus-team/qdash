@@ -37,6 +37,16 @@ def _sample_execution_model() -> ExecutionModel:
     )
 
 
+def test_task_result_document_preserves_quality_metrics() -> None:
+    """Normalized quality metrics remain attached to authoritative task provenance."""
+    task = _sample_task()
+    task.quality_metrics = {"r2": 0.95}
+
+    document = TaskResultHistoryDocument.from_datamodel(task, _sample_execution_model())
+
+    assert document.quality_metrics == {"r2": 0.95}
+
+
 @patch("qdash.workflow.engine.task.ai_review.enqueue_ai_review_note")
 @patch("qdash.repository.task_result_history.TaskResultHistoryDocument")
 def test_save_attaches_ai_review_after_upsert(

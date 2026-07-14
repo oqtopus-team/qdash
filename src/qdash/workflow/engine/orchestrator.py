@@ -172,6 +172,7 @@ class CalibOrchestrator:
             calib_dir=config.calib_data_path,
             history_recorder=self._create_history_recorder(),
             force_update_params=config.force_update_params,
+            persist_output_parameters=config.persist_output_parameters,
         )
 
         # Initialize Backend
@@ -493,6 +494,7 @@ class CalibOrchestrator:
             snapshot_loader=self._snapshot_loader,
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
+            persist_output_parameters=config.persist_output_parameters,
         )
 
         # Copy relevant calibration data
@@ -538,6 +540,7 @@ class CalibOrchestrator:
             snapshot_loader=self._snapshot_loader,
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
+            persist_output_parameters=config.persist_output_parameters,
         )
 
         relevant_qids: list[str] = []
