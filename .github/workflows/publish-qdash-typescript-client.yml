@@ -86,7 +86,7 @@ jobs:
           path: dist
 
       - name: Publish package
-        run: npm publish dist/oqtopus-team-qdash-client-*.tgz --access public --provenance
+        run: npm publish ./dist/oqtopus-team-qdash-client-*.tgz --access public --provenance
         env:
           # Used only to bootstrap the package before npm Trusted Publishing can be configured.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
