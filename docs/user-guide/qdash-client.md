@@ -1,6 +1,6 @@
 # QDash Client
 
-`qdash.client` is a Python client for reading QDash data from scripts, notebooks, and external automation.
+The Python package `qdash.client` is a client for reading QDash data from scripts, notebooks, and external automation.
 
 ## Installation
 
