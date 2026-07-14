@@ -271,7 +271,7 @@ import type {
   UserWithToken,
   ValidateFileContent200,
   ValidateFileRequest
-} from './models';
+} from '../../../../ui/src/schemas';
 
 import { qdashRequest } from '../orval-request';
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];

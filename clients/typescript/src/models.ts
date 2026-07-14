@@ -1,1 +1,1 @@
-export type * from "./generated/models/index.js";
+export type * from "../../../ui/src/schemas/index.js";

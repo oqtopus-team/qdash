@@ -8,7 +8,9 @@ module.exports = {
     },
     output: {
       target: "./src/generated/api.ts",
-      schemas: "./src/generated/models",
+      // Reuse the UI's generated schemas in the repository. The published
+      // declarations are bundled by tsup, so the npm package remains standalone.
+      schemas: "../../ui/src/schemas",
       client: "axios",
       mode: "single",
       clean: true,
