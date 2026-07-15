@@ -21,6 +21,22 @@ Run migrations with:
 
     python -m qdash.dbmodel.migration backfill-user-id          # dry-run
     python -m qdash.dbmodel.migration backfill-user-id --execute  # execute
+
+    python -m qdash.dbmodel.migration metric-notes-to-target-notes          # dry-run
+    python -m qdash.dbmodel.migration metric-notes-to-target-notes --execute  # execute
+
+    python -m qdash.dbmodel.migration metric-notes-to-latest-cooldown-target-notes          # dry-run
+    python -m qdash.dbmodel.migration metric-notes-to-latest-cooldown-target-notes --execute  # execute
+    python -m qdash.dbmodel.migration metric-notes-to-latest-cooldown-target-notes --execute --delete-source  # migrate then delete source metric notes
+
+    python -m qdash.dbmodel.migration legacy-target-notes-to-comments          # dry-run
+    python -m qdash.dbmodel.migration legacy-target-notes-to-comments --execute  # execute
+
+    python -m qdash.dbmodel.migration backfill-forum-thread-numbers          # dry-run
+    python -m qdash.dbmodel.migration backfill-forum-thread-numbers --execute  # execute
+
+    python -m qdash.dbmodel.migration migrate-forum-status          # dry-run
+    python -m qdash.dbmodel.migration migrate-forum-status --execute  # execute
 """
 
 import logging
@@ -71,6 +87,828 @@ USER_ID_FIELD_MIGRATIONS = {
 
 class MigrationError(Exception):
     """Raised when migration encounters an unrecoverable error."""
+
+
+MIGRATED_METRIC_NOTES_MARKER = "<!-- qdash:migrated-metric-notes -->"
+MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER = (
+    "<!-- qdash:migrated-metric-notes-to-latest-cooldown -->"
+)
+
+
+def _format_migrated_metric_note_section(
+    notes: list[Any],
+    *,
+    marker: str = MIGRATED_METRIC_NOTES_MARKER,
+    title: str = "Legacy metric notes",
+) -> str:
+    """Render metric notes as a compact target summary appendix."""
+    lines = [marker, f"## {title}"]
+    for note in notes:
+        updated_at = note.note.updated_at.isoformat() if note.note.updated_at else "unknown time"
+        updated_by = note.note.updated_by or "unknown user"
+        scope = note.scope_key or note.scope_type or "unknown scope"
+        content = (note.note.content or "").strip()
+        if not content:
+            continue
+        lines.extend(
+            [
+                "",
+                f"### {note.metric_key}",
+                f"- Scope: `{scope}`",
+                f"- Last edited: {updated_by} at {updated_at}",
+                "",
+                content,
+            ]
+        )
+    return "\n".join(lines).strip()
+
+
+def _merge_migrated_metric_notes(
+    existing_content: str,
+    section: str,
+    *,
+    marker: str = MIGRATED_METRIC_NOTES_MARKER,
+) -> tuple[str, bool]:
+    """Append migrated metric notes unless this target was already migrated."""
+    existing_content = (existing_content or "").strip()
+    if not section or marker in existing_content:
+        return existing_content, False
+    if not existing_content:
+        return section, True
+    return f"{existing_content}\n\n---\n\n{section}", True
+
+
+def _latest_cooldown_for_chip(*, project_id: str, chip_id: str) -> Any | None:
+    """Return the current or most recent cool-down containing ``chip_id``."""
+    from qdash.dbmodel.chip import ChipDocument
+    from qdash.dbmodel.cooldown import CooldownDocument
+
+    chip = ChipDocument.find_one(
+        ChipDocument.project_id == project_id,
+        ChipDocument.chip_id == chip_id,
+    ).run()
+    current_cooldown_id = getattr(chip, "current_cooldown_id", None)
+    if current_cooldown_id:
+        current = CooldownDocument.find_one(
+            {
+                "project_id": project_id,
+                "cooldown_id": current_cooldown_id,
+                "chip_ids": chip_id,
+            }
+        ).run()
+        if current is not None:
+            return current
+
+    cooldowns = list(
+        CooldownDocument.find(
+            {
+                "project_id": project_id,
+                "chip_ids": chip_id,
+            }
+        ).run()
+    )
+    if not cooldowns:
+        return None
+    return max(cooldowns, key=lambda cooldown: cooldown.started_at)
+
+
+def _legacy_target_note_comment_id(*, source: str, target_type: str, scope_key: str) -> str:
+    return f"legacy-{source}-{target_type}-{scope_key}"
+
+
+def migrate_legacy_target_notes_to_comments(dry_run: bool = True) -> dict[str, Any]:
+    """Move single target summaries into author-tracked target note comments.
+
+    Legacy target summaries lived either on ``QubitDocument.note`` /
+    ``CouplingDocument.note`` or in ``TargetNoteDocument.note``. The dashboard now
+    treats the target summary note as a collection of entries, so this migration
+    converts each non-empty single summary into one comment attributed to the
+    note's last editor and then clears the single-summary field.
+    """
+    from qdash.common.utils.datetime import now
+    from qdash.datamodel.note import NoteCommentModel, NoteModel
+    from qdash.dbmodel.coupling import CouplingDocument
+    from qdash.dbmodel.qubit import QubitDocument
+    from qdash.dbmodel.target_note import TargetNoteDocument
+
+    current_time = now()
+    stats: dict[str, Any] = {
+        "legacy_notes_found": 0,
+        "comments_created": 0,
+        "comments_relocated": 0,
+        "notes_cleared": 0,
+        "notes_skipped_already_migrated": 0,
+        "targets": [],
+    }
+
+    def add_comment(
+        *,
+        target_note: Any,
+        note: Any,
+        source: str,
+        target_info: dict[str, Any],
+    ) -> bool:
+        content = (note.content or "").strip()
+        if not content:
+            return False
+        comment_id = _legacy_target_note_comment_id(
+            source=source,
+            target_type=target_note.target_type,
+            scope_key=target_note.scope_key,
+        )
+        created_by = note.updated_by or "migration"
+        if any(comment.comment_id == comment_id for comment in target_note.comments) or any(
+            (comment.content or "").strip() == content and comment.created_by == created_by
+            for comment in target_note.comments
+        ):
+            stats["notes_skipped_already_migrated"] += 1
+            target_info["action"] = "already_migrated"
+            return True
+        created_at = note.updated_at or current_time
+        if not dry_run:
+            target_note.comments.append(
+                NoteCommentModel(
+                    comment_id=comment_id,
+                    content=content,
+                    created_by=created_by,
+                    created_at=created_at,
+                    updated_by=created_by,
+                    updated_at=None,
+                )
+            )
+        stats["comments_created"] += 1
+        target_info["action"] = "dry_run" if dry_run else "migrated"
+        return True
+
+    def scope_fields_for_legacy_target(*, project_id: str, chip_id: str) -> dict[str, Any]:
+        cooldown = _latest_cooldown_for_chip(project_id=project_id, chip_id=chip_id)
+        if cooldown is None:
+            return {
+                "scope_type": "global",
+                "scope_key": "global",
+                "cooldown_id": None,
+                "scope_started_at": None,
+                "scope_ended_at": None,
+                "scope_source": "legacy_global",
+            }
+        return {
+            "scope_type": "cooldown",
+            "scope_key": f"cooldown:{cooldown.cooldown_id}",
+            "cooldown_id": cooldown.cooldown_id,
+            "scope_started_at": cooldown.started_at,
+            "scope_ended_at": cooldown.ended_at,
+            "scope_source": "current_cooldown",
+        }
+
+    def get_or_create_target_note(
+        *,
+        project_id: str,
+        chip_id: str,
+        target_type: str,
+        target_id: str,
+        scope_fields: dict[str, Any],
+    ) -> Any:
+        target_note = TargetNoteDocument.find_one(
+            TargetNoteDocument.project_id == project_id,
+            TargetNoteDocument.chip_id == chip_id,
+            TargetNoteDocument.target_type == target_type,
+            TargetNoteDocument.target_id == target_id,
+            TargetNoteDocument.scope_key == scope_fields["scope_key"],
+        ).run()
+        if target_note is not None:
+            return target_note
+        target_note = TargetNoteDocument(
+            project_id=project_id,
+            chip_id=chip_id,
+            target_type=target_type,
+            target_id=target_id,
+            note=NoteModel(),
+            comments=[],
+            **scope_fields,
+        )
+        if not dry_run:
+            target_note.insert()
+        return target_note
+
+    target_note_docs = [
+        doc
+        for doc in TargetNoteDocument.find_all().run()
+        if getattr(doc, "note", None) is not None and (doc.note.content or "").strip()
+    ]
+    for target_note in target_note_docs:
+        stats["legacy_notes_found"] += 1
+        target_info = {
+            "project_id": target_note.project_id,
+            "chip_id": target_note.chip_id,
+            "target_type": target_note.target_type,
+            "target_id": target_note.target_id,
+            "scope_key": target_note.scope_key,
+            "source": "target_note",
+        }
+        changed = add_comment(
+            target_note=target_note,
+            note=target_note.note,
+            source="target-note",
+            target_info=target_info,
+        )
+        if changed and not dry_run:
+            target_note.note = NoteModel()
+            target_note.system_info.update_time()
+            target_note.save()
+            stats["notes_cleared"] += 1
+        stats["targets"].append(target_info)
+
+    for model, target_type, source in (
+        (QubitDocument, "qubit", "qubit"),
+        (CouplingDocument, "coupling", "coupling"),
+    ):
+        docs = [
+            doc
+            for doc in model.find_all().run()
+            if getattr(doc, "note", None) is not None and (doc.note.content or "").strip()
+        ]
+        for doc in docs:
+            stats["legacy_notes_found"] += 1
+            scope_fields = scope_fields_for_legacy_target(
+                project_id=doc.project_id,
+                chip_id=doc.chip_id,
+            )
+            target_note = get_or_create_target_note(
+                project_id=doc.project_id,
+                chip_id=doc.chip_id,
+                target_type=target_type,
+                target_id=doc.qid,
+                scope_fields=scope_fields,
+            )
+            target_info = {
+                "project_id": doc.project_id,
+                "chip_id": doc.chip_id,
+                "target_type": target_type,
+                "target_id": doc.qid,
+                "scope_key": scope_fields["scope_key"],
+                "source": source,
+            }
+            changed = add_comment(
+                target_note=target_note,
+                note=doc.note,
+                source=source,
+                target_info=target_info,
+            )
+            if changed and not dry_run:
+                doc.note = NoteModel()
+                doc.system_info.update_time()
+                doc.save()
+                target_note.system_info.update_time()
+                target_note.save()
+                stats["notes_cleared"] += 1
+            stats["targets"].append(target_info)
+
+    for global_note in TargetNoteDocument.find(
+        TargetNoteDocument.scope_key == "global",
+        TargetNoteDocument.scope_source == "legacy_global",
+    ).run():
+        scope_fields = scope_fields_for_legacy_target(
+            project_id=global_note.project_id,
+            chip_id=global_note.chip_id,
+        )
+        if scope_fields["scope_key"] == "global":
+            continue
+        migrated_comments = [
+            comment
+            for comment in global_note.comments
+            if comment.comment_id.startswith(
+                f"legacy-{global_note.target_type}-{global_note.target_type}-global"
+            )
+        ]
+        if not migrated_comments:
+            continue
+        target_note = get_or_create_target_note(
+            project_id=global_note.project_id,
+            chip_id=global_note.chip_id,
+            target_type=global_note.target_type,
+            target_id=global_note.target_id,
+            scope_fields=scope_fields,
+        )
+        moved = False
+        for comment in migrated_comments:
+            target_info = {
+                "project_id": global_note.project_id,
+                "chip_id": global_note.chip_id,
+                "target_type": global_note.target_type,
+                "target_id": global_note.target_id,
+                "scope_key": scope_fields["scope_key"],
+                "source": "relocated_global",
+            }
+            if any(
+                (existing.content or "").strip() == (comment.content or "").strip()
+                and existing.created_by == comment.created_by
+                for existing in target_note.comments
+            ):
+                target_info["action"] = "already_migrated"
+                stats["notes_skipped_already_migrated"] += 1
+                stats["targets"].append(target_info)
+                continue
+            if not dry_run:
+                relocated = comment.model_copy(
+                    update={
+                        "comment_id": _legacy_target_note_comment_id(
+                            source=global_note.target_type,
+                            target_type=global_note.target_type,
+                            scope_key=scope_fields["scope_key"],
+                        )
+                    }
+                )
+                target_note.comments.append(relocated)
+            moved = True
+            stats["comments_relocated"] += 1
+            target_info["action"] = "dry_run" if dry_run else "relocated"
+            stats["targets"].append(target_info)
+        if moved and not dry_run:
+            target_note.system_info.update_time()
+            target_note.save()
+            remaining = [
+                comment for comment in global_note.comments if comment not in migrated_comments
+            ]
+            global_note.comments = remaining
+            global_note.system_info.update_time()
+            if global_note.comments or (global_note.note.content or "").strip():
+                global_note.save()
+            else:
+                global_note.delete()
+
+    return stats
+
+
+def migrate_metric_notes_to_target_notes(dry_run: bool = True) -> dict[str, Any]:
+    """Copy existing per-metric dashboard notes into target-level pinned summaries.
+
+    The source ``MetricNoteDocument`` rows are preserved. Each target receives one
+    appended "Migrated metric notes" section in ``QubitDocument.note`` or
+    ``CouplingDocument.note``. The marker keeps the migration idempotent.
+    """
+    from qdash.common.utils.datetime import now
+    from qdash.datamodel.note import NoteModel
+    from qdash.dbmodel.coupling import CouplingDocument
+    from qdash.dbmodel.metric_note import MetricNoteDocument
+    from qdash.dbmodel.qubit import QubitDocument
+
+    metric_notes = [
+        note
+        for note in MetricNoteDocument.find_all().run()
+        if getattr(note, "note", None) is not None and (note.note.content or "").strip()
+    ]
+    grouped: dict[tuple[str, str, str, str], list[Any]] = {}
+    for note in metric_notes:
+        key = (note.project_id, note.chip_id, note.target_type, note.target_id)
+        grouped.setdefault(key, []).append(note)
+
+    stats: dict[str, Any] = {
+        "metric_notes_found": len(metric_notes),
+        "targets_found": len(grouped),
+        "targets_updated": 0,
+        "targets_skipped_already_migrated": 0,
+        "targets_missing": 0,
+        "targets": [],
+    }
+
+    for (project_id, chip_id, target_type, target_id), notes in sorted(grouped.items()):
+        notes.sort(
+            key=lambda item: (
+                item.metric_key,
+                item.scope_key,
+                item.note.updated_at.isoformat() if item.note.updated_at else "",
+            )
+        )
+        model = QubitDocument if target_type == "qubit" else CouplingDocument
+        target_doc = model.find_one(
+            model.project_id == project_id,
+            model.chip_id == chip_id,
+            model.qid == target_id,
+        ).run()
+        target_info = {
+            "project_id": project_id,
+            "chip_id": chip_id,
+            "target_type": target_type,
+            "target_id": target_id,
+            "metric_note_count": len(notes),
+            "action": "dry_run" if dry_run else "updated",
+        }
+        if target_doc is None:
+            stats["targets_missing"] += 1
+            target_info["action"] = "missing_target"
+            stats["targets"].append(target_info)
+            continue
+
+        existing_note = getattr(target_doc, "note", NoteModel()) or NoteModel()
+        section = _format_migrated_metric_note_section(notes)
+        merged_content, changed = _merge_migrated_metric_notes(existing_note.content, section)
+        if not changed:
+            stats["targets_skipped_already_migrated"] += 1
+            target_info["action"] = "already_migrated"
+            stats["targets"].append(target_info)
+            continue
+
+        if not dry_run:
+            last_note = max(
+                notes,
+                key=lambda item: item.note.updated_at or item.system_info.updated_at,
+            )
+            target_doc.note = NoteModel(
+                content=merged_content,
+                updated_by=last_note.note.updated_by or "migration",
+                updated_at=last_note.note.updated_at or now(),
+            )
+            target_doc.system_info.update_time()
+            target_doc.save()
+        stats["targets_updated"] += 1
+        stats["targets"].append(target_info)
+
+    return stats
+
+
+def migrate_metric_notes_to_latest_cooldown_target_notes(
+    dry_run: bool = True,
+    delete_source: bool = False,
+) -> dict[str, Any]:
+    """Copy legacy per-metric dashboard notes into latest-CD target summaries.
+
+    This migration intentionally collapses all existing ``MetricNoteDocument`` rows
+    for one target into that chip's current or most recent cool-down. The source
+    metric notes are preserved; the resulting target note carries each note's
+    original scope in the migrated appendix for manual follow-up. When
+    ``delete_source`` is true, successfully migrated ``MetricNoteDocument`` rows
+    are deleted after the target summary is written.
+    """
+    from qdash.common.utils.datetime import ensure_timezone, now
+    from qdash.datamodel.note import NoteModel
+    from qdash.dbmodel.coupling import CouplingDocument
+    from qdash.dbmodel.metric_note import MetricNoteDocument
+    from qdash.dbmodel.qubit import QubitDocument
+    from qdash.dbmodel.target_note import TargetNoteDocument
+
+    metric_notes = [
+        note
+        for note in MetricNoteDocument.find_all().run()
+        if getattr(note, "note", None) is not None and (note.note.content or "").strip()
+    ]
+    grouped: dict[tuple[str, str, str, str], list[Any]] = {}
+    for note in metric_notes:
+        key = (note.project_id, note.chip_id, note.target_type, note.target_id)
+        grouped.setdefault(key, []).append(note)
+
+    cooldown_cache: dict[tuple[str, str], Any | None] = {}
+    stats: dict[str, Any] = {
+        "metric_notes_found": len(metric_notes),
+        "targets_found": len(grouped),
+        "targets_updated": 0,
+        "targets_skipped_already_migrated": 0,
+        "targets_missing": 0,
+        "targets_without_cooldown": 0,
+        "metric_notes_deleted": 0,
+        "targets": [],
+    }
+
+    for (project_id, chip_id, target_type, target_id), notes in sorted(grouped.items()):
+        notes.sort(
+            key=lambda item: (
+                item.metric_key,
+                item.scope_key,
+                item.note.updated_at.isoformat() if item.note.updated_at else "",
+            )
+        )
+        model = QubitDocument if target_type == "qubit" else CouplingDocument
+        target_doc = model.find_one(
+            model.project_id == project_id,
+            model.chip_id == chip_id,
+            model.qid == target_id,
+        ).run()
+        target_info = {
+            "project_id": project_id,
+            "chip_id": chip_id,
+            "target_type": target_type,
+            "target_id": target_id,
+            "metric_note_count": len(notes),
+            "action": "dry_run" if dry_run else "updated",
+        }
+        if target_doc is None:
+            stats["targets_missing"] += 1
+            target_info["action"] = "missing_target"
+            stats["targets"].append(target_info)
+            continue
+
+        cooldown_key = (project_id, chip_id)
+        if cooldown_key not in cooldown_cache:
+            cooldown_cache[cooldown_key] = _latest_cooldown_for_chip(
+                project_id=project_id,
+                chip_id=chip_id,
+            )
+        cooldown = cooldown_cache[cooldown_key]
+        if cooldown is None:
+            stats["targets_without_cooldown"] += 1
+            target_info["action"] = "missing_cooldown"
+            stats["targets"].append(target_info)
+            continue
+
+        target_info["cooldown_id"] = cooldown.cooldown_id
+        scope_key = f"cooldown:{cooldown.cooldown_id}"
+        existing_target_note = TargetNoteDocument.find_one(
+            TargetNoteDocument.project_id == project_id,
+            TargetNoteDocument.chip_id == chip_id,
+            TargetNoteDocument.target_type == target_type,
+            TargetNoteDocument.target_id == target_id,
+            TargetNoteDocument.scope_key == scope_key,
+        ).run()
+        existing_note = (
+            existing_target_note.note if existing_target_note is not None else NoteModel()
+        )
+        section = _format_migrated_metric_note_section(
+            notes,
+            marker=MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER,
+            title="Migrated legacy metric notes",
+        )
+        merged_content, changed = _merge_migrated_metric_notes(
+            existing_note.content,
+            section,
+            marker=MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER,
+        )
+        if not changed:
+            stats["targets_skipped_already_migrated"] += 1
+            target_info["action"] = "already_migrated"
+            if delete_source and not dry_run:
+                for metric_note in notes:
+                    metric_note.delete()
+                    stats["metric_notes_deleted"] += 1
+                target_info["metric_notes_deleted"] = len(notes)
+            stats["targets"].append(target_info)
+            continue
+
+        if not dry_run:
+            last_note = max(
+                notes,
+                key=lambda item: item.note.updated_at or item.system_info.updated_at,
+            )
+            note = NoteModel(
+                content=merged_content,
+                updated_by=last_note.note.updated_by or "migration",
+                updated_at=last_note.note.updated_at or now(),
+            )
+            if existing_target_note is None:
+                TargetNoteDocument(
+                    project_id=project_id,
+                    chip_id=chip_id,
+                    target_type=target_type,
+                    target_id=target_id,
+                    note=note,
+                    scope_type="cooldown",
+                    scope_key=scope_key,
+                    cooldown_id=cooldown.cooldown_id,
+                    scope_started_at=ensure_timezone(cooldown.started_at),
+                    scope_ended_at=ensure_timezone(cooldown.ended_at),
+                    scope_source="explicit_cooldown",
+                ).insert()
+            else:
+                existing_target_note.note = note
+                existing_target_note.scope_type = "cooldown"
+                existing_target_note.cooldown_id = cooldown.cooldown_id
+                existing_target_note.scope_started_at = ensure_timezone(cooldown.started_at)
+                existing_target_note.scope_ended_at = ensure_timezone(cooldown.ended_at)
+                existing_target_note.scope_source = "explicit_cooldown"
+                existing_target_note.system_info.update_time()
+                existing_target_note.save()
+            if delete_source:
+                for metric_note in notes:
+                    metric_note.delete()
+                    stats["metric_notes_deleted"] += 1
+                target_info["metric_notes_deleted"] = len(notes)
+        stats["targets_updated"] += 1
+        stats["targets"].append(target_info)
+
+    return stats
+
+
+def migrate_backfill_forum_thread_numbers(dry_run: bool = True) -> dict[str, Any]:
+    """Backfill project-scoped forum thread numbers for existing posts.
+
+    Root threads receive stable ``#N`` numbers within each project. Replies share
+    their root thread number so API responses can display a single discussion ID.
+    Existing numbers are preserved and deleted root threads are included to avoid
+    future number reuse.
+    """
+    from qdash.dbmodel.forum import ForumCounterDocument, ForumPostDocument
+
+    collection = ForumPostDocument.get_motor_collection()
+    counter_collection = ForumCounterDocument.get_motor_collection()
+    project_ids = sorted(
+        project_id
+        for project_id in collection.distinct("project_id", {"parent_id": None})
+        if isinstance(project_id, str) and project_id
+    )
+    stats: dict[str, Any] = {
+        "projects_found": len(project_ids),
+        "root_threads_missing_number": 0,
+        "root_threads_updated": 0,
+        "replies_updated": 0,
+        "orphan_replies_found": 0,
+        "duplicate_root_numbers": {},
+        "counters_updated": 0,
+        "projects": [],
+    }
+
+    for project_id in project_ids:
+        roots = list(
+            collection.find({"project_id": project_id, "parent_id": None}).sort(
+                [("system_info.created_at", 1), ("_id", 1)]
+            )
+        )
+        root_ids = {str(root["_id"]) for root in roots}
+        existing_numbers: dict[int, list[str]] = {}
+        for root in roots:
+            current_number = root.get("number")
+            if isinstance(current_number, int) and current_number > 0:
+                existing_numbers.setdefault(current_number, []).append(str(root["_id"]))
+
+        duplicate_numbers = {
+            str(number): ids for number, ids in existing_numbers.items() if len(ids) > 1
+        }
+        if duplicate_numbers:
+            stats["duplicate_root_numbers"][project_id] = duplicate_numbers
+            if not dry_run:
+                raise MigrationError(
+                    "Duplicate forum root thread numbers already exist for "
+                    f"project {project_id}: {duplicate_numbers}"
+                )
+
+        used_numbers = set(existing_numbers)
+        next_number = 1
+        assignments: list[tuple[Any, int]] = []
+        root_number_by_id: dict[str, int] = {}
+        for root in roots:
+            current_number = root.get("number")
+            if isinstance(current_number, int) and current_number > 0:
+                root_number = current_number
+            else:
+                while next_number in used_numbers:
+                    next_number += 1
+                root_number = next_number
+                used_numbers.add(root_number)
+                assignments.append((root["_id"], root_number))
+                next_number += 1
+            root_number_by_id[str(root["_id"])] = root_number
+
+        reply_updates = 0
+        for root_id, root_number in root_number_by_id.items():
+            reply_filter = {
+                "project_id": project_id,
+                "parent_id": root_id,
+                "$or": [
+                    {"number": {"$exists": False}},
+                    {"number": None},
+                    {"number": {"$ne": root_number}},
+                ],
+            }
+            if dry_run:
+                reply_updates += collection.count_documents(reply_filter)
+            else:
+                result = collection.update_many(reply_filter, {"$set": {"number": root_number}})
+                reply_updates += result.modified_count
+
+        orphan_reply_filter = {
+            "project_id": project_id,
+            "parent_id": {"$nin": [None, *root_ids]},
+            "is_deleted": False,
+        }
+        orphan_replies = collection.count_documents(orphan_reply_filter)
+        stats["orphan_replies_found"] += orphan_replies
+
+        max_number = max(used_numbers) if used_numbers else 0
+        current_counter = counter_collection.find_one({"project_id": project_id})
+        current_counter_value = (
+            int(current_counter.get("value") or 0) if isinstance(current_counter, dict) else 0
+        )
+        counter_value = max(max_number, current_counter_value)
+        project_info = {
+            "project_id": project_id,
+            "root_threads": len(roots),
+            "root_threads_missing_number": len(assignments),
+            "replies_to_update": reply_updates,
+            "orphan_replies": orphan_replies,
+            "duplicate_root_numbers": duplicate_numbers,
+            "max_number": max_number,
+            "counter_value": counter_value,
+            "action": "blocked_duplicate_numbers"
+            if duplicate_numbers
+            else ("dry_run" if dry_run else "updated"),
+        }
+        stats["root_threads_missing_number"] += len(assignments)
+        stats["replies_updated"] += reply_updates
+
+        if not dry_run:
+            for root_id, root_number in assignments:
+                result = collection.update_one({"_id": root_id}, {"$set": {"number": root_number}})
+                stats["root_threads_updated"] += result.modified_count
+            counter_collection.update_one(
+                {"project_id": project_id},
+                {"$max": {"value": counter_value}, "$setOnInsert": {"project_id": project_id}},
+                upsert=True,
+            )
+            stats["counters_updated"] += 1
+
+        stats["projects"].append(project_info)
+
+    logger.info("Forum thread number migration: %s", stats)
+    return stats
+
+
+def migrate_forum_status(dry_run: bool = True) -> dict[str, Any]:
+    """Migrate forum threads from ``is_closed`` and legacy labels to ``status``.
+
+    The forum workflow now uses a dedicated status field. Existing closed
+    threads and threads with a ``resolved`` label become ``status=resolved``.
+    Legacy topic labels are collapsed to a small allowed set:
+    ``discussion``/``info``/``mtg`` become ``review`` and ``resolved`` is removed.
+    The deprecated ``is_closed`` field is unset when executing the migration.
+    """
+    from qdash.dbmodel.forum import FORUM_THREAD_STATUSES, ForumPostDocument
+
+    allowed_labels = {"review", "anomaly"}
+    label_aliases = {"discussion": "review", "info": "review", "mtg": "review"}
+    collection = ForumPostDocument.get_motor_collection()
+    docs = list(collection.find({}))
+    stats: dict[str, Any] = {
+        "posts_found": len(docs),
+        "posts_to_update": 0,
+        "status_from_is_closed": 0,
+        "status_from_resolved_label": 0,
+        "status_defaulted_open": 0,
+        "labels_changed": 0,
+        "is_closed_removed": 0,
+    }
+
+    for doc in docs:
+        current_status = doc.get("status")
+        labels = doc.get("labels") if isinstance(doc.get("labels"), list) else []
+        normalized_labels: list[str] = []
+        has_resolved_label = False
+        labels_changed = False
+
+        for raw_label in labels:
+            if not isinstance(raw_label, str):
+                labels_changed = True
+                continue
+            label = raw_label.strip().lower()
+            if label == "resolved":
+                has_resolved_label = True
+                labels_changed = True
+                continue
+            label = label_aliases.get(label, label)
+            if label not in allowed_labels:
+                label = "review"
+                labels_changed = True
+            if label not in normalized_labels:
+                normalized_labels.append(label)
+            if label != raw_label:
+                labels_changed = True
+
+        if len(normalized_labels) > 1:
+            normalized_labels = normalized_labels[:1]
+            labels_changed = True
+
+        next_status = current_status if current_status in FORUM_THREAD_STATUSES else None
+        if has_resolved_label:
+            if next_status != "resolved":
+                stats["status_from_resolved_label"] += 1
+            next_status = "resolved"
+        elif doc.get("is_closed") is True:
+            if next_status != "resolved":
+                stats["status_from_is_closed"] += 1
+            next_status = "resolved"
+        elif next_status is None:
+            next_status = "open"
+            stats["status_defaulted_open"] += 1
+
+        update: dict[str, Any] = {}
+        unset: dict[str, str] = {}
+        if current_status != next_status:
+            update["status"] = next_status
+        if labels_changed or labels != normalized_labels:
+            update["labels"] = normalized_labels
+            stats["labels_changed"] += 1
+        if "is_closed" in doc:
+            unset["is_closed"] = ""
+            stats["is_closed_removed"] += 1
+
+        if update or unset:
+            stats["posts_to_update"] += 1
+            if not dry_run:
+                operation: dict[str, Any] = {}
+                if update:
+                    operation["$set"] = update
+                if unset:
+                    operation["$unset"] = unset
+                collection.update_one({"_id": doc["_id"]}, operation)
+
+    logger.info("Forum status migration: %s", stats)
+    return stats
 
 
 def migrate_backfill_user_id(dry_run: bool = True) -> dict[str, Any]:
@@ -855,6 +1693,64 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    metric_notes_parser = subparsers.add_parser(
+        "metric-notes-to-target-notes",
+        help="Append existing per-metric dashboard notes to target-level pinned summaries",
+    )
+    metric_notes_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
+    latest_cd_metric_notes_parser = subparsers.add_parser(
+        "metric-notes-to-latest-cooldown-target-notes",
+        help=(
+            "Append existing per-metric dashboard notes to each target's latest "
+            "cool-down pinned summary"
+        ),
+    )
+    latest_cd_metric_notes_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+    latest_cd_metric_notes_parser.add_argument(
+        "--delete-source",
+        action="store_true",
+        help="Delete MetricNoteDocument rows after successfully migrating them",
+    )
+
+    legacy_target_notes_parser = subparsers.add_parser(
+        "legacy-target-notes-to-comments",
+        help="Move legacy target summaries into author-tracked note entries",
+    )
+    legacy_target_notes_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
+    forum_numbers_parser = subparsers.add_parser(
+        "backfill-forum-thread-numbers",
+        help="Backfill project-scoped #numbers for existing forum threads",
+    )
+    forum_numbers_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
+    forum_status_parser = subparsers.add_parser(
+        "migrate-forum-status",
+        help="Migrate forum is_closed and legacy labels to status",
+    )
+    forum_status_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "fix-invalid-fidelity":
@@ -899,6 +1795,39 @@ if __name__ == "__main__":
 
         initialize()
         stats = migrate_backfill_user_id(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "metric-notes-to-target-notes":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_metric_notes_to_target_notes(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "metric-notes-to-latest-cooldown-target-notes":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_metric_notes_to_latest_cooldown_target_notes(
+            dry_run=not args.execute,
+            delete_source=args.delete_source,
+        )
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "legacy-target-notes-to-comments":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_legacy_target_notes_to_comments(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "backfill-forum-thread-numbers":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_backfill_forum_thread_numbers(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "migrate-forum-status":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_forum_status(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
     else:
         parser.print_help()

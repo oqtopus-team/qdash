@@ -42,6 +42,10 @@ class BackendSaver:
         Calibration data directory
     task_manager_id : str
         The unique TaskManager ID (used for note files)
+    force_update_params : bool, default=False
+        Whether to update backend parameters when R² validation fails
+    persist_output_parameters : bool, default=True
+        Whether to persist output parameters to the database and backend
     """
 
     def __init__(
@@ -51,12 +55,14 @@ class BackendSaver:
         calib_dir: str,
         task_manager_id: str,
         force_update_params: bool = False,
+        persist_output_parameters: bool = True,
     ) -> None:
         self._state_manager = state_manager
         self._username = username
         self._calib_dir = calib_dir
         self._task_manager_id = task_manager_id
         self._force_update_params = force_update_params
+        self._persist_output_parameters = persist_output_parameters
 
     def save(
         self,
@@ -114,7 +120,7 @@ class BackendSaver:
         task_model = self._state_manager.get_task(task_name, task_type, qid)
         output_parameters = dict(task_model.output_parameters)
 
-        if not output_parameters:
+        if not output_parameters or not self._persist_output_parameters:
             return
 
         from qdash.repository import MongoQubitCalibrationRepository
@@ -183,7 +189,14 @@ class BackendSaver:
                 qid=note_qid,
             )
 
-        # Always save to database (even on R² failure)
+        if not self._persist_output_parameters:
+            logger.info(
+                "Staging output parameters for %s without calibration/backend write-back",
+                task_name,
+            )
+            return
+
+        # Save to the authoritative calibration database only when persistence is enabled.
         if output_parameters:
             if task.is_qubit_task():
                 qubit_repo.update_calib_data(

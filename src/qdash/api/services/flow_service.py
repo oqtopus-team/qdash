@@ -379,6 +379,7 @@ class FlowService:
                     created_at=flow.created_at,
                     updated_at=flow.updated_at,
                     tags=flow.tags,
+                    file_exists=Path(flow.file_path).exists(),
                 )
                 for flow in flows
             ]
@@ -676,7 +677,9 @@ class FlowService:
         source_task_id: str | None = None,
         parameter_overrides: dict[str, dict[str, Any]] | None = None,
         update_params: bool = True,
+        persist_output_parameters: bool = True,
         reconfigure: bool = False,
+        execution_name: str | None = None,
     ) -> ExecuteFlowResponse:
         """Execute a single task via the system single-task-executor deployment.
 
@@ -699,6 +702,10 @@ class FlowService:
             The project ID
         tags : list[str] | None
             Tags for categorization
+        execution_name : str | None
+            QDash execution display name. Defaults to the manual re-execution label.
+        persist_output_parameters : bool
+            Whether task outputs update authoritative QDash calibration state.
 
         Returns
         -------
@@ -719,7 +726,7 @@ class FlowService:
                 detail=("System deployment not available. The worker may not have started yet."),
             )
 
-        flow_name = f"re-execute:{task_name}"
+        flow_name = execution_name or f"re-execute:{task_name}"
         parameters: dict[str, Any] = {
             "username": username,
             "chip_id": chip_id,
@@ -731,6 +738,7 @@ class FlowService:
             "tags": tags or [],
             "source_task_id": source_task_id,
             "parameter_overrides": parameter_overrides,
+            "persist_output_parameters": persist_output_parameters,
             "update_params": update_params,
             "reconfigure": reconfigure,
         }
@@ -771,6 +779,54 @@ class FlowService:
                 status_code=500,
                 detail=f"Failed to execute single task: {e}",
             )
+
+    async def execute_agent_candidate_apply(
+        self,
+        *,
+        project_id: str,
+        session_id: str,
+        commit_id: str,
+        push_to_github: bool,
+    ) -> ExecuteFlowResponse:
+        """Dispatch worker-side application of one audited agent candidate commit."""
+        settings = get_settings()
+        deployment_name = "agent-candidate-apply/system-candidate-apply"
+        try:
+            async with get_client() as client:
+                deployment = await client.read_deployment_by_name(deployment_name)
+        except Exception:
+            logger.error(f"System deployment '{deployment_name}' not found")
+            raise HTTPException(
+                status_code=503,
+                detail="Agent candidate apply deployment is not available",
+            )
+
+        parameters = {
+            "project_id": project_id,
+            "session_id": session_id,
+            "commit_id": commit_id,
+            "push_to_github": push_to_github,
+        }
+        try:
+            async with get_client() as client:
+                flow_run = await client.create_flow_run_from_deployment(
+                    deployment_id=deployment.id,
+                    parameters=parameters,
+                )
+        except Exception as exc:
+            logger.error(f"Failed to dispatch agent candidate apply: {exc}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to dispatch agent candidate apply: {exc}",
+            ) from exc
+
+        operation_id = str(flow_run.id)
+        return ExecuteFlowResponse(
+            execution_id=operation_id,
+            flow_run_url=f"http://localhost:{settings.prefect_port}/runs/flow-run/{operation_id}",
+            qdash_ui_url=f"http://localhost:{settings.ui_port}/",
+            message=f"Agent candidate commit '{commit_id}' queued for backend application",
+        )
 
     async def list_templates(self) -> list[FlowTemplate]:
         """List all available flow templates.

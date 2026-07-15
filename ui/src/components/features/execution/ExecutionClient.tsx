@@ -3,17 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  ArrowLeft,
-  Calendar,
-  CheckCircle,
-  Clock,
-  Download,
-  ExternalLink,
-  StopCircle,
-  UserRound,
-  XCircle,
-} from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Download, StopCircle, UserRound } from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
@@ -23,8 +13,11 @@ import { ExecutionDAG } from "./ExecutionDAG";
 import type { ExecutionResponseDetail } from "@/schemas";
 
 import { useGetExecution, useCancelExecution } from "@/client/execution/execution";
+import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
+import { getCancelErrorMessage } from "@/components/features/execution/getCancelErrorMessage";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { useToast } from "@/components/ui/Toast";
 
 type FilterOption = {
   value: string;
@@ -90,6 +83,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
   });
 
   const cancelMutation = useCancelExecution();
+  const toast = useToast();
 
   const execution = executionDetailData?.data as
     | (ExecutionResponseDetail & {
@@ -113,9 +107,11 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
       { flowRunId },
       {
         onSuccess: () => {
+          toast.success("Cancellation requested successfully");
           setShowCancelConfirm(false);
         },
-        onError: () => {
+        onError: (error) => {
+          toast.error(getCancelErrorMessage(error));
           setShowCancelConfirm(false);
         },
       },
@@ -235,20 +231,6 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                   {cancelMutation.isPending ? "Cancelling..." : "Cancel Execution"}
                 </button>
               )}
-              <a
-                href={`/execution/${executionId}/experiment`}
-                className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
-              >
-                <ExternalLink className="mr-2" size={16} />
-                Go to Experiment
-              </a>
-              <a
-                href={((execution.note as { [key: string]: unknown })?.ui_url as string) || "#"}
-                className="bg-accent text-accent-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
-              >
-                <ExternalLink className="mr-2" size={16} />
-                Go to Flow
-              </a>
             </div>
           </div>
 
@@ -390,63 +372,12 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
         </div>
       </div>
 
-      {/* Cancel Confirmation Modal */}
-      {showCancelConfirm && (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">Cancel Execution</h3>
-            <p className="py-4">
-              Are you sure you want to cancel this execution? This action cannot be undone.
-            </p>
-            {cancelMutation.isError && (
-              <div className="alert alert-error mb-4">
-                <XCircle size={16} />
-                <span>
-                  {(
-                    cancelMutation.error as {
-                      response?: { data?: { detail?: string } };
-                    }
-                  )?.response?.data?.detail || "Failed to cancel execution"}
-                </span>
-              </div>
-            )}
-            <div className="modal-action">
-              <button
-                className="btn btn-ghost"
-                onClick={() => setShowCancelConfirm(false)}
-                disabled={cancelMutation.isPending}
-              >
-                Close
-              </button>
-              <button
-                className="btn btn-error"
-                onClick={handleCancel}
-                disabled={cancelMutation.isPending}
-              >
-                {cancelMutation.isPending ? (
-                  <span className="loading loading-spinner loading-sm" />
-                ) : (
-                  "Cancel Execution"
-                )}
-              </button>
-            </div>
-          </div>
-          <div
-            className="modal-backdrop"
-            onClick={() => !cancelMutation.isPending && setShowCancelConfirm(false)}
-          />
-        </div>
-      )}
-
-      {/* Cancel success alert */}
-      {cancelMutation.isSuccess && (
-        <div className="toast toast-end">
-          <div className="alert alert-success">
-            <CheckCircle size={16} />
-            <span>Cancellation requested successfully</span>
-          </div>
-        </div>
-      )}
+      <CancelExecutionModal
+        isOpen={showCancelConfirm}
+        isPending={cancelMutation.isPending}
+        onConfirm={handleCancel}
+        onClose={() => setShowCancelConfirm(false)}
+      />
     </div>
   );
 }

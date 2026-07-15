@@ -37,6 +37,48 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import MuxTargets
 
+FULL_1Q_CHECK_TASKS: list[str] = [
+    "CheckRabi",
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    # "CheckOptimalReadoutFrequency",
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CheckT1",
+    "CheckT2Echo",
+    "CheckRamsey",
+]
+
+FULL_1Q_FINE_TUNE_TASKS: list[str] = [
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
+    "ReadoutClassification",
+    "CheckT1Average",
+    "CheckT2EchoAverage",
+    "Check1QGateCoherenceLimit",
+    "RandomizedBenchmarking",
+    "X90InterleavedRandomizedBenchmarking",
+]
+
+FULL_2Q_TASKS: list[str] = [
+    "CheckCrossResonance",
+    "CreateZX90",
+    "CheckZX90",
+    "CheckBellState",
+    "CheckBellStateTomography",
+    "Check2QGateCoherenceLimit",
+    "ZX90InterleavedRandomizedBenchmarking",
+]
+
 
 @flow(on_cancellation=[on_flow_cancellation], on_crashed=[on_flow_crash])
 def full_calibration(
@@ -57,7 +99,7 @@ def full_calibration(
     Args:
         username: User name (from UI)
         chip_id: Chip ID (from UI)
-        mux_ids: MUX IDs to calibrate (default: all 16)
+        mux_ids: MUX IDs to calibrate (required)
         exclude_qids: Qubit IDs to exclude
         qids: Not used (for UI compatibility)
         flow_name: Flow name (auto-injected)
@@ -78,7 +120,7 @@ def full_calibration(
     # =========================================================================
 
     if mux_ids is None:
-        mux_ids = list(range(16))
+        raise ValueError("mux_ids is required; select MUX targets before running this flow")
     if exclude_qids is None:
         exclude_qids = []
 
@@ -96,16 +138,16 @@ def full_calibration(
         # Stage 0: Push current configuration to all selected MUXes
         ConfigureAll(),
         # Stage 1: Basic 1Q characterization
-        OneQubitCheck(mode="synchronized"),
+        OneQubitCheck(mode="synchronized", tasks=FULL_1Q_CHECK_TASKS),
         FilterByStatus(),  # Only proceed with successful qubits
         # Stage 2: Advanced 1Q calibration (DRAG, RB, IRB)
-        OneQubitFineTune(mode="synchronized"),
+        OneQubitFineTune(mode="synchronized", tasks=FULL_1Q_FINE_TUNE_TASKS),
         # Stage 3: Filter by X90 fidelity
         FilterByMetric(metric="x90_fidelity", threshold=fidelity_threshold),
         # Stage 4: Generate 2Q schedule with explicit direction
         GenerateCRSchedule(max_parallel_ops=max_parallel_ops, inverse=inverse),
         # Stage 5: 2Q calibration
-        TwoQubitCalibration(),
+        TwoQubitCalibration(tasks=FULL_2Q_TASKS),
     ]
 
     # =========================================================================

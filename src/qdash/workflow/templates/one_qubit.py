@@ -25,6 +25,38 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
+ONE_QUBIT_CHECK_TASKS: list[str] = [
+    "CheckRabi",
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    # "CheckOptimalReadoutFrequency",
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CheckT1",
+    "CheckT2Echo",
+    "CheckRamsey",
+]
+
+ONE_QUBIT_FINE_TUNE_TASKS: list[str] = [
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
+    "ReadoutClassification",
+    "CheckT1Average",
+    "CheckT2EchoAverage",
+    "Check1QGateCoherenceLimit",
+    "RandomizedBenchmarking",
+    "X90InterleavedRandomizedBenchmarking",
+]
+
 
 @flow(on_cancellation=[on_flow_cancellation], on_crashed=[on_flow_crash])
 def one_qubit(
@@ -43,7 +75,7 @@ def one_qubit(
     Args:
         username: User name (from UI)
         chip_id: Chip ID (from UI)
-        mux_ids: MUX IDs to calibrate (default: all 16)
+        mux_ids: MUX IDs to calibrate when using MUX-based scheduling
         exclude_qids: Qubit IDs to exclude
         qids: Qubit IDs to calibrate when mux_ids is not set
         flow_name: Flow name (auto-injected)
@@ -62,20 +94,20 @@ def one_qubit(
     elif qids is not None:
         targets = QubitTargets(qids=qids)
     else:
-        targets = MuxTargets(mux_ids=list(range(16)), exclude_qids=exclude_qids)
+        raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
     steps: list[Step]
     if check_only:
         # Basic check only
         steps = [
-            OneQubitCheck(mode="synchronized"),
+            OneQubitCheck(mode="synchronized", tasks=ONE_QUBIT_CHECK_TASKS),
         ]
     else:
         # Full 1Q calibration
         steps = [
-            OneQubitCheck(mode="synchronized"),
+            OneQubitCheck(mode="synchronized", tasks=ONE_QUBIT_CHECK_TASKS),
             FilterByStatus(),  # Only proceed with successful qubits
-            OneQubitFineTune(mode="synchronized"),
+            OneQubitFineTune(mode="synchronized", tasks=ONE_QUBIT_FINE_TUNE_TASKS),
         ]
 
     cal = CalibService(

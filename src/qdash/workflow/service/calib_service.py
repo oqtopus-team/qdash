@@ -349,6 +349,7 @@ class CalibService:
         parameter_overrides: dict[str, dict[str, Any]] | None = None,
         source_task_id: str | None = None,
         force_update_params: bool = False,
+        persist_output_parameters: bool = True,
         *,
         user_repo: UserRepository | None = None,
         lock_repo: ExecutionLockRepository | None = None,
@@ -416,6 +417,7 @@ class CalibService:
         self._parameter_overrides = parameter_overrides
         self._source_task_id = source_task_id
         self._force_update_params = force_update_params
+        self._persist_output_parameters = persist_output_parameters
 
         # Store injected repositories for later use
         self._user_repo = user_repo
@@ -606,6 +608,7 @@ class CalibService:
                 skip_execution=self.skip_execution,
                 default_run_parameters=self.default_run_parameters,
                 force_update_params=self._force_update_params,
+                persist_output_parameters=self._persist_output_parameters,
             )
 
             # Create snapshot loader if re-executing from a previous execution

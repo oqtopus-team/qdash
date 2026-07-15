@@ -110,8 +110,16 @@ export default withMermaid(
               link: "/user-guide/cryo",
             },
             {
-              text: "QDash Client",
+              text: "Python Client",
               link: "/user-guide/qdash-client",
+            },
+            {
+              text: "TypeScript Client",
+              link: "/user-guide/qdash-typescript-client",
+            },
+            {
+              text: "Agent Calibration",
+              link: "/user-guide/agent-calibration",
             },
           ],
         },

@@ -8,6 +8,12 @@
 import type { ForumPostCreateTitle } from './forumPostCreateTitle';
 import type { ForumPostCreateContentBlocksItem } from './forumPostCreateContentBlocksItem';
 import type { ForumPostCreateParentId } from './forumPostCreateParentId';
+import type { ForumPostCreateAssigneeUsername } from './forumPostCreateAssigneeUsername';
+import type { ForumPostCreateStatus } from './forumPostCreateStatus';
+import type { ForumPostCreateChipId } from './forumPostCreateChipId';
+import type { ForumPostCreateTargetType } from './forumPostCreateTargetType';
+import type { ForumPostCreateTargetId } from './forumPostCreateTargetId';
+import type { ForumPostCreateCooldownId } from './forumPostCreateCooldownId';
 
 /**
  * Request schema for creating a forum thread or reply.
@@ -32,4 +38,21 @@ export interface ForumPostCreate {
   content_blocks?: ForumPostCreateContentBlocksItem[];
   /** Parent forum post ID for replies. None for root threads. */
   parent_id?: ForumPostCreateParentId;
+  /**
+   * Operator label for root threads
+   * @maxItems 1
+   */
+  labels?: string[];
+  /** Assigned project member username */
+  assignee_username?: ForumPostCreateAssigneeUsername;
+  /** Thread workflow status */
+  status?: ForumPostCreateStatus;
+  /** Linked chip ID */
+  chip_id?: ForumPostCreateChipId;
+  /** Linked target type */
+  target_type?: ForumPostCreateTargetType;
+  /** Linked target ID */
+  target_id?: ForumPostCreateTargetId;
+  /** Linked cool-down ID */
+  cooldown_id?: ForumPostCreateCooldownId;
 }

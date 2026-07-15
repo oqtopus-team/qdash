@@ -514,14 +514,14 @@ class TaskResultService:
         qids = self._get_entity_ids(project_id, chip_id, entity_type)
         default_view = entity_type == "qubit"
 
-        all_results = self._task_result_repo.find(
-            {
-                "project_id": project_id,
-                "chip_id": chip_id,
-                "name": task,
-                "qid": {"$in": qids},
-            },
-            sort=[("end_at", SortDirection.DESCENDING)],
+        # Collapse to the latest result per qid in the DB rather than fetching
+        # every historical row for (chip, task) and deduping in Python — the
+        # latter grows linearly with history depth.
+        all_results = self._task_result_repo.find_latest_by_chip_and_qids(
+            project_id=project_id,
+            chip_id=chip_id,
+            qids=qids,
+            task_names=[task],
         )
 
         task_results = self._organize_by_qid(all_results)
@@ -547,6 +547,9 @@ class TaskResultService:
         task: str,
         entity_type: str,
         date: str,
+        *,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
     ) -> LatestTaskResultResponse:
         """Get historical task results for a specific date.
 
@@ -569,11 +572,18 @@ class TaskResultService:
 
         """
         parsed_date = parse_date(date, "YYYYMMDD")
-        start_time = start_of_day(parsed_date)
-        end_time = end_of_day(parsed_date)
+        start_time = start_at or start_of_day(parsed_date)
+        end_time = end_at or end_of_day(parsed_date)
         default_view = entity_type == "qubit"
 
-        qids = self._get_historical_entity_ids(project_id, chip_id, entity_type, date)
+        if start_at is not None or end_at is not None:
+            # A range request may end on a day that has no chip-history snapshot.
+            # The range itself is the source of truth for task-result selection;
+            # use current entity IDs for the grid skeleton and avoid failing before
+            # querying task_result_history.
+            qids = self._get_entity_ids(project_id, chip_id, entity_type)
+        else:
+            qids = self._get_historical_entity_ids(project_id, chip_id, entity_type, date)
 
         all_results = self._task_result_repo.find(
             {

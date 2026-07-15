@@ -17,6 +17,7 @@ from qdash.api.dependencies.cache import (
     clear_dependency_caches as _clear_dependency_caches,
 )
 from qdash.api.services.admin_service import AdminService
+from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
 from qdash.api.services.chip import ChipService
@@ -68,6 +69,12 @@ from qdash.repository.provenance import (
 from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.repository.tag import MongoTagRepository
 from qdash.repository.task_definition import MongoTaskDefinitionRepository
+
+
+@cached_dependency_provider
+def get_agent_session_service() -> AgentSessionService:
+    """Get the agent session service instance."""
+    return AgentSessionService()
 
 
 @cached_dependency_provider

@@ -9,12 +9,13 @@ import {
   useGetLatestQubitTaskResults,
   useGetHistoricalQubitTaskResults,
 } from "@/client/task-result/task-result";
-import { dateToDateInput } from "@/lib/utils/datetime";
 
 interface UseQubitTaskResultsOptions {
   chipId: string;
   task: string;
   selectedDate: string;
+  startAt?: string | null;
+  endAt?: string | null;
   staleTime?: number;
   keepPrevious?: boolean;
 }
@@ -23,13 +24,13 @@ export function useQubitTaskResults({
   chipId,
   task,
   selectedDate,
+  startAt,
+  endAt,
   staleTime = 30000,
   keepPrevious = false,
 }: UseQubitTaskResultsOptions) {
   const isLatest = selectedDate === "latest";
   const canFetch = Boolean(chipId && task);
-  const dateForHistorical = isLatest ? dateToDateInput(new Date()) : selectedDate;
-
   // Always call both hooks, but only enable one based on condition
   const latestResult = useGetLatestQubitTaskResults(
     { chip_id: chipId, task },
@@ -37,6 +38,7 @@ export function useQubitTaskResults({
       query: {
         staleTime,
         enabled: canFetch && isLatest,
+        retry: false,
         ...(keepPrevious && { placeholderData: keepPreviousData }),
       },
     },
@@ -46,12 +48,15 @@ export function useQubitTaskResults({
     {
       chip_id: chipId,
       task,
-      date: dateForHistorical,
+      date: selectedDate === "latest" ? "" : selectedDate,
+      start_at: startAt || undefined,
+      end_at: endAt || undefined,
     },
     {
       query: {
         staleTime,
         enabled: canFetch && !isLatest,
+        retry: false,
         ...(keepPrevious && { placeholderData: keepPreviousData }),
       },
     },

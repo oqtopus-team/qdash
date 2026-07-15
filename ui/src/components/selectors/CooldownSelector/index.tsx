@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import Select, { type SingleValue } from "react-select";
 
@@ -20,6 +20,8 @@ interface CooldownSelectorProps {
   selectedCooldownId?: string | null;
   /** Called with the picked cool-down. */
   onPick: (cooldown: CooldownResponse) => void;
+  /** Automatically pick the active cool-down when no value is selected. */
+  autoPickActive?: boolean;
   placeholder?: string;
 }
 
@@ -34,6 +36,7 @@ export function CooldownSelector({
   chipId,
   selectedCooldownId,
   onPick,
+  autoPickActive = true,
   placeholder = DEFAULT_PLACEHOLDER,
 }: CooldownSelectorProps) {
   const { data, isLoading, isError } = useListCooldowns(
@@ -55,7 +58,37 @@ export function CooldownSelector({
     labels: options.map((o) => o.label),
     placeholder,
   });
-  const selectedOption = options.find((option) => option.value === selectedCooldownId) ?? null;
+  const isControlled = selectedCooldownId !== undefined;
+  const [internalSelectedCooldownId, setInternalSelectedCooldownId] = useState<string | null>(null);
+  const effectiveSelectedCooldownId = isControlled
+    ? selectedCooldownId
+    : internalSelectedCooldownId;
+  const selectedOption =
+    options.find((option) => option.value === effectiveSelectedCooldownId) ?? null;
+  const autoPickedKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isControlled) setInternalSelectedCooldownId(null);
+    autoPickedKeyRef.current = null;
+  }, [chipId, isControlled]);
+
+  useEffect(() => {
+    if (!chipId || !autoPickActive) return;
+    if (effectiveSelectedCooldownId) {
+      autoPickedKeyRef.current = chipId + ":" + effectiveSelectedCooldownId;
+      return;
+    }
+
+    const activeCooldown = cooldowns.find((cooldown) => !cooldown.ended_at);
+    if (!activeCooldown) return;
+
+    const autoPickKey = chipId + ":" + activeCooldown.cooldown_id;
+    if (autoPickedKeyRef.current === autoPickKey) return;
+
+    autoPickedKeyRef.current = autoPickKey;
+    if (!isControlled) setInternalSelectedCooldownId(activeCooldown.cooldown_id);
+    onPick(activeCooldown);
+  }, [autoPickActive, chipId, cooldowns, effectiveSelectedCooldownId, isControlled, onPick]);
 
   if (!chipId) return null;
   if (isLoading) {
@@ -74,6 +107,7 @@ export function CooldownSelector({
     if (!option) return;
     const cd = cooldowns.find((c) => c.cooldown_id === option.value);
     if (!cd) return;
+    if (!isControlled) setInternalSelectedCooldownId(cd.cooldown_id);
     onPick(cd);
   };
 

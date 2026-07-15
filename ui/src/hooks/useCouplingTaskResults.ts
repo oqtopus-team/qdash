@@ -14,14 +14,20 @@ interface UseCouplingTaskResultsOptions {
   chipId: string;
   task: string;
   selectedDate: string;
+  startAt?: string | null;
+  endAt?: string | null;
   staleTime?: number;
+  keepPrevious?: boolean;
 }
 
 export function useCouplingTaskResults({
   chipId,
   task,
   selectedDate,
+  startAt,
+  endAt,
   staleTime = 30000,
+  keepPrevious = false,
 }: UseCouplingTaskResultsOptions) {
   const isLatest = selectedDate === "latest";
   const canFetch = Boolean(chipId && task);
@@ -31,9 +37,10 @@ export function useCouplingTaskResults({
     { chip_id: chipId, task },
     {
       query: {
-        placeholderData: keepPreviousData,
         staleTime,
         enabled: canFetch && isLatest,
+        retry: false,
+        ...(keepPrevious && { placeholderData: keepPreviousData }),
       },
     },
   );
@@ -43,12 +50,15 @@ export function useCouplingTaskResults({
       chip_id: chipId,
       task,
       date: selectedDate === "latest" ? "" : selectedDate,
+      start_at: startAt || undefined,
+      end_at: endAt || undefined,
     },
     {
       query: {
-        placeholderData: keepPreviousData,
         staleTime,
         enabled: canFetch && !isLatest,
+        retry: false,
+        ...(keepPrevious && { placeholderData: keepPreviousData }),
       },
     },
   );

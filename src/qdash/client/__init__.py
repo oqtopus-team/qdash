@@ -1,5 +1,16 @@
 """QDash exporter client package."""
 
+from qdash.client.services.agent_runner import (
+    AgentCalibrationRunner,
+    AgentCampaignNode,
+    AgentCampaignOutcome,
+    AgentCampaignPlanner,
+    AgentCampaignRunner,
+    AgentPlannerDecision,
+    AgentPlannerObservation,
+    AgentSkillTransition,
+    AgentStepOutcome,
+)
 from qdash.client.services.client import QDashClient
 from qdash.client.services.config import (
     QDashConfig,
@@ -16,10 +27,19 @@ from qdash.client.services.errors import (
 )
 from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
+    AgentActionListResponse,
+    AgentActionResponse,
+    AgentCampaignCommitResponse,
+    AgentCandidateCommitResponse,
+    AgentCandidateListResponse,
+    AgentCandidateResponse,
+    AgentSessionPolicy,
+    AgentSessionResponse,
     AiReviewListResponse,
     AiReviewRunDetailResponse,
     AiReviewRunListResponse,
     CancelExecutionResponse,
+    CandidateGateResponse,
     ChipMetricsResponse,
     ChipResponse,
     CouplingResponse,
@@ -64,10 +84,28 @@ from qdash.client.services.models import (
 from . import rest
 
 __all__ = [
+    "AgentActionListResponse",
+    "AgentActionResponse",
+    "AgentCalibrationRunner",
+    "AgentCampaignCommitResponse",
+    "AgentCampaignNode",
+    "AgentCampaignOutcome",
+    "AgentCampaignPlanner",
+    "AgentCampaignRunner",
+    "AgentCandidateCommitResponse",
+    "AgentCandidateListResponse",
+    "AgentCandidateResponse",
+    "AgentPlannerDecision",
+    "AgentPlannerObservation",
+    "AgentSessionPolicy",
+    "AgentSessionResponse",
+    "AgentSkillTransition",
+    "AgentStepOutcome",
     "AiReviewListResponse",
     "AiReviewRunDetailResponse",
     "AiReviewRunListResponse",
     "CancelExecutionResponse",
+    "CandidateGateResponse",
     "ChipMetricsResponse",
     "ChipResponse",
     "CouplingResponse",

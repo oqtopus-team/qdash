@@ -83,6 +83,7 @@ class TaskExecutor:
         snapshot_loader: SnapshotParameterLoader | None = None,
         source_task_id: str | None = None,
         force_update_params: bool = False,
+        persist_output_parameters: bool = True,
     ) -> None:
         self.state_manager = state_manager
         self.execution_id = execution_id
@@ -100,6 +101,7 @@ class TaskExecutor:
             calib_dir=calib_dir,
             task_manager_id=task_manager_id,
             force_update_params=force_update_params,
+            persist_output_parameters=persist_output_parameters,
         )
         self._mux_distributor = MuxDistributor(
             state_manager=state_manager,
@@ -307,6 +309,11 @@ class TaskExecutor:
             # 3. Run
             run_result = self._run_task(task, backend, qid)
             result.r2 = run_result.r2 if run_result else None
+            if run_result is not None and run_result.r2 is not None:
+                r2_value = run_result.r2.get(qid)
+                if r2_value is not None:
+                    task_model = self.state_manager.get_task(task_name, task_type, qid)
+                    task_model.quality_metrics["r2"] = float(r2_value)
 
             if run_result is None:
                 self._complete_task(task_name, task_type, qid, "No run result")
@@ -512,8 +519,12 @@ class TaskExecutor:
                 execution_service = self._update_execution(execution_service)
 
             run_result = self._run_batch_task(task, backend, qids)
-            for result in results.values():
-                result.r2 = run_result.r2 if run_result else None
+            for qid, result in results.items():
+                r2_value = run_result.r2.get(qid) if run_result and run_result.r2 else None
+                result.r2 = {qid: r2_value} if r2_value is not None else None
+                if r2_value is not None:
+                    task_model = self.state_manager.get_task(task_name, task_type, qid)
+                    task_model.quality_metrics["r2"] = float(r2_value)
 
             if run_result is None:
                 for qid, result in results.items():
