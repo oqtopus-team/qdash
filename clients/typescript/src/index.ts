@@ -1,11 +1,14 @@
 export { QDashClient } from "./client.js";
 export type {
   CreateAgentSessionOptions,
+  DegradationTrendsOptions,
   DownloadedFile,
   ListTaskResultsOptions,
   PaginationOptions,
   PollOptions,
   QDashClientOptions,
+  RecentChangesOptions,
+  RecalibrationRecommendationsOptions,
   SubmitAgentActionOptions,
   TaskResultFigureOptions,
   TaskResultsTimeseriesOptions,
