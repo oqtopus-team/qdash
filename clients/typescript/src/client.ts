@@ -32,6 +32,11 @@ import type {
   CandidateGateResponse,
   ChipMetricsResponse,
   ChipResponse,
+  DegradationTrendsResponse,
+  ExecutionComparisonResponse,
+  ExecutionLockStatusResponse,
+  RecalibrationRecommendationResponse,
+  RecentChangesResponse,
   CouplingResponse,
   ExecuteFlowResponse,
   ExecutionResponseDetail,
@@ -117,6 +122,22 @@ export interface TaskResultFigureOptions {
 }
 
 export interface QDashClientOptions extends TransportOptions {}
+
+export interface RecentChangesOptions {
+  parameterNames?: string[];
+  withinHours?: number;
+  limit?: number;
+}
+
+export interface DegradationTrendsOptions {
+  minStreak?: number;
+  limit?: number;
+  parameterNames?: string[];
+}
+
+export interface RecalibrationRecommendationsOptions {
+  maxDepth?: number;
+}
 
 function pathPart(value: string): string {
   return encodeURIComponent(value);
@@ -646,6 +667,59 @@ export class QDashClient {
 
   async getProvenanceStats(): Promise<ProvenanceStatsResponse> {
     return this.get("/provenance/stats");
+  }
+
+  async getExecutionLockStatus(): Promise<ExecutionLockStatusResponse> {
+    return this.get("/executions/lock-status");
+  }
+
+  async compareExecutions(
+    executionIdBefore: string,
+    executionIdAfter: string,
+  ): Promise<ExecutionComparisonResponse> {
+    return this.get(
+      "/provenance/compare",
+      query({
+        execution_id_before: executionIdBefore,
+        execution_id_after: executionIdAfter,
+      }),
+    );
+  }
+
+  async getRecentChanges(
+    options: RecentChangesOptions = {},
+  ): Promise<RecentChangesResponse> {
+    return this.get(
+      "/provenance/changes",
+      query({
+        parameter_names: options.parameterNames,
+        within_hours: options.withinHours,
+        limit: options.limit,
+      }),
+    );
+  }
+
+  async getDegradationTrends(
+    options: DegradationTrendsOptions = {},
+  ): Promise<DegradationTrendsResponse> {
+    return this.get(
+      "/provenance/degradation-trends",
+      query({
+        min_streak: options.minStreak,
+        limit: options.limit,
+        parameter_names: options.parameterNames,
+      }),
+    );
+  }
+
+  async getRecalibrationRecommendations(
+    entityId: string,
+    options: RecalibrationRecommendationsOptions = {},
+  ): Promise<RecalibrationRecommendationResponse> {
+    return this.get(
+      `/provenance/recommendations/${pathPart(entityId)}`,
+      query({ max_depth: options.maxDepth }),
+    );
   }
 
   private bindGeneratedApi(

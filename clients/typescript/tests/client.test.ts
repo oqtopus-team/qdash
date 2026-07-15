@@ -72,6 +72,40 @@ describe("QDashClient", () => {
     expect(wait).toHaveBeenCalledTimes(1);
   });
 
+  it("exposes typed read-only operational provenance helpers", async () => {
+    const requests: Request[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const request = new Request(input);
+      requests.push(request);
+      if (request.url.includes("lock-status")) return jsonResponse({ lock: false });
+      if (request.url.includes("provenance/compare")) return jsonResponse({ execution_id_before: "before", execution_id_after: "after", changed_parameters: [] });
+      if (request.url.includes("degradation-trends")) return jsonResponse({ trends: [], total_count: 0 });
+      if (request.url.includes("recommendations")) return jsonResponse({ source_entity_id: "entity", recommended_tasks: [] });
+      return jsonResponse({ changes: [], total_count: 0 });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    await expect(client.getExecutionLockStatus()).resolves.toEqual({ lock: false });
+    await expect(client.compareExecutions("before", "after")).resolves.toMatchObject({ execution_id_before: "before" });
+    await expect(client.getRecentChanges({ parameterNames: ["t1"], withinHours: 24, limit: 5 })).resolves.toMatchObject({ total_count: 0 });
+    await expect(client.getDegradationTrends({ minStreak: 4 })).resolves.toMatchObject({ total_count: 0 });
+    await expect(client.getRecalibrationRecommendations("frequency:Q0:exec:task")).resolves.toMatchObject({ source_entity_id: "entity" });
+
+    expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
+      "/api/executions/lock-status",
+      "/api/provenance/compare",
+      "/api/provenance/changes",
+      "/api/provenance/degradation-trends",
+      "/api/provenance/recommendations/frequency%3AQ0%3Aexec%3Atask",
+    ]);
+    const changesUrl = new URL(requests[2]!.url);
+    expect(changesUrl.searchParams.get("parameter_names")).toBe("t1");
+    expect(changesUrl.searchParams.get("within_hours")).toBe("24");
+  });
+
   it("binds body operations from the Orval-generated API", async () => {
     let request: Request | undefined;
     const fetch = vi.fn(async (input: RequestInfo | URL) => {
