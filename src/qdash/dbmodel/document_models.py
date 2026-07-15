@@ -36,6 +36,7 @@ from qdash.dbmodel.provenance import (
 )
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
+from qdash.dbmodel.system_setting import SystemSettingDocument
 from qdash.dbmodel.tag import TagDocument
 from qdash.dbmodel.target_note import TargetNoteDocument
 from qdash.dbmodel.task import TaskDocument
@@ -59,6 +60,7 @@ def document_models() -> list[Any]:
         CouplingDocument,
         ProjectDocument,
         ProjectMembershipDocument,
+        SystemSettingDocument,
         UserDocument,
         ExecutionCounterDocument,
         ExecutionLockDocument,

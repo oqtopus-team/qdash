@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+from qdash.api.schemas.settings import Settings as SettingsResponse
 from qdash.config import Settings
 from qdash.config import get_settings as get_settings_dependency
 
@@ -14,12 +15,14 @@ logger = getLogger("uvicorn.app")
 
 @router.get(
     "/settings",
-    response_model=Settings,
+    response_model=SettingsResponse,
     summary="Get settings",
     description="Get settings from the server",
     operation_id="getSettings",
 )
-def get_settings(settings: Annotated[Settings, Depends(get_settings_dependency)]) -> Settings:
+def get_settings(
+    settings: Annotated[Settings, Depends(get_settings_dependency)],
+) -> SettingsResponse:
     """Get server configuration settings.
 
     Retrieves the current server configuration including API ports, database
@@ -33,8 +36,8 @@ def get_settings(settings: Annotated[Settings, Depends(get_settings_dependency)]
 
     Returns
     -------
-    Settings
-        Current server configuration settings
+    SettingsResponse
+        Current non-secret server configuration settings
 
     """
-    return settings
+    return SettingsResponse.model_validate(settings, from_attributes=True)

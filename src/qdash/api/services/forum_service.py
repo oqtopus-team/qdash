@@ -35,7 +35,10 @@ from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
 
 if TYPE_CHECKING:
+    from fastapi import BackgroundTasks
+
     from qdash.api.services.notification_service import NotificationService
+    from qdash.api.services.slack_notification_service import SlackNotificationService
 
 DEFAULT_FORUM_CATEGORIES = [
     {
@@ -170,9 +173,14 @@ logger = logging.getLogger(__name__)
 class ForumService:
     """Service for project forum CRUD operations."""
 
-    def __init__(self, notification_service: NotificationService | None = None) -> None:
+    def __init__(
+        self,
+        notification_service: NotificationService | None = None,
+        slack_notification_service: SlackNotificationService | None = None,
+    ) -> None:
         """Initialize the service with an optional notification dependency."""
         self._notifications = notification_service
+        self._slack_notifications = slack_notification_service
 
     @staticmethod
     def _user_id_for_username(username: str) -> str | None:
@@ -642,6 +650,7 @@ class ForumService:
         cooldown_id: str | None = None,
         assignee_username: str | None = None,
         status: str | None = "open",
+        background_tasks: BackgroundTasks | None = None,
     ) -> ForumPostResponse:
         """Create a new forum thread or reply."""
         if parent_id is None and not title:
@@ -715,6 +724,19 @@ class ForumService:
                 )
             except Exception:
                 logger.exception("Failed to create forum notifications for post %s", doc.id)
+
+        if self._slack_notifications and parent_id is None:
+            if background_tasks is not None:
+                background_tasks.add_task(
+                    self._slack_notifications.notify_forum_post,
+                    post=doc,
+                    actor_username=username,
+                )
+            else:
+                self._slack_notifications.notify_forum_post(
+                    post=doc,
+                    actor_username=username,
+                )
 
         return self._to_response(doc)
 

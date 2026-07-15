@@ -38,6 +38,8 @@ import type {
   QdashApiSchemasAdminMemberListResponse,
   QdashApiSchemasAdminProjectListResponse,
   RemoveProjectMemberAdmin200,
+  SystemSettingsResponse,
+  UpdateSystemSettingsRequest,
   UpdateUserRequest,
   UserDetailResponse,
   UserListResponse
@@ -110,6 +112,162 @@ export const useReloadConfigCaches = <TError = void,
       > => {
 
       const mutationOptions = getReloadConfigCachesMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
+ * Get mutable system settings (admin only).
+ * @summary Get system settings
+ */
+export const getAdminSystemSettings = (
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<SystemSettingsResponse>(
+      {url: `/admin/system-settings`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
+
+export const getGetAdminSystemSettingsQueryKey = () => {
+    return [
+    `/admin/system-settings`
+    ] as const;
+    }
+
+    
+export const getGetAdminSystemSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminSystemSettings>>, TError = void>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSystemSettings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminSystemSettingsQueryKey();
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminSystemSettings>>> = ({ signal }) => getAdminSystemSettings(requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminSystemSettings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetAdminSystemSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminSystemSettings>>>
+export type GetAdminSystemSettingsQueryError = void
+
+
+export function useGetAdminSystemSettings<TData = Awaited<ReturnType<typeof getAdminSystemSettings>>, TError = void>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSystemSettings>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminSystemSettings>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminSystemSettings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetAdminSystemSettings<TData = Awaited<ReturnType<typeof getAdminSystemSettings>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSystemSettings>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminSystemSettings>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminSystemSettings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetAdminSystemSettings<TData = Awaited<ReturnType<typeof getAdminSystemSettings>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSystemSettings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+/**
+ * @summary Get system settings
+ */
+
+export function useGetAdminSystemSettings<TData = Awaited<ReturnType<typeof getAdminSystemSettings>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSystemSettings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+
+  const queryOptions = getGetAdminSystemSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+/**
+ * Update mutable system settings (admin only).
+ * @summary Update system settings
+ */
+export const updateAdminSystemSettings = (
+    updateSystemSettingsRequest: UpdateSystemSettingsRequest,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<SystemSettingsResponse>(
+      {url: `/admin/system-settings`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: updateSystemSettingsRequest
+    },
+      options);
+    }
+  
+
+
+export const getUpdateAdminSystemSettingsMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminSystemSettings>>, TError,{data: UpdateSystemSettingsRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminSystemSettings>>, TError,{data: UpdateSystemSettingsRequest}, TContext> => {
+
+const mutationKey = ['updateAdminSystemSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminSystemSettings>>, {data: UpdateSystemSettingsRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAdminSystemSettings(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminSystemSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminSystemSettings>>>
+    export type UpdateAdminSystemSettingsMutationBody = UpdateSystemSettingsRequest
+    export type UpdateAdminSystemSettingsMutationError = void | HTTPValidationError
+
+    /**
+ * @summary Update system settings
+ */
+export const useUpdateAdminSystemSettings = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminSystemSettings>>, TError,{data: UpdateSystemSettingsRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminSystemSettings>>,
+        TError,
+        {data: UpdateSystemSettingsRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateAdminSystemSettingsMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

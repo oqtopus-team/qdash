@@ -355,6 +355,84 @@
         ]
       }
     },
+    "/admin/system-settings": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get system settings",
+        "description": "Get mutable system settings (admin only).",
+        "operationId": "getAdminSystemSettings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemSettingsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update system settings",
+        "description": "Update mutable system settings (admin only).",
+        "operationId": "updateAdminSystemSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSystemSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemSettingsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/admin/users": {
       "get": {
         "tags": [
@@ -26443,11 +26521,6 @@
             "type": "string",
             "title": "Prefect Api Url"
           },
-          "slack_bot_token": {
-            "type": "string",
-            "title": "Slack Bot Token",
-            "default": ""
-          },
           "slack_channel_id": {
             "type": "string",
             "title": "Slack Channel Id",
@@ -26516,7 +26589,6 @@
             "default": false
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "env",
@@ -26612,6 +26684,23 @@
         ],
         "title": "SystemRole",
         "description": "System-level role for a user.\n\nADMIN: Full system access, can manage all users and projects.\nUSER: Regular user."
+      },
+      "SystemSettingsResponse": {
+        "properties": {
+          "slack_forum_notifications_enabled": {
+            "type": "boolean",
+            "title": "Slack Forum Notifications Enabled",
+            "default": false
+          },
+          "slack_webhook_configured": {
+            "type": "boolean",
+            "title": "Slack Webhook Configured",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "SystemSettingsResponse",
+        "description": "System-wide runtime settings visible to administrators."
       },
       "Tag": {
         "properties": {
@@ -28257,6 +28346,20 @@
         ],
         "title": "UpdateScheduleResponse",
         "description": "Response for updating a schedule."
+      },
+      "UpdateSystemSettingsRequest": {
+        "properties": {
+          "slack_forum_notifications_enabled": {
+            "type": "boolean",
+            "title": "Slack Forum Notifications Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slack_forum_notifications_enabled"
+        ],
+        "title": "UpdateSystemSettingsRequest",
+        "description": "Request to update system-wide runtime settings."
       },
       "UpdateUserRequest": {
         "properties": {
