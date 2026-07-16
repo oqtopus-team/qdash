@@ -96,6 +96,11 @@ class QubexBackend(BaseBackend):
                 calib_note_path=self._config.get(
                     "note_path", str(qubex_paths.default_calib_note_path)
                 ),
+                **(
+                    {"configuration_mode": self._config["configuration_mode"]}
+                    if "configuration_mode" in self._config
+                    else {}
+                ),
             )
             self._exp.connect()
 
