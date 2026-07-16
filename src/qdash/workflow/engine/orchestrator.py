@@ -226,6 +226,9 @@ class CalibOrchestrator:
         if config.muxes is not None:
             session_config["muxes"] = config.muxes
 
+        if config.configuration_mode is not None:
+            session_config["configuration_mode"] = config.configuration_mode
+
         backend = create_backend(
             backend=config.backend_name,
             config=session_config,

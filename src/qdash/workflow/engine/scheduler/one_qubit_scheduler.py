@@ -131,7 +131,12 @@ class OneQubitScheduler:
                 raise FileNotFoundError(msg)
 
             yaml_data = yaml.safe_load(wiring_path.read_text())
-            self._wiring_config = yaml_data[self.chip_id]
+            if self.chip_id in yaml_data:
+                self._wiring_config = yaml_data[self.chip_id]
+            else:
+                # New YAML format: top-level keys are group names (e.g., "A2"),
+                # each mapping to a list of MUX configs. Flatten all lists.
+                self._wiring_config = [entry for group in yaml_data.values() for entry in group]
 
         return self._wiring_config
 
