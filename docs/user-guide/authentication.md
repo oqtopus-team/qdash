@@ -165,28 +165,6 @@ curl -X GET "https://your-qdash-instance/auth/me" \
 }
 ```
 
-## Admin Panel
-
-Administrators have access to the Admin Panel (`/admin`), which provides system-wide configuration. The **System** tab includes a **Notifications** card for controlling Slack webhook notifications.
-
-### Slack Forum Notifications
-
-When `SLACK_WEBHOOK_URL` is set in `.env`, the Notifications card shows a toggle to enable or disable Slack notifications for new forum threads. The toggle is disabled when no webhook URL is configured.
-
-When enabled, QDash sends a Slack message whenever a user creates a new root forum thread. Replies and AI-generated replies are not notified. Each notification includes:
-
-| Field | Content |
-| ----- | ------- |
-| Title | Thread number and title with a link to the post |
-| Author | Username of the poster |
-| Environment | Value of the `ENV` variable |
-| Chip | Chip ID associated with the thread |
-| Target | Target type and ID if set |
-| Category | Thread category |
-| Excerpt | First few lines of the post body, up to 200 characters |
-
-Notification failures are logged and do not affect post creation.
-
 ## Permission Summary
 
 | Action | User | Admin |
@@ -196,4 +174,3 @@ Notification failures are logged and do not affect post creation.
 | Change own password | Yes | Yes |
 | Register new users | No | Yes |
 | Reset any user's password | No | Yes |
-| Configure system notifications | No | Yes |

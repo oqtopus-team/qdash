@@ -17,5 +17,5 @@ def test_get_settings_excludes_slack_secrets(test_client, init_db) -> None:
     assert response.status_code == 200
     data = response.json()
     assert "slack_bot_token" not in data
-    assert "slack_webhook_url" not in data
+    assert "slack_forum_notification" not in data
     assert "slack_channel_id" in data

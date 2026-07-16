@@ -7,7 +7,6 @@ from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
-from qdash.dbmodel.system_setting import SystemSettingDocument
 from qdash.dbmodel.user import UserDocument
 
 
@@ -102,44 +101,6 @@ class TestAdminUsersEndpoints:
         """Unauthenticated requests are rejected."""
         response = test_client.post("/admin/config/reload")
         assert response.status_code == 401
-
-    def test_get_system_settings_as_admin(self, test_client, admin_user, admin_headers):
-        """Admin can inspect system settings without exposing the webhook URL."""
-        response = test_client.get("/admin/system-settings", headers=admin_headers)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data == {
-            "slack_forum_notifications_enabled": False,
-            "slack_webhook_configured": False,
-        }
-        assert "slack_webhook_url" not in data
-
-    def test_update_system_settings_as_admin(self, test_client, admin_user, admin_headers):
-        """Admin can update system-wide Slack forum notification settings."""
-        response = test_client.put(
-            "/admin/system-settings",
-            headers=admin_headers,
-            json={"slack_forum_notifications_enabled": True},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["slack_forum_notifications_enabled"] is True
-        stored = SystemSettingDocument.get_singleton()
-        assert stored.slack_forum_notifications_enabled is True
-
-    def test_update_system_settings_requires_admin(
-        self, test_client, admin_user, regular_user, user_headers
-    ):
-        """Regular users cannot update system settings."""
-        response = test_client.put(
-            "/admin/system-settings",
-            headers=user_headers,
-            json={"slack_forum_notifications_enabled": True},
-        )
-
-        assert response.status_code == 403
 
     def test_get_user_details(self, test_client, admin_user, regular_user, admin_headers):
         """Admin can get user details."""

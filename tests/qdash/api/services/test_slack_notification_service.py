@@ -1,21 +1,32 @@
-"""Tests for Slack notification service."""
+"""Tests for Slack notification service (chat.postMessage variant)."""
 
 from __future__ import annotations
 
-import httpx
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+from slack_sdk.errors import SlackApiError
 
 from qdash.api.services.slack_notification_service import SlackNotificationService
 from qdash.config import Settings
 from qdash.dbmodel.forum import ForumPostDocument
-from qdash.dbmodel.system_setting import SystemSettingDocument
+from qdash.dbmodel.slack_forum_thread import SlackForumThreadDocument
 
 
-def _settings(webhook_url: str = "https://hooks.slack.test/services/T000/B000/secret") -> Settings:
+def _settings(
+    *,
+    enabled: bool = True,
+    token: str = "xoxb-test-token",  # noqa: S107
+    channel_id: str = "C0TESTCHAN",
+) -> Settings:
     return Settings.model_construct(
         env="test",
         client_url="http://localhost:3000",
         prefect_api_url="http://localhost:4200/api",
-        slack_webhook_url=webhook_url,
+        slack_bot_token=token,
+        slack_channel_id="test-channel",
+        slack_forum_notification=enabled,
+        slack_forum_channel_id=channel_id,
         postgres_data_path="/tmp/postgres",
         mongo_data_path="/tmp/mongo",
         calib_data_path="/tmp/calib",
@@ -38,93 +49,250 @@ def _post(**overrides: object) -> ForumPostDocument:
     return ForumPostDocument(**data)
 
 
-def _block_texts(payload: dict[str, object]) -> str:
-    blocks = payload["blocks"]
-    assert isinstance(blocks, list)
-    return "\n".join(str(block) for block in blocks)
+def _mock_client(ts: str = "111.222", channel: str = "C0TESTCHAN") -> MagicMock:
+    """Return a mock WebClient that simulates a successful chat_postMessage call."""
+    client = MagicMock()
+    response = MagicMock()
+    response.__getitem__ = lambda self, key: ts if key == "ts" else channel
+    client.chat_postMessage.return_value = response
+    return client
 
 
-def test_build_forum_post_payload_contains_expected_fields(init_db) -> None:
+# ---------------------------------------------------------------------------
+# is_enabled
+# ---------------------------------------------------------------------------
+
+
+def test_is_enabled_returns_true_when_all_set(init_db) -> None:
     service = SlackNotificationService(settings=_settings())
-
-    payload = service._build_forum_post_payload(post=_post(), actor_username="alice")
-
-    text = _block_texts(payload)
-    assert payload["text"] == "New forum thread: #7 T1 drift on Q12"
-    assert "#7 T1 drift on Q12" in text
-    assert "alice" in text
-    assert "test" in text
-    assert "chip-a" in text
-    assert "qubit:Q12" in text
-    assert "Line one" in text
-    assert "@qdash" not in text
+    assert service.is_enabled() is True
 
 
-def test_notify_forum_post_skips_when_webhook_url_missing(init_db, monkeypatch) -> None:
-    calls: list[dict[str, object]] = []
-    SystemSettingDocument.set_slack_forum_notifications_enabled(True)
-    monkeypatch.setattr("qdash.api.services.slack_notification_service.httpx.post", calls.append)
-    service = SlackNotificationService(settings=_settings(webhook_url=""))
-
-    service.notify_forum_post(post=_post(), actor_username="alice")
-
-    assert calls == []
+def test_is_enabled_returns_false_when_flag_false(init_db) -> None:
+    service = SlackNotificationService(settings=_settings(enabled=False))
+    assert service.is_enabled() is False
 
 
-def test_notify_forum_post_skips_when_flag_disabled(init_db, monkeypatch) -> None:
-    calls: list[dict[str, object]] = []
-    monkeypatch.setattr("qdash.api.services.slack_notification_service.httpx.post", calls.append)
+def test_is_enabled_returns_false_when_token_missing(init_db) -> None:
+    service = SlackNotificationService(settings=_settings(token=""))
+    assert service.is_enabled() is False
+
+
+def test_is_enabled_returns_false_when_channel_missing(init_db) -> None:
+    service = SlackNotificationService(settings=_settings(channel_id=""))
+    assert service.is_enabled() is False
+
+
+# ---------------------------------------------------------------------------
+# notify_forum_post
+# ---------------------------------------------------------------------------
+
+
+def test_notify_forum_post_skips_when_disabled(init_db) -> None:
+    service = SlackNotificationService(settings=_settings(enabled=False))
+    mock_client = _mock_client()
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_post(post=_post(), actor_username="alice")
+    mock_client.chat_postMessage.assert_not_called()
+
+
+def test_notify_forum_post_skips_when_token_missing(init_db) -> None:
+    service = SlackNotificationService(settings=_settings(token=""))
+    mock_client = _mock_client()
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_post(post=_post(), actor_username="alice")
+    mock_client.chat_postMessage.assert_not_called()
+
+
+def test_notify_forum_post_skips_when_channel_missing(init_db) -> None:
+    service = SlackNotificationService(settings=_settings(channel_id=""))
+    mock_client = _mock_client()
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_post(post=_post(), actor_username="alice")
+    mock_client.chat_postMessage.assert_not_called()
+
+
+def test_notify_forum_post_skips_replies(init_db) -> None:
     service = SlackNotificationService(settings=_settings())
+    mock_client = _mock_client()
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_post(post=_post(parent_id="root-id"), actor_username="alice")
+        service.notify_forum_post(post=_post(is_ai_reply=True), actor_username="qdash")
+    mock_client.chat_postMessage.assert_not_called()
 
-    service.notify_forum_post(post=_post(), actor_username="alice")
 
-    assert calls == []
-
-
-def test_notify_forum_post_sends_when_enabled(init_db, monkeypatch) -> None:
-    calls: list[dict[str, object]] = []
-
-    class _Response:
-        def raise_for_status(self) -> None:
-            return None
-
-    def fake_post(url: str, *, json: dict[str, object], timeout: float) -> _Response:
-        calls.append({"url": url, "json": json, "timeout": timeout})
-        return _Response()
-
-    SystemSettingDocument.set_slack_forum_notifications_enabled(True)
-    monkeypatch.setattr("qdash.api.services.slack_notification_service.httpx.post", fake_post)
+def test_notify_forum_post_sends_green_message_and_records_ts(init_db) -> None:
     service = SlackNotificationService(settings=_settings())
+    ts = "123456789.000100"
+    channel = "C0TESTCHAN"
+    mock_client = MagicMock()
+    mock_response: dict[str, Any] = {"ts": ts, "channel": channel}
+    mock_client.chat_postMessage.return_value = mock_response
+    post = _post()
 
-    service.notify_forum_post(post=_post(), actor_username="alice")
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_post(post=post, actor_username="alice")
 
-    assert calls == [
-        {
-            "url": "https://hooks.slack.test/services/T000/B000/secret",
-            "json": service._build_forum_post_payload(post=_post(), actor_username="alice"),
-            "timeout": 5.0,
-        }
-    ]
+    call_kwargs = mock_client.chat_postMessage.call_args.kwargs
+    assert call_kwargs["channel"] == "C0TESTCHAN"
+    attachments = call_kwargs["attachments"]
+    assert len(attachments) == 1
+    assert attachments[0]["color"] == "#2eb886"
+    assert "alice" in str(attachments[0]["blocks"])
+
+    # Check DB record was created
+    record = SlackForumThreadDocument.find_by_post_id(str(post.id))
+    assert record is not None
+    assert record.message_ts == ts
+    assert record.channel_id == channel
 
 
-def test_notify_forum_post_swallows_httpx_errors(init_db, monkeypatch) -> None:
-    def fail_post(url: str, *, json: dict[str, object], timeout: float) -> httpx.Response:
-        raise httpx.ConnectError("network down")
-
-    SystemSettingDocument.set_slack_forum_notifications_enabled(True)
-    monkeypatch.setattr("qdash.api.services.slack_notification_service.httpx.post", fail_post)
+def test_notify_forum_post_swallows_slack_api_error(init_db) -> None:
     service = SlackNotificationService(settings=_settings())
+    mock_client = MagicMock()
+    mock_client.chat_postMessage.side_effect = SlackApiError(
+        "channel_not_found",
+        {"error": "channel_not_found"},
+    )
+    with patch.object(service, "_client", return_value=mock_client):
+        # Must not raise
+        service.notify_forum_post(post=_post(), actor_username="alice")
 
-    service.notify_forum_post(post=_post(), actor_username="alice")
 
-
-def test_notify_forum_post_ignores_replies_and_ai_replies(init_db, monkeypatch) -> None:
-    calls: list[dict[str, object]] = []
-    SystemSettingDocument.set_slack_forum_notifications_enabled(True)
-    monkeypatch.setattr("qdash.api.services.slack_notification_service.httpx.post", calls.append)
+def test_notify_forum_post_swallows_generic_exception(init_db) -> None:
     service = SlackNotificationService(settings=_settings())
+    mock_client = MagicMock()
+    mock_client.chat_postMessage.side_effect = RuntimeError("network down")
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_post(post=_post(), actor_username="alice")
 
-    service.notify_forum_post(post=_post(parent_id="root-id"), actor_username="alice")
-    service.notify_forum_post(post=_post(is_ai_reply=True), actor_username="qdash")
 
-    assert calls == []
+# ---------------------------------------------------------------------------
+# notify_forum_reply
+# ---------------------------------------------------------------------------
+
+
+def test_notify_forum_reply_skips_when_no_thread_record(init_db) -> None:
+    service = SlackNotificationService(settings=_settings())
+    mock_client = _mock_client()
+    reply = _post(parent_id="nonexistent-root")
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_reply(
+            reply_post=reply,
+            root_post_id="nonexistent-root",
+            actor_username="bob",
+        )
+    mock_client.chat_postMessage.assert_not_called()
+
+
+def test_notify_forum_reply_sends_threaded_message_when_record_exists(init_db) -> None:
+    # First, create a thread record
+    root = _post()
+    root.insert()
+    SlackForumThreadDocument.record(
+        post_id=str(root.id),
+        project_id="project-1",
+        channel_id="C0ROOTCHAN",
+        message_ts="root.ts.000",
+    )
+
+    service = SlackNotificationService(settings=_settings())
+    mock_client = MagicMock()
+    mock_client.chat_postMessage.return_value = {"ts": "reply.ts", "channel": "C0ROOTCHAN"}
+    reply = _post(parent_id=str(root.id), content="My reply content")
+
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_reply(
+            reply_post=reply,
+            root_post_id=str(root.id),
+            actor_username="bob",
+        )
+
+    call_kwargs = mock_client.chat_postMessage.call_args.kwargs
+    assert call_kwargs["channel"] == "C0ROOTCHAN"
+    assert call_kwargs["thread_ts"] == "root.ts.000"
+    assert "bob" in str(call_kwargs)
+
+
+def test_notify_forum_reply_skips_when_disabled(init_db) -> None:
+    service = SlackNotificationService(settings=_settings(enabled=False))
+    mock_client = _mock_client()
+    reply = _post(parent_id="some-root-id")
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_reply(
+            reply_post=reply,
+            root_post_id="some-root-id",
+            actor_username="bob",
+        )
+    mock_client.chat_postMessage.assert_not_called()
+
+
+def test_notify_forum_reply_swallows_exceptions(init_db) -> None:
+    # Create thread record
+    root = _post()
+    root.insert()
+    SlackForumThreadDocument.record(
+        post_id=str(root.id),
+        project_id="project-1",
+        channel_id="C0ROOTCHAN",
+        message_ts="root.ts.000",
+    )
+
+    service = SlackNotificationService(settings=_settings())
+    mock_client = MagicMock()
+    mock_client.chat_postMessage.side_effect = RuntimeError("boom")
+    reply = _post(parent_id=str(root.id))
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_reply(
+            reply_post=reply,
+            root_post_id=str(root.id),
+            actor_username="bob",
+        )
+
+
+# ---------------------------------------------------------------------------
+# notify_forum_status_change
+# ---------------------------------------------------------------------------
+
+
+def test_notify_forum_status_change_closed_uses_red(init_db) -> None:
+    service = SlackNotificationService(settings=_settings())
+    mock_client = MagicMock()
+    mock_client.chat_postMessage.return_value = {"ts": "ts.001", "channel": "C0TESTCHAN"}
+    post = _post()
+
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_status_change(post=post, actor_username="alice", status="closed")
+
+    call_kwargs = mock_client.chat_postMessage.call_args.kwargs
+    assert call_kwargs["attachments"][0]["color"] == "#e01e5a"
+    assert "thread_ts" not in call_kwargs  # top-level message, no thread
+
+
+def test_notify_forum_status_change_open_uses_green(init_db) -> None:
+    service = SlackNotificationService(settings=_settings())
+    mock_client = MagicMock()
+    mock_client.chat_postMessage.return_value = {"ts": "ts.002", "channel": "C0TESTCHAN"}
+    post = _post()
+
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_status_change(post=post, actor_username="alice", status="open")
+
+    call_kwargs = mock_client.chat_postMessage.call_args.kwargs
+    assert call_kwargs["attachments"][0]["color"] == "#2eb886"
+
+
+def test_notify_forum_status_change_skips_when_disabled(init_db) -> None:
+    service = SlackNotificationService(settings=_settings(enabled=False))
+    mock_client = _mock_client()
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_status_change(post=_post(), actor_username="alice", status="closed")
+    mock_client.chat_postMessage.assert_not_called()
+
+
+def test_notify_forum_status_change_swallows_exceptions(init_db) -> None:
+    service = SlackNotificationService(settings=_settings())
+    mock_client = MagicMock()
+    mock_client.chat_postMessage.side_effect = RuntimeError("oops")
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_status_change(post=_post(), actor_username="alice", status="closed")

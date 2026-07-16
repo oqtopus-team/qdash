@@ -725,18 +725,33 @@ class ForumService:
             except Exception:
                 logger.exception("Failed to create forum notifications for post %s", doc.id)
 
-        if self._slack_notifications and parent_id is None:
-            if background_tasks is not None:
-                background_tasks.add_task(
-                    self._slack_notifications.notify_forum_post,
-                    post=doc,
-                    actor_username=username,
-                )
+        if self._slack_notifications:
+            if parent_id is None:
+                if background_tasks is not None:
+                    background_tasks.add_task(
+                        self._slack_notifications.notify_forum_post,
+                        post=doc,
+                        actor_username=username,
+                    )
+                else:
+                    self._slack_notifications.notify_forum_post(
+                        post=doc,
+                        actor_username=username,
+                    )
             else:
-                self._slack_notifications.notify_forum_post(
-                    post=doc,
-                    actor_username=username,
-                )
+                if background_tasks is not None:
+                    background_tasks.add_task(
+                        self._slack_notifications.notify_forum_reply,
+                        reply_post=doc,
+                        root_post_id=parent_id,
+                        actor_username=username,
+                    )
+                else:
+                    self._slack_notifications.notify_forum_reply(
+                        reply_post=doc,
+                        root_post_id=parent_id,
+                        actor_username=username,
+                    )
 
         return self._to_response(doc)
 
@@ -833,6 +848,14 @@ class ForumService:
             is_ai_reply=True,
         )
         ai_doc.insert()
+
+        if self._slack_notifications:
+            self._slack_notifications.notify_forum_reply(
+                reply_post=ai_doc,
+                root_post_id=parent_id,
+                actor_username="qdash",
+            )
+
         return self._to_response(ai_doc)
 
     @staticmethod
@@ -1009,6 +1032,7 @@ class ForumService:
         post_id: str,
         username: str,
         role: ProjectRole | None,
+        background_tasks: BackgroundTasks | None = None,
     ) -> SuccessResponse:
         """Close a forum thread."""
         doc = ForumPostDocument.find_one(
@@ -1030,6 +1054,22 @@ class ForumService:
         doc.status = "resolved"
         doc.system_info.update_time()
         doc.save()
+
+        if self._slack_notifications:
+            if background_tasks is not None:
+                background_tasks.add_task(
+                    self._slack_notifications.notify_forum_status_change,
+                    post=doc,
+                    actor_username=username,
+                    status="closed",
+                )
+            else:
+                self._slack_notifications.notify_forum_status_change(
+                    post=doc,
+                    actor_username=username,
+                    status="closed",
+                )
+
         return SuccessResponse(message="Forum thread resolved")
 
     def reopen_post(
@@ -1039,6 +1079,7 @@ class ForumService:
         post_id: str,
         username: str,
         role: ProjectRole | None,
+        background_tasks: BackgroundTasks | None = None,
     ) -> SuccessResponse:
         """Reopen a forum thread."""
         doc = ForumPostDocument.find_one(
@@ -1060,4 +1101,20 @@ class ForumService:
         doc.status = "open"
         doc.system_info.update_time()
         doc.save()
+
+        if self._slack_notifications:
+            if background_tasks is not None:
+                background_tasks.add_task(
+                    self._slack_notifications.notify_forum_status_change,
+                    post=doc,
+                    actor_username=username,
+                    status="open",
+                )
+            else:
+                self._slack_notifications.notify_forum_status_change(
+                    post=doc,
+                    actor_username=username,
+                    status="open",
+                )
+
         return SuccessResponse(message="Forum thread reopened")

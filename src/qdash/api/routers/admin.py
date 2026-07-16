@@ -14,8 +14,6 @@ from qdash.api.schemas.admin import (
     MemberItem,
     MemberListResponse,
     ProjectListResponse,
-    SystemSettingsResponse,
-    UpdateSystemSettingsRequest,
     UpdateUserRequest,
     UserDetailResponse,
     UserListResponse,
@@ -24,10 +22,7 @@ from qdash.api.schemas.auth import User
 from qdash.api.services.admin_service import AdminService
 from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.metrics import clear_metrics_config_cache
-from qdash.config import Settings
-from qdash.config import get_settings as get_settings_dependency
 from qdash.copilot.config import clear_copilot_config_cache
-from qdash.dbmodel.system_setting import SystemSettingDocument
 
 logger = logging.getLogger(__name__)
 
@@ -61,47 +56,6 @@ def reload_config_caches(
             "app/backend.yaml",
             "app/workflow.yaml",
         ]
-    )
-
-
-@router.get(
-    "/system-settings",
-    response_model=SystemSettingsResponse,
-    summary="Get system settings",
-    operation_id="getAdminSystemSettings",
-)
-def get_system_settings(
-    admin: Annotated[User, Depends(get_admin_user)],
-    settings: Annotated[Settings, Depends(get_settings_dependency)],
-) -> SystemSettingsResponse:
-    """Get mutable system settings (admin only)."""
-    logger.debug(f"Admin {admin.username} reading system settings")
-    system_setting = SystemSettingDocument.get_singleton()
-    return SystemSettingsResponse(
-        slack_forum_notifications_enabled=system_setting.slack_forum_notifications_enabled,
-        slack_webhook_configured=bool(settings.slack_webhook_url),
-    )
-
-
-@router.put(
-    "/system-settings",
-    response_model=SystemSettingsResponse,
-    summary="Update system settings",
-    operation_id="updateAdminSystemSettings",
-)
-def update_system_settings(
-    request: UpdateSystemSettingsRequest,
-    admin: Annotated[User, Depends(get_admin_user)],
-    settings: Annotated[Settings, Depends(get_settings_dependency)],
-) -> SystemSettingsResponse:
-    """Update mutable system settings (admin only)."""
-    logger.debug(f"Admin {admin.username} updating system settings")
-    system_setting = SystemSettingDocument.set_slack_forum_notifications_enabled(
-        request.slack_forum_notifications_enabled
-    )
-    return SystemSettingsResponse(
-        slack_forum_notifications_enabled=system_setting.slack_forum_notifications_enabled,
-        slack_webhook_configured=bool(settings.slack_webhook_url),
     )
 
 

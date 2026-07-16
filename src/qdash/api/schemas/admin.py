@@ -80,19 +80,6 @@ class ConfigReloadResponse(BaseModel):
     cleared: list[str] = Field(default_factory=list)
 
 
-class SystemSettingsResponse(BaseModel):
-    """System-wide runtime settings visible to administrators."""
-
-    slack_forum_notifications_enabled: bool = False
-    slack_webhook_configured: bool = False
-
-
-class UpdateSystemSettingsRequest(BaseModel):
-    """Request to update system-wide runtime settings."""
-
-    slack_forum_notifications_enabled: bool
-
-
 # --- Member Management ---
 
 

@@ -487,6 +487,7 @@ def delete_forum_post(
 )
 def close_forum_post(
     post_id: str,
+    background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> SuccessResponse:
@@ -496,6 +497,7 @@ def close_forum_post(
         post_id=post_id,
         username=ctx.user.username,
         role=ctx.role,
+        background_tasks=background_tasks,
     )
 
 
@@ -507,6 +509,7 @@ def close_forum_post(
 )
 def reopen_forum_post(
     post_id: str,
+    background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> SuccessResponse:
@@ -516,4 +519,5 @@ def reopen_forum_post(
         post_id=post_id,
         username=ctx.user.username,
         role=ctx.role,
+        background_tasks=background_tasks,
     )
