@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -42,6 +43,9 @@ class CalibConfig:
     skip_execution: bool = False  # Skip Execution creation (for wrapper/parent sessions)
     force_update_params: bool = False  # Force backend params update regardless of R² validation
     persist_output_parameters: bool = True  # Write task outputs to calibration/backend stores
+    configuration_mode: str | None = field(
+        default_factory=lambda: os.environ.get("QUBEX_CONFIGURATION_MODE")
+    )
     default_run_parameters: dict[str, Any] = field(
         default_factory=dict
     )  # Default run parameters for all tasks (e.g., {"interval": {"value": "300 * 1024", "value_type": "int"}})
