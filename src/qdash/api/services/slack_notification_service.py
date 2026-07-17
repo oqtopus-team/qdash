@@ -19,9 +19,15 @@ logger = logging.getLogger(__name__)
 MAX_EXCERPT_CHARS = 200
 MENTION_PATTERN = re.compile(r"@qdash\b", re.IGNORECASE)
 
-# Colour constants for Slack attachment colour bars
-_COLOR_GREEN = "#2eb886"
-_COLOR_RED = "#e01e5a"
+# Forum workflow status labels and badge colours; keep in sync with the
+# status badges in ui/src/components/features/forum/categories.tsx and the
+# light-theme palette in ui/src/app/globals.css.
+_STATUS_STYLES: dict[str, tuple[str, str]] = {
+    "open": ("Open", "#3a5ccc"),
+    "investigating": ("Investigating", "#d97706"),
+    "identified": ("Identified", "#e21331"),
+    "resolved": ("Resolved", "#18794e"),
+}
 
 
 def _excerpt(content: str, *, limit: int = MAX_EXCERPT_CHARS) -> str:
@@ -89,11 +95,12 @@ class SlackNotificationService:
             },
         ]
 
+        _, color = _STATUS_STYLES.get(post.status or "open", _STATUS_STYLES["open"])
         try:
             response = self._client().chat_postMessage(
                 channel=self._settings.slack_forum_channel_id,
                 text=text,
-                attachments=[{"color": _COLOR_GREEN, "blocks": blocks}],
+                attachments=[{"color": color, "blocks": blocks}],
             )
             SlackForumThreadDocument.record(
                 post_id=str(post.id),
@@ -152,12 +159,12 @@ class SlackNotificationService:
         actor_username: str,
         status: str,
     ) -> None:
-        """Send a Slack notification for forum thread open/close status change.
+        """Send a Slack notification for a forum thread status change.
 
         Args:
             post: The forum post document.
             actor_username: The username of the actor changing the status.
-            status: Either "closed" or "open" (reopen).
+            status: New workflow status (open/investigating/identified/resolved).
         """
         if not self.is_enabled():
             return
@@ -167,21 +174,16 @@ class SlackNotificationService:
         url = self._forum_post_url(post)
         title_link = f"<{url}|{title_text}>" if url else title_text
 
-        if status == "closed":
-            action_label = "closed"
-            color = _COLOR_RED
-        else:
-            action_label = "reopened"
-            color = _COLOR_GREEN
+        label, color = _STATUS_STYLES.get(status, (status, "#9ca3af"))
 
-        text = f"Forum thread {action_label}: {title_text}"
+        text = f"Forum thread status changed to {label}: {title_text}"
         blocks = [
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
                     "text": (
-                        f"*Forum thread {action_label}*\n"
+                        f"*Status changed to {label}*\n"
                         f"*Thread:* {title_link}\n"
                         f"*By:* {actor_username}\n"
                         f"*Environment:* {self._settings.env}"

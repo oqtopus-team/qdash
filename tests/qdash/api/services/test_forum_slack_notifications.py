@@ -163,7 +163,7 @@ def test_close_post_notifies_slack_status_change(init_db) -> None:
     )
 
     assert len(slack.status_calls) == 1
-    assert slack.status_calls[0]["status"] == "closed"
+    assert slack.status_calls[0]["status"] == "resolved"
     assert slack.status_calls[0]["actor_username"] == "alice"
 
 
@@ -199,3 +199,67 @@ def test_reopen_post_notifies_slack_status_change(init_db) -> None:
     assert len(slack.status_calls) == 1
     assert slack.status_calls[0]["status"] == "open"
     assert slack.status_calls[0]["actor_username"] == "alice"
+
+
+def test_update_post_status_change_notifies_slack(init_db) -> None:
+    from qdash.datamodel.project import ProjectRole
+
+    slack = _SlackRecorder()
+    service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
+
+    root = service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+    slack.post_calls.clear()
+
+    service.update_post(
+        project_id="project-1",
+        post_id=root.id,
+        username="alice",
+        category=None,
+        title=None,
+        content="Root content",
+        status="resolved",
+        update_status_context=True,
+        role=ProjectRole.OWNER,
+    )
+
+    assert len(slack.status_calls) == 1
+    assert slack.status_calls[0]["status"] == "resolved"
+    assert slack.status_calls[0]["actor_username"] == "alice"
+
+
+def test_update_post_same_status_does_not_notify_slack(init_db) -> None:
+    from qdash.datamodel.project import ProjectRole
+
+    slack = _SlackRecorder()
+    service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
+
+    root = service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+    slack.post_calls.clear()
+
+    service.update_post(
+        project_id="project-1",
+        post_id=root.id,
+        username="alice",
+        category=None,
+        title=None,
+        content="Edited content",
+        status="open",
+        update_status_context=True,
+        role=ProjectRole.OWNER,
+    )
+
+    assert slack.status_calls == []

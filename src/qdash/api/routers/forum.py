@@ -423,6 +423,7 @@ async def forum_ai_reply_stream(
 def update_forum_post(
     post_id: str,
     body: ForumPostUpdate,
+    background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> ForumPostResponse:
@@ -456,6 +457,7 @@ def update_forum_post(
         update_assignee_context=update_assignee_context,
         update_status_context=update_status_context,
         role=ctx.role,
+        background_tasks=background_tasks,
     )
 
 

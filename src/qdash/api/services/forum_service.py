@@ -922,6 +922,7 @@ class ForumService:
         update_assignee_context: bool = False,
         update_status_context: bool = False,
         role: ProjectRole | None = None,
+        background_tasks: BackgroundTasks | None = None,
     ) -> ForumPostResponse:
         """Update a forum post."""
         doc = ForumPostDocument.find_one(
@@ -935,6 +936,7 @@ class ForumService:
                 status_code=403, detail="Only the author or project owner can edit this post"
             )
 
+        status_changed = False
         if doc.parent_id is None:
             if title is not None:
                 doc.title = title
@@ -959,7 +961,9 @@ class ForumService:
             if update_assignee_context:
                 doc.assignee_username = self._ensure_project_assignee(project_id, assignee_username)
             if update_status_context:
-                doc.status = _normalize_forum_status(status)
+                new_status = _normalize_forum_status(status)
+                status_changed = new_status != _normalize_forum_status(doc.status)
+                doc.status = new_status
         doc.content = content
         # None means the caller omitted the field: keep existing rich content.
         # An explicit [] clears it (e.g. a plain-Markdown edit).
@@ -989,6 +993,21 @@ class ForumService:
                 )
             except Exception:
                 logger.exception("Failed to create forum notifications for post %s", doc.id)
+
+        if status_changed and self._slack_notifications:
+            if background_tasks is not None:
+                background_tasks.add_task(
+                    self._slack_notifications.notify_forum_status_change,
+                    post=doc,
+                    actor_username=username,
+                    status=doc.status,
+                )
+            else:
+                self._slack_notifications.notify_forum_status_change(
+                    post=doc,
+                    actor_username=username,
+                    status=doc.status,
+                )
 
         return self._to_response(doc)
 
@@ -1061,13 +1080,13 @@ class ForumService:
                     self._slack_notifications.notify_forum_status_change,
                     post=doc,
                     actor_username=username,
-                    status="closed",
+                    status="resolved",
                 )
             else:
                 self._slack_notifications.notify_forum_status_change(
                     post=doc,
                     actor_username=username,
-                    status="closed",
+                    status="resolved",
                 )
 
         return SuccessResponse(message="Forum thread resolved")
