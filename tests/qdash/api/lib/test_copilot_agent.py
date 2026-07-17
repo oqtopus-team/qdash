@@ -2,18 +2,20 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from qdash.copilot.agent import (
     _build_messages,
-    _run_chat_completions,
-    _run_responses_api,
+    _run_litellm_completion,
+    _run_litellm_responses,
     run_analysis,
 )
+from qdash.copilot.agent_runtime.client import build_litellm_kwargs
 from qdash.copilot.agent_runtime.execution import get_max_tool_rounds
-from qdash.copilot.agent_runtime.parsing import parse_response
+from qdash.copilot.agent_runtime.parsing import parse_blocks_response, parse_response
+from qdash.copilot.agent_runtime.schemas import BLOCKS_RESPONSE_SCHEMA
 from qdash.copilot.config import CopilotConfig, ModelConfig
 from qdash.copilot.contracts import TaskAnalysisContext
 
@@ -65,6 +67,38 @@ def test_parse_response_converts_plain_missing_review_text_to_safe_review() -> N
     assert "- Suggested labels: `model_format_error`" in response.explanation
 
 
+def test_blocks_response_schema_uses_nullable_assessment() -> None:
+    assessment_schema = BLOCKS_RESPONSE_SCHEMA["properties"]["assessment"]
+
+    assert assessment_schema == {
+        "type": ["string", "null"],
+        "enum": ["good", "warning", "bad", None],
+    }
+
+
+def test_blocks_response_schema_disallows_inline_chart_objects() -> None:
+    block_schema = BLOCKS_RESPONSE_SCHEMA["properties"]["blocks"]["items"]
+
+    assert block_schema["properties"]["type"] == {"type": "string", "enum": ["text"]}
+    assert block_schema["properties"]["chart"] == {"type": "null"}
+    assert block_schema["additionalProperties"] is False
+
+
+def test_blocks_response_schema_sets_additional_properties_false_on_objects() -> None:
+    def assert_object_schemas_are_closed(schema: Any) -> None:
+        if isinstance(schema, dict):
+            if schema.get("type") == "object":
+                assert schema.get("additionalProperties") is False
+            for value in schema.values():
+                assert_object_schemas_are_closed(value)
+        elif isinstance(schema, list):
+            for item in schema:
+                assert_object_schemas_are_closed(item)
+
+    assert_object_schemas_are_closed(BLOCKS_RESPONSE_SCHEMA)
+
+
+
 def test_build_messages_includes_multiple_target_images_with_labels() -> None:
     messages = _build_messages(
         "system",
@@ -85,17 +119,83 @@ def test_build_messages_includes_multiple_target_images_with_labels() -> None:
     assert len(images) == 2
 
 
+def test_build_litellm_kwargs_uses_provider_specific_model_strings(monkeypatch) -> None:
+    monkeypatch.setenv("AWS_REGION", "us-west-2")
+    monkeypatch.setenv("AWS_BASE_URL", "https://bedrock-runtime.us-west-2.amazonaws.com")
+    monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "bedrock-token")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama:11434")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("LITELLM_MODEL", "openai/Gemma-4-31B-IT-NVFP4")
+    monkeypatch.setenv("VLLM_BASE_URL", "http://10.20.10.19:8000/v1")
+    monkeypatch.setenv("VLLM_API_KEY", "EMPTY")
+
+    bedrock = build_litellm_kwargs(
+        CopilotConfig(model=ModelConfig(provider="bedrock", name="jp.anthropic.claude"))
+    )
+    ollama = build_litellm_kwargs(
+        CopilotConfig(
+            model=ModelConfig(
+                provider="ollama",
+                name="gemma4:31b",
+                base_url="env:OLLAMA_BASE_URL",
+            )
+        )
+    )
+    openai = build_litellm_kwargs(
+        CopilotConfig(
+            model=ModelConfig(provider="openai", name="gpt-5.4", api_key_env="OPENAI_API_KEY")
+        )
+    )
+    vllm = build_litellm_kwargs(
+        CopilotConfig(
+            model=ModelConfig(
+                provider="vllm",
+                name="env:LITELLM_MODEL",
+                base_url="env:VLLM_BASE_URL",
+                api_key_env="VLLM_API_KEY",
+            )
+        )
+    )
+
+    assert bedrock["model"] == "bedrock/jp.anthropic.claude"
+    assert bedrock["api_base"] == "https://bedrock-runtime.us-west-2.amazonaws.com"
+    assert bedrock["aws_region_name"] == "us-west-2"
+    assert bedrock["api_key"] == "bedrock-token"
+    assert bedrock["aws_access_key_id"] == "bedrock-api-key"
+    assert bedrock["aws_secret_access_key"] == "bedrock-api-key"
+    assert ollama == {"model": "ollama_chat/gemma4:31b", "api_base": "http://ollama:11434"}
+    assert openai == {"model": "openai/gpt-5.4", "api_key": "test-key"}
+    assert vllm == {
+        "model": "openai/Gemma-4-31B-IT-NVFP4",
+        "api_base": "http://10.20.10.19:8000/v1",
+        "api_key": "EMPTY",
+    }
+
+
+def test_build_litellm_kwargs_requires_bedrock_bearer_token(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("AWS_BEARER_TOKEN_BEDROCK", raising=False)
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "ignored-access-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "ignored-secret-key")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "ignored-session-token")
+    monkeypatch.setenv("AWS_PROFILE", "ignored-profile")
+
+    with pytest.raises(ValueError, match="AWS_BEARER_TOKEN_BEDROCK"):
+        build_litellm_kwargs(
+            CopilotConfig(model=ModelConfig(provider="bedrock", name="jp.anthropic.claude"))
+        )
+
+
 @pytest.mark.asyncio
-async def test_run_chat_completions_passes_ollama_options() -> None:
+async def test_run_litellm_completion_passes_ollama_options() -> None:
     captured = {}
 
-    class _Completions:
-        async def create(self, **kwargs):
-            captured.update(kwargs)
-            message = SimpleNamespace(content='{"summary":"ok","explanation":"ok"}')
-            return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+    async def _completion(**kwargs):
+        captured.update(kwargs)
+        message = SimpleNamespace(content='{"summary":"ok","explanation":"ok"}')
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
-    client: Any = SimpleNamespace(chat=SimpleNamespace(completions=_Completions()))
     config = CopilotConfig(
         model=ModelConfig(
             provider="ollama",
@@ -109,8 +209,10 @@ async def test_run_chat_completions_passes_ollama_options() -> None:
         )
     )
 
-    await _run_chat_completions(client, [{"role": "user", "content": "hi"}], config)
+    with patch("litellm.acompletion", new=_completion):
+        await _run_litellm_completion([{"role": "user", "content": "hi"}], config)
 
+    assert captured["model"] == "ollama_chat/gemma4:26b"
     assert captured["extra_body"] == {
         "keep_alive": "30m",
         "options": {"num_ctx": 8192, "top_k": 64},
@@ -121,13 +223,11 @@ async def test_run_chat_completions_passes_ollama_options() -> None:
 
 
 @pytest.mark.asyncio
-async def test_run_chat_completions_uses_reasoning_when_content_is_empty() -> None:
-    class _Completions:
-        async def create(self, **kwargs):
-            message = SimpleNamespace(content="", reasoning="reasoning review text")
-            return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+async def test_run_litellm_completion_uses_reasoning_when_content_is_empty() -> None:
+    async def _completion(**_kwargs):
+        message = SimpleNamespace(content="", reasoning="reasoning review text")
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
-    client: Any = SimpleNamespace(chat=SimpleNamespace(completions=_Completions()))
     config = CopilotConfig(
         model=ModelConfig(
             provider="ollama",
@@ -136,7 +236,8 @@ async def test_run_chat_completions_uses_reasoning_when_content_is_empty() -> No
         )
     )
 
-    content = await _run_chat_completions(client, [{"role": "user", "content": "hi"}], config)
+    with patch("litellm.acompletion", new=_completion):
+        content = await _run_litellm_completion([{"role": "user", "content": "hi"}], config)
 
     assert content == "reasoning review text"
 
@@ -150,7 +251,7 @@ def test_get_max_tool_rounds_uses_higher_budget_for_ollama() -> None:
 
 
 @pytest.mark.asyncio
-async def test_run_responses_api_finalizes_after_repeated_identical_tool_calls() -> None:
+async def test_run_litellm_responses_finalizes_after_repeated_identical_tool_calls() -> None:
     captured_final_input: list[dict[str, Any]] = []
 
     class _FunctionCallItem:
@@ -169,32 +270,30 @@ async def test_run_responses_api_finalizes_after_repeated_identical_tool_calls()
                 "call_id": self.call_id,
             }
 
-    class _Responses:
-        def __init__(self) -> None:
-            self.calls = 0
+    calls = 0
 
-        async def create(self, **kwargs):
-            self.calls += 1
-            if self.calls <= 4:
-                return SimpleNamespace(
-                    output=[
-                        _FunctionCallItem(
-                            name="execute_python_analysis",
-                            arguments='{"code":"result = 1"}',
-                            call_id=f"call-{self.calls}",
-                        )
-                    ],
-                    output_text=None,
-                )
-
-            nonlocal captured_final_input
-            captured_final_input = kwargs["input"]
+    async def _responses(**kwargs):
+        nonlocal calls
+        calls += 1
+        if calls <= 4:
             return SimpleNamespace(
-                output=[],
-                output_text='{"blocks":[{"type":"text","content":"best effort","chart":null}],"assessment":"warning"}',
+                output=[
+                    _FunctionCallItem(
+                        name="execute_python_analysis",
+                        arguments='{"code":"result = 1"}',
+                        call_id=f"call-{calls}",
+                    )
+                ],
+                output_text=None,
             )
 
-    client: Any = SimpleNamespace(responses=_Responses())
+        nonlocal captured_final_input
+        captured_final_input = kwargs["input"]
+        return SimpleNamespace(
+            output=[],
+            output_text='{"blocks":[{"type":"text","content":"best effort","chart":null}],"assessment":"warning"}',
+        )
+
     config = CopilotConfig(
         model=ModelConfig(
             provider="ollama",
@@ -203,13 +302,13 @@ async def test_run_responses_api_finalizes_after_repeated_identical_tool_calls()
         )
     )
 
-    content = await _run_responses_api(
-        client,
-        "system",
-        [{"role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
-        config,
-        {"execute_python_analysis": lambda _args: {"output": "ok"}},
-    )
+    with patch("litellm.aresponses", new=_responses):
+        content = await _run_litellm_responses(
+            "system",
+            [{"role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
+            config,
+            {"execute_python_analysis": lambda _args: {"output": "ok"}},
+        )
 
     assert "best effort" in content
     assert captured_final_input[-1]["role"] == "user"
@@ -220,19 +319,20 @@ async def test_run_responses_api_finalizes_after_repeated_identical_tool_calls()
 
 
 @pytest.mark.asyncio
-async def test_run_analysis_translates_ollama_output_when_target_language_mismatches() -> None:
-    client: Any = SimpleNamespace()
+async def test_run_analysis_uses_litellm_completion_for_completion_api_style() -> None:
     config = CopilotConfig(
         response_language="ja",
         model=ModelConfig(
             provider="ollama",
             name="gemma4:26b",
             temperature=0,
+            api_style="completion",
         ),
         analysis_model=ModelConfig(
             provider="ollama",
             name="gemma4:26b",
             temperature=0,
+            api_style="completion",
         ),
     )
     context = TaskAnalysisContext(
@@ -240,40 +340,21 @@ async def test_run_analysis_translates_ollama_output_when_target_language_mismat
         chip_id="chip",
         qid="0",
     )
-    translated = parse_response(
-        "\n".join(
-            [
-                "**AI review**",
-                "- Decision: `PASS`",
-                "- Human label suggestion: `CORRECT`",
-                "- Accepted parameter(s): f01",
-                "- Needs review: none",
-                "- Primary reason: 日本語で整形しました。",
-                "- Closest knowledge case: none",
-                "- Suggested labels: none",
-                "- Recommended action: accept",
-            ]
-        )
-    )
+    captured = {}
 
-    with (
-        patch("qdash.copilot.agent._build_client", return_value=client),
-        patch(
-            "qdash.copilot.agent._run_chat_completions",
-            new=AsyncMock(
-                return_value='{"summary":"한국어 요약","assessment":"good","explanation":"검토 분류\\n결정: PASS"}'
-            ),
-        ),
-        patch(
-            "qdash.copilot.agent._translate_analysis_response",
-            new=AsyncMock(return_value=translated),
-        ) as translate_mock,
-    ):
+    async def _completion(**kwargs):
+        captured.update(kwargs)
+        message = SimpleNamespace(
+            content='{"blocks":[{"type":"text","content":"日本語で整形しました。","chart":null}],"assessment":"good"}'
+        )
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    with patch("litellm.acompletion", new=_completion):
         result = await run_analysis(
             context=context,
             user_message="analyze",
             config=config,
         )
 
-    translate_mock.assert_awaited_once()
-    assert result["blocks"][0]["content"].startswith("**AI review**")
+    assert captured["model"] == "ollama_chat/gemma4:26b"
+    assert result["blocks"][0]["content"] == "日本語で整形しました。"
