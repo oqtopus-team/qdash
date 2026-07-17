@@ -234,6 +234,46 @@ def test_update_post_status_change_notifies_slack(init_db) -> None:
     assert slack.status_calls[0]["actor_username"] == "alice"
 
 
+def test_update_post_status_change_defers_slack_via_background_tasks(init_db) -> None:
+    from fastapi import BackgroundTasks
+
+    from qdash.datamodel.project import ProjectRole
+
+    slack = _SlackRecorder()
+    service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
+
+    root = service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+    slack.post_calls.clear()
+
+    background_tasks = BackgroundTasks()
+    service.update_post(
+        project_id="project-1",
+        post_id=root.id,
+        username="alice",
+        category=None,
+        title=None,
+        content="Root content",
+        status="investigating",
+        update_status_context=True,
+        role=ProjectRole.OWNER,
+        background_tasks=background_tasks,
+    )
+
+    # The notification is queued on the response's background tasks, not sent inline.
+    assert slack.status_calls == []
+    assert len(background_tasks.tasks) == 1
+    task = background_tasks.tasks[0]
+    assert task.func == slack.notify_forum_status_change
+    assert task.kwargs["status"] == "investigating"
+
+
 def test_update_post_same_status_does_not_notify_slack(init_db) -> None:
     from qdash.datamodel.project import ProjectRole
 

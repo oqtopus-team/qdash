@@ -84,6 +84,17 @@ def test_is_enabled_returns_false_when_channel_missing(init_db) -> None:
 
 
 # ---------------------------------------------------------------------------
+# _client
+# ---------------------------------------------------------------------------
+
+
+def test_client_uses_configured_bot_token(init_db) -> None:
+    service = SlackNotificationService(settings=_settings())
+    client = service._client()
+    assert client.token == "xoxb-test-token"  # noqa: S105
+
+
+# ---------------------------------------------------------------------------
 # notify_forum_post
 # ---------------------------------------------------------------------------
 
@@ -145,6 +156,49 @@ def test_notify_forum_post_sends_open_status_color_and_records_ts(init_db) -> No
     assert record is not None
     assert record.message_ts == ts
     assert record.channel_id == channel
+
+
+def test_notify_forum_post_truncates_long_excerpt(init_db) -> None:
+    service = SlackNotificationService(settings=_settings())
+    mock_client = MagicMock()
+    mock_client.chat_postMessage.return_value = {"ts": "ts.010", "channel": "C0TESTCHAN"}
+    post = _post(content="x" * 300)
+
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_post(post=post, actor_username="alice")
+
+    blocks = mock_client.chat_postMessage.call_args.kwargs["attachments"][0]["blocks"]
+    excerpt_text = blocks[2]["text"]["text"]
+    assert excerpt_text.endswith("...")
+    assert "x" * 300 not in excerpt_text
+
+
+def test_notify_forum_post_links_title_when_post_has_id(init_db) -> None:
+    service = SlackNotificationService(settings=_settings())
+    mock_client = MagicMock()
+    mock_client.chat_postMessage.return_value = {"ts": "ts.011", "channel": "C0TESTCHAN"}
+    post = _post()
+    post.insert()
+
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_post(post=post, actor_username="alice")
+
+    blocks = mock_client.chat_postMessage.call_args.kwargs["attachments"][0]["blocks"]
+    assert f"http://localhost:3000/forum/{post.id}" in blocks[0]["text"]["text"]
+
+
+def test_notify_forum_post_shows_dash_when_target_missing(init_db) -> None:
+    service = SlackNotificationService(settings=_settings())
+    mock_client = MagicMock()
+    mock_client.chat_postMessage.return_value = {"ts": "ts.012", "channel": "C0TESTCHAN"}
+    post = _post(target_type=None, target_id=None)
+
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_post(post=post, actor_username="alice")
+
+    blocks = mock_client.chat_postMessage.call_args.kwargs["attachments"][0]["blocks"]
+    target_field = next(f["text"] for f in blocks[1]["fields"] if f["text"].startswith("*Target:*"))
+    assert target_field == "*Target:*\n-"
 
 
 def test_notify_forum_post_swallows_slack_api_error(init_db) -> None:
