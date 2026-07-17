@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -32,6 +33,14 @@ class Settings(BaseSettings):
     timezone: str = "Asia/Tokyo"
     # Local agent integrations
     enable_local_codex_agent: bool = False
+
+    @field_validator("slack_forum_notification", "enable_local_codex_agent", mode="before")
+    @classmethod
+    def _empty_str_as_false(cls, value: object) -> object:
+        """Treat unset env vars (empty strings) as False for boolean fields."""
+        if isinstance(value, str) and value.strip() == "":
+            return False
+        return value
 
 
 def resolve_api_cors_origins(settings: Settings) -> list[str]:
