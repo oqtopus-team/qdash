@@ -8,6 +8,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel, ReturnDocument
 
+from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
 
 
@@ -44,6 +45,9 @@ class SlackForumThreadDocument(Document):
         message_ts: str,
     ) -> SlackForumThreadDocument:
         """Upsert a Slack thread record for a forum post."""
+        # Raw pymongo bypasses Bunnet encoding, so system_info must be written
+        # explicitly; datetimes are stored as BSON dates, matching a normal insert.
+        timestamp = now()
         raw = cls.get_motor_collection().find_one_and_update(
             {"post_id": post_id},
             {
@@ -51,21 +55,16 @@ class SlackForumThreadDocument(Document):
                     "project_id": project_id,
                     "channel_id": channel_id,
                     "message_ts": message_ts,
+                    "system_info.updated_at": timestamp,
                 },
-                "$setOnInsert": {"post_id": post_id},
+                "$setOnInsert": {
+                    "post_id": post_id,
+                    "system_info.created_at": timestamp,
+                },
             },
             upsert=True,
             return_document=ReturnDocument.AFTER,
         )
-        if raw is None:
-            doc = cls(
-                post_id=post_id,
-                project_id=project_id,
-                channel_id=channel_id,
-                message_ts=message_ts,
-            )
-            doc.insert()
-            return doc
         validated: SlackForumThreadDocument = cls.model_validate(raw)
         return validated
 
