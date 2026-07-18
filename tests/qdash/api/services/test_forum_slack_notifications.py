@@ -12,12 +12,16 @@ if TYPE_CHECKING:
 
 
 class _SlackRecorder:
+    """Test double that records Slack notification calls."""
+
     def __init__(self) -> None:
+        """Initialize empty call recorders."""
         self.post_calls: list[dict[str, Any]] = []
         self.reply_calls: list[dict[str, Any]] = []
         self.status_calls: list[dict[str, Any]] = []
 
     def notify_forum_post(self, *, post: ForumPostDocument, actor_username: str) -> None:
+        """Record a forum post notification call."""
         self.post_calls.append({"post": post, "actor_username": actor_username})
 
     def notify_forum_reply(
@@ -27,6 +31,7 @@ class _SlackRecorder:
         root_post_id: str,
         actor_username: str,
     ) -> None:
+        """Record a forum reply notification call."""
         self.reply_calls.append(
             {
                 "reply_post": reply_post,
@@ -42,10 +47,12 @@ class _SlackRecorder:
         actor_username: str,
         status: str,
     ) -> None:
+        """Record a status-change notification call."""
         self.status_calls.append({"post": post, "actor_username": actor_username, "status": status})
 
 
 def test_create_root_post_notifies_slack(init_db) -> None:
+    """Creating a root post triggers a Slack post notification."""
     slack = _SlackRecorder()
     service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
 
@@ -64,6 +71,7 @@ def test_create_root_post_notifies_slack(init_db) -> None:
 
 
 def test_create_reply_notifies_slack_reply(init_db) -> None:
+    """Creating a reply triggers a Slack thread-reply notification."""
     slack = _SlackRecorder()
     service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
 
@@ -115,6 +123,7 @@ def test_create_post_no_slack_notification_when_no_service(init_db) -> None:
 
 
 def test_save_ai_reply_notifies_slack_reply(init_db) -> None:
+    """Saving an AI reply triggers a Slack thread-reply notification as qdash."""
     slack = _SlackRecorder()
     service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
 
@@ -140,6 +149,7 @@ def test_save_ai_reply_notifies_slack_reply(init_db) -> None:
 
 
 def test_close_post_notifies_slack_status_change(init_db) -> None:
+    """Closing a post triggers a resolved status-change notification."""
     from qdash.datamodel.project import ProjectRole
 
     slack = _SlackRecorder()
@@ -168,6 +178,7 @@ def test_close_post_notifies_slack_status_change(init_db) -> None:
 
 
 def test_reopen_post_notifies_slack_status_change(init_db) -> None:
+    """Reopening a post triggers an open status-change notification."""
     from qdash.datamodel.project import ProjectRole
 
     slack = _SlackRecorder()
@@ -202,6 +213,7 @@ def test_reopen_post_notifies_slack_status_change(init_db) -> None:
 
 
 def test_update_post_status_change_notifies_slack(init_db) -> None:
+    """Updating a post's status triggers a status-change notification."""
     from qdash.datamodel.project import ProjectRole
 
     slack = _SlackRecorder()
@@ -235,6 +247,7 @@ def test_update_post_status_change_notifies_slack(init_db) -> None:
 
 
 def test_update_post_status_change_defers_slack_via_background_tasks(init_db) -> None:
+    """Status-change notification is queued on BackgroundTasks when provided."""
     from fastapi import BackgroundTasks
 
     from qdash.datamodel.project import ProjectRole
@@ -275,6 +288,7 @@ def test_update_post_status_change_defers_slack_via_background_tasks(init_db) ->
 
 
 def test_update_post_same_status_does_not_notify_slack(init_db) -> None:
+    """Updating a post without changing its status sends no notification."""
     from qdash.datamodel.project import ProjectRole
 
     slack = _SlackRecorder()

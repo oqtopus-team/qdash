@@ -41,6 +41,7 @@ def _excerpt(content: str, *, limit: int = MAX_EXCERPT_CHARS) -> str:
 
 
 def _format_field(label: str, value: str | None) -> dict[str, Any]:
+    """Build a Slack mrkdwn field block, showing "-" when the value is empty."""
     display = value if value else "-"
     return {"type": "mrkdwn", "text": f"*{label}:*\n{display}"}
 
@@ -202,6 +203,7 @@ class SlackNotificationService:
             logger.exception("Failed to send Slack status-change notification for post %s", post.id)
 
     def _forum_post_url(self, post: ForumPostDocument) -> str:
+        """Return the QDash UI URL for the post, or an empty string if unavailable."""
         base = self._settings.client_url.rstrip("/")
         if not base or post.id is None:
             return ""
@@ -209,6 +211,7 @@ class SlackNotificationService:
 
     @staticmethod
     def _target_label(post: ForumPostDocument) -> str | None:
+        """Return a "type:id" label for the post target, or None if unset."""
         if not (post.target_type and post.target_id):
             return None
         return f"{post.target_type}:{post.target_id}"

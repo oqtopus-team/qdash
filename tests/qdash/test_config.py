@@ -51,6 +51,7 @@ def test_resolve_api_cors_origins_uses_localhost_defaults_in_local_env() -> None
 
 
 def test_boolean_settings_treat_empty_env_strings_as_false() -> None:
+    """Empty or whitespace-only env strings parse as False for boolean settings."""
     settings = Settings.model_validate(
         {
             "env": "test",
@@ -68,6 +69,7 @@ def test_boolean_settings_treat_empty_env_strings_as_false() -> None:
 
 
 def test_boolean_settings_parse_non_empty_strings() -> None:
+    """Non-empty strings parse with normal boolean semantics."""
     settings = Settings.model_validate(
         {
             "env": "test",

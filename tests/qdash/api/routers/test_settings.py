@@ -5,6 +5,7 @@ from qdash.dbmodel.user import UserDocument
 
 
 def test_get_settings_excludes_slack_secrets(test_client, init_db) -> None:
+    """GET /settings response excludes Slack secrets and internal flags."""
     UserDocument(
         username="settings-user",
         hashed_password="hashed",

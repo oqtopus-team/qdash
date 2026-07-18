@@ -6,6 +6,7 @@ from qdash.dbmodel.slack_forum_thread import SlackForumThreadDocument
 
 
 def test_record_persists_system_info_on_insert(init_db) -> None:
+    """record() persists system_info timestamps to the database on insert."""
     SlackForumThreadDocument.record(
         post_id="post-1",
         project_id="project-1",
@@ -20,6 +21,7 @@ def test_record_persists_system_info_on_insert(init_db) -> None:
 
 
 def test_record_upsert_updates_message_and_preserves_created_at(init_db) -> None:
+    """record() updates message_ts on upsert while preserving created_at."""
     first = SlackForumThreadDocument.record(
         post_id="post-1",
         project_id="project-1",
