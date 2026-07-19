@@ -98,6 +98,33 @@ class ExecutionService:
             for execution in executions
         ]
 
+    def count_executions(
+        self,
+        project_id: str,
+        chip_id: str,
+    ) -> int:
+        """Count executions for a chip.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        int
+            Total number of executions for the chip
+
+        """
+        return int(
+            self._history_repo.count_by_chip(
+                project_id=project_id,
+                chip_id=chip_id,
+            )
+        )
+
     def get_execution(
         self,
         project_id: str,

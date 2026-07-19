@@ -44,11 +44,17 @@ function PaginationControls({
   currentPage,
   setCurrentPage,
   hasMore,
+  totalPages,
 }: {
   currentPage: number;
   setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
   hasMore: boolean;
+  totalPages?: number;
 }) {
+  const isNextDisabled = totalPages !== undefined ? currentPage >= totalPages : !hasMore;
+  const pageLabel =
+    totalPages !== undefined ? `Page ${currentPage} of ${totalPages}` : `Page ${currentPage}`;
+
   return (
     <div className="flex justify-center items-center gap-2 sm:gap-4 my-3 sm:my-4 px-4">
       <button
@@ -58,10 +64,10 @@ function PaginationControls({
       >
         Prev
       </button>
-      <span className="text-xs sm:text-sm">Page {currentPage}</span>
+      <span className="text-xs sm:text-sm">{pageLabel}</span>
       <button
         onClick={() => setCurrentPage((prev) => prev + 1)}
-        disabled={!hasMore}
+        disabled={isNextDisabled}
         className="btn btn-xs sm:btn-sm btn-outline"
       >
         Next
@@ -238,6 +244,9 @@ export function ExecutionPageContent() {
   const hasMorePages =
     !!executionData?.data?.executions && executionData.data.executions.length >= itemsPerPage;
 
+  const total = executionData?.data?.total;
+  const totalPages = total != null ? Math.max(1, Math.ceil(total / itemsPerPage)) : undefined;
+
   return (
     <PageContainer>
       <PageHeader title="Execution History" description="Monitor workflow runs and task results" />
@@ -268,6 +277,7 @@ export function ExecutionPageContent() {
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
         hasMore={hasMorePages}
+        totalPages={totalPages}
       />
       <div className="grid grid-cols-1 gap-1.5 sm:gap-2">
         {cardData.map((execution) => {
@@ -344,6 +354,7 @@ export function ExecutionPageContent() {
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
         hasMore={hasMorePages}
+        totalPages={totalPages}
       />
       {/* Sidebar */}
       <div
