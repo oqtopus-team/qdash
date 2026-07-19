@@ -430,7 +430,7 @@ export function FilesPageContent() {
             </button>
             <button
               onClick={handlePush}
-              className="btn btn-sm btn-secondary hidden sm:flex"
+              className="btn btn-sm btn-secondary hidden sm:flex overflow-visible"
               disabled={pushMutation.isPending}
               title="Create a pull request with config changes"
             >
