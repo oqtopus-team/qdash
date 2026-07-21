@@ -6,9 +6,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-from openai import BadRequestError
-
-from qdash.copilot.agent_runtime.client import build_client
+from qdash.copilot.agent_runtime.client import litellm_completion
 from qdash.copilot.agent_runtime.parsing import strip_code_fences
 
 if TYPE_CHECKING:
@@ -74,9 +72,7 @@ async def translate_analysis_response(
 
     try:
         translator_config = CopilotConfig(model=general_model)
-        client = build_client(translator_config)
         kwargs: dict[str, Any] = {
-            "model": general_model.name,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -85,15 +81,19 @@ async def translate_analysis_response(
         }
         if general_model.temperature is not None:
             kwargs["temperature"] = 0.2
+
         try:
-            completion = await client.chat.completions.create(**kwargs)
-        except BadRequestError as exc:
-            if "temperature" in str(exc):
+            completion = await litellm_completion(translator_config, **kwargs)
+        except Exception as exc:
+            if "temperature" in str(exc).lower() and "not support" in str(exc).lower():
                 kwargs.pop("temperature", None)
-                completion = await client.chat.completions.create(**kwargs)
+                completion = await litellm_completion(translator_config, **kwargs)
             else:
                 raise
-        content = completion.choices[0].message.content or "{}"
+        if isinstance(completion, dict):
+            content = completion.get("choices", [{}])[0].get("message", {}).get("content") or "{}"
+        else:
+            content = completion.choices[0].message.content or "{}"
         data = json.loads(strip_code_fences(content))
     except Exception as exc:
         logger.warning("Translation to %s failed, using original text: %s", lang_key, exc)

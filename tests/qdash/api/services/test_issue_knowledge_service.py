@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from starlette.exceptions import HTTPException
@@ -836,7 +836,10 @@ class TestCallLlmExtract:
         """Build a mock copilot config."""
         config = MagicMock()
         config.enabled = True
+        config.model.provider = "openai"
         config.model.name = "gpt-4o"
+        config.model.base_url = None
+        config.model.api_key_env = None
         return config
 
     @pytest.mark.asyncio
@@ -864,14 +867,17 @@ class TestCallLlmExtract:
             "lesson_learned": ["Check T1"],
         }
 
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = json.dumps(expected)
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+        async def _completion(_config, **_kwargs):
+            message = MagicMock()
+            message.content = json.dumps(expected)
+            return MagicMock(choices=[MagicMock(message=message)])
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
-            patch("qdash.copilot.agent._build_client", return_value=mock_client),
+            patch(
+                "qdash.api.services.issue_knowledge_service.litellm_completion",
+                new=_completion,
+            ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "T1 issue", "Thread"
@@ -885,14 +891,17 @@ class TestCallLlmExtract:
         payload = '{"title": "Fenced response", "severity": "info"}'
         raw_response = f"```json\n{payload}\n```"
 
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = raw_response
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+        async def _completion(_config, **_kwargs):
+            message = MagicMock()
+            message.content = raw_response
+            return MagicMock(choices=[MagicMock(message=message)])
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
-            patch("qdash.copilot.agent._build_client", return_value=mock_client),
+            patch(
+                "qdash.api.services.issue_knowledge_service.litellm_completion",
+                new=_completion,
+            ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"
@@ -904,14 +913,17 @@ class TestCallLlmExtract:
     @pytest.mark.asyncio
     async def test_returns_empty_on_invalid_json(self, mock_config):
         """Returns empty dict when LLM returns invalid JSON."""
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = "This is not valid JSON at all"
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+        async def _completion(_config, **_kwargs):
+            message = MagicMock()
+            message.content = "This is not valid JSON at all"
+            return MagicMock(choices=[MagicMock(message=message)])
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
-            patch("qdash.copilot.agent._build_client", return_value=mock_client),
+            patch(
+                "qdash.api.services.issue_knowledge_service.litellm_completion",
+                new=_completion,
+            ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"
@@ -922,12 +934,15 @@ class TestCallLlmExtract:
     @pytest.mark.asyncio
     async def test_returns_empty_on_api_error(self, mock_config):
         """Returns empty dict when the LLM API raises an exception."""
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(side_effect=RuntimeError("API unreachable"))
+        async def _completion(_config, **_kwargs):
+            raise RuntimeError("API unreachable")
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
-            patch("qdash.copilot.agent._build_client", return_value=mock_client),
+            patch(
+                "qdash.api.services.issue_knowledge_service.litellm_completion",
+                new=_completion,
+            ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"
@@ -938,14 +953,17 @@ class TestCallLlmExtract:
     @pytest.mark.asyncio
     async def test_returns_empty_on_empty_response(self, mock_config):
         """Returns empty dict when the LLM returns empty content."""
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = ""
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+        async def _completion(_config, **_kwargs):
+            message = MagicMock()
+            message.content = ""
+            return MagicMock(choices=[MagicMock(message=message)])
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
-            patch("qdash.copilot.agent._build_client", return_value=mock_client),
+            patch(
+                "qdash.api.services.issue_knowledge_service.litellm_completion",
+                new=_completion,
+            ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"
@@ -959,14 +977,17 @@ class TestCallLlmExtract:
         payload = '{"title": "Plain fences"}'
         raw_response = f"```\n{payload}\n```"
 
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = raw_response
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+        async def _completion(_config, **_kwargs):
+            message = MagicMock()
+            message.content = raw_response
+            return MagicMock(choices=[MagicMock(message=message)])
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
-            patch("qdash.copilot.agent._build_client", return_value=mock_client),
+            patch(
+                "qdash.api.services.issue_knowledge_service.litellm_completion",
+                new=_completion,
+            ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"
@@ -977,14 +998,17 @@ class TestCallLlmExtract:
     @pytest.mark.asyncio
     async def test_returns_empty_on_none_content(self, mock_config):
         """Returns empty dict when the LLM message content is None."""
-        mock_response = MagicMock()
-        mock_response.choices[0].message.content = None
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+        async def _completion(_config, **_kwargs):
+            message = MagicMock()
+            message.content = None
+            return MagicMock(choices=[MagicMock(message=message)])
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
-            patch("qdash.copilot.agent._build_client", return_value=mock_client),
+            patch(
+                "qdash.api.services.issue_knowledge_service.litellm_completion",
+                new=_completion,
+            ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"
