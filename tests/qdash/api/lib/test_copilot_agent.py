@@ -9,11 +9,15 @@ import pytest
 from qdash.copilot.agent import (
     _build_messages,
     _run_litellm_completion,
+    _run_litellm_completion_with_tools,
     _run_litellm_responses,
     run_analysis,
 )
 from qdash.copilot.agent_runtime.client import build_litellm_kwargs
-from qdash.copilot.agent_runtime.execution import get_max_tool_rounds
+from qdash.copilot.agent_runtime.execution import (
+    build_provider_response_schema,
+    get_max_tool_rounds,
+)
 from qdash.copilot.agent_runtime.parsing import parse_blocks_response, parse_response
 from qdash.copilot.agent_runtime.schemas import BLOCKS_RESPONSE_SCHEMA
 from qdash.copilot.config import CopilotConfig, ModelConfig
@@ -76,11 +80,11 @@ def test_blocks_response_schema_uses_nullable_assessment() -> None:
     }
 
 
-def test_blocks_response_schema_disallows_inline_chart_objects() -> None:
+def test_blocks_response_schema_allows_chart_blocks() -> None:
     block_schema = BLOCKS_RESPONSE_SCHEMA["properties"]["blocks"]["items"]
 
-    assert block_schema["properties"]["type"] == {"type": "string", "enum": ["text"]}
-    assert block_schema["properties"]["chart"] == {"type": "null"}
+    assert block_schema["properties"]["type"] == {"type": "string", "enum": ["text", "chart"]}
+    assert block_schema["properties"]["chart"] == {"type": ["object", "null"]}
     assert block_schema["additionalProperties"] is False
 
 
@@ -96,6 +100,30 @@ def test_blocks_response_schema_sets_additional_properties_false_on_objects() ->
                 assert_object_schemas_are_closed(item)
 
     assert_object_schemas_are_closed(BLOCKS_RESPONSE_SCHEMA)
+
+
+def test_build_provider_response_schema_makes_blocks_response_bedrock_compatible() -> None:
+    config = CopilotConfig(model=ModelConfig(provider="bedrock", name="jp.anthropic.claude"))
+
+    schema = build_provider_response_schema(BLOCKS_RESPONSE_SCHEMA, config)
+
+    assert schema is not BLOCKS_RESPONSE_SCHEMA
+    assert schema["properties"]["assessment"] == {
+        "type": "string",
+        "enum": ["good", "warning", "bad"],
+    }
+    block_properties = schema["properties"]["blocks"]["items"]["properties"]
+    assert block_properties["type"] == {"type": "string", "enum": ["text"]}
+    assert block_properties["content"] == {"type": "string"}
+    assert block_properties["chart"] == {"type": "null"}
+
+
+def test_build_provider_response_schema_leaves_non_bedrock_schema_unchanged() -> None:
+    config = CopilotConfig(model=ModelConfig(provider="ollama", name="gemma4:27b"))
+
+    schema = build_provider_response_schema(BLOCKS_RESPONSE_SCHEMA, config)
+
+    assert schema is BLOCKS_RESPONSE_SCHEMA
 
 
 
@@ -176,6 +204,7 @@ def test_build_litellm_kwargs_requires_bedrock_bearer_token(
     monkeypatch,
 ) -> None:
     monkeypatch.delenv("AWS_BEARER_TOKEN_BEDROCK", raising=False)
+    monkeypatch.setenv("AWS_BASE_URL", "https://bedrock-runtime.us-west-2.amazonaws.com")
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "ignored-access-key")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "ignored-secret-key")
     monkeypatch.setenv("AWS_SESSION_TOKEN", "ignored-session-token")
@@ -316,6 +345,66 @@ async def test_run_litellm_responses_finalizes_after_repeated_identical_tool_cal
     assert (
         "Detected repeated identical tool calls" in captured_final_input[-1]["content"][0]["text"]
     )
+
+
+@pytest.mark.asyncio
+async def test_run_litellm_completion_with_tools_keeps_tools_for_bedrock_finalization(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AWS_REGION", "us-west-2")
+    monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "bedrock-token")
+
+    captured_final_kwargs: dict[str, Any] = {}
+    calls = 0
+
+    async def _completion(**kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            tool_call = SimpleNamespace(
+                id="call-1",
+                function=SimpleNamespace(
+                    name="execute_python_analysis",
+                    arguments='{"code":"result = 1"}',
+                ),
+            )
+            message = SimpleNamespace(content="", tool_calls=[tool_call])
+            return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+        if calls == 2:
+            message = SimpleNamespace(content="", tool_calls=[])
+            return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+        captured_final_kwargs.update(kwargs)
+        message = SimpleNamespace(
+            content='{"blocks":[{"type":"text","content":"done","chart":null}],"assessment":"good"}',
+            tool_calls=[],
+        )
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    config = CopilotConfig(
+        model=ModelConfig(
+            provider="bedrock",
+            name="jp.anthropic.claude",
+            temperature=0,
+        )
+    )
+
+    with patch("litellm.acompletion", new=_completion):
+        content = await _run_litellm_completion_with_tools(
+            [{"role": "user", "content": "hi"}],
+            config,
+            {"execute_python_analysis": lambda _args: {"output": "ok"}},
+            response_schema=BLOCKS_RESPONSE_SCHEMA,
+        )
+
+    assert "done" in content
+    assert "tools" in captured_final_kwargs
+    assert captured_final_kwargs["tool_choice"] == "auto"
+    final_schema = captured_final_kwargs["response_format"]["json_schema"]["schema"]
+    assert final_schema["properties"]["assessment"] == {
+        "type": "string",
+        "enum": ["good", "warning", "bad"],
+    }
 
 
 @pytest.mark.asyncio

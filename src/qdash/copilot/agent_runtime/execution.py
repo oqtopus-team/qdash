@@ -199,6 +199,40 @@ def should_send_reasoning_effort(config: CopilotConfig) -> bool:
     return config.model.provider == "ollama" or reasoning_effort.lower() != "none"
 
 
+def build_provider_response_schema(schema: dict[str, Any], config: CopilotConfig) -> dict[str, Any]:
+    """Return a provider-compatible copy of a structured-output JSON schema."""
+    if config.model.provider.lower() == "bedrock":
+        return cast("dict[str, Any]", _bedrock_compatible_schema(schema))
+    return schema
+
+
+def _bedrock_compatible_schema(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_bedrock_compatible_schema(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+
+    converted = {key: _bedrock_compatible_schema(item) for key, item in value.items()}
+    schema_type = converted.get("type")
+    if isinstance(schema_type, list) and "null" in schema_type:
+        non_null_types = [item for item in schema_type if item != "null"]
+        if len(non_null_types) == 1:
+            converted["type"] = non_null_types[0]
+            enum_values = converted.get("enum")
+            if isinstance(enum_values, list):
+                converted["enum"] = [item for item in enum_values if item is not None]
+    properties = converted.get("properties", {})
+    if "blocks" in properties:
+        properties["blocks"]["items"]["properties"].update(
+            {
+                "type": {"type": "string", "enum": ["text"]},
+                "content": {"type": "string"},
+                "chart": {"type": "null"},
+            }
+        )
+    return converted
+
+
 def _is_unsupported_param(exc: Exception, name: str) -> bool:
     message = str(exc).lower()
     return name.lower() in message and (
@@ -295,7 +329,7 @@ async def run_litellm_responses(
     on_status: OnStatusHook = None,
 ) -> str:
     """Call LiteLLM Responses API and return the output text."""
-    schema = response_schema or ANALYSIS_RESPONSE_SCHEMA
+    schema = build_provider_response_schema(response_schema or ANALYSIS_RESPONSE_SCHEMA, config)
     text_format: dict[str, Any] = {
         "format": {
             "type": "json_schema",
@@ -315,6 +349,7 @@ async def run_litellm_responses(
         kwargs["text"] = text_format
     if config.model.temperature is not None:
         kwargs["temperature"] = config.model.temperature
+    keep_tools_for_finalization = config.model.provider.lower() == "bedrock"
 
     async def _create(**kw: Any) -> Any:
         try:
@@ -347,7 +382,13 @@ async def run_litellm_responses(
                         dumped = _item_dump(item)
                         if dumped:
                             final_input.append(dumped)
-                    final_kwargs = {k: v for k, v in kwargs.items() if k != "tools"}
+                    if keep_tools_for_finalization:
+                        final_input.append(build_responses_finalization_item("Tool calls completed."))
+                    final_kwargs = (
+                        dict(kwargs)
+                        if keep_tools_for_finalization
+                        else {k: v for k, v in kwargs.items() if k != "tools"}
+                    )
                     final_kwargs["input"] = final_input
                     final_kwargs["text"] = text_format
                     if on_status:
@@ -451,7 +492,11 @@ async def run_litellm_responses(
                 if dumped:
                     final_input.append(dumped)
             final_input.append(build_responses_finalization_item(stop_reason))
-            final_kwargs = {k: v for k, v in kwargs.items() if k != "tools"}
+            final_kwargs = (
+                dict(kwargs)
+                if keep_tools_for_finalization
+                else {k: v for k, v in kwargs.items() if k != "tools"}
+            )
             final_kwargs["input"] = final_input
             final_kwargs["text"] = text_format
             if on_status:
@@ -467,7 +512,13 @@ async def run_litellm_responses(
                 continue
             if dumped:
                 final_input.append(dumped)
-        final_kwargs = {k: v for k, v in kwargs.items() if k != "tools"}
+        if keep_tools_for_finalization:
+            final_input.append(build_responses_finalization_item("Finalize the response."))
+        final_kwargs = (
+            dict(kwargs)
+            if keep_tools_for_finalization
+            else {k: v for k, v in kwargs.items() if k != "tools"}
+        )
         final_kwargs["input"] = final_input
         final_kwargs["text"] = text_format
         if on_status:
@@ -539,7 +590,7 @@ async def run_litellm_completion_with_tools(
             "json_schema": {
                 "name": schema_name,
                 "strict": strict_schema,
-                "schema": response_schema,
+                "schema": build_provider_response_schema(response_schema, config),
             },
         }
     if extra_body:
@@ -680,9 +731,15 @@ async def run_litellm_completion_with_tools(
     else:
         stop_reason = f"Reached the maximum number of tool rounds ({max_tool_rounds})."
 
+    keep_tools_for_finalization = config.model.provider.lower() == "bedrock"
+
     if stop_reason is not None:
         logger.warning("Finalizing tool loop without further tool calls: %s", stop_reason)
-        final_kwargs = {k: v for k, v in base_kwargs.items() if k not in ("tools", "tool_choice")}
+        final_kwargs = (
+            dict(base_kwargs)
+            if keep_tools_for_finalization
+            else {k: v for k, v in base_kwargs.items() if k not in ("tools", "tool_choice")}
+        )
         if response_format is not None:
             final_kwargs["response_format"] = response_format
         final_messages = list(msgs)
@@ -691,7 +748,11 @@ async def run_litellm_completion_with_tools(
         last_message = _completion_message(response)
 
     if stop_reason is None and tool_call_counts and last_message is not None:
-        final_kwargs = {k: v for k, v in base_kwargs.items() if k not in ("tools", "tool_choice")}
+        final_kwargs = (
+            dict(base_kwargs)
+            if keep_tools_for_finalization
+            else {k: v for k, v in base_kwargs.items() if k not in ("tools", "tool_choice")}
+        )
         if response_format is not None:
             final_kwargs["response_format"] = response_format
         final_messages = list(msgs)
