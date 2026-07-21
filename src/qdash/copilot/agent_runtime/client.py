@@ -5,8 +5,20 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
+import litellm
+
 if TYPE_CHECKING:
     from qdash.copilot.config import CopilotConfig
+
+
+async def litellm_completion(config: CopilotConfig, **kwargs: Any) -> Any:
+    """Call LiteLLM Chat Completions with provider-aware configuration."""
+    return await litellm.acompletion(**build_litellm_kwargs(config), **kwargs)
+
+
+async def litellm_responses(config: CopilotConfig, **kwargs: Any) -> Any:
+    """Call LiteLLM Responses API with provider-aware configuration."""
+    return await litellm.aresponses(**build_litellm_kwargs(config), **kwargs)
 
 
 def build_litellm_kwargs(config: CopilotConfig) -> dict[str, Any]:
@@ -39,7 +51,7 @@ def build_litellm_kwargs(config: CopilotConfig) -> dict[str, Any]:
             )
         kwargs["api_key"] = bearer_token
         kwargs["aws_access_key_id"] = "bedrock-api-key"
-        kwargs["aws_secret_access_key"] = "bedrock-api-key"
+        kwargs["aws_secret_access_key"] = "bedrock-api-key"  # noqa: S105
         return kwargs
 
     base_url = resolve_model_config_value(model.base_url, field_name="base_url")

@@ -18,7 +18,7 @@ from qdash.copilot.agent_runtime.execution import (
     build_provider_response_schema,
     get_max_tool_rounds,
 )
-from qdash.copilot.agent_runtime.parsing import parse_blocks_response, parse_response
+from qdash.copilot.agent_runtime.parsing import parse_response
 from qdash.copilot.agent_runtime.schemas import BLOCKS_RESPONSE_SCHEMA
 from qdash.copilot.config import CopilotConfig, ModelConfig
 from qdash.copilot.contracts import TaskAnalysisContext
@@ -190,7 +190,7 @@ def test_build_litellm_kwargs_uses_provider_specific_model_strings(monkeypatch) 
     assert bedrock["aws_region_name"] == "us-west-2"
     assert bedrock["api_key"] == "bedrock-token"
     assert bedrock["aws_access_key_id"] == "bedrock-api-key"
-    assert bedrock["aws_secret_access_key"] == "bedrock-api-key"
+    assert bedrock["aws_secret_access_key"] == "bedrock-api-key"  # noqa: S105
     assert ollama == {"model": "ollama_chat/gemma4:31b", "api_base": "http://ollama:11434"}
     assert openai == {"model": "openai/gpt-5.4", "api_key": "test-key"}
     assert vllm == {
@@ -220,7 +220,8 @@ def test_build_litellm_kwargs_requires_bedrock_bearer_token(
 async def test_run_litellm_completion_passes_ollama_options() -> None:
     captured = {}
 
-    async def _completion(**kwargs):
+    async def _completion(_config, **kwargs):
+        captured.update(build_litellm_kwargs(_config))
         captured.update(kwargs)
         message = SimpleNamespace(content='{"summary":"ok","explanation":"ok"}')
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
@@ -238,7 +239,7 @@ async def test_run_litellm_completion_passes_ollama_options() -> None:
         )
     )
 
-    with patch("litellm.acompletion", new=_completion):
+    with patch("qdash.copilot.agent_runtime.execution.litellm_completion", new=_completion):
         await _run_litellm_completion([{"role": "user", "content": "hi"}], config)
 
     assert captured["model"] == "ollama_chat/gemma4:26b"
@@ -253,7 +254,7 @@ async def test_run_litellm_completion_passes_ollama_options() -> None:
 
 @pytest.mark.asyncio
 async def test_run_litellm_completion_uses_reasoning_when_content_is_empty() -> None:
-    async def _completion(**_kwargs):
+    async def _completion(_config, **_kwargs):
         message = SimpleNamespace(content="", reasoning="reasoning review text")
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
@@ -265,7 +266,7 @@ async def test_run_litellm_completion_uses_reasoning_when_content_is_empty() -> 
         )
     )
 
-    with patch("litellm.acompletion", new=_completion):
+    with patch("qdash.copilot.agent_runtime.execution.litellm_completion", new=_completion):
         content = await _run_litellm_completion([{"role": "user", "content": "hi"}], config)
 
     assert content == "reasoning review text"
@@ -301,7 +302,7 @@ async def test_run_litellm_responses_finalizes_after_repeated_identical_tool_cal
 
     calls = 0
 
-    async def _responses(**kwargs):
+    async def _responses(_config, **kwargs):
         nonlocal calls
         calls += 1
         if calls <= 4:
@@ -331,7 +332,7 @@ async def test_run_litellm_responses_finalizes_after_repeated_identical_tool_cal
         )
     )
 
-    with patch("litellm.aresponses", new=_responses):
+    with patch("qdash.copilot.agent_runtime.execution.litellm_responses", new=_responses):
         content = await _run_litellm_responses(
             "system",
             [{"role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
@@ -357,7 +358,7 @@ async def test_run_litellm_completion_with_tools_keeps_tools_for_bedrock_finaliz
     captured_final_kwargs: dict[str, Any] = {}
     calls = 0
 
-    async def _completion(**kwargs):
+    async def _completion(_config, **kwargs):
         nonlocal calls
         calls += 1
         if calls == 1:
@@ -389,7 +390,7 @@ async def test_run_litellm_completion_with_tools_keeps_tools_for_bedrock_finaliz
         )
     )
 
-    with patch("litellm.acompletion", new=_completion):
+    with patch("qdash.copilot.agent_runtime.execution.litellm_completion", new=_completion):
         content = await _run_litellm_completion_with_tools(
             [{"role": "user", "content": "hi"}],
             config,
@@ -431,14 +432,15 @@ async def test_run_analysis_uses_litellm_completion_for_completion_api_style() -
     )
     captured = {}
 
-    async def _completion(**kwargs):
+    async def _completion(_config, **kwargs):
+        captured.update(build_litellm_kwargs(_config))
         captured.update(kwargs)
         message = SimpleNamespace(
             content='{"blocks":[{"type":"text","content":"日本語で整形しました。","chart":null}],"assessment":"good"}'
         )
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
-    with patch("litellm.acompletion", new=_completion):
+    with patch("qdash.copilot.agent_runtime.execution.litellm_completion", new=_completion):
         result = await run_analysis(
             context=context,
             user_message="analyze",

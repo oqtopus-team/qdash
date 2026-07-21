@@ -7,7 +7,7 @@ import logging
 import math
 from typing import TYPE_CHECKING, Any, cast
 
-from qdash.copilot.agent_runtime.client import build_litellm_kwargs
+from qdash.copilot.agent_runtime.client import litellm_completion, litellm_responses
 from qdash.copilot.agent_runtime.rendering import build_llm_summary
 from qdash.copilot.agent_runtime.schemas import ANALYSIS_RESPONSE_SCHEMA
 from qdash.copilot.tooling.schemas import AGENT_TOOLS
@@ -353,9 +353,7 @@ async def run_litellm_responses(
 
     async def _create(**kw: Any) -> Any:
         try:
-            import litellm
-
-            return await litellm.aresponses(**build_litellm_kwargs(config), **kw)
+            return await litellm_responses(config, **kw)
         except Exception as exc:
             if _is_unsupported_param(exc, "temperature") and "temperature" in kw:
                 logger.info("Model does not support temperature, retrying without it")
@@ -606,9 +604,7 @@ async def run_litellm_completion_with_tools(
 
     async def _create(**kw: Any) -> Any:
         try:
-            import litellm
-
-            return await litellm.acompletion(**build_litellm_kwargs(config), **kw)
+            return await litellm_completion(config, **kw)
         except Exception as exc:
             if _is_unsupported_param(exc, "temperature") and "temperature" in kw:
                 kw.pop("temperature")
@@ -804,19 +800,17 @@ async def run_litellm_completion(
     if should_send_reasoning_effort(config):
         kwargs["reasoning_effort"] = config.model.reasoning_effort
     try:
-        import litellm
-
-        response = await litellm.acompletion(**build_litellm_kwargs(config), **kwargs)
+        response = await litellm_completion(config, **kwargs)
     except Exception as exc:
         if _is_unsupported_param(exc, "temperature") and "temperature" in kwargs:
             kwargs.pop("temperature")
-            response = await litellm.acompletion(**build_litellm_kwargs(config), **kwargs)
+            response = await litellm_completion(config, **kwargs)
         elif _is_unsupported_param(exc, "top_p") and "top_p" in kwargs:
             kwargs.pop("top_p")
-            response = await litellm.acompletion(**build_litellm_kwargs(config), **kwargs)
+            response = await litellm_completion(config, **kwargs)
         elif _is_unsupported_param(exc, "reasoning_effort") and "reasoning_effort" in kwargs:
             kwargs.pop("reasoning_effort")
-            response = await litellm.acompletion(**build_litellm_kwargs(config), **kwargs)
+            response = await litellm_completion(config, **kwargs)
         else:
             raise
     message = _completion_message(response)
