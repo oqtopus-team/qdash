@@ -3,10 +3,9 @@
 from pydantic import BaseModel
 
 
-# Response model for GET /settings. Named ``Settings`` so the OpenAPI schema keeps
-# the name generated clients depend on; unlike ``qdash.config.Settings`` it must
+# Response model for GET /settings. Unlike ``qdash.config.Settings`` it must
 # never contain secrets such as tokens or webhook URLs.
-class Settings(BaseModel):
+class SettingsResponse(BaseModel):
     """Settings for the QDash application."""
 
     env: str

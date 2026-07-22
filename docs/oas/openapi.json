@@ -3930,7 +3930,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Settings"
+                  "$ref": "#/components/schemas/SettingsResponse"
                 }
               }
             }
@@ -26420,7 +26420,7 @@
         "title": "SeedImportSource",
         "description": "Source of seed parameters."
       },
-      "Settings": {
+      "SettingsResponse": {
         "properties": {
           "env": {
             "type": "string",
@@ -26519,7 +26519,7 @@
           "mongo_data_path",
           "calib_data_path"
         ],
-        "title": "Settings",
+        "title": "SettingsResponse",
         "description": "Settings for the QDash application."
       },
       "SubmitAgentActionRequest": {

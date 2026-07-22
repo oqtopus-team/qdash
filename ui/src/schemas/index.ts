@@ -627,7 +627,7 @@ export * from './seedImportResultItem';
 export * from './seedImportResultItemMessage';
 export * from './seedImportResultItemValue';
 export * from './seedImportSource';
-export * from './settings';
+export * from './settingsResponse';
 export * from './submitAgentActionRequest';
 export * from './submitAgentActionRequestParameterOverrides';
 export * from './submitAgentActionRequestTaskName';

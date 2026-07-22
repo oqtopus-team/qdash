@@ -9,7 +9,7 @@
 /**
  * Settings for the QDash application.
  */
-export interface Settings {
+export interface SettingsResponse {
   env: string;
   client_url?: string;
   api_cors_origins?: string[];
