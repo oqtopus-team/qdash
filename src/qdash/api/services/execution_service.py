@@ -4,9 +4,11 @@ This module provides business logic for execution operations,
 abstracting away the repository layer from the routers.
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from bunnet import SortDirection
@@ -21,7 +23,12 @@ from qdash.api.schemas.execution import (
     ExecutionResponseSummary,
     Task,
 )
+from qdash.common.utils.datetime import parse_elapsed_time
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+if TYPE_CHECKING:
+    from qdash.repository.execution_history import MongoExecutionHistoryRepository
+    from qdash.repository.execution_lock import MongoExecutionLockRepository
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +41,17 @@ class ExecutionService:
 
     Parameters
     ----------
-    execution_history_repository : Any
+    execution_history_repository : MongoExecutionHistoryRepository
         Repository for execution history access
-    execution_lock_repository : Any
+    execution_lock_repository : MongoExecutionLockRepository
         Repository for execution lock operations
 
     """
 
     def __init__(
         self,
-        execution_history_repository: Any,
-        execution_lock_repository: Any,
+        execution_history_repository: MongoExecutionHistoryRepository,
+        execution_lock_repository: MongoExecutionLockRepository,
     ) -> None:
         """Initialize the service with repositories."""
         self._history_repo = execution_history_repository
@@ -91,7 +98,7 @@ class ExecutionService:
                 username=execution.username,
                 start_at=execution.start_at,
                 end_at=execution.end_at,
-                elapsed_time=execution.elapsed_time,
+                elapsed_time=parse_elapsed_time(execution.elapsed_time),
                 tags=execution.tags,
                 note=execution.note,
             )
@@ -118,11 +125,9 @@ class ExecutionService:
             Total number of executions for the chip
 
         """
-        return int(
-            self._history_repo.count_by_chip(
-                project_id=project_id,
-                chip_id=chip_id,
-            )
+        return self._history_repo.count_by_chip(
+            project_id=project_id,
+            chip_id=chip_id,
         )
 
     def get_execution(
@@ -160,7 +165,7 @@ class ExecutionService:
             username=execution.username,
             start_at=execution.start_at,
             end_at=execution.end_at,
-            elapsed_time=execution.elapsed_time,
+            elapsed_time=parse_elapsed_time(execution.elapsed_time),
             task=tasks,
             note=execution.note,
             tags=execution.tags,
