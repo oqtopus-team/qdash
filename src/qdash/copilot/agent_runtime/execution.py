@@ -349,6 +349,8 @@ async def run_litellm_responses(
         kwargs["text"] = text_format
     if config.model.temperature is not None:
         kwargs["temperature"] = config.model.temperature
+
+    # Bedrock keeps tool definitions during finalization; the prompt prevents more calls.
     keep_tools_for_finalization = config.model.provider.lower() == "bedrock"
 
     async def _create(**kw: Any) -> Any:
@@ -382,6 +384,7 @@ async def run_litellm_responses(
                             final_input.append(dumped)
                     if keep_tools_for_finalization:
                         final_input.append(build_responses_finalization_item("Tool calls completed."))
+                    # Keep tools only for Bedrock; other providers finalize without tools.
                     final_kwargs = (
                         dict(kwargs)
                         if keep_tools_for_finalization
@@ -490,6 +493,7 @@ async def run_litellm_responses(
                 if dumped:
                     final_input.append(dumped)
             final_input.append(build_responses_finalization_item(stop_reason))
+            # Keep tools only for Bedrock; other providers finalize without tools.
             final_kwargs = (
                 dict(kwargs)
                 if keep_tools_for_finalization
@@ -512,6 +516,7 @@ async def run_litellm_responses(
                 final_input.append(dumped)
         if keep_tools_for_finalization:
             final_input.append(build_responses_finalization_item("Finalize the response."))
+        # Keep tools only for Bedrock; other providers finalize without tools.
         final_kwargs = (
             dict(kwargs)
             if keep_tools_for_finalization
@@ -727,10 +732,12 @@ async def run_litellm_completion_with_tools(
     else:
         stop_reason = f"Reached the maximum number of tool rounds ({max_tool_rounds})."
 
+    # Bedrock keeps tool definitions during finalization; the prompt prevents more calls.
     keep_tools_for_finalization = config.model.provider.lower() == "bedrock"
 
     if stop_reason is not None:
         logger.warning("Finalizing tool loop without further tool calls: %s", stop_reason)
+        # Keep tools only for Bedrock; other providers finalize without tools.
         final_kwargs = (
             dict(base_kwargs)
             if keep_tools_for_finalization
@@ -744,6 +751,7 @@ async def run_litellm_completion_with_tools(
         last_message = _completion_message(response)
 
     if stop_reason is None and tool_call_counts and last_message is not None:
+        # Keep tools only for Bedrock; other providers finalize without tools.
         final_kwargs = (
             dict(base_kwargs)
             if keep_tools_for_finalization
