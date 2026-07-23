@@ -36,12 +36,15 @@ class Configure(QubexTask):
         ]
 
         print(labels)
-        exp.system_manager.load(
-            chip_id=exp.chip_id,
-            config_dir=exp.config_path,
-            params_dir=exp.params_path,
-            targets_to_exclude=labels,
-        )
+        load_kwargs: dict[str, object] = {
+            "chip_id": exp.chip_id,
+            "config_dir": exp.config_path,
+            "params_dir": exp.params_path,
+            "targets_to_exclude": labels,
+        }
+        if hasattr(exp, "configuration_mode"):
+            load_kwargs["configuration_mode"] = exp.configuration_mode
+        exp.system_manager.load(**load_kwargs)
         print(f"[Configure] Pushing system_manager for {label} (box_ids={exp.box_ids})")
         exp.system_manager.push(box_ids=exp.box_ids, confirm=False)
         print(f"[Configure] Done for {label}")

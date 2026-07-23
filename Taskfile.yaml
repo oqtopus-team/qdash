@@ -352,12 +352,7 @@ tasks:
   scan-leaks-staged:
     desc: Run Betterleaks on staged files only (same as pre-commit)
     cmds:
-      - |
-        if command -v betterleaks >/dev/null 2>&1; then
-          betterleaks git . --pre-commit --staged --verbose
-        else
-          echo "betterleaks not installed; skipping staged leak scan"
-        fi
+      - bash scripts/scan_staged_leaks.sh --verbose
 
   # =============================================================================
   # Local Check (run before push)

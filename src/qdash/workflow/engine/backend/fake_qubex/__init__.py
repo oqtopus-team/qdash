@@ -10,8 +10,8 @@ from .simulation import (
 try:
     from qubex import PulseSchedule, pulse
 except ImportError:
-    PulseSchedule = None  # type: ignore[assignment]
-    pulse = None  # type: ignore[assignment]
+    PulseSchedule = None  # type: ignore[assignment,unused-ignore]
+    pulse = None  # type: ignore[assignment,unused-ignore]
 
 Experiment = FakeExperiment
 
