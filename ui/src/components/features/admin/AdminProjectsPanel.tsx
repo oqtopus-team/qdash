@@ -56,7 +56,7 @@ export function AdminProjectsPanel({
                     </span>
                   ) : (
                     <button
-                      className="btn btn-xs btn-error btn-ghost"
+                      className="btn btn-xs btn-error btn-outline"
                       onClick={() => onDeleteProject(project)}
                     >
                       Delete
@@ -112,7 +112,7 @@ export function AdminProjectsPanel({
                         </span>
                       ) : (
                         <button
-                          className="btn btn-sm btn-error btn-ghost"
+                          className="btn btn-sm btn-error btn-outline"
                           onClick={() => onDeleteProject(project)}
                         >
                           Delete
