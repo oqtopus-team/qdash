@@ -8,7 +8,9 @@ jobs:
   claude-review:
     if: >
       github.event.pull_request.head.ref != 'develop' &&
-      github.event.pull_request.head.ref != 'main'
+      github.event.pull_request.head.ref != 'main' &&
+      !startsWith(github.event.pull_request.head.ref, 'dependabot/') &&
+      !startsWith(github.event.pull_request.head.ref, 'renovate/')
     runs-on: ubuntu-latest
     permissions:
       contents: read
