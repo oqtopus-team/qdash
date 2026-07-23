@@ -1,4 +1,4 @@
 pre-commit:
   commands:
     betterleaks:
-      run: betterleaks git --pre-commit --staged --no-banner
+      run: bash scripts/scan_staged_leaks.sh --no-banner
