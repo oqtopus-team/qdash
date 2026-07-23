@@ -120,7 +120,7 @@ class CheckFineChevron(QubexTask):
         figures = [base_fig, marked_fig]
 
         qubit_freq = self.output_parameters["qubit_frequency"].value
-        if qubit_freq is not None and qubit_freq < 3.0:
+        if qubit_freq is not None and qubit_freq < 2.5:
             error_msg = f"Qubit frequency too low for qid={qid}: {qubit_freq:.6f} GHz < 3.0 GHz"
             print(f"[ERROR] {error_msg}")
             return PostProcessResult(

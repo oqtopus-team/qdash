@@ -307,7 +307,7 @@ class CheckQubitSpectroscopy(QubexTask):
         # Validate qubit frequency range.
         # We still return figures so they are saved before the task is marked failed.
         # Invalid outputs are excluded so they are not persisted to the DB.
-        if estimated_frequency < 3.0:
+        if estimated_frequency < 2.5:
             error_msg = (
                 f"Qubit frequency too low for qid={qid}: {estimated_frequency:.6f} GHz < 3.0 GHz"
             )
