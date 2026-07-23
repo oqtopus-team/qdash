@@ -41,7 +41,6 @@ export function FlowImportsPanel({ compact = false }: FlowImportsPanelProps) {
   );
 
   return (
-    // h-full: fills height even in block-layout parents (e.g. react-resizable-panels Panel), where flex-1 has no effect
     <div className="h-full flex-1 flex flex-col overflow-hidden bg-base-300">
       {/* File Tabs */}
       <div
