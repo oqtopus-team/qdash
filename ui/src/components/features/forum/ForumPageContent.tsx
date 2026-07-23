@@ -449,7 +449,7 @@ function ForumThreadPreviewSidebar({
       </button>
 
       {postId && (
-        <div className="pr-8">
+        <div className="pr-8 pt-8">
           {isLoading ? (
             <div className="flex justify-center py-12">
               <span className="loading loading-spinner loading-lg" />
