@@ -292,7 +292,7 @@ After installing the tools, enable the git hooks:
 lefthook install
 ```
 
-> Lefthook gracefully skips if the binary is not found, so environments without it (e.g., Windows without manual install) will not be blocked.
+> The pre-commit hook requires Betterleaks. Install it before enabling Lefthook; otherwise commits fail closed instead of bypassing the staged leak scan.
 
 ## Environment Variables
 

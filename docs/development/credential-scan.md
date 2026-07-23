@@ -31,7 +31,7 @@ The result is a clear division of labor: Betterleaks is the strict, fast, syntac
 
 ### Lefthook
 
-`lefthook.yml` defines a single pre-commit command that calls `scripts/scan_staged_leaks.sh`. The helper copies staged index contents into a temporary tree and scans that tree with Betterleaks, avoiding Betterleaks' git-diff integration while still checking exactly the files about to be committed. Running `lefthook install` once writes the git hook into `.git/hooks/`. If the Betterleaks binary is missing, the helper skips the step rather than failing the commit, so contributors on platforms without the binary are not blocked.
+`lefthook.yml` defines a single pre-commit command that calls `scripts/scan_staged_leaks.sh`. The helper copies staged index contents into a temporary tree and scans that tree with Betterleaks, avoiding Betterleaks' git-diff integration while still checking exactly the files about to be committed. Running `lefthook install` once writes the git hook into `.git/hooks/`. If the Betterleaks binary is missing, the helper fails closed so commits cannot proceed without the staged leak scan.
 
 ### Betterleaks
 
