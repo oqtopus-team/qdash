@@ -12,7 +12,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
+exclude-newer = "2026-07-13T12:59:47.185552Z"
 exclude-newer-span = "P3D"
 
 [manifest]
@@ -1223,7 +1223,7 @@ name = "importlib-metadata"
 version = "9.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp" },
+    { name = "zipp", marker = "python_full_version < '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a9/01/15bb152d77b21318514a96f43af312635eb2500c96b55398d020c93d86ea/importlib_metadata-9.0.0.tar.gz", hash = "sha256:a4f57ab599e6a2e3016d7595cfd72eb4661a5106e787a95bcc90c7105b831efc", size = 56405, upload-time = "2026-03-20T06:42:56.999Z" }
 wheels = [
@@ -2222,7 +2222,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -3101,6 +3101,7 @@ dependencies = [
     { name = "reportlab" },
     { name = "ruff" },
     { name = "scipy" },
+    { name = "slack-sdk" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -3133,6 +3134,7 @@ requires-dist = [
     { name = "reportlab", specifier = ">=4.4.1" },
     { name = "ruff", specifier = "==0.15.14" },
     { name = "scipy" },
+    { name = "slack-sdk", specifier = "==3.41.0" },
     { name = "uvicorn", extras = ["standard"] },
 ]
 

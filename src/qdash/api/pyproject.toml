@@ -32,6 +32,7 @@ dependencies = [
     "python-json-logger>=3.3.0",
     "openai>=1.0.0",
     "prefect-client",
+    "slack-sdk==3.41.0",
 ]
 
 [tool.uv]

@@ -3930,7 +3930,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Settings"
+                  "$ref": "#/components/schemas/SettingsResponse"
                 }
               }
             }
@@ -26420,7 +26420,7 @@
         "title": "SeedImportSource",
         "description": "Source of seed parameters."
       },
-      "Settings": {
+      "SettingsResponse": {
         "properties": {
           "env": {
             "type": "string",
@@ -26442,11 +26442,6 @@
           "prefect_api_url": {
             "type": "string",
             "title": "Prefect Api Url"
-          },
-          "slack_bot_token": {
-            "type": "string",
-            "title": "Slack Bot Token",
-            "default": ""
           },
           "slack_channel_id": {
             "type": "string",
@@ -26516,7 +26511,6 @@
             "default": false
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "env",
@@ -26525,7 +26519,7 @@
           "mongo_data_path",
           "calib_data_path"
         ],
-        "title": "Settings",
+        "title": "SettingsResponse",
         "description": "Settings for the QDash application."
       },
       "SubmitAgentActionRequest": {

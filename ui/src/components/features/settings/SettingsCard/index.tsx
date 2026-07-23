@@ -5,10 +5,10 @@ import { useEffect, useState, useCallback } from "react";
 import { Toast } from "../Toast";
 
 import { useGetSettings } from "@/client/settings/settings";
-import { Settings } from "@/schemas/settings";
+import { SettingsResponse } from "@/schemas/settingsResponse";
 
 export function SettingsCard() {
-  const [setting, setSetting] = useState<Settings | null>(null);
+  const [setting, setSetting] = useState<SettingsResponse | null>(null);
   const [showToast, setShowToast] = useState(false);
   const { data, isError, isLoading } = useGetSettings();
 

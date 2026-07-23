@@ -237,7 +237,7 @@ import type {
   SearchNoteEventsParams,
   SeedImportRequest,
   SeedImportResponse,
-  Settings,
+  SettingsResponse,
   SubmitAgentActionRequest,
   SuccessResponse,
   TaskFileSettings,
@@ -1681,8 +1681,8 @@ const deleteCopilotChatSession = (
  */
 const getSettings = (
 
- options?: SecondParameter<typeof qdashRequest<Settings>>,) => {
-      return qdashRequest<Settings>(
+ options?: SecondParameter<typeof qdashRequest<SettingsResponse>>,) => {
+      return qdashRequest<SettingsResponse>(
       {url: `/settings`, method: 'GET'
     },
       options);
