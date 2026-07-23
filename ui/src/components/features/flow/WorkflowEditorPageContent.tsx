@@ -1584,7 +1584,9 @@ export function WorkflowEditorPageContent() {
             </div>
           </div>
           {/* Editor with Tab Switcher */}
-          <div className="flex-1 flex flex-col">
+          {/* min-w-0 (and minWidth: 0 on the split view panels) keeps Monaco's explicit px
+              widths from inflating the layout via min-content sizing */}
+          <div className="flex-1 flex flex-col min-w-0">
             {/* Tab Bar */}
             <div className="flex items-end bg-base-200 border-b border-base-300 h-9">
               <button
@@ -1668,8 +1670,11 @@ export function WorkflowEditorPageContent() {
 
             {/* Tab Content */}
             {isSplitView ? (
-              <PanelGroup orientation="horizontal" style={{ flex: 1, overflow: "hidden" }}>
-                <Panel defaultSize="60%" minSize="20%" style={{ overflow: "hidden" }}>
+              <PanelGroup
+                orientation="horizontal"
+                style={{ flex: 1, minWidth: 0, overflow: "hidden" }}
+              >
+                <Panel defaultSize="60%" minSize="20%" style={{ overflow: "hidden", minWidth: 0 }}>
                   <Editor
                     height="100%"
                     language="python"
@@ -1687,7 +1692,7 @@ export function WorkflowEditorPageContent() {
                   />
                 </Panel>
                 <PanelResizeHandle className="w-1 bg-base-300 hover:bg-primary/50 transition-colors cursor-col-resize" />
-                <Panel defaultSize="40%" minSize="15%" style={{ overflow: "hidden" }}>
+                <Panel defaultSize="40%" minSize="15%" style={{ overflow: "hidden", minWidth: 0 }}>
                   <FlowImportsPanel />
                 </Panel>
               </PanelGroup>
