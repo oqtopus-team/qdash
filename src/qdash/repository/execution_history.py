@@ -69,6 +69,29 @@ class MongoExecutionHistoryRepository:
         )
         return results
 
+    def count_by_chip(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+    ) -> int:
+        """Count executions for a chip.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+
+        Returns
+        -------
+        int
+            Total number of execution history documents matching the filter
+
+        """
+        return ExecutionHistoryDocument.find({"project_id": project_id, "chip_id": chip_id}).count()
+
     def find_by_id(
         self,
         project_id: str,

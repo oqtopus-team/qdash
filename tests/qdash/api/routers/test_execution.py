@@ -525,6 +525,7 @@ class TestListExecutions:
         assert response.status_code == 200
         data = response.json()
         assert data["executions"] == []
+        assert data["total"] == 0
 
     def test_list_executions_with_data(
         self,
@@ -543,6 +544,44 @@ class TestListExecutions:
         data = response.json()
         assert len(data["executions"]) == 1
         assert data["executions"][0]["execution_id"] == "exec-001"
+        assert data["total"] == 1
+
+    def test_list_executions_total_reflects_all_records(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        """Test that total reflects all records even when pagination limits results."""
+        now = datetime.now(tz=timezone.utc)
+        for i in range(3):
+            execution = ExecutionHistoryDocument(
+                project_id="test_project",
+                execution_id=f"exec-multi-{i:03d}",
+                name="test_flow",
+                status="completed",
+                chip_id="chip-1",
+                username="test_user",
+                tags=["test"],
+                note={},
+                calib_data_path="/tmp/calib",
+                message="completed",
+                system_info=SystemInfoModel(),
+                start_at=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
+                end_at=now,
+                elapsed_time=10.0,
+            )
+            execution.insert()
+
+        response = test_client.get(
+            "/executions",
+            headers=auth_headers,
+            params={"chip_id": "chip-1", "skip": 2, "limit": 2},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["executions"]) == 1
+        assert data["total"] == 3
 
 
 class TestGetExecution:

@@ -154,8 +154,13 @@ def list_executions(
         skip=skip,
         limit=limit,
     )
+    total = execution_service.count_executions(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+    )
     return ListExecutionsResponse(
         executions=executions,
+        total=total,
         skip=skip,
         limit=limit,
     )
