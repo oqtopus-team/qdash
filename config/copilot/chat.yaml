@@ -4,21 +4,21 @@
 # Selectable models for general chat (UI shows a dropdown). The first entry is
 # the default. The configured model in config.yaml is also offered as a fallback.
 chat_models:
-  # - provider: ollama
-  #   name: nvidia/Gemma-4-31B-IT-NVFP4
-  #   api_style: completion
-  #   # Ollama endpoint for LiteLLM. Set OLLAMA_BASE_URL to your Ollama server URL,
-  #   # e.g. http://localhost:11434.
-  #   base_url: env:OLLAMA_BASE_URL
-  #   # Optional. LiteLLM forwards this when set.
-  #   api_key_env: OLLAMA_API_KEY
-  #   keep_alive: 30m
-  #   temperature: 1.0
-  #   top_p: 0.95
-  #   top_k: 64
-  #   reasoning_effort: none
-  #   disable_thinking_instruction: true
-  #   max_output_tokens: 4096
+  - provider: ollama
+    name: nvidia/Gemma-4-31B-IT-NVFP4
+    api_style: completion
+    # Ollama endpoint for LiteLLM. Set OLLAMA_BASE_URL to your Ollama server URL,
+    # e.g. http://localhost:11434.
+    base_url: env:OLLAMA_BASE_URL
+    # Optional. LiteLLM forwards this when set.
+    api_key_env: OLLAMA_API_KEY
+    keep_alive: 30m
+    temperature: 1.0
+    top_p: 0.95
+    top_k: 64
+    reasoning_effort: none
+    disable_thinking_instruction: true
+    max_output_tokens: 4096
   - provider: ollama
     name: gemma4:31b
     api_style: completion
@@ -50,23 +50,23 @@ chat_models:
   #   reasoning_effort: high
   #   max_output_tokens: 4096
 
-  - provider: vllm
-    name: Gemma-4-31B-IT-NVFP4
-    api_style: responses
-    base_url: env:VLLM_BASE_URL
-    api_key_env: VLLM_API_KEY
-    temperature: 1.0
-    top_p: 0.95
-    top_k: 64
-    reasoning_effort: none
-    disable_thinking_instruction: true
-    max_output_tokens: 2048
+  # - provider: vllm
+  #   name: Gemma-4-31B-IT-NVFP4
+  #   api_style: responses
+  #   base_url: env:VLLM_BASE_URL
+  #   api_key_env: VLLM_API_KEY
+  #   temperature: 1.0
+  #   top_p: 0.95
+  #   top_k: 64
+  #   reasoning_effort: none
+  #   disable_thinking_instruction: true
+  #   max_output_tokens: 2048
 
-  - provider: bedrock
-    name: jp.anthropic.claude-sonnet-4-6
-    api_style: responses
-    temperature: 0.7
-    max_output_tokens: 4096
+  # - provider: bedrock
+  #   name: jp.anthropic.claude-sonnet-4-6
+  #   api_style: responses
+  #   temperature: 0.7
+  #   max_output_tokens: 4096
 
 
 # System prompt for the AI assistant
