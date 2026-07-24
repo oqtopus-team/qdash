@@ -413,13 +413,17 @@ async def run_analysis(
         wrapped_executors, collected_charts = None, []
 
     if api_style == "completion":
-        system_prompt = _build_system_prompt(
-            context,
-            config=config,
-            include_response_format=True,
-            has_expected_images=has_expected,
-            has_experiment_image=has_experiment,
-        ) + CHART_SYSTEM_PROMPT + CHAT_COMPLETIONS_STRICT_EMULATION
+        system_prompt = (
+            _build_system_prompt(
+                context,
+                config=config,
+                include_response_format=True,
+                has_expected_images=has_expected,
+                has_experiment_image=has_experiment,
+            )
+            + CHART_SYSTEM_PROMPT
+            + CHAT_COMPLETIONS_STRICT_EMULATION
+        )
         messages = _build_messages(
             system_prompt,
             user_message,

@@ -383,7 +383,9 @@ async def run_litellm_responses(
                         if dumped:
                             final_input.append(dumped)
                     if keep_tools_for_finalization:
-                        final_input.append(build_responses_finalization_item("Tool calls completed."))
+                        final_input.append(
+                            build_responses_finalization_item("Tool calls completed.")
+                        )
                     # Keep tools only for Bedrock; other providers finalize without tools.
                     final_kwargs = (
                         dict(kwargs)
@@ -725,7 +727,9 @@ async def run_litellm_completion_with_tools(
                 output_str = (
                     output_str[:MAX_TOOL_RESULT_CHARS] + "... [TRUNCATED - result too large]"
                 )
-            msgs.append({"role": "tool", "tool_call_id": _item_get(tc, "id"), "content": output_str})
+            msgs.append(
+                {"role": "tool", "tool_call_id": _item_get(tc, "id"), "content": output_str}
+            )
 
         if on_status:
             await on_status("thinking")

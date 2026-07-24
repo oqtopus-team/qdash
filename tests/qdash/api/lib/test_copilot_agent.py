@@ -126,7 +126,6 @@ def test_build_provider_response_schema_leaves_non_bedrock_schema_unchanged() ->
     assert schema is BLOCKS_RESPONSE_SCHEMA
 
 
-
 def test_build_messages_includes_multiple_target_images_with_labels() -> None:
     messages = _build_messages(
         "system",

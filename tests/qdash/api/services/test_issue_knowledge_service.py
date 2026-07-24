@@ -913,6 +913,7 @@ class TestCallLlmExtract:
     @pytest.mark.asyncio
     async def test_returns_empty_on_invalid_json(self, mock_config):
         """Returns empty dict when LLM returns invalid JSON."""
+
         async def _completion(_config, **_kwargs):
             message = MagicMock()
             message.content = "This is not valid JSON at all"
@@ -934,6 +935,7 @@ class TestCallLlmExtract:
     @pytest.mark.asyncio
     async def test_returns_empty_on_api_error(self, mock_config):
         """Returns empty dict when the LLM API raises an exception."""
+
         async def _completion(_config, **_kwargs):
             raise RuntimeError("API unreachable")
 
@@ -953,6 +955,7 @@ class TestCallLlmExtract:
     @pytest.mark.asyncio
     async def test_returns_empty_on_empty_response(self, mock_config):
         """Returns empty dict when the LLM returns empty content."""
+
         async def _completion(_config, **_kwargs):
             message = MagicMock()
             message.content = ""
@@ -998,6 +1001,7 @@ class TestCallLlmExtract:
     @pytest.mark.asyncio
     async def test_returns_empty_on_none_content(self, mock_config):
         """Returns empty dict when the LLM message content is None."""
+
         async def _completion(_config, **_kwargs):
             message = MagicMock()
             message.content = None
