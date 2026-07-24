@@ -3,7 +3,7 @@
 This module exposes the callable surface used by API routes and workflows.
 Implementation details live under ``agent_runtime/``:
 
-- ``client``: OpenAI-compatible client construction
+- ``client``: LLM request construction
 - ``execution``: Responses / Chat Completions loops and tool orchestration
 - ``parsing``: response parsing and fallback handling
 - ``rendering``: blocks rendering and compact summaries
@@ -17,19 +17,12 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-from qdash.copilot.agent_runtime import client as _agent_client
 from qdash.copilot.agent_runtime import execution as _agent_execution
 from qdash.copilot.agent_runtime.parsing import (
     has_real_blocks as _has_real_blocks,
 )
 from qdash.copilot.agent_runtime.parsing import (
     parse_blocks_response as _parse_blocks_response,
-)
-from qdash.copilot.agent_runtime.parsing import (
-    parse_response as _parse_response,
-)
-from qdash.copilot.agent_runtime.rendering import (
-    legacy_to_blocks as _legacy_to_blocks,
 )
 from qdash.copilot.agent_runtime.schemas import BLOCKS_RESPONSE_SCHEMA
 from qdash.copilot.agent_runtime.translation import (
@@ -44,8 +37,6 @@ from qdash.copilot.prompts.chat import (
 from qdash.copilot.prompts.models import AnalysisPromptOptions, ChatPromptContext
 
 if TYPE_CHECKING:
-    from openai import AsyncOpenAI
-
     from qdash.copilot.agent_runtime.types import (
         OnStatusHook,
         OnToolCallHook,
@@ -56,11 +47,6 @@ if TYPE_CHECKING:
     from qdash.copilot.tooling.sandbox import SandboxChartSpec
 
 logger = logging.getLogger(__name__)
-
-
-def _build_client(config: CopilotConfig) -> AsyncOpenAI:
-    """Build an AsyncOpenAI client based on provider configuration."""
-    return _agent_client.build_client(config)
 
 
 def _build_language_instruction(config: CopilotConfig | None) -> str:
@@ -300,8 +286,7 @@ def _inject_collected_charts(
     return _agent_execution.inject_collected_charts(result, collected_charts)
 
 
-async def _run_responses_api(
-    client: AsyncOpenAI,
+async def _run_litellm_responses(
     system_prompt: str,
     input_items: list[dict[str, Any]],
     config: CopilotConfig,
@@ -312,9 +297,8 @@ async def _run_responses_api(
     on_tool_call: OnToolCallHook = None,
     on_status: OnStatusHook = None,
 ) -> str:
-    """Call OpenAI Responses API and return the output text."""
-    return await _agent_execution.run_responses_api(
-        client,
+    """Call LiteLLM Responses API and return the output text."""
+    return await _agent_execution.run_litellm_responses(
         system_prompt,
         input_items,
         config,
@@ -331,8 +315,7 @@ def _agent_tools_for_chat_completions() -> list[dict[str, Any]]:
     return _agent_execution.agent_tools_for_chat_completions()
 
 
-async def _run_chat_completions_with_tools(
-    client: AsyncOpenAI,
+async def _run_litellm_completion_with_tools(
     messages: list[dict[str, Any]],
     config: CopilotConfig,
     tool_executors: ToolExecutors,
@@ -343,9 +326,8 @@ async def _run_chat_completions_with_tools(
     on_tool_call: OnToolCallHook = None,
     on_status: OnStatusHook = None,
 ) -> str:
-    """Tool-calling loop using the Chat Completions API."""
-    return await _agent_execution.run_chat_completions_with_tools(
-        client,
+    """Tool-calling loop using LiteLLM Chat Completions."""
+    return await _agent_execution.run_litellm_completion_with_tools(
         messages,
         config,
         tool_executors,
@@ -357,13 +339,12 @@ async def _run_chat_completions_with_tools(
     )
 
 
-async def _run_chat_completions(
-    client: AsyncOpenAI,
+async def _run_litellm_completion(
     messages: list[dict[str, Any]],
     config: CopilotConfig,
 ) -> str:
-    """Call Chat Completions API (Ollama fallback) and return the content."""
-    return await _agent_execution.run_chat_completions(client, messages, config)
+    """Call LiteLLM Chat Completions and return the content."""
+    return await _agent_execution.run_litellm_completion(messages, config)
 
 
 async def run_analysis(
@@ -404,7 +385,6 @@ async def run_analysis(
         Previous conversation messages.
     tool_executors : ToolExecutors | None
         Optional dict mapping tool names to executor callables.
-        Only used for OpenAI Responses API path; ignored for Ollama.
 
     Returns
     -------
@@ -413,29 +393,36 @@ async def run_analysis(
 
     """
     # Allow a dedicated analysis model (e.g. calibration-specialized LLM) to
-    # override the general chat model for task result analysis. Keep a
-    # reference to the original general model so we can use it for post-
-    # processing (e.g. translation to the user's response language).
-    general_model = config.model
+    # override the general chat model for task result analysis.
     analysis_model = config.analysis_model
     if analysis_model is None and config.analysis_models:
         analysis_model = config.analysis_models[0]
     if analysis_model is not None:
         config = config.model_copy(update={"model": analysis_model})
-    client = _build_client(config)
-    provider = config.model.provider
+    api_style = config.model.api_style
 
     has_expected = bool(expected_images)
     has_experiment = bool(experiment_images or image_base64)
 
-    if provider == "ollama":
-        # Ollama only supports Chat Completions API (no tool support)
-        system_prompt = _build_system_prompt(
-            context,
-            config=config,
-            include_response_format=True,
-            has_expected_images=has_expected,
-            has_experiment_image=has_experiment,
+    if tool_executors:
+        wrapped_executors: ToolExecutors | None = None
+        data_store: dict[str, Any] = {}
+        rate_limited = _wrap_rate_limited_executors(tool_executors)
+        wrapped_executors, collected_charts = _wrap_tool_executors(rate_limited, data_store)
+    else:
+        wrapped_executors, collected_charts = None, []
+
+    if api_style == "completion":
+        system_prompt = (
+            _build_system_prompt(
+                context,
+                config=config,
+                include_response_format=True,
+                has_expected_images=has_expected,
+                has_experiment_image=has_experiment,
+            )
+            + CHART_SYSTEM_PROMPT
+            + CHAT_COMPLETIONS_STRICT_EMULATION
         )
         messages = _build_messages(
             system_prompt,
@@ -445,19 +432,28 @@ async def run_analysis(
             expected_images,
             experiment_images,
         )
-        content = await _run_chat_completions(client, messages, config)
-        # Ollama still uses legacy schema; convert to blocks
-        response = _parse_response(content)
-        # Calibration-specialized models often ignore language instructions and
-        # may even answer in a third language. If the user expects a different
-        # language, translate the free-form fields as a post-processing step.
-        target_lang = (config.response_language or "en").lower()
-        should_translate = target_lang != "en"
-        if should_translate:
-            response = await _translate_analysis_response(response, target_lang, general_model)
-        return _legacy_to_blocks(response, config)
-    else:
-        # OpenAI: use Responses API with blocks schema (strict: False for flexible chart objects)
+        if wrapped_executors:
+            content = await _run_litellm_completion_with_tools(
+                messages,
+                config,
+                wrapped_executors,
+                response_schema=BLOCKS_RESPONSE_SCHEMA,
+                strict_schema=True,
+                schema_name="blocks_response",
+                on_tool_call=on_tool_call,
+                on_status=on_status,
+            )
+        else:
+            content = await _run_litellm_completion(messages, config)
+        parsed = _parse_blocks_response(content, config)
+        if not _has_real_blocks(parsed):
+            logger.warning(
+                "completion: BLOCKS parse fell back to single text block "
+                "(model emitted free text). content_chars=%d",
+                len(content or ""),
+            )
+        return _inject_collected_charts(parsed, collected_charts)
+    if api_style == "responses":
         system_prompt = (
             _build_system_prompt(
                 context,
@@ -474,18 +470,7 @@ async def run_analysis(
             expected_images,
             experiment_images,
         )
-
-        # Wrap tools: data store + chart collection + rate limiting
-        if tool_executors:
-            wrapped_executors: ToolExecutors | None = None
-            data_store: dict[str, Any] = {}
-            rate_limited = _wrap_rate_limited_executors(tool_executors)
-            wrapped_executors, collected_charts = _wrap_tool_executors(rate_limited, data_store)
-        else:
-            wrapped_executors, collected_charts = None, []
-
-        content = await _run_responses_api(
-            client,
+        content = await _run_litellm_responses(
             system_prompt,
             input_items,
             config,
@@ -496,6 +481,7 @@ async def run_analysis(
             on_status=on_status,
         )
         return _inject_collected_charts(_parse_blocks_response(content, config), collected_charts)
+    raise ValueError(f"Unsupported api_style: {config.model.api_style}")
 
 
 def blocks_to_markdown(result: dict[str, Any]) -> str:
@@ -555,7 +541,7 @@ async def run_chat(
     on_tool_call: OnToolCallHook = None,
     on_status: OnStatusHook = None,
 ) -> dict[str, Any]:
-    """Run a generic chat using OpenAI-compatible API.
+    """Run a generic chat using the configured LiteLLM API style.
 
     Lightweight version of run_analysis that does not require TaskAnalysisContext.
     Optionally includes chip_id/qid context if provided.
@@ -566,8 +552,6 @@ async def run_chat(
         Blocks-format response: {"blocks": [...], "assessment": ...}
 
     """
-    client = _build_client(config)
-
     system_prompt = _build_chat_system_prompt(
         config=config,
         chip_id=chip_id,
@@ -582,10 +566,10 @@ async def run_chat(
     else:
         wrapped_executors, collected_charts = None, []
 
-    # OpenAI and Ollama 0.13.3+ expose /v1/responses (tool-call, json_schema,
-    # reasoning-item preservation). Providers that only ship /v1/chat/completions
-    # (e.g. DeepSeek) opt in via `api_style: chat_completions` in copilot/chat.yaml.
-    if config.model.api_style == "chat_completions":
+    # LiteLLM Responses is the default path. Providers that only expose Chat
+    # Completions opt in via `api_style: completion`.
+    api_style = config.model.api_style
+    if api_style == "completion":
         # ds4-server and similar providers expose tools and chat completions
         # but reject `response_format: json_schema` / strict mode. Reinforce
         # the BLOCKS contract in the system prompt so the model still emits a
@@ -598,8 +582,7 @@ async def run_chat(
             conversation_history,
         )
         if wrapped_executors:
-            content = await _run_chat_completions_with_tools(
-                client,
+            content = await _run_litellm_completion_with_tools(
                 messages,
                 config,
                 wrapped_executors,
@@ -610,19 +593,21 @@ async def run_chat(
                 on_status=on_status,
             )
         else:
-            content = await _run_chat_completions(client, messages, config)
+            content = await _run_litellm_completion(messages, config)
         parsed = _parse_blocks_response(content, config)
         if not _has_real_blocks(parsed):
             logger.warning(
-                "chat_completions: BLOCKS parse fell back to single text block "
+                "completion: BLOCKS parse fell back to single text block "
                 "(model emitted free text). content_chars=%d",
                 len(content or ""),
             )
         return _inject_collected_charts(parsed, collected_charts)
 
+    if api_style != "responses":
+        raise ValueError(f"Unsupported api_style: {config.model.api_style}")
+
     input_items = _build_input(user_message, image_base64, conversation_history)
-    content = await _run_responses_api(
-        client,
+    content = await _run_litellm_responses(
         system_prompt,
         input_items,
         config,
