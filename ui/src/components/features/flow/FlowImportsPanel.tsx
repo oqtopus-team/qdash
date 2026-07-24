@@ -41,7 +41,7 @@ export function FlowImportsPanel({ compact = false }: FlowImportsPanelProps) {
   );
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-base-300">
+    <div className="h-full flex-1 flex flex-col overflow-hidden bg-base-300">
       {/* File Tabs */}
       <div
         className={`flex bg-base-200 border-b border-base-300 overflow-x-auto ${
