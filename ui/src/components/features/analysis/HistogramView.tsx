@@ -864,7 +864,10 @@ export function HistogramView() {
                 </div>
               </div>
               {/* Desktop: Stats component */}
-              <div className="stats stats-horizontal shadow w-full hidden sm:inline-grid">
+              {/* grid-auto-columns:1fr keeps every column an equal, fixed width so the
+                  row doesn't reflow when the Yield value width changes while dragging
+                  the threshold slider (see issue #757). */}
+              <div className="stats stats-horizontal shadow w-full hidden sm:inline-grid [grid-auto-columns:1fr]">
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Count</div>
                   <div className="stat-value text-primary text-lg">{statistics.count}</div>
