@@ -1584,8 +1584,6 @@ export function WorkflowEditorPageContent() {
             </div>
           </div>
           {/* Editor with Tab Switcher */}
-          {/* min-w-0 (and minWidth: 0 on the split view panels) keeps Monaco's explicit px
-              widths from inflating the layout via min-content sizing */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Tab Bar */}
             <div className="flex items-end bg-base-200 border-b border-base-300 h-9">
