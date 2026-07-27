@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, type MutableRefObject } from "react";
+import { useEffect, useState, type MutableRefObject, type ReactNode } from "react";
 
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
@@ -67,24 +67,54 @@ type ForumBlock = Record<string, unknown> & {
   children?: ForumBlock[];
 };
 
-function textFromInlineContent(content: unknown): string {
+type ForumInlineContent = {
+  type?: string;
+  text?: unknown;
+  href?: unknown;
+  content?: unknown;
+};
+
+function safeLinkHref(href: unknown): string | null {
+  if (typeof href !== "string") return null;
+  const value = href.trim();
+  if (value.startsWith("/") || value.startsWith("#") || /^(https?:|mailto:)/i.test(value)) {
+    return value;
+  }
+  return null;
+}
+
+function renderInlineContent(content: unknown): ReactNode {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
-    .map((item) => {
+    .map((item, index) => {
       if (typeof item === "string") return item;
-      if (item && typeof item === "object" && "text" in item) {
-        const text = (item as { text?: unknown }).text;
-        return typeof text === "string" ? text : "";
+      if (!item || typeof item !== "object") return "";
+
+      const inline = item as ForumInlineContent;
+      if (inline.type === "link") {
+        const children = renderInlineContent(inline.content);
+        const href = safeLinkHref(inline.href);
+        if (!href) return children;
+        return (
+          <a
+            key={index}
+            href={href}
+            className="break-words text-primary underline underline-offset-2 hover:text-primary/80"
+          >
+            {children}
+          </a>
+        );
       }
-      return "";
+
+      return typeof inline.text === "string" ? inline.text : "";
     })
-    .join("");
+    .filter((item) => item !== "");
 }
 
 function renderViewerBlock(block: ForumBlock, index: number) {
   const props = block.props ?? {};
-  const text = textFromInlineContent(block.content);
+  const content = renderInlineContent(block.content);
   const children = Array.isArray(block.children) ? block.children : [];
 
   if (block.type === "image") {
@@ -120,42 +150,42 @@ function renderViewerBlock(block: ForumBlock, index: number) {
     const className = level === 1 ? "text-xl" : level === 2 ? "text-lg" : "text-base";
     return (
       <h3 key={key} className={`my-2 font-semibold ${className}`}>
-        {text}
+        {content}
       </h3>
     );
   }
   if (block.type === "bulletListItem") {
     return (
       <li key={key} className="ml-5 list-disc">
-        {text}
+        {content}
       </li>
     );
   }
   if (block.type === "numberedListItem") {
     return (
       <li key={key} className="ml-5 list-decimal">
-        {text}
+        {content}
       </li>
     );
   }
   if (block.type === "quote") {
     return (
       <blockquote key={key} className="my-2 border-l-2 border-base-300 pl-3 text-base-content/70">
-        {text}
+        {content}
       </blockquote>
     );
   }
   if (block.type === "codeBlock") {
     return (
       <pre key={key} className="my-2 overflow-x-auto rounded bg-base-200 p-3 text-xs">
-        <code>{text}</code>
+        <code>{content}</code>
       </pre>
     );
   }
 
   return (
     <div key={key} className="my-1">
-      {text && <p>{text}</p>}
+      {content && <p>{content}</p>}
       {children.length > 0 && <div className="ml-4">{children.map(renderViewerBlock)}</div>}
     </div>
   );
