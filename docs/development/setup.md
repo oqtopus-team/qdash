@@ -313,6 +313,9 @@ defaults and `.env.example` for the fake backend defaults:
 | `NEXT_PUBLIC_API_URL`     | -       | Public API URL for frontend |
 | `NEXT_PUBLIC_PREFECT_URL` | -       | Prefect dashboard URL       |
 | `NEXT_ALLOWED_DEV_ORIGINS` | -       | Additional hostnames allowed to access the Next.js dev server |
+| `SLACK_FORUM_NOTIFICATION` | `false` | Set to `true` to enable Slack notifications for forum activity (optional) |
+| `SLACK_BOT_TOKEN`         | -       | Slack Bot Token (`xoxb-…`) with `chat:write` scope (optional) |
+| `SLACK_FORUM_CHANNEL_ID`  | -       | Slack channel ID for forum notifications (optional) |
 
 For Qubex-backed runs, `CONFIG_PATH` must contain chip-specific Qubex configuration directories.
 QDash reads `<CONFIG_PATH>/<chip_id>/config` and `<CONFIG_PATH>/<chip_id>/params`; see

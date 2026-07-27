@@ -12,7 +12,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
+exclude-newer = "2026-07-13T12:59:47.185552Z"
 exclude-newer-span = "P3D"
 
 [manifest]
@@ -3101,6 +3101,7 @@ dependencies = [
     { name = "reportlab" },
     { name = "ruff" },
     { name = "scipy" },
+    { name = "slack-sdk" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -3133,6 +3134,7 @@ requires-dist = [
     { name = "reportlab", specifier = ">=4.4.1" },
     { name = "ruff", specifier = "==0.15.14" },
     { name = "scipy" },
+    { name = "slack-sdk", specifier = "==3.41.0" },
     { name = "uvicorn", extras = ["standard"] },
 ]
 

@@ -40,6 +40,7 @@ from qdash.api.services.project_service import ProjectService
 from qdash.api.services.provenance_service import ProvenanceService
 from qdash.api.services.reanalysis_service import ReanalysisService
 from qdash.api.services.seed_import_service import SeedImportService
+from qdash.api.services.slack_notification_service import SlackNotificationService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
@@ -341,7 +342,16 @@ def get_issue_service() -> IssueService:
 @cached_dependency_provider
 def get_forum_service() -> ForumService:
     """Get the forum service instance."""
-    return ForumService(notification_service=get_notification_service())
+    return ForumService(
+        notification_service=get_notification_service(),
+        slack_notification_service=get_slack_notification_service(),
+    )
+
+
+@cached_dependency_provider
+def get_slack_notification_service() -> SlackNotificationService:
+    """Get the Slack notification service instance."""
+    return SlackNotificationService()
 
 
 @cached_dependency_provider
