@@ -43,6 +43,9 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_chevron import Check
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_coarse_chevron import (
     CheckCoarseChevron,
 )
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_coarse_readout_params import (
+    CheckCoarseReadoutParams,
+)
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_dispersive_shift import (
     CheckDispersiveShift,
 )
@@ -94,6 +97,7 @@ __all__ = [
     "CheckBellStateTomography",
     "CheckChevron",
     "CheckCoarseChevron",
+    "CheckCoarseReadoutParams",
     "CheckControlAmplitude",
     "CheckCrossResonance",
     "CheckDRAGHPIPulse",

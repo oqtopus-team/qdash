@@ -12,10 +12,10 @@ from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
-class CheckOptimalReadoutFrequency(QubexTask):
+class CheckCoarseReadoutParams(QubexTask):
     """Task to check the Optimal Readout Frequency"""
 
-    name: str = "CheckOptimalReadoutFrequency"
+    name: str = "CheckCoarseReadoutParams"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
@@ -34,6 +34,7 @@ class CheckOptimalReadoutFrequency(QubexTask):
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "readout_frequency": ParameterModel(unit="GHz", description="Optimal Readout Frequency"),
+        "readout_amplitude": ParameterModel(unit="a.u.", description="Optimal Readout Amplitude"),
     }
 
     def postprocess(
@@ -41,24 +42,27 @@ class CheckOptimalReadoutFrequency(QubexTask):
     ) -> PostProcessResult:
         """Process the results of the task."""
         result = run_result.raw_result
-        self.output_parameters["readout_frequency"].value = result.data["optimal_frequency"]
+        self.output_parameters["readout_frequency"].value = result.data["optimal_readout_frequency"]
+        self.output_parameters["readout_amplitude"].value = result.data["optimal_readout_amplitude"]
         output_parameters = self.attach_execution_id(execution_id)
-        fig = result.data["fig"]
+        fig = result.figure
         figures = [fig]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""
+        import qubex
+
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
 
         # Apply frequency override if qubit_frequency was explicitly provided
         with self._apply_frequency_override(backend, qid):
-            result = exp.find_optimal_readout_frequency(
+            result = qubex.contrib.characterize_coarse_readout_parameters(
+                exp,
                 target=label,
                 n_shots=self.run_parameters["shots"].get_value(),
                 shot_interval=self.run_parameters["interval"].get_value(),
-                objective="fidelity",
             )
 
         self.save_calibration(backend)
