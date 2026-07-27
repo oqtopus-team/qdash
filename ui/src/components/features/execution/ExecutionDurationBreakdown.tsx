@@ -3,10 +3,14 @@
 import { useMemo, useState, useEffect } from "react";
 
 import { useQueries } from "@tanstack/react-query";
-import { ArrowRight } from "lucide-react";
+import type Plotly from "plotly.js";
+import { ArrowRight, LineChart, XCircle } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 
 import { getExecution, getGetExecutionQueryKey } from "@/client/execution/execution";
+import { TaskSelector } from "@/components/selectors/TaskSelector";
+import { EmptyState } from "@/components/ui/EmptyState";
 import type { ExecutionResponseDetail, ExecutionResponseSummary, Task } from "@/schemas";
 
 interface ExecutionDurationBreakdownProps {
@@ -17,11 +21,14 @@ interface ExecutionDurationBreakdownProps {
   allItemsHref?: string;
   padded?: boolean;
   className?: string;
+  showTaskDurationTrend?: boolean;
 }
 
 interface TaskDurationSample {
   task: Task;
   durationSeconds: number;
+  executionId: string;
+  startedAt: string | null;
 }
 
 interface TaskNameDurationStats {
@@ -34,7 +41,10 @@ interface TaskNameDurationStats {
   maxSeconds: number;
   successRate: number;
   totalShare: number;
+  samples: TaskDurationSample[];
 }
+
+const Plot = dynamic(() => import("@/components/charts/Plot"), { ssr: false });
 
 const percentile = (values: number[], targetPercentile: number) => {
   if (values.length === 0) return 0;
@@ -117,8 +127,10 @@ export function ExecutionDurationBreakdown({
   allItemsHref,
   padded = true,
   className = "",
+  showTaskDurationTrend = false,
 }: ExecutionDurationBreakdownProps) {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [selectedTaskName, setSelectedTaskName] = useState<string | null>(null);
 
   // Get list of available tags
   useEffect(() => {
@@ -162,11 +174,12 @@ export function ExecutionDurationBreakdown({
       });
 
     const allTasks = executionDetails.flatMap(({ detail }) => detail.task);
-    const durationSamples: TaskDurationSample[] = allTasks
-      .map((task) => {
+    const durationSamples: TaskDurationSample[] = executionDetails
+      .flatMap(({ executionId, detail }) => detail.task.map((task) => ({ executionId, task })))
+      .map(({ executionId, task }) => {
         const durationSeconds = getDurationSeconds(task);
         if (durationSeconds === null) return null;
-        return { task, durationSeconds };
+        return { task, durationSeconds, executionId, startedAt: task.start_at ?? null };
       })
       .filter((sample): sample is TaskDurationSample => sample !== null);
 
@@ -199,6 +212,7 @@ export function ExecutionDurationBreakdown({
           maxSeconds: Math.max(...durations),
           successRate: samples.length > 0 ? (completedCount / samples.length) * 100 : 0,
           totalShare: totalTaskSeconds > 0 ? (totalSeconds / totalTaskSeconds) * 100 : 0,
+          samples,
         };
       })
       .sort((a, b) => b.totalSeconds - a.totalSeconds);
@@ -230,6 +244,40 @@ export function ExecutionDurationBreakdown({
     maxItems > 0 ? stats.taskBreakdown.slice(0, maxItems) : stats.taskBreakdown;
   const hiddenTaskCount = Math.max(stats.taskBreakdown.length - displayedTaskBreakdown.length, 0);
   const paddingClassName = padded ? "px-4 sm:px-10" : "";
+  const selectedTask = stats.taskBreakdown.find((task) => task.name === selectedTaskName);
+  const selectedTaskSamples = useMemo(
+    () =>
+      (selectedTask?.samples ?? [])
+        .filter(
+          (sample): sample is TaskDurationSample & { startedAt: string } =>
+            !!sample.startedAt && Number.isFinite(new Date(sample.startedAt).getTime()),
+        )
+        .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()),
+    [selectedTask],
+  );
+  const taskDurationPlotData = useMemo<Plotly.Data[]>(
+    () => [
+      {
+        type: "scatter",
+        mode: "lines+markers",
+        x: selectedTaskSamples.map((sample) => sample.startedAt),
+        y: selectedTaskSamples.map((sample) => sample.durationSeconds),
+        customdata: selectedTaskSamples.map((sample) => [
+          sample.executionId,
+          sample.task.status ?? "unknown",
+        ]),
+        hovertemplate:
+          "%{x}<br>Duration: %{y:.3~s} s<br>Execution: %{customdata[0]}<br>Status: %{customdata[1]}<extra></extra>",
+        line: { color: "var(--color-primary)", width: 2 },
+        marker: { color: "var(--color-primary)", size: 7 },
+      },
+    ],
+    [selectedTaskSamples],
+  );
+  const toggleTask = (taskName: string) => {
+    if (!showTaskDurationTrend) return;
+    setSelectedTaskName((current) => (current === taskName ? null : taskName));
+  };
 
   return (
     <div className={`mb-4 sm:mb-6 ${paddingClassName} ${className}`}>
@@ -259,6 +307,104 @@ export function ExecutionDurationBreakdown({
         {isLoadingTaskStats && <span className="loading loading-spinner loading-xs" />}
         {isTaskStatsPartial && !isLoadingTaskStats && <span>Partial data</span>}
       </div>
+
+      {showTaskDurationTrend && (
+        <section className="card mb-4 rounded-xl border border-base-300 bg-base-100 shadow-sm">
+          <div className="card-body gap-4 p-4 sm:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="card-title gap-2 text-base sm:text-lg">
+                  <LineChart className="h-5 w-5 text-primary" />
+                  Task duration over time
+                </h2>
+                <p className="mt-1 text-sm text-base-content/60">
+                  Select a task to inspect how its duration changes between runs.
+                </p>
+              </div>
+              <div className="form-control w-full sm:w-80">
+                <span className="label py-1 text-xs text-base-content/60">Task</span>
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <TaskSelector
+                      tasks={stats.taskBreakdown}
+                      selectedTask={selectedTaskName ?? ""}
+                      onTaskSelect={setSelectedTaskName}
+                      disabled={stats.taskBreakdown.length === 0}
+                    />
+                  </div>
+                  {selectedTaskName && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm btn-square"
+                      onClick={() => setSelectedTaskName(null)}
+                      title="Clear task selection"
+                      aria-label="Clear task selection"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="min-h-64 rounded-xl bg-base-200/50 p-2 sm:p-4">
+              {!selectedTask ? (
+                <EmptyState
+                  title="Select a task"
+                  description="Choose a task above or from the duration breakdown below."
+                  emoji="chart"
+                  size="sm"
+                />
+              ) : selectedTaskSamples.length === 0 ? (
+                <EmptyState
+                  title="No duration history"
+                  description="This task has no timestamped duration samples."
+                  emoji="clock"
+                  size="sm"
+                />
+              ) : (
+                <>
+                  <div className="mb-1 flex items-center justify-between gap-2 px-1 text-xs text-base-content/60">
+                    <span className="truncate font-medium text-base-content">
+                      {selectedTask.name}
+                    </span>
+                    <span className="shrink-0">
+                      {selectedTaskSamples.length} of {selectedTask.count} runs
+                    </span>
+                  </div>
+                  <Plot
+                    data={taskDurationPlotData}
+                    layout={{
+                      autosize: true,
+                      margin: { l: 64, r: 20, t: 12, b: 56 },
+                      paper_bgcolor: "transparent",
+                      plot_bgcolor: "transparent",
+                      hovermode: "closest",
+                      showlegend: false,
+                      xaxis: {
+                        title: { text: "Task start time", font: { size: 11 } },
+                        type: "date",
+                        gridcolor: "rgba(128,128,128,0.2)",
+                        zeroline: false,
+                        automargin: true,
+                      },
+                      yaxis: {
+                        title: { text: "Duration (seconds)", font: { size: 11 } },
+                        gridcolor: "rgba(128,128,128,0.2)",
+                        zeroline: false,
+                        rangemode: "tozero",
+                        automargin: true,
+                      },
+                    }}
+                    config={{ responsive: true, displaylogo: false, displayModeBar: false }}
+                    style={{ width: "100%", height: "300px" }}
+                    useResizeHandler
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="mb-3 sm:mb-4">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
@@ -299,10 +445,24 @@ export function ExecutionDurationBreakdown({
           <>
             <div className="space-y-3 md:hidden">
               {displayedTaskBreakdown.map((task) => (
-                <div key={task.name} className="rounded-lg border border-base-300 p-3">
+                <button
+                  key={task.name}
+                  type="button"
+                  className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                    showTaskDurationTrend && selectedTaskName === task.name
+                      ? "border-primary bg-primary/5"
+                      : `border-base-300 ${showTaskDurationTrend ? "hover:border-primary/50" : ""}`
+                  }`}
+                  aria-expanded={showTaskDurationTrend ? selectedTaskName === task.name : undefined}
+                  disabled={!showTaskDurationTrend}
+                  onClick={() => toggleTask(task.name)}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold">{task.name}</div>
+                      <div className="flex items-center gap-1 truncate text-sm font-semibold">
+                        {showTaskDurationTrend && <LineChart className="h-4 w-4 shrink-0" />}
+                        <span className="truncate">{task.name}</span>
+                      </div>
                       <div className="text-xs text-base-content/60">
                         {task.count} runs · {task.successRate.toFixed(0)}% success
                       </div>
@@ -335,7 +495,7 @@ export function ExecutionDurationBreakdown({
                       <div className="font-medium">{formatDuration(task.p95Seconds)}</div>
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
 
@@ -355,9 +515,30 @@ export function ExecutionDurationBreakdown({
                 </thead>
                 <tbody>
                   {displayedTaskBreakdown.map((task) => (
-                    <tr key={task.name}>
+                    <tr
+                      key={task.name}
+                      className={`${showTaskDurationTrend ? "cursor-pointer" : ""} ${
+                        showTaskDurationTrend && selectedTaskName === task.name
+                          ? "bg-primary/5"
+                          : ""
+                      }`}
+                      tabIndex={showTaskDurationTrend ? 0 : undefined}
+                      aria-expanded={
+                        showTaskDurationTrend ? selectedTaskName === task.name : undefined
+                      }
+                      onClick={() => toggleTask(task.name)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          toggleTask(task.name);
+                        }
+                      }}
+                    >
                       <td className="max-w-[18rem] truncate font-medium" title={task.name}>
-                        {task.name}
+                        <span className="inline-flex items-center gap-1">
+                          {showTaskDurationTrend && <LineChart className="h-4 w-4 shrink-0" />}
+                          {task.name}
+                        </span>
                       </td>
                       <td>
                         <div className="flex items-center gap-2">
