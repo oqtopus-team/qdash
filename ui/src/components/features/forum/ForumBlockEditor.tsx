@@ -262,7 +262,7 @@ export function ForumBlockEditor({
   }, [editor]);
 
   return (
-    <div className="wiring-blocknote">
+    <div className="forum-blocknote wiring-blocknote">
       <BlockNoteView
         editor={editor}
         editable={editable}
