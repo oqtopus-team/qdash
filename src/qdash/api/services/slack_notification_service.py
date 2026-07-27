@@ -119,7 +119,7 @@ class SlackNotificationService:
         root_post_id: str,
         actor_username: str,
     ) -> None:
-        """Send a Slack thread reply notification for a forum reply."""
+        """Send a Slack thread reply and broadcast it to the channel."""
         if not self.is_enabled():
             return
 
@@ -147,6 +147,7 @@ class SlackNotificationService:
             self._client().chat_postMessage(
                 channel=thread_record.channel_id,
                 thread_ts=thread_record.message_ts,
+                reply_broadcast=True,
                 text=text,
                 blocks=blocks,
             )
