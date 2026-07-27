@@ -21,7 +21,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  Settings
+  SettingsResponse
 } from '../../schemas';
 
 import { customInstance } from '../../lib/custom-instance';
@@ -41,7 +41,7 @@ export const getSettings = (
 ) => {
       
       
-      return customInstance<Settings>(
+      return customInstance<SettingsResponse>(
       {url: `/settings`, method: 'GET', signal
     },
       options);

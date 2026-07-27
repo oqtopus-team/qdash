@@ -266,6 +266,14 @@ db.metric_note.create_index(
 
 **Usage**: `GET /chips/{chip_id}/notes-summary` reads current notes for the requested `cooldown_id` or `start_at`/`end_at`. `PUT/DELETE /chips/{chip_id}/.../metric-notes/{metric_key}` writes the same scoped current-state row and appends an audit event to `note_event`.
 
+### SlackForumThreadDocument
+
+```python
+db.slack_forum_thread.create_index([("post_id", 1)], unique=True, name="slack_forum_thread_post_id_unique_idx")
+```
+
+**Usage**: `SlackForumThreadDocument.find_by_post_id(post_id)` is called on every forum reply and status-change notification to resolve the original Slack `thread_ts`. The unique index also serves as the upsert key in `SlackForumThreadDocument.record()`.
+
 ## Performance Impact
 
 Without indexes:

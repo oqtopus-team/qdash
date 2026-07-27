@@ -92,8 +92,8 @@ class CheckChevron(QubexTask):
         output_parameters = self.attach_execution_id(execution_id)
 
         figures = self._build_figures(result, label, resonant_freq)
-        if resonant_freq < 3.0:
-            error_msg = f"Qubit frequency too low for qid={qid}: {resonant_freq:.6f} GHz < 3.0 GHz"
+        if resonant_freq < 2.5:
+            error_msg = f"Qubit frequency too low for qid={qid}: {resonant_freq:.6f} GHz < 2.5 GHz"
             print(f"[ERROR] {error_msg}")
             return PostProcessResult(
                 output_parameters=output_parameters,
