@@ -257,9 +257,9 @@ def test_notify_forum_reply_skips_when_no_thread_record(init_db) -> None:
     mock_client.chat_postMessage.assert_not_called()
 
 
-def test_notify_forum_reply_sends_threaded_message_when_record_exists(init_db) -> None:
+def test_notify_forum_reply_broadcasts_threaded_message_when_record_exists(init_db) -> None:
     # First, create a thread record
-    """notify_forum_reply posts into the recorded Slack thread."""
+    """notify_forum_reply posts into the Slack thread and broadcasts to its channel."""
     root = _post()
     root.insert()
     SlackForumThreadDocument.record(
@@ -284,6 +284,7 @@ def test_notify_forum_reply_sends_threaded_message_when_record_exists(init_db) -
     call_kwargs = mock_client.chat_postMessage.call_args.kwargs
     assert call_kwargs["channel"] == "C0ROOTCHAN"
     assert call_kwargs["thread_ts"] == "root.ts.000"
+    assert call_kwargs["reply_broadcast"] is True
     assert "bob" in str(call_kwargs)
 
 
