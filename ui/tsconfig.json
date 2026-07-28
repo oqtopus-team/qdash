@@ -15,12 +15,11 @@
       }
     ],
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "baseUrl": ".",
     "ignoreDeprecations": "6.0",
     "allowJs": true,
     "noUnusedLocals": true,

@@ -177,6 +177,20 @@
   border-color: var(--color-base-300);
 }
 
+/* Forum links: match the read-only preview while keeping the shared cryo
+   editor styling unchanged. */
+.forum-blocknote .bn-editor a {
+  color: var(--color-primary);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  transition: opacity 0.15s ease;
+}
+
+.forum-blocknote .bn-editor a:hover {
+  opacity: 0.8;
+}
+
 /* Make sure the section doesn't itself clip floating menus */
 .wiring-blocknote {
   position: relative;

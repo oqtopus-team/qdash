@@ -242,7 +242,7 @@ export function AdminUsersPanel({
                       Edit
                     </button>
                     <button
-                      className="btn btn-xs btn-error btn-ghost"
+                      className="btn btn-xs btn-error btn-outline"
                       onClick={() => onDeleteUser(userItem)}
                       disabled={userItem.username === currentUsername}
                     >
@@ -336,7 +336,7 @@ export function AdminUsersPanel({
                         Edit
                       </button>
                       <button
-                        className="btn btn-sm btn-error btn-ghost"
+                        className="btn btn-sm btn-error btn-outline"
                         onClick={() => onDeleteUser(userItem)}
                         disabled={userItem.username === currentUsername}
                       >
