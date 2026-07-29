@@ -42,15 +42,13 @@ export function TaskSelector({
   });
 
   const handleChange = (option: SingleValue<TaskOption>) => {
-    if (option) {
-      onTaskSelect(option.value);
-    }
+    onTaskSelect(option ? option.value : "");
   };
 
   return (
     <Select<TaskOption>
       options={options}
-      value={options.find((option) => option.value === selectedTask)}
+      value={options.find((option) => option.value === selectedTask) ?? null}
       onChange={handleChange}
       placeholder={PLACEHOLDER}
       className="text-base-content"
