@@ -5,6 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ReanalyzeOutputParameterCurrentValue } from './reanalyzeOutputParameterCurrentValue';
+import type { ReanalyzeOutputParameterSnapshotValue } from './reanalyzeOutputParameterSnapshotValue';
+import type { ReanalyzeOutputParameterDerivedFrom } from './reanalyzeOutputParameterDerivedFrom';
 
 /**
  * A single re-analyzed output value.
@@ -13,4 +16,10 @@ export interface ReanalyzeOutputParameter {
   name: string;
   value: number;
   unit?: string;
+  /** Current calibration DB value before this reanalysis is committed. */
+  current_value?: ReanalyzeOutputParameterCurrentValue;
+  /** Value this parameter had in the source experiment, i.e. its snapshot then. */
+  snapshot_value?: ReanalyzeOutputParameterSnapshotValue;
+  /** Name of the parameter this value is computed from. Such values must not be edited directly; edit the source parameter instead. */
+  derived_from?: ReanalyzeOutputParameterDerivedFrom;
 }

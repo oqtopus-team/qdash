@@ -2,17 +2,14 @@
 
 import React, { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, History, FileText, GitBranch, Bot, ListTodo } from "lucide-react";
 
 import type { TaskResult as Task } from "@/schemas";
 
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
-import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 
 import { useGetExecution } from "@/client/execution/execution";
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
-import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import {
   ExecutionHistoryModalContent,
@@ -47,10 +44,6 @@ export function TaskHistoryModal({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedExecutionTaskIndex, setSelectedExecutionTaskIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
-  const [saveMessage, setSaveMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
   const { createNewSession, switchSession, sessions } = useAnalysisChatContext();
   const [isChatOpen, setIsChatOpen] = useState(false);
 
@@ -77,38 +70,7 @@ export function TaskHistoryModal({
   React.useEffect(() => {
     if (!isOpen) setIsChatOpen(false);
   }, [isOpen]);
-  const queryClient = useQueryClient();
-  const updateParamsMutation = useUpdateCalibrationParameters();
   const manualOverrides = useManualOverrides(qid);
-
-  const handleSaveParameters = useCallback(
-    async (updatedParams: Record<string, unknown>) => {
-      setSaveMessage(null);
-      try {
-        const res = await updateParamsMutation.mutateAsync({
-          data: {
-            chip_id: chipId,
-            qid: qid,
-            parameters: updatedParams as Record<string, Record<string, unknown>>,
-          },
-        });
-        await queryClient.invalidateQueries({ predicate: isChipMetricsQuery });
-        await queryClient.invalidateQueries({
-          queryKey: [`/calibrations/manual-edits/${qid}`],
-        });
-        const count = res.data?.updated_count ?? 0;
-        setSaveMessage({
-          type: "success",
-          text: `${count} parameter(s) saved`,
-        });
-        setTimeout(() => setSaveMessage(null), 5000);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to save";
-        setSaveMessage({ type: "error", text: message });
-      }
-    },
-    [chipId, qid, updateParamsMutation, queryClient],
-  );
 
   const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
     const p = encodeURIComponent(parameterName);
@@ -557,22 +519,8 @@ export function TaskHistoryModal({
                 <ParametersTable
                   title="Output Parameters"
                   parameters={selectedTask.output_parameters as Record<string, unknown>}
-                  editable
-                  onSave={handleSaveParameters}
-                  isSaving={updateParamsMutation.isPending}
                   overrides={manualOverrides}
                 />
-                {saveMessage && (
-                  <div
-                    className={`text-xs px-2 py-1 rounded ${
-                      saveMessage.type === "success"
-                        ? "text-success bg-success/10"
-                        : "text-error bg-error/10"
-                    }`}
-                  >
-                    {saveMessage.text}
-                  </div>
-                )}
               </>
             )}
           {selectedTask.run_parameters && Object.keys(selectedTask.run_parameters).length > 0 && (

@@ -7,6 +7,7 @@ without re-running the experiment on hardware.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -51,6 +52,38 @@ class ReanalyzeResonatorSpectroscopyParams(BaseModel):
             "Use 16q for mux[0], mux[3], mux[1], mux[2]."
         ),
     )
+    manual_readout_frequency: float | None = Field(
+        default=None,
+        description=(
+            "Manual readout frequency in GHz to return for this qubit. "
+            "When set, this overrides detected-slot assignment for the preview."
+        ),
+    )
+    manual_readout_frequencies: list[float | None] | None = Field(
+        default=None,
+        min_length=4,
+        max_length=4,
+        description=(
+            "Manual readout frequencies in GHz for frequency-sorted MUX slots 0..3. "
+            "Null entries fall back to detected-slot assignment."
+        ),
+    )
+    manual_resonator_slot: int | None = Field(
+        default=None,
+        ge=0,
+        le=3,
+        description=(
+            "Frequency-sorted resonator slot to assign to this qubit. "
+            "When set, this overrides resonator_assignment_pattern for the preview."
+        ),
+    )
+    output_parameter_overrides: dict[str, dict[str, float]] | None = Field(
+        default=None,
+        description=(
+            "Manual output-parameter values keyed by qid and parameter name. "
+            "These values override reanalysis results in the preview and commit."
+        ),
+    )
 
     @field_validator("resonator_assignment_pattern")
     @classmethod
@@ -59,6 +92,44 @@ class ReanalyzeResonatorSpectroscopyParams(BaseModel):
             return value
         if value not in {"default", "16q"}:
             raise ValueError("resonator_assignment_pattern must be 'default' or '16q'")
+        return value
+
+    @field_validator("manual_readout_frequency")
+    @classmethod
+    def validate_manual_readout_frequency(cls, value: float | None) -> float | None:
+        if value is None:
+            return value
+        if not math.isfinite(value):
+            raise ValueError("manual_readout_frequency must be finite")
+        return value
+
+    @field_validator("manual_readout_frequencies")
+    @classmethod
+    def validate_manual_readout_frequencies(
+        cls, value: list[float | None] | None
+    ) -> list[float | None] | None:
+        if value is None:
+            return value
+        for frequency in value:
+            if frequency is not None and not math.isfinite(frequency):
+                raise ValueError("manual_readout_frequencies must contain only finite values")
+        return value
+
+    @field_validator("output_parameter_overrides")
+    @classmethod
+    def validate_output_parameter_overrides(
+        cls, value: dict[str, dict[str, float]] | None
+    ) -> dict[str, dict[str, float]] | None:
+        if value is None:
+            return value
+        for qid, parameters in value.items():
+            if not qid:
+                raise ValueError("output_parameter_overrides qid keys must be non-empty")
+            for name, parameter_value in parameters.items():
+                if not name:
+                    raise ValueError("output_parameter_overrides parameter keys must be non-empty")
+                if not math.isfinite(parameter_value):
+                    raise ValueError("output_parameter_overrides values must be finite")
         return value
 
 
@@ -115,6 +186,28 @@ class ReanalyzeOutputParameter(BaseModel):
     name: str
     value: float
     unit: str = ""
+    current_value: float | None = Field(
+        default=None,
+        description="Current calibration DB value before this reanalysis is committed.",
+    )
+    snapshot_value: float | None = Field(
+        default=None,
+        description="Value this parameter had in the source experiment, i.e. its snapshot then.",
+    )
+    derived_from: str | None = Field(
+        default=None,
+        description=(
+            "Name of the parameter this value is computed from. Such values must not be "
+            "edited directly; edit the source parameter instead."
+        ),
+    )
+
+
+class ReanalyzeAffectedQubit(BaseModel):
+    """One qubit whose calibration value would be updated by a reanalysis."""
+
+    qid: str
+    output_parameters: list[ReanalyzeOutputParameter]
 
 
 class ReanalyzeResponse(BaseModel):
@@ -132,8 +225,16 @@ class ReanalyzeResponse(BaseModel):
         ...,
         description="Plotly figure JSON of the re-analyzed result with markers.",
     )
+    raw_figure: dict[str, Any] | None = Field(
+        default=None,
+        description="Plotly figure JSON before reanalysis markers are added.",
+    )
     output_parameters: list[ReanalyzeOutputParameter]
+    affected_qubits: list[ReanalyzeAffectedQubit] = Field(
+        default_factory=list,
+        description="Qubits in the same MUX whose output parameters are previewed or committed.",
+    )
     committed: bool = Field(
         default=False,
-        description="Always false in this version; persisting changes will land later.",
+        description="True when the reanalysis result has been persisted to calibration data.",
     )

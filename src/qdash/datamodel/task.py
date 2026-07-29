@@ -120,6 +120,8 @@ class ParameterModel(BaseModel):
         error: The error/uncertainty of the value.
         unit: The unit of measurement.
         description: Description of the parameter.
+        derived_from: Name of the parameter this one is computed from, if any. Consumers
+            must not let users edit a derived value directly.
         calibrated_at: When the calibration was performed.
         execution_id: The execution that produced this value.
         task_id: The task that produced this value.
@@ -133,6 +135,7 @@ class ParameterModel(BaseModel):
     error: float = 0
     unit: str = ""
     description: str = ""
+    derived_from: str = ""
     calibrated_at: datetime = Field(
         default_factory=now,
         description="The time when the calibration was performed",

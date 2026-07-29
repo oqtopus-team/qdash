@@ -11,6 +11,7 @@ import uuid
 from typing import Any
 
 from bunnet import SortDirection
+from fastapi import HTTPException
 
 from qdash.api.schemas.calibration import (
     ManualEditItem,
@@ -18,6 +19,7 @@ from qdash.api.schemas.calibration import (
     ManualParameterUpdateRequest,
     ManualParameterUpdateResponse,
 )
+from qdash.api.services.qubit_parameter_service import QubitParameterService
 from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.provenance import ParameterVersionDocument, ProvenanceRelationType
@@ -43,12 +45,20 @@ class ManualUpdateService:
         activity_repo: MongoActivityRepository | None = None,
         param_version_repo: MongoParameterVersionRepository | None = None,
         relation_repo: MongoProvenanceRelationRepository | None = None,
+        parameter_service: QubitParameterService | None = None,
     ) -> None:
         self._qubit_repo = qubit_repo or MongoQubitCalibrationRepository()
         self._coupling_repo = coupling_repo or MongoCouplingCalibrationRepository()
         self._activity_repo = activity_repo or MongoActivityRepository()
         self._param_version_repo = param_version_repo or MongoParameterVersionRepository()
         self._relation_repo = relation_repo or MongoProvenanceRelationRepository()
+        # Shared with the reanalysis commit: source-task validation and lineage linking.
+        self._parameter_service = parameter_service or QubitParameterService(
+            self._qubit_repo,
+            self._activity_repo,
+            self._param_version_repo,
+            self._relation_repo,
+        )
 
     def update_parameters(
         self,
@@ -56,8 +66,13 @@ class ManualUpdateService:
         project_id: str,
         username: str,
     ) -> ManualParameterUpdateResponse:
-        """Update calibration parameters and record provenance."""
+        """Update calibration parameters and record provenance.
+
+        When the request names a source task result, the edit is checked against what that
+        experiment produced and linked to it, so the lineage reaches back to the measurement.
+        """
         is_coupling = "-" in request.qid
+        source_doc = self._validate_against_source(request, project_id)
         execution_id = f"manual-edit-{uuid.uuid4().hex[:8]}"
         task_id = f"manual-edit-{uuid.uuid4().hex[:8]}"
         start_time = now()
@@ -138,6 +153,14 @@ class ManualUpdateService:
                 execution_id=execution_id,
             )
 
+        if source_doc is not None:
+            self._parameter_service.link_source_parameters(
+                activity_id=activity.activity_id,
+                project_id=project_id,
+                execution_id=execution_id,
+                source_task_id=source_doc.task_id,
+            )
+
         # Record in TaskResultHistory so metrics page picks up the new values
         task_type = "coupling" if is_coupling else "qubit"
         task_result = TaskResultHistoryDocument(
@@ -180,6 +203,40 @@ class ManualUpdateService:
             updated_count=len(request.parameters),
             provenance_activity_id=activity.activity_id,
         )
+
+    def _validate_against_source(
+        self,
+        request: ManualParameterUpdateRequest,
+        project_id: str,
+    ) -> Any:
+        """Check the edit against the task result it claims to come from.
+
+        Free-form edits (no source task) keep the previous behaviour of accepting any name.
+        """
+        if not request.source_task_id:
+            return None
+
+        source_doc = self._parameter_service.load_source_task_result(
+            project_id=project_id,
+            task_id=request.source_task_id,
+        )
+        known = source_doc.output_parameters or {}
+        unknown = sorted(name for name in request.parameters if name not in known)
+        if unknown:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Task result {request.source_task_id!r} has no output parameter(s) "
+                    f"{', '.join(unknown)}."
+                ),
+            )
+
+        self._parameter_service.reject_derived_parameters(
+            source_doc=source_doc,
+            project_id=project_id,
+            names=set(request.parameters),
+        )
+        return source_doc
 
     def get_manual_edits(self, project_id: str, qid: str) -> ManualEditsResponse:
         """Get all manual edits for a qid (most recent per parameter)."""

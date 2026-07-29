@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ReanalyzeResponseFigure } from './reanalyzeResponseFigure';
+import type { ReanalyzeResponseRawFigure } from './reanalyzeResponseRawFigure';
 import type { ReanalyzeOutputParameter } from './reanalyzeOutputParameter';
+import type { ReanalyzeAffectedQubit } from './reanalyzeAffectedQubit';
 
 /**
  * Preview response from a reanalyze endpoint.
@@ -22,7 +24,11 @@ export interface ReanalyzeResponse {
   qid: string;
   /** Plotly figure JSON of the re-analyzed result with markers. */
   figure: ReanalyzeResponseFigure;
+  /** Plotly figure JSON before reanalysis markers are added. */
+  raw_figure?: ReanalyzeResponseRawFigure;
   output_parameters: ReanalyzeOutputParameter[];
-  /** Always false in this version; persisting changes will land later. */
+  /** Qubits in the same MUX whose output parameters are previewed or committed. */
+  affected_qubits?: ReanalyzeAffectedQubit[];
+  /** True when the reanalysis result has been persisted to calibration data. */
   committed?: boolean;
 }

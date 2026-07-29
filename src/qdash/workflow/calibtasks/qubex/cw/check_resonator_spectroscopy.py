@@ -165,6 +165,7 @@ class CheckResonatorSpectroscopy(QubexTask):
         ),
         "readout_amplitude": ParameterModel(
             unit="a.u.",
+            derived_from="optimal_power",
             description=(
                 "Readout amplitude converted from optimal_power "
                 "(amplitude = 10**(optimal_power/20))."

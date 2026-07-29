@@ -536,8 +536,8 @@ def reanalyze_resonator_spectroscopy(
 ) -> ReanalyzeResponse:
     """Re-run the resonator-spectroscopy analysis on a previously stored figure.
 
-    Returns the marked figure and the re-estimated `readout_frequency` for
-    the requested qubit. The DB is **not** mutated; this is a preview only.
+    Returns the marked figure and the re-estimated `readout_frequency` values for
+    all detected qubits in the same MUX. The DB is **not** mutated.
     """
     return reanalysis_service.reanalyze_resonator_spectroscopy(
         project_id=ctx.project_id,
@@ -545,6 +545,34 @@ def reanalyze_resonator_spectroscopy(
         qid=qid,
         params=request.parameters,
         source_task_id=request.source_task_id,
+    )
+
+
+@router.post(
+    "/chips/{chip_id}/qubits/{qid}/reanalyze/resonator-spectroscopy/commit",
+    response_model=ReanalyzeResponse,
+    summary="Commit resonator spectroscopy reanalysis to calibration data",
+    operation_id="commitReanalyzeResonatorSpectroscopy",
+)
+def commit_reanalyze_resonator_spectroscopy(
+    chip_id: str,
+    qid: str,
+    request: ReanalyzeResonatorSpectroscopyRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    reanalysis_service: Annotated[ReanalysisService, Depends(get_reanalysis_service)],
+) -> ReanalyzeResponse:
+    """Persist a resonator-spectroscopy reanalysis after user confirmation.
+
+    The commit updates calibration data for all detected qubits in the same MUX
+    and records reanalysis task-result history rows linked to the source task.
+    """
+    return reanalysis_service.commit_reanalyze_resonator_spectroscopy(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        qid=qid,
+        params=request.parameters,
+        source_task_id=request.source_task_id,
+        username=ctx.user.username,
     )
 
 

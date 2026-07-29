@@ -1,21 +1,18 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
 
 import { ChevronRight, GitBranch, History, ListTodo, FileText, Bot } from "lucide-react";
 
 import { useGetQubitMetricHistory } from "@/client/metrics/metrics";
 import { useGetExecution } from "@/client/execution/execution";
-import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import {
   ExecutionHistoryModalContent,
   type ExecutionHistoryMobileTab,
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
-import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
@@ -59,13 +56,7 @@ export function QubitMetricHistoryModal({
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
-  const [saveMessage, setSaveMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
   const { openMiniChat } = useAnalysisChatContext();
-  const queryClient = useQueryClient();
-  const updateParamsMutation = useUpdateCalibrationParameters();
   const manualOverrides = useManualOverrides(qid);
 
   const { data, isLoading, isError } = useGetQubitMetricHistory(
@@ -192,36 +183,6 @@ export function QubitMetricHistoryModal({
       taskId: selectedTask.task_id || "",
     };
   }, [selectedTask, selectedExecutionId, chipId, qid]);
-
-  const handleSaveParameters = useCallback(
-    async (updatedParams: Record<string, unknown>) => {
-      setSaveMessage(null);
-      try {
-        const res = await updateParamsMutation.mutateAsync({
-          data: {
-            chip_id: chipId,
-            qid: qid,
-            parameters: updatedParams as Record<string, Record<string, unknown>>,
-          },
-        });
-        // Invalidate metrics queries so grid and history refresh
-        await queryClient.invalidateQueries({ predicate: isChipMetricsQuery });
-        await queryClient.invalidateQueries({
-          queryKey: [`/calibrations/manual-edits/${qid}`],
-        });
-        const count = res.data?.updated_count ?? 0;
-        setSaveMessage({
-          type: "success",
-          text: `${count} parameter(s) saved to DB`,
-        });
-        setTimeout(() => setSaveMessage(null), 5000);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to save parameters";
-        setSaveMessage({ type: "error", text: message });
-      }
-    },
-    [chipId, qid, updateParamsMutation, queryClient],
-  );
 
   if (isLoading) {
     return (
@@ -590,22 +551,8 @@ export function QubitMetricHistoryModal({
                 <ParametersTable
                   title="Output Parameters"
                   parameters={selectedTask.output_parameters as Record<string, unknown>}
-                  editable
-                  onSave={handleSaveParameters}
-                  isSaving={updateParamsMutation.isPending}
                   overrides={manualOverrides}
                 />
-                {saveMessage && (
-                  <div
-                    className={`text-xs px-2 py-1 rounded ${
-                      saveMessage.type === "success"
-                        ? "text-success bg-success/10"
-                        : "text-error bg-error/10"
-                    }`}
-                  >
-                    {saveMessage.text}
-                  </div>
-                )}
               </>
             )}
           {selectedTask.run_parameters && Object.keys(selectedTask.run_parameters).length > 0 && (

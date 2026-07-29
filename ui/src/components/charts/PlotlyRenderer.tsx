@@ -1,15 +1,18 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import type { PlotMouseEvent } from "plotly.js";
 
 import Plot from "@/components/charts/Plot";
 
 export function PlotlyRenderer({
   fullPath,
   className = "",
+  onClick,
 }: {
   fullPath: string;
   className?: string;
+  onClick?: (event: PlotMouseEvent) => void;
 }) {
   const { data: figure, error } = useQuery({
     queryKey: ["plotly-figure", fullPath],
@@ -34,6 +37,7 @@ export function PlotlyRenderer({
         }}
         config={{ displayModeBar: true, responsive: false }}
         useResizeHandler={false}
+        onClick={onClick}
         style={{ width: "auto", height: "auto" }}
       />
     </div>

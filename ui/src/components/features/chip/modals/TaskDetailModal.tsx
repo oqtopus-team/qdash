@@ -3,15 +3,19 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { CheckCircle, AlertTriangle, Clock, HelpCircle, GitBranch } from "lucide-react";
+import type { PlotMouseEvent } from "plotly.js";
 
 import type { Task } from "@/schemas";
 
 import { useGetTaskResult } from "@/client/task/task";
-import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureContent";
+import {
+  InteractiveFigureContent,
+  type InteractiveFigureEntry,
+} from "@/components/charts/InteractiveFigureContent";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
-import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
+import { ReanalysisPanel, type PickedPoint } from "@/components/features/qubit/ReanalysisPanel";
 import {
   formatDate as formatDateUtil,
   formatTime as formatTimeUtil,
@@ -59,6 +63,7 @@ export function TaskDetailModal({
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [subIndex, setSubIndex] = useState(initialSubIndex);
+  const [pickedPoint, setPickedPoint] = useState<PickedPoint | null>(null);
   const modalRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -76,6 +81,15 @@ export function TaskDetailModal({
     const p = encodeURIComponent(parameterName);
     const q = encodeURIComponent(qidValue);
     return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
+  };
+
+  const handleInteractivePlotClick = (event: PlotMouseEvent) => {
+    const point = event.points?.[0];
+    if (!point) return;
+    const x = typeof point.x === "number" ? point.x : Number(point.x);
+    const y = typeof point.y === "number" ? point.y : Number(point.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    setPickedPoint((current: PickedPoint | null) => ({ x, y, token: (current?.token ?? 0) + 1 }));
   };
 
   // Handle keyboard navigation
@@ -196,6 +210,14 @@ export function TaskDetailModal({
       : [task.json_figure_path]
     : [];
   const currentJsonFigure = jsonFigures[subIndex] || null;
+  const interactiveFigures: InteractiveFigureEntry[] = Array.from(
+    { length: Math.max(figures.length, jsonFigures.length) },
+    (_, index) => ({
+      label: index === 0 ? "Preview" : index === 1 ? "Raw" : `Figure ${index + 1}`,
+      jsonPath: jsonFigures[index] ?? null,
+      staticPath: figures[index] ?? null,
+    }),
+  );
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
@@ -306,7 +328,7 @@ export function TaskDetailModal({
             </div>
           )}
 
-          {viewMode === "static" && (
+          {
             <>
               {/* Figures */}
               {figures.length > 0 && (
@@ -592,6 +614,7 @@ export function TaskDetailModal({
                         qubitId={qid}
                         taskName={task.name}
                         sourceTaskId={task.task_id}
+                        pickedPoint={pickedPoint}
                       />
                     </div>
                   )}
@@ -832,17 +855,13 @@ export function TaskDetailModal({
                 </>
               )}
             </>
-          )}
+          }
 
           {viewMode === "interactive" && currentJsonFigure && (
             <InteractiveFigureContent
-              figureJsonPath={currentJsonFigure}
-              figureIndex={subIndex}
-              totalFigures={jsonFigures.length}
-              onNavigatePrevious={() =>
-                setSubIndex((subIndex - 1 + jsonFigures.length) % jsonFigures.length)
-              }
-              onNavigateNext={() => setSubIndex((subIndex + 1) % jsonFigures.length)}
+              figures={interactiveFigures}
+              qid={qid}
+              onPlotClick={handleInteractivePlotClick}
             />
           )}
         </div>
@@ -850,7 +869,7 @@ export function TaskDetailModal({
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-end gap-2">
           {viewMode === "interactive" && (
             <button className="btn btn-sm" onClick={() => setViewMode("static")}>
-              Back to Summary
+              Hide Interactive View
             </button>
           )}
           <button className="btn btn-ghost btn-sm sm:btn-md" onClick={onClose}>

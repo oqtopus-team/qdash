@@ -5063,8 +5063,91 @@
           "chip"
         ],
         "summary": "Re-run resonator spectroscopy analysis on a stored task result (preview)",
-        "description": "Re-run the resonator-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `readout_frequency` for\nthe requested qubit. The DB is **not** mutated; this is a preview only.",
+        "description": "Re-run the resonator-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `readout_frequency` values for\nall detected qubits in the same MUX. The DB is **not** mutated.",
         "operationId": "reanalyzeResonatorSpectroscopy",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReanalyzeResonatorSpectroscopyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReanalyzeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/qubits/{qid}/reanalyze/resonator-spectroscopy/commit": {
+      "post": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Commit resonator spectroscopy reanalysis to calibration data",
+        "description": "Persist a resonator-spectroscopy reanalysis after user confirmation.\n\nThe commit updates calibration data for all detected qubits in the same MUX\nand records reanalysis task-result history rows linked to the source task.",
+        "operationId": "commitReanalyzeResonatorSpectroscopy",
         "security": [
           {
             "HTTPBearer": []
@@ -23270,6 +23353,18 @@
             "type": "object",
             "title": "Parameters",
             "description": "Parameters to update. Format: {\"param_name\": {\"value\": 4.85, \"unit\": \"GHz\"}}"
+          },
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id",
+            "description": "Task result the corrected values come from. When set, the parameter names are checked against that result and the edit is linked to it in the provenance graph."
           }
         },
         "type": "object",
@@ -24750,6 +24845,11 @@
             "title": "Description",
             "default": ""
           },
+          "derived_from": {
+            "type": "string",
+            "title": "Derived From",
+            "default": ""
+          },
           "calibrated_at": {
             "type": "string",
             "format": "date-time",
@@ -24769,7 +24869,7 @@
         },
         "type": "object",
         "title": "ParameterModel",
-        "description": "Calibration parameter model.\n\nUsed for both input_parameters (calibration dependencies) and\noutput_parameters (calibration outputs) in tasks.\n\nAttributes\n----------\n    parameter_name: The actual DB parameter name. If empty, the dict key is used.\n    qid_role: The qid role for 2-qubit tasks. One of:\n        - \"\" or \"self\": Use task's qid as-is (default, for 1-qubit tasks)\n        - \"control\": Use control qubit's qid (for 2-qubit tasks)\n        - \"target\": Use target qubit's qid (for 2-qubit tasks)\n        - \"coupling\": Use coupling qid as-is (for 2-qubit tasks)\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
+        "description": "Calibration parameter model.\n\nUsed for both input_parameters (calibration dependencies) and\noutput_parameters (calibration outputs) in tasks.\n\nAttributes\n----------\n    parameter_name: The actual DB parameter name. If empty, the dict key is used.\n    qid_role: The qid role for 2-qubit tasks. One of:\n        - \"\" or \"self\": Use task's qid as-is (default, for 1-qubit tasks)\n        - \"control\": Use control qubit's qid (for 2-qubit tasks)\n        - \"target\": Use target qubit's qid (for 2-qubit tasks)\n        - \"coupling\": Use coupling qid as-is (for 2-qubit tasks)\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    derived_from: Name of the parameter this one is computed from, if any. Consumers\n        must not let users edit a derived value directly.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
       },
       "ParameterVersionResponse": {
         "properties": {
@@ -25431,6 +25531,28 @@
         "title": "ReExecutionEntry",
         "description": "A child task result created by re-execution."
       },
+      "ReanalyzeAffectedQubit": {
+        "properties": {
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "output_parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ReanalyzeOutputParameter"
+            },
+            "type": "array",
+            "title": "Output Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "qid",
+          "output_parameters"
+        ],
+        "title": "ReanalyzeAffectedQubit",
+        "description": "One qubit whose calibration value would be updated by a reanalysis."
+      },
       "ReanalyzeOutputParameter": {
         "properties": {
           "name": {
@@ -25445,6 +25567,42 @@
             "type": "string",
             "title": "Unit",
             "default": ""
+          },
+          "current_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Value",
+            "description": "Current calibration DB value before this reanalysis is committed."
+          },
+          "snapshot_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Value",
+            "description": "Value this parameter had in the source experiment, i.e. its snapshot then."
+          },
+          "derived_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived From",
+            "description": "Name of the parameter this value is computed from. Such values must not be edited directly; edit the source parameter instead."
           }
         },
         "type": "object",
@@ -25662,6 +25820,74 @@
             ],
             "title": "Resonator Assignment Pattern",
             "description": "Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2]."
+          },
+          "manual_readout_frequency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Readout Frequency",
+            "description": "Manual readout frequency in GHz to return for this qubit. When set, this overrides detected-slot assignment for the preview."
+          },
+          "manual_readout_frequencies": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Readout Frequencies",
+            "description": "Manual readout frequencies in GHz for frequency-sorted MUX slots 0..3. Null entries fall back to detected-slot assignment."
+          },
+          "manual_resonator_slot": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Resonator Slot",
+            "description": "Frequency-sorted resonator slot to assign to this qubit. When set, this overrides resonator_assignment_pattern for the preview."
+          },
+          "output_parameter_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "number"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Parameter Overrides",
+            "description": "Manual output-parameter values keyed by qid and parameter name. These values override reanalysis results in the preview and commit."
           }
         },
         "type": "object",
@@ -25711,6 +25937,19 @@
             "title": "Figure",
             "description": "Plotly figure JSON of the re-analyzed result with markers."
           },
+          "raw_figure": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Figure",
+            "description": "Plotly figure JSON before reanalysis markers are added."
+          },
           "output_parameters": {
             "items": {
               "$ref": "#/components/schemas/ReanalyzeOutputParameter"
@@ -25718,10 +25957,18 @@
             "type": "array",
             "title": "Output Parameters"
           },
+          "affected_qubits": {
+            "items": {
+              "$ref": "#/components/schemas/ReanalyzeAffectedQubit"
+            },
+            "type": "array",
+            "title": "Affected Qubits",
+            "description": "Qubits in the same MUX whose output parameters are previewed or committed."
+          },
           "committed": {
             "type": "boolean",
             "title": "Committed",
-            "description": "Always false in this version; persisting changes will land later.",
+            "description": "True when the reanalysis result has been persisted to calibration data.",
             "default": false
           }
         },

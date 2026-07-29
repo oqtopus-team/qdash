@@ -12,6 +12,10 @@ import type { ReanalyzeResonatorSpectroscopyParamsLowPower } from './reanalyzeRe
 import type { ReanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType } from './reanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType';
 import type { ReanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit } from './reanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit';
 import type { ReanalyzeResonatorSpectroscopyParamsResonatorAssignmentPattern } from './reanalyzeResonatorSpectroscopyParamsResonatorAssignmentPattern';
+import type { ReanalyzeResonatorSpectroscopyParamsManualReadoutFrequency } from './reanalyzeResonatorSpectroscopyParamsManualReadoutFrequency';
+import type { ReanalyzeResonatorSpectroscopyParamsManualReadoutFrequencies } from './reanalyzeResonatorSpectroscopyParamsManualReadoutFrequencies';
+import type { ReanalyzeResonatorSpectroscopyParamsManualResonatorSlot } from './reanalyzeResonatorSpectroscopyParamsManualResonatorSlot';
+import type { ReanalyzeResonatorSpectroscopyParamsOutputParameterOverrides } from './reanalyzeResonatorSpectroscopyParamsOutputParameterOverrides';
 
 /**
  * Optional analysis-parameter overrides for resonator spectroscopy.
@@ -34,4 +38,12 @@ export interface ReanalyzeResonatorSpectroscopyParams {
   bare_shift_strength_limit?: ReanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit;
   /** Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2]. */
   resonator_assignment_pattern?: ReanalyzeResonatorSpectroscopyParamsResonatorAssignmentPattern;
+  /** Manual readout frequency in GHz to return for this qubit. When set, this overrides detected-slot assignment for the preview. */
+  manual_readout_frequency?: ReanalyzeResonatorSpectroscopyParamsManualReadoutFrequency;
+  /** Manual readout frequencies in GHz for frequency-sorted MUX slots 0..3. Null entries fall back to detected-slot assignment. */
+  manual_readout_frequencies?: ReanalyzeResonatorSpectroscopyParamsManualReadoutFrequencies;
+  /** Frequency-sorted resonator slot to assign to this qubit. When set, this overrides resonator_assignment_pattern for the preview. */
+  manual_resonator_slot?: ReanalyzeResonatorSpectroscopyParamsManualResonatorSlot;
+  /** Manual output-parameter values keyed by qid and parameter name. These values override reanalysis results in the preview and commit. */
+  output_parameter_overrides?: ReanalyzeResonatorSpectroscopyParamsOutputParameterOverrides;
 }

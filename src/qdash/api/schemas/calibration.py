@@ -101,6 +101,13 @@ class ManualParameterUpdateRequest(BaseModel):
         ...,
         description='Parameters to update. Format: {"param_name": {"value": 4.85, "unit": "GHz"}}',
     )
+    source_task_id: str | None = Field(
+        default=None,
+        description=(
+            "Task result the corrected values come from. When set, the parameter names are "
+            "checked against that result and the edit is linked to it in the provenance graph."
+        ),
+    )
 
 
 class ManualParameterUpdateResponse(BaseModel):

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ManualParameterUpdateRequestParameters } from './manualParameterUpdateRequestParameters';
+import type { ManualParameterUpdateRequestSourceTaskId } from './manualParameterUpdateRequestSourceTaskId';
 
 /**
  * Request to manually update calibration parameters.
@@ -20,4 +21,6 @@ export interface ManualParameterUpdateRequest {
   qid: string;
   /** Parameters to update. Format: {"param_name": {"value": 4.85, "unit": "GHz"}} */
   parameters: ManualParameterUpdateRequestParameters;
+  /** Task result the corrected values come from. When set, the parameter names are checked against that result and the edit is linked to it in the provenance graph. */
+  source_task_id?: ManualParameterUpdateRequestSourceTaskId;
 }

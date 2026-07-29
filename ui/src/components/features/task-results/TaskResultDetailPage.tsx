@@ -23,6 +23,7 @@ import { useCreateIssue, getGetTaskResultIssuesQueryKey } from "@/client/issue/i
 import { useQueryClient } from "@tanstack/react-query";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
+import { OutputParametersEditor } from "@/components/features/parameters/OutputParametersEditor";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
@@ -622,12 +623,21 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           />
         )}
 
-        {taskResult.output_parameters && Object.keys(taskResult.output_parameters).length > 0 && (
-          <ParametersTable
-            title="Output Parameters"
-            parameters={taskResult.output_parameters as Record<string, unknown>}
-          />
-        )}
+        {taskResult.output_parameters &&
+          Object.keys(taskResult.output_parameters).length > 0 &&
+          (taskResult.chip_id ? (
+            <OutputParametersEditor
+              chipId={taskResult.chip_id}
+              qid={taskResult.qid}
+              taskId={taskResult.task_id}
+              outputParameters={taskResult.output_parameters as Record<string, unknown>}
+            />
+          ) : (
+            <ParametersTable
+              title="Output Parameters"
+              parameters={taskResult.output_parameters as Record<string, unknown>}
+            />
+          ))}
 
         {taskResult.run_parameters && Object.keys(taskResult.run_parameters).length > 0 && (
           <ParametersTable
