@@ -89,7 +89,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListForumCategoriesQueryResult = NonNullable<Awaited<ReturnType<typeof listForumCategories>>>
@@ -105,7 +105,7 @@ export function useListForumCategories<TData = Awaited<ReturnType<typeof listFor
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListForumCategories<TData = Awaited<ReturnType<typeof listForumCategories>>, TError = HTTPValidationError>(
  params?: ListForumCategoriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -115,11 +115,11 @@ export function useListForumCategories<TData = Awaited<ReturnType<typeof listFor
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListForumCategories<TData = Awaited<ReturnType<typeof listForumCategories>>, TError = HTTPValidationError>(
  params?: ListForumCategoriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List forum categories
  */
@@ -127,11 +127,11 @@ export function useListForumCategories<TData = Awaited<ReturnType<typeof listFor
 export function useListForumCategories<TData = Awaited<ReturnType<typeof listForumCategories>>, TError = HTTPValidationError>(
  params?: ListForumCategoriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListForumCategoriesQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -374,7 +374,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListForumPostsQueryResult = NonNullable<Awaited<ReturnType<typeof listForumPosts>>>
@@ -390,7 +390,7 @@ export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPos
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPosts>>, TError = HTTPValidationError>(
  params?: ListForumPostsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -400,11 +400,11 @@ export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPos
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPosts>>, TError = HTTPValidationError>(
  params?: ListForumPostsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List forum threads
  */
@@ -412,11 +412,11 @@ export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPos
 export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPosts>>, TError = HTTPValidationError>(
  params?: ListForumPostsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListForumPostsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -531,7 +531,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(postId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(postId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetForumPostQueryResult = NonNullable<Awaited<ReturnType<typeof getForumPost>>>
@@ -547,7 +547,7 @@ export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>, TError = HTTPValidationError>(
  postId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -557,11 +557,11 @@ export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>, TError = HTTPValidationError>(
  postId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get a forum post
  */
@@ -569,11 +569,11 @@ export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>
 export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>, TError = HTTPValidationError>(
  postId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetForumPostQueryOptions(postId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -754,7 +754,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(postId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(postId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetForumPostRepliesQueryResult = NonNullable<Awaited<ReturnType<typeof getForumPostReplies>>>
@@ -771,7 +771,7 @@ export function useGetForumPostReplies<TData = Awaited<ReturnType<typeof getForu
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetForumPostReplies<TData = Awaited<ReturnType<typeof getForumPostReplies>>, TError = HTTPValidationError>(
  postId: string,
     params?: GetForumPostRepliesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData>> & Pick<
@@ -782,12 +782,12 @@ export function useGetForumPostReplies<TData = Awaited<ReturnType<typeof getForu
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetForumPostReplies<TData = Awaited<ReturnType<typeof getForumPostReplies>>, TError = HTTPValidationError>(
  postId: string,
     params?: GetForumPostRepliesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List forum replies
  */
@@ -796,11 +796,11 @@ export function useGetForumPostReplies<TData = Awaited<ReturnType<typeof getForu
  postId: string,
     params?: GetForumPostRepliesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetForumPostRepliesQueryOptions(postId,params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

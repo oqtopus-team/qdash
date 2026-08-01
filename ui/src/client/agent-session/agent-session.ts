@@ -155,7 +155,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(sessionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentSession>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(sessionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentSession>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetAgentSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentSession>>>
@@ -171,7 +171,7 @@ export function useGetAgentSession<TData = Awaited<ReturnType<typeof getAgentSes
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAgentSession<TData = Awaited<ReturnType<typeof getAgentSession>>, TError = HTTPValidationError>(
  sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSession>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -181,11 +181,11 @@ export function useGetAgentSession<TData = Awaited<ReturnType<typeof getAgentSes
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAgentSession<TData = Awaited<ReturnType<typeof getAgentSession>>, TError = HTTPValidationError>(
  sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSession>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get an agent session
  */
@@ -193,11 +193,11 @@ export function useGetAgentSession<TData = Awaited<ReturnType<typeof getAgentSes
 export function useGetAgentSession<TData = Awaited<ReturnType<typeof getAgentSession>>, TError = HTTPValidationError>(
  sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentSession>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetAgentSessionQueryOptions(sessionId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -379,7 +379,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(sessionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgentActions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(sessionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgentActions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListAgentActionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAgentActions>>>
@@ -395,7 +395,7 @@ export function useListAgentActions<TData = Awaited<ReturnType<typeof listAgentA
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListAgentActions<TData = Awaited<ReturnType<typeof listAgentActions>>, TError = HTTPValidationError>(
  sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentActions>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -405,11 +405,11 @@ export function useListAgentActions<TData = Awaited<ReturnType<typeof listAgentA
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListAgentActions<TData = Awaited<ReturnType<typeof listAgentActions>>, TError = HTTPValidationError>(
  sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentActions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List agent actions
  */
@@ -417,11 +417,11 @@ export function useListAgentActions<TData = Awaited<ReturnType<typeof listAgentA
 export function useListAgentActions<TData = Awaited<ReturnType<typeof listAgentActions>>, TError = HTTPValidationError>(
  sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentActions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListAgentActionsQueryOptions(sessionId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -474,7 +474,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(sessionId && actionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgentActionCandidates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(sessionId && actionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAgentActionCandidates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListAgentActionCandidatesQueryResult = NonNullable<Awaited<ReturnType<typeof listAgentActionCandidates>>>
@@ -491,7 +491,7 @@ export function useListAgentActionCandidates<TData = Awaited<ReturnType<typeof l
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListAgentActionCandidates<TData = Awaited<ReturnType<typeof listAgentActionCandidates>>, TError = HTTPValidationError>(
  sessionId: string,
     actionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentActionCandidates>>, TError, TData>> & Pick<
@@ -502,12 +502,12 @@ export function useListAgentActionCandidates<TData = Awaited<ReturnType<typeof l
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListAgentActionCandidates<TData = Awaited<ReturnType<typeof listAgentActionCandidates>>, TError = HTTPValidationError>(
  sessionId: string,
     actionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentActionCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List agent action candidates
  */
@@ -516,11 +516,11 @@ export function useListAgentActionCandidates<TData = Awaited<ReturnType<typeof l
  sessionId: string,
     actionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAgentActionCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListAgentActionCandidatesQueryOptions(sessionId,actionId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -707,7 +707,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(sessionId && commitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(sessionId && commitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetAgentCampaignCommitQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentCampaignCommit>>>
@@ -724,7 +724,7 @@ export function useGetAgentCampaignCommit<TData = Awaited<ReturnType<typeof getA
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAgentCampaignCommit<TData = Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError = HTTPValidationError>(
  sessionId: string,
     commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError, TData>> & Pick<
@@ -735,12 +735,12 @@ export function useGetAgentCampaignCommit<TData = Awaited<ReturnType<typeof getA
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAgentCampaignCommit<TData = Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError = HTTPValidationError>(
  sessionId: string,
     commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get an agent campaign commit
  */
@@ -749,11 +749,11 @@ export function useGetAgentCampaignCommit<TData = Awaited<ReturnType<typeof getA
  sessionId: string,
     commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetAgentCampaignCommitQueryOptions(sessionId,commitId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -806,7 +806,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(sessionId && commitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentCandidateCommit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(sessionId && commitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentCandidateCommit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetAgentCandidateCommitQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentCandidateCommit>>>
@@ -823,7 +823,7 @@ export function useGetAgentCandidateCommit<TData = Awaited<ReturnType<typeof get
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAgentCandidateCommit<TData = Awaited<ReturnType<typeof getAgentCandidateCommit>>, TError = HTTPValidationError>(
  sessionId: string,
     commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCandidateCommit>>, TError, TData>> & Pick<
@@ -834,12 +834,12 @@ export function useGetAgentCandidateCommit<TData = Awaited<ReturnType<typeof get
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAgentCandidateCommit<TData = Awaited<ReturnType<typeof getAgentCandidateCommit>>, TError = HTTPValidationError>(
  sessionId: string,
     commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCandidateCommit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get an agent candidate commit
  */
@@ -848,11 +848,11 @@ export function useGetAgentCandidateCommit<TData = Awaited<ReturnType<typeof get
  sessionId: string,
     commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCandidateCommit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetAgentCandidateCommitQueryOptions(sessionId,commitId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -972,7 +972,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(sessionId && actionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentAction>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(sessionId && actionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentAction>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetAgentActionQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentAction>>>
@@ -989,7 +989,7 @@ export function useGetAgentAction<TData = Awaited<ReturnType<typeof getAgentActi
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAgentAction<TData = Awaited<ReturnType<typeof getAgentAction>>, TError = HTTPValidationError>(
  sessionId: string,
     actionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentAction>>, TError, TData>> & Pick<
@@ -1000,12 +1000,12 @@ export function useGetAgentAction<TData = Awaited<ReturnType<typeof getAgentActi
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAgentAction<TData = Awaited<ReturnType<typeof getAgentAction>>, TError = HTTPValidationError>(
  sessionId: string,
     actionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentAction>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get an agent action
  */
@@ -1014,11 +1014,11 @@ export function useGetAgentAction<TData = Awaited<ReturnType<typeof getAgentActi
  sessionId: string,
     actionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentAction>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetAgentActionQueryOptions(sessionId,actionId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

@@ -87,9 +87,14 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
         toast.error("Please enter a cron expression");
         return;
       }
+      const trimmedCron = cronExpression.trim();
+      if (schedules.some((schedule) => schedule.cron === trimmedCron)) {
+        toast.error("This cron schedule already exists");
+        return;
+      }
       createScheduleMutation.mutate({
         data: {
-          cron: cronExpression.trim(),
+          cron: trimmedCron,
           active: isActive,
           parameters: {},
         },
@@ -163,6 +168,9 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
             />
             <label className="label">
               <span className="label-text-alt text-xs">Timezone: Asia/Tokyo (JST)</span>
+            </label>
+            <label className="label py-0">
+              <span className="label-text-alt text-xs">You can add multiple cron schedules</span>
             </label>
           </div>
 
@@ -260,8 +268,10 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       >
         {createScheduleMutation.isPending ? (
           <span className="loading loading-spinner loading-xs"></span>
+        ) : scheduleType === "cron" ? (
+          "Add Cron Schedule"
         ) : (
-          `Create ${scheduleType === "cron" ? "Cron" : "One-time"} Schedule`
+          "Create One-time Schedule"
         )}
       </button>
 
