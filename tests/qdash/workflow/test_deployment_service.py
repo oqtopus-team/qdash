@@ -315,8 +315,8 @@ class _ScheduleFakeClient:
     def __init__(
         self,
         deployment: object,
-        existing_schedules: list[object],
-        created_schedules: list[object],
+        existing_schedules: list[SimpleNamespace],
+        created_schedules: list[SimpleNamespace],
     ) -> None:
         self.read_deployment = AsyncMock(return_value=deployment)
         self.read_deployment_schedules = AsyncMock(return_value=existing_schedules)
@@ -350,7 +350,9 @@ async def test_set_schedule_appends_without_deleting_existing(
 
     client.delete_deployment_schedule.assert_not_called()
     client.create_deployment_schedules.assert_awaited_once()
-    assert client.create_deployment_schedules.await_args.args[0] == deployment_id
+    await_args = client.create_deployment_schedules.await_args
+    assert await_args is not None
+    assert await_args.args[0] == deployment_id
     assert response.schedule_id == str(new_schedule_id)
     assert response.cron == "0 2 * * *"
 

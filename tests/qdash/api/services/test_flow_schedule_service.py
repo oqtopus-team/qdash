@@ -2,6 +2,7 @@
 
 import uuid
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -10,6 +11,9 @@ from fastapi import HTTPException
 from qdash.api.schemas.flow import UpdateScheduleRequest
 from qdash.api.services import flow_schedule_service
 from qdash.api.services.flow_schedule_service import FlowScheduleService
+
+if TYPE_CHECKING:
+    from qdash.repository import MongoFlowRepository
 
 
 class _FakeFlowRepo:
@@ -26,6 +30,10 @@ class _FakeFlowRepo:
             if all(getattr(flow, key, None) == value for key, value in query.items()):
                 return flow
         return None
+
+
+def _service(flows: list[object]) -> FlowScheduleService:
+    return FlowScheduleService(flow_repository=cast("MongoFlowRepository", _FakeFlowRepo(flows)))
 
 
 class _ClientCtx:
@@ -71,7 +79,7 @@ async def test_resolve_cron_schedule_found() -> None:
     schedule = _fake_schedule(schedule_id)
     flow = _flow(deployment_id=str(deployment_id))
     client = SimpleNamespace(read_deployment_schedules=AsyncMock(return_value=[schedule]))
-    service = FlowScheduleService(flow_repository=_FakeFlowRepo([flow]))
+    service = _service([flow])
 
     result = await service._resolve_cron_schedule(client, str(schedule_id), "proj-1")
 
@@ -87,7 +95,7 @@ async def test_resolve_cron_schedule_not_found() -> None:
     deployment_id = uuid.uuid4()
     flow = _flow(deployment_id=str(deployment_id))
     client = SimpleNamespace(read_deployment_schedules=AsyncMock(return_value=[]))
-    service = FlowScheduleService(flow_repository=_FakeFlowRepo([flow]))
+    service = _service([flow])
 
     result = await service._resolve_cron_schedule(client, str(uuid.uuid4()), "proj-1")
 
@@ -97,7 +105,7 @@ async def test_resolve_cron_schedule_not_found() -> None:
 @pytest.mark.asyncio
 async def test_resolve_cron_schedule_invalid_uuid() -> None:
     client = SimpleNamespace(read_deployment_schedules=AsyncMock())
-    service = FlowScheduleService(flow_repository=_FakeFlowRepo([]))
+    service = _service([])
 
     result = await service._resolve_cron_schedule(client, "not-a-uuid", "proj-1")
 
@@ -121,7 +129,7 @@ async def test_resolve_cron_schedule_skips_flow_whose_read_fails() -> None:
         return [schedule]
 
     client = SimpleNamespace(read_deployment_schedules=AsyncMock(side_effect=read_schedules))
-    service = FlowScheduleService(flow_repository=_FakeFlowRepo([bad_flow, good_flow]))
+    service = _service([bad_flow, good_flow])
 
     result = await service._resolve_cron_schedule(client, str(schedule_id), "proj-1")
 
@@ -162,7 +170,7 @@ async def test_update_schedule_updates_cron_in_place(monkeypatch: pytest.MonkeyP
     )
     monkeypatch.setattr(flow_schedule_service, "get_client", lambda: _ClientCtx(client))
 
-    service = FlowScheduleService(flow_repository=_FakeFlowRepo([flow]))
+    service = _service([flow])
     request = UpdateScheduleRequest(active=False, cron="0 3 * * *", timezone="Asia/Tokyo")
 
     response = await service.update_schedule(str(schedule_id), request, "user", "proj-1")
@@ -192,7 +200,7 @@ async def test_update_schedule_active_only_leaves_cron_untouched(
     )
     monkeypatch.setattr(flow_schedule_service, "get_client", lambda: _ClientCtx(client))
 
-    service = FlowScheduleService(flow_repository=_FakeFlowRepo([flow]))
+    service = _service([flow])
     request = UpdateScheduleRequest(active=False)
 
     await service.update_schedule(str(schedule_id), request, "user", "proj-1")
@@ -207,7 +215,7 @@ async def test_update_schedule_not_found_raises_404(monkeypatch: pytest.MonkeyPa
     client = SimpleNamespace(read_deployment_schedules=AsyncMock(return_value=[]))
     monkeypatch.setattr(flow_schedule_service, "get_client", lambda: _ClientCtx(client))
 
-    service = FlowScheduleService(flow_repository=_FakeFlowRepo([]))
+    service = _service([])
     request = UpdateScheduleRequest(active=True)
 
     with pytest.raises(HTTPException) as exc_info:
@@ -236,7 +244,7 @@ async def test_delete_schedule_deletes_only_matched_cron_schedule(
     )
     monkeypatch.setattr(flow_schedule_service, "get_client", lambda: _ClientCtx(client))
 
-    service = FlowScheduleService(flow_repository=_FakeFlowRepo([flow]))
+    service = _service([flow])
 
     response = await service.delete_schedule(str(schedule_id), "user", "proj-1")
 
@@ -260,7 +268,7 @@ async def test_delete_schedule_falls_back_to_one_time(monkeypatch: pytest.Monkey
     )
     monkeypatch.setattr(flow_schedule_service, "get_client", lambda: _ClientCtx(client))
 
-    service = FlowScheduleService(flow_repository=_FakeFlowRepo([flow]))
+    service = _service([flow])
 
     response = await service.delete_schedule(str(flow_run_id), "user", "proj-1")
 
@@ -277,7 +285,7 @@ async def test_delete_schedule_not_found_raises_404(monkeypatch: pytest.MonkeyPa
     )
     monkeypatch.setattr(flow_schedule_service, "get_client", lambda: _ClientCtx(client))
 
-    service = FlowScheduleService(flow_repository=_FakeFlowRepo([]))
+    service = _service([])
 
     with pytest.raises(HTTPException) as exc_info:
         await service.delete_schedule(str(uuid.uuid4()), "user", "proj-1")
