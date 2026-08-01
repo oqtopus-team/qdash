@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
-from qdash.api.schemas.flow import UpdateScheduleRequest
+from qdash.api.schemas.flow import ScheduleFlowRequest, UpdateScheduleRequest
 from qdash.api.services import flow_schedule_service
-from qdash.api.services.flow_schedule_service import FlowScheduleService
+from qdash.api.services.flow_schedule_service import FlowScheduleService, _iter_cron_schedules
 
 if TYPE_CHECKING:
     from qdash.repository import MongoFlowRepository
@@ -28,6 +28,12 @@ class _FakeFlowRepo:
     def find_one(self, query: dict[str, object]) -> object | None:
         for flow in self._flows:
             if all(getattr(flow, key, None) == value for key, value in query.items()):
+                return flow
+        return None
+
+    def find_by_project_and_name(self, project_id: str, name: str) -> object | None:
+        for flow in self._flows:
+            if getattr(flow, "name", None) == name:
                 return flow
         return None
 
@@ -67,6 +73,26 @@ def _flow(
     name: str = "myflow", deployment_id: str | None = None, project_id: str = "proj-1"
 ) -> SimpleNamespace:
     return SimpleNamespace(name=name, deployment_id=deployment_id, project_id=project_id)
+
+
+def _non_cron_schedule() -> SimpleNamespace:
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        schedule=SimpleNamespace(interval=3600),
+        active=True,
+        created=None,
+    )
+
+
+# --- _iter_cron_schedules ---
+
+
+def test_iter_cron_schedules_yields_only_cron_schedules() -> None:
+    cron = _fake_schedule(uuid.uuid4())
+    interval = _non_cron_schedule()
+
+    assert list(_iter_cron_schedules([interval, cron])) == [cron]
+    assert list(_iter_cron_schedules([])) == []
 
 
 # --- _resolve_cron_schedule ---
@@ -137,6 +163,24 @@ async def test_resolve_cron_schedule_skips_flow_whose_read_fails() -> None:
     found_flow, found_deployment_uuid, _found_schedule = result
     assert found_flow is good_flow
     assert found_deployment_uuid == good_deployment_id
+
+
+@pytest.mark.asyncio
+async def test_resolve_cron_schedule_skips_flow_without_deployment() -> None:
+    """A flow with no deployment_id is skipped without querying Prefect."""
+    schedule_id = uuid.uuid4()
+    deployment_id = uuid.uuid4()
+    schedule = _fake_schedule(schedule_id)
+    no_deploy_flow = _flow(name="nodeploy", deployment_id=None)
+    flow = _flow(deployment_id=str(deployment_id))
+    client = SimpleNamespace(read_deployment_schedules=AsyncMock(return_value=[schedule]))
+    service = _service([no_deploy_flow, flow])
+
+    result = await service._resolve_cron_schedule(client, str(schedule_id), "proj-1")
+
+    assert result is not None
+    assert result[0] is flow
+    client.read_deployment_schedules.assert_awaited_once_with(deployment_id)
 
 
 # --- update_schedule ---
@@ -291,3 +335,87 @@ async def test_delete_schedule_not_found_raises_404(monkeypatch: pytest.MonkeyPa
         await service.delete_schedule(str(uuid.uuid4()), "user", "proj-1")
 
     assert exc_info.value.status_code == 404
+
+
+# --- list_all_schedules / list_flow_schedules ---
+
+
+@pytest.mark.asyncio
+async def test_list_all_schedules_returns_cron_schedules(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cron schedules are collected across flows; non-cron schedules are ignored."""
+    deployment_id = uuid.uuid4()
+    schedule_id = uuid.uuid4()
+    flow = _flow(deployment_id=str(deployment_id))
+    deployment = SimpleNamespace(
+        schedules=[_fake_schedule(schedule_id), _non_cron_schedule()], created=None
+    )
+    client = SimpleNamespace(
+        read_deployment=AsyncMock(return_value=deployment),
+        read_flow_runs=AsyncMock(return_value=[]),
+    )
+    monkeypatch.setattr(flow_schedule_service, "get_client", lambda: _ClientCtx(client))
+    service = _service([flow])
+
+    response = await service.list_all_schedules("user", "proj-1")
+
+    assert [s.schedule_id for s in response.schedules] == [str(schedule_id)]
+    summary = response.schedules[0]
+    assert summary.schedule_type == "cron"
+    assert summary.cron == "0 2 * * *"
+    assert summary.flow_name == "myflow"
+
+
+@pytest.mark.asyncio
+async def test_list_flow_schedules_returns_cron_schedules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Schedules for a named flow include its cron schedules."""
+    deployment_id = uuid.uuid4()
+    schedule_id = uuid.uuid4()
+    flow = _flow(deployment_id=str(deployment_id))
+    deployment = SimpleNamespace(schedules=[_fake_schedule(schedule_id)], created=None)
+    client = SimpleNamespace(
+        read_deployment=AsyncMock(return_value=deployment),
+        read_flow_runs=AsyncMock(return_value=[]),
+    )
+    monkeypatch.setattr(flow_schedule_service, "get_client", lambda: _ClientCtx(client))
+    service = _service([flow])
+
+    response = await service.list_flow_schedules("myflow", "user", "proj-1")
+
+    assert [s.schedule_id for s in response.schedules] == [str(schedule_id)]
+    assert response.schedules[0].schedule_type == "cron"
+
+
+# --- _schedule_cron ---
+
+
+@pytest.mark.asyncio
+async def test_schedule_cron_posts_to_deployment_service(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cron scheduling posts to the deployment service and surfaces its schedule_id."""
+    service = _service([])
+    schedule_id = str(uuid.uuid4())
+    post = AsyncMock(return_value={"schedule_id": schedule_id})
+    monkeypatch.setattr(service, "_http_post_with_retry", post)
+    request = ScheduleFlowRequest(cron="0 2 * * *", timezone="Asia/Tokyo", active=True)
+
+    response = await service._schedule_cron("myflow", request, "dep-1", {"param": 1})
+
+    post.assert_awaited_once()
+    await_args = post.await_args
+    assert await_args is not None
+    url, payload = await_args.args
+    assert url.endswith("/set-schedule")
+    assert payload == {
+        "deployment_id": "dep-1",
+        "cron": "0 2 * * *",
+        "timezone": "Asia/Tokyo",
+        "active": True,
+        "parameters": {"param": 1},
+    }
+    assert response.schedule_id == schedule_id
+    assert response.schedule_type == "cron"
+    assert response.cron == "0 2 * * *"
+    assert response.next_run is not None
