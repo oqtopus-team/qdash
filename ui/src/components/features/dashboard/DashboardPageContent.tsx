@@ -484,7 +484,7 @@ export function DashboardPageContent() {
         {/* Filters */}
         <PageFiltersBar>
           <PageFiltersBar.Group>
-            <PageFiltersBar.Item>
+            <PageFiltersBar.Item className="sm:w-64">
               <ChipSelector
                 selectedChip={selectedChip}
                 onChipSelect={(chipId) => {
@@ -494,7 +494,7 @@ export function DashboardPageContent() {
                 }}
               />
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item>
+            <PageFiltersBar.Item className="sm:w-56">
               <CooldownSelector
                 chipId={selectedChip}
                 selectedCooldownId={selectedCooldownId}

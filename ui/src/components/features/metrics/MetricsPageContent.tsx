@@ -408,11 +408,11 @@ export function MetricsPageContent() {
             </PageFiltersBar.Group>
 
             <PageFiltersBar.Group>
-              <PageFiltersBar.Item>
+              <PageFiltersBar.Item className="sm:w-64">
                 <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
               </PageFiltersBar.Item>
 
-              <PageFiltersBar.Item>
+              <PageFiltersBar.Item className="sm:w-56">
                 <CooldownSelector
                   chipId={selectedChip}
                   onPick={(cd) => {

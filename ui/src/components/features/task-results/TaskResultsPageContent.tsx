@@ -228,10 +228,7 @@ function ExecutionFilter({
     return items;
   }, [executionData?.data?.executions, selectedExecutionId]);
 
-  const { styles } = useSelectStyles<ExecutionOption>({
-    labels: options.map((option) => option.label),
-    placeholder: "Select an execution",
-  });
+  const styles = useSelectStyles<ExecutionOption>();
 
   if (isLoading) {
     return <div className="h-[38px] animate-pulse rounded bg-base-300" />;
@@ -608,7 +605,7 @@ export function TaskResultsPageContent() {
       <form onSubmit={handleSubmit}>
         <PageFiltersBar className="mb-4 sm:mb-6">
           <PageFiltersBar.Group className="flex-1">
-            <PageFiltersBar.Item label="Chip" className="sm:min-w-40">
+            <PageFiltersBar.Item label="Chip" className="sm:w-40">
               <div className="flex items-center gap-2">
                 <ChipSelector
                   selectedChip={draftFilters.chipId}
@@ -630,7 +627,7 @@ export function TaskResultsPageContent() {
                 )}
               </div>
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Execution" className="sm:min-w-52">
+            <PageFiltersBar.Item label="Execution" className="sm:w-56">
               <div className="flex items-center gap-2">
                 <ExecutionFilter
                   chipId={draftFilters.chipId}
@@ -651,7 +648,7 @@ export function TaskResultsPageContent() {
                 )}
               </div>
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Task" className="sm:min-w-56">
+            <PageFiltersBar.Item label="Task" className="sm:w-56">
               <div className="flex items-center gap-2">
                 <TaskSelector
                   tasks={tasks}

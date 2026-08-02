@@ -129,10 +129,10 @@ export function ExecutionDurationBreakdownPageContent() {
 
       <PageFiltersBar className="mb-4 sm:mb-6">
         <PageFiltersBar.Group>
-          <PageFiltersBar.Item>
+          <PageFiltersBar.Item className="sm:w-64">
             <ChipSelector selectedChip={selectedChip || ""} onChipSelect={handleChipChange} />
           </PageFiltersBar.Item>
-          <PageFiltersBar.Item>
+          <PageFiltersBar.Item className="sm:w-56">
             <CooldownSelector
               chipId={selectedChip || ""}
               selectedCooldownId={selectedCooldownId}

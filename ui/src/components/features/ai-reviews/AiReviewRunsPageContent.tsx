@@ -177,7 +177,7 @@ export function AiReviewRunsPageContent() {
       <div className="mb-4 rounded-lg border border-base-300 bg-base-100 p-3">
         <PageFiltersBar>
           <PageFiltersBar.Group>
-            <PageFiltersBar.Item label="Chip" className="sm:min-w-56">
+            <PageFiltersBar.Item label="Chip" className="sm:w-56">
               <div className="flex items-center gap-2">
                 <ChipSelector
                   selectedChip={filters.chipId}
@@ -195,7 +195,7 @@ export function AiReviewRunsPageContent() {
                 )}
               </div>
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Task" className="sm:min-w-80">
+            <PageFiltersBar.Item label="Task" className="sm:w-80">
               <div className="flex items-center gap-2">
                 <TaskSelector
                   tasks={aiReviewTasks}

@@ -125,7 +125,7 @@ function QubitDetailPageContent() {
           {/* Controls */}
           <PageFiltersBar>
             <PageFiltersBar.Group>
-              <PageFiltersBar.Item>
+              <PageFiltersBar.Item className="sm:w-64">
                 <ChipSelector
                   selectedChip={chipId}
                   onChipSelect={(newChipId) => {
@@ -133,7 +133,7 @@ function QubitDetailPageContent() {
                   }}
                 />
               </PageFiltersBar.Item>
-              <PageFiltersBar.Item>
+              <PageFiltersBar.Item className="sm:w-56">
                 <CooldownSelector
                   chipId={chipId}
                   selectedCooldownId={selectedCooldownId}
@@ -149,7 +149,7 @@ function QubitDetailPageContent() {
                 />
               </PageFiltersBar.Item>
               {viewMode === "history" && (
-                <PageFiltersBar.Item>
+                <PageFiltersBar.Item className="sm:w-80">
                   <TaskSelector
                     tasks={filteredTasks}
                     selectedTask={selectedTask}

@@ -36,10 +36,7 @@ export function TaskSelector({
     label: task.name,
   }));
 
-  const { styles } = useSelectStyles<TaskOption>({
-    labels: options.map((opt) => opt.label),
-    placeholder: PLACEHOLDER,
-  });
+  const styles = useSelectStyles<TaskOption>();
 
   const handleChange = (option: SingleValue<TaskOption>) => {
     if (option) {
