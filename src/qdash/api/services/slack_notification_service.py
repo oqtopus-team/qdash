@@ -171,6 +171,14 @@ class SlackNotificationService:
         if not self.is_enabled():
             return
 
+        thread_record = SlackForumThreadDocument.find_by_post_id(str(post.id))
+        if thread_record is None:
+            logger.info(
+                "No Slack thread record found for root post %s; skipping status notification",
+                post.id,
+            )
+            return
+
         title = post.title or "Forum thread"
         title_text = f"#{post.number} {title}" if post.number is not None else title
         url = self._forum_post_url(post)
@@ -196,7 +204,9 @@ class SlackNotificationService:
 
         try:
             self._client().chat_postMessage(
-                channel=self._settings.slack_forum_channel_id,
+                channel=thread_record.channel_id,
+                thread_ts=thread_record.message_ts,
+                reply_broadcast=True,
                 text=text,
                 attachments=[{"color": color, "blocks": blocks}],
             )

@@ -332,11 +332,18 @@ def test_notify_forum_reply_swallows_exceptions(init_db) -> None:
 
 
 def test_notify_forum_status_change_resolved_uses_forum_success_color(init_db) -> None:
-    """notify_forum_status_change uses the resolved-status color for resolved."""
+    """notify_forum_status_change replies to the root thread with the resolved color."""
     service = SlackNotificationService(settings=_settings())
     mock_client = MagicMock()
     mock_client.chat_postMessage.return_value = {"ts": "ts.001", "channel": "C0TESTCHAN"}
     post = _post()
+    post.insert()
+    SlackForumThreadDocument.record(
+        post_id=str(post.id),
+        project_id=post.project_id,
+        channel_id="C0ROOTCHAN",
+        message_ts="root.ts.000",
+    )
 
     with patch.object(service, "_client", return_value=mock_client):
         service.notify_forum_status_change(post=post, actor_username="alice", status="resolved")
@@ -344,7 +351,9 @@ def test_notify_forum_status_change_resolved_uses_forum_success_color(init_db) -
     call_kwargs = mock_client.chat_postMessage.call_args.kwargs
     assert call_kwargs["attachments"][0]["color"] == "#18794e"
     assert "Resolved" in str(call_kwargs["attachments"][0]["blocks"])
-    assert "thread_ts" not in call_kwargs  # top-level message, no thread
+    assert call_kwargs["channel"] == "C0ROOTCHAN"
+    assert call_kwargs["thread_ts"] == "root.ts.000"
+    assert call_kwargs["reply_broadcast"] is True
 
 
 def test_notify_forum_status_change_open_uses_forum_info_color(init_db) -> None:
@@ -353,6 +362,13 @@ def test_notify_forum_status_change_open_uses_forum_info_color(init_db) -> None:
     mock_client = MagicMock()
     mock_client.chat_postMessage.return_value = {"ts": "ts.002", "channel": "C0TESTCHAN"}
     post = _post()
+    post.insert()
+    SlackForumThreadDocument.record(
+        post_id=str(post.id),
+        project_id=post.project_id,
+        channel_id="C0ROOTCHAN",
+        message_ts="root.ts.000",
+    )
 
     with patch.object(service, "_client", return_value=mock_client):
         service.notify_forum_status_change(post=post, actor_username="alice", status="open")
@@ -360,6 +376,15 @@ def test_notify_forum_status_change_open_uses_forum_info_color(init_db) -> None:
     call_kwargs = mock_client.chat_postMessage.call_args.kwargs
     assert call_kwargs["attachments"][0]["color"] == "#3a5ccc"
     assert "Open" in str(call_kwargs["attachments"][0]["blocks"])
+
+
+def test_notify_forum_status_change_skips_when_no_thread_record(init_db) -> None:
+    """notify_forum_status_change sends nothing when the root Slack post is unknown."""
+    service = SlackNotificationService(settings=_settings())
+    mock_client = _mock_client()
+    with patch.object(service, "_client", return_value=mock_client):
+        service.notify_forum_status_change(post=_post(), actor_username="alice", status="resolved")
+    mock_client.chat_postMessage.assert_not_called()
 
 
 def test_notify_forum_status_change_skips_when_disabled(init_db) -> None:
@@ -376,5 +401,13 @@ def test_notify_forum_status_change_swallows_exceptions(init_db) -> None:
     service = SlackNotificationService(settings=_settings())
     mock_client = MagicMock()
     mock_client.chat_postMessage.side_effect = RuntimeError("oops")
+    post = _post()
+    post.insert()
+    SlackForumThreadDocument.record(
+        post_id=str(post.id),
+        project_id=post.project_id,
+        channel_id="C0ROOTCHAN",
+        message_ts="root.ts.000",
+    )
     with patch.object(service, "_client", return_value=mock_client):
-        service.notify_forum_status_change(post=_post(), actor_username="alice", status="resolved")
+        service.notify_forum_status_change(post=post, actor_username="alice", status="resolved")
