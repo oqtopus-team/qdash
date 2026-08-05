@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronRight,
   RefreshCw,
+  Undo2,
 } from "lucide-react";
 
 import { ChipSelector } from "@/components/selectors/ChipSelector";
@@ -59,10 +60,27 @@ interface CompareData {
   parameters: Record<string, ParameterData>;
 }
 
+// Raw string shown in the edit input for a value
+function toInputString(value: number | string | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
+// Parse user input into an importable value (null = invalid/empty)
+function parseEditedValue(raw: string): number | string | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  const num = Number(trimmed);
+  if (!Number.isNaN(num)) return num;
+  return trimmed;
+}
+
 export function SeedParametersPanel() {
   const [selectedChip, setSelectedChip] = useState<string>("");
   const [expandedParams, setExpandedParams] = useState<Set<string>>(new Set());
   const [selectedQubits, setSelectedQubits] = useState<Record<string, Set<string>>>({});
+  // Manual overrides of import values, keyed by parameter name then qubit id
+  const [editedValues, setEditedValues] = useState<Record<string, Record<string, string>>>({});
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     mode: "all" | "selected";
@@ -111,6 +129,13 @@ export function SeedParametersPanel() {
     };
   }, [data]);
 
+  // Switching chips invalidates selections and manual edits
+  const handleChipSelect = useCallback((chip: string) => {
+    setSelectedChip(chip);
+    setSelectedQubits({});
+    setEditedValues({});
+  }, []);
+
   // Toggle parameter expansion
   const toggleParam = useCallback((paramName: string) => {
     setExpandedParams((prev) => {
@@ -137,16 +162,48 @@ export function SeedParametersPanel() {
     });
   }, []);
 
-  // Select all non-same qubits in a parameter
-  const selectAllInParam = useCallback((paramName: string, paramData: ParameterData) => {
-    const qidsToSelect = Object.entries(paramData.qubits)
-      .filter(([, q]) => q.status !== "same")
-      .map(([qid]) => qid);
-    setSelectedQubits((prev) => ({
-      ...prev,
-      [paramName]: new Set(qidsToSelect),
-    }));
+  // Update or clear a manual value override
+  const setEditedValue = useCallback(
+    (paramName: string, qid: string, raw: string, yamlValue: number | string | null) => {
+      setEditedValues((prev) => {
+        const paramEdits = { ...(prev[paramName] || {}) };
+        if (raw === toInputString(yamlValue)) {
+          delete paramEdits[qid];
+        } else {
+          paramEdits[qid] = raw;
+        }
+        return { ...prev, [paramName]: paramEdits };
+      });
+    },
+    [],
+  );
+
+  const resetEditedValue = useCallback((paramName: string, qid: string) => {
+    setEditedValues((prev) => {
+      const paramEdits = { ...(prev[paramName] || {}) };
+      delete paramEdits[qid];
+      return { ...prev, [paramName]: paramEdits };
+    });
   }, []);
+
+  const editedCount = useMemo(() => {
+    return Object.values(editedValues).reduce((sum, edits) => sum + Object.keys(edits).length, 0);
+  }, [editedValues]);
+
+  // Select all non-same or manually edited qubits in a parameter
+  const selectAllInParam = useCallback(
+    (paramName: string, paramData: ParameterData) => {
+      const paramEdits = editedValues[paramName] || {};
+      const qidsToSelect = Object.entries(paramData.qubits)
+        .filter(([qid, q]) => q.status !== "same" || paramEdits[qid] !== undefined)
+        .map(([qid]) => qid);
+      setSelectedQubits((prev) => ({
+        ...prev,
+        [paramName]: new Set(qidsToSelect),
+      }));
+    },
+    [editedValues],
+  );
 
   // Clear selection for a parameter
   const clearParamSelection = useCallback((paramName: string) => {
@@ -161,58 +218,65 @@ export function SeedParametersPanel() {
     return Object.values(selectedQubits).reduce((sum, set) => sum + set.size, 0);
   }, [selectedQubits]);
 
-  // Count items that would be overwritten for a given mode
-  const countOverwrites = useCallback(
+  // Collect the values that would be imported for a given mode.
+  // Manually edited values take precedence over YAML values, and an edit also
+  // makes a "same" row importable.
+  const collectImportEntries = useCallback(
     (mode: "all" | "selected") => {
-      if (!data) return 0;
-      let diffCount = 0;
+      const entries: {
+        paramName: string;
+        qid: string;
+        value: number | string;
+        overwrites: boolean;
+      }[] = [];
+      if (!data) return entries;
+
       Object.entries(data.parameters).forEach(([paramName, paramData]) => {
         Object.entries(paramData.qubits).forEach(([qid, qubitData]) => {
-          if (qubitData.status !== "different") return;
+          const editedRaw = editedValues[paramName]?.[qid];
+          const isEdited = editedRaw !== undefined;
+          if (!isEdited && qubitData.status === "same") return;
+
           if (mode === "selected") {
             const paramSelected = selectedQubits[paramName];
             if (!paramSelected || !paramSelected.has(qid)) return;
           }
-          diffCount++;
+
+          const value = isEdited ? parseEditedValue(editedRaw) : qubitData.yaml_value;
+          if (value === null || value === undefined) return;
+
+          entries.push({
+            paramName,
+            qid,
+            value,
+            overwrites: qubitData.qdash_value !== null && qubitData.qdash_value !== undefined,
+          });
         });
       });
-      return diffCount;
+      return entries;
     },
-    [data, selectedQubits],
+    [data, selectedQubits, editedValues],
   );
+
+  // Total number of values Import All would send (new/different plus manual edits)
+  const importAllCount = useMemo(() => collectImportEntries("all").length, [collectImportEntries]);
 
   // Execute import (called after confirmation or directly if no overwrites)
   const executeImport = useCallback(
     (mode: "all" | "selected") => {
-      if (!selectedChip || !data) return;
+      if (!selectedChip) return;
+
+      const entries = collectImportEntries(mode);
+      if (entries.length === 0) return;
 
       // Build manual_data for import
       const manualData: Record<string, Record<string, number | string>> = {};
-
-      Object.entries(data.parameters).forEach(([paramName, paramData]) => {
-        Object.entries(paramData.qubits).forEach(([qid, qubitData]) => {
-          // Skip if same status (no need to import)
-          if (qubitData.status === "same") return;
-
-          // For 'selected' mode, check if this qubit is selected
-          if (mode === "selected") {
-            const paramSelected = selectedQubits[paramName];
-            if (!paramSelected || !paramSelected.has(qid)) return;
-          }
-
-          // Add to manual_data
-          if (!manualData[paramName]) {
-            manualData[paramName] = {};
-          }
-          if (qubitData.yaml_value !== null) {
-            manualData[paramName][qid] = qubitData.yaml_value;
-          }
-        });
+      entries.forEach(({ paramName, qid, value }) => {
+        if (!manualData[paramName]) {
+          manualData[paramName] = {};
+        }
+        manualData[paramName][qid] = value;
       });
-
-      if (Object.keys(manualData).length === 0) {
-        return;
-      }
 
       importMutation.mutate(
         {
@@ -226,19 +290,20 @@ export function SeedParametersPanel() {
           onSuccess: () => {
             // Clear selections and refetch
             setSelectedQubits({});
+            setEditedValues({});
             setConfirmDialog({ open: false, mode: "all", diffCount: 0 });
             refetch();
           },
         },
       );
     },
-    [selectedChip, data, selectedQubits, importMutation, refetch],
+    [selectedChip, collectImportEntries, importMutation, refetch],
   );
 
   // Request import (shows confirmation if there are overwrites)
   const requestImport = useCallback(
     (mode: "all" | "selected") => {
-      const diffCount = countOverwrites(mode);
+      const diffCount = collectImportEntries(mode).filter((e) => e.overwrites).length;
       if (diffCount > 0) {
         // Show confirmation dialog
         setConfirmDialog({ open: true, mode, diffCount });
@@ -247,7 +312,7 @@ export function SeedParametersPanel() {
         executeImport(mode);
       }
     },
-    [countOverwrites, executeImport],
+    [collectImportEntries, executeImport],
   );
 
   // Handle confirmation dialog actions
@@ -288,7 +353,7 @@ export function SeedParametersPanel() {
           <label className="label">
             <span className="label-text">Target Chip</span>
           </label>
-          <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
+          <ChipSelector selectedChip={selectedChip} onChipSelect={handleChipSelect} />
         </div>
 
         {/* Loading State */}
@@ -310,6 +375,11 @@ export function SeedParametersPanel() {
             <div className="badge badge-ghost gap-1">
               <span className="font-medium">{counts.same}</span> Same
             </div>
+            {editedCount > 0 && (
+              <div className="badge badge-warning gap-1">
+                <span className="font-medium">{editedCount}</span> Edited
+              </div>
+            )}
           </div>
         )}
 
@@ -337,8 +407,9 @@ export function SeedParametersPanel() {
             {Object.entries(data.parameters).map(([paramName, paramData]) => {
               const isExpanded = expandedParams.has(paramName);
               const paramSelected = selectedQubits[paramName] || new Set();
-              const nonSameCount = Object.values(paramData.qubits).filter(
-                (q) => q.status !== "same",
+              const paramEdits = editedValues[paramName] || {};
+              const nonSameCount = Object.entries(paramData.qubits).filter(
+                ([qid, q]) => q.status !== "same" || paramEdits[qid] !== undefined,
               ).length;
 
               return (
@@ -360,6 +431,11 @@ export function SeedParametersPanel() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      {Object.keys(paramEdits).length > 0 && (
+                        <span className="badge badge-warning badge-sm">
+                          {Object.keys(paramEdits).length} edited
+                        </span>
+                      )}
                       {paramSelected.size > 0 && (
                         <span className="badge badge-primary badge-sm">
                           {paramSelected.size} selected
@@ -404,42 +480,83 @@ export function SeedParametersPanel() {
                             <tr>
                               <th className="w-8"></th>
                               <th>Qubit</th>
-                              <th>YAML Value</th>
+                              <th>Import Value</th>
                               <th>QDash Value</th>
                               <th>Status</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {Object.entries(paramData.qubits).map(([qid, qubitData]) => (
-                              <tr
-                                key={qid}
-                                className={qubitData.status === "same" ? "opacity-50" : ""}
-                              >
-                                <td>
-                                  <input
-                                    type="checkbox"
-                                    className="checkbox checkbox-xs"
-                                    checked={paramSelected.has(qid)}
-                                    disabled={qubitData.status === "same"}
-                                    onChange={() => toggleQubit(paramName, qid)}
-                                  />
-                                </td>
-                                <td className="font-mono">{qid}</td>
-                                <td className="font-mono text-xs">
-                                  {formatValue(qubitData.yaml_value)}
-                                </td>
-                                <td className="font-mono text-xs">
-                                  {formatValue(qubitData.qdash_value)}
-                                </td>
-                                <td>
-                                  <span
-                                    className={`badge badge-xs ${STATUS_STYLES[qubitData.status]}`}
-                                  >
-                                    {STATUS_LABELS[qubitData.status]}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
+                            {Object.entries(paramData.qubits).map(([qid, qubitData]) => {
+                              const editedRaw = paramEdits[qid];
+                              const isEdited = editedRaw !== undefined;
+                              const isInvalid = isEdited && parseEditedValue(editedRaw) === null;
+                              return (
+                                <tr
+                                  key={qid}
+                                  className={
+                                    qubitData.status === "same" && !isEdited ? "opacity-50" : ""
+                                  }
+                                >
+                                  <td>
+                                    <input
+                                      type="checkbox"
+                                      className="checkbox checkbox-xs"
+                                      checked={paramSelected.has(qid)}
+                                      disabled={qubitData.status === "same" && !isEdited}
+                                      onChange={() => toggleQubit(paramName, qid)}
+                                    />
+                                  </td>
+                                  <td className="font-mono">{qid}</td>
+                                  <td>
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="text"
+                                        className={`input input-xs input-bordered font-mono w-32 ${
+                                          isInvalid
+                                            ? "input-error"
+                                            : isEdited
+                                              ? "input-warning"
+                                              : ""
+                                        }`}
+                                        value={editedRaw ?? toInputString(qubitData.yaml_value)}
+                                        title={`YAML value: ${formatValue(qubitData.yaml_value)}`}
+                                        onChange={(e) =>
+                                          setEditedValue(
+                                            paramName,
+                                            qid,
+                                            e.target.value,
+                                            qubitData.yaml_value,
+                                          )
+                                        }
+                                      />
+                                      {isEdited && (
+                                        <button
+                                          className="btn btn-xs btn-ghost btn-square"
+                                          title={`Reset to YAML value (${formatValue(qubitData.yaml_value)})`}
+                                          onClick={() => resetEditedValue(paramName, qid)}
+                                        >
+                                          <Undo2 className="h-3 w-3" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="font-mono text-xs">
+                                    {formatValue(qubitData.qdash_value)}
+                                  </td>
+                                  <td>
+                                    {isEdited ? (
+                                      <span className="badge badge-xs badge-warning">Edited</span>
+                                    ) : (
+                                      <span
+                                        className={`badge badge-xs ${STATUS_STYLES[qubitData.status]}`}
+                                      >
+                                        {STATUS_LABELS[qubitData.status]}
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -467,7 +584,7 @@ export function SeedParametersPanel() {
         )}
 
         {/* Import Actions */}
-        {data && (counts.new > 0 || counts.different > 0) && (
+        {data && (counts.new > 0 || counts.different > 0 || editedCount > 0) && (
           <div className="card-actions justify-end mt-4 pt-4 border-t border-base-300">
             <div className="dropdown dropdown-end">
               <div tabIndex={0} role="button" className="btn btn-primary gap-2">
@@ -490,7 +607,7 @@ export function SeedParametersPanel() {
               >
                 <li>
                   <button onClick={() => requestImport("all")} disabled={importMutation.isPending}>
-                    Import All New/Different ({counts.new + counts.different})
+                    Import All New/Different ({importAllCount})
                   </button>
                 </li>
                 <li>
@@ -517,7 +634,8 @@ export function SeedParametersPanel() {
                   <p className="py-4">
                     This will overwrite{" "}
                     <span className="font-bold text-warning">{confirmDialog.diffCount}</span>{" "}
-                    existing calibration value(s) with YAML seed values.
+                    existing calibration value(s) with the values shown in the Import Value column
+                    (including any manual edits).
                   </p>
                   <p className="text-sm text-base-content/70">
                     Existing measured values will be replaced. This action cannot be undone.

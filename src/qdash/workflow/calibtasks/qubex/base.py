@@ -2,6 +2,8 @@ from collections.abc import Generator
 from contextlib import ExitStack, contextmanager
 from typing import TYPE_CHECKING, Any
 
+from qubex.experiment import Experiment
+
 from qdash.datamodel.task import ParameterModel
 from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.qubit import MongoQubitCalibrationRepository
@@ -193,7 +195,7 @@ class QubexTask(BaseTask):
     @contextmanager
     def _modified_qubit_readout_frequencies(
         self,
-        exp: Any,
+        exp: Experiment,
         *,
         qubit_label: str,
         frequency_overrides: dict[str, float],
