@@ -13,6 +13,7 @@ import type {
   AgentActionType,
   AgentCampaignCandidateReference,
   FileTreeNode,
+  ForumImageUploadResponse,
   ForumPostCreate,
   ForumPostResponse,
   ForumPostUpdate,
@@ -655,6 +656,12 @@ export class QDashClient {
 
   async getForumPostReplies(postId: string): Promise<ListForumPostsResponse> {
     return this.get(`/forum/posts/${pathPart(postId)}/replies`);
+  }
+
+  async uploadForumImage(image: Blob, filename: string): Promise<ForumImageUploadResponse> {
+    const form = new FormData();
+    form.append("file", image, filename);
+    return this.post("/forum/upload-image", form);
   }
 
   async getProvenanceLineage(entityId: string): Promise<LineageResponse> {

@@ -159,6 +159,56 @@ describe("QDashClient", () => {
     expect([...new Uint8Array(file.data)]).toEqual([...bytes]);
   });
 
+  it("uploads forum images as multipart data with a fetch-generated boundary", async () => {
+    let request: Request | undefined;
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      request = new Request(input);
+      return jsonResponse({ url: "/api/forum/images/generated.png" });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    await expect(
+      client.uploadForumImage(
+        new Blob([new Uint8Array([0x89, 0x50])], { type: "image/png" }),
+        "analysis.png",
+      ),
+    ).resolves.toEqual({ url: "/api/forum/images/generated.png" });
+
+    expect(request?.method).toBe("POST");
+    expect(request?.headers.get("Content-Type")).toMatch(/^multipart\/form-data; boundary=/);
+    const form = await request?.formData();
+    const file = form?.get("file");
+    expect(file).toBeInstanceOf(File);
+    if (!(file instanceof File)) throw new TypeError("expected a multipart file");
+    expect(file.name).toBe("analysis.png");
+    expect(file.type).toBe("image/png");
+  });
+
+  it("repairs the generated multipart header before sending forum images", async () => {
+    let request: Request | undefined;
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      request = new Request(input);
+      return jsonResponse({ url: "/api/forum/images/generated.png" });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    const file = new Blob(["image"], { type: "image/png" });
+    await client.api.uploadForumImage({ file });
+
+    expect(request?.headers.get("Content-Type")).toMatch(/^multipart\/form-data; boundary=/);
+    const form = await request?.formData();
+    const uploadedFile = form?.get("file");
+    expect(uploadedFile).toBeInstanceOf(File);
+    if (!(uploadedFile instanceof File)) throw new TypeError("expected a multipart file");
+    expect(uploadedFile.type).toBe("image/png");
+  });
+
   it("downloads a figure selected from a task result", async () => {
     const requests: Request[] = [];
     const bytes = new Uint8Array([1, 2, 3]);

@@ -8,14 +8,14 @@ import Link from "next/link";
 import { useListChips } from "@/client/chip/chip";
 import { useListExecutions } from "@/client/execution/execution";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
-import { DateSelector } from "@/components/selectors/DateSelector";
+import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
-import { useDateNavigation } from "@/hooks/useDateNavigation";
-import { useExecutionUrlState } from "@/hooks/useUrlState";
-import { formatDate } from "@/lib/utils/datetime";
+import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
+import { useExecutionUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
+import { dateToDateTimeLocal, toIsoSeconds } from "@/lib/utils/datetime";
 
 import { ExecutionDurationBreakdown } from "./ExecutionDurationBreakdown";
 
@@ -51,12 +51,11 @@ function PaginationControls({
 
 export function ExecutionDurationBreakdownPageContent() {
   const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
-  const [selectedDate, setSelectedDate] = useState<string>("latest");
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } = useRangeModeUrlState();
+  const [selectedCooldownId, setSelectedCooldownId] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 100;
-
-  useDateNavigation(selectedChip || "", selectedDate, setSelectedDate);
 
   const { data: chipsData } = useListChips();
 
@@ -96,21 +95,19 @@ export function ExecutionDurationBreakdownPageContent() {
 
   const analyzedExecutions = useMemo(() => {
     if (!executionData?.data?.executions) return [];
-    if (selectedDate === "latest") return executionData.data.executions;
+    const start = new Date(toIsoSeconds(startDate)).getTime();
+    const end = new Date(toIsoSeconds(endDate)).getTime();
+
     return executionData.data.executions.filter((exec) => {
       if (!exec.start_at) return false;
-      const execDateStr = formatDate(exec.start_at).replace(/-/g, "");
-      return execDateStr === selectedDate;
+      const startedAt = new Date(exec.start_at).getTime();
+      return Number.isFinite(startedAt) && startedAt >= start && startedAt <= end;
     });
-  }, [executionData, selectedDate]);
+  }, [endDate, executionData, startDate]);
 
   const handleChipChange = (chipId: string) => {
+    setSelectedCooldownId(null);
     setSelectedChip(chipId || null);
-    setCurrentPage(1);
-  };
-
-  const handleDateChange = (date: string) => {
-    setSelectedDate(date);
     setCurrentPage(1);
   };
 
@@ -121,15 +118,13 @@ export function ExecutionDurationBreakdownPageContent() {
 
   return (
     <PageContainer>
+      <Link href="/execution" className="btn btn-ghost btn-sm mb-2 w-fit gap-2">
+        <ArrowLeft className="h-4 w-4" />
+        Back to Executions
+      </Link>
       <PageHeader
         title="Task Duration Breakdown"
         description="Analyze which tasks consume execution time across the selected executions."
-        actions={
-          <Link href="/execution" className="btn btn-ghost btn-sm w-full gap-2 sm:w-auto">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Executions
-          </Link>
-        }
       />
 
       <PageFiltersBar className="mb-4 sm:mb-6">
@@ -138,15 +133,43 @@ export function ExecutionDurationBreakdownPageContent() {
             <ChipSelector selectedChip={selectedChip || ""} onChipSelect={handleChipChange} />
           </PageFiltersBar.Item>
           <PageFiltersBar.Item>
-            <DateSelector
+            <CooldownSelector
               chipId={selectedChip || ""}
-              selectedDate={selectedDate}
-              onDateSelect={handleDateChange}
-              disabled={!selectedChip}
+              selectedCooldownId={selectedCooldownId}
+              onPick={(cooldown) => {
+                setSelectedCooldownId(cooldown.cooldown_id);
+                setStartDate(dateToDateTimeLocal(new Date(cooldown.started_at)));
+                setEndDate(
+                  dateToDateTimeLocal(cooldown.ended_at ? new Date(cooldown.ended_at) : new Date()),
+                );
+                setCurrentPage(1);
+              }}
             />
           </PageFiltersBar.Item>
         </PageFiltersBar.Group>
       </PageFiltersBar>
+
+      <div className="mb-4 sm:mb-6">
+        <TimeRangeSelector
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={(value) => {
+            setSelectedCooldownId(null);
+            setStartDate(value);
+            setCurrentPage(1);
+          }}
+          onEndDateChange={(value) => {
+            setSelectedCooldownId(null);
+            setEndDate(value);
+            setCurrentPage(1);
+          }}
+          onQuickRange={(range) => {
+            setSelectedCooldownId(null);
+            setQuickRange(range);
+            setCurrentPage(1);
+          }}
+        />
+      </div>
 
       {isError ? (
         <div className="rounded-lg border border-error/30 bg-error/5 p-4 text-sm text-error">
@@ -160,6 +183,7 @@ export function ExecutionDurationBreakdownPageContent() {
             onTagSelect={setSelectedTag}
             maxItems={0}
             padded={false}
+            showTaskDurationTrend
           />
           <PaginationControls
             currentPage={currentPage}

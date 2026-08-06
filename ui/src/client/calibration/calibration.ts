@@ -106,7 +106,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalibrationNote>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalibrationNote>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetCalibrationNoteQueryResult = NonNullable<Awaited<ReturnType<typeof getCalibrationNote>>>
@@ -122,7 +122,7 @@ export function useGetCalibrationNote<TData = Awaited<ReturnType<typeof getCalib
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetCalibrationNote<TData = Awaited<ReturnType<typeof getCalibrationNote>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationNote>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -132,11 +132,11 @@ export function useGetCalibrationNote<TData = Awaited<ReturnType<typeof getCalib
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetCalibrationNote<TData = Awaited<ReturnType<typeof getCalibrationNote>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationNote>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get the calibration note
  */
@@ -144,11 +144,11 @@ export function useGetCalibrationNote<TData = Awaited<ReturnType<typeof getCalib
 export function useGetCalibrationNote<TData = Awaited<ReturnType<typeof getCalibrationNote>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationNote>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetCalibrationNoteQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -317,7 +317,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetAvailableSeedParametersQueryResult = NonNullable<Awaited<ReturnType<typeof getAvailableSeedParameters>>>
@@ -333,7 +333,7 @@ export function useGetAvailableSeedParameters<TData = Awaited<ReturnType<typeof 
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAvailableSeedParameters<TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError = HTTPValidationError>(
  chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -343,11 +343,11 @@ export function useGetAvailableSeedParameters<TData = Awaited<ReturnType<typeof 
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAvailableSeedParameters<TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError = HTTPValidationError>(
  chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get available seed parameters for a chip
  */
@@ -355,11 +355,11 @@ export function useGetAvailableSeedParameters<TData = Awaited<ReturnType<typeof 
 export function useGetAvailableSeedParameters<TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError = HTTPValidationError>(
  chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetAvailableSeedParametersQueryOptions(chipId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -447,7 +447,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof compareSeedValues>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof compareSeedValues>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type CompareSeedValuesQueryResult = NonNullable<Awaited<ReturnType<typeof compareSeedValues>>>
@@ -464,7 +464,7 @@ export function useCompareSeedValues<TData = Awaited<ReturnType<typeof compareSe
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useCompareSeedValues<TData = Awaited<ReturnType<typeof compareSeedValues>>, TError = HTTPValidationError>(
  chipId: string,
     params?: CompareSeedValuesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof compareSeedValues>>, TError, TData>> & Pick<
@@ -475,12 +475,12 @@ export function useCompareSeedValues<TData = Awaited<ReturnType<typeof compareSe
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useCompareSeedValues<TData = Awaited<ReturnType<typeof compareSeedValues>>, TError = HTTPValidationError>(
  chipId: string,
     params?: CompareSeedValuesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof compareSeedValues>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Compare YAML seed values with QDash values
  */
@@ -489,11 +489,11 @@ export function useCompareSeedValues<TData = Awaited<ReturnType<typeof compareSe
  chipId: string,
     params?: CompareSeedValuesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof compareSeedValues>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getCompareSeedValuesQueryOptions(chipId,params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -611,7 +611,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(qid), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(qid), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetManualEditsQueryResult = NonNullable<Awaited<ReturnType<typeof getManualEdits>>>
@@ -627,7 +627,7 @@ export function useGetManualEdits<TData = Awaited<ReturnType<typeof getManualEdi
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetManualEdits<TData = Awaited<ReturnType<typeof getManualEdits>>, TError = HTTPValidationError>(
  qid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -637,11 +637,11 @@ export function useGetManualEdits<TData = Awaited<ReturnType<typeof getManualEdi
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetManualEdits<TData = Awaited<ReturnType<typeof getManualEdits>>, TError = HTTPValidationError>(
  qid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get manual edits for a qubit or coupling
  */
@@ -649,11 +649,11 @@ export function useGetManualEdits<TData = Awaited<ReturnType<typeof getManualEdi
 export function useGetManualEdits<TData = Awaited<ReturnType<typeof getManualEdits>>, TError = HTTPValidationError>(
  qid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetManualEditsQueryOptions(qid,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

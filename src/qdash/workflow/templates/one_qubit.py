@@ -26,11 +26,12 @@ from qdash.workflow.service.steps import (
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 ONE_QUBIT_CHECK_TASKS: list[str] = [
+    "CheckCoarseReadoutParams",
+    "Configure",
     "CheckRabi",
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
-    # "CheckOptimalReadoutFrequency",
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",

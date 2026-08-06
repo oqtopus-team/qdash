@@ -718,3 +718,49 @@ def test_upload_and_serve_forum_image(test_client, init_db, tmp_path, monkeypatc
     image = test_client.get(url.removeprefix("/api"))
     assert image.status_code == 200
     assert image.headers["content-type"] == "image/png"
+
+
+def test_upload_forum_image_openapi_contract(test_client):
+    """Forum image upload is a documented multipart API operation."""
+    operation = test_client.app.openapi()["paths"]["/forum/upload-image"]["post"]
+
+    assert operation["operationId"] == "uploadForumImage"
+    assert operation["requestBody"]["content"]["multipart/form-data"]
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ForumImageUploadResponse"
+    }
+    assert operation["responses"]["400"]["description"]
+
+    upload_schema = operation["requestBody"]["content"]["multipart/form-data"]["schema"]
+    component = upload_schema["$ref"].rsplit("/", 1)[-1]
+    assert (
+        test_client.app.openapi()["components"]["schemas"][component]["properties"]["file"][
+            "format"
+        ]
+        == "binary"
+    )
+
+    bulk_import = test_client.app.openapi()["paths"]["/admin/users/bulk-import"]["post"]
+    bulk_schema = bulk_import["requestBody"]["content"]["multipart/form-data"]["schema"]
+    bulk_component = bulk_schema["$ref"].rsplit("/", 1)[-1]
+    assert (
+        test_client.app.openapi()["components"]["schemas"][bulk_component]["properties"]["file"][
+            "format"
+        ]
+        == "binary"
+    )
+
+
+def test_upload_forum_image_rejects_unsupported_content_type(test_client, init_db):
+    """Forum image upload reports unsupported multipart files as a client error."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+
+    upload = test_client.post(
+        "/forum/upload-image",
+        headers=_headers("owner_token"),
+        files={"file": ("analysis.svg", b"<svg />", "image/svg+xml")},
+    )
+
+    assert upload.status_code == 400
+    assert "Unsupported image type" in upload.json()["detail"]

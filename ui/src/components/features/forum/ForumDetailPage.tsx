@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CalendarDays,
-  Lock,
+  Check,
   MessageSquare,
   Pencil,
   Crosshair,
@@ -167,7 +167,7 @@ function PostBody({
 }) {
   const canEdit = canEditOverride ?? currentUsername === post.username;
   const isAi = post.is_ai_reply || post.username === "qdash";
-  const ActionIcon = postAction === "close" ? Lock : Trash2;
+  const ActionIcon = postAction === "close" ? Check : Trash2;
   const actionTitle = postAction === "close" ? "Close thread" : "Delete";
 
   return (

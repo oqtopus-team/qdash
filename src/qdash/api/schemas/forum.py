@@ -15,6 +15,12 @@ FORUM_THREAD_STATUS_PATTERN = r"^(open|investigating|identified|resolved)$"
 ForumThreadStatus = Literal["open", "investigating", "identified", "resolved"]
 
 
+class ForumImageUploadResponse(BaseModel):
+    """Response returned after uploading a forum image."""
+
+    url: str = Field(..., description="API URL for the uploaded forum image")
+
+
 class ForumCategoryCreate(BaseModel):
     """Request schema for creating a forum category."""
 

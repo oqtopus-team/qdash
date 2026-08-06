@@ -58,7 +58,7 @@ class FakeCheckFineChevron(CheckFineChevron):
                 )
                 continue
             current = getattr(param, "value", None)
-            if current is None or float(current) < 3.0:
+            if current is None or float(current) < 2.5:
                 param.value = value
                 param.unit = param.unit or unit
                 param.description = param.description or description
