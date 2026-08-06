@@ -101,7 +101,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListTaskResultsQueryResult = NonNullable<Awaited<ReturnType<typeof listTaskResults>>>
@@ -117,7 +117,7 @@ export function useListTaskResults<TData = Awaited<ReturnType<typeof listTaskRes
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTaskResults<TData = Awaited<ReturnType<typeof listTaskResults>>, TError = HTTPValidationError>(
  params?: ListTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResults>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -127,11 +127,11 @@ export function useListTaskResults<TData = Awaited<ReturnType<typeof listTaskRes
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTaskResults<TData = Awaited<ReturnType<typeof listTaskResults>>, TError = HTTPValidationError>(
  params?: ListTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List task results
  */
@@ -139,11 +139,11 @@ export function useListTaskResults<TData = Awaited<ReturnType<typeof listTaskRes
 export function useListTaskResults<TData = Awaited<ReturnType<typeof listTaskResults>>, TError = HTTPValidationError>(
  params?: ListTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListTaskResultsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -218,7 +218,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetLatestQubitTaskResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getLatestQubitTaskResults>>>
@@ -234,7 +234,7 @@ export function useGetLatestQubitTaskResults<TData = Awaited<ReturnType<typeof g
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetLatestQubitTaskResults<TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError = HTTPValidationError>(
  params: GetLatestQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -244,11 +244,11 @@ export function useGetLatestQubitTaskResults<TData = Awaited<ReturnType<typeof g
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetLatestQubitTaskResults<TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError = HTTPValidationError>(
  params: GetLatestQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get latest qubit task results
  */
@@ -256,11 +256,11 @@ export function useGetLatestQubitTaskResults<TData = Awaited<ReturnType<typeof g
 export function useGetLatestQubitTaskResults<TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError = HTTPValidationError>(
  params: GetLatestQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetLatestQubitTaskResultsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -338,7 +338,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetHistoricalQubitTaskResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>>
@@ -354,7 +354,7 @@ export function useGetHistoricalQubitTaskResults<TData = Awaited<ReturnType<type
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetHistoricalQubitTaskResults<TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError = HTTPValidationError>(
  params: GetHistoricalQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -364,11 +364,11 @@ export function useGetHistoricalQubitTaskResults<TData = Awaited<ReturnType<type
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetHistoricalQubitTaskResults<TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError = HTTPValidationError>(
  params: GetHistoricalQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get historical qubit task results
  */
@@ -376,11 +376,11 @@ export function useGetHistoricalQubitTaskResults<TData = Awaited<ReturnType<type
 export function useGetHistoricalQubitTaskResults<TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError = HTTPValidationError>(
  params: GetHistoricalQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetHistoricalQubitTaskResultsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -461,7 +461,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(qid), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQubitTaskHistory>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(qid), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQubitTaskHistory>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetQubitTaskHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getQubitTaskHistory>>>
@@ -478,7 +478,7 @@ export function useGetQubitTaskHistory<TData = Awaited<ReturnType<typeof getQubi
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetQubitTaskHistory<TData = Awaited<ReturnType<typeof getQubitTaskHistory>>, TError = HTTPValidationError>(
  qid: string,
     params: GetQubitTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitTaskHistory>>, TError, TData>> & Pick<
@@ -489,12 +489,12 @@ export function useGetQubitTaskHistory<TData = Awaited<ReturnType<typeof getQubi
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetQubitTaskHistory<TData = Awaited<ReturnType<typeof getQubitTaskHistory>>, TError = HTTPValidationError>(
  qid: string,
     params: GetQubitTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitTaskHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get qubit task history
  */
@@ -503,11 +503,11 @@ export function useGetQubitTaskHistory<TData = Awaited<ReturnType<typeof getQubi
  qid: string,
     params: GetQubitTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitTaskHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetQubitTaskHistoryQueryOptions(qid,params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -583,7 +583,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetLatestCouplingTaskResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>>
@@ -599,7 +599,7 @@ export function useGetLatestCouplingTaskResults<TData = Awaited<ReturnType<typeo
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetLatestCouplingTaskResults<TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError = HTTPValidationError>(
  params: GetLatestCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -609,11 +609,11 @@ export function useGetLatestCouplingTaskResults<TData = Awaited<ReturnType<typeo
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetLatestCouplingTaskResults<TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError = HTTPValidationError>(
  params: GetLatestCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get latest coupling task results
  */
@@ -621,11 +621,11 @@ export function useGetLatestCouplingTaskResults<TData = Awaited<ReturnType<typeo
 export function useGetLatestCouplingTaskResults<TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError = HTTPValidationError>(
  params: GetLatestCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetLatestCouplingTaskResultsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -703,7 +703,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetHistoricalCouplingTaskResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>>
@@ -719,7 +719,7 @@ export function useGetHistoricalCouplingTaskResults<TData = Awaited<ReturnType<t
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetHistoricalCouplingTaskResults<TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError = HTTPValidationError>(
  params: GetHistoricalCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -729,11 +729,11 @@ export function useGetHistoricalCouplingTaskResults<TData = Awaited<ReturnType<t
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetHistoricalCouplingTaskResults<TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError = HTTPValidationError>(
  params: GetHistoricalCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get historical coupling task results
  */
@@ -741,11 +741,11 @@ export function useGetHistoricalCouplingTaskResults<TData = Awaited<ReturnType<t
 export function useGetHistoricalCouplingTaskResults<TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError = HTTPValidationError>(
  params: GetHistoricalCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetHistoricalCouplingTaskResultsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -826,7 +826,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(couplingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(couplingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetCouplingTaskHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getCouplingTaskHistory>>>
@@ -843,7 +843,7 @@ export function useGetCouplingTaskHistory<TData = Awaited<ReturnType<typeof getC
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetCouplingTaskHistory<TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError = HTTPValidationError>(
  couplingId: string,
     params: GetCouplingTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError, TData>> & Pick<
@@ -854,12 +854,12 @@ export function useGetCouplingTaskHistory<TData = Awaited<ReturnType<typeof getC
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetCouplingTaskHistory<TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError = HTTPValidationError>(
  couplingId: string,
     params: GetCouplingTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get coupling task history
  */
@@ -868,11 +868,11 @@ export function useGetCouplingTaskHistory<TData = Awaited<ReturnType<typeof getC
  couplingId: string,
     params: GetCouplingTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetCouplingTaskHistoryQueryOptions(couplingId,params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -951,7 +951,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetTimeseriesTaskResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getTimeseriesTaskResults>>>
@@ -967,7 +967,7 @@ export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof ge
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError = HTTPValidationError>(
  params: GetTimeseriesTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -977,11 +977,11 @@ export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof ge
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError = HTTPValidationError>(
  params: GetTimeseriesTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get timeseries task results by tag and parameter
  */
@@ -989,11 +989,11 @@ export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof ge
 export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError = HTTPValidationError>(
  params: GetTimeseriesTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetTimeseriesTaskResultsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1044,7 +1044,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListTaskResultAiReviewRunsQueryResult = NonNullable<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>>
@@ -1060,7 +1060,7 @@ export function useListTaskResultAiReviewRuns<TData = Awaited<ReturnType<typeof 
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTaskResultAiReviewRuns<TData = Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError = HTTPValidationError>(
  params?: ListTaskResultAiReviewRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -1070,11 +1070,11 @@ export function useListTaskResultAiReviewRuns<TData = Awaited<ReturnType<typeof 
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTaskResultAiReviewRuns<TData = Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError = HTTPValidationError>(
  params?: ListTaskResultAiReviewRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List bulk AI review runs
  */
@@ -1082,11 +1082,11 @@ export function useListTaskResultAiReviewRuns<TData = Awaited<ReturnType<typeof 
 export function useListTaskResultAiReviewRuns<TData = Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError = HTTPValidationError>(
  params?: ListTaskResultAiReviewRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListTaskResultAiReviewRunsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1136,7 +1136,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(reviewRunId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(reviewRunId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetTaskResultAiReviewRunQueryResult = NonNullable<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>>
@@ -1152,7 +1152,7 @@ export function useGetTaskResultAiReviewRun<TData = Awaited<ReturnType<typeof ge
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTaskResultAiReviewRun<TData = Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError = HTTPValidationError>(
  reviewRunId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -1162,11 +1162,11 @@ export function useGetTaskResultAiReviewRun<TData = Awaited<ReturnType<typeof ge
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTaskResultAiReviewRun<TData = Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError = HTTPValidationError>(
  reviewRunId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get one bulk AI review run
  */
@@ -1174,11 +1174,11 @@ export function useGetTaskResultAiReviewRun<TData = Awaited<ReturnType<typeof ge
 export function useGetTaskResultAiReviewRun<TData = Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError = HTTPValidationError>(
  reviewRunId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetTaskResultAiReviewRunQueryOptions(reviewRunId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1229,7 +1229,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListTaskResultAiReviewsQueryResult = NonNullable<Awaited<ReturnType<typeof listTaskResultAiReviews>>>
@@ -1245,7 +1245,7 @@ export function useListTaskResultAiReviews<TData = Awaited<ReturnType<typeof lis
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTaskResultAiReviews<TData = Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError = HTTPValidationError>(
  params?: ListTaskResultAiReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -1255,11 +1255,11 @@ export function useListTaskResultAiReviews<TData = Awaited<ReturnType<typeof lis
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTaskResultAiReviews<TData = Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError = HTTPValidationError>(
  params?: ListTaskResultAiReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List task-result AI reviews
  */
@@ -1267,11 +1267,11 @@ export function useListTaskResultAiReviews<TData = Awaited<ReturnType<typeof lis
 export function useListTaskResultAiReviews<TData = Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError = HTTPValidationError>(
  params?: ListTaskResultAiReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListTaskResultAiReviewsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

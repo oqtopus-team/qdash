@@ -8553,6 +8553,74 @@
         }
       }
     },
+    "/forum/upload-image": {
+      "post": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Upload an image for a forum post",
+        "description": "Upload an image to attach to a forum post. Returns the image URL.",
+        "operationId": "uploadForumImage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_uploadForumImage"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumImageUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported image type or image exceeds the 5 MB limit"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/forum/posts/{post_id}/close": {
       "patch": {
         "tags": [
@@ -17912,7 +17980,8 @@
           "file": {
             "type": "string",
             "contentMediaType": "application/octet-stream",
-            "title": "File"
+            "title": "File",
+            "format": "binary"
           }
         },
         "type": "object",
@@ -17972,6 +18041,21 @@
         },
         "type": "object",
         "title": "Body_reExecuteTaskResult"
+      },
+      "Body_uploadForumImage": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "format": "binary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_uploadForumImage"
       },
       "BulkAiReviewRequest": {
         "properties": {
@@ -20938,6 +21022,21 @@
         "type": "object",
         "title": "ForumCategoryUpdate",
         "description": "Request schema for updating a forum category."
+      },
+      "ForumImageUploadResponse": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "API URL for the uploaded forum image"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "ForumImageUploadResponse",
+        "description": "Response returned after uploading a forum image."
       },
       "ForumPostCreate": {
         "properties": {

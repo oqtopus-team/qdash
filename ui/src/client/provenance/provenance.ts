@@ -109,7 +109,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(entityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProvenanceEntity>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(entityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProvenanceEntity>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetProvenanceEntityQueryResult = NonNullable<Awaited<ReturnType<typeof getProvenanceEntity>>>
@@ -125,7 +125,7 @@ export function useGetProvenanceEntity<TData = Awaited<ReturnType<typeof getProv
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetProvenanceEntity<TData = Awaited<ReturnType<typeof getProvenanceEntity>>, TError = HTTPValidationError>(
  entityId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceEntity>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -135,11 +135,11 @@ export function useGetProvenanceEntity<TData = Awaited<ReturnType<typeof getProv
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetProvenanceEntity<TData = Awaited<ReturnType<typeof getProvenanceEntity>>, TError = HTTPValidationError>(
  entityId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceEntity>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get a parameter version by entity ID
  */
@@ -147,11 +147,11 @@ export function useGetProvenanceEntity<TData = Awaited<ReturnType<typeof getProv
 export function useGetProvenanceEntity<TData = Awaited<ReturnType<typeof getProvenanceEntity>>, TError = HTTPValidationError>(
  entityId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceEntity>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetProvenanceEntityQueryOptions(entityId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -224,7 +224,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(entityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProvenanceLineage>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(entityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProvenanceLineage>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetProvenanceLineageQueryResult = NonNullable<Awaited<ReturnType<typeof getProvenanceLineage>>>
@@ -241,7 +241,7 @@ export function useGetProvenanceLineage<TData = Awaited<ReturnType<typeof getPro
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetProvenanceLineage<TData = Awaited<ReturnType<typeof getProvenanceLineage>>, TError = HTTPValidationError>(
  entityId: string,
     params?: GetProvenanceLineageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceLineage>>, TError, TData>> & Pick<
@@ -252,12 +252,12 @@ export function useGetProvenanceLineage<TData = Awaited<ReturnType<typeof getPro
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetProvenanceLineage<TData = Awaited<ReturnType<typeof getProvenanceLineage>>, TError = HTTPValidationError>(
  entityId: string,
     params?: GetProvenanceLineageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceLineage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get lineage (ancestors) of a parameter version
  */
@@ -266,11 +266,11 @@ export function useGetProvenanceLineage<TData = Awaited<ReturnType<typeof getPro
  entityId: string,
     params?: GetProvenanceLineageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceLineage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetProvenanceLineageQueryOptions(entityId,params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -343,7 +343,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(entityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProvenanceImpact>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(entityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProvenanceImpact>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetProvenanceImpactQueryResult = NonNullable<Awaited<ReturnType<typeof getProvenanceImpact>>>
@@ -360,7 +360,7 @@ export function useGetProvenanceImpact<TData = Awaited<ReturnType<typeof getProv
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetProvenanceImpact<TData = Awaited<ReturnType<typeof getProvenanceImpact>>, TError = HTTPValidationError>(
  entityId: string,
     params?: GetProvenanceImpactParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceImpact>>, TError, TData>> & Pick<
@@ -371,12 +371,12 @@ export function useGetProvenanceImpact<TData = Awaited<ReturnType<typeof getProv
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetProvenanceImpact<TData = Awaited<ReturnType<typeof getProvenanceImpact>>, TError = HTTPValidationError>(
  entityId: string,
     params?: GetProvenanceImpactParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceImpact>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get impact (descendants) of a parameter version
  */
@@ -385,11 +385,11 @@ export function useGetProvenanceImpact<TData = Awaited<ReturnType<typeof getProv
  entityId: string,
     params?: GetProvenanceImpactParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceImpact>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetProvenanceImpactQueryOptions(entityId,params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -459,7 +459,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof compareExecutions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof compareExecutions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type CompareExecutionsQueryResult = NonNullable<Awaited<ReturnType<typeof compareExecutions>>>
@@ -475,7 +475,7 @@ export function useCompareExecutions<TData = Awaited<ReturnType<typeof compareEx
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useCompareExecutions<TData = Awaited<ReturnType<typeof compareExecutions>>, TError = HTTPValidationError>(
  params: CompareExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof compareExecutions>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -485,11 +485,11 @@ export function useCompareExecutions<TData = Awaited<ReturnType<typeof compareEx
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useCompareExecutions<TData = Awaited<ReturnType<typeof compareExecutions>>, TError = HTTPValidationError>(
  params: CompareExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof compareExecutions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Compare parameter values between two executions
  */
@@ -497,11 +497,11 @@ export function useCompareExecutions<TData = Awaited<ReturnType<typeof compareEx
 export function useCompareExecutions<TData = Awaited<ReturnType<typeof compareExecutions>>, TError = HTTPValidationError>(
  params: CompareExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof compareExecutions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getCompareExecutionsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -573,7 +573,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getParameterHistory>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getParameterHistory>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetParameterHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getParameterHistory>>>
@@ -589,7 +589,7 @@ export function useGetParameterHistory<TData = Awaited<ReturnType<typeof getPara
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetParameterHistory<TData = Awaited<ReturnType<typeof getParameterHistory>>, TError = HTTPValidationError>(
  params: GetParameterHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getParameterHistory>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -599,11 +599,11 @@ export function useGetParameterHistory<TData = Awaited<ReturnType<typeof getPara
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetParameterHistory<TData = Awaited<ReturnType<typeof getParameterHistory>>, TError = HTTPValidationError>(
  params: GetParameterHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getParameterHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get version history for a parameter
  */
@@ -611,11 +611,11 @@ export function useGetParameterHistory<TData = Awaited<ReturnType<typeof getPara
 export function useGetParameterHistory<TData = Awaited<ReturnType<typeof getParameterHistory>>, TError = HTTPValidationError>(
  params: GetParameterHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getParameterHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetParameterHistoryQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -679,7 +679,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProvenanceStats>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProvenanceStats>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetProvenanceStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getProvenanceStats>>>
@@ -695,7 +695,7 @@ export function useGetProvenanceStats<TData = Awaited<ReturnType<typeof getProve
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetProvenanceStats<TData = Awaited<ReturnType<typeof getProvenanceStats>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceStats>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -705,11 +705,11 @@ export function useGetProvenanceStats<TData = Awaited<ReturnType<typeof getProve
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetProvenanceStats<TData = Awaited<ReturnType<typeof getProvenanceStats>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get provenance statistics
  */
@@ -717,11 +717,11 @@ export function useGetProvenanceStats<TData = Awaited<ReturnType<typeof getProve
 export function useGetProvenanceStats<TData = Awaited<ReturnType<typeof getProvenanceStats>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProvenanceStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetProvenanceStatsQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -789,7 +789,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecentExecutions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecentExecutions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetRecentExecutionsQueryResult = NonNullable<Awaited<ReturnType<typeof getRecentExecutions>>>
@@ -805,7 +805,7 @@ export function useGetRecentExecutions<TData = Awaited<ReturnType<typeof getRece
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetRecentExecutions<TData = Awaited<ReturnType<typeof getRecentExecutions>>, TError = HTTPValidationError>(
  params?: GetRecentExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecentExecutions>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -815,11 +815,11 @@ export function useGetRecentExecutions<TData = Awaited<ReturnType<typeof getRece
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetRecentExecutions<TData = Awaited<ReturnType<typeof getRecentExecutions>>, TError = HTTPValidationError>(
  params?: GetRecentExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecentExecutions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get recent execution IDs
  */
@@ -827,11 +827,11 @@ export function useGetRecentExecutions<TData = Awaited<ReturnType<typeof getRece
 export function useGetRecentExecutions<TData = Awaited<ReturnType<typeof getRecentExecutions>>, TError = HTTPValidationError>(
  params?: GetRecentExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecentExecutions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetRecentExecutionsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -903,7 +903,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecentChanges>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecentChanges>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetRecentChangesQueryResult = NonNullable<Awaited<ReturnType<typeof getRecentChanges>>>
@@ -919,7 +919,7 @@ export function useGetRecentChanges<TData = Awaited<ReturnType<typeof getRecentC
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetRecentChanges<TData = Awaited<ReturnType<typeof getRecentChanges>>, TError = HTTPValidationError>(
  params?: GetRecentChangesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecentChanges>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -929,11 +929,11 @@ export function useGetRecentChanges<TData = Awaited<ReturnType<typeof getRecentC
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetRecentChanges<TData = Awaited<ReturnType<typeof getRecentChanges>>, TError = HTTPValidationError>(
  params?: GetRecentChangesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecentChanges>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get recent parameter changes with delta
  */
@@ -941,11 +941,11 @@ export function useGetRecentChanges<TData = Awaited<ReturnType<typeof getRecentC
 export function useGetRecentChanges<TData = Awaited<ReturnType<typeof getRecentChanges>>, TError = HTTPValidationError>(
  params?: GetRecentChangesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecentChanges>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetRecentChangesQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1017,7 +1017,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDegradationTrends>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDegradationTrends>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetDegradationTrendsQueryResult = NonNullable<Awaited<ReturnType<typeof getDegradationTrends>>>
@@ -1033,7 +1033,7 @@ export function useGetDegradationTrends<TData = Awaited<ReturnType<typeof getDeg
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetDegradationTrends<TData = Awaited<ReturnType<typeof getDegradationTrends>>, TError = HTTPValidationError>(
  params?: GetDegradationTrendsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDegradationTrends>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -1043,11 +1043,11 @@ export function useGetDegradationTrends<TData = Awaited<ReturnType<typeof getDeg
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetDegradationTrends<TData = Awaited<ReturnType<typeof getDegradationTrends>>, TError = HTTPValidationError>(
  params?: GetDegradationTrendsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDegradationTrends>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get degradation trends (consecutive worsening)
  */
@@ -1055,11 +1055,11 @@ export function useGetDegradationTrends<TData = Awaited<ReturnType<typeof getDeg
 export function useGetDegradationTrends<TData = Awaited<ReturnType<typeof getDegradationTrends>>, TError = HTTPValidationError>(
  params?: GetDegradationTrendsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDegradationTrends>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetDegradationTrendsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1145,7 +1145,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(entityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecalibrationRecommendations>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(entityId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecalibrationRecommendations>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetRecalibrationRecommendationsQueryResult = NonNullable<Awaited<ReturnType<typeof getRecalibrationRecommendations>>>
@@ -1162,7 +1162,7 @@ export function useGetRecalibrationRecommendations<TData = Awaited<ReturnType<ty
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetRecalibrationRecommendations<TData = Awaited<ReturnType<typeof getRecalibrationRecommendations>>, TError = HTTPValidationError>(
  entityId: string,
     params?: GetRecalibrationRecommendationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecalibrationRecommendations>>, TError, TData>> & Pick<
@@ -1173,12 +1173,12 @@ export function useGetRecalibrationRecommendations<TData = Awaited<ReturnType<ty
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetRecalibrationRecommendations<TData = Awaited<ReturnType<typeof getRecalibrationRecommendations>>, TError = HTTPValidationError>(
  entityId: string,
     params?: GetRecalibrationRecommendationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecalibrationRecommendations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get recalibration task recommendations
  */
@@ -1187,11 +1187,11 @@ export function useGetRecalibrationRecommendations<TData = Awaited<ReturnType<ty
  entityId: string,
     params?: GetRecalibrationRecommendationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecalibrationRecommendations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetRecalibrationRecommendationsQueryOptions(entityId,params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

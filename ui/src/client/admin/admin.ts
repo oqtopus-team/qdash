@@ -155,7 +155,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListAllUsersQueryResult = NonNullable<Awaited<ReturnType<typeof listAllUsers>>>
@@ -171,7 +171,7 @@ export function useListAllUsers<TData = Awaited<ReturnType<typeof listAllUsers>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListAllUsers<TData = Awaited<ReturnType<typeof listAllUsers>>, TError = void | HTTPValidationError>(
  params?: ListAllUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -181,11 +181,11 @@ export function useListAllUsers<TData = Awaited<ReturnType<typeof listAllUsers>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListAllUsers<TData = Awaited<ReturnType<typeof listAllUsers>>, TError = void | HTTPValidationError>(
  params?: ListAllUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List all users
  */
@@ -193,11 +193,11 @@ export function useListAllUsers<TData = Awaited<ReturnType<typeof listAllUsers>>
 export function useListAllUsers<TData = Awaited<ReturnType<typeof listAllUsers>>, TError = void | HTTPValidationError>(
  params?: ListAllUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListAllUsersQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -247,7 +247,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(username), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(username), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetUserDetailsQueryResult = NonNullable<Awaited<ReturnType<typeof getUserDetails>>>
@@ -263,7 +263,7 @@ export function useGetUserDetails<TData = Awaited<ReturnType<typeof getUserDetai
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetUserDetails<TData = Awaited<ReturnType<typeof getUserDetails>>, TError = void | HTTPValidationError>(
  username: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -273,11 +273,11 @@ export function useGetUserDetails<TData = Awaited<ReturnType<typeof getUserDetai
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetUserDetails<TData = Awaited<ReturnType<typeof getUserDetails>>, TError = void | HTTPValidationError>(
  username: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get user details
  */
@@ -285,11 +285,11 @@ export function useGetUserDetails<TData = Awaited<ReturnType<typeof getUserDetai
 export function useGetUserDetails<TData = Awaited<ReturnType<typeof getUserDetails>>, TError = void | HTTPValidationError>(
  username: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetUserDetailsQueryOptions(username,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -534,7 +534,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAllProjects>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAllProjects>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListAllProjectsQueryResult = NonNullable<Awaited<ReturnType<typeof listAllProjects>>>
@@ -550,7 +550,7 @@ export function useListAllProjects<TData = Awaited<ReturnType<typeof listAllProj
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListAllProjects<TData = Awaited<ReturnType<typeof listAllProjects>>, TError = void | HTTPValidationError>(
  params?: ListAllProjectsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllProjects>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -560,11 +560,11 @@ export function useListAllProjects<TData = Awaited<ReturnType<typeof listAllProj
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListAllProjects<TData = Awaited<ReturnType<typeof listAllProjects>>, TError = void | HTTPValidationError>(
  params?: ListAllProjectsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllProjects>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List all projects
  */
@@ -572,11 +572,11 @@ export function useListAllProjects<TData = Awaited<ReturnType<typeof listAllProj
 export function useListAllProjects<TData = Awaited<ReturnType<typeof listAllProjects>>, TError = void | HTTPValidationError>(
  params?: ListAllProjectsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllProjects>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListAllProjectsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -688,7 +688,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(projectId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(projectId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListProjectMembersAdminQueryResult = NonNullable<Awaited<ReturnType<typeof listProjectMembersAdmin>>>
@@ -704,7 +704,7 @@ export function useListProjectMembersAdmin<TData = Awaited<ReturnType<typeof lis
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListProjectMembersAdmin<TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError = void | HTTPValidationError>(
  projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -714,11 +714,11 @@ export function useListProjectMembersAdmin<TData = Awaited<ReturnType<typeof lis
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListProjectMembersAdmin<TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError = void | HTTPValidationError>(
  projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List project members
  */
@@ -726,11 +726,11 @@ export function useListProjectMembersAdmin<TData = Awaited<ReturnType<typeof lis
 export function useListProjectMembersAdmin<TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError = void | HTTPValidationError>(
  projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListProjectMembersAdminQueryOptions(projectId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
