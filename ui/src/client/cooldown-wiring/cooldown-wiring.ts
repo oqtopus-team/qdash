@@ -148,7 +148,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(cooldownId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(cooldownId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListCooldownWiringEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listCooldownWiringEvents>>>
@@ -165,7 +165,7 @@ export function useListCooldownWiringEvents<TData = Awaited<ReturnType<typeof li
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListCooldownWiringEvents<TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError = HTTPValidationError>(
  cooldownId: string,
     params?: ListCooldownWiringEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError, TData>> & Pick<
@@ -176,12 +176,12 @@ export function useListCooldownWiringEvents<TData = Awaited<ReturnType<typeof li
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListCooldownWiringEvents<TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError = HTTPValidationError>(
  cooldownId: string,
     params?: ListCooldownWiringEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List wiring change history for a cool-down
  */
@@ -190,11 +190,11 @@ export function useListCooldownWiringEvents<TData = Awaited<ReturnType<typeof li
  cooldownId: string,
     params?: ListCooldownWiringEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListCooldownWiringEventsQueryOptions(cooldownId,params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

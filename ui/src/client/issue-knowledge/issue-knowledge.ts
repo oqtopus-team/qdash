@@ -82,7 +82,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listIssueKnowledge>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listIssueKnowledge>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListIssueKnowledgeQueryResult = NonNullable<Awaited<ReturnType<typeof listIssueKnowledge>>>
@@ -98,7 +98,7 @@ export function useListIssueKnowledge<TData = Awaited<ReturnType<typeof listIssu
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListIssueKnowledge<TData = Awaited<ReturnType<typeof listIssueKnowledge>>, TError = HTTPValidationError>(
  params?: ListIssueKnowledgeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listIssueKnowledge>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -108,11 +108,11 @@ export function useListIssueKnowledge<TData = Awaited<ReturnType<typeof listIssu
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListIssueKnowledge<TData = Awaited<ReturnType<typeof listIssueKnowledge>>, TError = HTTPValidationError>(
  params?: ListIssueKnowledgeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listIssueKnowledge>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List knowledge cases
  */
@@ -120,11 +120,11 @@ export function useListIssueKnowledge<TData = Awaited<ReturnType<typeof listIssu
 export function useListIssueKnowledge<TData = Awaited<ReturnType<typeof listIssueKnowledge>>, TError = HTTPValidationError>(
  params?: ListIssueKnowledgeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listIssueKnowledge>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListIssueKnowledgeQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -174,7 +174,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(knowledgeId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIssueKnowledge>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(knowledgeId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIssueKnowledge>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetIssueKnowledgeQueryResult = NonNullable<Awaited<ReturnType<typeof getIssueKnowledge>>>
@@ -190,7 +190,7 @@ export function useGetIssueKnowledge<TData = Awaited<ReturnType<typeof getIssueK
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetIssueKnowledge<TData = Awaited<ReturnType<typeof getIssueKnowledge>>, TError = HTTPValidationError>(
  knowledgeId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIssueKnowledge>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -200,11 +200,11 @@ export function useGetIssueKnowledge<TData = Awaited<ReturnType<typeof getIssueK
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetIssueKnowledge<TData = Awaited<ReturnType<typeof getIssueKnowledge>>, TError = HTTPValidationError>(
  knowledgeId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIssueKnowledge>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get a knowledge case
  */
@@ -212,11 +212,11 @@ export function useGetIssueKnowledge<TData = Awaited<ReturnType<typeof getIssueK
 export function useGetIssueKnowledge<TData = Awaited<ReturnType<typeof getIssueKnowledge>>, TError = HTTPValidationError>(
  knowledgeId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getIssueKnowledge>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetIssueKnowledgeQueryOptions(knowledgeId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

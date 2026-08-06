@@ -80,7 +80,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCryostats>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCryostats>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListCryostatsQueryResult = NonNullable<Awaited<ReturnType<typeof listCryostats>>>
@@ -96,7 +96,7 @@ export function useListCryostats<TData = Awaited<ReturnType<typeof listCryostats
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListCryostats<TData = Awaited<ReturnType<typeof listCryostats>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCryostats>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -106,11 +106,11 @@ export function useListCryostats<TData = Awaited<ReturnType<typeof listCryostats
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListCryostats<TData = Awaited<ReturnType<typeof listCryostats>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCryostats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List all cryostats
  */
@@ -118,11 +118,11 @@ export function useListCryostats<TData = Awaited<ReturnType<typeof listCryostats
 export function useListCryostats<TData = Awaited<ReturnType<typeof listCryostats>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCryostats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListCryostatsQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -235,7 +235,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(cryoId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCryostat>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(cryoId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCryostat>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetCryostatQueryResult = NonNullable<Awaited<ReturnType<typeof getCryostat>>>
@@ -251,7 +251,7 @@ export function useGetCryostat<TData = Awaited<ReturnType<typeof getCryostat>>, 
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetCryostat<TData = Awaited<ReturnType<typeof getCryostat>>, TError = HTTPValidationError>(
  cryoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCryostat>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -261,11 +261,11 @@ export function useGetCryostat<TData = Awaited<ReturnType<typeof getCryostat>>, 
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetCryostat<TData = Awaited<ReturnType<typeof getCryostat>>, TError = HTTPValidationError>(
  cryoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCryostat>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get a cryostat by id
  */
@@ -273,11 +273,11 @@ export function useGetCryostat<TData = Awaited<ReturnType<typeof getCryostat>>, 
 export function useGetCryostat<TData = Awaited<ReturnType<typeof getCryostat>>, TError = HTTPValidationError>(
  cryoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCryostat>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetCryostatQueryOptions(cryoId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

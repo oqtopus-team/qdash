@@ -160,7 +160,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListFlowsQueryResult = NonNullable<Awaited<ReturnType<typeof listFlows>>>
@@ -176,7 +176,7 @@ export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TErr
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -186,11 +186,11 @@ export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TErr
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List all flows
  */
@@ -198,11 +198,11 @@ export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TErr
 export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TError = HTTPValidationError>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListFlowsQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -252,7 +252,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListFlowTemplatesQueryResult = NonNullable<Awaited<ReturnType<typeof listFlowTemplates>>>
@@ -268,7 +268,7 @@ export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowT
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -278,11 +278,11 @@ export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowT
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List all flow templates
  */
@@ -290,11 +290,11 @@ export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowT
 export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListFlowTemplatesQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -344,7 +344,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(templateId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlowTemplate>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(templateId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlowTemplate>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetFlowTemplateQueryResult = NonNullable<Awaited<ReturnType<typeof getFlowTemplate>>>
@@ -360,7 +360,7 @@ export function useGetFlowTemplate<TData = Awaited<ReturnType<typeof getFlowTemp
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetFlowTemplate<TData = Awaited<ReturnType<typeof getFlowTemplate>>, TError = HTTPValidationError>(
  templateId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowTemplate>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -370,11 +370,11 @@ export function useGetFlowTemplate<TData = Awaited<ReturnType<typeof getFlowTemp
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetFlowTemplate<TData = Awaited<ReturnType<typeof getFlowTemplate>>, TError = HTTPValidationError>(
  templateId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowTemplate>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get a flow template
  */
@@ -382,11 +382,11 @@ export function useGetFlowTemplate<TData = Awaited<ReturnType<typeof getFlowTemp
 export function useGetFlowTemplate<TData = Awaited<ReturnType<typeof getFlowTemplate>>, TError = HTTPValidationError>(
  templateId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowTemplate>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetFlowTemplateQueryOptions(templateId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -436,7 +436,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlowHelperFiles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlowHelperFiles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListFlowHelperFilesQueryResult = NonNullable<Awaited<ReturnType<typeof listFlowHelperFiles>>>
@@ -452,7 +452,7 @@ export function useListFlowHelperFiles<TData = Awaited<ReturnType<typeof listFlo
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListFlowHelperFiles<TData = Awaited<ReturnType<typeof listFlowHelperFiles>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowHelperFiles>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -462,11 +462,11 @@ export function useListFlowHelperFiles<TData = Awaited<ReturnType<typeof listFlo
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListFlowHelperFiles<TData = Awaited<ReturnType<typeof listFlowHelperFiles>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowHelperFiles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List flow helper files
  */
@@ -474,11 +474,11 @@ export function useListFlowHelperFiles<TData = Awaited<ReturnType<typeof listFlo
 export function useListFlowHelperFiles<TData = Awaited<ReturnType<typeof listFlowHelperFiles>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowHelperFiles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListFlowHelperFilesQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -528,7 +528,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(filename), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlowHelperFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(filename), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlowHelperFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetFlowHelperFileQueryResult = NonNullable<Awaited<ReturnType<typeof getFlowHelperFile>>>
@@ -544,7 +544,7 @@ export function useGetFlowHelperFile<TData = Awaited<ReturnType<typeof getFlowHe
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetFlowHelperFile<TData = Awaited<ReturnType<typeof getFlowHelperFile>>, TError = HTTPValidationError>(
  filename: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowHelperFile>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -554,11 +554,11 @@ export function useGetFlowHelperFile<TData = Awaited<ReturnType<typeof getFlowHe
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetFlowHelperFile<TData = Awaited<ReturnType<typeof getFlowHelperFile>>, TError = HTTPValidationError>(
  filename: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowHelperFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get flow helper file content
  */
@@ -566,11 +566,11 @@ export function useGetFlowHelperFile<TData = Awaited<ReturnType<typeof getFlowHe
 export function useGetFlowHelperFile<TData = Awaited<ReturnType<typeof getFlowHelperFile>>, TError = HTTPValidationError>(
  filename: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowHelperFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetFlowHelperFileQueryOptions(filename,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -621,7 +621,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAllFlowSchedules>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAllFlowSchedules>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListAllFlowSchedulesQueryResult = NonNullable<Awaited<ReturnType<typeof listAllFlowSchedules>>>
@@ -637,7 +637,7 @@ export function useListAllFlowSchedules<TData = Awaited<ReturnType<typeof listAl
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListAllFlowSchedules<TData = Awaited<ReturnType<typeof listAllFlowSchedules>>, TError = HTTPValidationError>(
  params?: ListAllFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllFlowSchedules>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -647,11 +647,11 @@ export function useListAllFlowSchedules<TData = Awaited<ReturnType<typeof listAl
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListAllFlowSchedules<TData = Awaited<ReturnType<typeof listAllFlowSchedules>>, TError = HTTPValidationError>(
  params?: ListAllFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllFlowSchedules>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List all flow schedules for current project
  */
@@ -659,11 +659,11 @@ export function useListAllFlowSchedules<TData = Awaited<ReturnType<typeof listAl
 export function useListAllFlowSchedules<TData = Awaited<ReturnType<typeof listAllFlowSchedules>>, TError = HTTPValidationError>(
  params?: ListAllFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllFlowSchedules>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListAllFlowSchedulesQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -840,7 +840,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(name), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(name), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetFlowQueryResult = NonNullable<Awaited<ReturnType<typeof getFlow>>>
@@ -856,7 +856,7 @@ export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError =
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(
  name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -866,11 +866,11 @@ export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError =
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(
  name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get flow details
  */
@@ -878,11 +878,11 @@ export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError =
 export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(
  name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetFlowQueryOptions(name,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1196,7 +1196,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(name), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlowSchedules>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(name), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlowSchedules>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListFlowSchedulesQueryResult = NonNullable<Awaited<ReturnType<typeof listFlowSchedules>>>
@@ -1213,7 +1213,7 @@ export function useListFlowSchedules<TData = Awaited<ReturnType<typeof listFlowS
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListFlowSchedules<TData = Awaited<ReturnType<typeof listFlowSchedules>>, TError = HTTPValidationError>(
  name: string,
     params?: ListFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowSchedules>>, TError, TData>> & Pick<
@@ -1224,12 +1224,12 @@ export function useListFlowSchedules<TData = Awaited<ReturnType<typeof listFlowS
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListFlowSchedules<TData = Awaited<ReturnType<typeof listFlowSchedules>>, TError = HTTPValidationError>(
  name: string,
     params?: ListFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowSchedules>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List schedules for a specific flow
  */
@@ -1238,11 +1238,11 @@ export function useListFlowSchedules<TData = Awaited<ReturnType<typeof listFlowS
  name: string,
     params?: ListFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowSchedules>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListFlowSchedulesQueryOptions(name,params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

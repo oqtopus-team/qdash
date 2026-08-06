@@ -268,7 +268,7 @@ export function AdminPageContent() {
 
   const handleBulkImportUsers = async (file: File): Promise<BulkUserImportResponse> => {
     const response = await bulkImportMutation.mutateAsync({
-      data: { file: file as unknown as string },
+      data: { file },
     });
     queryClient.invalidateQueries({ queryKey: getListAllUsersQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
