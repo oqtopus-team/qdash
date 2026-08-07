@@ -29,10 +29,18 @@ from typing import Any
 from prefect import flow, get_run_logger
 
 from qdash.workflow.service import CalibService
-from qdash.workflow.service.calib_service import on_flow_cancellation
+from qdash.workflow.service.calib_service import (
+    on_flow_cancellation,
+    on_flow_crashed,
+    on_flow_failure,
+)
 
 
-@flow(on_cancellation=[on_flow_cancellation])
+@flow(
+    on_cancellation=[on_flow_cancellation],
+    on_failure=[on_flow_failure],
+    on_crashed=[on_flow_crashed],
+)
 def parallel_retry_calibration(
     username: str,
     chip_id: str,

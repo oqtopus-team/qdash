@@ -70,6 +70,29 @@ def _is_cancellation(exc: BaseException) -> bool:
     return any(cls.__name__ in ("CancelledRun", "CancelledError") for cls in type(exc).__mro__)
 
 
+def _run_terminal_hook(hook_name: str, flow_run: Any, status: str, message: str) -> None:
+    """Close executions belonging to a finished flow run."""
+    _logger = logging.getLogger(__name__)
+    try:
+        params = flow_run.parameters or {}
+        project_id = params.get("project_id")
+        flow_run_id = str(flow_run.id)
+
+        if not project_id:
+            _logger.warning("%s: no project_id in parameters, skipping", hook_name)
+            return
+
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+
+        _finalize_executions_by_flow_run_id(
+            flow_run_id, project_id, status, message, hook_name, _logger
+        )
+    except Exception:
+        _logger.error("%s failed", hook_name, exc_info=True)
+
+
 def on_flow_cancellation(flow: Any, flow_run: Any, state: Any) -> None:
     """Prefect on_cancellation hook for flow runs.
 
@@ -79,36 +102,41 @@ def on_flow_cancellation(flow: Any, flow_run: Any, state: Any) -> None:
 
     Usage::
 
-        @flow(on_cancellation=[on_flow_cancellation])
+        @flow(
+            on_cancellation=[on_flow_cancellation],
+            on_failure=[on_flow_failure],
+            on_crashed=[on_flow_crashed],
+        )
         def my_flow(username, chip_id, ...):
             ...
 
     """
-    _logger = logging.getLogger(__name__)
-    try:
-        params = flow_run.parameters or {}
-        project_id = params.get("project_id")
-        flow_run_id = str(flow_run.id)
-
-        if not project_id:
-            _logger.warning("on_flow_cancellation: no project_id in parameters, skipping")
-            return
-
-        from qdash.dbmodel.initialize import initialize
-
-        initialize()
-
-        _cancel_executions_by_flow_run_id(flow_run_id, project_id, _logger)
-    except Exception:
-        _logger.error("on_flow_cancellation failed", exc_info=True)
+    _run_terminal_hook("on_flow_cancellation", flow_run, "cancelled", "Execution was cancelled")
 
 
-def _cancel_executions_by_flow_run_id(
+def on_flow_failure(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_failure hook. Closes executions left open by an exception."""
+    _run_terminal_hook(
+        "on_flow_failure", flow_run, "failed", "Flow run failed before the execution was closed"
+    )
+
+
+def on_flow_crashed(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_crashed hook. Closes executions left open by an infrastructure crash."""
+    _run_terminal_hook(
+        "on_flow_crashed", flow_run, "failed", "Flow run crashed before the execution was closed"
+    )
+
+
+def _finalize_executions_by_flow_run_id(
     flow_run_id: str,
     project_id: str,
+    status: str,
+    message: str,
+    hook_name: str,
     _logger: Any,
 ) -> None:
-    """Find executions with the given flow_run_id in note and mark as cancelled."""
+    """Find executions with the given flow_run_id in note and close them."""
     from qdash.common.utils.datetime import now
     from qdash.dbmodel.execution_history import ExecutionHistoryDocument
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -126,21 +154,26 @@ def _cancel_executions_by_flow_run_id(
 
     if not executions:
         _logger.info(
-            "on_flow_cancellation: no active executions found for flow_run_id=%s",
+            "%s: no active executions found for flow_run_id=%s",
+            hook_name,
             flow_run_id,
         )
         return
 
     for execution in executions:
         execution_id = execution.execution_id
-        _logger.info("Cancelling execution %s (flow_run_id=%s)", execution_id, flow_run_id)
+        _logger.info(
+            "%s: closing execution %s as %s (flow_run_id=%s)",
+            hook_name,
+            execution_id,
+            status,
+            flow_run_id,
+        )
 
-        # Update execution status to cancelled
         ExecutionHistoryDocument.find(
             {"project_id": project_id, "execution_id": execution_id}
-        ).update_many({"$set": {"status": "cancelled", "end_at": end_time}}).run()
+        ).update_many({"$set": {"status": status, "end_at": end_time}}).run()
 
-        # Update non-terminal tasks to cancelled
         result = (
             TaskResultHistoryDocument.find(
                 {
@@ -152,8 +185,8 @@ def _cancel_executions_by_flow_run_id(
             .update_many(
                 {
                     "$set": {
-                        "status": "cancelled",
-                        "message": "Execution was cancelled",
+                        "status": status,
+                        "message": message,
                         "end_at": end_time,
                     }
                 }
@@ -163,7 +196,8 @@ def _cancel_executions_by_flow_run_id(
 
         task_count = result.modified_count if result else 0
         _logger.info(
-            "Cancelled execution %s: %d task(s) updated",
+            "%s: execution %s closed, %d task(s) updated",
+            hook_name,
             execution_id,
             task_count,
         )
@@ -189,6 +223,8 @@ __all__ = [
     "get_session",
     "init_calibration",
     "on_flow_cancellation",
+    "on_flow_crashed",
+    "on_flow_failure",
 ]
 
 
