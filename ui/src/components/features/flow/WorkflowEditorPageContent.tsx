@@ -1317,7 +1317,7 @@ export function WorkflowEditorPageContent() {
                         openSidePanel(item.id);
                       }
                     }}
-                    className={`btn btn-ghost btn-sm btn-square relative rounded-sm ${
+                    className={`btn btn-ghost btn-sm btn-square relative h-9 w-9 rounded-sm ${
                       isActive ? "bg-base-300 text-primary" : "text-base-content/60"
                     }`}
                     title={item.label}
@@ -1325,7 +1325,7 @@ export function WorkflowEditorPageContent() {
                   >
                     <Icon size={18} />
                     {item.count ? (
-                      <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-content">
+                      <span className="absolute right-0 top-0 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-content">
                         {item.count > 99 ? "99+" : item.count}
                       </span>
                     ) : null}
@@ -1340,7 +1340,7 @@ export function WorkflowEditorPageContent() {
                   setShowCommandPalette(true);
                   setCommandSearch("");
                 }}
-                className="btn btn-ghost btn-sm btn-square rounded-sm text-base-content/60"
+                className="btn btn-ghost btn-sm btn-square h-9 w-9 rounded-sm text-base-content/60"
                 title="Command Palette"
                 aria-label="Command Palette"
               >
