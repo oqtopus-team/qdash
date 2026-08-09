@@ -31,6 +31,7 @@ import { CouplingTaskHistoryModal } from "@/components/features/chip/modals/Coup
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
+import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
@@ -198,6 +199,7 @@ export function CouplingGrid({
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
   const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
   const [isDirectionReversed, setIsDirectionReversed] = useState(false);
+  const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
 
   // Region tab is only available for square grids; fall back to pan-zoom otherwise.
   useEffect(() => {
@@ -205,6 +207,10 @@ export function CouplingGrid({
       setViewMode("pan-zoom");
     }
   }, [isSquareGrid, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "pan-zoom") exitFullscreen();
+  }, [viewMode, exitFullscreen]);
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -309,8 +315,8 @@ export function CouplingGrid({
   const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
     cols: displayCols,
     rows: displayRows,
-    reservedHeight: { mobile: 300, desktop: 350 },
-    deps: [taskResponse?.data],
+    reservedHeight: isFullscreen ? { mobile: 160, desktop: 180 } : { mobile: 300, desktop: 350 },
+    deps: [taskResponse?.data, isFullscreen],
   });
 
   // Debounced scale update to avoid excessive re-renders during zoom
@@ -967,7 +973,13 @@ export function CouplingGrid({
   );
 
   return (
-    <div className="flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8">
+    <div
+      className={
+        isFullscreen
+          ? "fixed inset-0 z-[60] flex flex-col h-screen w-screen space-y-2 bg-base-100 p-4 overflow-hidden"
+          : "flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8"
+      }
+    >
       {isFetching && !isLoading && (
         <div className="alert alert-info py-2 text-sm">
           <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -1228,12 +1240,13 @@ export function CouplingGrid({
             wheel={{ step: 0.08 }}
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
-            panning={{ velocityDisabled: false }}
+            panning={{ velocityDisabled: true }}
             smooth={false}
+            limitToBounds={false}
             centerOnInit={true}
             onTransform={handleTransform}
           >
-            <GridZoomControls />
+            <GridZoomControls isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />
             <TransformComponent
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{

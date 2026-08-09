@@ -21,6 +21,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskHistoryModal } from "@/components/features/chip/modals/TaskHistoryModal";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
@@ -455,6 +456,7 @@ export function QubitGrid({
     row: number;
     col: number;
   } | null>(null);
+  const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
 
   // LOD: store zoom scale, compute visibility flags from effective cell size.
   // Initialize to a conservative value; will be updated on first transform.
@@ -471,6 +473,10 @@ export function QubitGrid({
     }
   }, [isSquareGrid, viewMode]);
 
+  useEffect(() => {
+    if (viewMode !== "pan-zoom") exitFullscreen();
+  }, [viewMode, exitFullscreen]);
+
   // Calculate displayed grid size based on zoom mode
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
@@ -479,8 +485,8 @@ export function QubitGrid({
   const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
     cols: displayCols,
     rows: displayRows,
-    reservedHeight: { mobile: 300, desktop: 350 },
-    deps: [taskResponse, topologyQubits, zoomMode, selectedRegion],
+    reservedHeight: isFullscreen ? { mobile: 160, desktop: 180 } : { mobile: 300, desktop: 350 },
+    deps: [taskResponse, topologyQubits, zoomMode, selectedRegion, isFullscreen],
   });
 
   // Debounced scale update to avoid excessive re-renders during zoom
@@ -924,7 +930,13 @@ export function QubitGrid({
   );
 
   return (
-    <div className="flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8">
+    <div
+      className={
+        isFullscreen
+          ? "fixed inset-0 z-[60] flex flex-col h-screen w-screen space-y-2 bg-base-100 p-4 overflow-hidden"
+          : "flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8"
+      }
+    >
       {isFetchingTask && !isLoadingTask && (
         <div className="alert alert-info py-2 text-sm">
           <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -1181,12 +1193,13 @@ export function QubitGrid({
             wheel={{ step: 0.08 }}
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
-            panning={{ velocityDisabled: false }}
+            panning={{ velocityDisabled: true }}
             smooth={false}
+            limitToBounds={false}
             centerOnInit={true}
             onTransform={handleTransform}
           >
-            <GridZoomControls />
+            <GridZoomControls isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />
             <TransformComponent
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
