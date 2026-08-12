@@ -6,6 +6,7 @@ import { Home, ZoomIn, ZoomOut } from "lucide-react";
 import { useControls } from "react-zoom-pan-pinch";
 
 import { GridFullscreenButton, gridControlButtonClass } from "@/components/ui/GridFullscreenButton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 
 interface GridZoomControlsProps {
   isFullscreen?: boolean;
@@ -34,19 +35,45 @@ export function GridZoomControls({ isFullscreen, onToggleFullscreen }: GridZoomC
           <div className="h-px bg-base-content/20 mx-1" />
         </>
       )}
-      <button onClick={() => zoomIn()} className={gridControlButtonClass} title="Zoom in">
-        <ZoomIn className="h-4 w-4" />
-      </button>
-      <button onClick={() => zoomOut()} className={gridControlButtonClass} title="Zoom out">
-        <ZoomOut className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => resetTransform()}
-        className={gridControlButtonClass}
-        title="Reset view"
-      >
-        <Home className="h-4 w-4" />
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => zoomIn()}
+            className={gridControlButtonClass}
+            aria-label="Zoom in"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="left">Zoom in</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => zoomOut()}
+            className={gridControlButtonClass}
+            aria-label="Zoom out"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="left">Zoom out</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => resetTransform()}
+            className={gridControlButtonClass}
+            aria-label="Reset view"
+          >
+            <Home className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="left">Reset view</TooltipContent>
+      </Tooltip>
     </div>
   );
 }

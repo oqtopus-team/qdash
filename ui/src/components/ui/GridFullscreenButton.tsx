@@ -2,6 +2,8 @@
 
 import { Maximize, Minimize } from "lucide-react";
 
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+
 interface GridFullscreenButtonProps {
   isFullscreen?: boolean;
   onToggle: () => void;
@@ -17,16 +19,22 @@ export function GridFullscreenButton({
   onToggle,
   inline = false,
 }: GridFullscreenButtonProps) {
+  const label = isFullscreen ? "Exit fullscreen" : "Fullscreen";
   const button = (
-    <button
-      onClick={onToggle}
-      className={gridControlButtonClass}
-      title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
-      aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-      aria-pressed={isFullscreen ?? false}
-    >
-      {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onToggle}
+          className={gridControlButtonClass}
+          aria-label={label}
+          aria-pressed={isFullscreen ?? false}
+        >
+          {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="left">{isFullscreen ? "Exit fullscreen (Esc)" : label}</TooltipContent>
+    </Tooltip>
   );
 
   if (inline) return button;

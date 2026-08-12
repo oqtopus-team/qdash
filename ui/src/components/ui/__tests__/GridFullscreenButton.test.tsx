@@ -23,7 +23,6 @@ describe("GridFullscreenButton", () => {
 
     const button = screen.getByRole("button", { name: "Exit fullscreen" });
     expect(button.getAttribute("aria-pressed")).toBe("true");
-    expect(button.getAttribute("title")).toBe("Exit fullscreen (Esc)");
   });
 
   it("drops the floating wrapper when inline", () => {
