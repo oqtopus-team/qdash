@@ -26,6 +26,7 @@ import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { AnalysisChatPanel } from "@/components/features/metrics/AnalysisChatPanel";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
 interface TaskHistoryModalProps {
   chipId: string;
@@ -592,24 +593,25 @@ export function TaskHistoryModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="modal modal-open modal-bottom sm:modal-middle"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className={`modal-box w-full bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col transition-[max-width] duration-300 ease-in-out ${
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className={`max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none w-full p-0 h-[90vh] sm:h-[95vh] !overflow-hidden flex flex-col transition-[max-width] duration-300 ease-in-out ${
           isChatOpen ? "sm:w-[96vw] max-w-[112rem]" : "sm:w-11/12 max-w-[112rem]"
         }`}
-        onClick={(event) => event.stopPropagation()}
       >
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg sm:text-2xl font-bold truncate">{taskName}</h2>
-            <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">QID {qid}</p>
+            <DialogTitle className="text-lg sm:text-2xl font-bold truncate">{taskName}</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+              QID {qid}
+            </DialogDescription>
           </div>
-          <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-sm btn-circle btn-ghost flex-shrink-0"
+            aria-label="Close"
+          >
             ✕
           </button>
         </div>
@@ -660,7 +662,7 @@ export function TaskHistoryModal({
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
