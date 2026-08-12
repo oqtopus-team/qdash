@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 import {
   BookOpen,
@@ -43,7 +43,7 @@ type ExternalNavItem = {
 function SectionHeader({ label, visible }: { label: string; visible: boolean }) {
   if (!visible) return null;
   return (
-    <li className="menu-title text-xs font-semibold text-base-content/50 uppercase tracking-wider px-3 pt-3 pb-1">
+    <li className="menu-title px-3 pb-1 pt-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-base-content/50">
       {label}
     </li>
   );
@@ -77,6 +77,7 @@ function SidebarNavItem({
         href={item.href}
         className={isMobileOpen ? linkClass(active) : desktopLinkClass(active)}
         title={item.title ?? item.label}
+        aria-current={active ? "page" : undefined}
         onClick={onClick}
       >
         <Icon size={18} />
@@ -128,6 +129,8 @@ export function Sidebar() {
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
   const [logoutPending, setLogoutPending] = useState(false);
+  const desktopNavRef = useRef<HTMLElement>(null);
+  const mobileNavRef = useRef<HTMLElement>(null);
   const { isOpen, isMobileOpen, toggleSidebar, setMobileSidebarOpen } = useSidebar();
   const { canEdit } = useProject();
   const { user, logout: authLogout } = useAuth();
@@ -136,6 +139,11 @@ export function Sidebar() {
   const unreadNotifications = unreadNotificationsResponse?.data.unread_count ?? 0;
   const isAdmin = user?.system_role === "admin";
   const isDarkTheme = DARK_THEMES.includes(theme as (typeof DARK_THEMES)[number]);
+
+  useEffect(() => {
+    const navigation = isMobileOpen ? mobileNavRef.current : desktopNavRef.current;
+    navigation?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest" });
+  }, [pathname, isOpen, isMobileOpen]);
 
   const handleLogout = useCallback(async () => {
     await authLogout();
@@ -176,14 +184,18 @@ export function Sidebar() {
 
   // Mobile sidebar style
   const linkClass = (active: boolean) =>
-    `py-2.5 px-3 mx-1 my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
-      active ? "bg-neutral text-neutral-content" : "text-base-content hover:bg-base-300"
+    `relative min-h-10 px-3 mx-1 my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
+      active
+        ? "bg-primary/12 text-primary before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-primary"
+        : "text-base-content/75 hover:bg-base-300 hover:text-base-content"
     }`;
 
   // Desktop sidebar style
   const desktopLinkClass = (active: boolean) =>
-    `py-2.5 ${isOpen ? "px-3 mx-1" : "px-2 mx-1 justify-center"} my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
-      active ? "bg-neutral text-neutral-content" : "text-base-content hover:bg-base-300"
+    `relative min-h-9 ${isOpen ? "px-3 mx-1" : "px-2 mx-1 justify-center"} my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
+      active
+        ? "bg-primary/12 text-primary before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-primary"
+        : "text-base-content/75 hover:bg-base-300 hover:text-base-content"
     }`;
 
   const sectionHeaderVisible = isOpen || isMobileOpen;
@@ -217,19 +229,23 @@ export function Sidebar() {
     <>
       <ul className="menu p-2 py-0">
         {(isOpen || isMobileOpen) && (
-          <div className="flex justify-center items-center p-3">
-            <Link href="/" className="flex items-center" onClick={handleLinkClick}>
+          <li className="mb-1">
+            <Link
+              href="/"
+              className="flex min-h-16 items-center justify-center rounded-xl"
+              aria-label="QDash home"
+              onClick={handleLinkClick}
+            >
               <Image
                 src="/oqtopus_logo.png"
                 alt="Oqtopus Logo"
-                width={100}
-                height={25}
-                className="object-contain"
-                style={{ width: "auto", height: "auto" }}
+                width={72}
+                height={72}
+                className="h-16 w-16 object-contain"
                 priority
               />
             </Link>
-          </div>
+          </li>
         )}
 
         {navSections.map((section) => {
@@ -383,11 +399,12 @@ export function Sidebar() {
     <>
       {/* Desktop Sidebar */}
       <aside
-        className={`bg-base-200 h-full transition-all duration-300 hidden lg:flex lg:flex-col ${
-          isOpen ? "w-44" : "w-16"
+        aria-label="Primary navigation"
+        className={`hidden h-full border-r border-base-300 bg-base-200 transition-all duration-300 lg:flex lg:flex-col ${
+          isOpen ? "w-48" : "w-16"
         }`}
       >
-        <div className="flex justify-end p-2">
+        <div className="flex flex-shrink-0 justify-end p-2 pb-0">
           <button
             onClick={toggleSidebar}
             className="btn btn-ghost btn-sm btn-square"
@@ -396,21 +413,26 @@ export function Sidebar() {
             {isOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">{sidebarContent}</div>
+        <nav ref={desktopNavRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {sidebarContent}
+        </nav>
         {userSection}
       </aside>
 
       {/* Mobile Sidebar Overlay */}
       {isMobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          aria-label="Close navigation menu"
           onClick={() => setMobileSidebarOpen(false)}
         />
       )}
 
       {/* Mobile Sidebar Drawer */}
       <aside
-        className={`fixed top-0 left-0 h-full w-48 bg-base-200 z-50 transform transition-transform duration-300 lg:hidden flex flex-col ${
+        aria-label="Primary navigation"
+        className={`fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-base-300 bg-base-200 shadow-2xl transition-transform duration-300 lg:hidden ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -423,7 +445,9 @@ export function Sidebar() {
             <X size={20} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">{sidebarContent}</div>
+        <nav ref={mobileNavRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {sidebarContent}
+        </nav>
         {userSection}
       </aside>
 

@@ -99,7 +99,7 @@ function ProjectSelector() {
 
 export function Navbar() {
   return (
-    <nav className="navbar w-full">
+    <nav className="navbar z-20 min-h-14 w-full border-b border-base-300 bg-base-100/95 px-3 backdrop-blur-sm sm:px-4">
       <div className="flex flex-1 md:gap-1 lg:gap-2 items-center">
         <HiddenIcon />
         <ProjectSelector />
