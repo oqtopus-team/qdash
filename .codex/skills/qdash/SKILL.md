@@ -69,10 +69,10 @@ Read [references/qdash.md](references/qdash.md) when you need endpoint groups, l
 
 Primary local sources in the QDash checkout:
 
-- `src/qdash/client/README.md`
+- `clients/python/README.md`
 - `docs/user-guide/qdash-client.md`
 - `docs/oas/openapi.json`
-- `src/qdash/client/services/client.py`
+- `clients/python/src/qdash/client/services/client.py`
 
 ## Safety
 

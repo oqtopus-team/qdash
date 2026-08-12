@@ -19,7 +19,7 @@ pip install qdash-client
 For development against this repository:
 
 ```bash
-pip install ./src/qdash/client
+pip install ./clients/python
 ```
 
 The distribution name is `qdash-client`, but the Python import path is `qdash.client`.

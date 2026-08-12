@@ -84,7 +84,7 @@ In a local `oqtopus-team/qdash` checkout:
 - `docs/reference/openapi.md`: VitePress page that renders the OpenAPI viewer.
 - `src/qdash/api/routers/`: FastAPI routers for endpoint behavior.
 - `src/qdash/api/schemas/`: response and request schemas.
-- `src/qdash/client/services/client.py`: current high-level `qdash-client` methods.
+- `clients/python/src/qdash/client/services/client.py`: current high-level `qdash-client` methods.
 
 Useful path groups from the OpenAPI spec:
 
