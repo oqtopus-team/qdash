@@ -27,6 +27,24 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
     setIsInitialized(true);
   }, []);
 
+  useEffect(() => {
+    if (!isMobileOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMobileOpen(false);
+      }
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMobileOpen]);
+
   // Save sidebar state to localStorage when it changes
   useEffect(() => {
     if (isInitialized) {

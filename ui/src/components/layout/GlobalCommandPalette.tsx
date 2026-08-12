@@ -1,7 +1,7 @@
 "use client";
 
-import { Search } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Gauge, Search } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { getNavigationSections } from "@/components/layout/navigation";
@@ -16,12 +16,16 @@ import {
 } from "@/components/ui/Command";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 export function GlobalCommandPalette() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user } = useAuth();
   const { canEdit } = useProject();
   const [open, setOpen] = useState(false);
+  const isDashboard = pathname === "/dashboard";
+  const { qubitMetrics, couplingMetrics } = useMetricsConfig(isDashboard);
   const sections = getNavigationSections({
     canEdit,
     isAdmin: user?.system_role === "admin",
@@ -44,6 +48,13 @@ export function GlobalCommandPalette() {
     router.push(href);
   };
 
+  const jumpToMetric = (metricId: string) => {
+    setOpen(false);
+    window.setTimeout(() => {
+      document.getElementById(metricId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  };
+
   return (
     <>
       <button
@@ -63,12 +74,42 @@ export function GlobalCommandPalette() {
         open={open}
         onOpenChange={setOpen}
         title="Navigate"
-        description="Search for a page to open."
+        description="Search for a page or dashboard metric to open."
       >
         <Command loop label="QDash navigation">
-          <CommandInput placeholder="Search pages..." />
+          <CommandInput
+            placeholder={isDashboard ? "Search pages and metrics..." : "Search pages..."}
+          />
           <CommandList>
-            <CommandEmpty>No matching pages</CommandEmpty>
+            <CommandEmpty>No matching results</CommandEmpty>
+            {isDashboard && (qubitMetrics.length > 0 || couplingMetrics.length > 0) && (
+              <CommandGroup heading="Dashboard metrics">
+                {qubitMetrics.map((metric) => (
+                  <CommandItem
+                    key={`qubit-${metric.key}`}
+                    value={`${metric.title} qubit metric`}
+                    keywords={[metric.key, "dashboard", "qubit"]}
+                    onSelect={() => jumpToMetric(`dashboard-qubit-metric-${metric.key}`)}
+                  >
+                    <Gauge size={15} className="shrink-0 opacity-60" aria-hidden="true" />
+                    <span>{metric.title}</span>
+                    <span className="ml-auto text-xs text-base-content/40">Qubit</span>
+                  </CommandItem>
+                ))}
+                {couplingMetrics.map((metric) => (
+                  <CommandItem
+                    key={`coupling-${metric.key}`}
+                    value={`${metric.title} coupling metric`}
+                    keywords={[metric.key, "dashboard", "coupling"]}
+                    onSelect={() => jumpToMetric(`dashboard-coupling-metric-${metric.key}`)}
+                  >
+                    <Gauge size={15} className="shrink-0 opacity-60" aria-hidden="true" />
+                    <span>{metric.title}</span>
+                    <span className="ml-auto text-xs text-base-content/40">Coupling</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
             {sections.map((section) => {
               const items = section.items.filter((item) => item.visible !== false);
               if (items.length === 0) return null;

@@ -85,9 +85,10 @@ export interface MetricConfig {
  *   - isError: Error state
  *   - error: Error object if failed
  */
-export function useMetricsConfig() {
+export function useMetricsConfig(enabled = true) {
   const { data, isLoading, isError, error } = useGetMetricsConfig({
     query: {
+      enabled,
       staleTime: Infinity, // Config rarely changes, cache indefinitely
       gcTime: Infinity, // Keep in cache forever
     },
