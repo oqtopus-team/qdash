@@ -2,22 +2,10 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useMemo, type ReactElement } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Braces,
-  Copy,
-  File,
-  FileCode2,
-  Folder,
-  FolderOpen,
-  ListTree,
-  PanelLeft,
-  Pencil,
-  Plus,
-  Save,
-} from "lucide-react";
+import { Braces, Copy, FileCode2, ListTree, PanelLeft, Pencil, Plus, Save } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 
 import type {
@@ -42,6 +30,7 @@ import {
   listTaskInfo,
 } from "@/client/task-file/task-file";
 import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { PierreFileTree } from "@/components/ui/PierreFileTree";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -232,56 +221,6 @@ export function TasksPageContent() {
     setHasUnsavedChanges(true);
   };
 
-  const getFileIcon = (node: TaskFileTreeNode, isOpen = false) => {
-    if (node.type === "directory") {
-      return isOpen ? (
-        <FolderOpen className="inline-block mr-1 text-yellow-600" size={14} />
-      ) : (
-        <Folder className="inline-block mr-1 text-yellow-600" size={14} />
-      );
-    }
-
-    // Python files
-    if (node.name.endsWith(".py")) {
-      return <FileCode2 className="inline-block mr-1 text-blue-400" size={14} />;
-    }
-
-    return <File className="inline-block mr-1 text-base-content/50" size={14} />;
-  };
-
-  const renderFileTree = (nodes: TaskFileTreeNode[], level = 0): ReactElement[] => {
-    return nodes.map((node) => (
-      <div key={node.path}>
-        {node.type === "directory" ? (
-          <details className="group" open={level === 0}>
-            <summary
-              className="text-sm text-base-content/80 hover:bg-base-200 px-2 py-0.5 cursor-pointer select-none flex items-center list-none"
-              style={{ paddingLeft: `${level * 12 + 8}px` }}
-            >
-              <span className="mr-1 transition-transform group-open:rotate-90">▸</span>
-              {getFileIcon(node, true)}
-              <span className="truncate">{node.name}</span>
-            </summary>
-            {node.children && renderFileTree(node.children, level + 1)}
-          </details>
-        ) : (
-          <div
-            className={`text-sm px-2 py-0.5 cursor-pointer select-none flex items-center transition-colors ${
-              selectedFile === `${selectedBackend}/${node.path}`
-                ? "bg-primary/20 text-base-content"
-                : "text-base-content/80 hover:bg-base-200"
-            }`}
-            style={{ paddingLeft: `${level * 12 + 20}px` }}
-            onClick={() => handleFileSelect(node.path)}
-          >
-            {getFileIcon(node)}
-            <span className="truncate">{node.name}</span>
-          </div>
-        )}
-      </div>
-    ));
-  };
-
   // Group tasks by task_type
   const groupedTasks = useMemo(() => {
     if (!taskListData?.tasks) return {};
@@ -469,7 +408,7 @@ export function TasksPageContent() {
               </div>
 
               {/* Content */}
-              <div className="flex-1 overflow-y-auto py-2">
+              <div className="flex min-h-0 flex-1 flex-col py-2">
                 {viewMode === null ? (
                   <div className="flex items-center justify-center py-4">
                     <span className="loading loading-spinner loading-sm"></span>
@@ -489,7 +428,15 @@ export function TasksPageContent() {
                     ) : treeError ? (
                       <div className="text-xs text-red-400 px-3">Error loading tree</div>
                     ) : (
-                      fileTreeData && renderFileTree(fileTreeData)
+                      fileTreeData && (
+                        <div className="min-h-0 flex-1">
+                          <PierreFileTree
+                            nodes={fileTreeData}
+                            onSelectFile={handleFileSelect}
+                            selectedPath={selectedFile?.replace(`${selectedBackend}/`, "")}
+                          />
+                        </div>
+                      )
                     )}
                   </>
                 ) : (

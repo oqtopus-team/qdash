@@ -10,6 +10,7 @@ import type { SaveFlowRequest, ExecuteFlowResponse } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
 import { useToast } from "@/components/ui/Toast";
+import { PierreFileTree } from "@/components/ui/PierreFileTree";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
@@ -1392,45 +1393,36 @@ export function WorkflowEditorPageContent() {
                       />
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto py-1">
-                    {filteredFlows.map((flow) => (
-                      <button
-                        key={flow.name}
-                        type="button"
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${
-                          flow.name === name
-                            ? "bg-primary/15 text-base-content"
-                            : "text-base-content/70 hover:bg-base-300"
-                        }`}
-                        onClick={() => {
-                          if (flow.name !== name) {
-                            router.push(`/workflow/${encodeURIComponent(flow.name)}`);
+                  <div className="min-h-0 flex-1 py-1">
+                    {filteredFlows.length > 0 && (
+                      <PierreFileTree
+                        nodes={filteredFlows.map((flow) => ({
+                          decoration:
+                            flow.name === name && isDirty
+                              ? {
+                                  color: "var(--color-warning)",
+                                  text: "●",
+                                  title: "Unsaved changes",
+                                }
+                              : flow.file_exists === false
+                                ? {
+                                    color: "var(--color-warning)",
+                                    text: "missing",
+                                    title: "Missing source file",
+                                  }
+                                : undefined,
+                          path: `${flow.name}.py`,
+                          type: "file",
+                        }))}
+                        onSelectFile={(path) => {
+                          const flowName = path.replace(/\.py$/, "");
+                          if (flowName !== name) {
+                            router.push(`/workflow/${encodeURIComponent(flowName)}`);
                           }
                         }}
-                        title={flow.description || flow.name}
-                      >
-                        <FileCode
-                          size={14}
-                          className={`shrink-0 ${flow.name === name ? "text-primary" : "text-info/60"}`}
-                        />
-                        <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                          {flow.name}.py
-                        </span>
-                        {flow.file_exists === false && (
-                          <AlertTriangle
-                            size={13}
-                            className="shrink-0 text-warning"
-                            aria-label="Missing source file"
-                          />
-                        )}
-                        {flow.name === name && isDirty ? (
-                          <span
-                            className="h-2 w-2 rounded-full bg-warning"
-                            title="Unsaved changes"
-                          />
-                        ) : null}
-                      </button>
-                    ))}
+                        selectedPath={`${name}.py`}
+                      />
+                    )}
                     {filteredFlows.length === 0 && (
                       <div className="px-3 py-6 text-center text-xs text-base-content/40">
                         No flows match the filter.
