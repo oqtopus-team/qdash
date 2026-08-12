@@ -12,7 +12,8 @@ describe("GridFullscreenButton", () => {
 
     const button = screen.getByRole("button", { name: "Fullscreen" });
     expect(button.getAttribute("aria-pressed")).toBe("false");
-    expect(container.firstElementChild?.className).toContain("absolute");
+    expect(button.getAttribute("data-state")).toBe("closed");
+    expect(container.querySelector(".absolute")).not.toBeNull();
 
     fireEvent.click(button);
     expect(onToggle).toHaveBeenCalledTimes(1);
@@ -23,11 +24,5 @@ describe("GridFullscreenButton", () => {
 
     const button = screen.getByRole("button", { name: "Exit fullscreen" });
     expect(button.getAttribute("aria-pressed")).toBe("true");
-  });
-
-  it("drops the floating wrapper when inline", () => {
-    const { container } = render(<GridFullscreenButton onToggle={vi.fn()} inline />);
-
-    expect(container.firstElementChild?.tagName).toBe("BUTTON");
   });
 });

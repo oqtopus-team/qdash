@@ -4,17 +4,17 @@ import { useEffect, useRef } from "react";
 
 import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import { useControls } from "react-zoom-pan-pinch";
+import { twMerge } from "tailwind-merge";
 
-import { GridFullscreenButton, gridControlButtonClass } from "@/components/ui/GridFullscreenButton";
+import { gridControlButtonClass } from "@/components/ui/GridFullscreenButton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 
 interface GridZoomControlsProps {
   isFullscreen?: boolean;
-  /** Omit to hide the fullscreen toggle */
-  onToggleFullscreen?: () => void;
+  className?: string;
 }
 
-export function GridZoomControls({ isFullscreen, onToggleFullscreen }: GridZoomControlsProps = {}) {
+export function GridZoomControls({ isFullscreen, className }: GridZoomControlsProps = {}) {
   const { zoomIn, zoomOut, resetTransform } = useControls();
 
   // Re-center once the panel has finished resizing around the fullscreen toggle.
@@ -28,13 +28,7 @@ export function GridZoomControls({ isFullscreen, onToggleFullscreen }: GridZoomC
   }, [isFullscreen]);
 
   return (
-    <div className="absolute top-2 right-2 z-30 flex flex-col gap-1">
-      {onToggleFullscreen && (
-        <>
-          <GridFullscreenButton isFullscreen={isFullscreen} onToggle={onToggleFullscreen} inline />
-          <div className="h-px bg-base-content/20 mx-1" />
-        </>
-      )}
+    <div className={twMerge("absolute top-2 right-2 z-30 flex flex-col gap-1", className)}>
       <Tooltip>
         <TooltipTrigger asChild>
           <button

@@ -1194,6 +1194,7 @@ export function QubitGrid({
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
       >
+        <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
         {viewMode === "pan-zoom" ? (
           <TransformWrapper
             initialScale={initialScale}
@@ -1208,7 +1209,7 @@ export function QubitGrid({
             centerOnInit={true}
             onTransform={handleTransform}
           >
-            <GridZoomControls isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />
+            <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
@@ -1221,10 +1222,7 @@ export function QubitGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          <>
-            <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
-            {gridContent}
-          </>
+          gridContent
         )}
       </div>
 

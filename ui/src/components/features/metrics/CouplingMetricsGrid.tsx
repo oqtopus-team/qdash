@@ -662,6 +662,7 @@ export function CouplingMetricsGrid({
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
       >
+        <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
         {viewMode === "pan-zoom" ? (
           <TransformWrapper
             initialScale={1}
@@ -676,7 +677,7 @@ export function CouplingMetricsGrid({
             centerOnInit={true}
             onTransform={handleTransform}
           >
-            <GridZoomControls isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />
+            <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
@@ -689,10 +690,7 @@ export function CouplingMetricsGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          <>
-            <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
-            {gridContent}
-          </>
+          gridContent
         )}
       </div>
 
