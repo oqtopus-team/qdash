@@ -1,7 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Component, type ReactNode, useCallback, useRef, useState } from "react";
+import { Component, type ReactNode, useCallback, useState } from "react";
+
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
 const Plot = dynamic(() => import("@/components/charts/Plot"), { ssr: false });
 
@@ -35,15 +37,12 @@ class ChartErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundar
 
 export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const dialogRef = useRef<HTMLDialogElement>(null);
 
   const openLightbox = useCallback(() => {
     setIsExpanded(true);
-    dialogRef.current?.showModal();
   }, []);
 
   const closeLightbox = useCallback(() => {
-    dialogRef.current?.close();
     setIsExpanded(false);
   }, []);
 
@@ -103,18 +102,19 @@ export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
         </div>
       </ChartErrorBoundary>
 
-      <dialog ref={dialogRef} className="modal" onClose={() => setIsExpanded(false)}>
-        <div className="modal-box w-11/12 max-w-5xl h-[80vh] flex flex-col p-4">
+      <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
+        <DialogContent className="max-w-5xl h-[80vh] flex flex-col p-4 !overflow-hidden">
           <div className="flex justify-between items-center mb-2">
-            <h3 className="font-bold text-sm">
+            <DialogTitle className="text-sm">
               {typeof layout.title === "string"
                 ? layout.title
                 : (((layout.title as Record<string, unknown>)?.text as string) ?? "Chart")}
-            </h3>
+            </DialogTitle>
             <button type="button" onClick={closeLightbox} className="btn btn-sm btn-ghost">
               ✕
             </button>
           </div>
+          <DialogDescription className="sr-only">Expanded interactive chart.</DialogDescription>
           <div className="flex-1 min-h-0">
             {isExpanded && (
               <ChartErrorBoundary>
@@ -138,11 +138,8 @@ export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
               </ChartErrorBoundary>
             )}
           </div>
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button type="submit">close</button>
-        </form>
-      </dialog>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
