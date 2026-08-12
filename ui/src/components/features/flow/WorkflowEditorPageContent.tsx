@@ -5,13 +5,20 @@ import { useRouter, useParams } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
 import type { SaveFlowRequest, ExecuteFlowResponse } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
 import { useToast } from "@/components/ui/Toast";
 import { PierreFileTree } from "@/components/ui/PierreFileTree";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/Command";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
@@ -30,7 +37,7 @@ import {
   ChevronRight,
   Clock,
   Columns2,
-  Command,
+  Command as CommandIcon,
   FileCode,
   FilePlus2,
   FolderOpen,
@@ -124,13 +131,10 @@ export function WorkflowEditorPageContent() {
   const [activeSidePanel, setActiveSidePanel] = useState<SidePanel>("explorer");
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [commandSearch, setCommandSearch] = useState("");
-  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [fontSize, setFontSize] = useState(14);
   const [selection, setSelection] = useState({ lines: 0, chars: 0 });
   const [isBottomPanelOpen, setIsBottomPanelOpen] = useState(false);
   const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
-  const commandInputRef = useRef<HTMLInputElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRef = useRef<any>(null);
 
@@ -330,7 +334,6 @@ export function WorkflowEditorPageContent() {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "p") {
         e.preventDefault();
         setShowCommandPalette(true);
-        setCommandSearch("");
       }
       // Ctrl/Cmd + = → Zoom In
       if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+")) {
@@ -352,14 +355,10 @@ export function WorkflowEditorPageContent() {
         e.preventDefault();
         setIsBottomPanelOpen((prev) => !prev);
       }
-      // Escape → close command palette
-      if (e.key === "Escape" && showCommandPalette) {
-        setShowCommandPalette(false);
-      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showCommandPalette]);
+  }, []);
 
   // Sync fontSize and wordWrap to editor
   useEffect(() => {
@@ -367,13 +366,6 @@ export function WorkflowEditorPageContent() {
       editorRef.current.updateOptions({ fontSize, wordWrap });
     }
   }, [fontSize, wordWrap]);
-
-  // Focus command palette input when opened
-  useEffect(() => {
-    if (showCommandPalette) {
-      requestAnimationFrame(() => commandInputRef.current?.focus());
-    }
-  }, [showCommandPalette]);
 
   // Command palette actions
   const commands = [
@@ -529,14 +521,6 @@ export function WorkflowEditorPageContent() {
       enabled: true,
     },
   ];
-
-  const filteredCommands = commands.filter((cmd) =>
-    cmd.label.toLowerCase().includes(commandSearch.toLowerCase()),
-  );
-
-  useEffect(() => {
-    setSelectedCommandIndex(0);
-  }, [commandSearch, showCommandPalette]);
 
   const executeCommand = (cmd: (typeof commands)[0]) => {
     if (!cmd.enabled) return;
@@ -886,15 +870,12 @@ export function WorkflowEditorPageContent() {
             <div className="flex flex-col items-center gap-1 py-2">
               <button
                 type="button"
-                onClick={() => {
-                  setShowCommandPalette(true);
-                  setCommandSearch("");
-                }}
+                onClick={() => setShowCommandPalette(true)}
                 className="btn btn-ghost btn-sm btn-square h-9 w-9 rounded-sm text-base-content/60"
                 title="Command Palette"
                 aria-label="Command Palette"
               >
-                <Command size={18} />
+                <CommandIcon size={18} />
               </button>
             </div>
           </div>
@@ -1362,99 +1343,51 @@ export function WorkflowEditorPageContent() {
               type="button"
               onClick={() => {
                 setShowCommandPalette(true);
-                setCommandSearch("");
               }}
               className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer hidden sm:flex items-center gap-1 opacity-70 hover:opacity-100"
               title="Command Palette"
             >
-              <Command size={10} />
+              <CommandIcon size={10} />
               <span>⌘⇧P</span>
             </button>
           </div>
         </div>
 
         {/* Command Palette */}
-        {showCommandPalette && (
-          <div
-            className="fixed inset-0 z-50 flex justify-center pt-[15vh]"
-            onClick={() => setShowCommandPalette(false)}
-          >
-            <div className="absolute inset-0 bg-black/50" />
-            <div
-              className="relative w-full max-w-lg h-fit bg-base-200 rounded-lg shadow-2xl border border-base-300 overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-base-300">
-                <Search size={14} className="text-base-content/40 shrink-0" />
-                <input
-                  id="workflow-command-palette-search"
-                  name="workflowCommandPaletteSearch"
-                  ref={commandInputRef}
-                  type="text"
-                  placeholder="Type a command..."
-                  className="flex-1 bg-transparent text-sm text-base-content outline-none placeholder:text-base-content/40"
-                  value={commandSearch}
-                  onChange={(e) => setCommandSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      if (filteredCommands.length === 0) return;
-                      setSelectedCommandIndex((prev) =>
-                        Math.min(prev + 1, filteredCommands.length - 1),
-                      );
-                    }
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      if (filteredCommands.length === 0) return;
-                      setSelectedCommandIndex((prev) => Math.max(prev - 1, 0));
-                    }
-                    if (e.key === "Enter" && filteredCommands.length > 0) {
-                      executeCommand(filteredCommands[selectedCommandIndex] || filteredCommands[0]);
-                    }
-                    if (e.key === "Escape") {
-                      setShowCommandPalette(false);
-                    }
-                  }}
-                />
-              </div>
-              <div className="max-h-64 overflow-y-auto py-1">
-                {filteredCommands.map((cmd) => (
-                  <button
-                    key={cmd.id}
-                    type="button"
-                    onClick={() => executeCommand(cmd)}
-                    disabled={!cmd.enabled}
-                    onMouseEnter={() =>
-                      setSelectedCommandIndex(
-                        filteredCommands.findIndex((command) => command.id === cmd.id),
-                      )
-                    }
-                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors ${
-                      cmd.enabled
-                        ? "text-base-content hover:bg-base-300 cursor-pointer"
-                        : "text-base-content/30 cursor-not-allowed"
-                    } ${
-                      filteredCommands[selectedCommandIndex]?.id === cmd.id ? "bg-base-300" : ""
-                    }`}
-                  >
-                    <cmd.icon size={14} className="shrink-0 opacity-60" />
-                    <span className="flex-1">{cmd.label}</span>
-                    {cmd.shortcut && (
-                      <kbd className="text-xs text-base-content/40 bg-base-300 px-1.5 py-0.5 rounded">
-                        {cmd.shortcut}
-                      </kbd>
-                    )}
-                  </button>
-                ))}
-                {filteredCommands.length === 0 && (
-                  <div className="px-3 py-4 text-sm text-base-content/40 text-center">
-                    No matching commands
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        <CommandDialog
+          open={showCommandPalette}
+          onOpenChange={setShowCommandPalette}
+          title="Command Palette"
+          description="Search for an editor command, then press Enter to run it."
+        >
+          <Command loop label="Workflow commands">
+            <CommandInput
+              id="workflow-command-palette-search"
+              name="workflowCommandPaletteSearch"
+              placeholder="Type a command..."
+            />
+            <CommandList>
+              <CommandEmpty>No matching commands</CommandEmpty>
+              {commands.map((cmd) => (
+                <CommandItem
+                  key={cmd.id}
+                  value={cmd.label}
+                  keywords={[cmd.id]}
+                  disabled={!cmd.enabled}
+                  onSelect={() => executeCommand(cmd)}
+                >
+                  <cmd.icon size={14} className="shrink-0 opacity-60" aria-hidden="true" />
+                  <span className="flex-1">{cmd.label}</span>
+                  {cmd.shortcut && (
+                    <kbd className="rounded bg-base-300 px-1.5 py-0.5 text-xs text-base-content/40">
+                      {cmd.shortcut}
+                    </kbd>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandList>
+          </Command>
+        </CommandDialog>
 
         {/* Mobile FAB / Speed Dial - only visible on mobile */}
         <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">

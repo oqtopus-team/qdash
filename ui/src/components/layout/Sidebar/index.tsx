@@ -6,36 +6,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { Fragment, useCallback, useState } from "react";
 
 import {
-  BarChart3,
-  BookMarked,
   BookOpen,
   ChevronLeft,
   ChevronRight,
-  Code,
-  Cpu,
-  Download,
   FileJson2,
-  Files,
-  GitBranch,
-  Inbox,
-  LayoutDashboard,
-  LayoutGrid,
-  ClipboardList,
-  Snowflake,
-  ListTodo,
   LogOut,
-  Brain,
-  CircleDot,
-  MessagesSquare,
   Moon,
   Settings,
-  ShieldCheck,
-  Bot,
-  ClipboardCheck,
   Sun,
   Workflow,
   X,
-  Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -47,18 +27,10 @@ import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { DARK_THEMES } from "@/constants/themes";
+import { getNavigationSections } from "@/components/layout/navigation";
+import type { NavItem, NavSection } from "@/components/layout/navigation";
 
 const PREFECT_URL = process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
-
-type NavItem = {
-  href: string;
-  label: string;
-  title?: string;
-  icon: LucideIcon;
-  match?: "exact" | "prefix";
-  badge?: number;
-  visible?: boolean;
-};
 
 type ExternalNavItem = {
   href: string;
@@ -66,11 +38,6 @@ type ExternalNavItem = {
   title?: string;
   icon: LucideIcon;
   visible?: boolean;
-};
-
-type NavSection = {
-  label: string;
-  items: NavItem[];
 };
 
 function SectionHeader({ label, visible }: { label: string; visible: boolean }) {
@@ -220,105 +187,11 @@ export function Sidebar() {
     }`;
 
   const sectionHeaderVisible = isOpen || isMobileOpen;
-  const navSections: NavSection[] = [
-    {
-      label: "Overview",
-      items: [
-        {
-          href: "/inbox",
-          label: "Inbox",
-          icon: Inbox,
-          badge: unreadNotifications,
-        },
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/metrics", label: "Metrics", icon: LayoutGrid },
-        { href: "/chip", label: "Chip", icon: Cpu },
-        { href: "/analysis", label: "Analysis", icon: BarChart3 },
-        { href: "/chat", label: "AI Chat", icon: Bot },
-        {
-          href: "/provenance",
-          label: "Provenance",
-          icon: GitBranch,
-        },
-      ],
-    },
-    {
-      label: "Operate",
-      items: [
-        {
-          href: "/workflow",
-          label: "Workflow",
-          icon: Code,
-          match: "prefix",
-          visible: canEdit,
-        },
-        { href: "/execution", label: "Execution", icon: Zap },
-        {
-          href: "/task-results",
-          label: "Task Results",
-          icon: ClipboardList,
-          match: "prefix",
-        },
-        {
-          href: "/tasks",
-          label: "Tasks",
-          icon: ListTodo,
-          visible: canEdit,
-        },
-        { href: "/cryo", label: "Cryo", icon: Snowflake },
-        { href: "/import", label: "Import", icon: Download },
-      ],
-    },
-    {
-      label: "Collaborate",
-      items: [
-        { href: "/issues", label: "Issues", icon: CircleDot, match: "prefix" },
-        {
-          href: "/forum",
-          label: "Forum",
-          icon: MessagesSquare,
-          match: "prefix",
-        },
-        {
-          href: "/issue-knowledge",
-          label: "Knowledge",
-          icon: Brain,
-          match: "prefix",
-        },
-        {
-          href: "/ai-reviews",
-          label: "AI Reviews",
-          icon: ClipboardCheck,
-          match: "prefix",
-        },
-        {
-          href: "/task-knowledge",
-          label: "Task Knowledge",
-          icon: BookMarked,
-          match: "prefix",
-        },
-      ],
-    },
-    {
-      label: "Manage",
-      items: [
-        {
-          href: "/files",
-          label: "Files",
-          icon: Files,
-          match: "prefix",
-          visible: canEdit,
-        },
-        { href: "/settings", label: "Settings", icon: Settings },
-        {
-          href: "/admin",
-          label: "Admin",
-          icon: ShieldCheck,
-          visible: isAdmin,
-        },
-      ],
-    },
-  ];
+  const navSections: NavSection[] = getNavigationSections({
+    canEdit,
+    isAdmin,
+    unreadNotifications,
+  });
   const externalItems: ExternalNavItem[] = [
     {
       href: "https://oqtopus-team.github.io/qdash/",
