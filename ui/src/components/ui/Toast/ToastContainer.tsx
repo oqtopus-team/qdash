@@ -1,40 +1,40 @@
 "use client";
 
+import { Toaster } from "sonner";
+
+import { DARK_THEMES } from "@/constants/themes";
+import { useTheme } from "@/contexts/ThemeContext";
 import { FluentEmoji } from "@/components/ui/FluentEmoji";
 
-import { useToastContext } from "./ToastContext";
-
-const alertClass: Record<string, string> = {
-  success: "alert-success",
-  error: "alert-error",
-  info: "alert-info",
-  warning: "alert-warning",
-};
-
-const toastEmoji: Record<string, string> = {
-  success: "success",
-  error: "error",
-  info: "info",
-  warning: "warning",
-};
-
 export function ToastContainer() {
-  const { toasts, removeToast } = useToastContext();
-
-  if (toasts.length === 0) return null;
+  const { theme } = useTheme();
 
   return (
-    <div className="toast toast-end toast-top z-50">
-      {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          className={`alert ${alertClass[toast.type]} cursor-pointer shadow-lg`}
-          onClick={() => removeToast(toast.id)}
-        >
-          <FluentEmoji name={toastEmoji[toast.type]} size={20} />
-          <span>{toast.message}</span>
-        </div>
-      ))}
-    </div>
+    <Toaster
+      theme={DARK_THEMES.includes(theme) ? "dark" : "light"}
+      position="top-right"
+      duration={3000}
+      closeButton
+      icons={{
+        success: <FluentEmoji name="success" size={20} />,
+        error: <FluentEmoji name="error" size={20} />,
+        info: <FluentEmoji name="info" size={20} />,
+        warning: <FluentEmoji name="warning" size={20} />,
+      }}
+      toastOptions={{
+        unstyled: true,
+        classNames: {
+          toast:
+            "alert flex w-full items-center gap-2 rounded-xl border border-base-content/10 px-4 py-3 text-sm shadow-lg",
+          success: "alert-success",
+          error: "alert-error",
+          info: "alert-info",
+          warning: "alert-warning",
+          content: "min-w-0 flex-1",
+          closeButton: "btn btn-xs btn-circle btn-ghost shrink-0",
+        },
+      }}
+      containerAriaLabel="Notifications"
+    />
   );
 }
