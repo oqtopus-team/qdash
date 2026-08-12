@@ -349,6 +349,7 @@ describe("DashboardPageContent", () => {
   it("opens the metric history modal for a qubit metric even when the metric value is missing", () => {
     render(<DashboardPageContent />);
 
+    fireEvent.click(screen.getAllByText("Show topology")[0]);
     fireEvent.click(screen.getByRole("button", { name: "Open qubit" }));
 
     expect(screen.getByTestId("metric-note-modal").textContent).toContain("0:t1");
@@ -358,6 +359,7 @@ describe("DashboardPageContent", () => {
   it("opens the metric history modal for a coupling metric even when the metric value is missing", () => {
     render(<DashboardPageContent />);
 
+    fireEvent.click(screen.getAllByText("Show topology")[1]);
     const couplingButtons = screen.getAllByRole("button", { name: "Open coupling" });
     fireEvent.click(couplingButtons[couplingButtons.length - 1]);
 

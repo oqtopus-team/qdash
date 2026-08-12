@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { ArrowRightLeft, ChevronDown } from "lucide-react";
 
@@ -115,6 +115,30 @@ function scaleData(
     };
   });
   return out;
+}
+
+function EmptyMetricDisclosure({ children }: { children: ReactNode }) {
+  return (
+    <details className="group rounded-lg border border-dashed border-base-300 bg-base-200/40">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">No values in the selected range</p>
+          <p className="text-xs text-base-content/50">
+            Try a wider time range, or open the topology to inspect individual targets.
+          </p>
+        </div>
+        <span className="text-xs font-medium text-primary group-open:hidden">Show topology</span>
+        <span className="hidden text-xs font-medium text-primary group-open:inline">
+          Hide topology
+        </span>
+        <ChevronDown
+          className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        />
+      </summary>
+      <div className="border-t border-base-300 p-4">{children}</div>
+    </details>
+  );
 }
 
 export function DashboardPageContent() {
@@ -771,8 +795,8 @@ export function DashboardPageContent() {
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-                          <div className="xl:col-span-2 min-w-0">
+                        {cov.current === 0 ? (
+                          <EmptyMetricDisclosure>
                             <DashboardQubitGrid
                               metricData={qubitMetricData[m.key]}
                               unit={m.unit}
@@ -795,16 +819,43 @@ export function DashboardPageContent() {
                                 });
                               }}
                             />
+                          </EmptyMetricDisclosure>
+                        ) : (
+                          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+                            <div className="min-w-0 xl:col-span-2">
+                              <DashboardQubitGrid
+                                metricData={qubitMetricData[m.key]}
+                                unit={m.unit}
+                                topologyId={topologyId}
+                                colors={colors}
+                                notedQids={noted}
+                                targetNotedQids={targetNotedQids}
+                                forumLinkedQids={forumLinkedQids}
+                                forumLinksByTarget={forumLinksByTarget}
+                                crossMetricNotedQids={crossMetricNoted}
+                                notesByTarget={notesByTarget}
+                                targetNotesByTarget={targetNotesByTarget}
+                                metricKey={m.key}
+                                onQubitClick={(qid) => {
+                                  setEditingNote({
+                                    targetId: qid,
+                                    metricKey: m.key,
+                                    metricTitle: m.title,
+                                    metricUnit: m.unit,
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 xl:col-span-1">
+                              <DashboardCdfChart
+                                metricData={qubitMetricData[m.key]}
+                                title={m.title}
+                                unit={m.unit}
+                                height={260}
+                              />
+                            </div>
                           </div>
-                          <div className="xl:col-span-1 min-w-0">
-                            <DashboardCdfChart
-                              metricData={qubitMetricData[m.key]}
-                              title={m.title}
-                              unit={m.unit}
-                              height={260}
-                            />
-                          </div>
-                        </div>
+                        )}
                       </div>
                     );
                   })}
@@ -875,8 +926,8 @@ export function DashboardPageContent() {
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-                          <div className="xl:col-span-2 min-w-0">
+                        {cov.current === 0 ? (
+                          <EmptyMetricDisclosure>
                             <DashboardCouplingGrid
                               metricData={couplingMetricData[m.key]}
                               unit={m.unit}
@@ -900,16 +951,44 @@ export function DashboardPageContent() {
                                 });
                               }}
                             />
+                          </EmptyMetricDisclosure>
+                        ) : (
+                          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+                            <div className="min-w-0 xl:col-span-2">
+                              <DashboardCouplingGrid
+                                metricData={couplingMetricData[m.key]}
+                                unit={m.unit}
+                                topologyId={topologyId}
+                                colors={colors}
+                                reverseDirection={isReverseCouplingDirection}
+                                notedTargets={noted}
+                                targetNotedTargets={targetNotedCouplings}
+                                forumLinkedTargets={forumLinkedCouplings}
+                                forumLinksByTarget={forumLinksByTarget}
+                                crossMetricNotedTargets={crossMetricNoted}
+                                notesByTarget={notesByTarget}
+                                targetNotesByTarget={targetNotesByTarget}
+                                metricKey={m.key}
+                                onCouplingClick={(couplingId) => {
+                                  setEditingNote({
+                                    targetId: couplingId,
+                                    metricKey: m.key,
+                                    metricTitle: m.title,
+                                    metricUnit: m.unit,
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 xl:col-span-1">
+                              <DashboardCdfChart
+                                metricData={couplingMetricData[m.key]}
+                                title={m.title}
+                                unit={m.unit}
+                                height={260}
+                              />
+                            </div>
                           </div>
-                          <div className="xl:col-span-1 min-w-0">
-                            <DashboardCdfChart
-                              metricData={couplingMetricData[m.key]}
-                              title={m.title}
-                              unit={m.unit}
-                              height={260}
-                            />
-                          </div>
-                        </div>
+                        )}
                       </div>
                     );
                   })}
