@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ExecutionPageContent } from "@/components/features/execution/ExecutionPageContent";
@@ -151,6 +151,32 @@ describe("ExecutionPageContent cancel confirmation", () => {
     ).toBeTruthy();
     // The cancellation is NOT triggered until the user confirms.
     expect(mockCancelMutate).not.toHaveBeenCalled();
+  });
+
+  it("loads the duration breakdown only after it is expanded", () => {
+    render(<ExecutionPageContent />);
+
+    expect(screen.queryByText("DurationBreakdown")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Task duration breakdown/i }));
+
+    expect(screen.getByText("DurationBreakdown")).toBeTruthy();
+  });
+
+  it("summarizes the current executions and opens a non-modal details panel", () => {
+    render(<ExecutionPageContent />);
+
+    const summary = screen.getByRole("region", { name: "Execution status summary" });
+    expect(within(summary).getByText("Total")).toBeTruthy();
+    expect(within(summary).getByText("Running")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Running Execution"));
+
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(panel.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("cancels the execution with its flow_run_id after confirming in the dialog", () => {
