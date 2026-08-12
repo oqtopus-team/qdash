@@ -7,6 +7,7 @@ import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import { GitBranch, Maximize2, Move } from "lucide-react";
 
+import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -282,7 +283,7 @@ export function QubitMetricsGrid({
   // Grid layout
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
-  const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
+  const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
   const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
     cols: displayCols,
     rows: displayRows,
@@ -301,10 +302,6 @@ export function QubitMetricsGrid({
       setViewMode("pan-zoom");
     }
   }, [isSquareGrid, viewMode]);
-
-  useEffect(() => {
-    if (viewMode !== "pan-zoom") exitFullscreen();
-  }, [viewMode, exitFullscreen]);
 
   // Debounced LOD update to avoid excessive re-renders during zoom
   const handleTransform = useCallback((_: unknown, state: { scale: number }) => {
@@ -749,7 +746,10 @@ export function QubitMetricsGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <>
+            <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+            {gridContent}
+          </>
         )}
       </div>
 

@@ -19,6 +19,7 @@ import {
 } from "@/components/features/chip/DownloadConfirmModal";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskHistoryModal } from "@/components/features/chip/modals/TaskHistoryModal";
+import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
@@ -472,10 +473,6 @@ export function QubitGrid({
       setViewMode("pan-zoom");
     }
   }, [isSquareGrid, viewMode]);
-
-  useEffect(() => {
-    if (viewMode !== "pan-zoom") exitFullscreen();
-  }, [viewMode, exitFullscreen]);
 
   // Calculate displayed grid size based on zoom mode
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -1224,7 +1221,10 @@ export function QubitGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <>
+            <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+            {gridContent}
+          </>
         )}
       </div>
 

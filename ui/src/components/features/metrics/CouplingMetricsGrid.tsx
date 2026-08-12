@@ -6,6 +6,7 @@ import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import { ArrowRightLeft, GitBranch, Maximize2, Move } from "lucide-react";
 
+import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -127,11 +128,7 @@ export function CouplingMetricsGrid({
     }
   }, [isSquareGrid, viewMode]);
 
-  const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
-
-  useEffect(() => {
-    if (viewMode !== "pan-zoom") exitFullscreen();
-  }, [viewMode, exitFullscreen]);
+  const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -692,7 +689,10 @@ export function CouplingMetricsGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <>
+            <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+            {gridContent}
+          </>
         )}
       </div>
 
