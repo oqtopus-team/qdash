@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, useCallback, useRef } from "react";
+import { Fragment, useCallback, useState } from "react";
 
 import {
   BarChart3,
@@ -41,6 +41,7 @@ import type { LucideIcon } from "lucide-react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -158,7 +159,8 @@ function SidebarExternalNavItem({
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const modalRef = useRef<HTMLDialogElement>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [logoutPending, setLogoutPending] = useState(false);
   const { isOpen, isMobileOpen, toggleSidebar, setMobileSidebarOpen } = useSidebar();
   const { canEdit } = useProject();
   const { user, logout: authLogout } = useAuth();
@@ -173,9 +175,7 @@ export function Sidebar() {
   }, [authLogout]);
 
   const openProfileModal = useCallback(() => {
-    if (modalRef.current) {
-      modalRef.current.showModal();
-    }
+    setProfileOpen(true);
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -183,7 +183,7 @@ export function Sidebar() {
   }, [isDarkTheme, setTheme]);
 
   const handleSettingsClick = useCallback(() => {
-    modalRef.current?.close();
+    setProfileOpen(false);
     if (isMobileOpen) {
       setMobileSidebarOpen(false);
     }
@@ -191,8 +191,13 @@ export function Sidebar() {
   }, [isMobileOpen, setMobileSidebarOpen, router]);
 
   const handleModalLogout = useCallback(async () => {
-    modalRef.current?.close();
-    await handleLogout();
+    setLogoutPending(true);
+    try {
+      await handleLogout();
+      setProfileOpen(false);
+    } finally {
+      setLogoutPending(false);
+    }
   }, [handleLogout]);
 
   // Close mobile sidebar when clicking a link
@@ -430,8 +435,15 @@ export function Sidebar() {
   );
 
   const userModal = (
-    <dialog ref={modalRef} className="modal modal-bottom sm:modal-middle">
-      <div className="modal-box w-full sm:w-96 sm:max-w-sm">
+    <Dialog
+      open={profileOpen}
+      onOpenChange={(open) => !open && !logoutPending && setProfileOpen(false)}
+    >
+      <DialogContent className="max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none sm:w-96 sm:max-w-sm">
+        <DialogTitle className="sr-only">User profile</DialogTitle>
+        <DialogDescription className="sr-only">
+          Manage theme, account settings, and sign out.
+        </DialogDescription>
         {/* Profile Section */}
         <div className="flex flex-col items-center py-4 border-b border-base-300">
           <div className="mb-3">
@@ -471,6 +483,7 @@ export function Sidebar() {
 
           {/* Settings Link */}
           <button
+            type="button"
             onClick={handleSettingsClick}
             className="btn btn-ghost w-full justify-start gap-3 h-12"
           >
@@ -480,18 +493,17 @@ export function Sidebar() {
 
           {/* Logout */}
           <button
+            type="button"
             onClick={handleModalLogout}
             className="btn btn-ghost w-full justify-start gap-3 h-12 text-error"
+            disabled={logoutPending}
           >
             <LogOut size={18} />
-            <span>Logout</span>
+            <span>{logoutPending ? "Logging out…" : "Logout"}</span>
           </button>
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button>close</button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 
   return (
