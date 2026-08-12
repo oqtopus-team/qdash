@@ -91,7 +91,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskFileSettings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskFileSettings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetTaskFileSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getTaskFileSettings>>>
@@ -107,7 +107,7 @@ export function useGetTaskFileSettings<TData = Awaited<ReturnType<typeof getTask
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTaskFileSettings<TData = Awaited<ReturnType<typeof getTaskFileSettings>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileSettings>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -117,11 +117,11 @@ export function useGetTaskFileSettings<TData = Awaited<ReturnType<typeof getTask
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTaskFileSettings<TData = Awaited<ReturnType<typeof getTaskFileSettings>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileSettings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get task file settings
  */
@@ -129,11 +129,11 @@ export function useGetTaskFileSettings<TData = Awaited<ReturnType<typeof getTask
 export function useGetTaskFileSettings<TData = Awaited<ReturnType<typeof getTaskFileSettings>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileSettings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetTaskFileSettingsQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -187,7 +187,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskFileBackends>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskFileBackends>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListTaskFileBackendsQueryResult = NonNullable<Awaited<ReturnType<typeof listTaskFileBackends>>>
@@ -203,7 +203,7 @@ export function useListTaskFileBackends<TData = Awaited<ReturnType<typeof listTa
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTaskFileBackends<TData = Awaited<ReturnType<typeof listTaskFileBackends>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskFileBackends>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -213,11 +213,11 @@ export function useListTaskFileBackends<TData = Awaited<ReturnType<typeof listTa
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTaskFileBackends<TData = Awaited<ReturnType<typeof listTaskFileBackends>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskFileBackends>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List available task file backends
  */
@@ -225,11 +225,11 @@ export function useListTaskFileBackends<TData = Awaited<ReturnType<typeof listTa
 export function useListTaskFileBackends<TData = Awaited<ReturnType<typeof listTaskFileBackends>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskFileBackends>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListTaskFileBackendsQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -288,7 +288,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskFileTree>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskFileTree>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetTaskFileTreeQueryResult = NonNullable<Awaited<ReturnType<typeof getTaskFileTree>>>
@@ -304,7 +304,7 @@ export function useGetTaskFileTree<TData = Awaited<ReturnType<typeof getTaskFile
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTaskFileTree<TData = Awaited<ReturnType<typeof getTaskFileTree>>, TError = HTTPValidationError>(
  params: GetTaskFileTreeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileTree>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -314,11 +314,11 @@ export function useGetTaskFileTree<TData = Awaited<ReturnType<typeof getTaskFile
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTaskFileTree<TData = Awaited<ReturnType<typeof getTaskFileTree>>, TError = HTTPValidationError>(
  params: GetTaskFileTreeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileTree>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get file tree for a specific backend
  */
@@ -326,11 +326,11 @@ export function useGetTaskFileTree<TData = Awaited<ReturnType<typeof getTaskFile
 export function useGetTaskFileTree<TData = Awaited<ReturnType<typeof getTaskFileTree>>, TError = HTTPValidationError>(
  params: GetTaskFileTreeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileTree>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetTaskFileTreeQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -389,7 +389,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskFileContent>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskFileContent>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetTaskFileContentQueryResult = NonNullable<Awaited<ReturnType<typeof getTaskFileContent>>>
@@ -405,7 +405,7 @@ export function useGetTaskFileContent<TData = Awaited<ReturnType<typeof getTaskF
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTaskFileContent<TData = Awaited<ReturnType<typeof getTaskFileContent>>, TError = HTTPValidationError>(
  params: GetTaskFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileContent>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -415,11 +415,11 @@ export function useGetTaskFileContent<TData = Awaited<ReturnType<typeof getTaskF
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTaskFileContent<TData = Awaited<ReturnType<typeof getTaskFileContent>>, TError = HTTPValidationError>(
  params: GetTaskFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get task file content for viewing/editing
  */
@@ -427,11 +427,11 @@ export function useGetTaskFileContent<TData = Awaited<ReturnType<typeof getTaskF
 export function useGetTaskFileContent<TData = Awaited<ReturnType<typeof getTaskFileContent>>, TError = HTTPValidationError>(
  params: GetTaskFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetTaskFileContentQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -557,7 +557,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBackendConfig>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBackendConfig>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetBackendConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getBackendConfig>>>
@@ -573,7 +573,7 @@ export function useGetBackendConfig<TData = Awaited<ReturnType<typeof getBackend
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetBackendConfig<TData = Awaited<ReturnType<typeof getBackendConfig>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBackendConfig>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -583,11 +583,11 @@ export function useGetBackendConfig<TData = Awaited<ReturnType<typeof getBackend
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetBackendConfig<TData = Awaited<ReturnType<typeof getBackendConfig>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBackendConfig>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get backend configuration
  */
@@ -595,11 +595,11 @@ export function useGetBackendConfig<TData = Awaited<ReturnType<typeof getBackend
 export function useGetBackendConfig<TData = Awaited<ReturnType<typeof getBackendConfig>>, TError = unknown>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getBackendConfig>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetBackendConfigQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -660,7 +660,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskInfo>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskInfo>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListTaskInfoQueryResult = NonNullable<Awaited<ReturnType<typeof listTaskInfo>>>
@@ -676,7 +676,7 @@ export function useListTaskInfo<TData = Awaited<ReturnType<typeof listTaskInfo>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTaskInfo<TData = Awaited<ReturnType<typeof listTaskInfo>>, TError = HTTPValidationError>(
  params: ListTaskInfoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskInfo>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -686,11 +686,11 @@ export function useListTaskInfo<TData = Awaited<ReturnType<typeof listTaskInfo>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTaskInfo<TData = Awaited<ReturnType<typeof listTaskInfo>>, TError = HTTPValidationError>(
  params: ListTaskInfoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskInfo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List all tasks in a backend
  */
@@ -698,11 +698,11 @@ export function useListTaskInfo<TData = Awaited<ReturnType<typeof listTaskInfo>>
 export function useListTaskInfo<TData = Awaited<ReturnType<typeof listTaskInfo>>, TError = HTTPValidationError>(
  params: ListTaskInfoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskInfo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListTaskInfoQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

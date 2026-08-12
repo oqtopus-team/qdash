@@ -136,8 +136,17 @@ class ReadoutClassification(QubexTask):
         self.output_parameters["readout_fidelity_0"].value = result["readout_fidelities"][label][0]
         self.output_parameters["readout_fidelity_1"].value = result["readout_fidelities"][label][1]
         output_parameters = self.attach_execution_id(execution_id)
-
-        figures: list[go.Figure] = [self.plot_section_from_result(backend, result, qid)]
+        prep0_fig = result.figures[f"{label}_prepared_0"].update_layout(
+            title=f"State Classification: {label} (prep 0)"
+        )
+        prep1_fig = result.figures[f"{label}_prepared_1"].update_layout(
+            title=f"State Classification: {label} (prep 1)"
+        )
+        figures: list[go.Figure] = [
+            self.plot_section_from_result(backend, result, qid),
+            prep0_fig,
+            prep1_fig,
+        ]
         validation_error = first_validation_error(
             finite_value_error(
                 self.output_parameters["average_readout_fidelity"].value,

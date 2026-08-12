@@ -24,6 +24,7 @@ from qdash.api.schemas.issue_knowledge import (
 )
 from qdash.api.schemas.success import SuccessResponse
 from qdash.common.config.path_resolver import resolve_calib_data_path
+from qdash.copilot.agent_runtime.client import litellm_completion
 from qdash.copilot.prompts.issue_knowledge import ISSUE_KNOWLEDGE_EXTRACTION_PROMPT
 from qdash.dbmodel.issue_knowledge import IssueKnowledgeDocument
 from qdash.dbmodel.user import UserDocument
@@ -319,16 +320,16 @@ class IssueKnowledgeService:
         )
 
         try:
-            from qdash.copilot.agent import _build_client
-
-            client = _build_client(config)
-            response = await client.chat.completions.create(
-                model=config.model.name,
+            response = await litellm_completion(
+                config,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
                 max_tokens=1000,
             )
-            raw = response.choices[0].message.content or ""
+            if isinstance(response, dict):
+                raw = response.get("choices", [{}])[0].get("message", {}).get("content") or ""
+            else:
+                raw = response.choices[0].message.content or ""
             # Strip markdown code fences if present
             raw = raw.strip()
             if raw.startswith("```"):

@@ -73,6 +73,18 @@ const posts = await client.api.listForumPosts({ limit: 20 });
 
 Use the high-level methods for stable domain operations and polling helpers. Use `client.api` when an endpoint does not yet need a convenience method.
 
+## Forum Images
+
+Upload locally generated PNG, JPEG, GIF, or WebP images (up to 5 MB) using a Node `Blob` and filename:
+
+```ts
+const image = new Blob([imageBytes], { type: "image/png" });
+const { url } = await client.uploadForumImage(image, "analysis.png");
+```
+
+The returned `url` can be embedded in forum post Markdown. The client supplies multipart `FormData`,
+including the fetch-generated boundary, and applies the configured authentication and project headers.
+
 ## Agent Calibration
 
 ```ts
