@@ -27,6 +27,7 @@ import {
 } from "@/client/note/note";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor, type MentionCandidate } from "@/components/ui/MarkdownEditor";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { GetChipNotesSummaryParams, NoteCommentModel, SystemRole } from "@/schemas";
 
@@ -256,34 +257,35 @@ export function DashboardTargetNoteModal({
   const isEditingEntryTooLong = editingEntryDraft.length > 5000;
 
   return (
-    <div
-      className="modal modal-open"
-      onClick={(e) => {
-        if (!entryDraft.trim() && !editingEntryId && e.target === e.currentTarget) {
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !entryDraft.trim() && !editingEntryId && !mutationPending) {
           onClose();
         }
       }}
     >
-      <div className="modal-box w-full max-w-3xl p-0 overflow-hidden">
+      <DialogContent className="max-w-3xl p-0 !overflow-hidden">
         <div className="px-5 py-4 border-b border-base-300 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-lg font-bold">
+            <DialogTitle className="flex items-center gap-2">
               <StickyNote className="h-5 w-5 text-warning" />
               <span className="truncate">
                 Summary notes · {formatTarget(targetId)}
                 {cooldownId ? ` · ${cooldownId}` : ""}
               </span>
-            </div>
-            <p className="text-sm text-base-content/60 mt-1">
+            </DialogTitle>
+            <DialogDescription className="text-sm text-base-content/60 mt-1">
               Post target-level observations with author history. Use forum topics for separate
               discussions and images.
-            </p>
+            </DialogDescription>
           </div>
           <button
             className="btn btn-ghost btn-sm btn-circle"
             onClick={onClose}
             type="button"
             aria-label="Close"
+            disabled={mutationPending}
           >
             <X className="h-4 w-4" />
           </button>
@@ -505,7 +507,7 @@ export function DashboardTargetNoteModal({
             </div>
           </section>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
