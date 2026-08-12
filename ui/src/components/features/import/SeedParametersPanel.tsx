@@ -15,6 +15,12 @@ import {
 
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/DropdownMenu";
 import { useCompareSeedValues, useImportSeedParameters } from "@/client/calibration/calibration";
 import type { SeedImportSource } from "@/schemas";
 
@@ -470,40 +476,38 @@ export function SeedParametersPanel() {
         {/* Import Actions */}
         {data && (counts.new > 0 || counts.different > 0) && (
           <div className="card-actions justify-end mt-4 pt-4 border-t border-base-300">
-            <div className="dropdown dropdown-end">
-              <div tabIndex={0} role="button" className="btn btn-primary gap-2">
-                {importMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Importing...
-                  </>
-                ) : (
-                  <>
-                    <Database className="h-4 w-4" />
-                    Import
-                    <ChevronDown className="h-4 w-4" />
-                  </>
-                )}
-              </div>
-              <ul
-                tabIndex={0}
-                className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-56"
-              >
-                <li>
-                  <button onClick={() => requestImport("all")} disabled={importMutation.isPending}>
-                    Import All New/Different ({counts.new + counts.different})
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => requestImport("selected")}
-                    disabled={importMutation.isPending || selectedCount === 0}
-                  >
-                    Import Selected Only ({selectedCount})
-                  </button>
-                </li>
-              </ul>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="btn btn-primary gap-2">
+                  {importMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="h-4 w-4" />
+                      Import
+                      <ChevronDown className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem
+                  onSelect={() => requestImport("all")}
+                  disabled={importMutation.isPending}
+                >
+                  Import All New/Different ({counts.new + counts.different})
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => requestImport("selected")}
+                  disabled={importMutation.isPending || selectedCount === 0}
+                >
+                  Import Selected Only ({selectedCount})
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
 
