@@ -7,9 +7,12 @@ import type { FormEvent } from "react";
 import {
   AlertCircle,
   ArrowUpRight,
+  ChevronDown,
   ExternalLink,
+  MessageSquareText,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   X,
   XCircle,
 } from "lucide-react";
@@ -81,6 +84,10 @@ function statusBadgeClass(status: string): string {
   return "badge-ghost";
 }
 
+function isFailureStatus(status: string): boolean {
+  return status === "failed";
+}
+
 function compactId(value: string): string {
   if (!value) return "-";
   return value.length > 16 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
@@ -130,11 +137,13 @@ function TaskResultRow({
   onSelect: () => void;
 }) {
   const message = item.message?.trim();
+  const isFailure = isFailureStatus(item.status);
 
   return (
     <tr
       role="button"
       tabIndex={0}
+      aria-label={`Preview ${item.task_name || "unnamed"} task result for ${item.qid || "unknown target"}`}
       className={`cursor-pointer align-top hover ${isSelected ? "bg-primary/10" : ""}`}
       onClick={onSelect}
       onKeyDown={(event) => {
@@ -178,9 +187,17 @@ function TaskResultRow({
       <td className="min-w-80">
         {message ? (
           <div className="flex gap-2">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-error" />
+            {isFailure ? (
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-error" />
+            ) : (
+              <MessageSquareText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-base-content/35" />
+            )}
             <div>
-              <div className="line-clamp-2 text-xs text-base-content/80">{message}</div>
+              <div
+                className={`line-clamp-2 text-xs ${isFailure ? "text-error/80" : "text-base-content/60"}`}
+              >
+                {message}
+              </div>
               {item.has_stack_trace && (
                 <span className="badge badge-xs badge-outline mt-1">Stack trace</span>
               )}
@@ -331,8 +348,21 @@ function TaskResultPreviewSidebar({
   const jsonFigures =
     taskResult && Array.isArray(taskResult.json_figure_path) ? taskResult.json_figure_path : [];
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isOpen, onClose]);
+
   return (
     <div
+      role="complementary"
+      aria-label="Task result preview"
+      aria-hidden={!isOpen}
+      inert={!isOpen}
       className={`fixed right-0 top-0 z-50 h-full w-full overflow-y-auto border-l border-base-300 bg-base-100 p-4 shadow-xl transition-transform duration-300 sm:w-3/4 sm:p-6 lg:w-2/5 ${
         isOpen ? "translate-x-0" : "translate-x-full"
       }`}
@@ -502,6 +532,9 @@ export function TaskResultsPageContent() {
   const filters = useMemo(() => readFilters(searchParams), [searchParams]);
   const [draftFilters, setDraftFilters] = useState<FilterState>(filters);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [showMoreFilters, setShowMoreFilters] = useState(
+    () => !!filters.qid || !!filters.message || !!filters.username,
+  );
   const skip = Number(searchParams.get("skip") || 0);
   const tasks = taskInfoData?.data?.tasks ?? EMPTY_TASKS;
 
@@ -630,7 +663,7 @@ export function TaskResultsPageContent() {
                 )}
               </div>
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Execution" className="sm:min-w-52">
+            <PageFiltersBar.Item label="Execution" className="sm:min-w-44">
               <div className="flex items-center gap-2">
                 <ExecutionFilter
                   chipId={draftFilters.chipId}
@@ -651,7 +684,7 @@ export function TaskResultsPageContent() {
                 )}
               </div>
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Task" className="sm:min-w-56">
+            <PageFiltersBar.Item label="Task" className="sm:min-w-44">
               <div className="flex items-center gap-2">
                 <TaskSelector
                   tasks={tasks}
@@ -673,31 +706,24 @@ export function TaskResultsPageContent() {
                 )}
               </div>
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="QID" className="sm:min-w-32">
-              <input
-                className="input input-bordered h-[38px] min-h-[38px] w-full"
-                value={draftFilters.qid}
-                onChange={(event) =>
-                  setDraftFilters((current) => ({ ...current, qid: event.target.value }))
-                }
-                placeholder="0 or 0-1"
-              />
-            </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Message" className="sm:min-w-72">
-              <label className="input input-bordered flex h-[38px] min-h-[38px] items-center gap-2">
-                <Search className="h-3.5 w-3.5 text-base-content/40" />
-                <input
-                  className="grow"
-                  value={draftFilters.message}
-                  onChange={(event) =>
-                    setDraftFilters((current) => ({ ...current, message: event.target.value }))
-                  }
-                  placeholder="Search error message"
-                />
-              </label>
-            </PageFiltersBar.Item>
           </PageFiltersBar.Group>
           <PageFiltersBar.Group position="end">
+            <button
+              type="button"
+              className={`btn btn-sm gap-1 ${showMoreFilters ? "btn-neutral" : "btn-ghost"}`}
+              aria-expanded={showMoreFilters}
+              aria-controls="task-result-more-filters"
+              onClick={() => setShowMoreFilters((value) => !value)}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              More filters
+              {(filters.qid || filters.message || filters.username) && (
+                <span className="badge badge-xs badge-primary">Active</span>
+              )}
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform ${showMoreFilters ? "rotate-180" : ""}`}
+              />
+            </button>
             <button type="submit" className="btn btn-primary btn-sm">
               Apply
             </button>
@@ -709,6 +735,40 @@ export function TaskResultsPageContent() {
             )}
           </PageFiltersBar.Group>
         </PageFiltersBar>
+        {showMoreFilters && (
+          <div
+            id="task-result-more-filters"
+            className="mb-6 grid gap-3 rounded-box border border-base-300 bg-base-200/40 p-4 sm:grid-cols-[minmax(8rem,12rem)_minmax(16rem,1fr)]"
+          >
+            <label className="form-control">
+              <span className="mb-1 text-xs font-medium text-base-content/60">QID</span>
+              <input
+                className="input input-bordered h-[38px] min-h-[38px] w-full bg-base-100"
+                value={draftFilters.qid}
+                onChange={(event) =>
+                  setDraftFilters((current) => ({ ...current, qid: event.target.value }))
+                }
+                placeholder="0 or 0-1"
+              />
+            </label>
+            <label className="form-control">
+              <span className="mb-1 text-xs font-medium text-base-content/60">
+                Message contains
+              </span>
+              <span className="input input-bordered flex h-[38px] min-h-[38px] items-center gap-2 bg-base-100">
+                <Search className="h-3.5 w-3.5 text-base-content/40" />
+                <input
+                  className="grow"
+                  value={draftFilters.message}
+                  onChange={(event) =>
+                    setDraftFilters((current) => ({ ...current, message: event.target.value }))
+                  }
+                  placeholder="Search result messages"
+                />
+              </span>
+            </label>
+          </div>
+        )}
       </form>
 
       {isError ? (
@@ -740,7 +800,7 @@ export function TaskResultsPageContent() {
                   <th>Target</th>
                   <th>Execution</th>
                   <th>Started</th>
-                  <th>Error Message</th>
+                  <th>Message</th>
                 </tr>
               </thead>
               <tbody>
