@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ZoomIn } from "lucide-react";
 
 import { useGetTaskResult } from "@/client/task/task";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { FigureLightbox } from "./FigureLightbox";
 
 interface TaskFigureProps {
@@ -48,17 +49,22 @@ function ExpandableImage({
       {/* eslint-disable-next-line @next/next/no-img-element -- dynamic API image with native sizing */}
       <img src={src} alt={alt} className={className} onError={() => setHasError(true)} />
       {!hideExpandButton && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsOpen(true);
-          }}
-          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity btn btn-xs btn-circle bg-base-100/80 shadow hover:bg-base-200"
-          title="Expand"
-        >
-          <ZoomIn className="h-3 w-3" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(true);
+              }}
+              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity btn btn-xs btn-circle bg-base-100/80 shadow hover:bg-base-200"
+              aria-label="Expand figure"
+            >
+              <ZoomIn className="h-3 w-3" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Expand figure</TooltipContent>
+        </Tooltip>
       )}
       {isOpen && (
         <FigureLightbox
