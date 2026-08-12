@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Ban, RotateCcw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSetTaskResultExcluded } from "@/client/task-result/task-result";
 import { formatDateTime } from "@/lib/utils/datetime";
 import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
 interface TaskResultExcludeButtonProps {
   taskId: string;
@@ -24,23 +25,12 @@ export function TaskResultExcludeButton({
 }: TaskResultExcludeButtonProps) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState(excludedReason ?? "");
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const queryClient = useQueryClient();
   const mutation = useSetTaskResultExcluded();
 
   useEffect(() => {
     setReason(excludedReason ?? "");
   }, [excludedReason, taskId]);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) {
-      dialog.showModal();
-    } else if (!open && dialog.open) {
-      dialog.close();
-    }
-  }, [open]);
 
   const invalidateMetrics = async () => {
     await queryClient.invalidateQueries({ predicate: isChipMetricsQuery });
@@ -108,13 +98,16 @@ export function TaskResultExcludeButton({
         <Ban className="h-3 w-3" />
         Exclude this measurement
       </button>
-      <dialog ref={dialogRef} className="modal" onClose={() => setOpen(false)}>
-        <div className="modal-box">
-          <h3 className="font-bold text-base mb-2">Exclude this measurement</h3>
-          <p className="text-sm text-base-content/70 mb-3">
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => !nextOpen && !mutation.isPending && setOpen(false)}
+      >
+        <DialogContent>
+          <DialogTitle className="text-base mb-2">Exclude this measurement</DialogTitle>
+          <DialogDescription className="text-sm text-base-content/70 mb-3">
             Excluded measurements are skipped on the dashboard and metrics screens. Raw data is
             preserved and you can restore it later.
-          </p>
+          </DialogDescription>
           <label className="label">
             <span className="label-text text-sm">Reason (optional)</span>
           </label>
@@ -148,11 +141,8 @@ export function TaskResultExcludeButton({
               Exclude
             </button>
           </div>
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
