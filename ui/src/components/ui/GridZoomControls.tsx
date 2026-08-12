@@ -2,20 +2,20 @@
 
 import { useEffect, useRef } from "react";
 
-import { Maximize, Maximize2, Minimize, ZoomIn, ZoomOut } from "lucide-react";
+import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import { useControls } from "react-zoom-pan-pinch";
+import { twMerge } from "tailwind-merge";
 
+import { gridControlButtonClass } from "@/components/ui/GridFullscreenButton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 
 interface GridZoomControlsProps {
   isFullscreen?: boolean;
-  /** Omit to hide the fullscreen toggle */
-  onToggleFullscreen?: () => void;
+  className?: string;
 }
 
-export function GridZoomControls({ isFullscreen, onToggleFullscreen }: GridZoomControlsProps = {}) {
+export function GridZoomControls({ isFullscreen, className }: GridZoomControlsProps = {}) {
   const { zoomIn, zoomOut, resetTransform } = useControls();
-  const buttonClass = "btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200";
 
   // Re-center once the panel has finished resizing around the fullscreen toggle.
   const previousFullscreenRef = useRef(isFullscreen);
@@ -28,34 +28,13 @@ export function GridZoomControls({ isFullscreen, onToggleFullscreen }: GridZoomC
   }, [isFullscreen]);
 
   return (
-    <div className="absolute top-2 right-2 z-30 flex flex-col gap-1">
-      {onToggleFullscreen && (
-        <>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={onToggleFullscreen}
-                className={buttonClass}
-                aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-                aria-pressed={isFullscreen}
-              >
-                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              {isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
-            </TooltipContent>
-          </Tooltip>
-          <div className="h-px bg-base-content/20 mx-1" />
-        </>
-      )}
+    <div className={twMerge("absolute top-2 right-2 z-30 flex flex-col gap-1", className)}>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
             type="button"
             onClick={() => zoomIn()}
-            className={buttonClass}
+            className={gridControlButtonClass}
             aria-label="Zoom in"
           >
             <ZoomIn className="h-4 w-4" />
@@ -68,7 +47,7 @@ export function GridZoomControls({ isFullscreen, onToggleFullscreen }: GridZoomC
           <button
             type="button"
             onClick={() => zoomOut()}
-            className={buttonClass}
+            className={gridControlButtonClass}
             aria-label="Zoom out"
           >
             <ZoomOut className="h-4 w-4" />
@@ -81,7 +60,7 @@ export function GridZoomControls({ isFullscreen, onToggleFullscreen }: GridZoomC
           <button
             type="button"
             onClick={() => resetTransform()}
-            className={buttonClass}
+            className={gridControlButtonClass}
             aria-label="Reset view"
           >
             <Maximize2 className="h-4 w-4" />

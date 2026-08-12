@@ -29,6 +29,7 @@ import {
 } from "@/components/features/chip/DownloadConfirmModal";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CouplingTaskHistoryModal } from "@/components/features/chip/modals/CouplingTaskHistoryModal";
+import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
@@ -208,10 +209,6 @@ export function CouplingGrid({
       setViewMode("pan-zoom");
     }
   }, [isSquareGrid, viewMode]);
-
-  useEffect(() => {
-    if (viewMode !== "pan-zoom") exitFullscreen();
-  }, [viewMode, exitFullscreen]);
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -1245,6 +1242,7 @@ export function CouplingGrid({
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
       >
+        <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
         {viewMode === "pan-zoom" ? (
           <TransformWrapper
             initialScale={initialScale}
@@ -1259,7 +1257,7 @@ export function CouplingGrid({
             centerOnInit={true}
             onTransform={handleTransform}
           >
-            <GridZoomControls isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />
+            <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
