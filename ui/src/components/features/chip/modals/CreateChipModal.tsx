@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -20,11 +23,28 @@ interface CreateChipModalProps {
   onSuccess?: (chipId: string) => void;
 }
 
+const createChipSchema = z.object({
+  chipId: z.string().trim().min(1, "Chip ID is required"),
+  topologyId: z.string().min(1, "Please select a topology template"),
+});
+
+type CreateChipFormData = z.infer<typeof createChipSchema>;
+
 export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalProps) {
-  const [chipId, setChipId] = useState("");
-  const [selectedTopologyId, setSelectedTopologyId] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<CreateChipFormData>({
+    resolver: zodResolver(createChipSchema),
+    defaultValues: { chipId: "", topologyId: "" },
+  });
+  const selectedTopologyId = watch("topologyId");
 
   // Fetch available topologies
   const { data: topologiesData, isLoading: isLoadingTopologies } = useListTopologies(undefined, {
@@ -62,9 +82,9 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
     if (!selectedTopologyId && topologies.length > 0) {
       // Default to first 64-qubit topology or first available
       const default64 = topologies.find((t) => t.num_qubits === 64);
-      setSelectedTopologyId(default64?.id ?? topologies[0].id);
+      setValue("topologyId", default64?.id ?? topologies[0].id, { shouldValidate: true });
     }
-  }, [topologies, selectedTopologyId]);
+  }, [setValue, topologies, selectedTopologyId]);
 
   const queryClient = useQueryClient();
 
@@ -80,81 +100,70 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
         }
 
         // Reset form and close modal
-        setChipId("");
-        setSelectedTopologyId("");
-        setError(null);
+        reset();
+        setServerError(null);
         onClose();
       },
       onError: (err: Error) => {
         const axiosErr = err as Error & {
           response?: { data?: { detail?: string } };
         };
-        setError(axiosErr.response?.data?.detail || "Failed to create chip");
+        setServerError(axiosErr.response?.data?.detail || "Failed to create chip");
       },
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    // Validation
-    if (!chipId.trim()) {
-      setError("Chip ID is required");
-      return;
-    }
-
+  const submit = (data: CreateChipFormData) => {
+    setServerError(null);
     if (!selectedTopology) {
-      setError("Please select a topology template");
+      setError("topologyId", { message: "Please select a topology template" });
       return;
     }
 
     // Create chip
     createChipMutation.mutate({
       data: {
-        chip_id: chipId.trim(),
+        chip_id: data.chipId,
         size: selectedTopology.num_qubits,
-        topology_id: selectedTopologyId,
+        topology_id: data.topologyId,
       },
     });
   };
 
   const handleClose = () => {
     if (!createChipMutation.isPending) {
-      setChipId("");
-      setSelectedTopologyId("");
-      setError(null);
+      reset();
+      setServerError(null);
       onClose();
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent
-        onOpenAutoFocus={(event) => {
-          event.preventDefault();
-          inputRef.current?.focus();
-        }}
-      >
+      <DialogContent>
         <DialogTitle className="mb-4">Create New Chip</DialogTitle>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit(submit)} className="space-y-4" noValidate>
           {/* Chip ID Input */}
           <div className="form-control">
             <label className="label" htmlFor="chip-id-input">
               <span className="label-text">Chip ID</span>
             </label>
             <input
-              ref={inputRef}
               id="chip-id-input"
               type="text"
               placeholder="e.g., 64Q, Chip001"
-              className="input input-bordered w-full"
-              value={chipId}
-              onChange={(e) => setChipId(e.target.value)}
+              className={`input input-bordered w-full ${errors.chipId ? "input-error" : ""}`}
               disabled={createChipMutation.isPending}
-              aria-describedby={error ? "chip-error" : undefined}
+              aria-invalid={Boolean(errors.chipId)}
+              aria-describedby={errors.chipId ? "chip-id-error" : undefined}
+              {...register("chipId")}
             />
+            {errors.chipId && (
+              <p id="chip-id-error" className="mt-1 text-sm text-error">
+                {errors.chipId.message}
+              </p>
+            )}
           </div>
 
           {/* Topology Template Selection */}
@@ -170,10 +179,11 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
             ) : (
               <select
                 id="topology-select"
-                className="select select-bordered w-full"
-                value={selectedTopologyId}
-                onChange={(e) => setSelectedTopologyId(e.target.value)}
+                className={`select select-bordered w-full ${errors.topologyId ? "select-error" : ""}`}
                 disabled={createChipMutation.isPending}
+                aria-invalid={Boolean(errors.topologyId)}
+                aria-describedby={errors.topologyId ? "topology-error" : undefined}
+                {...register("topologyId")}
               >
                 {groupedTopologies.map(([size, topos]) => (
                   <optgroup key={size} label={`${size} Qubits`}>
@@ -186,6 +196,11 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
                 ))}
               </select>
             )}
+            {errors.topologyId && (
+              <p id="topology-error" className="mt-1 text-sm text-error">
+                {errors.topologyId.message}
+              </p>
+            )}
             {selectedTopology && (
               <label className="label">
                 <span className="label-text-alt text-base-content/60">
@@ -196,7 +211,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
           </div>
 
           {/* Error Message */}
-          {error && (
+          {serverError && (
             <div id="chip-error" className="alert alert-error" role="alert">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -212,7 +227,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
                   d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <span>{error}</span>
+              <span>{serverError}</span>
             </div>
           )}
 

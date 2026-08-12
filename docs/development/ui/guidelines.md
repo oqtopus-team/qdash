@@ -323,6 +323,14 @@ export function DataTable({ data, columns }: { data: any; columns: any }) {
 
 ## State Management
 
+### Form State and Validation
+
+Use React Hook Form with Zod for forms that have validation, multiple fields, or submission value
+normalization. Keep UI-only state such as password visibility outside the form. Prefer field-level error
+messages connected with `aria-describedby`; reserve alerts and toasts for submission or server errors.
+
+Simple search fields, toggles, and single-value controls do not need a form library.
+
 ### Server State with TanStack Query
 
 Use TanStack Query for all API data fetching:
