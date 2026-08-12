@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, ChevronDown } from "lucide-react";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
@@ -427,6 +427,7 @@ export function DashboardPageContent() {
   } | null>(null);
   const [editingTargetNote, setEditingTargetNote] = useState<string | null>(null);
   const [couplingDirection, setCouplingDirection] = useState<"forward" | "reverse">("forward");
+  const [showTargetSummaries, setShowTargetSummaries] = useState(false);
   const isReverseCouplingDirection = couplingDirection === "reverse";
 
   const editingLegacyMetricNote =
@@ -606,78 +607,109 @@ export function DashboardPageContent() {
             <DashboardChipNoteCard chipId={selectedChip} noteScopeParams={noteScopeParams} />
 
             {/* Pinned summary topology */}
-            <Card
-              variant="default"
-              padding="md"
-              title="Target Summaries"
-              description="Use these empty topologies for pinned target summaries. Create forum topics for individual issues, images, and discussion."
-            >
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
-                <div className="flex flex-col gap-2">
-                  <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
-                    <h4 className="text-sm font-semibold">Qubit summaries</h4>
-                  </div>
-                  <div className={SUMMARY_TOPOLOGY_VIEWPORT_CLASS}>
-                    <DashboardQubitGrid
-                      metricData={null}
-                      unit=""
-                      topologyId={topologyId}
-                      colors={colors}
-                      maxCellSize={48}
-                      presentation="summary"
-                      targetNotedQids={targetNotedQids}
-                      forumLinkedQids={forumLinkedQids}
-                      forumLinksByTarget={forumLinksByTarget}
-                      notesByTarget={notesByTarget}
-                      targetNotesByTarget={targetNotesByTarget}
-                      metricKey=""
-                      onQubitClick={setEditingTargetNote}
-                    />
-                  </div>
+            <Card variant="default" padding="md">
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                aria-expanded={showTargetSummaries}
+                aria-controls="dashboard-target-summaries"
+                onClick={() => setShowTargetSummaries((visible) => !visible)}
+              >
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg font-semibold">Target Summaries</h3>
+                  <p className="mt-0.5 text-sm text-base-content/60">
+                    Pin shared context to individual qubits and couplings.
+                  </p>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold">Coupling summaries</h4>
+                <div className="hidden flex-wrap justify-end gap-2 sm:flex">
+                  <span className="badge badge-ghost badge-sm">
+                    {targetNotedQids.size} qubit {targetNotedQids.size === 1 ? "note" : "notes"}
+                  </span>
+                  <span className="badge badge-ghost badge-sm">
+                    {targetNotedCouplings.size} coupling{" "}
+                    {targetNotedCouplings.size === 1 ? "note" : "notes"}
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-primary">
+                  {showTargetSummaries ? "Hide" : "Show"}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 transition-transform ${showTargetSummaries ? "rotate-180" : ""}`}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {showTargetSummaries && (
+                <div
+                  id="dashboard-target-summaries"
+                  className="mt-5 grid grid-cols-1 items-stretch gap-6 border-t border-base-300 pt-5 xl:grid-cols-2"
+                >
+                  <div className="flex flex-col gap-2">
+                    <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
+                      <h4 className="text-sm font-semibold">Qubit summaries</h4>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCouplingDirection(isReverseCouplingDirection ? "forward" : "reverse")
-                      }
-                      className={`btn btn-sm gap-1.5 ${isReverseCouplingDirection ? "btn-secondary" : "btn-outline"}`}
-                      title={
-                        isReverseCouplingDirection
-                          ? "Showing reverse direction"
-                          : "Showing forward direction"
-                      }
-                    >
-                      <ArrowRightLeft className="h-3.5 w-3.5" />
-                      <span className="text-xs">
-                        {isReverseCouplingDirection ? "Reverse" : "Forward"}
-                      </span>
-                    </button>
+                    <div className={SUMMARY_TOPOLOGY_VIEWPORT_CLASS}>
+                      <DashboardQubitGrid
+                        metricData={null}
+                        unit=""
+                        topologyId={topologyId}
+                        colors={colors}
+                        maxCellSize={48}
+                        presentation="summary"
+                        targetNotedQids={targetNotedQids}
+                        forumLinkedQids={forumLinkedQids}
+                        forumLinksByTarget={forumLinksByTarget}
+                        notesByTarget={notesByTarget}
+                        targetNotesByTarget={targetNotesByTarget}
+                        metricKey=""
+                        onQubitClick={setEditingTargetNote}
+                      />
+                    </div>
                   </div>
-                  <div className={SUMMARY_TOPOLOGY_VIEWPORT_CLASS}>
-                    <DashboardCouplingGrid
-                      metricData={noteCouplingTopologyData}
-                      unit=""
-                      topologyId={topologyId}
-                      colors={colors}
-                      maxCellSize={48}
-                      presentation="summary"
-                      reverseDirection={isReverseCouplingDirection}
-                      targetNotedTargets={targetNotedCouplings}
-                      forumLinkedTargets={forumLinkedCouplings}
-                      forumLinksByTarget={forumLinksByTarget}
-                      notesByTarget={notesByTarget}
-                      targetNotesByTarget={targetNotesByTarget}
-                      metricKey=""
-                      onCouplingClick={setEditingTargetNote}
-                    />
+                  <div className="flex flex-col gap-2">
+                    <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-semibold">Coupling summaries</h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCouplingDirection(isReverseCouplingDirection ? "forward" : "reverse")
+                        }
+                        className={`btn btn-sm gap-1.5 ${isReverseCouplingDirection ? "btn-secondary" : "btn-outline"}`}
+                        title={
+                          isReverseCouplingDirection
+                            ? "Showing reverse direction"
+                            : "Showing forward direction"
+                        }
+                      >
+                        <ArrowRightLeft className="h-3.5 w-3.5" />
+                        <span className="text-xs">
+                          {isReverseCouplingDirection ? "Reverse" : "Forward"}
+                        </span>
+                      </button>
+                    </div>
+                    <div className={SUMMARY_TOPOLOGY_VIEWPORT_CLASS}>
+                      <DashboardCouplingGrid
+                        metricData={noteCouplingTopologyData}
+                        unit=""
+                        topologyId={topologyId}
+                        colors={colors}
+                        maxCellSize={48}
+                        presentation="summary"
+                        reverseDirection={isReverseCouplingDirection}
+                        targetNotedTargets={targetNotedCouplings}
+                        forumLinkedTargets={forumLinkedCouplings}
+                        forumLinksByTarget={forumLinksByTarget}
+                        notesByTarget={notesByTarget}
+                        targetNotesByTarget={targetNotesByTarget}
+                        metricKey=""
+                        onCouplingClick={setEditingTargetNote}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </Card>
 
             {/* Summary table — collapsed by default */}

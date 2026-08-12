@@ -329,6 +329,7 @@ describe("DashboardPageContent", () => {
   it("opens the pinned summary modal from the empty qubit topology", () => {
     render(<DashboardPageContent />);
 
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
     fireEvent.click(screen.getAllByRole("button", { name: "Open qubit" })[0]);
 
     expect(screen.getByTestId("target-note-modal").textContent).toContain("0");
@@ -338,6 +339,7 @@ describe("DashboardPageContent", () => {
   it("opens the pinned summary modal from the empty coupling topology", () => {
     render(<DashboardPageContent />);
 
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
     fireEvent.click(screen.getAllByRole("button", { name: "Open coupling" })[0]);
 
     expect(screen.getByTestId("target-note-modal").textContent).toContain("0-1");
@@ -347,7 +349,7 @@ describe("DashboardPageContent", () => {
   it("opens the metric history modal for a qubit metric even when the metric value is missing", () => {
     render(<DashboardPageContent />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Open qubit" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Open qubit" }));
 
     expect(screen.getByTestId("metric-note-modal").textContent).toContain("0:t1");
     expect(screen.queryByTestId("target-note-modal")).toBeNull();
