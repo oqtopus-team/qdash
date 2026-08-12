@@ -120,6 +120,7 @@ export class QDashTransport {
         config.data instanceof ArrayBuffer
       ) {
         body = config.data as BodyInit;
+        if (config.data instanceof FormData) headers.delete("Content-Type");
       } else {
         if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
         body = JSON.stringify(config.data);

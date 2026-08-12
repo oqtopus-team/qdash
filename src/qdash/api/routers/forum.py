@@ -24,6 +24,7 @@ from qdash.api.schemas.forum import (
     ForumCategoryCreate,
     ForumCategoryResponse,
     ForumCategoryUpdate,
+    ForumImageUploadResponse,
     ForumPostCreate,
     ForumPostResponse,
     ForumPostUpdate,
@@ -275,16 +276,17 @@ def get_forum_post_replies(
     "/forum/upload-image",
     summary="Upload an image for a forum post",
     operation_id="uploadForumImage",
-    include_in_schema=False,
+    response_model=ForumImageUploadResponse,
+    responses={400: {"description": "Unsupported image type or image exceeds the 5 MB limit"}},
 )
 async def upload_forum_image(
     file: UploadFile,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
-) -> dict[str, str]:
+) -> ForumImageUploadResponse:
     """Upload an image to attach to a forum post. Returns the image URL."""
     data = await file.read()
     url = ForumService.upload_image(data, file.content_type or "")
-    return {"url": url}
+    return ForumImageUploadResponse(url=url)
 
 
 @public_router.get(

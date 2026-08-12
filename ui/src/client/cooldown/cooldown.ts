@@ -82,7 +82,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListCooldownsQueryResult = NonNullable<Awaited<ReturnType<typeof listCooldowns>>>
@@ -98,7 +98,7 @@ export function useListCooldowns<TData = Awaited<ReturnType<typeof listCooldowns
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListCooldowns<TData = Awaited<ReturnType<typeof listCooldowns>>, TError = HTTPValidationError>(
  params?: ListCooldownsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -108,11 +108,11 @@ export function useListCooldowns<TData = Awaited<ReturnType<typeof listCooldowns
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListCooldowns<TData = Awaited<ReturnType<typeof listCooldowns>>, TError = HTTPValidationError>(
  params?: ListCooldownsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List cool-downs (optionally filter by cryostat or chip)
  */
@@ -120,11 +120,11 @@ export function useListCooldowns<TData = Awaited<ReturnType<typeof listCooldowns
 export function useListCooldowns<TData = Awaited<ReturnType<typeof listCooldowns>>, TError = HTTPValidationError>(
  params?: ListCooldownsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListCooldownsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -237,7 +237,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(cooldownId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(cooldownId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetCooldownQueryResult = NonNullable<Awaited<ReturnType<typeof getCooldown>>>
@@ -253,7 +253,7 @@ export function useGetCooldown<TData = Awaited<ReturnType<typeof getCooldown>>, 
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetCooldown<TData = Awaited<ReturnType<typeof getCooldown>>, TError = HTTPValidationError>(
  cooldownId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -263,11 +263,11 @@ export function useGetCooldown<TData = Awaited<ReturnType<typeof getCooldown>>, 
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetCooldown<TData = Awaited<ReturnType<typeof getCooldown>>, TError = HTTPValidationError>(
  cooldownId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get a cool-down by id
  */
@@ -275,11 +275,11 @@ export function useGetCooldown<TData = Awaited<ReturnType<typeof getCooldown>>, 
 export function useGetCooldown<TData = Awaited<ReturnType<typeof getCooldown>>, TError = HTTPValidationError>(
  cooldownId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetCooldownQueryOptions(cooldownId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

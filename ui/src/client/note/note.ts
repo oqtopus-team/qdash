@@ -1030,7 +1030,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(taskId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskNote>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(taskId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskNote>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetTaskNoteQueryResult = NonNullable<Awaited<ReturnType<typeof getTaskNote>>>
@@ -1046,7 +1046,7 @@ export function useGetTaskNote<TData = Awaited<ReturnType<typeof getTaskNote>>, 
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTaskNote<TData = Awaited<ReturnType<typeof getTaskNote>>, TError = HTTPValidationError>(
  taskId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskNote>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -1056,11 +1056,11 @@ export function useGetTaskNote<TData = Awaited<ReturnType<typeof getTaskNote>>, 
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTaskNote<TData = Awaited<ReturnType<typeof getTaskNote>>, TError = HTTPValidationError>(
  taskId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskNote>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get the user note for a task result
  */
@@ -1068,11 +1068,11 @@ export function useGetTaskNote<TData = Awaited<ReturnType<typeof getTaskNote>>, 
 export function useGetTaskNote<TData = Awaited<ReturnType<typeof getTaskNote>>, TError = HTTPValidationError>(
  taskId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskNote>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetTaskNoteQueryOptions(taskId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1250,7 +1250,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChipNotesSummary>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChipNotesSummary>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetChipNotesSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getChipNotesSummary>>>
@@ -1267,7 +1267,7 @@ export function useGetChipNotesSummary<TData = Awaited<ReturnType<typeof getChip
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetChipNotesSummary<TData = Awaited<ReturnType<typeof getChipNotesSummary>>, TError = HTTPValidationError>(
  chipId: string,
     params?: GetChipNotesSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipNotesSummary>>, TError, TData>> & Pick<
@@ -1278,12 +1278,12 @@ export function useGetChipNotesSummary<TData = Awaited<ReturnType<typeof getChip
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetChipNotesSummary<TData = Awaited<ReturnType<typeof getChipNotesSummary>>, TError = HTTPValidationError>(
  chipId: string,
     params?: GetChipNotesSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipNotesSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List all notes (qubit / coupling / task-result) on a chip
  */
@@ -1292,11 +1292,11 @@ export function useGetChipNotesSummary<TData = Awaited<ReturnType<typeof getChip
  chipId: string,
     params?: GetChipNotesSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipNotesSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetChipNotesSummaryQueryOptions(chipId,params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1349,7 +1349,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChipNoteEvents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChipNoteEvents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListChipNoteEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listChipNoteEvents>>>
@@ -1366,7 +1366,7 @@ export function useListChipNoteEvents<TData = Awaited<ReturnType<typeof listChip
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListChipNoteEvents<TData = Awaited<ReturnType<typeof listChipNoteEvents>>, TError = HTTPValidationError>(
  chipId: string,
     params?: ListChipNoteEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipNoteEvents>>, TError, TData>> & Pick<
@@ -1377,12 +1377,12 @@ export function useListChipNoteEvents<TData = Awaited<ReturnType<typeof listChip
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListChipNoteEvents<TData = Awaited<ReturnType<typeof listChipNoteEvents>>, TError = HTTPValidationError>(
  chipId: string,
     params?: ListChipNoteEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipNoteEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Chip-scoped note edit timeline
  */
@@ -1391,11 +1391,11 @@ export function useListChipNoteEvents<TData = Awaited<ReturnType<typeof listChip
  chipId: string,
     params?: ListChipNoteEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipNoteEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListChipNoteEventsQueryOptions(chipId,params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1445,7 +1445,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTargetNoteEvents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTargetNoteEvents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListTargetNoteEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listTargetNoteEvents>>>
@@ -1461,7 +1461,7 @@ export function useListTargetNoteEvents<TData = Awaited<ReturnType<typeof listTa
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTargetNoteEvents<TData = Awaited<ReturnType<typeof listTargetNoteEvents>>, TError = HTTPValidationError>(
  params: ListTargetNoteEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTargetNoteEvents>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -1471,11 +1471,11 @@ export function useListTargetNoteEvents<TData = Awaited<ReturnType<typeof listTa
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTargetNoteEvents<TData = Awaited<ReturnType<typeof listTargetNoteEvents>>, TError = HTTPValidationError>(
  params: ListTargetNoteEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTargetNoteEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Per-target note edit timeline
  */
@@ -1483,11 +1483,11 @@ export function useListTargetNoteEvents<TData = Awaited<ReturnType<typeof listTa
 export function useListTargetNoteEvents<TData = Awaited<ReturnType<typeof listTargetNoteEvents>>, TError = HTTPValidationError>(
  params: ListTargetNoteEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTargetNoteEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListTargetNoteEventsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -1537,7 +1537,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchNoteEvents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchNoteEvents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type SearchNoteEventsQueryResult = NonNullable<Awaited<ReturnType<typeof searchNoteEvents>>>
@@ -1553,7 +1553,7 @@ export function useSearchNoteEvents<TData = Awaited<ReturnType<typeof searchNote
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useSearchNoteEvents<TData = Awaited<ReturnType<typeof searchNoteEvents>>, TError = HTTPValidationError>(
  params: SearchNoteEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchNoteEvents>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -1563,11 +1563,11 @@ export function useSearchNoteEvents<TData = Awaited<ReturnType<typeof searchNote
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useSearchNoteEvents<TData = Awaited<ReturnType<typeof searchNoteEvents>>, TError = HTTPValidationError>(
  params: SearchNoteEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchNoteEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Full-text search across note contents
  */
@@ -1575,11 +1575,11 @@ export function useSearchNoteEvents<TData = Awaited<ReturnType<typeof searchNote
 export function useSearchNoteEvents<TData = Awaited<ReturnType<typeof searchNoteEvents>>, TError = HTTPValidationError>(
  params: SearchNoteEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchNoteEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getSearchNoteEventsQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 

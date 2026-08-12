@@ -84,7 +84,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type ListTopologiesQueryResult = NonNullable<Awaited<ReturnType<typeof listTopologies>>>
@@ -100,7 +100,7 @@ export function useListTopologies<TData = Awaited<ReturnType<typeof listTopologi
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTopologies<TData = Awaited<ReturnType<typeof listTopologies>>, TError = HTTPValidationError>(
  params?: ListTopologiesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -110,11 +110,11 @@ export function useListTopologies<TData = Awaited<ReturnType<typeof listTopologi
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useListTopologies<TData = Awaited<ReturnType<typeof listTopologies>>, TError = HTTPValidationError>(
  params?: ListTopologiesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List available topologies
  */
@@ -122,11 +122,11 @@ export function useListTopologies<TData = Awaited<ReturnType<typeof listTopologi
 export function useListTopologies<TData = Awaited<ReturnType<typeof listTopologies>>, TError = HTTPValidationError>(
  params?: ListTopologiesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListTopologiesQueryOptions(params,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
@@ -184,7 +184,7 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
       
 
-   return  { queryKey, queryFn, enabled: !!(topologyId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTopologyById>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+   return  { queryKey, queryFn, enabled: !!(topologyId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTopologyById>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetTopologyByIdQueryResult = NonNullable<Awaited<ReturnType<typeof getTopologyById>>>
@@ -200,7 +200,7 @@ export function useGetTopologyById<TData = Awaited<ReturnType<typeof getTopology
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTopologyById<TData = Awaited<ReturnType<typeof getTopologyById>>, TError = HTTPValidationError>(
  topologyId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTopologyById>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -210,11 +210,11 @@ export function useGetTopologyById<TData = Awaited<ReturnType<typeof getTopology
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTopologyById<TData = Awaited<ReturnType<typeof getTopologyById>>, TError = HTTPValidationError>(
  topologyId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTopologyById>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary Get topology by ID
  */
@@ -222,11 +222,11 @@ export function useGetTopologyById<TData = Awaited<ReturnType<typeof getTopology
 export function useGetTopologyById<TData = Awaited<ReturnType<typeof getTopologyById>>, TError = HTTPValidationError>(
  topologyId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTopologyById>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetTopologyByIdQueryOptions(topologyId,options)
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
   query.queryKey = queryOptions.queryKey ;
 
