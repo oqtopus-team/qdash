@@ -335,19 +335,18 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const { nodes, edges } = getLayoutedElements();
 
   return (
-    <div className="flex gap-4 relative">
+    <div className={`flex gap-4 relative ${isMaximized ? "" : "h-[600px]"}`}>
       <ReactFlowProvider>
         <div
           style={{
             width: selectedTask ? "70%" : "100%",
-            height: isMaximized ? "90vh" : "400px",
             position: isMaximized ? "fixed" : "relative",
             top: isMaximized ? "5vh" : "auto",
             left: isMaximized ? "5vw" : "auto",
             right: isMaximized ? "5vw" : "auto",
             zIndex: isMaximized ? 50 : "auto",
           }}
-          className={isMaximized ? "bg-base-100 p-4 rounded-lg shadow-xl" : ""}
+          className={isMaximized ? "h-[90vh] bg-base-100 p-4 rounded-lg shadow-xl" : "h-full"}
         >
           <FlowContent
             nodes={nodes}
@@ -365,9 +364,10 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
       {selectedTask && (
         <div
           className={`bg-base-100 p-4 rounded-lg shadow overflow-y-auto ${
-            isMaximized ? "fixed right-8 top-[5vh] w-[400px] z-50 max-h-[90vh]" : "w-[30%]"
+            isMaximized
+              ? "fixed right-8 top-[5vh] w-[400px] z-50 h-auto max-h-[90vh]"
+              : "w-[30%] h-full"
           }`}
-          style={{ height: isMaximized ? "auto" : "600px" }}
         >
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">{selectedTask.name}</h3>

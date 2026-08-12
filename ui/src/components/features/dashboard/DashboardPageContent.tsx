@@ -54,8 +54,8 @@ interface MetricValueLike {
 type MetricMap = { [key: string]: MetricValueLike };
 
 const FALLBACK_COLORS = ["#440154", "#31688e", "#35b779", "#fde724"];
-const SUMMARY_TOPOLOGY_SCROLL_CLASS =
-  "max-h-[min(62vh,34rem)] overflow-auto overscroll-contain rounded-md border border-base-300 bg-base-100/60 p-3";
+const SUMMARY_TOPOLOGY_VIEWPORT_CLASS = "grow rounded-md border border-base-300 bg-base-100/60 p-3";
+const SUMMARY_TOPOLOGY_HEADER_CLASS = "flex flex-wrap items-center justify-between gap-2 min-h-8";
 const MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER =
   "<!-- qdash:migrated-metric-notes-to-latest-cooldown -->";
 
@@ -584,12 +584,12 @@ export function DashboardPageContent() {
               title="Target Summaries"
               description="Use these empty topologies for pinned target summaries. Create forum topics for individual issues, images, and discussion."
             >
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
+                <div className="flex flex-col gap-2">
+                  <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
                     <h4 className="text-sm font-semibold">Qubit summaries</h4>
                   </div>
-                  <div className={SUMMARY_TOPOLOGY_SCROLL_CLASS}>
+                  <div className={SUMMARY_TOPOLOGY_VIEWPORT_CLASS}>
                     <DashboardQubitGrid
                       metricData={null}
                       unit=""
@@ -607,8 +607,8 @@ export function DashboardPageContent() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-col gap-2">
+                  <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
                     <div className="flex items-center gap-2">
                       <h4 className="text-sm font-semibold">Coupling summaries</h4>
                     </div>
@@ -630,7 +630,7 @@ export function DashboardPageContent() {
                       </span>
                     </button>
                   </div>
-                  <div className={SUMMARY_TOPOLOGY_SCROLL_CLASS}>
+                  <div className={SUMMARY_TOPOLOGY_VIEWPORT_CLASS}>
                     <DashboardCouplingGrid
                       metricData={noteCouplingTopologyData}
                       unit=""

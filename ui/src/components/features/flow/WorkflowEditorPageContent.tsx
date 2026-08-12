@@ -1317,7 +1317,7 @@ export function WorkflowEditorPageContent() {
                         openSidePanel(item.id);
                       }
                     }}
-                    className={`btn btn-ghost btn-sm btn-square relative rounded-sm ${
+                    className={`btn btn-ghost btn-sm btn-square relative h-9 w-9 rounded-sm ${
                       isActive ? "bg-base-300 text-primary" : "text-base-content/60"
                     }`}
                     title={item.label}
@@ -1325,7 +1325,7 @@ export function WorkflowEditorPageContent() {
                   >
                     <Icon size={18} />
                     {item.count ? (
-                      <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-content">
+                      <span className="absolute right-0 top-0 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-content">
                         {item.count > 99 ? "99+" : item.count}
                       </span>
                     ) : null}
@@ -1340,7 +1340,7 @@ export function WorkflowEditorPageContent() {
                   setShowCommandPalette(true);
                   setCommandSearch("");
                 }}
-                className="btn btn-ghost btn-sm btn-square rounded-sm text-base-content/60"
+                className="btn btn-ghost btn-sm btn-square h-9 w-9 rounded-sm text-base-content/60"
                 title="Command Palette"
                 aria-label="Command Palette"
               >
@@ -1584,7 +1584,7 @@ export function WorkflowEditorPageContent() {
             </div>
           </div>
           {/* Editor with Tab Switcher */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-w-0">
             {/* Tab Bar */}
             <div className="flex items-end bg-base-200 border-b border-base-300 h-9">
               <button
@@ -1668,8 +1668,11 @@ export function WorkflowEditorPageContent() {
 
             {/* Tab Content */}
             {isSplitView ? (
-              <PanelGroup orientation="horizontal" style={{ flex: 1, overflow: "hidden" }}>
-                <Panel defaultSize="60%" minSize="20%" style={{ overflow: "hidden" }}>
+              <PanelGroup
+                orientation="horizontal"
+                style={{ flex: 1, minWidth: 0, overflow: "hidden" }}
+              >
+                <Panel defaultSize="60%" minSize="20%" style={{ overflow: "hidden", minWidth: 0 }}>
                   <Editor
                     height="100%"
                     language="python"
@@ -1687,7 +1690,7 @@ export function WorkflowEditorPageContent() {
                   />
                 </Panel>
                 <PanelResizeHandle className="w-1 bg-base-300 hover:bg-primary/50 transition-colors cursor-col-resize" />
-                <Panel defaultSize="40%" minSize="15%" style={{ overflow: "hidden" }}>
+                <Panel defaultSize="40%" minSize="15%" style={{ overflow: "hidden", minWidth: 0 }}>
                   <FlowImportsPanel />
                 </Panel>
               </PanelGroup>

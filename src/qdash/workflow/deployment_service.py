@@ -273,6 +273,7 @@ class SetScheduleResponse(BaseModel):
     cron: str
     active: bool
     message: str
+    schedule_id: str | None = None
 
 
 class CreateScheduledRunRequest(BaseModel):
@@ -328,19 +329,27 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
                 )
 
             try:
-                # Delete existing schedules first
                 existing_schedules = await client.read_deployment_schedules(deployment_id)
                 for existing in existing_schedules:
-                    await client.delete_deployment_schedule(deployment_id, existing.id)
-                    logger.info(f"Deleted existing schedule: {existing.id}")
+                    existing_cron = getattr(existing.schedule, "cron", None)
+                    existing_timezone = getattr(existing.schedule, "timezone", None)
+                    if existing_cron == request.cron and existing_timezone == request.timezone:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=(
+                                f"A schedule with cron '{request.cron}' and timezone "
+                                f"'{request.timezone}' already exists on deployment "
+                                f"{target_deployment.name}"
+                            ),
+                        )
 
-                # Create new schedule
                 schedules: list[tuple[Any, bool]] = [(cron_schedule, request.active)]
-                await client.create_deployment_schedules(
+                created = await client.create_deployment_schedules(
                     deployment_id,
                     schedules,
                 )
-                logger.info("Successfully created deployment schedule")
+                schedule_id = str(created[0].id) if created else None
+                logger.info(f"Successfully created deployment schedule: {schedule_id}")
 
                 # Update parameters via direct API call if provided
                 if request.parameters:
@@ -351,6 +360,8 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
                     )
                     response.raise_for_status()
                     logger.info("Successfully updated deployment parameters")
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Failed to update deployment: {e}")
                 raise HTTPException(status_code=500, detail=f"Failed to update deployment: {e!s}")
@@ -363,6 +374,7 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
                 deployment_id=request.deployment_id,
                 cron=request.cron,
                 active=request.active,
+                schedule_id=schedule_id,
                 message=f"Schedule set successfully on deployment {target_deployment.name}",
             )
 
