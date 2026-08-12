@@ -11,6 +11,7 @@ import type { AxiosResponse } from "axios";
 
 import { useToast } from "@/components/ui/Toast";
 import { PierreFileTree } from "@/components/ui/PierreFileTree";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
@@ -1085,15 +1086,21 @@ export function WorkflowEditorPageContent() {
           </div>
         )}
         {showDeleteConfirm && (
-          <div className="modal modal-open">
-            <div className="modal-box">
-              <h3 className="font-bold text-lg">Delete Flow</h3>
-              <p className="py-4">
+          <Dialog
+            open
+            onOpenChange={(open) =>
+              !open && !deleteMutation.isPending && setShowDeleteConfirm(false)
+            }
+          >
+            <DialogContent>
+              <DialogTitle>Delete Flow</DialogTitle>
+              <DialogDescription className="py-4">
                 Are you sure you want to delete <strong>{name}</strong>? The source file could not
                 be loaded, so this will remove the remaining flow metadata.
-              </p>
+              </DialogDescription>
               <div className="modal-action">
                 <button
+                  type="button"
                   onClick={() => setShowDeleteConfirm(false)}
                   className="btn btn-ghost"
                   disabled={deleteMutation.isPending}
@@ -1101,6 +1108,7 @@ export function WorkflowEditorPageContent() {
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setShowDeleteConfirm(false);
                     handleDelete();
@@ -1115,8 +1123,8 @@ export function WorkflowEditorPageContent() {
                   )}
                 </button>
               </div>
-            </div>
-          </div>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     );
@@ -2315,11 +2323,10 @@ export function WorkflowEditorPageContent() {
 
         {/* Properties Modal */}
         {showPropertiesModal && (
-          <div className="modal modal-open">
-            <div className="modal-backdrop" onClick={() => setShowPropertiesModal(false)} />
-            <div className="modal-box max-w-md max-h-[calc(100vh-8rem)]">
+          <Dialog open onOpenChange={(open) => !open && setShowPropertiesModal(false)}>
+            <DialogContent className="max-w-md max-h-[calc(100vh-8rem)]">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg">Properties</h3>
+                <DialogTitle>Properties</DialogTitle>
                 <button
                   onClick={() => setShowPropertiesModal(false)}
                   className="btn btn-ghost btn-sm btn-square"
@@ -2327,6 +2334,9 @@ export function WorkflowEditorPageContent() {
                   <X size={16} />
                 </button>
               </div>
+              <DialogDescription className="sr-only">
+                View and edit workflow metadata and schedules.
+              </DialogDescription>
 
               <div className="space-y-4">
                 <div className="form-control flex flex-col gap-1">
@@ -2463,25 +2473,31 @@ export function WorkflowEditorPageContent() {
               </div>
 
               <div className="modal-action">
-                <button onClick={() => setShowPropertiesModal(false)} className="btn">
+                <button type="button" onClick={() => setShowPropertiesModal(false)} className="btn">
                   Close
                 </button>
               </div>
-            </div>
-          </div>
+            </DialogContent>
+          </Dialog>
         )}
 
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (
-          <div className="modal modal-open">
-            <div className="modal-box">
-              <h3 className="font-bold text-lg">Delete Flow</h3>
-              <p className="py-4">
+          <Dialog
+            open
+            onOpenChange={(open) =>
+              !open && !deleteMutation.isPending && setShowDeleteConfirm(false)
+            }
+          >
+            <DialogContent>
+              <DialogTitle>Delete Flow</DialogTitle>
+              <DialogDescription className="py-4">
                 Are you sure you want to delete <strong>{name}</strong>? This action cannot be
                 undone.
-              </p>
+              </DialogDescription>
               <div className="modal-action">
                 <button
+                  type="button"
                   onClick={() => setShowDeleteConfirm(false)}
                   className="btn btn-ghost"
                   disabled={deleteMutation.isPending}
@@ -2489,6 +2505,7 @@ export function WorkflowEditorPageContent() {
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setShowDeleteConfirm(false);
                     handleDelete();
@@ -2503,8 +2520,8 @@ export function WorkflowEditorPageContent() {
                   )}
                 </button>
               </div>
-            </div>
-          </div>
+            </DialogContent>
+          </Dialog>
         )}
 
         {/* Execute Confirmation Modal */}
