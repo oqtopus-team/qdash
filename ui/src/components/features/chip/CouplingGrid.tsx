@@ -8,6 +8,7 @@ import {
   LoaderCircle,
   X,
   Maximize2,
+  Minimize,
   Move,
 } from "lucide-react";
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
@@ -370,10 +371,28 @@ export function CouplingGrid({
   const rangeLabel = taskRangeLabel(selectedDate, startAt, endAt);
   const errorDetail = requestErrorMessage(error);
 
+  const containerClass = isFullscreen
+    ? "fixed inset-0 z-[60] flex flex-col h-screen w-screen space-y-2 bg-base-100 p-4 overflow-hidden"
+    : "flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8";
+
   if (isLoading)
     return (
-      <div className="w-full flex justify-center py-12">
-        <span className="loading loading-spinner loading-lg"></span>
+      <div className={containerClass}>
+        {isFullscreen && (
+          <div className="flex justify-end">
+            <button
+              onClick={exitFullscreen}
+              className="btn btn-sm btn-square btn-ghost"
+              title="Exit fullscreen (Esc)"
+              aria-label="Exit fullscreen"
+            >
+              <Minimize className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        <div className="w-full flex flex-1 items-center justify-center py-12">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
       </div>
     );
 
@@ -973,13 +992,7 @@ export function CouplingGrid({
   );
 
   return (
-    <div
-      className={
-        isFullscreen
-          ? "fixed inset-0 z-[60] flex flex-col h-screen w-screen space-y-2 bg-base-100 p-4 overflow-hidden"
-          : "flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8"
-      }
-    >
+    <div className={containerClass}>
       {isFetching && !isLoading && (
         <div className="alert alert-info py-2 text-sm">
           <LoaderCircle className="h-4 w-4 animate-spin" />

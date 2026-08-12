@@ -11,6 +11,35 @@ interface UseFullscreenPanelResult {
   exitFullscreen: () => void;
 }
 
+const openPanels: Array<() => void> = [];
+let previousOverflow = "";
+
+function handleKeyDown(event: KeyboardEvent) {
+  if (event.key !== "Escape") return;
+  if (document.querySelector("dialog[open], .modal-open")) return;
+  openPanels[openPanels.length - 1]?.();
+}
+
+function openPanel(exit: () => void) {
+  if (openPanels.length === 0) {
+    previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+  }
+  openPanels.push(exit);
+
+  return () => {
+    const index = openPanels.lastIndexOf(exit);
+    if (index === -1) return;
+    openPanels.splice(index, 1);
+    if (openPanels.length === 0) {
+      document.body.style.overflow = previousOverflow;
+      previousOverflow = "";
+      window.removeEventListener("keydown", handleKeyDown);
+    }
+  };
+}
+
 /**
  * Fullscreen overlay state for grid panels.
  *
@@ -25,23 +54,8 @@ export function useFullscreenPanel(): UseFullscreenPanelResult {
 
   useEffect(() => {
     if (!isFullscreen) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      // An open modal owns Escape first.
-      if (document.querySelector("dialog[open], .modal-open")) return;
-      setIsFullscreen(false);
-    };
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isFullscreen]);
+    return openPanel(exitFullscreen);
+  }, [isFullscreen, exitFullscreen]);
 
   return { isFullscreen, toggleFullscreen, exitFullscreen };
 }
