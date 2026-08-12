@@ -21,7 +21,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 source = "vcs"
-tag-pattern = "^qdash-client-v(?P<version>\\d+\\.\\d+\\.\\d+)$"
+tag-pattern = "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
 fallback-version = "0.0.0"
 
 [tool.hatch.version.raw-options]
@@ -30,7 +30,7 @@ version_scheme = "no-guess-dev"
 local_scheme = "no-local-version"
 
 [tool.hatch.version.raw-options.scm.git]
-describe_command = "git describe --dirty --tags --long --match qdash-client-v*"
+describe_command = "git describe --dirty --tags --long --match v[0-9]*"
 
 [tool.hatch.build]
 exclude = [
