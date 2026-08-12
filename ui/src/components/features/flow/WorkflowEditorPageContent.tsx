@@ -785,7 +785,7 @@ export function WorkflowEditorPageContent() {
     },
     {
       id: "split-view",
-      label: isSplitView ? "Close Split View" : "Open Split View",
+      label: isSplitView ? "Close Split Editor" : "Open Split Editor",
       shortcut: "",
       icon: Columns2,
       action: () => {
@@ -1626,7 +1626,8 @@ export function WorkflowEditorPageContent() {
                     if (!isSplitView) setActiveTab("code");
                   }}
                   className={`btn btn-xs btn-ghost ${isSplitView ? "text-primary" : "text-base-content/50"}`}
-                  title={isSplitView ? "Single view" : "Split view"}
+                  title={isSplitView ? "Close split editor" : "Open split editor"}
+                  aria-label={isSplitView ? "Close split editor" : "Open split editor"}
                 >
                   <Columns2 size={14} />
                 </button>
@@ -1683,7 +1684,20 @@ export function WorkflowEditorPageContent() {
                 </Panel>
                 <PanelResizeHandle className="w-1 bg-base-300 hover:bg-primary/50 transition-colors cursor-col-resize" />
                 <Panel defaultSize="40%" minSize="15%" style={{ overflow: "hidden", minWidth: 0 }}>
-                  <FlowImportsPanel />
+                  <Editor
+                    height="100%"
+                    language="python"
+                    theme="vs-dark"
+                    value={code}
+                    onChange={(value) => setCode(value || "")}
+                    options={{
+                      ...EDITOR_OPTIONS,
+                      fontSize,
+                      wordWrap,
+                      readOnly: isEditorLocked,
+                      domReadOnly: isEditorLocked,
+                    }}
+                  />
                 </Panel>
               </PanelGroup>
             ) : activeTab === "code" ? (
