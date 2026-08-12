@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useCompareSeedValues, useImportSeedParameters } from "@/client/calibration/calibration";
 import type { SeedImportSource } from "@/schemas";
 
@@ -508,17 +509,20 @@ export function SeedParametersPanel() {
 
         {/* Overwrite Confirmation Dialog */}
         {confirmDialog.open && (
-          <div className="modal modal-open">
-            <div className="modal-box">
+          <Dialog
+            open
+            onOpenChange={(open) => !open && !importMutation.isPending && handleCancelImport()}
+          >
+            <DialogContent>
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-6 w-6 text-warning flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="font-bold text-lg">Confirm Overwrite</h3>
-                  <p className="py-4">
+                  <DialogTitle>Confirm Overwrite</DialogTitle>
+                  <DialogDescription className="py-4">
                     This will overwrite{" "}
                     <span className="font-bold text-warning">{confirmDialog.diffCount}</span>{" "}
                     existing calibration value(s) with YAML seed values.
-                  </p>
+                  </DialogDescription>
                   <p className="text-sm text-base-content/70">
                     Existing measured values will be replaced. This action cannot be undone.
                   </p>
@@ -526,6 +530,7 @@ export function SeedParametersPanel() {
               </div>
               <div className="modal-action">
                 <button
+                  type="button"
                   className="btn btn-ghost"
                   onClick={handleCancelImport}
                   disabled={importMutation.isPending}
@@ -533,6 +538,7 @@ export function SeedParametersPanel() {
                   Cancel
                 </button>
                 <button
+                  type="button"
                   className="btn btn-warning"
                   onClick={handleConfirmImport}
                   disabled={importMutation.isPending}
@@ -547,9 +553,8 @@ export function SeedParametersPanel() {
                   )}
                 </button>
               </div>
-            </div>
-            <div className="modal-backdrop" onClick={handleCancelImport}></div>
-          </div>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     </div>
