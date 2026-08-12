@@ -36,26 +36,21 @@ export function TaskSelector({
     label: task.name,
   }));
 
-  const { minWidth, styles } = useSelectStyles<TaskOption>({
-    labels: options.map((opt) => opt.label),
-    placeholder: PLACEHOLDER,
-  });
+  const styles = useSelectStyles<TaskOption>();
 
   const handleChange = (option: SingleValue<TaskOption>) => {
     onTaskSelect(option ? option.value : "");
   };
 
   return (
-    <div style={{ minWidth }}>
-      <Select<TaskOption>
-        options={options}
-        value={options.find((option) => option.value === selectedTask) ?? null}
-        onChange={handleChange}
-        placeholder={PLACEHOLDER}
-        className="text-base-content"
-        isDisabled={disabled}
-        styles={styles}
-      />
-    </div>
+    <Select<TaskOption>
+      options={options}
+      value={options.find((option) => option.value === selectedTask) ?? null}
+      onChange={handleChange}
+      placeholder={PLACEHOLDER}
+      className="text-base-content"
+      isDisabled={disabled}
+      styles={styles}
+    />
   );
 }

@@ -489,10 +489,10 @@ export function ChipPageContent() {
           {/* Selection Controls */}
           <PageFiltersBar>
             <PageFiltersBar.Group>
-              <PageFiltersBar.Item className="sm:min-w-48">
+              <PageFiltersBar.Item className="sm:w-64">
                 <ChipSelector selectedChip={selectedChip} onChipSelect={handleChipSelect} />
               </PageFiltersBar.Item>
-              <PageFiltersBar.Item className="sm:min-w-48">
+              <PageFiltersBar.Item className="sm:w-56">
                 <CooldownSelector
                   chipId={selectedChip}
                   selectedCooldownId={selectedCooldownId}
@@ -507,7 +507,7 @@ export function ChipPageContent() {
                   }}
                 />
               </PageFiltersBar.Item>
-              <PageFiltersBar.Item className="sm:min-w-96">
+              <PageFiltersBar.Item className="sm:w-96">
                 <TaskSelector
                   tasks={filteredTasks}
                   selectedTask={selectedTask}

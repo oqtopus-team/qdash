@@ -694,7 +694,7 @@ export function CDFView() {
                 </button>
               </div>
 
-              <div className="w-full sm:w-48">
+              <div className="w-full sm:w-64">
                 <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
               </div>
 

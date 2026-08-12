@@ -323,10 +323,10 @@ export function ExecutionPageContent() {
       <PageHeader title="Execution History" description="Monitor workflow runs and task results" />
       <PageFiltersBar className="mb-4 sm:mb-6">
         <PageFiltersBar.Group>
-          <PageFiltersBar.Item>
+          <PageFiltersBar.Item className="sm:w-64">
             <ChipSelector selectedChip={selectedChip || ""} onChipSelect={handleChipChange} />
           </PageFiltersBar.Item>
-          <PageFiltersBar.Item>
+          <PageFiltersBar.Item className="sm:w-44">
             <DateSelector
               chipId={selectedChip || ""}
               selectedDate={selectedDate}

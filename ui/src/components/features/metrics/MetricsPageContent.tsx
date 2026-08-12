@@ -388,13 +388,13 @@ export function MetricsPageContent() {
             <div className="flex flex-col gap-4">
               <PageFiltersBar className="gap-3">
                 <PageFiltersBar.Group className="gap-3">
-                  <PageFiltersBar.Item label="Chip">
+                  <PageFiltersBar.Item label="Chip" className="sm:w-64">
                     <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
                   </PageFiltersBar.Item>
 
                   <PageFiltersBar.Item
                     label="Cooldown"
-                    className="[&:not(:has(.cooldown-selector-control))]:hidden"
+                    className="sm:w-56 [&:not(:has(.cooldown-selector-control))]:hidden"
                   >
                     <CooldownSelector
                       chipId={selectedChip}
