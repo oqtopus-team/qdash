@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { useId, useMemo, useState } from "react";
 import { FluentEmoji } from "@/components/ui/FluentEmoji";
 
 const Plot = dynamic(() => import("@/components/charts/Plot"), { ssr: false });
@@ -163,6 +164,8 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
   const unit = props.unit;
 
   const [isCompact, setIsCompact] = useState(true);
+  const [isOpen, setIsOpen] = useState(true);
+  const contentId = useId();
 
   if (!plotData) {
     return (
@@ -174,26 +177,39 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
 
   return (
     <div
-      className={`collapse collapse-arrow bg-base-100 rounded-lg shadow-sm border border-base-300 transition-all ${isCompact ? "max-w-xl mx-auto" : ""}`}
+      className={`bg-base-100 rounded-lg shadow-sm border border-base-300 transition-all ${isCompact ? "max-w-xl mx-auto" : ""}`}
     >
-      <input type="checkbox" defaultChecked />
-      <div className="collapse-title px-4 py-2 min-h-0 font-semibold text-sm flex items-center">
-        <span>CDF - {title}</span>
+      <div className="flex items-center px-2 py-1 min-h-10">
         <button
           type="button"
-          className={`btn btn-xs btn-ghost ml-auto mr-6 z-10 gap-1`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsCompact(!isCompact);
-          }}
+          className="btn btn-sm btn-ghost min-h-0 h-8 flex-1 justify-start px-2 font-semibold"
+          aria-expanded={isOpen}
+          aria-controls={contentId}
+          onClick={() => setIsOpen((open) => !open)}
+        >
+          <ChevronDown
+            size={16}
+            className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+          <span>CDF - {title}</span>
+        </button>
+        <button
+          type="button"
+          className="btn btn-xs btn-ghost ml-auto gap-1"
+          onClick={() => setIsCompact((compact) => !compact)}
           title={isCompact ? "Expand width" : "Compact width"}
         >
           <FluentEmoji name={isCompact ? "left-right" : "compress"} size={14} />
           <span className="text-xs">{isCompact ? "Expand" : "Compact"}</span>
         </button>
       </div>
-      <div className="collapse-content p-0">
-        <div className="p-2 w-full border-t border-base-300" style={{ minHeight: 250 }}>
+      {isOpen && (
+        <div
+          id={contentId}
+          className="p-2 w-full border-t border-base-300"
+          style={{ minHeight: 250 }}
+        >
           <Plot
             data={plotData}
             layout={{
@@ -234,7 +250,7 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
             style={{ width: "100%", height: "100%" }}
           />
         </div>
-      </div>
+      )}
     </div>
   );
 }
