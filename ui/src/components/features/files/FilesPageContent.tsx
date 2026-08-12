@@ -11,6 +11,7 @@ import {
   Check,
   Database,
   ExternalLink,
+  GitCompareArrows,
   GitPullRequestArrow,
   PanelLeft,
   Pencil,
@@ -39,6 +40,7 @@ import {
 } from "@/client/file/file";
 import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { PierreFileTree } from "@/components/ui/PierreFileTree";
+import { FileDiffReviewDialog } from "@/components/ui/FileDiffReviewDialog";
 import { useToast } from "@/components/ui/Toast";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -60,6 +62,12 @@ interface GitStatusExtended {
   commit?: string;
   is_dirty?: boolean;
   has_remote_updates?: boolean;
+}
+
+interface FileContentExtended {
+  base_content?: unknown;
+  content?: unknown;
+  is_saved_change?: unknown;
 }
 
 // Extended git push result type (API returns generic dict)
@@ -93,6 +101,7 @@ export function FilesPageContent() {
   const [commitMessage, setCommitMessage] = useState("");
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isDiffPreviewOpen, setIsDiffPreviewOpen] = useState(false);
   const [importResult, setImportResult] = useState<SeedImportResponse | null>(null);
   const [prResult, setPrResult] = useState<{
     pr_url: string;
@@ -124,6 +133,9 @@ export function FilesPageContent() {
     enabled: !!selectedFile,
   });
 
+  const savedFileContent = fileContentData as FileContentExtended | undefined;
+  const hasSavedChanges = savedFileContent?.is_saved_change === true;
+
   const { data: gitStatusData, refetch: refetchGitStatus } = useQuery({
     queryKey: ["gitStatus"],
     queryFn: () => getGitStatus().then((res: AxiosResponse<GetGitStatus200>) => res.data),
@@ -135,6 +147,7 @@ export function FilesPageContent() {
       saveFileContent(request).then((res: AxiosResponse<SaveFileContent200>) => res.data),
     onSuccess: () => {
       setHasUnsavedChanges(false);
+      setIsDiffPreviewOpen(false);
       toast.success("File saved successfully!");
       queryClient.invalidateQueries({
         queryKey: ["fileContent", selectedFile],
@@ -310,6 +323,15 @@ export function FilesPageContent() {
 
   return (
     <>
+      {selectedFile && (
+        <FileDiffReviewDialog
+          filename={selectedFile}
+          newContent={String(savedFileContent?.content ?? "")}
+          oldContent={String(savedFileContent?.base_content ?? "")}
+          onClose={() => setIsDiffPreviewOpen(false)}
+          open={isDiffPreviewOpen}
+        />
+      )}
       <div className="h-[calc(100dvh-4rem)] flex flex-col bg-base-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
@@ -370,19 +392,6 @@ export function FilesPageContent() {
               )}
             </button>
             <button
-              onClick={handlePush}
-              className="btn btn-sm btn-secondary hidden sm:flex"
-              disabled={pushMutation.isPending}
-              title="Create a pull request with config changes"
-            >
-              {pushMutation.isPending ? (
-                <span className="loading loading-spinner loading-xs"></span>
-              ) : (
-                <GitPullRequestArrow size={16} />
-              )}
-              <span className="ml-1">Create PR</span>
-            </button>
-            <button
               onClick={handleSave}
               className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-success"}`}
               disabled={
@@ -397,6 +406,28 @@ export function FilesPageContent() {
                   <span className="ml-1">Save</span>
                 </>
               )}
+            </button>
+            <button
+              onClick={() => setIsDiffPreviewOpen(true)}
+              className="btn btn-sm btn-ghost hidden sm:flex"
+              disabled={!selectedFile || !hasSavedChanges || hasUnsavedChanges}
+              title={hasUnsavedChanges ? "Save changes before review" : "Review saved changes"}
+            >
+              <GitCompareArrows size={16} />
+              <span className="ml-1">Review</span>
+            </button>
+            <button
+              onClick={handlePush}
+              className="btn btn-sm btn-secondary hidden sm:flex"
+              disabled={pushMutation.isPending}
+              title="Create a pull request with config changes"
+            >
+              {pushMutation.isPending ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                <GitPullRequestArrow size={16} />
+              )}
+              <span className="ml-1">Create PR</span>
             </button>
             {/* Import to QDash button - only show for params YAML files */}
             {paramsFileInfo && (
