@@ -452,6 +452,8 @@ export function DashboardPageContent() {
   const [editingTargetNote, setEditingTargetNote] = useState<string | null>(null);
   const [couplingDirection, setCouplingDirection] = useState<"forward" | "reverse">("forward");
   const [showTargetSummaries, setShowTargetSummaries] = useState(false);
+  const [showEmptyQubitMetrics, setShowEmptyQubitMetrics] = useState(false);
+  const [showEmptyCouplingMetrics, setShowEmptyCouplingMetrics] = useState(false);
   const isReverseCouplingDirection = couplingDirection === "reverse";
 
   const editingLegacyMetricNote =
@@ -501,6 +503,13 @@ export function DashboardPageContent() {
     [summaryRows],
   );
   const emptyMetricCount = summaryRows.length - metricsWithData;
+  const emptyQubitMetricCount = qubitMetrics.filter(
+    (metric) => coverageOf(qubitMetricData[metric.key], qubitCount).current === 0,
+  ).length;
+  const emptyCouplingMetricCount = couplingMetrics.filter((metric) => {
+    const metricData = couplingMetricData[metric.key];
+    return coverageOf(metricData, metricData ? Object.keys(metricData).length : 0).current === 0;
+  }).length;
 
   if (isConfigLoading || isChipsLoading) {
     return <MetricsPageSkeleton />;
@@ -788,6 +797,31 @@ export function DashboardPageContent() {
                 title="Qubit Metrics"
                 description="Click any qubit to update its pinned summary while inspecting the selected metric."
               >
+                {emptyQubitMetricCount > 0 && (
+                  <button
+                    type="button"
+                    className="mb-5 flex w-full items-center justify-between gap-3 rounded-lg border border-dashed border-base-300 bg-base-200/40 px-4 py-3 text-left transition-colors hover:bg-base-200/70"
+                    aria-expanded={showEmptyQubitMetrics}
+                    onClick={() => setShowEmptyQubitMetrics((visible) => !visible)}
+                  >
+                    <span>
+                      <span className="block text-sm font-medium">
+                        {emptyQubitMetricCount} qubit{" "}
+                        {emptyQubitMetricCount === 1 ? "metric" : "metrics"} without data
+                      </span>
+                      <span className="block text-xs text-base-content/50">
+                        Hidden to keep this dashboard focused on available results.
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary">
+                      {showEmptyQubitMetrics ? "Hide" : "Show"}
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${showEmptyQubitMetrics ? "rotate-180" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </button>
+                )}
                 <div className="space-y-8">
                   {qubitMetrics.map((m) => {
                     const noted = new Set(Object.keys(notesByMetric[m.key] ?? {}));
@@ -797,6 +831,7 @@ export function DashboardPageContent() {
                       if (!noted.has(targetId)) crossMetricNoted.add(targetId);
                     });
                     const cov = coverageOf(qubitMetricData[m.key], qubitCount);
+                    if (cov.current === 0 && !showEmptyQubitMetrics) return null;
                     return (
                       <div
                         key={m.key}
@@ -897,6 +932,31 @@ export function DashboardPageContent() {
                 title="Coupling Metrics"
                 description="Click any coupling to update its pinned summary while inspecting the selected metric."
               >
+                {emptyCouplingMetricCount > 0 && (
+                  <button
+                    type="button"
+                    className="mb-4 flex w-full items-center justify-between gap-3 rounded-lg border border-dashed border-base-300 bg-base-200/40 px-4 py-3 text-left transition-colors hover:bg-base-200/70"
+                    aria-expanded={showEmptyCouplingMetrics}
+                    onClick={() => setShowEmptyCouplingMetrics((visible) => !visible)}
+                  >
+                    <span>
+                      <span className="block text-sm font-medium">
+                        {emptyCouplingMetricCount} coupling{" "}
+                        {emptyCouplingMetricCount === 1 ? "metric" : "metrics"} without data
+                      </span>
+                      <span className="block text-xs text-base-content/50">
+                        Hidden to keep this dashboard focused on available results.
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary">
+                      {showEmptyCouplingMetrics ? "Hide" : "Show"}
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${showEmptyCouplingMetrics ? "rotate-180" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </button>
+                )}
                 <div className="mb-4 flex justify-end">
                   <button
                     type="button"
@@ -928,6 +988,7 @@ export function DashboardPageContent() {
                       ? Object.keys(couplingMetricData[m.key] ?? {}).length
                       : 0;
                     const cov = coverageOf(couplingMetricData[m.key], couplingTotal);
+                    if (cov.current === 0 && !showEmptyCouplingMetrics) return null;
                     return (
                       <div
                         key={m.key}
