@@ -13,6 +13,7 @@ build:
     nodejs: "18"
   commands:
     - mkdir --parents $READTHEDOCS_OUTPUT/html/
-    - cd docs && npm ci
-    - cd docs && npm run docs:build -- --base "/$READTHEDOCS_LANGUAGE/$READTHEDOCS_VERSION/"
+    - npm install --global bun@1.3.13
+    - cd docs && bun install --frozen-lockfile
+    - cd docs && bun run docs:build -- --base "/$READTHEDOCS_LANGUAGE/$READTHEDOCS_VERSION/"
     - cp --recursive docs/.vitepress/dist/* $READTHEDOCS_OUTPUT/html/
