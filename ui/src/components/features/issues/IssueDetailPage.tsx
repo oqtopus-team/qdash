@@ -13,7 +13,7 @@ import { useIssueAiReply } from "@/hooks/useIssueAiReply";
 import type { IssueResponse } from "@/schemas";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
 import { useImageUpload } from "@/hooks/useImageUpload";
@@ -597,38 +597,16 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
         />
       </div>
 
-      <Dialog
+      <ConfirmDialog
         open={replyToDeleteId !== null}
-        onOpenChange={(open) => {
-          if (!open && !isDeletingReply) setReplyToDeleteId(null);
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogTitle>Delete reply?</DialogTitle>
-          <DialogDescription className="mt-2 text-sm text-base-content/70">
-            This reply will be permanently deleted. This action cannot be undone.
-          </DialogDescription>
-          <div className="modal-action">
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => setReplyToDeleteId(null)}
-              disabled={isDeletingReply}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-error"
-              onClick={handleConfirmDeleteReply}
-              disabled={isDeletingReply}
-            >
-              {isDeletingReply && <span className="loading loading-spinner loading-xs" />}
-              Delete reply
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        title="Delete reply?"
+        description="This reply will be permanently deleted. This action cannot be undone."
+        confirmLabel="Delete reply"
+        onConfirm={handleConfirmDeleteReply}
+        onOpenChange={(open) => !open && setReplyToDeleteId(null)}
+        pending={isDeletingReply}
+        destructive
+      />
     </div>
   );
 }
