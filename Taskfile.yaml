@@ -300,7 +300,7 @@ tasks:
   build-docs:
     dir: docs
     cmds:
-      - npm run docs:build
+      - bun run docs:build
 
   # =============================================================================
   # Linting & Formatting (local development - auto-fix)
