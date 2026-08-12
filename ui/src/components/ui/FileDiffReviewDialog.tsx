@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 
 import { GitCompareArrows, X } from "lucide-react";
 
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./Dialog";
+
 const PierreDiffViewer = dynamic(
   () => import("@/components/ui/PierreDiffViewer").then((module) => module.PierreDiffViewer),
   {
@@ -31,18 +33,18 @@ export function FileDiffReviewDialog({
   onClose,
   open,
 }: FileDiffReviewDialogProps) {
-  if (!open) return null;
-
   return (
-    <div className="modal modal-open z-50" role="dialog" aria-modal="true">
-      <div className="modal-box flex h-[min(85dvh,56rem)] w-11/12 max-w-6xl flex-col p-0">
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="flex h-[min(85dvh,56rem)] max-w-6xl flex-col !overflow-hidden p-0">
         <div className="flex items-center justify-between border-b border-base-300 px-4 py-3">
           <div className="min-w-0">
-            <h2 className="flex items-center gap-2 font-semibold">
+            <DialogTitle className="flex items-center gap-2 font-semibold text-base">
               <GitCompareArrows size={18} className="text-primary" />
               Review saved changes
-            </h2>
-            <p className="truncate font-mono text-xs text-base-content/60">{filename}</p>
+            </DialogTitle>
+            <DialogDescription className="truncate font-mono text-xs text-base-content/60">
+              {filename}
+            </DialogDescription>
           </div>
           <button
             type="button"
@@ -63,13 +65,7 @@ export function FileDiffReviewDialog({
             Close
           </button>
         </div>
-      </div>
-      <button
-        type="button"
-        className="modal-backdrop"
-        onClick={onClose}
-        aria-label="Close diff review"
-      />
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
