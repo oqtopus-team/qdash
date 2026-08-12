@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 import type { SystemRole, UserListItem } from "@/schemas";
 
 import { useResetPassword } from "@/client/auth/auth";
@@ -35,6 +36,7 @@ export function EditUserModal({
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   const resetPasswordMutation = useResetPassword();
+  const isPending = isLoading || resetPasswordMutation.isPending;
 
   const handleSave = () => {
     onSave({
@@ -76,9 +78,9 @@ export function EditUserModal({
   };
 
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box max-w-2xl">
-        <h3 className="font-bold text-lg mb-4">Edit User: {user.username}</h3>
+    <Dialog open onOpenChange={(open) => !open && !isPending && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogTitle className="mb-4">Edit User: {user.username}</DialogTitle>
 
         <div className="space-y-4">
           <div className="form-control">
@@ -210,17 +212,19 @@ export function EditUserModal({
         </div>
 
         <div className="modal-action">
-          <button className="btn" onClick={onClose}>
+          <button type="button" className="btn" onClick={onClose} disabled={isPending}>
             Cancel
           </button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={isLoading}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={isPending}
+          >
             {isLoading ? <span className="loading loading-spinner loading-sm" /> : "Save Changes"}
           </button>
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
+
 type CreateUserModalProps = {
   onClose: () => void;
   onSave: (userData: {
@@ -55,9 +57,9 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
     localError || (error ? "Failed to create user. Username may already exist." : null);
 
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box">
-        <h3 className="font-bold text-lg mb-4">Create New User</h3>
+    <Dialog open onOpenChange={(open) => !open && !isLoading && onClose()}>
+      <DialogContent>
+        <DialogTitle className="mb-4">Create New User</DialogTitle>
 
         {displayError && (
           <div className="alert alert-error mb-4">
@@ -163,19 +165,21 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
         )}
 
         <div className="modal-action">
-          <button className="btn" onClick={onClose}>
+          <button type="button" className="btn" onClick={onClose} disabled={isLoading}>
             {temporaryPassword ? "Close" : "Cancel"}
           </button>
           {!temporaryPassword && (
-            <button className="btn btn-primary" onClick={handleSave} disabled={isLoading}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleSave}
+              disabled={isLoading}
+            >
               {isLoading ? <span className="loading loading-spinner loading-sm" /> : "Create User"}
             </button>
           )}
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }
