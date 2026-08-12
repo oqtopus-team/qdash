@@ -15,6 +15,7 @@ import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
@@ -353,26 +354,23 @@ export function ExecutionTaskDetailModal({
   );
 
   return (
-    <div
-      className="modal modal-open modal-bottom sm:modal-middle"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="modal-box w-full sm:w-11/12 max-w-[112rem] h-[90vh] sm:h-[95vh] bg-base-100 p-0 overflow-hidden flex flex-col"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none w-full max-w-[112rem] h-[90vh] sm:h-[95vh] p-0 !overflow-hidden flex flex-col">
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg sm:text-2xl font-bold truncate">
+            <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
               {selectedTask?.name || "Task Details"}
-            </h2>
-            <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+            </DialogTitle>
+            <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
               {qid.includes("-") ? "Coupling" : "QID"} {qid}
-            </p>
+            </DialogDescription>
           </div>
-          <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-sm btn-circle btn-ghost flex-shrink-0"
+            aria-label="Close"
+          >
             ✕
           </button>
         </div>
@@ -386,7 +384,7 @@ export function ExecutionTaskDetailModal({
             details={renderTaskDetails()}
           />
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

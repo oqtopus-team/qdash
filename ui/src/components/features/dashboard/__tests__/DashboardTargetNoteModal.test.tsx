@@ -106,11 +106,11 @@ function renderModal(props?: Partial<React.ComponentProps<typeof DashboardTarget
 }
 
 describe("DashboardTargetNoteModal", () => {
-  it("keeps the modal open when an entry edit backdrop is clicked", () => {
+  it("keeps the modal open when Escape is pressed during an entry edit", () => {
     const { onClose } = renderModal();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit entry" }));
-    fireEvent.click(document.querySelector(".modal") as HTMLElement);
+    fireEvent.keyDown(document, { key: "Escape" });
 
     expect(onClose).not.toHaveBeenCalled();
   });

@@ -176,8 +176,26 @@ class FileService:
 
         try:
             content = file_path.read_text(encoding="utf-8")
+            base_content = content
+            is_saved_change = False
+            git_dir = self._base_path / ".git"
+            if git_dir.exists():
+                repo = Repo(self._base_path)
+                if repo.head.is_valid():
+                    try:
+                        blob = repo.head.commit.tree / Path(path).as_posix()
+                        base_content = blob.data_stream.read().decode("utf-8")
+                    except KeyError:
+                        # An untracked text file has no content in HEAD.
+                        base_content = ""
+                else:
+                    base_content = ""
+                is_saved_change = content != base_content
+
             return {
                 "content": content,
+                "base_content": base_content,
+                "is_saved_change": is_saved_change,
                 "path": path,
                 "name": file_path.name,
                 "size": file_path.stat().st_size,

@@ -8,6 +8,7 @@ import { ArrowRightLeft, GitBranch, Maximize2, Move } from "lucide-react";
 
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
@@ -696,14 +697,9 @@ export function CouplingMetricsGrid({
       </div>
 
       {/* Coupling Detail Modal with History */}
-      <div
-        className={`modal modal-bottom sm:modal-middle ${isModalOpen ? "modal-open" : ""}`}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) setSelectedCouplingInfo(null);
-        }}
-      >
-        <div
-          className="modal-box w-full bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col"
+      <Dialog open={isModalOpen} onOpenChange={(open) => !open && setSelectedCouplingInfo(null)}>
+        <DialogContent
+          className="max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none w-full p-0 h-[90vh] sm:h-[95vh] !overflow-hidden flex flex-col"
           style={{ maxWidth: "1800px" }}
         >
           {selectedCouplingInfo && (
@@ -711,16 +707,17 @@ export function CouplingMetricsGrid({
               {/* Modal Header */}
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-lg sm:text-2xl font-bold truncate">
+                  <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
                     {selectedCouplingInfo.couplingId} - {title}
-                  </h2>
-                  <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+                  </DialogTitle>
+                  <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
                     {selectedCouplingInfo.metric.value !== null
                       ? `${selectedCouplingInfo.metric.value.toFixed(4)} ${unit}`
                       : "No data"}
-                  </p>
+                  </DialogDescription>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setSelectedCouplingInfo(null)}
                   className="btn btn-ghost btn-sm btn-circle flex-shrink-0 ml-2"
                 >
@@ -751,6 +748,7 @@ export function CouplingMetricsGrid({
                 </Link>
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => setSelectedCouplingInfo(null)}
                     className="btn btn-ghost btn-sm sm:btn-md"
                   >
@@ -760,8 +758,8 @@ export function CouplingMetricsGrid({
               </div>
             </>
           )}
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

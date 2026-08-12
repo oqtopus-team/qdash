@@ -14,6 +14,7 @@ import {
   useGetChipDeletionImpact,
   useUpdateChip,
 } from "@/client/chip/chip";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 interface ChipManageModalProps {
@@ -38,6 +39,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
   const [note, setNote] = useState("");
   const [forceDelete, setForceDelete] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const isPending = updateChip.isPending || deleteChip.isPending;
 
   useEffect(() => {
     if (chip) {
@@ -83,19 +85,23 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
   };
 
   return (
-    <div
-      className="modal modal-open"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="modal-box w-full max-w-2xl">
+    <Dialog open onOpenChange={(open) => !open && !isPending && onClose()}>
+      <DialogContent className="max-w-2xl">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold">Manage chip · {chipId}</h3>
-          <button className="btn btn-ghost btn-sm btn-square" onClick={onClose}>
+          <DialogTitle>Manage chip · {chipId}</DialogTitle>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm btn-square"
+            onClick={onClose}
+            disabled={isPending}
+            aria-label="Close"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
+        <DialogDescription className="sr-only">
+          Update chip metadata or permanently delete this chip.
+        </DialogDescription>
 
         {!chip ? (
           <div className="text-base-content/60 text-sm">Loading…</div>
@@ -179,6 +185,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
               </Field>
               <div className="flex justify-end">
                 <button
+                  type="button"
                   className="btn btn-sm btn-primary gap-1"
                   onClick={handleSave}
                   disabled={updateChip.isPending}
@@ -238,6 +245,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
               <div className="flex justify-end gap-2">
                 {confirmDelete && (
                   <button
+                    type="button"
                     className="btn btn-sm btn-ghost"
                     onClick={() => {
                       setConfirmDelete(false);
@@ -248,6 +256,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
                   </button>
                 )}
                 <button
+                  type="button"
                   className="btn btn-sm btn-error gap-1"
                   onClick={handleDelete}
                   disabled={
@@ -274,8 +283,8 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

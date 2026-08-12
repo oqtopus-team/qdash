@@ -1,5 +1,6 @@
 "use client";
 
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import type { ProjectListItem, UserListItem } from "@/schemas";
 
 type DeleteUserDialogProps = {
@@ -11,26 +12,23 @@ type DeleteUserDialogProps = {
 
 export function DeleteUserDialog({ user, isLoading, onClose, onConfirm }: DeleteUserDialogProps) {
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box">
-        <h3 className="font-bold text-lg">Confirm Delete</h3>
-        <p className="py-4">
+    <Dialog open onOpenChange={(open) => !open && !isLoading && onClose()}>
+      <DialogContent>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogDescription className="py-4">
           Are you sure you want to delete user <span className="font-bold">{user.username}</span>?
           This action cannot be undone.
-        </p>
+        </DialogDescription>
         <div className="modal-action">
-          <button className="btn" onClick={onClose}>
+          <button type="button" className="btn" onClick={onClose} disabled={isLoading}>
             Cancel
           </button>
-          <button className="btn btn-error" onClick={onConfirm} disabled={isLoading}>
+          <button type="button" className="btn btn-error" onClick={onConfirm} disabled={isLoading}>
             {isLoading ? <span className="loading loading-spinner loading-sm" /> : "Delete"}
           </button>
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -48,12 +46,12 @@ export function BulkDeleteUsersDialog({
   onConfirm,
 }: BulkDeleteUsersDialogProps) {
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box">
-        <h3 className="font-bold text-lg">Delete Selected Users</h3>
-        <p className="py-4">
+    <Dialog open onOpenChange={(open) => !open && !isLoading && onClose()}>
+      <DialogContent>
+        <DialogTitle>Delete Selected Users</DialogTitle>
+        <DialogDescription className="py-4">
           Delete {users.length} selected user{users.length !== 1 ? "s" : ""}?
-        </p>
+        </DialogDescription>
         <p className="text-sm text-base-content/60">
           Owned projects and project memberships for these users will also be removed.
         </p>
@@ -70,18 +68,15 @@ export function BulkDeleteUsersDialog({
           </div>
         </div>
         <div className="modal-action">
-          <button className="btn" onClick={onClose}>
+          <button type="button" className="btn" onClick={onClose} disabled={isLoading}>
             Cancel
           </button>
-          <button className="btn btn-error" onClick={onConfirm} disabled={isLoading}>
+          <button type="button" className="btn btn-error" onClick={onConfirm} disabled={isLoading}>
             {isLoading ? <span className="loading loading-spinner loading-sm" /> : "Delete Users"}
           </button>
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -99,27 +94,24 @@ export function DeleteProjectDialog({
   onConfirm,
 }: DeleteProjectDialogProps) {
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box">
-        <h3 className="font-bold text-lg">Confirm Delete Project</h3>
-        <p className="py-4">
+    <Dialog open onOpenChange={(open) => !open && !isLoading && onClose()}>
+      <DialogContent>
+        <DialogTitle>Confirm Delete Project</DialogTitle>
+        <DialogDescription className="py-4">
           Are you sure you want to delete project <span className="font-bold">{project.name}</span>?
-        </p>
+        </DialogDescription>
         <p className="text-sm text-base-content/60">
           This will also remove all project memberships. This action cannot be undone.
         </p>
         <div className="modal-action">
-          <button className="btn" onClick={onClose}>
+          <button type="button" className="btn" onClick={onClose} disabled={isLoading}>
             Cancel
           </button>
-          <button className="btn btn-error" onClick={onConfirm} disabled={isLoading}>
+          <button type="button" className="btn btn-error" onClick={onConfirm} disabled={isLoading}>
             {isLoading ? <span className="loading loading-spinner loading-sm" /> : "Delete"}
           </button>
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }
