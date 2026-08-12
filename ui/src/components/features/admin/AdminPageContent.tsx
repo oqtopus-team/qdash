@@ -41,6 +41,7 @@ import { EditUserModal } from "@/components/features/admin/EditUserModal";
 import { SettingsCard } from "@/components/features/settings/SettingsCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { AdminPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDate } from "@/lib/utils/datetime";
@@ -680,9 +681,12 @@ function BulkImportUsersModal({
   const displayError = localError || (error ? "Failed to import users from CSV." : null);
 
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box max-w-4xl">
-        <h3 className="font-bold text-lg mb-4">Bulk Import Users</h3>
+    <Dialog open onOpenChange={(open) => !open && !isLoading && onClose()}>
+      <DialogContent className="max-w-4xl">
+        <DialogTitle className="mb-4">Bulk Import Users</DialogTitle>
+        <DialogDescription className="sr-only">
+          Import user accounts from a CSV file and download the result.
+        </DialogDescription>
 
         {displayError && (
           <div className="alert alert-error mb-4">
@@ -784,16 +788,21 @@ function BulkImportUsersModal({
         )}
 
         <div className="modal-action">
-          <button className="btn" onClick={onClose}>
+          <button type="button" className="btn" onClick={onClose} disabled={isLoading}>
             {result ? "Close" : "Cancel"}
           </button>
           {result ? (
-            <button className="btn btn-primary" onClick={() => downloadBulkImportResult(result)}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => downloadBulkImportResult(result)}
+            >
               <Download className="h-4 w-4" />
               Download CSV
             </button>
           ) : (
             <button
+              type="button"
               className="btn btn-primary"
               onClick={handleImport}
               disabled={isLoading || !file}
@@ -809,11 +818,8 @@ function BulkImportUsersModal({
             </button>
           )}
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -962,14 +968,14 @@ function MembersModal({
   };
 
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box max-w-5xl w-full sm:w-11/12 max-h-[90vh] p-4 sm:p-6">
+    <Dialog open onOpenChange={(open) => !open && !isBulkAdding && !isRemovingMember && onClose()}>
+      <DialogContent className="max-w-5xl max-h-[90vh] p-4 sm:p-6">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="font-bold text-lg">Members of {project.name}</h3>
-            <p className="text-sm text-base-content/60">
+            <DialogTitle>Members of {project.name}</DialogTitle>
+            <DialogDescription className="text-sm text-base-content/60">
               Add multiple users at once and manage memberships in one place.
-            </p>
+            </DialogDescription>
           </div>
           <span className="badge badge-ghost self-start sm:self-auto">
             {members.length} member{members.length !== 1 ? "s" : ""}
@@ -1193,15 +1199,17 @@ function MembersModal({
         )}
 
         <div className="modal-action">
-          <button className="btn" onClick={onClose}>
+          <button
+            type="button"
+            className="btn"
+            onClick={onClose}
+            disabled={isBulkAdding || isRemovingMember}
+          >
             Close
           </button>
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1273,12 +1281,12 @@ function AssignUsersToProjectModal({
   };
 
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box max-w-4xl w-full sm:w-11/12 max-h-[90vh] p-4 sm:p-6">
-        <h3 className="font-bold text-lg">Assign Users To Project</h3>
-        <p className="text-sm text-base-content/60 mb-4">
+    <Dialog open onOpenChange={(open) => !open && !isLoading && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[90vh] p-4 sm:p-6">
+        <DialogTitle>Assign Users To Project</DialogTitle>
+        <DialogDescription className="text-sm text-base-content/60 mb-4">
           Add the selected users to one project with the same role in a single action.
-        </p>
+        </DialogDescription>
 
         {(localError || !!error) && (
           <div className="alert alert-error mb-4">
@@ -1402,10 +1410,11 @@ function AssignUsersToProjectModal({
         </div>
 
         <div className="modal-action">
-          <button className="btn" onClick={onClose}>
+          <button type="button" className="btn" onClick={onClose} disabled={isLoading}>
             Cancel
           </button>
           <button
+            type="button"
             className="btn btn-primary"
             onClick={handleAssign}
             disabled={isLoading || selectedProjectMembersLoading || !selectedProjectId}
@@ -1417,10 +1426,7 @@ function AssignUsersToProjectModal({
             )}
           </button>
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }
