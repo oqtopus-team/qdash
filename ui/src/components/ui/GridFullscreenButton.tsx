@@ -5,7 +5,9 @@ import { Maximize, Minimize } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 
 interface GridFullscreenButtonProps {
+  /** Current fullscreen state, from useFullscreenPanel */
   isFullscreen?: boolean;
+  /** Enter or leave fullscreen */
   onToggle: () => void;
   /** Render without the floating wrapper, e.g. inside GridZoomControls */
   inline?: boolean;
@@ -14,6 +16,9 @@ interface GridFullscreenButtonProps {
 export const gridControlButtonClass =
   "btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200";
 
+/**
+ * Fullscreen toggle for grid panels, shared by the region and pan/zoom views
+ */
 export function GridFullscreenButton({
   isFullscreen,
   onToggle,
