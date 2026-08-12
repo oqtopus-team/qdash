@@ -2,6 +2,7 @@
 
 import { Bot, X } from "lucide-react";
 
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import type { ModelOverride } from "@/lib/copilotModels";
 
 interface ModelOption {
@@ -33,8 +34,6 @@ export function AiReviewConfirmModal({
   onConfirm,
   onClose,
 }: AiReviewConfirmModalProps) {
-  if (!isOpen) return null;
-
   const selectedModel =
     modelOptions.find((option) => option.key === selectedModelKey) ?? modelOptions[0];
   const modelName = selectedModel?.model
@@ -42,12 +41,12 @@ export function AiReviewConfirmModal({
     : selectedModel?.label || "Configured model";
 
   return (
-    <div className="modal modal-open">
-      <div className="modal-box max-w-lg rounded-lg">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
+      <DialogContent className="max-w-lg rounded-lg">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold text-lg">Request AI review</h3>
+            <DialogTitle className="font-semibold">Request AI review</DialogTitle>
           </div>
           <button
             type="button"
@@ -59,6 +58,9 @@ export function AiReviewConfirmModal({
             <X className="h-4 w-4" />
           </button>
         </div>
+        <DialogDescription className="sr-only">
+          Choose a model and request an AI review for the selected task results.
+        </DialogDescription>
 
         <div className="mt-4 space-y-3 text-sm">
           <div className="rounded-md bg-base-200 px-3 py-2">
@@ -116,7 +118,7 @@ export function AiReviewConfirmModal({
             Request review
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
