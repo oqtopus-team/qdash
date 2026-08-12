@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useCreateChip, getListChipsQueryKey } from "@/client/chip/chip";
 import { useListTopologies } from "@/client/topology/topology";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 
 interface TopologyItem {
   id: string;
@@ -67,28 +68,6 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
 
   const queryClient = useQueryClient();
 
-  // Handle keyboard navigation
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    },
-    [onClose],
-  );
-
-  // Focus management and keyboard handling
-  useEffect(() => {
-    if (isOpen) {
-      inputRef.current?.focus();
-      document.addEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "hidden";
-    }
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, handleKeyDown]);
   const createChipMutation = useCreateChip({
     mutation: {
       onSuccess: (data) => {
@@ -149,19 +128,15 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="modal modal-open"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-chip-title"
-    >
-      <div className="modal-box">
-        <h3 id="create-chip-title" className="font-bold text-lg mb-4">
-          Create New Chip
-        </h3>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          inputRef.current?.focus();
+        }}
+      >
+        <DialogTitle className="mb-4">Create New Chip</DialogTitle>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Chip ID Input */}
@@ -267,8 +242,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
             </button>
           </div>
         </form>
-      </div>
-      <div className="modal-backdrop" onClick={handleClose} aria-label="Close modal"></div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
