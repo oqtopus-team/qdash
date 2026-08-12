@@ -30,7 +30,6 @@ Review or fill in these values before starting services:
 | `QDASH_API_TOKEN` | Optional API token for automation or service-to-service access |
 | `OPENAI_API_KEY` / `OLLAMA_BASE_URL` / `OLLAMA_API_KEY` | Optional Copilot AI provider settings |
 | `KNOWLEDGE_REPO_URL` | Optional external knowledge repository for Copilot context |
-| `ENABLE_LOCAL_CODEX_AGENT` | Optional local-only workflow editing bridge for Host Codex; keep `false` unless explicitly testing it |
 | `SLACK_FORUM_NOTIFICATION` | Set to `true` to enable Slack notifications for forum thread creation, replies, and open/close status changes (optional) |
 | `SLACK_BOT_TOKEN` | Slack Bot Token (`xoxb-…`) with `chat:write` and `chat:write.public` scopes; required when `SLACK_FORUM_NOTIFICATION=true` |
 | `SLACK_FORUM_CHANNEL_ID` | Slack channel ID where forum notifications are posted; required when `SLACK_FORUM_NOTIFICATION=true` |
