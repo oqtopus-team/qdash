@@ -190,18 +190,19 @@ export function CodeBlock({ language, children }: CodeBlockProps) {
           {language || "code"}
         </span>
         <button
+          type="button"
           onClick={handleCopy}
           className={`btn btn-ghost btn-xs gap-1 transition-all ${
             copied
               ? "opacity-100 text-success"
-              : "opacity-0 group-hover:opacity-100 text-base-content/50"
+              : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-base-content/50"
           }`}
-          title="Copy code"
+          aria-label={copied ? "Code copied" : "Copy code"}
         >
           {copied ? (
             <>
               <Check className="w-3 h-3" />
-              Copied
+              <span aria-live="polite">Copied</span>
             </>
           ) : (
             <>
