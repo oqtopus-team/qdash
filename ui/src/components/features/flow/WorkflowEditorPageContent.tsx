@@ -26,7 +26,6 @@ import {
 import {
   AlertTriangle,
   ArrowLeft,
-  BookOpen,
   Bot,
   ChevronRight,
   Clock,
@@ -59,7 +58,6 @@ import {
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
-import { FlowImportsPanel } from "@/components/features/flow/FlowImportsPanel";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { buildAuthHeaders } from "@/lib/auth/session";
@@ -101,7 +99,7 @@ const EDITOR_OPTIONS = {
   scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
 };
 
-type SidePanel = "explorer" | "properties" | "helpers";
+type SidePanel = "explorer" | "properties";
 type BottomPanelTab = "output" | "agent";
 type AgentView = "terminal" | "diff" | "context";
 type AgentRunStatus = "idle" | "running" | "done" | "error";
@@ -198,7 +196,6 @@ export function WorkflowEditorPageContent() {
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
   const [lastExecutionId, setLastExecutionId] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
-  const [activeTab, setActiveTab] = useState<"code" | "helpers">("code");
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [originalCode, setOriginalCode] = useState("");
@@ -465,7 +462,6 @@ export function WorkflowEditorPageContent() {
           setCode(nextCode);
           setIsEditorLocked(false);
         }
-        setActiveTab("code");
         setAgentView("terminal");
         setAgentPhase(
           appliedEdit
@@ -788,10 +784,7 @@ export function WorkflowEditorPageContent() {
       label: isSplitView ? "Close Split Editor" : "Open Split Editor",
       shortcut: "",
       icon: Columns2,
-      action: () => {
-        setIsSplitView(!isSplitView);
-        if (!isSplitView) setActiveTab("code");
-      },
+      action: () => setIsSplitView(!isSplitView),
       enabled: true,
     },
     {
@@ -835,14 +828,6 @@ export function WorkflowEditorPageContent() {
       shortcut: "",
       icon: Info,
       action: () => openSidePanel("properties"),
-      enabled: true,
-    },
-    {
-      id: "focus-helpers",
-      label: "Show Helpers",
-      shortcut: "",
-      icon: BookOpen,
-      action: () => openSidePanel("helpers"),
       enabled: true,
     },
     {
@@ -960,11 +945,6 @@ export function WorkflowEditorPageContent() {
       icon: Info,
       count: activeSchedules.length,
     },
-    {
-      id: "helpers" as const,
-      label: "Helpers",
-      icon: BookOpen,
-    },
   ];
 
   const openSidePanel = (panel: SidePanel) => {
@@ -1024,7 +1004,6 @@ export function WorkflowEditorPageContent() {
     agentDecorationIdsRef.current =
       editorRef.current?.deltaDecorations(agentDecorationIdsRef.current, []) ?? [];
     setIsEditorLocked(false);
-    setActiveTab("code");
     toast.success("Applied agent code block to editor");
   };
 
@@ -1567,30 +1546,14 @@ export function WorkflowEditorPageContent() {
                   </div>
                 </div>
               )}
-
-              {activeSidePanel === "helpers" && (
-                <div className="flex-1 overflow-hidden">
-                  <FlowImportsPanel compact />
-                </div>
-              )}
             </div>
           </div>
           {/* Editor with Tab Switcher */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Tab Bar */}
             <div className="flex items-end bg-base-200 border-b border-base-300 h-9">
-              <button
-                type="button"
-                onClick={() => setActiveTab("code")}
-                className={`h-full px-4 text-sm font-medium flex items-center gap-2 border-r border-base-300 transition-colors relative ${
-                  activeTab === "code" || isSplitView
-                    ? "bg-base-300 text-base-content"
-                    : "bg-base-200 text-base-content/50 hover:text-base-content/80"
-                }`}
-              >
-                {(activeTab === "code" || isSplitView) && (
-                  <span className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
-                )}
+              <div className="h-full px-4 text-sm font-medium flex items-center gap-2 border-r border-base-300 bg-base-300 text-base-content relative">
+                <span className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
                 <span className="text-info">py</span>
                 {name}.py
                 {isDirty && (
@@ -1599,32 +1562,12 @@ export function WorkflowEditorPageContent() {
                     title="Unsaved changes"
                   />
                 )}
-              </button>
-              {!isSplitView && (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("helpers")}
-                  className={`h-full px-4 text-sm font-medium flex items-center gap-2 border-r border-base-300 transition-colors relative ${
-                    activeTab === "helpers"
-                      ? "bg-base-300 text-base-content"
-                      : "bg-base-200 text-base-content/50 hover:text-base-content/80"
-                  }`}
-                >
-                  {activeTab === "helpers" && (
-                    <span className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
-                  )}
-                  <BookOpen size={14} className="text-secondary" />
-                  Helpers
-                </button>
-              )}
+              </div>
               {/* Split View Toggle */}
               <div className="ml-auto flex items-center px-2 h-full">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsSplitView(!isSplitView);
-                    if (!isSplitView) setActiveTab("code");
-                  }}
+                  onClick={() => setIsSplitView(!isSplitView)}
                   className={`btn btn-xs btn-ghost ${isSplitView ? "text-primary" : "text-base-content/50"}`}
                   title={isSplitView ? "Close split editor" : "Open split editor"}
                   aria-label={isSplitView ? "Close split editor" : "Open split editor"}
@@ -1700,7 +1643,7 @@ export function WorkflowEditorPageContent() {
                   />
                 </Panel>
               </PanelGroup>
-            ) : activeTab === "code" ? (
+            ) : (
               <Editor
                 height="100%"
                 language="python"
@@ -1716,8 +1659,6 @@ export function WorkflowEditorPageContent() {
                   domReadOnly: isEditorLocked,
                 }}
               />
-            ) : (
-              <FlowImportsPanel />
             )}
           </div>
         </div>
