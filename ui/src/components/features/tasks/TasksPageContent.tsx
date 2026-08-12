@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Braces, Copy, FileCode2, ListTree, PanelLeft, Pencil, Plus, Save } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 import type {
   TaskFileTreeNode,
@@ -47,6 +48,10 @@ export function TasksPageContent() {
   const [fileContent, setFileContent] = useState("");
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    type: "backend" | "file";
+    value: string;
+  } | null>(null);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
@@ -154,12 +159,7 @@ export function TasksPageContent() {
     }
   }, [fileContentData]);
 
-  const handleBackendChange = (backend: string) => {
-    if (hasUnsavedChanges) {
-      if (!confirm("You have unsaved changes. Do you want to discard them and switch backends?")) {
-        return;
-      }
-    }
+  const changeBackend = (backend: string) => {
     setSelectedBackend(backend);
     setSelectedFile(null);
     setFileContent("");
@@ -167,19 +167,28 @@ export function TasksPageContent() {
     setIsEditorLocked(true);
   };
 
-  const handleFileSelect = (path: string) => {
+  const handleBackendChange = (backend: string) => {
     if (hasUnsavedChanges) {
-      if (
-        !confirm("You have unsaved changes. Do you want to discard them and open another file?")
-      ) {
-        return;
-      }
+      setPendingNavigation({ type: "backend", value: backend });
+      return;
     }
+    changeBackend(backend);
+  };
+
+  const selectFile = (path: string) => {
     // Prepend backend name to get full path
     const fullPath = `${selectedBackend}/${path}`;
     setSelectedFile(fullPath);
     setHasUnsavedChanges(false);
     setIsEditorLocked(true);
+  };
+
+  const handleFileSelect = (path: string) => {
+    if (hasUnsavedChanges) {
+      setPendingNavigation({ type: "file", value: path });
+      return;
+    }
+    selectFile(path);
   };
 
   const handleTaskClick = (task: TaskInfo) => {
@@ -576,6 +585,25 @@ export function TasksPageContent() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={pendingNavigation !== null}
+        title="Discard unsaved changes?"
+        description={
+          pendingNavigation?.type === "backend"
+            ? "Your unsaved changes will be lost when you switch backends."
+            : "Your unsaved changes will be lost when you open another file."
+        }
+        confirmLabel={
+          pendingNavigation?.type === "backend" ? "Discard and switch" : "Discard and open"
+        }
+        onConfirm={() => {
+          if (pendingNavigation?.type === "backend") changeBackend(pendingNavigation.value);
+          if (pendingNavigation?.type === "file") selectFile(pendingNavigation.value);
+          setPendingNavigation(null);
+        }}
+        onOpenChange={(open) => !open && setPendingNavigation(null)}
+        destructive
+      />
     </>
   );
 }

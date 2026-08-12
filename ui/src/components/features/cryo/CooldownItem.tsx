@@ -10,6 +10,7 @@ import {
   useUnassignChipFromCooldown,
   useUpdateCooldown,
 } from "@/client/cooldown/cooldown";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatDate, toIsoSeconds } from "@/lib/utils/datetime";
 
 import { CooldownWiringSection } from "./CooldownWiringSection";
@@ -59,6 +60,7 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
   const assignMutation = useAssignChipToCooldown();
   const unassignMutation = useUnassignChipFromCooldown();
   const [chipToAdd, setChipToAdd] = useState("");
+  const [confirmation, setConfirmation] = useState<"end" | "delete" | null>(null);
   const isActive = !cooldown.ended_at;
 
   // Dates: click-to-edit
@@ -89,20 +91,18 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
     onChange();
   };
 
-  const handleEnd = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm(`End cool-down ${cooldown.cooldown_id} now?`)) return;
+  const handleEnd = async () => {
     await updateMutation.mutateAsync({
       cooldownId: cooldown.cooldown_id,
       data: { ended_at: new Date().toISOString() },
     });
+    setConfirmation(null);
     onChange();
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm(`Delete cool-down ${cooldown.cooldown_id}?`)) return;
+  const handleDelete = async () => {
     await deleteMutation.mutateAsync({ cooldownId: cooldown.cooldown_id });
+    setConfirmation(null);
     onChange();
   };
 
@@ -160,7 +160,7 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
           {isActive && (
             <button
               className="btn btn-xs btn-warning"
-              onClick={handleEnd}
+              onClick={() => setConfirmation("end")}
               disabled={updateMutation.isPending}
               title="End this cool-down (warm-up)"
             >
@@ -169,7 +169,7 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
           )}
           <button
             className="btn btn-xs btn-ghost text-error"
-            onClick={handleDelete}
+            onClick={() => setConfirmation("delete")}
             disabled={deleteMutation.isPending}
             title="Delete this cool-down"
           >
@@ -305,6 +305,20 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
           />
         </div>
       )}
+      <ConfirmDialog
+        open={confirmation !== null}
+        title={confirmation === "end" ? "End cool-down?" : "Delete cool-down?"}
+        description={
+          confirmation === "end"
+            ? `End cool-down ${cooldown.cooldown_id} now?`
+            : `Delete cool-down ${cooldown.cooldown_id}? This action cannot be undone.`
+        }
+        confirmLabel={confirmation === "end" ? "End cool-down" : "Delete cool-down"}
+        onConfirm={confirmation === "end" ? handleEnd : handleDelete}
+        onOpenChange={(open) => !open && setConfirmation(null)}
+        pending={updateMutation.isPending || deleteMutation.isPending}
+        destructive={confirmation === "delete"}
+      />
     </div>
   );
 });
