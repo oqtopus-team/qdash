@@ -24,15 +24,15 @@ describe("DashboardChipNoteCard", () => {
   it("keeps an empty note compact until the user chooses to edit", () => {
     render(<DashboardChipNoteCard chipId="chip-1" />);
 
-    expect(screen.queryByTestId("markdown-editor")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add note" })).toBeInTheDocument();
+    expect(screen.queryByTestId("markdown-editor")).toBeNull();
+    expect(screen.getByRole("button", { name: "Add note" })).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Add note" }));
 
-    expect(screen.getByTestId("markdown-editor")).toBeInTheDocument();
+    expect(screen.getByTestId("markdown-editor")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    expect(screen.queryByTestId("markdown-editor")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("markdown-editor")).toBeNull();
   });
 });

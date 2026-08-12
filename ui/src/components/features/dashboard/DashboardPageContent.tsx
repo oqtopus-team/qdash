@@ -528,6 +528,7 @@ export function DashboardPageContent() {
         </PageFiltersBar>
 
         <TimeRangeSelector
+          collapsible
           startDate={startDate}
           endDate={endDate}
           onStartDateChange={(value) => {
