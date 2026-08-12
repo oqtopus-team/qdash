@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { Home, ZoomIn, ZoomOut } from "lucide-react";
+import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import { useControls } from "react-zoom-pan-pinch";
 
 import { GridFullscreenButton, gridControlButtonClass } from "@/components/ui/GridFullscreenButton";
@@ -69,7 +69,7 @@ export function GridZoomControls({ isFullscreen, onToggleFullscreen }: GridZoomC
             className={gridControlButtonClass}
             aria-label="Reset view"
           >
-            <Home className="h-4 w-4" />
+            <Maximize2 className="h-4 w-4" />
           </button>
         </TooltipTrigger>
         <TooltipContent side="left">Reset view</TooltipContent>
