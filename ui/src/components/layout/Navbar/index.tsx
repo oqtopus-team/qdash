@@ -12,6 +12,7 @@ import {
 import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { GlobalCommandPalette } from "@/components/layout/GlobalCommandPalette";
 
 function HiddenIcon() {
   const { toggleMobileSidebar } = useSidebar();
@@ -103,6 +104,7 @@ export function Navbar() {
         <HiddenIcon />
         <ProjectSelector />
         <EnvironmentBadge className="badge-sm sm:badge-md" />
+        <GlobalCommandPalette />
       </div>
     </nav>
   );

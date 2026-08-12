@@ -32,6 +32,7 @@
     "@types/dagre": "^0.7.54",
     "@xyflow/react": "^12.11.2",
     "axios": "^1.18.1",
+    "cmdk": "^1.1.1",
     "dagre": "^0.8.5",
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
