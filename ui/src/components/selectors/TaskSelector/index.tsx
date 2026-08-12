@@ -36,7 +36,7 @@ export function TaskSelector({
     label: task.name,
   }));
 
-  const { styles } = useSelectStyles<TaskOption>({
+  const { minWidth, styles } = useSelectStyles<TaskOption>({
     labels: options.map((opt) => opt.label),
     placeholder: PLACEHOLDER,
   });
@@ -48,14 +48,16 @@ export function TaskSelector({
   };
 
   return (
-    <Select<TaskOption>
-      options={options}
-      value={options.find((option) => option.value === selectedTask)}
-      onChange={handleChange}
-      placeholder={PLACEHOLDER}
-      className="text-base-content"
-      isDisabled={disabled}
-      styles={styles}
-    />
+    <div style={{ minWidth }}>
+      <Select<TaskOption>
+        options={options}
+        value={options.find((option) => option.value === selectedTask)}
+        onChange={handleChange}
+        placeholder={PLACEHOLDER}
+        className="text-base-content"
+        isDisabled={disabled}
+        styles={styles}
+      />
+    </div>
   );
 }
