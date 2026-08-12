@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { ArrowRightLeft, ChevronDown, LocateFixed } from "lucide-react";
+import { ArrowRightLeft, ChevronDown } from "lucide-react";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
@@ -430,11 +430,6 @@ export function DashboardPageContent() {
   const [showTargetSummaries, setShowTargetSummaries] = useState(false);
   const isReverseCouplingDirection = couplingDirection === "reverse";
 
-  const jumpToMetric = (metricId: string) => {
-    if (!metricId) return;
-    document.getElementById(metricId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
   const editingLegacyMetricNote =
     editingNote && notesByMetric[editingNote.metricKey]?.[editingNote.targetId]
       ? notesByMetric[editingNote.metricKey][editingNote.targetId]
@@ -734,54 +729,6 @@ export function DashboardPageContent() {
                 </div>
               </details>
             </Card>
-
-            {(qubitMetrics.length > 0 || couplingMetrics.length > 0) && (
-              <nav
-                aria-label="Metric navigation"
-                className="sticky top-16 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-base-300 bg-base-100/95 px-4 py-3 shadow-sm backdrop-blur"
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <LocateFixed className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                  <span className="text-sm font-semibold">Jump to metric</span>
-                </div>
-                <select
-                  className="select select-bordered select-sm min-w-48 flex-1 sm:max-w-xs"
-                  aria-label="Jump to metric"
-                  defaultValue=""
-                  onChange={(event) => {
-                    jumpToMetric(event.currentTarget.value);
-                    event.currentTarget.value = "";
-                  }}
-                >
-                  <option value="" disabled>
-                    Select a metric…
-                  </option>
-                  {qubitMetrics.length > 0 && (
-                    <optgroup label={`Qubit metrics (${qubitMetrics.length})`}>
-                      {qubitMetrics.map((metric) => (
-                        <option key={metric.key} value={`dashboard-qubit-metric-${metric.key}`}>
-                          {metric.title}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {couplingMetrics.length > 0 && (
-                    <optgroup label={`Coupling metrics (${couplingMetrics.length})`}>
-                      {couplingMetrics.map((metric) => (
-                        <option key={metric.key} value={`dashboard-coupling-metric-${metric.key}`}>
-                          {metric.title}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-                <div className="ml-auto hidden items-center gap-2 text-xs text-base-content/60 md:flex">
-                  <span>{qubitMetrics.length} qubit</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{couplingMetrics.length} coupling</span>
-                </div>
-              </nav>
-            )}
 
             {/* Qubit metrics grids */}
             {qubitMetrics.length > 0 && (
