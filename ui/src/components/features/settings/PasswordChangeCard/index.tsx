@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { Toast } from "../Toast";
-
 import { getGetCurrentUserQueryKey, useChangePassword } from "@/client/auth/auth";
+import { useToast } from "@/components/ui/Toast";
 
 const EyeIcon = () => (
   <svg
@@ -44,24 +43,17 @@ const EyeSlashIcon = () => (
 
 export function PasswordChangeCard() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
-
   const changePasswordMutation = useChangePassword({
     mutation: {
       onSuccess: () => {
-        setToast({
-          message: "Password changed successfully!",
-          type: "success",
-        });
+        toast.success("Password changed successfully!");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
@@ -74,7 +66,7 @@ export function PasswordChangeCard() {
           error instanceof Error
             ? error.message
             : "Failed to change password. Please check your current password.";
-        setToast({ message: errorMessage, type: "error" });
+        toast.error(errorMessage);
       },
     },
   });
@@ -83,15 +75,12 @@ export function PasswordChangeCard() {
     e.preventDefault();
 
     if (newPassword !== confirmPassword) {
-      setToast({ message: "New passwords do not match", type: "error" });
+      toast.error("New passwords do not match");
       return;
     }
 
     if (newPassword.length < 4) {
-      setToast({
-        message: "New password must be at least 4 characters",
-        type: "error",
-      });
+      toast.error("New password must be at least 4 characters");
       return;
     }
 
@@ -205,7 +194,6 @@ export function PasswordChangeCard() {
           </button>
         </form>
       </div>
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
