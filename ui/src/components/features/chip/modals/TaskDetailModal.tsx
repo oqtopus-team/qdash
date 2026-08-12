@@ -116,28 +116,36 @@ export function TaskDetailModal({
   // Loading state
   if (loading && !taskProp) {
     return (
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-        <div className="bg-base-100 rounded-xl p-8">
-          <span className="loading loading-spinner loading-lg"></span>
-          <p className="mt-4 text-center">Loading task details...</p>
-        </div>
-      </div>
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-sm text-center">
+          <DialogTitle className="sr-only">Loading task details</DialogTitle>
+          <DialogDescription asChild>
+            <div>
+              <span className="loading loading-spinner loading-lg" />
+              <p className="mt-4">Loading task details...</p>
+            </div>
+          </DialogDescription>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   // Error state
   if (error) {
     return (
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
-        <div className="bg-base-100 rounded-xl p-8 max-w-md">
-          <div className="alert alert-error">
-            <span>Error: {error}</span>
-          </div>
-          <button onClick={onClose} className="btn btn-primary mt-4 w-full">
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Task details unavailable</DialogTitle>
+          <DialogDescription asChild>
+            <div className="alert alert-error mt-4">
+              <span>Error: {error}</span>
+            </div>
+          </DialogDescription>
+          <button type="button" onClick={onClose} className="btn btn-primary mt-4 w-full">
             Close
           </button>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 

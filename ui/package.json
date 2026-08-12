@@ -48,6 +48,7 @@
     "react18-json-view": "0.2.10",
     "remark-gfm": "^4.0.1",
     "sharp": "^0.35.3",
+    "tailwind-merge": "^3.6.0",
     "theme-change": "^3.0.4"
   },
   "devDependencies": {

@@ -3,9 +3,10 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import type { ComponentPropsWithoutRef, ElementRef } from "react";
 import { forwardRef } from "react";
+import { twMerge } from "tailwind-merge";
 
 function mergeClassNames(...classNames: Array<string | undefined>): string {
-  return classNames.filter(Boolean).join(" ");
+  return twMerge(...classNames);
 }
 
 export const Dialog = DialogPrimitive.Root;
@@ -16,7 +17,7 @@ const DialogOverlay = forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
-    className={mergeClassNames("fixed inset-0 z-50 bg-black/40", className)}
+    className={mergeClassNames("fixed inset-0 z-[1200] bg-black/40", className)}
     {...props}
   />
 ));
@@ -31,7 +32,7 @@ export const DialogContent = forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={mergeClassNames(
-        "fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-base-content/10 bg-base-100 p-6 text-base-content shadow-2xl",
+        "fixed left-1/2 top-1/2 z-[1200] max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-base-content/10 bg-base-100 p-6 text-base-content shadow-2xl",
         className,
       )}
       {...props}
