@@ -5,6 +5,8 @@ import { useEffect, useRef } from "react";
 import { Maximize, Maximize2, Minimize, ZoomIn, ZoomOut } from "lucide-react";
 import { useControls } from "react-zoom-pan-pinch";
 
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+
 interface GridZoomControlsProps {
   isFullscreen?: boolean;
   /** Omit to hide the fullscreen toggle */
@@ -29,26 +31,64 @@ export function GridZoomControls({ isFullscreen, onToggleFullscreen }: GridZoomC
     <div className="absolute top-2 right-2 z-30 flex flex-col gap-1">
       {onToggleFullscreen && (
         <>
-          <button
-            onClick={onToggleFullscreen}
-            className={buttonClass}
-            title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
-            aria-pressed={isFullscreen}
-          >
-            {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onToggleFullscreen}
+                className={buttonClass}
+                aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                aria-pressed={isFullscreen}
+              >
+                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              {isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+            </TooltipContent>
+          </Tooltip>
           <div className="h-px bg-base-content/20 mx-1" />
         </>
       )}
-      <button onClick={() => zoomIn()} className={buttonClass} title="Zoom in">
-        <ZoomIn className="h-4 w-4" />
-      </button>
-      <button onClick={() => zoomOut()} className={buttonClass} title="Zoom out">
-        <ZoomOut className="h-4 w-4" />
-      </button>
-      <button onClick={() => resetTransform()} className={buttonClass} title="Reset view">
-        <Maximize2 className="h-4 w-4" />
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => zoomIn()}
+            className={buttonClass}
+            aria-label="Zoom in"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="left">Zoom in</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => zoomOut()}
+            className={buttonClass}
+            aria-label="Zoom out"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="left">Zoom out</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => resetTransform()}
+            className={buttonClass}
+            aria-label="Reset view"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="left">Reset view</TooltipContent>
+      </Tooltip>
     </div>
   );
 }
