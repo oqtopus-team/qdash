@@ -418,11 +418,10 @@ export function TaskDetailModal({
                           </div>
                         )}
                         {task.run_parameters && Object.keys(task.run_parameters).length > 0 && (
-                          <div className="collapse collapse-arrow bg-base-200 rounded-xl">
-                            <input type="checkbox" />
-                            <div className="collapse-title font-medium text-sm py-3">
+                          <details className="collapse collapse-arrow bg-base-200 rounded-xl">
+                            <summary className="collapse-title font-medium text-sm py-3">
                               Run Parameters
-                            </div>
+                            </summary>
                             <div className="collapse-content">
                               <div className="space-y-1">
                                 {Object.entries(task.run_parameters).map(([key, value]) => {
@@ -451,7 +450,7 @@ export function TaskDetailModal({
                                 })}
                               </div>
                             </div>
-                          </div>
+                          </details>
                         )}
                         {task.message && (
                           <div className="card bg-base-200 p-4 rounded-xl">
