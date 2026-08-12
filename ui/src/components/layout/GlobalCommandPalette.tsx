@@ -25,7 +25,9 @@ export function GlobalCommandPalette() {
   const { canEdit } = useProject();
   const [open, setOpen] = useState(false);
   const isDashboard = pathname === "/dashboard";
-  const { qubitMetrics, couplingMetrics } = useMetricsConfig(isDashboard);
+  const isMetrics = pathname === "/metrics";
+  const hasMetricCommands = isDashboard || isMetrics;
+  const { qubitMetrics, couplingMetrics } = useMetricsConfig(hasMetricCommands);
   const sections = getNavigationSections({
     canEdit,
     isAdmin: user?.system_role === "admin",
@@ -55,6 +57,24 @@ export function GlobalCommandPalette() {
     }, 0);
   };
 
+  const selectMetricsPageMetric = (metricType: "qubit" | "coupling", metricKey: string) => {
+    const params = new URLSearchParams(window.location.search);
+    if (metricType === "qubit") params.delete("type");
+    else params.set("type", "coupling");
+    if (metricKey === "t1") params.delete("metric");
+    else params.set("metric", metricKey);
+    const query = params.toString();
+    navigate(query ? `/metrics?${query}` : "/metrics");
+  };
+
+  const selectMetric = (metricType: "qubit" | "coupling", metricKey: string) => {
+    if (isMetrics) {
+      selectMetricsPageMetric(metricType, metricKey);
+      return;
+    }
+    jumpToMetric(`dashboard-${metricType}-metric-${metricKey}`);
+  };
+
   return (
     <>
       <button
@@ -74,22 +94,22 @@ export function GlobalCommandPalette() {
         open={open}
         onOpenChange={setOpen}
         title="Navigate"
-        description="Search for a page or dashboard metric to open."
+        description="Search for a page or metric to open."
       >
         <Command loop label="QDash navigation">
           <CommandInput
-            placeholder={isDashboard ? "Search pages and metrics..." : "Search pages..."}
+            placeholder={hasMetricCommands ? "Search pages and metrics..." : "Search pages..."}
           />
           <CommandList>
             <CommandEmpty>No matching results</CommandEmpty>
-            {isDashboard && (qubitMetrics.length > 0 || couplingMetrics.length > 0) && (
-              <CommandGroup heading="Dashboard metrics">
+            {hasMetricCommands && (qubitMetrics.length > 0 || couplingMetrics.length > 0) && (
+              <CommandGroup heading={isMetrics ? "Switch metric" : "Dashboard metrics"}>
                 {qubitMetrics.map((metric) => (
                   <CommandItem
                     key={`qubit-${metric.key}`}
                     value={`${metric.title} qubit metric`}
                     keywords={[metric.key, "dashboard", "qubit"]}
-                    onSelect={() => jumpToMetric(`dashboard-qubit-metric-${metric.key}`)}
+                    onSelect={() => selectMetric("qubit", metric.key)}
                   >
                     <Gauge size={15} className="shrink-0 opacity-60" aria-hidden="true" />
                     <span>{metric.title}</span>
@@ -101,7 +121,7 @@ export function GlobalCommandPalette() {
                     key={`coupling-${metric.key}`}
                     value={`${metric.title} coupling metric`}
                     keywords={[metric.key, "dashboard", "coupling"]}
-                    onSelect={() => jumpToMetric(`dashboard-coupling-metric-${metric.key}`)}
+                    onSelect={() => selectMetric("coupling", metric.key)}
                   >
                     <Gauge size={15} className="shrink-0 opacity-60" aria-hidden="true" />
                     <span>{metric.title}</span>

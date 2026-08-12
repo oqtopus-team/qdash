@@ -74,4 +74,18 @@ describe("GlobalCommandPalette", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     target.remove();
   });
+
+  it("switches the selected metric on the metrics page", () => {
+    mockPathname.mockReturnValue("/metrics");
+    window.history.replaceState({}, "", "/metrics?project=project-1&chip=chip-1");
+
+    render(<GlobalCommandPalette />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.click(screen.getByRole("option", { name: /ZX90 Gate Fidelity.*Coupling/ }));
+
+    expect(push).toHaveBeenCalledWith(
+      "/metrics?project=project-1&chip=chip-1&type=coupling&metric=zx90_gate_fidelity",
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });
