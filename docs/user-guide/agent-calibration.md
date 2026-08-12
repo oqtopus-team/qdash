@@ -15,7 +15,7 @@ pip install qdash-client
 For local development:
 
 ~~~bash
-uv tool install ./src/qdash/client
+uv tool install ./clients/python
 ~~~
 
 Configure a named QDash profile as described in the [QDash Client guide](./qdash-client.md). The CLI reads credentials from that profile and does not print them. In a secret-managed environment, set the documented `QDASH_*` variables and replace `--profile local` below with `--from-env`. Agent instructions are distributed separately from [oqtopus-team/skills](https://github.com/oqtopus-team/skills).

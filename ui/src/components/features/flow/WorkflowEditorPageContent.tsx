@@ -10,6 +10,8 @@ import type { SaveFlowRequest, ExecuteFlowResponse } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
 import { useToast } from "@/components/ui/Toast";
+import { PierreFileTree } from "@/components/ui/PierreFileTree";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
@@ -25,7 +27,6 @@ import {
 import {
   AlertTriangle,
   ArrowLeft,
-  BookOpen,
   Bot,
   ChevronRight,
   Clock,
@@ -58,7 +59,6 @@ import {
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
-import { FlowImportsPanel } from "@/components/features/flow/FlowImportsPanel";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { buildAuthHeaders } from "@/lib/auth/session";
@@ -100,7 +100,7 @@ const EDITOR_OPTIONS = {
   scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
 };
 
-type SidePanel = "explorer" | "properties" | "helpers";
+type SidePanel = "explorer" | "properties";
 type BottomPanelTab = "output" | "agent";
 type AgentView = "terminal" | "diff" | "context";
 type AgentRunStatus = "idle" | "running" | "done" | "error";
@@ -197,7 +197,6 @@ export function WorkflowEditorPageContent() {
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
   const [lastExecutionId, setLastExecutionId] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
-  const [activeTab, setActiveTab] = useState<"code" | "helpers">("code");
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [originalCode, setOriginalCode] = useState("");
@@ -464,7 +463,6 @@ export function WorkflowEditorPageContent() {
           setCode(nextCode);
           setIsEditorLocked(false);
         }
-        setActiveTab("code");
         setAgentView("terminal");
         setAgentPhase(
           appliedEdit
@@ -784,13 +782,10 @@ export function WorkflowEditorPageContent() {
     },
     {
       id: "split-view",
-      label: isSplitView ? "Close Split View" : "Open Split View",
+      label: isSplitView ? "Close Split Editor" : "Open Split Editor",
       shortcut: "",
       icon: Columns2,
-      action: () => {
-        setIsSplitView(!isSplitView);
-        if (!isSplitView) setActiveTab("code");
-      },
+      action: () => setIsSplitView(!isSplitView),
       enabled: true,
     },
     {
@@ -834,14 +829,6 @@ export function WorkflowEditorPageContent() {
       shortcut: "",
       icon: Info,
       action: () => openSidePanel("properties"),
-      enabled: true,
-    },
-    {
-      id: "focus-helpers",
-      label: "Show Helpers",
-      shortcut: "",
-      icon: BookOpen,
-      action: () => openSidePanel("helpers"),
       enabled: true,
     },
     {
@@ -959,11 +946,6 @@ export function WorkflowEditorPageContent() {
       icon: Info,
       count: activeSchedules.length,
     },
-    {
-      id: "helpers" as const,
-      label: "Helpers",
-      icon: BookOpen,
-    },
   ];
 
   const openSidePanel = (panel: SidePanel) => {
@@ -1023,7 +1005,6 @@ export function WorkflowEditorPageContent() {
     agentDecorationIdsRef.current =
       editorRef.current?.deltaDecorations(agentDecorationIdsRef.current, []) ?? [];
     setIsEditorLocked(false);
-    setActiveTab("code");
     toast.success("Applied agent code block to editor");
   };
 
@@ -1105,15 +1086,21 @@ export function WorkflowEditorPageContent() {
           </div>
         )}
         {showDeleteConfirm && (
-          <div className="modal modal-open">
-            <div className="modal-box">
-              <h3 className="font-bold text-lg">Delete Flow</h3>
-              <p className="py-4">
+          <Dialog
+            open
+            onOpenChange={(open) =>
+              !open && !deleteMutation.isPending && setShowDeleteConfirm(false)
+            }
+          >
+            <DialogContent>
+              <DialogTitle>Delete Flow</DialogTitle>
+              <DialogDescription className="py-4">
                 Are you sure you want to delete <strong>{name}</strong>? The source file could not
                 be loaded, so this will remove the remaining flow metadata.
-              </p>
+              </DialogDescription>
               <div className="modal-action">
                 <button
+                  type="button"
                   onClick={() => setShowDeleteConfirm(false)}
                   className="btn btn-ghost"
                   disabled={deleteMutation.isPending}
@@ -1121,6 +1108,7 @@ export function WorkflowEditorPageContent() {
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setShowDeleteConfirm(false);
                     handleDelete();
@@ -1135,8 +1123,8 @@ export function WorkflowEditorPageContent() {
                   )}
                 </button>
               </div>
-            </div>
-          </div>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     );
@@ -1317,7 +1305,7 @@ export function WorkflowEditorPageContent() {
                         openSidePanel(item.id);
                       }
                     }}
-                    className={`btn btn-ghost btn-sm btn-square relative rounded-sm ${
+                    className={`btn btn-ghost btn-sm btn-square relative h-9 w-9 rounded-sm ${
                       isActive ? "bg-base-300 text-primary" : "text-base-content/60"
                     }`}
                     title={item.label}
@@ -1325,7 +1313,7 @@ export function WorkflowEditorPageContent() {
                   >
                     <Icon size={18} />
                     {item.count ? (
-                      <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-content">
+                      <span className="absolute right-0 top-0 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-content">
                         {item.count > 99 ? "99+" : item.count}
                       </span>
                     ) : null}
@@ -1340,7 +1328,7 @@ export function WorkflowEditorPageContent() {
                   setShowCommandPalette(true);
                   setCommandSearch("");
                 }}
-                className="btn btn-ghost btn-sm btn-square rounded-sm text-base-content/60"
+                className="btn btn-ghost btn-sm btn-square h-9 w-9 rounded-sm text-base-content/60"
                 title="Command Palette"
                 aria-label="Command Palette"
               >
@@ -1392,45 +1380,36 @@ export function WorkflowEditorPageContent() {
                       />
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto py-1">
-                    {filteredFlows.map((flow) => (
-                      <button
-                        key={flow.name}
-                        type="button"
-                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${
-                          flow.name === name
-                            ? "bg-primary/15 text-base-content"
-                            : "text-base-content/70 hover:bg-base-300"
-                        }`}
-                        onClick={() => {
-                          if (flow.name !== name) {
-                            router.push(`/workflow/${encodeURIComponent(flow.name)}`);
+                  <div className="min-h-0 flex-1 py-1">
+                    {filteredFlows.length > 0 && (
+                      <PierreFileTree
+                        nodes={filteredFlows.map((flow) => ({
+                          decoration:
+                            flow.name === name && isDirty
+                              ? {
+                                  color: "var(--color-warning)",
+                                  text: "●",
+                                  title: "Unsaved changes",
+                                }
+                              : flow.file_exists === false
+                                ? {
+                                    color: "var(--color-warning)",
+                                    text: "missing",
+                                    title: "Missing source file",
+                                  }
+                                : undefined,
+                          path: `${flow.name}.py`,
+                          type: "file",
+                        }))}
+                        onSelectFile={(path) => {
+                          const flowName = path.replace(/\.py$/, "");
+                          if (flowName !== name) {
+                            router.push(`/workflow/${encodeURIComponent(flowName)}`);
                           }
                         }}
-                        title={flow.description || flow.name}
-                      >
-                        <FileCode
-                          size={14}
-                          className={`shrink-0 ${flow.name === name ? "text-primary" : "text-info/60"}`}
-                        />
-                        <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                          {flow.name}.py
-                        </span>
-                        {flow.file_exists === false && (
-                          <AlertTriangle
-                            size={13}
-                            className="shrink-0 text-warning"
-                            aria-label="Missing source file"
-                          />
-                        )}
-                        {flow.name === name && isDirty ? (
-                          <span
-                            className="h-2 w-2 rounded-full bg-warning"
-                            title="Unsaved changes"
-                          />
-                        ) : null}
-                      </button>
-                    ))}
+                        selectedPath={`${name}.py`}
+                      />
+                    )}
                     {filteredFlows.length === 0 && (
                       <div className="px-3 py-6 text-center text-xs text-base-content/40">
                         No flows match the filter.
@@ -1575,30 +1554,14 @@ export function WorkflowEditorPageContent() {
                   </div>
                 </div>
               )}
-
-              {activeSidePanel === "helpers" && (
-                <div className="flex-1 overflow-hidden">
-                  <FlowImportsPanel compact />
-                </div>
-              )}
             </div>
           </div>
           {/* Editor with Tab Switcher */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-w-0">
             {/* Tab Bar */}
             <div className="flex items-end bg-base-200 border-b border-base-300 h-9">
-              <button
-                type="button"
-                onClick={() => setActiveTab("code")}
-                className={`h-full px-4 text-sm font-medium flex items-center gap-2 border-r border-base-300 transition-colors relative ${
-                  activeTab === "code" || isSplitView
-                    ? "bg-base-300 text-base-content"
-                    : "bg-base-200 text-base-content/50 hover:text-base-content/80"
-                }`}
-              >
-                {(activeTab === "code" || isSplitView) && (
-                  <span className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
-                )}
+              <div className="h-full px-4 text-sm font-medium flex items-center gap-2 border-r border-base-300 bg-base-300 text-base-content relative">
+                <span className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
                 <span className="text-info">py</span>
                 {name}.py
                 {isDirty && (
@@ -1607,34 +1570,15 @@ export function WorkflowEditorPageContent() {
                     title="Unsaved changes"
                   />
                 )}
-              </button>
-              {!isSplitView && (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("helpers")}
-                  className={`h-full px-4 text-sm font-medium flex items-center gap-2 border-r border-base-300 transition-colors relative ${
-                    activeTab === "helpers"
-                      ? "bg-base-300 text-base-content"
-                      : "bg-base-200 text-base-content/50 hover:text-base-content/80"
-                  }`}
-                >
-                  {activeTab === "helpers" && (
-                    <span className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
-                  )}
-                  <BookOpen size={14} className="text-secondary" />
-                  Helpers
-                </button>
-              )}
+              </div>
               {/* Split View Toggle */}
               <div className="ml-auto flex items-center px-2 h-full">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsSplitView(!isSplitView);
-                    if (!isSplitView) setActiveTab("code");
-                  }}
+                  onClick={() => setIsSplitView(!isSplitView)}
                   className={`btn btn-xs btn-ghost ${isSplitView ? "text-primary" : "text-base-content/50"}`}
-                  title={isSplitView ? "Single view" : "Split view"}
+                  title={isSplitView ? "Close split editor" : "Open split editor"}
+                  aria-label={isSplitView ? "Close split editor" : "Open split editor"}
                 >
                   <Columns2 size={14} />
                 </button>
@@ -1668,8 +1612,11 @@ export function WorkflowEditorPageContent() {
 
             {/* Tab Content */}
             {isSplitView ? (
-              <PanelGroup orientation="horizontal" style={{ flex: 1, overflow: "hidden" }}>
-                <Panel defaultSize="60%" minSize="20%" style={{ overflow: "hidden" }}>
+              <PanelGroup
+                orientation="horizontal"
+                style={{ flex: 1, minWidth: 0, overflow: "hidden" }}
+              >
+                <Panel defaultSize="60%" minSize="20%" style={{ overflow: "hidden", minWidth: 0 }}>
                   <Editor
                     height="100%"
                     language="python"
@@ -1687,11 +1634,24 @@ export function WorkflowEditorPageContent() {
                   />
                 </Panel>
                 <PanelResizeHandle className="w-1 bg-base-300 hover:bg-primary/50 transition-colors cursor-col-resize" />
-                <Panel defaultSize="40%" minSize="15%" style={{ overflow: "hidden" }}>
-                  <FlowImportsPanel />
+                <Panel defaultSize="40%" minSize="15%" style={{ overflow: "hidden", minWidth: 0 }}>
+                  <Editor
+                    height="100%"
+                    language="python"
+                    theme="vs-dark"
+                    value={code}
+                    onChange={(value) => setCode(value || "")}
+                    options={{
+                      ...EDITOR_OPTIONS,
+                      fontSize,
+                      wordWrap,
+                      readOnly: isEditorLocked,
+                      domReadOnly: isEditorLocked,
+                    }}
+                  />
                 </Panel>
               </PanelGroup>
-            ) : activeTab === "code" ? (
+            ) : (
               <Editor
                 height="100%"
                 language="python"
@@ -1707,8 +1667,6 @@ export function WorkflowEditorPageContent() {
                   domReadOnly: isEditorLocked,
                 }}
               />
-            ) : (
-              <FlowImportsPanel />
             )}
           </div>
         </div>
@@ -2365,11 +2323,10 @@ export function WorkflowEditorPageContent() {
 
         {/* Properties Modal */}
         {showPropertiesModal && (
-          <div className="modal modal-open">
-            <div className="modal-backdrop" onClick={() => setShowPropertiesModal(false)} />
-            <div className="modal-box max-w-md max-h-[calc(100vh-8rem)]">
+          <Dialog open onOpenChange={(open) => !open && setShowPropertiesModal(false)}>
+            <DialogContent className="max-w-md max-h-[calc(100vh-8rem)]">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg">Properties</h3>
+                <DialogTitle>Properties</DialogTitle>
                 <button
                   onClick={() => setShowPropertiesModal(false)}
                   className="btn btn-ghost btn-sm btn-square"
@@ -2377,6 +2334,9 @@ export function WorkflowEditorPageContent() {
                   <X size={16} />
                 </button>
               </div>
+              <DialogDescription className="sr-only">
+                View and edit workflow metadata and schedules.
+              </DialogDescription>
 
               <div className="space-y-4">
                 <div className="form-control flex flex-col gap-1">
@@ -2513,25 +2473,31 @@ export function WorkflowEditorPageContent() {
               </div>
 
               <div className="modal-action">
-                <button onClick={() => setShowPropertiesModal(false)} className="btn">
+                <button type="button" onClick={() => setShowPropertiesModal(false)} className="btn">
                   Close
                 </button>
               </div>
-            </div>
-          </div>
+            </DialogContent>
+          </Dialog>
         )}
 
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (
-          <div className="modal modal-open">
-            <div className="modal-box">
-              <h3 className="font-bold text-lg">Delete Flow</h3>
-              <p className="py-4">
+          <Dialog
+            open
+            onOpenChange={(open) =>
+              !open && !deleteMutation.isPending && setShowDeleteConfirm(false)
+            }
+          >
+            <DialogContent>
+              <DialogTitle>Delete Flow</DialogTitle>
+              <DialogDescription className="py-4">
                 Are you sure you want to delete <strong>{name}</strong>? This action cannot be
                 undone.
-              </p>
+              </DialogDescription>
               <div className="modal-action">
                 <button
+                  type="button"
                   onClick={() => setShowDeleteConfirm(false)}
                   className="btn btn-ghost"
                   disabled={deleteMutation.isPending}
@@ -2539,6 +2505,7 @@ export function WorkflowEditorPageContent() {
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setShowDeleteConfirm(false);
                     handleDelete();
@@ -2553,8 +2520,8 @@ export function WorkflowEditorPageContent() {
                   )}
                 </button>
               </div>
-            </div>
-          </div>
+            </DialogContent>
+          </Dialog>
         )}
 
         {/* Execute Confirmation Modal */}

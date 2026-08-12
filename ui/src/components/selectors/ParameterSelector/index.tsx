@@ -28,15 +28,13 @@ export function ParameterSelector({
   }));
 
   const handleChange = (option: SingleValue<ParameterOption>) => {
-    if (option) {
-      onParameterSelect(option.value);
-    }
+    onParameterSelect(option ? option.value : "");
   };
 
   return (
     <Select<ParameterOption>
       options={options}
-      value={options.find((option) => option.value === selectedParameter)}
+      value={options.find((option) => option.value === selectedParameter) ?? null}
       onChange={handleChange}
       placeholder="Select parameter"
       className="text-base-content w-full"

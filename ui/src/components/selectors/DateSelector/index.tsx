@@ -49,9 +49,7 @@ export function DateSelector({
   };
 
   const handleChange = (option: SingleValue<DateOption>) => {
-    if (option) {
-      onDateSelect(option.value);
-    }
+    onDateSelect(option ? option.value : "");
   };
 
   // Always include "latest" option, add other dates if available
@@ -103,7 +101,7 @@ export function DateSelector({
     <div style={{ minWidth }}>
       <Select<DateOption>
         options={dateOptions}
-        value={dateOptions.find((option) => option.value === selectedDate)}
+        value={dateOptions.find((option) => option.value === selectedDate) ?? null}
         onChange={handleChange}
         placeholder={PLACEHOLDER}
         className="text-base-content"

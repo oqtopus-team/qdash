@@ -4,8 +4,42 @@ from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
+from git import Repo
 
 from qdash.api.services.file_service import FileService
+
+
+def test_get_file_content_includes_saved_git_diff_base(tmp_path: Path) -> None:
+    config_dir = tmp_path / "qubex-config"
+    config_dir.mkdir()
+    file_path = config_dir / "settings.yaml"
+    file_path.write_text("name: before\n", encoding="utf-8")
+    repo = Repo.init(config_dir)
+    repo.index.add(["settings.yaml"])
+    repo.index.commit("Initial config")
+    file_path.write_text("name: after\n", encoding="utf-8")
+
+    result = FileService(config_base_path=config_dir).get_file_content("settings.yaml")
+
+    assert result["content"] == "name: after\n"
+    assert result["base_content"] == "name: before\n"
+    assert result["is_saved_change"] is True
+
+
+def test_get_file_content_marks_untracked_file_as_saved_change(tmp_path: Path) -> None:
+    config_dir = tmp_path / "qubex-config"
+    config_dir.mkdir()
+    repo = Repo.init(config_dir)
+    tracked_file = config_dir / "tracked.yaml"
+    tracked_file.write_text("tracked: true\n", encoding="utf-8")
+    repo.index.add(["tracked.yaml"])
+    repo.index.commit("Initial config")
+    (config_dir / "new.yaml").write_text("new: true\n", encoding="utf-8")
+
+    result = FileService(config_base_path=config_dir).get_file_content("new.yaml")
+
+    assert result["base_content"] == ""
+    assert result["is_saved_change"] is True
 
 
 def test_uses_config_path_from_environment(monkeypatch, tmp_path: Path) -> None:

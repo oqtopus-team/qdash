@@ -1,10 +1,8 @@
 release: <%= Time.now.strftime('%Y-%m-%d %H:%M') %>
-> [!CAUTION]
-> **Create Merge Commit** is recommended to merge this PR.
-> before merging, update the appropriate version of `pyproject.toml`
-> you can use the following command to update the version.
-> update-version="x.y.z"
-> comment in the PR.
+> [!NOTE]
+> **Create Merge Commit** is recommended to merge this PR. After merging, create and push a
+> `v<version>` tag on `main`. The tag creates the GitHub Release and publishes both clients with
+> the same version.
 
 <% pull_requests.each do |pr| -%>
 - #<%= pr.number %> <%= pr.mention %>

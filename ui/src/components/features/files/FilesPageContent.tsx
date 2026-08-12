@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useMemo, type ReactElement } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -11,10 +11,7 @@ import {
   Check,
   Database,
   ExternalLink,
-  File,
-  FileJson,
-  Folder,
-  FolderOpen,
+  GitCompareArrows,
   GitPullRequestArrow,
   PanelLeft,
   Pencil,
@@ -42,6 +39,8 @@ import {
   gitPushConfig,
 } from "@/client/file/file";
 import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { PierreFileTree } from "@/components/ui/PierreFileTree";
+import { FileDiffReviewDialog } from "@/components/ui/FileDiffReviewDialog";
 import { useToast } from "@/components/ui/Toast";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -63,6 +62,12 @@ interface GitStatusExtended {
   commit?: string;
   is_dirty?: boolean;
   has_remote_updates?: boolean;
+}
+
+interface FileContentExtended {
+  base_content?: unknown;
+  content?: unknown;
+  is_saved_change?: unknown;
 }
 
 // Extended git push result type (API returns generic dict)
@@ -96,6 +101,7 @@ export function FilesPageContent() {
   const [commitMessage, setCommitMessage] = useState("");
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isDiffPreviewOpen, setIsDiffPreviewOpen] = useState(false);
   const [importResult, setImportResult] = useState<SeedImportResponse | null>(null);
   const [prResult, setPrResult] = useState<{
     pr_url: string;
@@ -127,6 +133,9 @@ export function FilesPageContent() {
     enabled: !!selectedFile,
   });
 
+  const savedFileContent = fileContentData as FileContentExtended | undefined;
+  const hasSavedChanges = savedFileContent?.is_saved_change === true;
+
   const { data: gitStatusData, refetch: refetchGitStatus } = useQuery({
     queryKey: ["gitStatus"],
     queryFn: () => getGitStatus().then((res: AxiosResponse<GetGitStatus200>) => res.data),
@@ -138,6 +147,7 @@ export function FilesPageContent() {
       saveFileContent(request).then((res: AxiosResponse<SaveFileContent200>) => res.data),
     onSuccess: () => {
       setHasUnsavedChanges(false);
+      setIsDiffPreviewOpen(false);
       toast.success("File saved successfully!");
       queryClient.invalidateQueries({
         queryKey: ["fileContent", selectedFile],
@@ -294,62 +304,6 @@ export function FilesPageContent() {
     return "plaintext";
   };
 
-  const getFileIcon = (node: FileTreeNode, isOpen = false) => {
-    if (node.type === "directory") {
-      return isOpen ? (
-        <FolderOpen className="inline-block mr-1 text-yellow-600" size={14} />
-      ) : (
-        <Folder className="inline-block mr-1 text-yellow-600" size={14} />
-      );
-    }
-
-    // File type specific icons
-    if (node.name.endsWith(".json")) {
-      return <FileJson className="inline-block mr-1 text-yellow-500" size={14} />;
-    }
-    if (node.name.endsWith(".yaml") || node.name.endsWith(".yml")) {
-      return <File className="inline-block mr-1 text-red-400" size={14} />;
-    }
-    if (node.name.endsWith(".toml")) {
-      return <File className="inline-block mr-1 text-purple-400" size={14} />;
-    }
-
-    return <File className="inline-block mr-1 text-gray-400" size={14} />;
-  };
-
-  const renderFileTree = (nodes: FileTreeNode[], level = 0): ReactElement[] => {
-    return nodes.map((node) => (
-      <div key={node.path}>
-        {node.type === "directory" ? (
-          <details className="group">
-            <summary
-              className="text-sm text-base-content/80 hover:bg-base-200 px-2 py-0.5 cursor-pointer select-none flex items-center list-none"
-              style={{ paddingLeft: `${level * 12 + 8}px` }}
-            >
-              <span className="mr-1 transition-transform group-open:rotate-90">▸</span>
-              {getFileIcon(node, true)}
-              <span className="truncate">{node.name}</span>
-            </summary>
-            {node.children && renderFileTree(node.children, level + 1)}
-          </details>
-        ) : (
-          <div
-            className={`text-sm px-2 py-0.5 cursor-pointer select-none flex items-center transition-colors ${
-              selectedFile === node.path
-                ? "bg-primary/20 text-base-content"
-                : "text-base-content/80 hover:bg-base-200"
-            }`}
-            style={{ paddingLeft: `${level * 12 + 20}px` }}
-            onClick={() => handleFileSelect(node.path)}
-          >
-            {getFileIcon(node)}
-            <span className="truncate">{node.name}</span>
-          </div>
-        )}
-      </div>
-    ));
-  };
-
   if (isTreeLoading) {
     return <EditorPageSkeleton />;
   }
@@ -369,6 +323,15 @@ export function FilesPageContent() {
 
   return (
     <>
+      {selectedFile && (
+        <FileDiffReviewDialog
+          filename={selectedFile}
+          newContent={String(savedFileContent?.content ?? "")}
+          oldContent={String(savedFileContent?.base_content ?? "")}
+          onClose={() => setIsDiffPreviewOpen(false)}
+          open={isDiffPreviewOpen}
+        />
+      )}
       <div className="h-[calc(100dvh-4rem)] flex flex-col bg-base-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
@@ -429,19 +392,6 @@ export function FilesPageContent() {
               )}
             </button>
             <button
-              onClick={handlePush}
-              className="btn btn-sm btn-secondary hidden sm:flex"
-              disabled={pushMutation.isPending}
-              title="Create a pull request with config changes"
-            >
-              {pushMutation.isPending ? (
-                <span className="loading loading-spinner loading-xs"></span>
-              ) : (
-                <GitPullRequestArrow size={16} />
-              )}
-              <span className="ml-1">Create PR</span>
-            </button>
-            <button
               onClick={handleSave}
               className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-success"}`}
               disabled={
@@ -456,6 +406,28 @@ export function FilesPageContent() {
                   <span className="ml-1">Save</span>
                 </>
               )}
+            </button>
+            <button
+              onClick={() => setIsDiffPreviewOpen(true)}
+              className="btn btn-sm btn-ghost hidden sm:flex"
+              disabled={!selectedFile || !hasSavedChanges || hasUnsavedChanges}
+              title={hasUnsavedChanges ? "Save changes before review" : "Review saved changes"}
+            >
+              <GitCompareArrows size={16} />
+              <span className="ml-1">Review</span>
+            </button>
+            <button
+              onClick={handlePush}
+              className="btn btn-sm btn-secondary hidden sm:flex"
+              disabled={pushMutation.isPending}
+              title="Create a pull request with config changes"
+            >
+              {pushMutation.isPending ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                <GitPullRequestArrow size={16} />
+              )}
+              <span className="ml-1">Create PR</span>
             </button>
             {/* Import to QDash button - only show for params YAML files */}
             {paramsFileInfo && (
@@ -533,14 +505,22 @@ export function FilesPageContent() {
             <div
               className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} flex flex-col transition-all duration-200 overflow-hidden`}
             >
-              <div className="flex-1 overflow-y-auto py-2">
+              <div className="flex min-h-0 flex-1 flex-col py-2">
                 <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
                   EXPLORER
                 </h2>
                 <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
                   Config Files
                 </div>
-                {fileTreeData && renderFileTree(fileTreeData)}
+                {fileTreeData && (
+                  <div className="min-h-0 flex-1">
+                    <PierreFileTree
+                      nodes={fileTreeData}
+                      onSelectFile={handleFileSelect}
+                      selectedPath={selectedFile}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

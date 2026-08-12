@@ -27,6 +27,7 @@ describe("CancelExecutionModal", () => {
   it("renders the confirmation content when open", () => {
     render(<CancelExecutionModal isOpen isPending={false} onConfirm={vi.fn()} onClose={vi.fn()} />);
 
+    expect(screen.getByRole("dialog").classList.contains("modal-box")).toBe(false);
     expect(screen.getByText(confirmText)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cancel Execution" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
@@ -52,15 +53,11 @@ describe("CancelExecutionModal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onClose when the backdrop is clicked and not pending", () => {
+  it("calls onClose when Escape is pressed and not pending", () => {
     const onClose = vi.fn();
-    const { container } = render(
-      <CancelExecutionModal isOpen isPending={false} onConfirm={vi.fn()} onClose={onClose} />,
-    );
+    render(<CancelExecutionModal isOpen isPending={false} onConfirm={vi.fn()} onClose={onClose} />);
 
-    const backdrop = container.querySelector(".modal-backdrop");
-    expect(backdrop).toBeTruthy();
-    fireEvent.click(backdrop as Element);
+    fireEvent.keyDown(document, { key: "Escape" });
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -68,7 +65,7 @@ describe("CancelExecutionModal", () => {
   it("disables the actions and shows a spinner while pending", () => {
     const onConfirm = vi.fn();
     const onClose = vi.fn();
-    const { container } = render(
+    const { baseElement } = render(
       <CancelExecutionModal isOpen isPending onConfirm={onConfirm} onClose={onClose} />,
     );
 
@@ -77,12 +74,10 @@ describe("CancelExecutionModal", () => {
       expect((button as HTMLButtonElement).disabled).toBe(true);
     }
     // The confirm label is replaced by a loading spinner.
-    expect(container.querySelector(".loading-spinner")).toBeTruthy();
+    expect(baseElement.querySelector(".loading-spinner")).toBeTruthy();
 
-    // Backdrop clicks are ignored while pending.
-    const backdrop = container.querySelector(".modal-backdrop");
-    expect(backdrop).toBeTruthy();
-    fireEvent.click(backdrop as Element);
+    // Escape is ignored while pending.
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).not.toHaveBeenCalled();
   });
 });

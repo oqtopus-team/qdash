@@ -24,6 +24,7 @@ import remarkGfm from "remark-gfm";
 import { useCopilotChat, type CopilotMessage, type CopilotSession } from "@/hooks/useCopilotChat";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
+import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
 import {
   buildChatModelOptions,
@@ -104,12 +105,7 @@ function AssessmentBadge({ assessment }: { assessment: string | null }) {
 
 function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"] }) {
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
-  const modalRef = useRef<HTMLDialogElement>(null);
-
-  const openPreview = useCallback((src: string) => {
-    setPreviewSrc(src);
-    modalRef.current?.showModal();
-  }, []);
+  const openPreview = useCallback((src: string) => setPreviewSrc(src), []);
 
   if (!imagesSent) return null;
   const { experiment_figure, experiment_figure_paths, expected_images, task_name } = imagesSent;
@@ -166,19 +162,7 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
           );
         })}
       </div>
-      <dialog ref={modalRef} className="modal">
-        <div className="modal-box max-w-3xl p-4">
-          {previewSrc && (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element -- modal preview uses arbitrary remote/API dimensions */}
-              <img src={previewSrc} alt="Preview" className="w-full h-auto" />
-            </>
-          )}
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
+      <ImagePreviewDialog src={previewSrc} onClose={() => setPreviewSrc(null)} />
     </div>
   );
 }
@@ -466,10 +450,11 @@ export function CopilotChatPage() {
             <label className="flex items-center gap-1 mr-1" title="Chat model">
               <Cpu className="w-3.5 h-3.5 text-base-content/40" />
               <select
-                className="select select-bordered select-xs w-44 text-xs"
+                className="select select-bordered select-xs w-44 text-xs truncate appearance-auto"
                 value={selectedModel.key}
                 onChange={(event) => handleModelChange(event.target.value)}
                 disabled={isLoading}
+                title={selectedModel.label}
               >
                 {modelOptions.map((option) => (
                   <option key={option.key} value={option.key}>

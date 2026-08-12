@@ -14,6 +14,9 @@ on:
       - "Taskfile.yaml"
       - ".github/workflows/frontend-ci.yml"
 
+env:
+  NODE_OPTIONS: --use-system-ca
+
 jobs:
   lint:
     name: Lint & Format

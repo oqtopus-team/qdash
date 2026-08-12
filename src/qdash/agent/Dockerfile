@@ -7,7 +7,8 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 COPY pyproject.toml uv.lock ./
 COPY src/qdash/api/pyproject.toml ./src/qdash/api/pyproject.toml
-COPY src/qdash/client/pyproject.toml ./src/qdash/client/pyproject.toml
+COPY clients/python/pyproject.toml ./clients/python/pyproject.toml
+COPY clients/python/README.md ./clients/python/README.md
 COPY src/qdash/workflow/pyproject.toml ./src/qdash/workflow/pyproject.toml
 
 ENV UV_COMPILE_BYTECODE=1 \

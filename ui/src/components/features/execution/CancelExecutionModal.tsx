@@ -1,5 +1,7 @@
 "use client";
 
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+
 export interface CancelExecutionModalProps {
   isOpen: boolean;
   isPending: boolean;
@@ -13,20 +15,18 @@ export function CancelExecutionModal({
   onConfirm,
   onClose,
 }: CancelExecutionModalProps) {
-  if (!isOpen) return null;
-
   return (
-    <div className="modal modal-open">
-      <div className="modal-box">
-        <h3 className="font-bold text-lg">Cancel Execution</h3>
-        <p className="py-4">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isPending && onClose()}>
+      <DialogContent>
+        <DialogTitle>Cancel Execution</DialogTitle>
+        <DialogDescription className="py-4">
           Are you sure you want to cancel this execution? This action cannot be undone.
-        </p>
+        </DialogDescription>
         <div className="modal-action">
-          <button className="btn btn-ghost" onClick={onClose} disabled={isPending}>
+          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={isPending}>
             Close
           </button>
-          <button className="btn btn-error" onClick={onConfirm} disabled={isPending}>
+          <button type="button" className="btn btn-error" onClick={onConfirm} disabled={isPending}>
             {isPending ? (
               <span className="loading loading-spinner loading-sm" />
             ) : (
@@ -34,8 +34,7 @@ export function CancelExecutionModal({
             )}
           </button>
         </div>
-      </div>
-      <div className="modal-backdrop" onClick={() => !isPending && onClose()} />
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

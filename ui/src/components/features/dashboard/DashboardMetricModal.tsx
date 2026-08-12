@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { CouplingMetricHistoryModal } from "@/components/features/metrics/CouplingMetricHistoryModal";
 import { QubitMetricHistoryModal } from "@/components/features/metrics/QubitMetricHistoryModal";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
 import {
   MetricNotePanel,
@@ -71,27 +72,23 @@ export function DashboardMetricModal({
   const isCoupling = targetId.includes("-");
 
   return (
-    <div
-      className="modal modal-bottom sm:modal-middle modal-open"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="modal-box w-full bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col"
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none w-full p-0 h-[90vh] sm:h-[95vh] !overflow-hidden flex flex-col"
         style={{ maxWidth: "1800px" }}
       >
         {/* Header */}
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg sm:text-2xl font-bold truncate">
+            <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
               {formatTarget(targetId)} · {metricTitle}
-            </h2>
-            <p className="text-sm text-base-content/70 mt-0.5">
+            </DialogTitle>
+            <DialogDescription className="text-sm text-base-content/70 mt-0.5">
               Metric history, per-task notes, and shared target context.
-            </p>
+            </DialogDescription>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="btn btn-ghost btn-sm btn-circle flex-shrink-0 ml-2"
             aria-label="Close"
@@ -153,7 +150,7 @@ export function DashboardMetricModal({
             </Link>
           )}
           <div className="flex gap-2 ml-auto">
-            <button onClick={onClose} className="btn btn-ghost btn-sm sm:btn-md">
+            <button type="button" onClick={onClose} className="btn btn-ghost btn-sm sm:btn-md">
               Close
             </button>
             {!isCoupling && (
@@ -166,7 +163,7 @@ export function DashboardMetricModal({
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

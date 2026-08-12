@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useQueryClient } from "@tanstack/react-query";
@@ -12,6 +12,7 @@ import {
 } from "@/client/cooldown-wiring/cooldown-wiring";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import type { CooldownWiringEventResponse } from "@/schemas";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
 interface CooldownWiringHistoryProps {
   cooldownId: string;
@@ -19,7 +20,7 @@ interface CooldownWiringHistoryProps {
 
 export function CooldownWiringHistory({ cooldownId }: CooldownWiringHistoryProps) {
   const queryClient = useQueryClient();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -40,7 +41,7 @@ export function CooldownWiringHistory({ cooldownId }: CooldownWiringHistoryProps
   const openModal = () => {
     setComment("");
     setError(null);
-    dialogRef.current?.showModal();
+    setDialogOpen(true);
   };
 
   const submit = async () => {
@@ -54,7 +55,7 @@ export function CooldownWiringHistory({ cooldownId }: CooldownWiringHistoryProps
         cooldownId,
         data: { comment: trimmed },
       });
-      dialogRef.current?.close();
+      setDialogOpen(false);
     } catch {
       setError("Failed to save checkpoint. Please try again.");
     }
@@ -91,12 +92,15 @@ export function CooldownWiringHistory({ cooldownId }: CooldownWiringHistoryProps
         </ul>
       )}
 
-      <dialog ref={dialogRef} className="modal">
-        <div className="modal-box max-w-md">
-          <h3 className="font-semibold text-sm mb-2">Save wiring checkpoint</h3>
-          <p className="text-xs text-base-content/60 mb-3">
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => !open && !createCheckpoint.isPending && setDialogOpen(false)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogTitle className="font-semibold text-sm mb-2">Save wiring checkpoint</DialogTitle>
+          <DialogDescription className="text-xs text-base-content/60 mb-3">
             Capture the current wiring as a snapshot. Briefly describe what changed (required).
-          </p>
+          </DialogDescription>
           <textarea
             className="textarea textarea-bordered w-full text-sm"
             rows={3}
@@ -112,11 +116,14 @@ export function CooldownWiringHistory({ cooldownId }: CooldownWiringHistoryProps
             </div>
           )}
           <div className="modal-action">
-            <form method="dialog">
-              <button type="submit" className="btn btn-sm btn-ghost">
-                Cancel
-              </button>
-            </form>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              onClick={() => setDialogOpen(false)}
+              disabled={createCheckpoint.isPending}
+            >
+              Cancel
+            </button>
             <button
               type="button"
               className="btn btn-sm btn-primary"
@@ -126,11 +133,8 @@ export function CooldownWiringHistory({ cooldownId }: CooldownWiringHistoryProps
               {createCheckpoint.isPending ? "Saving…" : "Save checkpoint"}
             </button>
           </div>
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button type="submit">close</button>
-        </form>
-      </dialog>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

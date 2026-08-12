@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { CheckCircle, AlertTriangle, Clock, HelpCircle, GitBranch } from "lucide-react";
 
 import type { Task } from "@/schemas";
@@ -12,6 +12,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import {
   formatDate as formatDateUtil,
   formatTime as formatTimeUtil,
@@ -59,7 +60,6 @@ export function TaskDetailModal({
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [subIndex, setSubIndex] = useState(initialSubIndex);
-  const modalRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const resolveQid = (taskQid: string, qidRole?: string): string => {
@@ -77,33 +77,6 @@ export function TaskDetailModal({
     const q = encodeURIComponent(qidValue);
     return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
   };
-
-  // Handle keyboard navigation
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    },
-    [onClose],
-  );
-
-  // Focus management and keyboard handling
-  useEffect(() => {
-    if (isOpen) {
-      // Focus the close button when modal opens
-      closeButtonRef.current?.focus();
-      // Add keyboard listener
-      document.addEventListener("keydown", handleKeyDown);
-      // Prevent body scroll
-      document.body.style.overflow = "hidden";
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, handleKeyDown]);
 
   // Use generated API client hook when taskId is provided
   const {
@@ -143,28 +116,36 @@ export function TaskDetailModal({
   // Loading state
   if (loading && !taskProp) {
     return (
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-        <div className="bg-base-100 rounded-xl p-8">
-          <span className="loading loading-spinner loading-lg"></span>
-          <p className="mt-4 text-center">Loading task details...</p>
-        </div>
-      </div>
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-sm text-center">
+          <DialogTitle className="sr-only">Loading task details</DialogTitle>
+          <DialogDescription asChild>
+            <div>
+              <span className="loading loading-spinner loading-lg" />
+              <p className="mt-4">Loading task details...</p>
+            </div>
+          </DialogDescription>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   // Error state
   if (error) {
     return (
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
-        <div className="bg-base-100 rounded-xl p-8 max-w-md">
-          <div className="alert alert-error">
-            <span>Error: {error}</span>
-          </div>
-          <button onClick={onClose} className="btn btn-primary mt-4 w-full">
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Task details unavailable</DialogTitle>
+          <DialogDescription asChild>
+            <div className="alert alert-error mt-4">
+              <span>Error: {error}</span>
+            </div>
+          </DialogDescription>
+          <button type="button" onClick={onClose} className="btn btn-primary mt-4 w-full">
             Close
           </button>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -215,23 +196,22 @@ export function TaskDetailModal({
     variant === "detailed" && taskName ? `Task Details - ${taskName}` : `Result for QID ${qid}`;
 
   return (
-    <dialog
-      ref={modalRef}
-      className="modal modal-open modal-bottom sm:modal-middle"
-      aria-labelledby="modal-title"
-      aria-modal="true"
-      role="dialog"
-    >
-      <div
-        className="modal-box w-full sm:w-11/12 max-w-[112rem] h-[90vh] sm:h-[95vh] p-0 bg-base-100 overflow-hidden flex flex-col"
-        onClick={(event) => event.stopPropagation()}
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none w-full max-w-[112rem] h-[90vh] sm:h-[95vh] p-0 !overflow-hidden flex flex-col"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          closeButtonRef.current?.focus();
+        }}
       >
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <h2 id="modal-title" className="text-lg sm:text-2xl font-bold truncate">
+            <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
               {modalTitle}
-            </h2>
-            <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">QID {qid}</p>
+            </DialogTitle>
+            <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+              QID {qid}
+            </DialogDescription>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
             {getStatusBadge(task.status)}
@@ -866,12 +846,7 @@ export function TaskDetailModal({
             </button>
           )}
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose} aria-label="Close modal">
-          close
-        </button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }

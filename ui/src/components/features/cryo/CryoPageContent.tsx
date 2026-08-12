@@ -16,6 +16,7 @@ import {
   useListCryostats,
 } from "@/client/cryostat/cryostat";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useQueryClient } from "@tanstack/react-query";
@@ -174,7 +175,7 @@ function NewCryostatModal({ onClose, onCreated }: { onClose: () => void; onCreat
   };
 
   return (
-    <ModalShell title="New cryostat" onClose={onClose}>
+    <ModalShell title="New cryostat" onClose={onClose} pending={create.isPending}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Cryo ID" required>
           <input
@@ -255,7 +256,7 @@ function NewCooldownModal({
   };
 
   return (
-    <ModalShell title={`New cool-down · ${cryoId}`} onClose={onClose}>
+    <ModalShell title={`New cool-down · ${cryoId}`} onClose={onClose} pending={create.isPending}>
       <Field label="Cooldown ID" required>
         <input
           className="input input-sm input-bordered w-full"
@@ -283,28 +284,31 @@ function ModalShell({
   title,
   onClose,
   children,
+  pending = false,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  pending?: boolean;
 }) {
   return (
-    <div
-      className="modal modal-open"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="modal-box w-full max-w-2xl">
+    <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
+      <DialogContent className="max-w-2xl">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-bold">{title}</h3>
-          <button className="btn btn-ghost btn-sm btn-square" onClick={onClose} aria-label="Close">
+          <DialogTitle>{title}</DialogTitle>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm btn-square"
+            onClick={onClose}
+            disabled={pending}
+            aria-label="Close"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
         {children}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -345,10 +349,15 @@ function ModalFooter({
 }) {
   return (
     <div className="modal-action mt-4">
-      <button className="btn btn-sm btn-ghost" onClick={onCancel}>
+      <button type="button" className="btn btn-sm btn-ghost" onClick={onCancel} disabled={pending}>
         Cancel
       </button>
-      <button className="btn btn-sm btn-primary" onClick={onSubmit} disabled={disabled}>
+      <button
+        type="button"
+        className="btn btn-sm btn-primary"
+        onClick={onSubmit}
+        disabled={disabled}
+      >
         {pending ? "Creating…" : submitLabel}
       </button>
     </div>

@@ -19,7 +19,7 @@ pip install qdash-client
 For development against this repository:
 
 ```bash
-pip install ./src/qdash/client
+pip install ./clients/python
 ```
 
 The distribution name is `qdash-client`, but the Python import path is `qdash.client`.
@@ -30,12 +30,13 @@ The distribution name is `qdash-client`, but the Python import path is `qdash.cl
 `qdash-client` project on PyPI to trust this GitHub repository and the
 `.github/workflows/publish-qdash-client.yml` workflow.
 
-Release tags use the `qdash-client-v<version>` format. Do not edit a package version in
-`pyproject.toml`; the package version is derived from the matching Git tag at build time.
+QDash uses a single `v<version>` release tag for the application and its clients. Do not edit a
+package version in `pyproject.toml`; the package version is derived from that Git tag at build
+time. Creating the tag also publishes the TypeScript client and creates the GitHub Release.
 
 ```bash
-git tag qdash-client-v<version>
-git push origin qdash-client-v<version>
+git tag v<version>
+git push origin v<version>
 ```
 
 ## Minimal Quick Start
