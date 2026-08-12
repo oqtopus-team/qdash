@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { MarkdownContent } from "./MarkdownContent";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./Tooltip";
 import { QdashBotAvatar, UserAvatar } from "./UserAvatar";
 
 export interface MentionCandidate {
@@ -393,28 +394,37 @@ export function MarkdownEditor({
           {/* Toolbar */}
           <div className="flex items-center gap-0.5 px-1 py-1 border border-base-300 border-b-0 rounded-t-none bg-base-200/50">
             {toolbarActions.map((action) => (
-              <button
-                key={action.title}
-                type="button"
-                className="btn btn-ghost btn-xs px-1.5"
-                title={action.title}
-                onClick={() => applyAction(action)}
-                disabled={disabled}
-              >
-                {action.icon}
-              </button>
+              <Tooltip key={action.title}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs px-1.5"
+                    aria-label={action.title}
+                    onClick={() => applyAction(action)}
+                    disabled={disabled}
+                  >
+                    {action.icon}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">{action.title}</TooltipContent>
+              </Tooltip>
             ))}
             {onImageUpload && (
               <>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-xs px-1.5"
-                  title="Upload Image"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={disabled}
-                >
-                  <ImageIcon className={ICON_SIZE} />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs px-1.5"
+                      aria-label="Upload image"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={disabled}
+                    >
+                      <ImageIcon className={ICON_SIZE} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Upload image</TooltipContent>
+                </Tooltip>
                 <input
                   ref={fileInputRef}
                   type="file"
