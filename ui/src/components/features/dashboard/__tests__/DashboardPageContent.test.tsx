@@ -366,4 +366,16 @@ describe("DashboardPageContent", () => {
     expect(screen.getByTestId("metric-note-modal").textContent).toContain("0-1:zx90_gate_fidelity");
     expect(screen.queryByTestId("target-note-modal")).toBeNull();
   });
+
+  it("summarizes metric availability before expanding the full table", () => {
+    render(<DashboardPageContent />);
+
+    expect(screen.getByText("0 with data")).toBeTruthy();
+    expect(screen.getByText("2 empty")).toBeTruthy();
+
+    const summary = screen.getByText("All Metrics Summary").closest("summary");
+    expect(summary).not.toBeNull();
+    fireEvent.click(summary!);
+    expect(summary?.parentElement?.hasAttribute("open")).toBe(true);
+  });
 });

@@ -491,6 +491,17 @@ export function DashboardPageContent() {
     return [...qubitRows, ...couplingRows];
   }, [qubitMetrics, couplingMetrics, qubitMetricData, couplingMetricData, qubitCount]);
 
+  const metricsWithData = useMemo(
+    () =>
+      summaryRows.filter((row) =>
+        Object.values(row.data ?? {}).some(
+          (metric) => metric.value !== null && metric.value !== undefined,
+        ),
+      ).length,
+    [summaryRows],
+  );
+  const emptyMetricCount = summaryRows.length - metricsWithData;
+
   if (isConfigLoading || isChipsLoading) {
     return <MetricsPageSkeleton />;
   }
@@ -738,15 +749,30 @@ export function DashboardPageContent() {
 
             {/* Summary table — collapsed by default */}
             <Card variant="default" padding="md">
-              <details>
-                <summary className="cursor-pointer list-none flex items-center justify-between">
-                  <div>
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center gap-3">
+                  <div className="min-w-0 flex-1">
                     <h3 className="text-lg font-semibold">All Metrics Summary</h3>
                     <p className="text-sm text-base-content/60">
                       Coverage, median, min and max for every metric in the active time range.
                     </p>
                   </div>
-                  <span className="text-xs text-base-content/50">click to expand</span>
+                  <div className="hidden flex-wrap justify-end gap-2 sm:flex">
+                    <span className="badge badge-success badge-sm">
+                      {metricsWithData} with data
+                    </span>
+                    {emptyMetricCount > 0 && (
+                      <span className="badge badge-ghost badge-sm">{emptyMetricCount} empty</span>
+                    )}
+                  </div>
+                  <span className="text-xs font-medium text-primary group-open:hidden">Show</span>
+                  <span className="hidden text-xs font-medium text-primary group-open:inline">
+                    Hide
+                  </span>
+                  <ChevronDown
+                    className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
+                    aria-hidden="true"
+                  />
                 </summary>
                 <div className="mt-4">
                   <DashboardSummaryTable rows={summaryRows} />
