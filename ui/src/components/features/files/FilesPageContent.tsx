@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useMemo, type ReactElement } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -11,10 +11,6 @@ import {
   Check,
   Database,
   ExternalLink,
-  File,
-  FileJson,
-  Folder,
-  FolderOpen,
   GitPullRequestArrow,
   PanelLeft,
   Pencil,
@@ -42,6 +38,7 @@ import {
   gitPushConfig,
 } from "@/client/file/file";
 import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { PierreFileTree } from "@/components/ui/PierreFileTree";
 import { useToast } from "@/components/ui/Toast";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -294,62 +291,6 @@ export function FilesPageContent() {
     return "plaintext";
   };
 
-  const getFileIcon = (node: FileTreeNode, isOpen = false) => {
-    if (node.type === "directory") {
-      return isOpen ? (
-        <FolderOpen className="inline-block mr-1 text-yellow-600" size={14} />
-      ) : (
-        <Folder className="inline-block mr-1 text-yellow-600" size={14} />
-      );
-    }
-
-    // File type specific icons
-    if (node.name.endsWith(".json")) {
-      return <FileJson className="inline-block mr-1 text-yellow-500" size={14} />;
-    }
-    if (node.name.endsWith(".yaml") || node.name.endsWith(".yml")) {
-      return <File className="inline-block mr-1 text-red-400" size={14} />;
-    }
-    if (node.name.endsWith(".toml")) {
-      return <File className="inline-block mr-1 text-purple-400" size={14} />;
-    }
-
-    return <File className="inline-block mr-1 text-gray-400" size={14} />;
-  };
-
-  const renderFileTree = (nodes: FileTreeNode[], level = 0): ReactElement[] => {
-    return nodes.map((node) => (
-      <div key={node.path}>
-        {node.type === "directory" ? (
-          <details className="group">
-            <summary
-              className="text-sm text-base-content/80 hover:bg-base-200 px-2 py-0.5 cursor-pointer select-none flex items-center list-none"
-              style={{ paddingLeft: `${level * 12 + 8}px` }}
-            >
-              <span className="mr-1 transition-transform group-open:rotate-90">▸</span>
-              {getFileIcon(node, true)}
-              <span className="truncate">{node.name}</span>
-            </summary>
-            {node.children && renderFileTree(node.children, level + 1)}
-          </details>
-        ) : (
-          <div
-            className={`text-sm px-2 py-0.5 cursor-pointer select-none flex items-center transition-colors ${
-              selectedFile === node.path
-                ? "bg-primary/20 text-base-content"
-                : "text-base-content/80 hover:bg-base-200"
-            }`}
-            style={{ paddingLeft: `${level * 12 + 20}px` }}
-            onClick={() => handleFileSelect(node.path)}
-          >
-            {getFileIcon(node)}
-            <span className="truncate">{node.name}</span>
-          </div>
-        )}
-      </div>
-    ));
-  };
-
   if (isTreeLoading) {
     return <EditorPageSkeleton />;
   }
@@ -533,14 +474,22 @@ export function FilesPageContent() {
             <div
               className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} flex flex-col transition-all duration-200 overflow-hidden`}
             >
-              <div className="flex-1 overflow-y-auto py-2">
+              <div className="flex min-h-0 flex-1 flex-col py-2">
                 <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
                   EXPLORER
                 </h2>
                 <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
                   Config Files
                 </div>
-                {fileTreeData && renderFileTree(fileTreeData)}
+                {fileTreeData && (
+                  <div className="min-h-0 flex-1">
+                    <PierreFileTree
+                      nodes={fileTreeData}
+                      onSelectFile={handleFileSelect}
+                      selectedPath={selectedFile}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
