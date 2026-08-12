@@ -482,71 +482,98 @@ export function DashboardPageContent() {
         </div>
 
         {/* Filters */}
-        <PageFiltersBar>
-          <PageFiltersBar.Group>
-            <PageFiltersBar.Item>
-              <ChipSelector
-                selectedChip={selectedChip}
-                onChipSelect={(chipId) => {
+        <section
+          aria-labelledby="dashboard-data-scope"
+          className="rounded-xl border border-base-300 bg-base-200/45 p-3 sm:p-4"
+        >
+          <h2
+            id="dashboard-data-scope"
+            className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-base-content/55"
+          >
+            Data scope
+          </h2>
+          <div className="flex flex-col gap-4">
+            <PageFiltersBar className="gap-3">
+              <PageFiltersBar.Group className="gap-3">
+                <PageFiltersBar.Item label="Chip">
+                  <ChipSelector
+                    selectedChip={selectedChip}
+                    onChipSelect={(chipId) => {
+                      setSelectedCooldownId(null);
+                      setHasInitializedCooldownSelection(false);
+                      setSelectedChip(chipId);
+                    }}
+                  />
+                </PageFiltersBar.Item>
+                <PageFiltersBar.Item
+                  label="Cooldown"
+                  className="[&:not(:has(.cooldown-selector-control))]:hidden"
+                >
+                  <CooldownSelector
+                    chipId={selectedChip}
+                    selectedCooldownId={selectedCooldownId}
+                    onPick={(cd) => {
+                      setSelectedCooldownId(cd.cooldown_id);
+                      setHasInitializedCooldownSelection(true);
+                      setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
+                      setEndDate(
+                        dateToDateTimeLocal(cd.ended_at ? new Date(cd.ended_at) : new Date()),
+                      );
+                    }}
+                  />
+                </PageFiltersBar.Item>
+              </PageFiltersBar.Group>
+
+              <PageFiltersBar.Group position="end" className="items-start sm:items-end">
+                <PageFiltersBar.Item label="Value selection">
+                  <div className="space-y-1">
+                    <span className="hidden text-xs font-medium text-base-content/55 sm:block">
+                      Value selection
+                    </span>
+                    <div className="join overflow-hidden rounded-lg">
+                      {(["latest", "best", "average"] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          aria-pressed={selectionMode === mode}
+                          className={`join-item btn btn-sm ${
+                            selectionMode === mode ? "btn-primary" : ""
+                          }`}
+                          onClick={() => setSelectionMode(mode)}
+                        >
+                          {mode[0].toUpperCase() + mode.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </PageFiltersBar.Item>
+              </PageFiltersBar.Group>
+            </PageFiltersBar>
+
+            <div className="border-t border-base-300 pt-3">
+              <TimeRangeSelector
+                collapsible
+                startDate={startDate}
+                endDate={endDate}
+                onStartDateChange={(value) => {
                   setSelectedCooldownId(null);
-                  setHasInitializedCooldownSelection(false);
-                  setSelectedChip(chipId);
-                }}
-              />
-            </PageFiltersBar.Item>
-            <PageFiltersBar.Item>
-              <CooldownSelector
-                chipId={selectedChip}
-                selectedCooldownId={selectedCooldownId}
-                onPick={(cd) => {
-                  setSelectedCooldownId(cd.cooldown_id);
                   setHasInitializedCooldownSelection(true);
-                  setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
-                  setEndDate(dateToDateTimeLocal(cd.ended_at ? new Date(cd.ended_at) : new Date()));
+                  setStartDate(value);
+                }}
+                onEndDateChange={(value) => {
+                  setSelectedCooldownId(null);
+                  setHasInitializedCooldownSelection(true);
+                  setEndDate(value);
+                }}
+                onQuickRange={(range) => {
+                  setSelectedCooldownId(null);
+                  setHasInitializedCooldownSelection(true);
+                  setQuickRange(range);
                 }}
               />
-            </PageFiltersBar.Item>
-          </PageFiltersBar.Group>
-
-          <PageFiltersBar.Group>
-            <PageFiltersBar.Item>
-              <div className="join rounded-lg overflow-hidden">
-                {(["latest", "best", "average"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    className={`join-item btn btn-sm ${
-                      selectionMode === mode ? "btn-primary" : ""
-                    }`}
-                    onClick={() => setSelectionMode(mode)}
-                  >
-                    {mode[0].toUpperCase() + mode.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </PageFiltersBar.Item>
-          </PageFiltersBar.Group>
-        </PageFiltersBar>
-
-        <TimeRangeSelector
-          collapsible
-          startDate={startDate}
-          endDate={endDate}
-          onStartDateChange={(value) => {
-            setSelectedCooldownId(null);
-            setHasInitializedCooldownSelection(true);
-            setStartDate(value);
-          }}
-          onEndDateChange={(value) => {
-            setSelectedCooldownId(null);
-            setHasInitializedCooldownSelection(true);
-            setEndDate(value);
-          }}
-          onQuickRange={(range) => {
-            setSelectedCooldownId(null);
-            setHasInitializedCooldownSelection(true);
-            setQuickRange(range);
-          }}
-        />
+            </div>
+          </div>
+        </section>
 
         {/* Body */}
         {!selectedChip ? (
