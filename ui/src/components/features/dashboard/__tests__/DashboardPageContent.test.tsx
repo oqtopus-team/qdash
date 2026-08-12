@@ -364,4 +364,18 @@ describe("DashboardPageContent", () => {
     expect(screen.getByTestId("metric-note-modal").textContent).toContain("0-1:zx90_gate_fidelity");
     expect(screen.queryByTestId("target-note-modal")).toBeNull();
   });
+
+  it("jumps directly to a selected metric", () => {
+    const scrollIntoView = vi.fn();
+    render(<DashboardPageContent />);
+    const couplingMetric = document.getElementById("dashboard-coupling-metric-zx90_gate_fidelity");
+    expect(couplingMetric).not.toBeNull();
+    Object.defineProperty(couplingMetric, "scrollIntoView", { value: scrollIntoView });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Jump to metric" }), {
+      target: { value: "dashboard-coupling-metric-zx90_gate_fidelity" },
+    });
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+  });
 });
