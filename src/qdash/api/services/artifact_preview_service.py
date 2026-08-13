@@ -37,6 +37,11 @@ def _json_scalar(value: Any) -> int | float | str | bool | None:
     return str(value)
 
 
+def _optional_string(value: Any) -> str | None:
+    """Normalize optional NetCDF metadata to the API schema type."""
+    return None if value is None else str(value)
+
+
 def _axis_variables(dataset: Dataset, shape: tuple[int, ...]) -> list[tuple[str, np.ndarray]]:
     axes: list[tuple[str, np.ndarray]] = []
     for name, variable in dataset.variables.items():
@@ -105,8 +110,8 @@ def preview_netcdf(path: Path, limit: int = _PREVIEW_ROW_LIMIT) -> ArtifactPrevi
 
     return ArtifactPreviewResponse(
         filename=path.name,
-        target=_json_scalar(metadata.get("target")),
-        source_type=_json_scalar(metadata.get("source_type")),
+        target=_optional_string(metadata.get("target")),
+        source_type=_optional_string(metadata.get("source_type")),
         shape=list(shape),
         dtype="complex" if is_complex else str(data_variable.dtype),
         columns=columns,
