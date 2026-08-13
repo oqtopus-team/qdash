@@ -19,6 +19,12 @@ function fileName(path: string): string {
   return path.split("/").pop() || "artifact";
 }
 
+function archiveUrl(paths: string[]): string {
+  const query = new URLSearchParams();
+  paths.forEach((path) => query.append("paths", path));
+  return `/api/executions/artifacts/archive?${query.toString()}`;
+}
+
 export function TaskArtifactDownloads({
   jsonFigurePaths = [],
   rawDataPaths = [],
@@ -83,6 +89,17 @@ export function TaskArtifactDownloads({
           </div>
         ))}
       </div>
+      {artifacts.length > 1 && (
+        <div className="flex justify-end">
+          <a
+            href={archiveUrl(artifacts.map(({ path }) => path))}
+            download="artifacts.zip"
+            className="btn btn-sm btn-outline gap-2"
+          >
+            <Download className="h-4 w-4" /> Download all (.zip)
+          </a>
+        </div>
+      )}
       <FigureJsonPreviewDialog
         path={figurePreviewPath}
         onClose={() => setFigurePreviewPath(null)}

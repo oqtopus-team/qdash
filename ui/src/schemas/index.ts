@@ -205,6 +205,7 @@ export * from './device';
 export * from './deviceCalibratedAt';
 export * from './deviceTopologyRequest';
 export * from './downloadArtifactByPathParams';
+export * from './downloadArtifactsAsArchiveParams';
 export * from './downloadFiguresAsZipRequest';
 export * from './downloadFileParams';
 export * from './downloadMetricsPdfParams';

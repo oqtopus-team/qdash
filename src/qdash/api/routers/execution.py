@@ -7,10 +7,12 @@ Business logic is delegated to ExecutionService for better testability.
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from io import BytesIO
+from typing import TYPE_CHECKING, Annotated
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from starlette.exceptions import HTTPException
 
 from qdash.api.dependencies import get_execution_service, get_flow_service
@@ -37,6 +39,9 @@ from qdash.common.config.path_resolver import resolve_calib_data_path
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @router.get(
@@ -91,6 +96,48 @@ def download_artifact_by_path(path: str) -> FileResponse:
     if not resolved_path.exists():
         raise HTTPException(status_code=404, detail=f"File not found: {path}")
     return FileResponse(resolved_path, filename=resolved_path.name)
+
+
+def _unique_archive_name(path: Path, used_names: set[str]) -> str:
+    """Return a stable, unique basename for a ZIP member."""
+    candidate = path.name
+    counter = 2
+    while candidate in used_names:
+        candidate = f"{path.stem}_{counter}{path.suffix}"
+        counter += 1
+    used_names.add(candidate)
+    return candidate
+
+
+@router.get(
+    "/executions/artifacts/archive",
+    responses={404: {"model": Detail}},
+    response_class=StreamingResponse,
+    summary="Download calibration artifacts as a ZIP archive",
+    operation_id="downloadArtifactsAsArchive",
+)
+def download_artifacts_as_archive(
+    paths: Annotated[list[str], Query(min_length=1, max_length=100)],
+) -> StreamingResponse:
+    """Download multiple figure JSON and raw NetCDF artifacts as one ZIP file."""
+    resolved_paths: list[Path] = []
+    for path in paths:
+        resolved_path = resolve_calib_data_path(path)
+        if not resolved_path.exists():
+            raise HTTPException(status_code=404, detail=f"File not found: {path}")
+        resolved_paths.append(resolved_path)
+
+    archive = BytesIO()
+    used_names: set[str] = set()
+    with ZipFile(archive, mode="w", compression=ZIP_DEFLATED) as zip_file:
+        for resolved_path in resolved_paths:
+            zip_file.write(resolved_path, arcname=_unique_archive_name(resolved_path, used_names))
+    archive.seek(0)
+    return StreamingResponse(
+        archive,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="artifacts.zip"'},
+    )
 
 
 @router.get(

@@ -1,9 +1,11 @@
 """Tests for execution router endpoints."""
 
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
+from zipfile import ZipFile
 
 import numpy as np
 import pytest
@@ -211,6 +213,33 @@ def test_download_artifact_by_path(
     assert response.status_code == 200
     assert response.content == b"netcdf"
     assert response.headers["content-disposition"] == 'attachment; filename="raw_data.nc"'
+
+
+def test_download_artifacts_as_archive(
+    test_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    figure_dir = tmp_path / "figures"
+    raw_dir = tmp_path / "raw"
+    figure_dir.mkdir()
+    raw_dir.mkdir()
+    figure = figure_dir / "artifact.json"
+    raw_data = raw_dir / "artifact.json"
+    figure.write_text('{"data": []}')
+    raw_data.write_text("raw")
+
+    response = test_client.get(
+        "/executions/artifacts/archive",
+        params=[("paths", str(figure)), ("paths", str(raw_data))],
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+    assert response.headers["content-disposition"] == 'attachment; filename="artifacts.zip"'
+    with ZipFile(BytesIO(response.content)) as archive:
+        assert archive.namelist() == ["artifact.json", "artifact_2.json"]
+        assert archive.read("artifact.json") == b'{"data": []}'
+        assert archive.read("artifact_2.json") == b"raw"
 
 
 def test_preview_artifact_by_path_returns_complex_table(

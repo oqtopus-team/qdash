@@ -1610,6 +1610,57 @@
         }
       }
     },
+    "/executions/artifacts/archive": {
+      "get": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Download calibration artifacts as a ZIP archive",
+        "description": "Download multiple figure JSON and raw NetCDF artifacts as one ZIP file.",
+        "operationId": "downloadArtifactsAsArchive",
+        "parameters": [
+          {
+            "name": "paths",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 100,
+              "title": "Paths"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/executions/artifact/preview": {
       "get": {
         "tags": [

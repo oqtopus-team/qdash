@@ -20,6 +20,9 @@ describe("TaskArtifactDownloads", () => {
     expect(screen.getByRole("link", { name: "Download raw data.nc" }).getAttribute("href")).toBe(
       "/api/executions/artifact?path=%2Fdata%2Fraw%20data.nc",
     );
+    expect(screen.getByRole("link", { name: "Download all (.zip)" }).getAttribute("href")).toBe(
+      "/api/executions/artifacts/archive?paths=%2Fdata%2Ffigure.json&paths=%2Fdata%2Fraw+data.nc",
+    );
   });
 
   it("renders nothing without artifacts", () => {
