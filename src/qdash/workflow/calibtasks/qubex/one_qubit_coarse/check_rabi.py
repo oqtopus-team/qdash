@@ -240,11 +240,9 @@ class CheckRabi(QubexTask):
         iq_plotter = IQPlotter(state_centers=exp.state_centers)
         iq_plotter.update({label: result.data[label].data})
         figures.append(go.Figure(iq_plotter._widget.to_dict()))
-        raw_data = [result.data[label].data]
         return PostProcessResult(
             output_parameters=output_parameters,
             figures=figures,
-            raw_data=raw_data,
             validation_error=_rabi_validation_error(result, label),
         )
 

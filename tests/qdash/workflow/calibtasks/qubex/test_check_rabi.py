@@ -110,5 +110,5 @@ def test_check_rabi_postprocess_marks_non_finite_frequency_failed_after_artifact
     )
 
     assert result.figures
-    assert result.raw_data
+    assert result.raw_data == []
     assert result.validation_error == "CheckRabi produced non-finite frequency for Q01: nan"
