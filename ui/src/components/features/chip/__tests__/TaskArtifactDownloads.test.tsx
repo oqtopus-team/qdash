@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { TaskArtifactDownloads } from "../TaskArtifactDownloads";
 
 describe("TaskArtifactDownloads", () => {
-  it("renders figure JSON and raw NetCDF download links", () => {
+  it("makes preview the primary raw data action", () => {
     render(
       <TaskArtifactDownloads
         jsonFigurePaths={["/data/figure.json"]}
@@ -15,9 +15,8 @@ describe("TaskArtifactDownloads", () => {
     expect(screen.getByRole("link", { name: "Figure JSON" }).getAttribute("href")).toBe(
       "/api/executions/artifact?path=%2Fdata%2Ffigure.json",
     );
-    expect(screen.getByRole("link", { name: "Raw data (.nc)" }).getAttribute("href")).toBe(
-      "/api/executions/artifact?path=%2Fdata%2Fraw%20data.nc",
-    );
+    expect(screen.getByRole("button", { name: /Raw data.*raw data\.nc.*Preview/ })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /Raw data/ })).toBeNull();
   });
 
   it("renders nothing without artifacts", () => {
