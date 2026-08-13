@@ -21,6 +21,7 @@ const ROW_HEIGHT = 30;
 const BAR_HEIGHT = 22;
 const TOP_PADDING = 10;
 const ROW_PIXEL_GAP = 8;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const CHIP_STYLES = [
   {
@@ -84,6 +85,27 @@ function formatChipSummary(chipIds: string[]): string {
   if (chipIds.length === 0) return "No chips";
   if (chipIds.length <= 2) return chipIds.join(", ");
   return `${chipIds.slice(0, 2).join(", ")} +${chipIds.length - 2}`;
+}
+
+function buildTicks(lo: number, span: number, range: number, firstStartedAt: number) {
+  if (range < DAY_MS) {
+    return [
+      {
+        pct: 0,
+        label: formatDateTime(new Date(firstStartedAt).toISOString(), "MMM d, HH:mm"),
+      },
+      { pct: 100, label: "Now" },
+    ];
+  }
+
+  const tickCount = range < 14 * DAY_MS ? Math.min(6, Math.floor(range / DAY_MS) + 1) : 6;
+  const fractions = Array.from({ length: tickCount }, (_, index) => index / (tickCount - 1));
+  const pattern = range < 180 * DAY_MS ? "MMM d" : "yyyy MMM";
+
+  return fractions.map((fraction) => ({
+    pct: fraction * 100,
+    label: formatDateTime(new Date(lo + span * fraction).toISOString(), pattern),
+  }));
 }
 
 /**
@@ -155,14 +177,7 @@ export function CooldownTimeline({ cooldowns, selectedId, onSelect }: CooldownTi
     // may be packed slightly tighter or looser than ideal but never overlap.
     const { bars, rowCount } = layoutBars(cooldowns, lo, span, 720, now);
 
-    const ticks = [0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => {
-      const t = lo + span * f;
-      const date = new Date(t);
-      return {
-        pct: f * 100,
-        label: formatDateTime(date.toISOString(), "yyyy MMM"),
-      };
-    });
+    const ticks = buildTicks(lo, span, range, tMin);
 
     const chipLegend = Array.from(new Set(cooldowns.flatMap((c) => c.chip_ids))).sort();
 
@@ -234,7 +249,9 @@ export function CooldownTimeline({ cooldowns, selectedId, onSelect }: CooldownTi
         {ticks.map((t) => (
           <span
             key={t.pct}
-            className="absolute -translate-x-1/2 text-[10px] text-base-content/50"
+            className={`absolute text-[10px] text-base-content/50 ${
+              t.pct === 0 ? "" : t.pct === 100 ? "-translate-x-full" : "-translate-x-1/2"
+            }`}
             style={{ left: `${t.pct}%` }}
           >
             {t.label}
