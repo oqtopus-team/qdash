@@ -10,7 +10,6 @@ import {
   Cpu,
   Download,
   Files,
-  GitBranch,
   Inbox,
   LayoutDashboard,
   LayoutGrid,
@@ -59,7 +58,6 @@ export function getNavigationSections({
         { href: "/chip", label: "Chip", icon: Cpu },
         { href: "/analysis", label: "Analysis", icon: BarChart3 },
         { href: "/chat", label: "AI Chat", icon: Bot },
-        { href: "/provenance", label: "Provenance", icon: GitBranch },
       ],
     },
     {
