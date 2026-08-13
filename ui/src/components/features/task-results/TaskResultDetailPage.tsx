@@ -590,7 +590,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {((taskResult.json_figure_path && taskResult.json_figure_path.length > 0) ||
         (taskResult.raw_data_path && taskResult.raw_data_path.length > 0)) && (
         <div className="mb-4 rounded-lg bg-base-200/50 p-4">
-          <h2 className="mb-3 text-sm font-semibold">Downloads</h2>
+          <h2 className="mb-3 text-sm font-semibold">Artifacts</h2>
           <TaskArtifactDownloads
             jsonFigurePaths={taskResult.json_figure_path}
             rawDataPaths={taskResult.raw_data_path}

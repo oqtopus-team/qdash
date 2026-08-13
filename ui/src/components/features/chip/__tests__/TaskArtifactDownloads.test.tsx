@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { TaskArtifactDownloads } from "../TaskArtifactDownloads";
 
 describe("TaskArtifactDownloads", () => {
-  it("makes preview the primary raw data action", () => {
+  it("offers preview and direct download for figure and raw data", () => {
     render(
       <TaskArtifactDownloads
         jsonFigurePaths={["/data/figure.json"]}
@@ -12,11 +12,14 @@ describe("TaskArtifactDownloads", () => {
       />,
     );
 
-    expect(screen.getByRole("link", { name: "Figure JSON" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("button", { name: /Figure JSON.*figure\.json.*Preview/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Download figure.json" }).getAttribute("href")).toBe(
       "/api/executions/artifact?path=%2Fdata%2Ffigure.json",
     );
     expect(screen.getByRole("button", { name: /Raw data.*raw data\.nc.*Preview/ })).toBeTruthy();
-    expect(screen.queryByRole("link", { name: /Raw data/ })).toBeNull();
+    expect(screen.getByRole("link", { name: "Download raw data.nc" }).getAttribute("href")).toBe(
+      "/api/executions/artifact?path=%2Fdata%2Fraw%20data.nc",
+    );
   });
 
   it("renders nothing without artifacts", () => {

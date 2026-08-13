@@ -297,7 +297,7 @@ export function TaskDetailModal({
 
           {(jsonFigures.length > 0 || rawDataPaths.length > 0) && (
             <div className="mb-6 rounded-xl bg-base-200 p-4">
-              <h4 className="mb-2 font-medium">Downloads</h4>
+              <h4 className="mb-2 font-medium">Artifacts</h4>
               <TaskArtifactDownloads jsonFigurePaths={jsonFigures} rawDataPaths={rawDataPaths} />
             </div>
           )}
