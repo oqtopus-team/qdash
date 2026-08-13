@@ -570,7 +570,7 @@ def test_create_figures_zip_includes_ai_review_markdown(tmp_path) -> None:
             ("ai_review/CheckRabi_0_task-1.md", "## AI review\n\n- Decision: `REVIEW`\n")
         ],
     ):
-        buffer, filename = TaskResultService.create_figures_zip(
+        archive_path, filename = TaskResultService.create_figures_zip(
             [str(figure)],
             "artifacts.zip",
             project_id="proj-1",
@@ -578,14 +578,17 @@ def test_create_figures_zip_includes_ai_review_markdown(tmp_path) -> None:
         )
 
     assert filename == "artifacts.zip"
-    with zipfile.ZipFile(buffer) as archive:
-        assert sorted(archive.namelist()) == [
-            "ai_review/CheckRabi_0_task-1.md",
-            "figure.json",
-        ]
-        assert archive.read("ai_review/CheckRabi_0_task-1.md").decode() == (
-            "## AI review\n\n- Decision: `REVIEW`\n"
-        )
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            assert sorted(archive.namelist()) == [
+                "ai_review/CheckRabi_0_task-1.md",
+                "figure.json",
+            ]
+            assert archive.read("ai_review/CheckRabi_0_task-1.md").decode() == (
+                "## AI review\n\n- Decision: `REVIEW`\n"
+            )
+    finally:
+        archive_path.unlink(missing_ok=True)
 
 
 def test_create_figures_zip_maps_container_calib_data_path(tmp_path, monkeypatch) -> None:
@@ -595,15 +598,18 @@ def test_create_figures_zip_maps_container_calib_data_path(tmp_path, monkeypatch
     figure.write_text('{"data":[]}', encoding="utf-8")
     monkeypatch.setenv("CALIB_DATA_PATH", str(local_base))
 
-    buffer, filename = TaskResultService.create_figures_zip(
+    archive_path, filename = TaskResultService.create_figures_zip(
         ["/app/calib_data/proj-1/figure.json"],
         "artifacts.zip",
     )
 
     assert filename == "artifacts.zip"
-    with zipfile.ZipFile(buffer) as archive:
-        assert archive.namelist() == ["figure.json"]
-        assert archive.read("figure.json").decode() == '{"data":[]}'
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            assert archive.namelist() == ["figure.json"]
+            assert archive.read("figure.json").decode() == '{"data":[]}'
+    finally:
+        archive_path.unlink(missing_ok=True)
 
 
 def test_create_figures_zip_includes_ai_review_replay_bundle(tmp_path) -> None:
@@ -615,7 +621,7 @@ def test_create_figures_zip_includes_ai_review_replay_bundle(tmp_path) -> None:
         "_load_ai_review_bundle_entries",
         return_value=[("ai_review_bundle/CheckRabi_0_task-1.zip", b"bundle-bytes")],
     ):
-        buffer, filename = TaskResultService.create_figures_zip(
+        archive_path, filename = TaskResultService.create_figures_zip(
             [str(figure)],
             "artifacts.zip",
             project_id="proj-1",
@@ -623,12 +629,15 @@ def test_create_figures_zip_includes_ai_review_replay_bundle(tmp_path) -> None:
         )
 
     assert filename == "artifacts.zip"
-    with zipfile.ZipFile(buffer) as archive:
-        assert sorted(archive.namelist()) == [
-            "ai_review_bundle/CheckRabi_0_task-1.zip",
-            "figure.json",
-        ]
-        assert archive.read("ai_review_bundle/CheckRabi_0_task-1.zip") == b"bundle-bytes"
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            assert sorted(archive.namelist()) == [
+                "ai_review_bundle/CheckRabi_0_task-1.zip",
+                "figure.json",
+            ]
+            assert archive.read("ai_review_bundle/CheckRabi_0_task-1.zip") == b"bundle-bytes"
+    finally:
+        archive_path.unlink(missing_ok=True)
 
 
 def test_load_reviewed_task_results_prefers_latest_completed_review_over_newer_pending() -> None:

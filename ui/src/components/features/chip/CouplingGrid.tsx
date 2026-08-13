@@ -506,9 +506,7 @@ export function CouplingGrid({
         { responseType: "blob" },
       );
 
-      const blob = new Blob([response.data as BlobPart], {
-        type: "application/zip",
-      });
+      const blob = response.data as Blob;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
