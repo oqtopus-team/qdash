@@ -6,11 +6,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
+  AlertCircle,
   Crosshair,
   ExternalLink,
   MessageSquare,
   Pencil,
   Plus,
+  RotateCcw,
   Settings,
   Tag,
   Trash2,
@@ -218,7 +220,7 @@ function ForumThreadCard({
 
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
             <span>{post.username}</span>
-            <span>{formatRelativeTime(post.created_at)}</span>
+            <span>Updated {formatRelativeTime(post.updated_at ?? post.created_at)}</span>
             {post.assignee_username && (
               <span className="inline-flex items-center gap-1">
                 <UserRound className="h-3.5 w-3.5" />
@@ -818,7 +820,7 @@ export function ForumPageContent() {
     status: status === "all" ? null : status,
     q: searchQuery.trim() || undefined,
   };
-  const { data, isLoading } = useListForumPosts(params, {
+  const { data, isLoading, isError, refetch } = useListForumPosts(params, {
     query: { staleTime: 30_000 },
   });
   const posts = data?.data.posts ?? [];
@@ -1015,21 +1017,33 @@ export function ForumPageContent() {
       />
 
       <div className="mb-4 overflow-x-auto">
-        <div className="tabs tabs-boxed w-fit whitespace-nowrap">
+        <div
+          className="tabs tabs-boxed w-fit whitespace-nowrap"
+          role="tablist"
+          aria-label="Forum status"
+        >
           {FORUM_STATUSES.map((item) => (
             <button
               key={item.id}
-              className={`tab tab-sm ${status === item.id ? "tab-active" : ""}`}
+              type="button"
+              role="tab"
+              aria-selected={status === item.id}
+              className={`tab tab-sm gap-1.5 ${status === item.id ? "tab-active" : ""}`}
               onClick={() => setStatusFilter(item.id as StatusFilter)}
             >
               {item.label}
+              {status === item.id && !isLoading && <span className="badge badge-sm">{total}</span>}
             </button>
           ))}
           <button
-            className={`tab tab-sm ${status === "all" ? "tab-active" : ""}`}
+            type="button"
+            role="tab"
+            aria-selected={status === "all"}
+            className={`tab tab-sm gap-1.5 ${status === "all" ? "tab-active" : ""}`}
             onClick={() => setStatusFilter("all")}
           >
             All
+            {status === "all" && !isLoading && <span className="badge badge-sm">{total}</span>}
           </button>
         </div>
       </div>
@@ -1222,15 +1236,57 @@ export function ForumPageContent() {
         </div>
       )}
 
+      {!isLoading && !isError && posts.length > 0 && (
+        <div className="mb-3 flex items-center justify-between gap-3 text-xs text-base-content/60">
+          <span>
+            <strong className="font-semibold text-base-content">{total}</strong>{" "}
+            {total === 1 ? "thread" : "threads"} in this view
+          </span>
+          {hasListFilters && <span>Filters applied</span>}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-16">
           <span className="loading loading-spinner loading-lg"></span>
         </div>
+      ) : isError ? (
+        <div className="alert alert-error" role="alert">
+          <AlertCircle className="h-5 w-5" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold">Failed to load forum threads</div>
+            <div className="text-sm opacity-80">The discussion list could not be retrieved.</div>
+          </div>
+          <button type="button" className="btn btn-sm btn-ghost gap-1" onClick={() => refetch()}>
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            Retry
+          </button>
+        </div>
       ) : posts.length === 0 ? (
         <EmptyState
-          title="No forum threads yet"
-          description="Project discussions and mentions will appear here."
+          title={
+            hasListFilters
+              ? "No matching threads"
+              : `No ${status === "all" ? "forum" : status} threads`
+          }
+          description={
+            hasListFilters
+              ? "Try clearing filters or changing the selected status."
+              : "Start a project discussion to share calibration context with the team."
+          }
           emoji="speech-balloon"
+          action={
+            hasListFilters ? (
+              <button type="button" className="btn btn-sm btn-ghost" onClick={clearFilters}>
+                Clear filters
+              </button>
+            ) : (
+              <Link href="/forum/new" className="btn btn-sm btn-primary gap-1">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                New thread
+              </Link>
+            )
+          }
         />
       ) : (
         <>
