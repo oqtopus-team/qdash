@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { useDeleteCryostat } from "@/client/cryostat/cryostat";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatDate } from "@/lib/utils/datetime";
 
 import { CooldownItem } from "./CooldownItem";
@@ -102,6 +103,7 @@ export function CryostatCard({
   const [expandedId, setExpandedId] = useState<string | null>(() => {
     return activeCooldown?.cooldown_id ?? sortedCooldowns[0]?.cooldown_id ?? null;
   });
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
 
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -123,10 +125,8 @@ export function CryostatCard({
   }, [activeCooldown, expandedId]);
 
   const handleDelete = async () => {
-    if (!confirm(`Delete cryostat ${cryo.cryo_id}? Existing cool-downs are not affected.`)) {
-      return;
-    }
     await deleteCryostat.mutateAsync({ cryoId: cryo.cryo_id });
+    setDeleteConfirmationOpen(false);
     onChange();
   };
 
@@ -168,7 +168,7 @@ export function CryostatCard({
         </div>
         <button
           className="btn btn-ghost btn-xs text-error flex-shrink-0"
-          onClick={handleDelete}
+          onClick={() => setDeleteConfirmationOpen(true)}
           disabled={deleteCryostat.isPending}
           title="Delete cryostat"
         >
@@ -231,6 +231,16 @@ export function CryostatCard({
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={deleteConfirmationOpen}
+        title="Delete cryostat?"
+        description={`Delete cryostat ${cryo.cryo_id}? Existing cool-downs are not affected.`}
+        confirmLabel="Delete cryostat"
+        onConfirm={handleDelete}
+        onOpenChange={setDeleteConfirmationOpen}
+        pending={deleteCryostat.isPending}
+        destructive
+      />
     </section>
   );
 }

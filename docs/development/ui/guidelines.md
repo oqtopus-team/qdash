@@ -16,7 +16,8 @@
 | Library              | Purpose                                |
 | -------------------- | -------------------------------------- |
 | Tailwind CSS         | Utility-first CSS framework            |
-| DaisyUI              | Component library built on Tailwind    |
+| DaisyUI              | Visual components, themes, and semantic colors |
+| Radix UI             | Headless primitives for complex interaction behavior |
 | plotly.js-dist-min   | Plotly chart rendering                 |
 | XYFlow               | Node-based diagrams and workflows      |
 | Lucide React         | Icon components (see [design-policy.md](design-policy.md)) |
@@ -204,6 +205,26 @@ export function useData() { ... }           // Too generic
 
 ## Component Design
 
+### DaisyUI and Radix Responsibilities
+
+QDash uses DaisyUI and Radix UI together rather than migrating wholesale from one to the other.
+
+- Use DaisyUI for the visual system: buttons, cards, form controls, badges, tables, loading states, themes, and semantic colors.
+- Use an established Radix-based component from `ui/src/components/ui/` when an interaction needs focus trapping or restoration, keyboard navigation, portals, outside-click or Escape dismissal, or collision-aware positioning.
+- Style Radix primitives with Tailwind and DaisyUI semantic colors so they remain consistent across light and dark themes.
+- Reuse `Dialog` and `DropdownMenu` instead of importing Radix packages directly in feature components.
+- Do not add a new headless primitive merely to replace a working DaisyUI visual component. Confirm that the interaction has behavioral or accessibility requirements first.
+
+Typical choices:
+
+| UI need | Preferred foundation |
+| ------- | -------------------- |
+| Button, card, input, badge, table | DaisyUI |
+| Modal dialog | Shared Radix `Dialog` primitive |
+| Action or multi-select menu | Shared Radix `DropdownMenu` primitive |
+| Page-specific spacing and layout | Tailwind CSS |
+| Select, popover, tooltip, or collapsible | Evaluate behavior first; introduce a shared headless primitive only when needed |
+
 ### Component Organization
 
 Organize components by feature and reusability:
@@ -301,6 +322,14 @@ export function DataTable({ data, columns }: { data: any; columns: any }) {
 ---
 
 ## State Management
+
+### Form State and Validation
+
+Use React Hook Form with Zod for forms that have validation, multiple fields, or submission value
+normalization. Keep UI-only state such as password visibility outside the form. Prefer field-level error
+messages connected with `aria-describedby`; reserve alerts and toasts for submission or server errors.
+
+Simple search fields, toggles, and single-value controls do not need a form library.
 
 ### Server State with TanStack Query
 

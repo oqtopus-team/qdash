@@ -17,6 +17,7 @@ import { CancelExecutionModal } from "@/components/features/execution/CancelExec
 import { getCancelErrorMessage } from "@/components/features/execution/getCancelErrorMessage";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
 
 type FilterOption = {
@@ -245,14 +246,18 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               <span className="font-medium mr-1">End:</span>
               <time className="truncate">{formatDateTimeUtil(execution.end_at)}</time>
             </div>
-            <div
-              className="flex items-center text-base-content/70 tooltip tooltip-bottom"
-              data-tip={calculateDetailedDuration(execution.start_at, execution.end_at)}
-            >
-              <Clock className="mr-2 text-info/70 flex-shrink-0" size={14} />
-              <span className="font-medium mr-1">Duration:</span>
-              <span>{execution.elapsed_time}</span>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center text-base-content/70" tabIndex={0}>
+                  <Clock className="mr-2 text-info/70 flex-shrink-0" size={14} />
+                  <span className="font-medium mr-1">Duration:</span>
+                  <span>{execution.elapsed_time}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {calculateDetailedDuration(execution.start_at, execution.end_at)}
+              </TooltipContent>
+            </Tooltip>
             <div className="flex items-center text-base-content/70 min-w-0">
               <UserRound className="mr-2 text-info/70 flex-shrink-0" size={14} />
               <span className="font-medium mr-1">User:</span>
@@ -271,9 +276,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           typeof execution.note === "object" &&
           Object.keys(execution.note).length > 0 && (
             <div className="bg-base-100 rounded-lg shadow-md p-6">
-              <div className="collapse collapse-arrow border border-base-300">
-                <input type="checkbox" />
-                <div className="collapse-title text-lg font-semibold">Execution Note</div>
+              <details className="collapse collapse-arrow border border-base-300">
+                <summary className="collapse-title text-lg font-semibold">Execution Note</summary>
                 <div className="collapse-content">
                   <div className="pt-4 space-y-4">
                     <div className="flex justify-end">
@@ -303,7 +307,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                     </pre>
                   </div>
                 </div>
-              </div>
+              </details>
             </div>
           )}
 

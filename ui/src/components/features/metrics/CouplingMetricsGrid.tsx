@@ -2,12 +2,15 @@
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
-import { ArrowRightLeft, GitBranch, ZoomIn, ZoomOut, Maximize2, Move } from "lucide-react";
+import { ArrowRightLeft, GitBranch, Maximize2, Move } from "lucide-react";
 
+import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
+import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
@@ -55,36 +58,6 @@ interface CouplingMetricsGridProps {
 interface SelectedCouplingInfo {
   couplingId: string;
   metric: MetricValue;
-}
-
-// Zoom control buttons component
-function ZoomControls() {
-  const { zoomIn, zoomOut, resetTransform } = useControls();
-  return (
-    <div className="absolute top-2 right-2 z-30 flex flex-col gap-1">
-      <button
-        onClick={() => zoomIn()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Zoom in"
-      >
-        <ZoomIn className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => zoomOut()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Zoom out"
-      >
-        <ZoomOut className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => resetTransform()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Reset view"
-      >
-        <Maximize2 className="h-4 w-4" />
-      </button>
-    </div>
-  );
 }
 
 export function CouplingMetricsGrid({
@@ -155,6 +128,8 @@ export function CouplingMetricsGrid({
     }
   }, [isSquareGrid, viewMode]);
 
+  const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
+
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
@@ -199,8 +174,8 @@ export function CouplingMetricsGrid({
   const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
     cols: displayCols,
     rows: displayRows,
-    reservedHeight: { mobile: 300, desktop: 350 },
-    deps: [metricData],
+    reservedHeight: isFullscreen ? { mobile: 160, desktop: 180 } : { mobile: 300, desktop: 350 },
+    deps: [metricData, isFullscreen],
   });
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
@@ -602,7 +577,14 @@ export function CouplingMetricsGrid({
   );
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto w-full mt-8" ref={containerRef}>
+    <div
+      className={
+        isFullscreen
+          ? "fixed inset-0 z-[60] flex flex-col h-screen w-screen bg-base-100 p-4 overflow-hidden"
+          : "flex flex-col h-full max-w-4xl mx-auto w-full mt-8"
+      }
+      ref={containerRef}
+    >
       {/* View mode toggle */}
       <div className="flex items-center justify-between px-1 md:px-4 py-2">
         <div className="tabs tabs-boxed bg-base-200/50 p-1">
@@ -680,6 +662,7 @@ export function CouplingMetricsGrid({
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
       >
+        <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
         {viewMode === "pan-zoom" ? (
           <TransformWrapper
             initialScale={1}
@@ -688,12 +671,13 @@ export function CouplingMetricsGrid({
             wheel={{ step: 0.08 }}
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
-            panning={{ velocityDisabled: false }}
+            panning={{ velocityDisabled: true }}
             smooth={false}
+            limitToBounds={false}
             centerOnInit={true}
             onTransform={handleTransform}
           >
-            <ZoomControls />
+            <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{

@@ -27,5 +27,4 @@ export interface SettingsResponse {
   ui_port?: number;
   log_level?: string;
   timezone?: string;
-  enable_local_codex_agent?: boolean;
 }

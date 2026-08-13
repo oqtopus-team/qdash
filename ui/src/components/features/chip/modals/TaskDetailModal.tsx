@@ -14,6 +14,12 @@ import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/DropdownMenu";
+import {
   formatDate as formatDateUtil,
   formatTime as formatTimeUtil,
   formatDateTime as formatDateTimeUtil,
@@ -412,11 +418,10 @@ export function TaskDetailModal({
                           </div>
                         )}
                         {task.run_parameters && Object.keys(task.run_parameters).length > 0 && (
-                          <div className="collapse collapse-arrow bg-base-200 rounded-xl">
-                            <input type="checkbox" />
-                            <div className="collapse-title font-medium text-sm py-3">
+                          <details className="collapse collapse-arrow bg-base-200 rounded-xl">
+                            <summary className="collapse-title font-medium text-sm py-3">
                               Run Parameters
-                            </div>
+                            </summary>
                             <div className="collapse-content">
                               <div className="space-y-1">
                                 {Object.entries(task.run_parameters).map(([key, value]) => {
@@ -445,7 +450,7 @@ export function TaskDetailModal({
                                 })}
                               </div>
                             </div>
-                          </div>
+                          </details>
                         )}
                         {task.message && (
                           <div className="card bg-base-200 p-4 rounded-xl">
@@ -700,48 +705,46 @@ export function TaskDetailModal({
                                     <div className="flex items-center gap-2 text-xs text-base-content/60">
                                       <span>↳ from</span>
                                       {paramValue.execution_id ? (
-                                        <div className="dropdown dropdown-top">
-                                          <button tabIndex={0} className="link link-primary">
-                                            {paramValue.task_name ||
-                                              `Execution ${paramValue.execution_id.slice(0, 8)}`}
-                                          </button>
-                                          <ul
-                                            tabIndex={0}
-                                            className="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-48 border border-base-300"
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <button type="button" className="link link-primary">
+                                              {paramValue.task_name ||
+                                                `Execution ${paramValue.execution_id.slice(0, 8)}`}
+                                            </button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent
+                                            side="top"
+                                            align="start"
+                                            className="w-48"
                                           >
-                                            <li>
-                                              <button
-                                                onClick={() => {
-                                                  router.push(
-                                                    `/executions/${paramValue.execution_id}`,
-                                                  );
-                                                }}
-                                              >
-                                                View Execution
-                                              </button>
-                                            </li>
-                                            <li>
-                                              <button
-                                                onClick={() => {
-                                                  const pv = paramValue as Record<string, unknown>;
-                                                  const parameterName =
-                                                    (pv?.parameter_name as string | undefined) ||
-                                                    key;
-                                                  const resolvedQid = resolveQid(
-                                                    qid,
-                                                    pv?.qid_role as string | undefined,
-                                                  );
-                                                  router.push(
-                                                    buildProvenanceUrl(parameterName, resolvedQid),
-                                                  );
-                                                  onClose();
-                                                }}
-                                              >
-                                                View Lineage
-                                              </button>
-                                            </li>
-                                          </ul>
-                                        </div>
+                                            <DropdownMenuItem
+                                              onSelect={() => {
+                                                router.push(
+                                                  `/executions/${paramValue.execution_id}`,
+                                                );
+                                              }}
+                                            >
+                                              View Execution
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                              onSelect={() => {
+                                                const pv = paramValue as Record<string, unknown>;
+                                                const parameterName =
+                                                  (pv?.parameter_name as string | undefined) || key;
+                                                const resolvedQid = resolveQid(
+                                                  qid,
+                                                  pv?.qid_role as string | undefined,
+                                                );
+                                                router.push(
+                                                  buildProvenanceUrl(parameterName, resolvedQid),
+                                                );
+                                                onClose();
+                                              }}
+                                            >
+                                              View Lineage
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
                                       ) : (
                                         <span>Unknown source</span>
                                       )}

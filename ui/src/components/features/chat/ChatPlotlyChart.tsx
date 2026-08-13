@@ -1,9 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Maximize2, X } from "lucide-react";
 import { Component, type ReactNode, useCallback, useState } from "react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 
 const Plot = dynamic(() => import("@/components/charts/Plot"), { ssr: false });
 
@@ -71,21 +73,19 @@ export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
       <ChartErrorBoundary>
         <div className="w-full my-2 rounded-lg border border-base-300 overflow-hidden">
           <div className="flex justify-end px-2 pt-1">
-            <button
-              type="button"
-              onClick={openLightbox}
-              className="btn btn-xs btn-ghost"
-              title="Expand chart"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="w-4 h-4"
-              >
-                <path d="M13.28 7.78l3.22-3.22v2.69a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.69l-3.22 3.22a.75.75 0 001.06 1.06zM2 17.25v-4.5a.75.75 0 011.5 0v2.69l3.22-3.22a.75.75 0 011.06 1.06L4.56 16.5h2.69a.75.75 0 010 1.5h-4.5a.75.75 0 01-.75-.75z" />
-              </svg>
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={openLightbox}
+                  className="btn btn-xs btn-ghost btn-square"
+                  aria-label="Expand chart"
+                >
+                  <Maximize2 className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Expand chart</TooltipContent>
+            </Tooltip>
           </div>
           <Plot
             data={data as Plotly.Data[]}
@@ -110,9 +110,19 @@ export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
                 ? layout.title
                 : (((layout.title as Record<string, unknown>)?.text as string) ?? "Chart")}
             </DialogTitle>
-            <button type="button" onClick={closeLightbox} className="btn btn-sm btn-ghost">
-              ✕
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={closeLightbox}
+                  className="btn btn-sm btn-ghost btn-square"
+                  aria-label="Close expanded chart"
+                >
+                  <X className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Close</TooltipContent>
+            </Tooltip>
           </div>
           <DialogDescription className="sr-only">Expanded interactive chart.</DialogDescription>
           <div className="flex-1 min-h-0">

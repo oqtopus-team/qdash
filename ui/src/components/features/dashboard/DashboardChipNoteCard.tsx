@@ -36,7 +36,7 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
 
   useEffect(() => {
     setDraft(note?.content ?? "");
-    setMode(note?.content?.trim() ? "view" : "edit");
+    setMode("view");
   }, [
     note?.content,
     chipId,
@@ -69,7 +69,7 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
 
   const handleCancel = () => {
     setDraft(note?.content ?? "");
-    setMode(note?.content?.trim() ? "view" : "edit");
+    setMode("view");
   };
 
   return (
@@ -84,7 +84,7 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
             Chip-level context for the selected cooldown.
           </div>
         </div>
-        {mode === "view" && (
+        {mode === "view" && hasNote && (
           <button
             className="btn btn-sm btn-outline gap-1"
             onClick={() => setMode("edit")}
@@ -97,7 +97,7 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
         )}
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className={`${mode === "view" && !hasNote ? "p-3" : "p-4"} space-y-3`}>
         {isLoading ? (
           <div className="text-sm text-base-content/60">Loading...</div>
         ) : mode === "view" && hasNote ? (
@@ -110,6 +110,20 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
               {note?.updated_at && <span>· {formatDateTime(note.updated_at)}</span>}
             </div>
           </>
+        ) : mode === "view" ? (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-base-content/60">
+              Add cooldown context, handoff details, or observations for your team.
+            </p>
+            <button
+              className="btn btn-sm btn-outline shrink-0 gap-1.5"
+              onClick={() => setMode("edit")}
+              type="button"
+            >
+              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+              Add note
+            </button>
+          </div>
         ) : (
           <>
             <MarkdownEditor
@@ -130,12 +144,10 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
               )}
             </div>
             <div className="flex justify-end gap-2">
-              {hasNote && (
-                <button className="btn btn-sm btn-ghost gap-1" onClick={handleCancel} type="button">
-                  <X className="h-3.5 w-3.5" />
-                  Cancel
-                </button>
-              )}
+              <button className="btn btn-sm btn-ghost gap-1" onClick={handleCancel} type="button">
+                <X className="h-3.5 w-3.5" />
+                Cancel
+              </button>
               <button
                 className="btn btn-sm btn-primary gap-1"
                 onClick={handleSave}

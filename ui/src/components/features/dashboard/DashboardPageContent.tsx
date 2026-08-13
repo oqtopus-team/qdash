@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
-import { ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, ChevronDown } from "lucide-react";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
@@ -115,6 +115,30 @@ function scaleData(
     };
   });
   return out;
+}
+
+function EmptyMetricDisclosure({ children }: { children: ReactNode }) {
+  return (
+    <details className="group rounded-lg border border-dashed border-base-300 bg-base-200/40">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">No values in the selected range</p>
+          <p className="text-xs text-base-content/50">
+            Try a wider time range, or open the topology to inspect individual targets.
+          </p>
+        </div>
+        <span className="text-xs font-medium text-primary group-open:hidden">Show topology</span>
+        <span className="hidden text-xs font-medium text-primary group-open:inline">
+          Hide topology
+        </span>
+        <ChevronDown
+          className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        />
+      </summary>
+      <div className="border-t border-base-300 p-4">{children}</div>
+    </details>
+  );
 }
 
 export function DashboardPageContent() {
@@ -427,6 +451,9 @@ export function DashboardPageContent() {
   } | null>(null);
   const [editingTargetNote, setEditingTargetNote] = useState<string | null>(null);
   const [couplingDirection, setCouplingDirection] = useState<"forward" | "reverse">("forward");
+  const [showTargetSummaries, setShowTargetSummaries] = useState(false);
+  const [showEmptyQubitMetrics, setShowEmptyQubitMetrics] = useState(false);
+  const [showEmptyCouplingMetrics, setShowEmptyCouplingMetrics] = useState(false);
   const isReverseCouplingDirection = couplingDirection === "reverse";
 
   const editingLegacyMetricNote =
@@ -466,6 +493,24 @@ export function DashboardPageContent() {
     return [...qubitRows, ...couplingRows];
   }, [qubitMetrics, couplingMetrics, qubitMetricData, couplingMetricData, qubitCount]);
 
+  const metricsWithData = useMemo(
+    () =>
+      summaryRows.filter((row) =>
+        Object.values(row.data ?? {}).some(
+          (metric) => metric.value !== null && metric.value !== undefined,
+        ),
+      ).length,
+    [summaryRows],
+  );
+  const emptyMetricCount = summaryRows.length - metricsWithData;
+  const emptyQubitMetricCount = qubitMetrics.filter(
+    (metric) => coverageOf(qubitMetricData[metric.key], qubitCount).current === 0,
+  ).length;
+  const emptyCouplingMetricCount = couplingMetrics.filter((metric) => {
+    const metricData = couplingMetricData[metric.key];
+    return coverageOf(metricData, metricData ? Object.keys(metricData).length : 0).current === 0;
+  }).length;
+
   if (isConfigLoading || isChipsLoading) {
     return <MetricsPageSkeleton />;
   }
@@ -482,70 +527,98 @@ export function DashboardPageContent() {
         </div>
 
         {/* Filters */}
-        <PageFiltersBar>
-          <PageFiltersBar.Group>
-            <PageFiltersBar.Item>
-              <ChipSelector
-                selectedChip={selectedChip}
-                onChipSelect={(chipId) => {
+        <section
+          aria-labelledby="dashboard-data-scope"
+          className="rounded-xl border border-base-300 bg-base-200/45 p-3 sm:p-4"
+        >
+          <h2
+            id="dashboard-data-scope"
+            className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-base-content/55"
+          >
+            Data scope
+          </h2>
+          <div className="flex flex-col gap-4">
+            <PageFiltersBar className="gap-3">
+              <PageFiltersBar.Group className="gap-3">
+                <PageFiltersBar.Item label="Chip">
+                  <ChipSelector
+                    selectedChip={selectedChip}
+                    onChipSelect={(chipId) => {
+                      setSelectedCooldownId(null);
+                      setHasInitializedCooldownSelection(false);
+                      setSelectedChip(chipId);
+                    }}
+                  />
+                </PageFiltersBar.Item>
+                <PageFiltersBar.Item
+                  label="Cooldown"
+                  className="[&:not(:has(.cooldown-selector-control))]:hidden"
+                >
+                  <CooldownSelector
+                    chipId={selectedChip}
+                    selectedCooldownId={selectedCooldownId}
+                    onPick={(cd) => {
+                      setSelectedCooldownId(cd.cooldown_id);
+                      setHasInitializedCooldownSelection(true);
+                      setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
+                      setEndDate(
+                        dateToDateTimeLocal(cd.ended_at ? new Date(cd.ended_at) : new Date()),
+                      );
+                    }}
+                  />
+                </PageFiltersBar.Item>
+              </PageFiltersBar.Group>
+
+              <PageFiltersBar.Group position="end" className="items-start sm:items-end">
+                <PageFiltersBar.Item label="Value selection">
+                  <div className="space-y-1">
+                    <span className="hidden text-xs font-medium text-base-content/55 sm:block">
+                      Value selection
+                    </span>
+                    <div className="join overflow-hidden rounded-lg">
+                      {(["latest", "best", "average"] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          aria-pressed={selectionMode === mode}
+                          className={`join-item btn btn-sm ${
+                            selectionMode === mode ? "btn-primary" : ""
+                          }`}
+                          onClick={() => setSelectionMode(mode)}
+                        >
+                          {mode[0].toUpperCase() + mode.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </PageFiltersBar.Item>
+              </PageFiltersBar.Group>
+            </PageFiltersBar>
+
+            <div className="border-t border-base-300 pt-3">
+              <TimeRangeSelector
+                collapsible
+                startDate={startDate}
+                endDate={endDate}
+                onStartDateChange={(value) => {
                   setSelectedCooldownId(null);
-                  setHasInitializedCooldownSelection(false);
-                  setSelectedChip(chipId);
-                }}
-              />
-            </PageFiltersBar.Item>
-            <PageFiltersBar.Item>
-              <CooldownSelector
-                chipId={selectedChip}
-                selectedCooldownId={selectedCooldownId}
-                onPick={(cd) => {
-                  setSelectedCooldownId(cd.cooldown_id);
                   setHasInitializedCooldownSelection(true);
-                  setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
-                  setEndDate(dateToDateTimeLocal(cd.ended_at ? new Date(cd.ended_at) : new Date()));
+                  setStartDate(value);
+                }}
+                onEndDateChange={(value) => {
+                  setSelectedCooldownId(null);
+                  setHasInitializedCooldownSelection(true);
+                  setEndDate(value);
+                }}
+                onQuickRange={(range) => {
+                  setSelectedCooldownId(null);
+                  setHasInitializedCooldownSelection(true);
+                  setQuickRange(range);
                 }}
               />
-            </PageFiltersBar.Item>
-          </PageFiltersBar.Group>
-
-          <PageFiltersBar.Group>
-            <PageFiltersBar.Item>
-              <div className="join rounded-lg overflow-hidden">
-                {(["latest", "best", "average"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    className={`join-item btn btn-sm ${
-                      selectionMode === mode ? "btn-primary" : ""
-                    }`}
-                    onClick={() => setSelectionMode(mode)}
-                  >
-                    {mode[0].toUpperCase() + mode.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </PageFiltersBar.Item>
-          </PageFiltersBar.Group>
-        </PageFiltersBar>
-
-        <TimeRangeSelector
-          startDate={startDate}
-          endDate={endDate}
-          onStartDateChange={(value) => {
-            setSelectedCooldownId(null);
-            setHasInitializedCooldownSelection(true);
-            setStartDate(value);
-          }}
-          onEndDateChange={(value) => {
-            setSelectedCooldownId(null);
-            setHasInitializedCooldownSelection(true);
-            setEndDate(value);
-          }}
-          onQuickRange={(range) => {
-            setSelectedCooldownId(null);
-            setHasInitializedCooldownSelection(true);
-            setQuickRange(range);
-          }}
-        />
+            </div>
+          </div>
+        </section>
 
         {/* Body */}
         {!selectedChip ? (
@@ -578,91 +651,137 @@ export function DashboardPageContent() {
             <DashboardChipNoteCard chipId={selectedChip} noteScopeParams={noteScopeParams} />
 
             {/* Pinned summary topology */}
-            <Card
-              variant="default"
-              padding="md"
-              title="Target Summaries"
-              description="Use these empty topologies for pinned target summaries. Create forum topics for individual issues, images, and discussion."
-            >
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
-                <div className="flex flex-col gap-2">
-                  <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
-                    <h4 className="text-sm font-semibold">Qubit summaries</h4>
-                  </div>
-                  <div className={SUMMARY_TOPOLOGY_VIEWPORT_CLASS}>
-                    <DashboardQubitGrid
-                      metricData={null}
-                      unit=""
-                      topologyId={topologyId}
-                      colors={colors}
-                      maxCellSize={48}
-                      presentation="summary"
-                      targetNotedQids={targetNotedQids}
-                      forumLinkedQids={forumLinkedQids}
-                      forumLinksByTarget={forumLinksByTarget}
-                      notesByTarget={notesByTarget}
-                      targetNotesByTarget={targetNotesByTarget}
-                      metricKey=""
-                      onQubitClick={setEditingTargetNote}
-                    />
-                  </div>
+            <Card variant="default" padding="md">
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                aria-expanded={showTargetSummaries}
+                aria-controls="dashboard-target-summaries"
+                onClick={() => setShowTargetSummaries((visible) => !visible)}
+              >
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg font-semibold">Target Summaries</h3>
+                  <p className="mt-0.5 text-sm text-base-content/60">
+                    Pin shared context to individual qubits and couplings.
+                  </p>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold">Coupling summaries</h4>
+                <div className="hidden flex-wrap justify-end gap-2 sm:flex">
+                  <span className="badge badge-ghost badge-sm">
+                    {targetNotedQids.size} qubit {targetNotedQids.size === 1 ? "note" : "notes"}
+                  </span>
+                  <span className="badge badge-ghost badge-sm">
+                    {targetNotedCouplings.size} coupling{" "}
+                    {targetNotedCouplings.size === 1 ? "note" : "notes"}
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-primary">
+                  {showTargetSummaries ? "Hide" : "Show"}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 transition-transform ${showTargetSummaries ? "rotate-180" : ""}`}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {showTargetSummaries && (
+                <div
+                  id="dashboard-target-summaries"
+                  className="mt-5 grid grid-cols-1 items-stretch gap-6 border-t border-base-300 pt-5 xl:grid-cols-2"
+                >
+                  <div className="flex flex-col gap-2">
+                    <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
+                      <h4 className="text-sm font-semibold">Qubit summaries</h4>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCouplingDirection(isReverseCouplingDirection ? "forward" : "reverse")
-                      }
-                      className={`btn btn-sm gap-1.5 ${isReverseCouplingDirection ? "btn-secondary" : "btn-outline"}`}
-                      title={
-                        isReverseCouplingDirection
-                          ? "Showing reverse direction"
-                          : "Showing forward direction"
-                      }
-                    >
-                      <ArrowRightLeft className="h-3.5 w-3.5" />
-                      <span className="text-xs">
-                        {isReverseCouplingDirection ? "Reverse" : "Forward"}
-                      </span>
-                    </button>
+                    <div className={SUMMARY_TOPOLOGY_VIEWPORT_CLASS}>
+                      <DashboardQubitGrid
+                        metricData={null}
+                        unit=""
+                        topologyId={topologyId}
+                        colors={colors}
+                        maxCellSize={48}
+                        presentation="summary"
+                        targetNotedQids={targetNotedQids}
+                        forumLinkedQids={forumLinkedQids}
+                        forumLinksByTarget={forumLinksByTarget}
+                        notesByTarget={notesByTarget}
+                        targetNotesByTarget={targetNotesByTarget}
+                        metricKey=""
+                        onQubitClick={setEditingTargetNote}
+                      />
+                    </div>
                   </div>
-                  <div className={SUMMARY_TOPOLOGY_VIEWPORT_CLASS}>
-                    <DashboardCouplingGrid
-                      metricData={noteCouplingTopologyData}
-                      unit=""
-                      topologyId={topologyId}
-                      colors={colors}
-                      maxCellSize={48}
-                      presentation="summary"
-                      reverseDirection={isReverseCouplingDirection}
-                      targetNotedTargets={targetNotedCouplings}
-                      forumLinkedTargets={forumLinkedCouplings}
-                      forumLinksByTarget={forumLinksByTarget}
-                      notesByTarget={notesByTarget}
-                      targetNotesByTarget={targetNotesByTarget}
-                      metricKey=""
-                      onCouplingClick={setEditingTargetNote}
-                    />
+                  <div className="flex flex-col gap-2">
+                    <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-semibold">Coupling summaries</h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCouplingDirection(isReverseCouplingDirection ? "forward" : "reverse")
+                        }
+                        className={`btn btn-sm gap-1.5 ${isReverseCouplingDirection ? "btn-secondary" : "btn-outline"}`}
+                        title={
+                          isReverseCouplingDirection
+                            ? "Showing reverse direction"
+                            : "Showing forward direction"
+                        }
+                      >
+                        <ArrowRightLeft className="h-3.5 w-3.5" />
+                        <span className="text-xs">
+                          {isReverseCouplingDirection ? "Reverse" : "Forward"}
+                        </span>
+                      </button>
+                    </div>
+                    <div className={SUMMARY_TOPOLOGY_VIEWPORT_CLASS}>
+                      <DashboardCouplingGrid
+                        metricData={noteCouplingTopologyData}
+                        unit=""
+                        topologyId={topologyId}
+                        colors={colors}
+                        maxCellSize={48}
+                        presentation="summary"
+                        reverseDirection={isReverseCouplingDirection}
+                        targetNotedTargets={targetNotedCouplings}
+                        forumLinkedTargets={forumLinkedCouplings}
+                        forumLinksByTarget={forumLinksByTarget}
+                        notesByTarget={notesByTarget}
+                        targetNotesByTarget={targetNotesByTarget}
+                        metricKey=""
+                        onCouplingClick={setEditingTargetNote}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </Card>
 
             {/* Summary table — collapsed by default */}
             <Card variant="default" padding="md">
-              <details>
-                <summary className="cursor-pointer list-none flex items-center justify-between">
-                  <div>
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center gap-3">
+                  <div className="min-w-0 flex-1">
                     <h3 className="text-lg font-semibold">All Metrics Summary</h3>
                     <p className="text-sm text-base-content/60">
                       Coverage, median, min and max for every metric in the active time range.
                     </p>
                   </div>
-                  <span className="text-xs text-base-content/50">click to expand</span>
+                  <div className="hidden flex-wrap justify-end gap-2 sm:flex">
+                    <span className="badge badge-success badge-sm">
+                      {metricsWithData} with data
+                    </span>
+                    {emptyMetricCount > 0 && (
+                      <span className="badge badge-ghost badge-sm">{emptyMetricCount} empty</span>
+                    )}
+                  </div>
+                  <span className="text-xs font-medium text-primary group-open:hidden">Show</span>
+                  <span className="hidden text-xs font-medium text-primary group-open:inline">
+                    Hide
+                  </span>
+                  <ChevronDown
+                    className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
+                    aria-hidden="true"
+                  />
                 </summary>
                 <div className="mt-4">
                   <DashboardSummaryTable rows={summaryRows} />
@@ -678,6 +797,31 @@ export function DashboardPageContent() {
                 title="Qubit Metrics"
                 description="Click any qubit to update its pinned summary while inspecting the selected metric."
               >
+                {emptyQubitMetricCount > 0 && (
+                  <button
+                    type="button"
+                    className="mb-5 flex w-full items-center justify-between gap-3 rounded-lg border border-dashed border-base-300 bg-base-200/40 px-4 py-3 text-left transition-colors hover:bg-base-200/70"
+                    aria-expanded={showEmptyQubitMetrics}
+                    onClick={() => setShowEmptyQubitMetrics((visible) => !visible)}
+                  >
+                    <span>
+                      <span className="block text-sm font-medium">
+                        {emptyQubitMetricCount} qubit{" "}
+                        {emptyQubitMetricCount === 1 ? "metric" : "metrics"} without data
+                      </span>
+                      <span className="block text-xs text-base-content/50">
+                        Hidden to keep this dashboard focused on available results.
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary">
+                      {showEmptyQubitMetrics ? "Hide" : "Show"}
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${showEmptyQubitMetrics ? "rotate-180" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </button>
+                )}
                 <div className="space-y-8">
                   {qubitMetrics.map((m) => {
                     const noted = new Set(Object.keys(notesByMetric[m.key] ?? {}));
@@ -687,8 +831,13 @@ export function DashboardPageContent() {
                       if (!noted.has(targetId)) crossMetricNoted.add(targetId);
                     });
                     const cov = coverageOf(qubitMetricData[m.key], qubitCount);
+                    if (cov.current === 0 && !showEmptyQubitMetrics) return null;
                     return (
-                      <div key={m.key} className="space-y-2">
+                      <div
+                        key={m.key}
+                        id={`dashboard-qubit-metric-${m.key}`}
+                        className="scroll-mt-32 space-y-2"
+                      >
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="text-base font-semibold">{m.title}</h4>
                           <span className="badge badge-outline badge-sm">{m.unit}</span>
@@ -707,8 +856,8 @@ export function DashboardPageContent() {
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-                          <div className="xl:col-span-2 min-w-0">
+                        {cov.current === 0 ? (
+                          <EmptyMetricDisclosure>
                             <DashboardQubitGrid
                               metricData={qubitMetricData[m.key]}
                               unit={m.unit}
@@ -731,16 +880,43 @@ export function DashboardPageContent() {
                                 });
                               }}
                             />
+                          </EmptyMetricDisclosure>
+                        ) : (
+                          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+                            <div className="min-w-0 xl:col-span-2">
+                              <DashboardQubitGrid
+                                metricData={qubitMetricData[m.key]}
+                                unit={m.unit}
+                                topologyId={topologyId}
+                                colors={colors}
+                                notedQids={noted}
+                                targetNotedQids={targetNotedQids}
+                                forumLinkedQids={forumLinkedQids}
+                                forumLinksByTarget={forumLinksByTarget}
+                                crossMetricNotedQids={crossMetricNoted}
+                                notesByTarget={notesByTarget}
+                                targetNotesByTarget={targetNotesByTarget}
+                                metricKey={m.key}
+                                onQubitClick={(qid) => {
+                                  setEditingNote({
+                                    targetId: qid,
+                                    metricKey: m.key,
+                                    metricTitle: m.title,
+                                    metricUnit: m.unit,
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 xl:col-span-1">
+                              <DashboardCdfChart
+                                metricData={qubitMetricData[m.key]}
+                                title={m.title}
+                                unit={m.unit}
+                                height={260}
+                              />
+                            </div>
                           </div>
-                          <div className="xl:col-span-1 min-w-0">
-                            <DashboardCdfChart
-                              metricData={qubitMetricData[m.key]}
-                              title={m.title}
-                              unit={m.unit}
-                              height={260}
-                            />
-                          </div>
-                        </div>
+                        )}
                       </div>
                     );
                   })}
@@ -756,6 +932,31 @@ export function DashboardPageContent() {
                 title="Coupling Metrics"
                 description="Click any coupling to update its pinned summary while inspecting the selected metric."
               >
+                {emptyCouplingMetricCount > 0 && (
+                  <button
+                    type="button"
+                    className="mb-4 flex w-full items-center justify-between gap-3 rounded-lg border border-dashed border-base-300 bg-base-200/40 px-4 py-3 text-left transition-colors hover:bg-base-200/70"
+                    aria-expanded={showEmptyCouplingMetrics}
+                    onClick={() => setShowEmptyCouplingMetrics((visible) => !visible)}
+                  >
+                    <span>
+                      <span className="block text-sm font-medium">
+                        {emptyCouplingMetricCount} coupling{" "}
+                        {emptyCouplingMetricCount === 1 ? "metric" : "metrics"} without data
+                      </span>
+                      <span className="block text-xs text-base-content/50">
+                        Hidden to keep this dashboard focused on available results.
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary">
+                      {showEmptyCouplingMetrics ? "Hide" : "Show"}
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${showEmptyCouplingMetrics ? "rotate-180" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </button>
+                )}
                 <div className="mb-4 flex justify-end">
                   <button
                     type="button"
@@ -787,8 +988,13 @@ export function DashboardPageContent() {
                       ? Object.keys(couplingMetricData[m.key] ?? {}).length
                       : 0;
                     const cov = coverageOf(couplingMetricData[m.key], couplingTotal);
+                    if (cov.current === 0 && !showEmptyCouplingMetrics) return null;
                     return (
-                      <div key={m.key} className="space-y-2">
+                      <div
+                        key={m.key}
+                        id={`dashboard-coupling-metric-${m.key}`}
+                        className="scroll-mt-32 space-y-2"
+                      >
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="text-base font-semibold">{m.title}</h4>
                           <span className="badge badge-outline badge-sm">{m.unit}</span>
@@ -807,8 +1013,8 @@ export function DashboardPageContent() {
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-                          <div className="xl:col-span-2 min-w-0">
+                        {cov.current === 0 ? (
+                          <EmptyMetricDisclosure>
                             <DashboardCouplingGrid
                               metricData={couplingMetricData[m.key]}
                               unit={m.unit}
@@ -832,16 +1038,44 @@ export function DashboardPageContent() {
                                 });
                               }}
                             />
+                          </EmptyMetricDisclosure>
+                        ) : (
+                          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
+                            <div className="min-w-0 xl:col-span-2">
+                              <DashboardCouplingGrid
+                                metricData={couplingMetricData[m.key]}
+                                unit={m.unit}
+                                topologyId={topologyId}
+                                colors={colors}
+                                reverseDirection={isReverseCouplingDirection}
+                                notedTargets={noted}
+                                targetNotedTargets={targetNotedCouplings}
+                                forumLinkedTargets={forumLinkedCouplings}
+                                forumLinksByTarget={forumLinksByTarget}
+                                crossMetricNotedTargets={crossMetricNoted}
+                                notesByTarget={notesByTarget}
+                                targetNotesByTarget={targetNotesByTarget}
+                                metricKey={m.key}
+                                onCouplingClick={(couplingId) => {
+                                  setEditingNote({
+                                    targetId: couplingId,
+                                    metricKey: m.key,
+                                    metricTitle: m.title,
+                                    metricUnit: m.unit,
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 xl:col-span-1">
+                              <DashboardCdfChart
+                                metricData={couplingMetricData[m.key]}
+                                title={m.title}
+                                unit={m.unit}
+                                height={260}
+                              />
+                            </div>
                           </div>
-                          <div className="xl:col-span-1 min-w-0">
-                            <DashboardCdfChart
-                              metricData={couplingMetricData[m.key]}
-                              title={m.title}
-                              unit={m.unit}
-                              height={260}
-                            />
-                          </div>
-                        </div>
+                        )}
                       </div>
                     );
                   })}

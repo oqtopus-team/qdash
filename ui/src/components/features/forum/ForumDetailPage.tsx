@@ -35,6 +35,8 @@ import {
   useUpdateForumPost,
 } from "@/client/forum/forum";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
@@ -195,22 +197,34 @@ function PostBody({
         </div>
         {canEdit && !editing && !isAi && onDelete && (
           <div className="flex items-center gap-1">
-            <button
-              className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-primary"
-              onClick={onEdit}
-              title="Edit"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-            <button
-              className={`btn btn-ghost btn-sm btn-square text-base-content/40 ${
-                postAction === "close" ? "hover:text-primary" : "hover:text-error"
-              }`}
-              onClick={onDelete}
-              title={actionTitle}
-            >
-              <ActionIcon className="h-4 w-4" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-primary"
+                  onClick={onEdit}
+                  aria-label="Edit"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Edit</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={`btn btn-ghost btn-sm btn-square text-base-content/40 ${
+                    postAction === "close" ? "hover:text-primary" : "hover:text-error"
+                  }`}
+                  onClick={onDelete}
+                  aria-label={actionTitle}
+                >
+                  <ActionIcon className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{actionTitle}</TooltipContent>
+            </Tooltip>
           </div>
         )}
       </div>
@@ -276,6 +290,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
   const [editReplyContent, setEditReplyContent] = useState("");
   const [editReplyBlocks, setEditReplyBlocks] = useState<Record<string, unknown>[]>([]);
+  const [replyToDeleteId, setReplyToDeleteId] = useState<string | null>(null);
+  const [isDeletingReply, setIsDeletingReply] = useState(false);
   const editReplySnapshotRef = useRef<ForumBlockSnapshotGetter | null>(null);
   const replyComposerSnapshotRef = useRef<ForumBlockSnapshotGetter | null>(null);
   const [replyLimit, setReplyLimit] = useState(REPLY_PAGE_SIZE);
@@ -597,9 +613,16 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     updateRootMetadata({ assigneeUsername: nextAssigneeUsername || null });
   };
 
-  const handleDeleteReply = async (targetPostId: string) => {
-    await deleteMutation.mutateAsync({ postId: targetPostId });
-    invalidateThread();
+  const handleConfirmDeleteReply = async () => {
+    if (!replyToDeleteId) return;
+    setIsDeletingReply(true);
+    try {
+      await deleteMutation.mutateAsync({ postId: replyToDeleteId });
+      invalidateThread();
+      setReplyToDeleteId(null);
+    } finally {
+      setIsDeletingReply(false);
+    }
   };
 
   if (postLoading) {
@@ -633,12 +656,19 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-6 flex min-w-0 items-start gap-3">
-        <button
-          className="btn btn-square btn-ghost btn-sm shrink-0"
-          onClick={() => router.push(forumReturnHref)}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="btn btn-square btn-ghost btn-sm shrink-0"
+              onClick={() => router.push(forumReturnHref)}
+              aria-label="Back to forum"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Back to forum</TooltipContent>
+        </Tooltip>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start gap-2">
             {formatForumPostNumber(post.number) && (
@@ -676,14 +706,19 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               </h1>
             )}
             {canManage && !editingTitle && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm btn-square shrink-0 text-base-content/40 hover:text-primary"
-                onClick={handleStartEditTitle}
-                title="Edit title"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm btn-square shrink-0 text-base-content/40 hover:text-primary"
+                    onClick={handleStartEditTitle}
+                    aria-label="Edit title"
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Edit title</TooltipContent>
+              </Tooltip>
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
@@ -743,7 +778,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                     post={reply}
                     currentUsername={currentUsername}
                     onEdit={() => handleStartEditReply(reply)}
-                    onDelete={() => handleDeleteReply(reply.id)}
+                    onDelete={() => setReplyToDeleteId(reply.id)}
                     editing={editingReplyId === reply.id}
                     editContent={editReplyContent}
                     editInitialBlocks={editReplyBlocks}
@@ -1130,6 +1165,17 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </section>
         </aside>
       </div>
+
+      <ConfirmDialog
+        open={replyToDeleteId !== null}
+        title="Delete reply?"
+        description="This reply will be permanently deleted. This action cannot be undone."
+        confirmLabel="Delete reply"
+        onConfirm={handleConfirmDeleteReply}
+        onOpenChange={(open) => !open && setReplyToDeleteId(null)}
+        pending={isDeletingReply}
+        destructive
+      />
     </div>
   );
 }

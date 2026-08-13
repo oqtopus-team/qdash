@@ -41,6 +41,7 @@ import {
 import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { PierreFileTree } from "@/components/ui/PierreFileTree";
 import { FileDiffReviewDialog } from "@/components/ui/FileDiffReviewDialog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -98,6 +99,8 @@ export function FilesPageContent() {
   const [fileContent, setFileContent] = useState("");
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
+  const [pullConfirmationOpen, setPullConfirmationOpen] = useState(false);
   const [commitMessage, setCommitMessage] = useState("");
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
@@ -162,6 +165,7 @@ export function FilesPageContent() {
   const pullMutation = useMutation({
     mutationFn: () => gitPullConfig().then((res: AxiosResponse<GitPullConfig200>) => res.data),
     onSuccess: (data: GitPullConfig200) => {
+      setPullConfirmationOpen(false);
       toast.success(
         `Git pull successful! Updated to commit: ${(data.commit as string) || "unknown"}`,
       );
@@ -235,18 +239,19 @@ export function FilesPageContent() {
     }
   }, [fileContentData]);
 
-  const handleFileSelect = (path: string) => {
-    if (hasUnsavedChanges) {
-      if (
-        !confirm("You have unsaved changes. Do you want to discard them and open another file?")
-      ) {
-        return;
-      }
-    }
+  const selectFile = (path: string) => {
     setSelectedFile(path);
     setHasUnsavedChanges(false);
     setIsEditorLocked(true); // Lock editor when opening new file
     setImportResult(null); // Clear import result when selecting new file
+  };
+
+  const handleFileSelect = (path: string) => {
+    if (hasUnsavedChanges) {
+      setPendingFilePath(path);
+      return;
+    }
+    selectFile(path);
   };
 
   const handleImportToQDash = () => {
@@ -275,9 +280,8 @@ export function FilesPageContent() {
 
   const handlePull = () => {
     if (hasUnsavedChanges) {
-      if (!confirm("You have unsaved changes. Git pull will overwrite them. Continue?")) {
-        return;
-      }
+      setPullConfirmationOpen(true);
+      return;
     }
     pullMutation.mutate();
   };
@@ -675,6 +679,28 @@ export function FilesPageContent() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={pendingFilePath !== null}
+        title="Discard unsaved changes?"
+        description="Your unsaved changes will be lost when you open another file."
+        confirmLabel="Discard and open"
+        onConfirm={() => {
+          if (pendingFilePath) selectFile(pendingFilePath);
+          setPendingFilePath(null);
+        }}
+        onOpenChange={(open) => !open && setPendingFilePath(null)}
+        destructive
+      />
+      <ConfirmDialog
+        open={pullConfirmationOpen}
+        title="Discard changes and pull?"
+        description="Git pull will overwrite your unsaved changes."
+        confirmLabel="Discard and pull"
+        onConfirm={() => pullMutation.mutate()}
+        onOpenChange={setPullConfirmationOpen}
+        pending={pullMutation.isPending}
+        destructive
+      />
     </>
   );
 }

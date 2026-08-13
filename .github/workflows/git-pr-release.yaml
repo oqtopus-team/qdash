@@ -13,8 +13,9 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.3
-      - run: gem install --no-document git-pr-release
-      - run: git-pr-release --squashed
+      - run: gem install --no-document git-pr-release --version 2.5.0
+      - name: Create or update release PR
+        run: ruby .github/scripts/git-pr-release.rb --squashed --no-fetch
         env:
           GIT_PR_RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIT_PR_RELEASE_BRANCH_PRODUCTION: main

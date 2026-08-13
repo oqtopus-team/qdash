@@ -35,7 +35,7 @@ export function useIssues() {
     is_closed: buildIsClosedParam(statusFilter),
   };
 
-  const { data, isLoading } = useListIssues(params);
+  const { data, isLoading, isError, refetch } = useListIssues(params);
 
   const issues = data?.data?.issues ?? [];
   const total = data?.data?.total ?? 0;
@@ -87,6 +87,7 @@ export function useIssues() {
     skip,
     pageSize: PAGE_SIZE,
     isLoading,
+    isError,
     taskIdFilter,
     filterByTaskId,
     statusFilter,
@@ -95,6 +96,7 @@ export function useIssues() {
     reopenIssue,
     goToPage,
     refresh,
+    refetch,
   };
 }
 

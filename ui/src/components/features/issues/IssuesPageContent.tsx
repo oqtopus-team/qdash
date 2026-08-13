@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageSquare, X, Lock, Unlock } from "lucide-react";
+import { AlertCircle, ArrowRight, MessageSquare, X, Lock, Unlock, RotateCcw } from "lucide-react";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -51,7 +51,7 @@ function IssueThread({
           <div className="flex items-center gap-1.5">
             <span className="badge badge-sm badge-neutral">{issue.username}</span>
             <span className="text-xs text-base-content/40">
-              {formatRelativeTime(issue.created_at)}
+              Updated {formatRelativeTime(issue.updated_at ?? issue.created_at)}
             </span>
             {issue.is_closed === true && <span className="badge badge-sm badge-ghost">Closed</span>}
           </div>
@@ -102,6 +102,7 @@ export function IssuesPageContent() {
     skip,
     pageSize,
     isLoading,
+    isError,
     taskIdFilter,
     filterByTaskId,
     statusFilter,
@@ -109,6 +110,7 @@ export function IssuesPageContent() {
     closeIssue,
     reopenIssue,
     goToPage,
+    refetch,
   } = useIssues();
   const { isOwner } = useProject();
   const { username: currentUser } = useAuth();
@@ -131,48 +133,52 @@ export function IssuesPageContent() {
     <PageContainer maxWidth>
       <PageHeader title="Issues" description="Track and discuss issues on task results" />
 
-      {/* Status tabs */}
-      <div className="mb-4">
-        <div className="tabs tabs-boxed w-fit">
-          {(["open", "closed", "all"] as const).map((status) => (
-            <button
-              key={status}
-              className={`tab tab-sm ${statusFilter === status ? "tab-active" : ""}`}
-              onClick={() => setStatusFilter(status)}
-            >
-              {status.charAt(0).toUpperCase() + status.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Filter bar */}
-      <div className="mb-4">
-        <form onSubmit={handleFilterSubmit} className="flex flex-wrap gap-2 items-center">
-          <SearchInput
-            value={filterInput}
-            onChange={setFilterInput}
-            onClear={clearFilter}
-            placeholder="Filter by task ID..."
-            className="flex-1 max-w-sm"
-          />
-          <button type="submit" className="btn btn-sm btn-primary">
-            Filter
-          </button>
-          {taskIdFilter && (
-            <div className="flex items-center gap-1 basis-full sm:basis-auto min-w-0">
-              <span className="badge badge-sm badge-outline min-w-0">
-                <span className="min-w-0 truncate">task: {taskIdFilter}</span>
-              </span>
+      <div className="mb-5 rounded-xl border border-base-300 bg-base-100 p-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="tabs tabs-boxed w-fit" role="tablist" aria-label="Issue status">
+            {(["open", "closed", "all"] as const).map((status) => (
               <button
-                onClick={clearFilter}
-                className="btn btn-ghost btn-xs p-0 h-auto min-h-0 shrink-0"
+                key={status}
+                type="button"
+                role="tab"
+                aria-selected={statusFilter === status}
+                className={`tab tab-sm gap-1.5 ${statusFilter === status ? "tab-active" : ""}`}
+                onClick={() => setStatusFilter(status)}
               >
-                <X className="h-3 w-3" />
+                {status.charAt(0).toUpperCase() + status.slice(1)}
+                {statusFilter === status && !isLoading && (
+                  <span className="badge badge-sm">{total}</span>
+                )}
               </button>
-            </div>
-          )}
-        </form>
+            ))}
+          </div>
+          <form onSubmit={handleFilterSubmit} className="flex min-w-0 flex-1 gap-2 sm:max-w-lg">
+            <SearchInput
+              value={filterInput}
+              onChange={setFilterInput}
+              onClear={clearFilter}
+              placeholder="Find an exact task ID"
+              className="min-w-0 flex-1"
+            />
+            <button type="submit" className="btn btn-sm btn-primary">
+              Apply
+            </button>
+          </form>
+        </div>
+        {taskIdFilter && (
+          <div className="mt-3 flex min-w-0 items-center gap-1 border-t border-base-300 pt-3">
+            <span className="text-xs text-base-content/50">Filtered by</span>
+            <span className="badge badge-sm badge-outline min-w-0">
+              <span className="min-w-0 truncate">task: {taskIdFilter}</span>
+            </span>
+            <button
+              onClick={clearFilter}
+              className="btn btn-ghost btn-xs p-0 h-auto min-h-0 shrink-0"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -180,15 +186,49 @@ export function IssuesPageContent() {
         <div className="flex justify-center py-16">
           <span className="loading loading-spinner loading-lg"></span>
         </div>
+      ) : isError ? (
+        <div className="alert alert-error" role="alert">
+          <AlertCircle className="h-5 w-5" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold">Failed to load issues</div>
+            <div className="text-sm opacity-80">The issue list could not be retrieved.</div>
+          </div>
+          <button type="button" className="btn btn-sm btn-ghost gap-1" onClick={() => refetch()}>
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            Retry
+          </button>
+        </div>
       ) : issues.length === 0 ? (
         <EmptyState
-          title="No issues yet"
+          title={
+            taskIdFilter
+              ? "No issues for this task"
+              : statusFilter === "open"
+                ? "No open issues"
+                : statusFilter === "closed"
+                  ? "No closed issues"
+                  : "No issues yet"
+          }
           description={
             taskIdFilter
               ? "No issues found for this task. Try removing the filter."
-              : "Issues on task results will appear here."
+              : statusFilter === "open"
+                ? "Everything is clear. Open a task result to report a calibration issue."
+                : "Issues created from task results will appear here."
           }
           emoji="speech-balloon"
+          action={
+            taskIdFilter ? (
+              <button type="button" className="btn btn-sm btn-ghost" onClick={clearFilter}>
+                Clear task filter
+              </button>
+            ) : (
+              <Link href="/task-results" className="btn btn-sm btn-primary gap-1">
+                Browse task results
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            )
+          }
         />
       ) : (
         <>

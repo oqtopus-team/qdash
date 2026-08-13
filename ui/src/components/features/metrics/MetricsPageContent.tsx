@@ -350,15 +350,24 @@ export function MetricsPageContent() {
             </div>
           </div>
 
-          {/* Metric Type Tabs */}
-          <div className="tabs tabs-boxed bg-base-200 w-fit">
+          <div
+            className="tabs tabs-boxed w-fit bg-base-200"
+            role="tablist"
+            aria-label="Metric target"
+          >
             <button
+              type="button"
+              role="tab"
+              aria-selected={metricType === "qubit"}
               className={`tab ${metricType === "qubit" ? "tab-active" : ""}`}
               onClick={() => setMetricType("qubit")}
             >
               Qubit
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={metricType === "coupling"}
               className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
               onClick={() => setMetricType("coupling")}
             >
@@ -366,90 +375,107 @@ export function MetricsPageContent() {
             </button>
           </div>
 
-          {/* Selection Mode and Filters Row */}
-          <PageFiltersBar>
-            <PageFiltersBar.Group>
-              {/* Latest/Best Toggle */}
-              <PageFiltersBar.Item>
-                <div className="join rounded-lg overflow-hidden">
-                  <button
-                    className={`join-item btn btn-sm ${
-                      selectionMode === "latest" ? "btn-primary" : ""
-                    }`}
-                    onClick={() => setSelectionMode("latest")}
-                  >
-                    <span>Latest</span>
-                  </button>
-                  <button
-                    className={`join-item btn btn-sm ${
-                      selectionMode === "best" ? "btn-primary" : ""
-                    } ${!isBestModeSupported ? "btn-disabled" : ""}`}
-                    onClick={() => setSelectionMode("best")}
-                    disabled={!isBestModeSupported}
-                    title={
-                      !isBestModeSupported
-                        ? "Best mode not available for this metric"
-                        : "Show best values within time range"
-                    }
-                  >
-                    <span>Best</span>
-                  </button>
-                  <button
-                    className={`join-item btn btn-sm ${
-                      selectionMode === "average" ? "btn-primary" : ""
-                    }`}
-                    onClick={() => setSelectionMode("average")}
-                    title="Show average values within time range"
-                  >
-                    <span>Average</span>
-                  </button>
-                </div>
-              </PageFiltersBar.Item>
-            </PageFiltersBar.Group>
+          <section
+            aria-labelledby="metrics-data-scope"
+            className="rounded-xl border border-base-300 bg-base-200/45 p-3 sm:p-4"
+          >
+            <h2
+              id="metrics-data-scope"
+              className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-base-content/55"
+            >
+              Data scope
+            </h2>
+            <div className="flex flex-col gap-4">
+              <PageFiltersBar className="gap-3">
+                <PageFiltersBar.Group className="gap-3">
+                  <PageFiltersBar.Item label="Chip">
+                    <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
+                  </PageFiltersBar.Item>
 
-            <PageFiltersBar.Group>
-              <PageFiltersBar.Item>
-                <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
-              </PageFiltersBar.Item>
+                  <PageFiltersBar.Item
+                    label="Cooldown"
+                    className="[&:not(:has(.cooldown-selector-control))]:hidden"
+                  >
+                    <CooldownSelector
+                      chipId={selectedChip}
+                      onPick={(cd) => {
+                        setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
+                        setEndDate(
+                          dateToDateTimeLocal(cd.ended_at ? new Date(cd.ended_at) : new Date()),
+                        );
+                      }}
+                    />
+                  </PageFiltersBar.Item>
 
-              <PageFiltersBar.Item>
-                <CooldownSelector
-                  chipId={selectedChip}
-                  onPick={(cd) => {
-                    setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
-                    setEndDate(
-                      dateToDateTimeLocal(cd.ended_at ? new Date(cd.ended_at) : new Date()),
-                    );
-                  }}
+                  <PageFiltersBar.Item label="Metric">
+                    <Select<MetricOption, false, GroupBase<MetricOption>>
+                      className="w-full text-base-content sm:w-64"
+                      classNamePrefix="react-select"
+                      options={groupedMetricOptions}
+                      value={
+                        metricOptions.find((option) => option.value === selectedMetric) ?? null
+                      }
+                      onChange={(option: SingleValue<MetricOption>) => {
+                        if (option) setSelectedMetric(option.value);
+                      }}
+                      placeholder="Select a metric"
+                      isSearchable
+                      styles={metricSelectStyles}
+                    />
+                  </PageFiltersBar.Item>
+                </PageFiltersBar.Group>
+
+                <PageFiltersBar.Group position="end" className="items-start sm:items-end">
+                  <PageFiltersBar.Item label="Value selection">
+                    <div className="join overflow-hidden rounded-lg">
+                      <button
+                        type="button"
+                        aria-pressed={selectionMode === "latest"}
+                        className={`join-item btn btn-sm ${selectionMode === "latest" ? "btn-primary" : ""}`}
+                        onClick={() => setSelectionMode("latest")}
+                      >
+                        Latest
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={selectionMode === "best"}
+                        className={`join-item btn btn-sm ${selectionMode === "best" ? "btn-primary" : ""}`}
+                        onClick={() => setSelectionMode("best")}
+                        disabled={!isBestModeSupported}
+                        title={
+                          !isBestModeSupported
+                            ? "Best mode not available for this metric"
+                            : "Show best values within time range"
+                        }
+                      >
+                        Best
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={selectionMode === "average"}
+                        className={`join-item btn btn-sm ${selectionMode === "average" ? "btn-primary" : ""}`}
+                        onClick={() => setSelectionMode("average")}
+                        title="Show average values within time range"
+                      >
+                        Average
+                      </button>
+                    </div>
+                  </PageFiltersBar.Item>
+                </PageFiltersBar.Group>
+              </PageFiltersBar>
+
+              <div className="border-t border-base-300 pt-3">
+                <TimeRangeSelector
+                  collapsible
+                  startDate={startDate}
+                  endDate={endDate}
+                  onStartDateChange={setStartDate}
+                  onEndDateChange={setEndDate}
+                  onQuickRange={setQuickRange}
                 />
-              </PageFiltersBar.Item>
-
-              <PageFiltersBar.Item>
-                <Select<MetricOption, false, GroupBase<MetricOption>>
-                  className="w-full sm:w-64 text-base-content"
-                  classNamePrefix="react-select"
-                  options={groupedMetricOptions}
-                  value={metricOptions.find((option) => option.value === selectedMetric) ?? null}
-                  onChange={(option: SingleValue<MetricOption>) => {
-                    if (option) {
-                      setSelectedMetric(option.value);
-                    }
-                  }}
-                  placeholder="Select a metric"
-                  isSearchable={false}
-                  styles={metricSelectStyles}
-                />
-              </PageFiltersBar.Item>
-            </PageFiltersBar.Group>
-          </PageFiltersBar>
-
-          <TimeRangeSelector
-            startDate={startDate}
-            endDate={endDate}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-            onQuickRange={setQuickRange}
-          />
+              </div>
+            </div>
+          </section>
         </div>
 
         {/* Metrics Grid */}

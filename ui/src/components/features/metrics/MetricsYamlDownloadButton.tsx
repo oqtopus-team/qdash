@@ -1,6 +1,7 @@
 "use client";
 
 import { Download } from "lucide-react";
+import { stringify } from "yaml";
 
 interface MetricConfig {
   key: string;
@@ -25,33 +26,7 @@ interface MetricsYamlDownloadButtonProps {
   disabled?: boolean;
 }
 
-const YAML_SPECIAL_CHARS = [
-  ":",
-  "#",
-  "[",
-  "]",
-  "{",
-  "}",
-  "&",
-  "*",
-  "!",
-  "|",
-  ">",
-  "'",
-  '"',
-  "%",
-  "@",
-  "`",
-];
-
-function escapeYamlString(value: string): string {
-  if (YAML_SPECIAL_CHARS.some((char) => value.includes(char)) || value.trim() !== value) {
-    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  }
-  return `"${value}"`;
-}
-
-function buildYaml(
+export function buildMetricsYaml(
   chipId: string,
   metricConfig: MetricConfig,
   selectionMode: string,
@@ -63,17 +38,6 @@ function buildYaml(
     selectionMode === "average" &&
     Object.values(metricData).some((v) => v.stddev !== null && v.stddev !== undefined);
 
-  const lines: string[] = [
-    `chip_id: ${escapeYamlString(chipId)}`,
-    `metric: ${metricConfig.key}`,
-    `title: ${escapeYamlString(metricConfig.title)}`,
-    `unit: ${escapeYamlString(metricConfig.unit)}`,
-    `selection_mode: ${selectionMode}`,
-    `time_range: ${escapeYamlString(timeRange)}`,
-    `timestamp: ${escapeYamlString(timestamp)}`,
-    `data:`,
-  ];
-
   const entries = Object.entries(metricData)
     .filter(([, v]) => v.value !== null)
     .sort(([a], [b]) => {
@@ -83,19 +47,28 @@ function buildYaml(
       return a.localeCompare(b);
     });
 
-  if (hasStddev) {
-    for (const [entityId, { value, stddev }] of entries) {
-      lines.push(`  ${escapeYamlString(entityId)}:`);
-      lines.push(`    value: ${value}`);
-      lines.push(`    stddev: ${stddev != null && isFinite(stddev) ? stddev : "null"}`);
-    }
-  } else {
-    for (const [entityId, { value }] of entries) {
-      lines.push(`  ${escapeYamlString(entityId)}: ${value}`);
-    }
-  }
+  const data = Object.fromEntries(
+    entries.map(([entityId, { value, stddev }]) => [
+      entityId,
+      hasStddev
+        ? {
+            value,
+            stddev: stddev != null && Number.isFinite(stddev) ? stddev : null,
+          }
+        : value,
+    ]),
+  );
 
-  return lines.join("\n") + "\n";
+  return stringify({
+    chip_id: chipId,
+    metric: metricConfig.key,
+    title: metricConfig.title,
+    unit: metricConfig.unit,
+    selection_mode: selectionMode,
+    time_range: timeRange,
+    timestamp,
+    data,
+  });
 }
 
 export function MetricsYamlDownloadButton({
@@ -109,7 +82,7 @@ export function MetricsYamlDownloadButton({
   const handleDownload = () => {
     if (!chipId || !metricData || !metricConfig) return;
 
-    const yaml = buildYaml(chipId, metricConfig, selectionMode, timeRange, metricData);
+    const yaml = buildMetricsYaml(chipId, metricConfig, selectionMode, timeRange, metricData);
 
     const blob = new Blob([yaml], { type: "text/yaml;charset=utf-8" });
 

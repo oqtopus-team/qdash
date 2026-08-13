@@ -24,14 +24,16 @@ interface SummaryRow {
   title: string;
   unit: string;
   type: "Qubit" | "Coupling";
-  coverage: string;
+  valueCount: number;
+  total: number;
+  coveragePct: number;
   median: string;
   min: string;
   max: string;
 }
 
 function fmt(value: number | null): string {
-  if (value === null) return "N/A";
+  if (value === null) return "—";
   const abs = Math.abs(value);
   if (abs >= 100) return value.toFixed(2);
   if (abs >= 10) return value.toFixed(3);
@@ -47,7 +49,12 @@ export function DashboardSummaryTable({ rows }: DashboardSummaryTableProps) {
           .map((v) => v.value)
           .filter((v): v is number => v !== null && v !== undefined);
         const sorted = [...values].sort((a, b) => a - b);
-        const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : null;
+        const middle = Math.floor(sorted.length / 2);
+        const median = sorted.length
+          ? sorted.length % 2 === 0
+            ? (sorted[middle - 1] + sorted[middle]) / 2
+            : sorted[middle]
+          : null;
         const min = values.length ? Math.min(...values) : null;
         const max = values.length ? Math.max(...values) : null;
         const total = r.expectedTotal || values.length;
@@ -57,7 +64,9 @@ export function DashboardSummaryTable({ rows }: DashboardSummaryTableProps) {
           title: r.title,
           unit: r.unit,
           type: r.type,
-          coverage: `${coverage.toFixed(1)}% (${values.length}/${total})`,
+          valueCount: values.length,
+          total,
+          coveragePct: coverage,
           median: fmt(median),
           min: fmt(min),
           max: fmt(max),
@@ -67,10 +76,13 @@ export function DashboardSummaryTable({ rows }: DashboardSummaryTableProps) {
   );
 
   return (
-    <div className="overflow-x-auto">
-      <table className="table table-zebra table-sm">
+    <div className="overflow-x-auto rounded-lg border border-base-300">
+      <table className="table table-sm">
+        <caption className="sr-only">
+          Metric coverage and distribution statistics for the selected data scope
+        </caption>
         <thead>
-          <tr>
+          <tr className="bg-base-200/70 text-xs uppercase tracking-wide text-base-content/60">
             <th>Metric</th>
             <th>Type</th>
             <th>Unit</th>
@@ -82,7 +94,7 @@ export function DashboardSummaryTable({ rows }: DashboardSummaryTableProps) {
         </thead>
         <tbody>
           {summaries.map((row) => (
-            <tr key={`${row.type}-${row.key}`}>
+            <tr key={`${row.type}-${row.key}`} className="hover:bg-base-200/45">
               <td className="font-medium">{row.title}</td>
               <td>
                 <span
@@ -94,10 +106,22 @@ export function DashboardSummaryTable({ rows }: DashboardSummaryTableProps) {
                 </span>
               </td>
               <td className="text-base-content/70">{row.unit}</td>
-              <td className="tabular-nums">{row.coverage}</td>
-              <td className="tabular-nums">{row.median}</td>
-              <td className="tabular-nums">{row.min}</td>
-              <td className="tabular-nums">{row.max}</td>
+              <td className="min-w-40">
+                <div className="flex items-center gap-2">
+                  <progress
+                    className="progress progress-primary h-1.5 w-20"
+                    value={row.coveragePct}
+                    max="100"
+                    aria-label={`${row.title} coverage`}
+                  />
+                  <span className="whitespace-nowrap text-xs tabular-nums">
+                    {row.coveragePct.toFixed(1)}% ({row.valueCount}/{row.total})
+                  </span>
+                </div>
+              </td>
+              <td className="font-medium tabular-nums">{row.median}</td>
+              <td className="tabular-nums text-base-content/70">{row.min}</td>
+              <td className="tabular-nums text-base-content/70">{row.max}</td>
             </tr>
           ))}
         </tbody>
