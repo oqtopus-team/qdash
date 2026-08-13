@@ -564,12 +564,12 @@ class CalibDataSaver(Protocol):
         qid: str,
         output_dir: str | None = None,
     ) -> list[str]:
-        """Save raw data as CSV files.
+        """Save raw data as NetCDF files.
 
         Parameters
         ----------
         raw_data : list
-            List of numpy arrays to save
+            List of Qubex data models or NumPy-compatible arrays to save
         task_name : str
             The name of the task
         task_type : str

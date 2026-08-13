@@ -21,6 +21,7 @@ from qdash.api.lib.project import (
 )
 from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
+    ArtifactPreviewResponse,
     CancelExecutionResponse,
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
@@ -28,6 +29,7 @@ from qdash.api.schemas.execution import (
     ReExecuteRequest,
 )
 from qdash.api.schemas.flow import ExecuteFlowResponse
+from qdash.api.services.artifact_preview_service import preview_netcdf
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.flow_service import FlowService
 from qdash.common.config.path_resolver import resolve_calib_data_path
@@ -74,6 +76,44 @@ def get_figure_by_path(path: str) -> FileResponse:
         )
     # FileResponse sets Content-Length, avoiding chunked encoding
     return FileResponse(resolved_path, media_type="image/png")
+
+
+@router.get(
+    "/executions/artifact",
+    responses={404: {"model": Detail}},
+    response_class=FileResponse,
+    summary="Download a calibration artifact by its path",
+    operation_id="downloadArtifactByPath",
+)
+def download_artifact_by_path(path: str) -> FileResponse:
+    """Download a calibration artifact such as figure JSON or raw NetCDF data."""
+    resolved_path = resolve_calib_data_path(path)
+    if not resolved_path.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    return FileResponse(resolved_path, filename=resolved_path.name)
+
+
+@router.get(
+    "/executions/artifact/preview",
+    responses={400: {"model": Detail}, 404: {"model": Detail}},
+    response_model=ArtifactPreviewResponse,
+    summary="Preview a NetCDF calibration artifact",
+    operation_id="previewArtifactByPath",
+)
+def preview_artifact_by_path(path: str) -> ArtifactPreviewResponse:
+    """Return a size-limited table preview of a NetCDF calibration artifact."""
+    resolved_path = resolve_calib_data_path(path)
+    if not resolved_path.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    if resolved_path.suffix.lower() != ".nc":
+        raise HTTPException(status_code=400, detail="Only NetCDF (.nc) artifacts can be previewed")
+    try:
+        return preview_netcdf(resolved_path)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unable to preview NetCDF artifact: {error}",
+        ) from error
 
 
 @router.get(

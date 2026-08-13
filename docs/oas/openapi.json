@@ -1564,6 +1564,115 @@
         }
       }
     },
+    "/executions/artifact": {
+      "get": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Download a calibration artifact by its path",
+        "description": "Download a calibration artifact such as figure JSON or raw NetCDF data.",
+        "operationId": "downloadArtifactByPath",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/executions/artifact/preview": {
+      "get": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Preview a NetCDF calibration artifact",
+        "description": "Return a size-limited table preview of a NetCDF calibration artifact.",
+        "operationId": "previewArtifactByPath",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/executions/lock-status": {
       "get": {
         "tags": [
@@ -17831,6 +17940,100 @@
         "title": "ApplyAgentCandidateRequest",
         "description": "Dispatch a committed candidate for worker-side backend application."
       },
+      "ArtifactPreviewResponse": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "shape": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Shape"
+          },
+          "dtype": {
+            "type": "string",
+            "title": "Dtype"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "shape",
+          "dtype",
+          "columns",
+          "rows",
+          "total_rows",
+          "truncated"
+        ],
+        "title": "ArtifactPreviewResponse",
+        "description": "Tabular preview of a NetCDF calibration artifact."
+      },
       "BackendConfigResponse": {
         "properties": {
           "default_backend": {
@@ -27803,6 +28006,13 @@
             "type": "array",
             "title": "Json Figure Path"
           },
+          "raw_data_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Raw Data Path"
+          },
           "input_parameters": {
             "additionalProperties": true,
             "type": "object",
@@ -27906,11 +28116,12 @@
           "execution_id",
           "figure_path",
           "json_figure_path",
+          "raw_data_path",
           "input_parameters",
           "output_parameters"
         ],
         "title": "TaskResultResponse",
-        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    user_id (str | None): Internal ID of the user who executed the task.\n    username (str): Username snapshot of the user who executed the task.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time.\n    source_task_id (str | None): Parent task ID this was re-executed from.\n    re_executions (list[ReExecutionEntry]): Child task results from re-executions."
+        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    user_id (str | None): Internal ID of the user who executed the task.\n    username (str): Username snapshot of the user who executed the task.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    raw_data_path (list[str]): List of raw data artifact paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time.\n    source_task_id (str | None): Parent task ID this was re-executed from.\n    re_executions (list[ReExecutionEntry]): Child task results from re-executions."
       },
       "TimeSeriesData": {
         "properties": {

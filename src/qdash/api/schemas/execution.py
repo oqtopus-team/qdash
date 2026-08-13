@@ -8,6 +8,20 @@ from pydantic import BaseModel, field_serializer, field_validator
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 
 
+class ArtifactPreviewResponse(BaseModel):
+    """Tabular preview of a NetCDF calibration artifact."""
+
+    filename: str
+    target: str | None = None
+    source_type: str | None = None
+    shape: list[int]
+    dtype: str
+    columns: list[str]
+    rows: list[dict[str, int | float | str | bool | None]]
+    total_rows: int
+    truncated: bool
+
+
 class ExecutionLockStatusResponse(BaseModel):
     """Response model for the fetch_execution_lock_status endpoint."""
 

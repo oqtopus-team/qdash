@@ -24,6 +24,28 @@ CONTROL_AMPLITUDE_MAX = 1.0
 logger = logging.getLogger(__name__)
 
 
+def _store_rabi_params(exp: Any, result: Any) -> None:
+    """Store fitted Rabi parameters after converting NumPy scalars for JSON."""
+    rabi_params = result.rabi_params
+    float_fields = (
+        "frequency",
+        "amplitude",
+        "phase",
+        "offset",
+        "noise",
+        "angle",
+        "distance",
+        "r2",
+        "reference_phase",
+    )
+    for rabi_param in rabi_params.values():
+        for field_name in float_fields:
+            value = getattr(rabi_param, field_name, None)
+            if value is not None:
+                setattr(rabi_param, field_name, float(value))
+    exp.ctx.store_rabi_params(rabi_params)
+
+
 def _extract_rabi_r2_candidates(result: Any, label: str) -> dict[str, float | None]:
     """Extract Rabi R² candidates from data/fit and rabi_params."""
     candidates: dict[str, float | None] = {
@@ -256,8 +278,10 @@ class CheckRabi(QubexTask):
             n_shots=self.run_parameters["shots"].get_value(),
             shot_interval=self.run_parameters["interval"].get_value(),
             targets=label,
+            store_params=False,
         )
 
+        _store_rabi_params(exp, result)
         self.save_calibration(backend)
         r2_candidates = _extract_rabi_r2_candidates(result, label)
         r2 = _extract_rabi_r2(result, label)

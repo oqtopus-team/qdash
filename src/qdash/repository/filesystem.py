@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import numpy.typing as npt
 import plotly.graph_objs as go
 
 from qdash.common.visualization.figure_metadata import figure_role_suffix
@@ -173,18 +172,18 @@ class FilesystemCalibDataSaver:
 
     def save_raw_data(
         self,
-        raw_data: list[npt.NDArray[Any]],
+        raw_data: list[Any],
         task_name: str,
         task_type: str,
         qid: str,
         output_dir: str | None = None,
     ) -> list[str]:
-        """Save raw data as CSV files.
+        """Save raw data as Qubex-compatible NetCDF files.
 
         Parameters
         ----------
         raw_data : list
-            List of numpy arrays to save
+            List of Qubex data models or NumPy-compatible arrays to save
         task_name : str
             The name of the task
         task_type : str
@@ -209,21 +208,16 @@ class FilesystemCalibDataSaver:
         paths: list[str] = []
 
         for i, data in enumerate(raw_data):
-            csv_filename = self._build_filename(task_name, task_type, qid, "raw", "csv", i)
-            csv_path = self._resolve_conflict(raw_data_dir / csv_filename)
-
-            # Handle complex arrays
-            if np.iscomplexobj(data):
-                # Save as real, imag columns
-                np.savetxt(
-                    csv_path,
-                    np.column_stack([data.real, data.imag]),
-                    delimiter=",",
-                )
+            nc_filename = self._build_filename(task_name, task_type, qid, "raw", "nc", i)
+            nc_path = self._resolve_conflict(raw_data_dir / nc_filename)
+            save_netcdf = getattr(data, "save_netcdf", None)
+            if callable(save_netcdf):
+                save_netcdf(nc_path)
             else:
-                np.savetxt(csv_path, data, delimiter=",")
+                from qdash.common.raw_data import ArrayRawData
 
-            paths.append(str(csv_path))
+                ArrayRawData(data=np.asarray(data)).save_netcdf(nc_path)
+            paths.append(str(nc_path))
 
         return paths
 

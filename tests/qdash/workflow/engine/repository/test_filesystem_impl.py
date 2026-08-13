@@ -7,6 +7,7 @@ import numpy as np
 import plotly.graph_objs as go
 import pytest
 
+from qdash.common.raw_data import ArrayRawData
 from qdash.common.visualization.figure_metadata import set_figure_role
 from qdash.repository.filesystem import FilesystemCalibDataSaver
 
@@ -66,33 +67,26 @@ class TestFilesystemCalibDataSaver:
         assert png_paths == []
         assert json_paths == []
 
-    def test_save_raw_data_creates_csv(self, saver):
-        """Test save_raw_data creates CSV files."""
+    def test_save_raw_data_creates_netcdf(self, saver):
+        """Test save_raw_data creates a round-trippable NetCDF file."""
         data = [np.array([1.0, 2.0, 3.0])]
 
         paths = saver.save_raw_data(data, "CheckRabi", "qubit", "0")
 
         assert len(paths) == 1
         assert Path(paths[0]).exists()
-        assert paths[0].endswith(".csv")
+        assert paths[0].endswith(".nc")
+        loaded = ArrayRawData.load_netcdf(paths[0])
+        np.testing.assert_array_equal(loaded.data, data[0])
 
-        # Verify content
-        loaded = np.loadtxt(paths[0], delimiter=",")
-        np.testing.assert_array_almost_equal(loaded, data[0])
-
-    def test_save_raw_data_handles_complex_arrays(self, saver):
-        """Test save_raw_data handles complex arrays correctly."""
-        complex_data = [np.array([1 + 2j, 3 + 4j, 5 + 6j])]
+    def test_save_raw_data_preserves_complex_arrays(self, saver):
+        """Test NetCDF raw data preserves complex values and shape."""
+        complex_data = [np.array([[1 + 2j, 3 + 4j], [5 + 6j, 7 + 8j]])]
 
         paths = saver.save_raw_data(complex_data, "CheckRabi", "qubit", "0")
 
-        assert len(paths) == 1
-        loaded = np.loadtxt(paths[0], delimiter=",")
-
-        # Should have two columns: real, imag
-        assert loaded.shape == (3, 2)
-        np.testing.assert_array_almost_equal(loaded[:, 0], [1.0, 3.0, 5.0])
-        np.testing.assert_array_almost_equal(loaded[:, 1], [2.0, 4.0, 6.0])
+        loaded = ArrayRawData.load_netcdf(paths[0])
+        np.testing.assert_array_equal(loaded.data, complex_data[0])
 
     def test_save_raw_data_empty_list(self, saver):
         """Test save_raw_data with empty list returns empty list."""

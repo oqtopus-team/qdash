@@ -10,6 +10,7 @@ from qdash.workflow.calibtasks.base import (
     PreProcessResult,
     RunResult,
 )
+from qdash.workflow.calibtasks.qubex.raw_data import extract_qubex_raw_data
 from qdash.workflow.engine.task.provenance_recorder import resolve_qid
 
 if TYPE_CHECKING:
@@ -260,6 +261,10 @@ class QubexTask(BaseTask):
             "cnco_freq": cnco_freq,
             "fnco_freq": 0,
         }
+
+    def extract_raw_data(self, run_result: RunResult) -> list[Any]:
+        """Return NetCDF-serializable artifacts from the unprocessed Qubex result."""
+        return extract_qubex_raw_data(run_result.raw_result)
 
     def batch_run(self, backend: "QubexBackend", qids: list[str]) -> RunResult:
         """Default implementation for batch run.

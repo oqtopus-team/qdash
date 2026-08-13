@@ -85,6 +85,13 @@ class BaseTask(ABC):
         """Check if the R2 value is above the threshold."""
         return r2 <= self.r2_threshold
 
+    def extract_raw_data(self, run_result: RunResult) -> list[Any]:
+        """Return raw artifacts to persist before postprocessing.
+
+        Backends that expose persistable raw results can override this hook.
+        """
+        return []
+
     def _convert_value_to_type(self, value: Any, value_type: str) -> Any:
         """Convert value to the specified type.
 
