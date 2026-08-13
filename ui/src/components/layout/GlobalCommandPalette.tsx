@@ -1,9 +1,10 @@
 "use client";
 
-import { Gauge, Search } from "lucide-react";
+import { Braces, Gauge, Search } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
 import { getNavigationSections } from "@/components/layout/navigation";
 import {
   Command,
@@ -26,8 +27,20 @@ export function GlobalCommandPalette() {
   const [open, setOpen] = useState(false);
   const isDashboard = pathname === "/dashboard";
   const isMetrics = pathname === "/metrics";
+  const isTasks = pathname === "/tasks";
   const hasMetricCommands = isDashboard || isMetrics;
   const { qubitMetrics, couplingMetrics } = useMetricsConfig(hasMetricCommands);
+  const { data: taskFileSettings } = useGetTaskFileSettings({
+    query: { enabled: isTasks, staleTime: 60_000 },
+  });
+  const defaultTaskBackend = taskFileSettings?.data?.default_backend ?? "";
+  const [activeTaskBackend, setActiveTaskBackend] = useState("");
+  const taskBackend = activeTaskBackend || defaultTaskBackend;
+  const { data: taskInfoData } = useListTaskInfo(
+    { backend: taskBackend || "__none__" },
+    { query: { enabled: isTasks && !!taskBackend, staleTime: 60_000 } },
+  );
+  const taskCommands = taskInfoData?.data?.tasks ?? [];
   const sections = getNavigationSections({
     canEdit,
     isAdmin: user?.system_role === "admin",
@@ -43,6 +56,15 @@ export function GlobalCommandPalette() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const handleBackendChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ backend?: string }>).detail;
+      if (detail?.backend) setActiveTaskBackend(detail.backend);
+    };
+    window.addEventListener("qdash:task-backend-change", handleBackendChange);
+    return () => window.removeEventListener("qdash:task-backend-change", handleBackendChange);
   }, []);
 
   const navigate = (href: string) => {
@@ -75,6 +97,13 @@ export function GlobalCommandPalette() {
     jumpToMetric(`dashboard-${metricType}-metric-${metricKey}`);
   };
 
+  const selectTask = (filePath: string) => {
+    setOpen(false);
+    window.dispatchEvent(
+      new CustomEvent("qdash:open-task-source", { detail: { filePath, backend: taskBackend } }),
+    );
+  };
+
   return (
     <>
       <button
@@ -94,14 +123,38 @@ export function GlobalCommandPalette() {
         open={open}
         onOpenChange={setOpen}
         title="Navigate"
-        description="Search for a page or metric to open."
+        description="Search for a page or page-specific item to open."
       >
         <Command loop label="QDash navigation">
           <CommandInput
-            placeholder={hasMetricCommands ? "Search pages and metrics..." : "Search pages..."}
+            placeholder={
+              hasMetricCommands
+                ? "Search pages and metrics..."
+                : isTasks
+                  ? "Search pages and tasks..."
+                  : "Search pages..."
+            }
           />
           <CommandList>
             <CommandEmpty>No matching results</CommandEmpty>
+            {isTasks && taskCommands.length > 0 && (
+              <CommandGroup heading="Switch task source">
+                {taskCommands.map((task) => (
+                  <CommandItem
+                    key={`${task.file_path}-${task.name}`}
+                    value={`${task.name} task source`}
+                    keywords={[task.task_type ?? "", task.file_path, taskBackend]}
+                    onSelect={() => selectTask(task.file_path)}
+                  >
+                    <Braces size={15} className="shrink-0 opacity-60" aria-hidden="true" />
+                    <span>{task.name}</span>
+                    <span className="ml-auto text-xs text-base-content/40">
+                      {task.task_type || "Other"}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
             {hasMetricCommands && (qubitMetrics.length > 0 || couplingMetrics.length > 0) && (
               <CommandGroup heading={isMetrics ? "Switch metric" : "Dashboard metrics"}>
                 {qubitMetrics.map((metric) => (
