@@ -25,6 +25,19 @@ describe("TaskArtifactDownloads", () => {
     );
   });
 
+  it("disables archive download with a clear message above the API limit", () => {
+    render(
+      <TaskArtifactDownloads
+        rawDataPaths={Array.from({ length: 101 }, (_, index) => `/data/raw-${index}.nc`)}
+      />,
+    );
+
+    expect(
+      (screen.getByRole("button", { name: "Download all (.zip)" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(screen.getByText(/Download all supports up to 100 files/)).toBeTruthy();
+  });
+
   it("renders nothing without artifacts", () => {
     const { container } = render(<TaskArtifactDownloads />);
     expect(container.innerHTML).toBe("");

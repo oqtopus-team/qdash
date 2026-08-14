@@ -58,6 +58,12 @@ class TaskProtocol(Protocol):
         """Extract serializable artifacts before postprocessing."""
         ...
 
+    def extract_batch_raw_data(
+        self, backend: Any, run_result: RunResult, qids: list[str]
+    ) -> dict[str, list[Any]]:
+        """Extract serializable artifacts grouped by qid from a batch result."""
+        ...
+
     def postprocess(
         self, backend: Any, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:

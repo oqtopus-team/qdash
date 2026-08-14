@@ -740,6 +740,10 @@ def set_task_result_excluded(
     "/task-results/figures/download",
     summary="Download multiple figures as a ZIP file",
     operation_id="downloadFiguresAsZip",
+    response_class=FileResponse,
+    responses={
+        200: {"content": {"application/zip": {"schema": {"type": "string", "format": "binary"}}}}
+    },
 )
 def download_figures_as_zip(
     body: DownloadFiguresAsZipRequest,

@@ -92,6 +92,12 @@ class BaseTask(ABC):
         """
         return []
 
+    def extract_batch_raw_data(
+        self, backend: BaseBackend, run_result: RunResult, qids: list[str]
+    ) -> dict[str, list[Any]]:
+        """Return raw artifacts grouped by qid for a batch result."""
+        return {qid: [] for qid in qids}
+
     def _convert_value_to_type(self, value: Any, value_type: str) -> Any:
         """Convert value to the specified type.
 

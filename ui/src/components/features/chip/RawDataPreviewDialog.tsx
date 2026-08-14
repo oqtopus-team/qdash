@@ -70,6 +70,9 @@ export function RawDataPreviewDialog({ path, onClose }: RawDataPreviewDialogProp
                 {preview.target && (
                   <span className="badge badge-outline">Target: {preview.target}</span>
                 )}
+                {preview.source_type && (
+                  <span className="badge badge-outline">Source: {preview.source_type}</span>
+                )}
                 <span className="badge badge-outline">
                   Shape: {preview.shape.join(" × ") || "scalar"}
                 </span>

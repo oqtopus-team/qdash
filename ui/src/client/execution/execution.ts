@@ -323,8 +323,8 @@ export const downloadArtifactsAsArchive = (
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
-  return customInstance<void>(
-    { url: `/executions/artifacts/archive`, method: "GET", params, signal },
+  return customInstance<Blob>(
+    { url: `/executions/artifacts/archive`, method: "GET", params, responseType: "blob", signal },
     options,
   );
 };

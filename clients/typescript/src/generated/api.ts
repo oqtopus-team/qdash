@@ -838,10 +838,11 @@ const downloadArtifactByPath = (
  */
 const downloadArtifactsAsArchive = (
     params: DownloadArtifactsAsArchiveParams,
- options?: SecondParameter<typeof qdashRequest<void>>,) => {
-      return qdashRequest<void>(
+ options?: SecondParameter<typeof qdashRequest<Blob>>,) => {
+      return qdashRequest<Blob>(
       {url: `/executions/artifacts/archive`, method: 'GET',
-        params
+        params,
+        responseType: 'blob'
     },
       options);
     }
@@ -2920,11 +2921,12 @@ HTTPException
  */
 const downloadFiguresAsZip = (
     downloadFiguresAsZipRequest: DownloadFiguresAsZipRequest,
- options?: SecondParameter<typeof qdashRequest<unknown>>,) => {
-      return qdashRequest<unknown>(
+ options?: SecondParameter<typeof qdashRequest<Blob>>,) => {
+      return qdashRequest<Blob>(
       {url: `/task-results/figures/download`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: downloadFiguresAsZipRequest
+      data: downloadFiguresAsZipRequest,
+        responseType: 'blob'
     },
       options);
     }

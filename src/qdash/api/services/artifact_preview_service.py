@@ -42,25 +42,35 @@ def _optional_string(value: Any) -> str | None:
     return None if value is None else str(value)
 
 
-def _axis_variables(dataset: Dataset, shape: tuple[int, ...]) -> list[tuple[str, np.ndarray]]:
-    axes: list[tuple[str, np.ndarray]] = []
-    for name, variable in dataset.variables.items():
-        if not name.startswith("axes_"):
-            continue
-        values = np.asarray(variable[:]).reshape(-1)
-        axes.append((name.removeprefix("axes_"), values))
+def _axis_variables(
+    dataset: Dataset,
+    shape: tuple[int, ...],
+    coordinates: list[tuple[int, ...]],
+) -> list[tuple[str, dict[int, Any]]]:
+    axes = [
+        (name.removeprefix("axes_"), variable)
+        for name, variable in dataset.variables.items()
+        if name.startswith("axes_")
+    ]
 
-    matched: list[tuple[str, np.ndarray]] = []
+    matched: list[tuple[str, dict[int, Any]]] = []
     unused = list(axes)
     for dimension, size in enumerate(shape):
         match_index = next(
-            (index for index, (_, values) in enumerate(unused) if values.size == size),
+            (index for index, (_, variable) in enumerate(unused) if variable.size == size),
             None,
         )
+        required_indices = {coordinate[dimension] for coordinate in coordinates}
         if match_index is None:
-            matched.append((f"index_{dimension}", np.arange(size)))
+            matched.append((f"index_{dimension}", {index: index for index in required_indices}))
         else:
-            matched.append(unused.pop(match_index))
+            name, variable = unused.pop(match_index)
+            matched.append(
+                (
+                    name,
+                    {index: np.asarray(variable[index]).item() for index in required_indices},
+                )
+            )
     return matched
 
 
@@ -78,12 +88,18 @@ def preview_netcdf(path: Path, limit: int = _PREVIEW_ROW_LIMIT) -> ArtifactPrevi
         data_variable = variables[data_name]
         shape = tuple(int(size) for size in data_variable.shape)
         total_rows = int(data_variable.size)
-        axes = _axis_variables(dataset, shape)
         preview_size = min(total_rows, limit)
+        coordinates: list[tuple[int, ...]] = (
+            [
+                tuple(int(coordinate) for coordinate in np.unravel_index(index, shape))
+                for index in range(preview_size)
+            ]
+            if shape
+            else [()]
+        )
+        axes = _axis_variables(dataset, shape, coordinates)
         if shape:
-            flat_data = np.asarray(
-                [data_variable[np.unravel_index(index, shape)] for index in range(preview_size)]
-            )
+            flat_data = np.asarray([data_variable[coordinate] for coordinate in coordinates])
         else:
             flat_data = np.asarray([data_variable[()]])
 
@@ -94,11 +110,10 @@ def preview_netcdf(path: Path, limit: int = _PREVIEW_ROW_LIMIT) -> ArtifactPrevi
         columns = [name for name, _ in axes] + value_columns
         rows: list[dict[str, int | float | str | bool | None]] = []
 
-        for flat_index, value in enumerate(flat_data):
-            coordinates = np.unravel_index(flat_index, shape) if shape else ()
+        for coordinate, value in zip(coordinates, flat_data, strict=True):
             row = {
                 name: _json_scalar(values[index])
-                for (name, values), index in zip(axes, coordinates, strict=True)
+                for (name, values), index in zip(axes, coordinate, strict=True)
             }
             if is_complex:
                 real = float(value["r"])

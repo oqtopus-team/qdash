@@ -168,6 +168,20 @@ class TaskExecutor:
             return []
         return list(extractor(run_result))
 
+    def _extract_batch_raw_data(
+        self,
+        task: TaskProtocol,
+        backend: BackendProtocol,
+        run_result: RunResult,
+        qids: list[str],
+    ) -> dict[str, list[Any]]:
+        """Extract raw artifacts grouped by qid before batch postprocessing."""
+        extractor = getattr(task, "extract_batch_raw_data", None)
+        if extractor is None:
+            return {qid: [] for qid in qids}
+        extracted = extractor(backend, run_result, qids)
+        return {qid: list(extracted.get(qid, [])) for qid in qids}
+
     def _run_postprocess(
         self,
         task: TaskProtocol,
@@ -552,6 +566,10 @@ class TaskExecutor:
                     result.success = True
                     result.message = "Completed without run result"
                 return execution_service, results
+
+            raw_data_by_qid = self._extract_batch_raw_data(task, backend, run_result, qids)
+            for qid in qids:
+                self._save_raw_data(raw_data_by_qid[qid], task_name, task_type, qid)
 
             for qid, result in results.items():
                 try:

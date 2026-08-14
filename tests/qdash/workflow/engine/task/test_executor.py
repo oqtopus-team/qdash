@@ -57,6 +57,11 @@ class MockTask:
     def extract_raw_data(self, run_result: RunResult) -> list[Any]:
         return []
 
+    def extract_batch_raw_data(
+        self, session: Any, run_result: RunResult, qids: list[str]
+    ) -> dict[str, list[Any]]:
+        return {qid: [] for qid in qids}
+
     def postprocess(
         self, session: Any, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
@@ -278,6 +283,34 @@ class TestTaskExecutorExecuteTask:
         assert task.postprocess.call_count == 2
         mock_state_manager.update_task_status_to_failed.assert_called()
         mock_state_manager.update_task_status_to_completed.assert_called()
+
+    def test_execute_batch_saves_qid_raw_data_before_postprocess(
+        self, executor: TaskExecutor, mock_data_saver: MagicMock
+    ) -> None:
+        """Test batch artifacts are distributed and saved before postprocessing."""
+        task = MockTask()
+        events: list[str] = []
+        task.extract_batch_raw_data = MagicMock(  # type: ignore[method-assign]
+            return_value={"0": [{"raw": [1]}], "4": [{"raw": [2]}]}
+        )
+        original_postprocess = task.postprocess
+
+        def record_postprocess(*args: Any) -> PostProcessResult:
+            events.append(f"postprocess:{args[-1]}")
+            return original_postprocess(*args)
+
+        def record_save(raw_data: list[Any], _name: str, _type: str, qid: str) -> list[str]:
+            events.append(f"save:{qid}")
+            return [f"/{qid}.nc"]
+
+        task.postprocess = MagicMock(side_effect=record_postprocess)  # type: ignore[method-assign]
+        mock_data_saver.save_raw_data.side_effect = record_save
+        session: Any = MockSession()
+
+        executor.execute_batch(task, session, ["0", "4"])
+
+        task.extract_batch_raw_data.assert_called_once()
+        assert events == ["save:0", "save:4", "postprocess:0", "postprocess:4"]
 
     def test_execute_task_validates_r2(
         self, executor: TaskExecutor, mock_result_processor: MagicMock

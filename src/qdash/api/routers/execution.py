@@ -7,12 +7,14 @@ Business logic is delegated to ExecutionService for better testability.
 from __future__ import annotations
 
 import logging
-from io import BytesIO
-from typing import TYPE_CHECKING, Annotated
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from typing import Annotated
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException
 
 from qdash.api.dependencies import get_execution_service, get_flow_service
@@ -39,9 +41,6 @@ from qdash.common.config.path_resolver import resolve_calib_data_path
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 @router.get(
@@ -111,14 +110,17 @@ def _unique_archive_name(path: Path, used_names: set[str]) -> str:
 
 @router.get(
     "/executions/artifacts/archive",
-    responses={404: {"model": Detail}},
-    response_class=StreamingResponse,
+    responses={
+        200: {"content": {"application/zip": {"schema": {"type": "string", "format": "binary"}}}},
+        404: {"model": Detail},
+    },
+    response_class=FileResponse,
     summary="Download calibration artifacts as a ZIP archive",
     operation_id="downloadArtifactsAsArchive",
 )
 def download_artifacts_as_archive(
     paths: Annotated[list[str], Query(min_length=1, max_length=100)],
-) -> StreamingResponse:
+) -> FileResponse:
     """Download multiple figure JSON and raw NetCDF artifacts as one ZIP file."""
     resolved_paths: list[Path] = []
     for path in paths:
@@ -127,16 +129,26 @@ def download_artifacts_as_archive(
             raise HTTPException(status_code=404, detail=f"File not found: {path}")
         resolved_paths.append(resolved_path)
 
-    archive = BytesIO()
-    used_names: set[str] = set()
-    with ZipFile(archive, mode="w", compression=ZIP_DEFLATED) as zip_file:
-        for resolved_path in resolved_paths:
-            zip_file.write(resolved_path, arcname=_unique_archive_name(resolved_path, used_names))
-    archive.seek(0)
-    return StreamingResponse(
-        archive,
+    with NamedTemporaryFile(delete=False, suffix=".zip") as temporary_file:
+        archive_path = Path(temporary_file.name)
+
+    try:
+        used_names: set[str] = set()
+        with ZipFile(archive_path, mode="w", compression=ZIP_DEFLATED) as zip_file:
+            for resolved_path in resolved_paths:
+                zip_file.write(
+                    resolved_path,
+                    arcname=_unique_archive_name(resolved_path, used_names),
+                )
+    except Exception:
+        archive_path.unlink(missing_ok=True)
+        raise
+
+    return FileResponse(
+        archive_path,
         media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename="artifacts.zip"'},
+        filename="artifacts.zip",
+        background=BackgroundTask(archive_path.unlink, missing_ok=True),
     )
 
 

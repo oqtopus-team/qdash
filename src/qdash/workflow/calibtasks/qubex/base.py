@@ -1,4 +1,4 @@
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from contextlib import ExitStack, contextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -265,6 +265,28 @@ class QubexTask(BaseTask):
     def extract_raw_data(self, run_result: RunResult) -> list[Any]:
         """Return NetCDF-serializable artifacts from the unprocessed Qubex result."""
         return extract_qubex_raw_data(run_result.raw_result)
+
+    def extract_batch_raw_data(
+        self, backend: "QubexBackend", run_result: RunResult, qids: list[str]
+    ) -> dict[str, list[Any]]:
+        """Return NetCDF artifacts grouped by the qid represented in a batch result."""
+        raw_result = run_result.raw_result
+        result_by_label = raw_result if isinstance(raw_result, Mapping) else None
+        if result_by_label is None:
+            nested_data = getattr(raw_result, "data", None)
+            if isinstance(nested_data, Mapping):
+                result_by_label = nested_data
+
+        artifacts: dict[str, list[Any]] = {}
+        for qid in qids:
+            label = self.get_qubit_label(backend, qid)
+            if result_by_label is not None and label in result_by_label:
+                artifacts[qid] = extract_qubex_raw_data(result_by_label[label])
+            elif len(qids) == 1:
+                artifacts[qid] = extract_qubex_raw_data(raw_result)
+            else:
+                artifacts[qid] = []
+        return artifacts
 
     def batch_run(self, backend: "QubexBackend", qids: list[str]) -> RunResult:
         """Default implementation for batch run.

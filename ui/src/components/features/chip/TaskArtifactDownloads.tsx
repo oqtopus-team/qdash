@@ -6,6 +6,8 @@ import { useState } from "react";
 import { RawDataPreviewDialog } from "./RawDataPreviewDialog";
 import { FigureJsonPreviewDialog } from "./FigureJsonPreviewDialog";
 
+const ARCHIVE_PATH_LIMIT = 100;
+
 interface TaskArtifactDownloadsProps {
   jsonFigurePaths?: string[];
   rawDataPaths?: string[];
@@ -46,6 +48,8 @@ export function TaskArtifactDownloads({
       type: "raw" as const,
     })),
   ];
+
+  const archiveLimitExceeded = artifacts.length > ARCHIVE_PATH_LIMIT;
 
   return (
     <div className="space-y-3">
@@ -90,14 +94,26 @@ export function TaskArtifactDownloads({
         ))}
       </div>
       {artifacts.length > 1 && (
-        <div className="flex justify-end">
-          <a
-            href={archiveUrl(artifacts.map(({ path }) => path))}
-            download="artifacts.zip"
-            className="btn btn-sm btn-outline gap-2"
-          >
-            <Download className="h-4 w-4" /> Download all (.zip)
-          </a>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {archiveLimitExceeded && (
+            <span className="text-xs text-warning">
+              Download all supports up to {ARCHIVE_PATH_LIMIT} files. Download these artifacts
+              individually.
+            </span>
+          )}
+          {archiveLimitExceeded ? (
+            <button type="button" className="btn btn-sm btn-outline gap-2" disabled>
+              <Download className="h-4 w-4" /> Download all (.zip)
+            </button>
+          ) : (
+            <a
+              href={archiveUrl(artifacts.map(({ path }) => path))}
+              download="artifacts.zip"
+              className="btn btn-sm btn-outline gap-2"
+            >
+              <Download className="h-4 w-4" /> Download all (.zip)
+            </a>
+          )}
         </div>
       )}
       <FigureJsonPreviewDialog
