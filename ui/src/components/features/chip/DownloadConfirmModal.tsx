@@ -91,7 +91,7 @@ export function DownloadConfirmModal({
           />
           <DownloadOptionRow
             icon={<Database className="h-4 w-4" />}
-            label="Raw data"
+            label="Raw data (NetCDF)"
             count={counts.rawData}
             checked={options.rawData}
             onToggle={() => toggle("rawData")}

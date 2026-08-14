@@ -5,10 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import {
-  useMutation,
-  useQuery
-} from '@tanstack/react-query';
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -21,12 +18,15 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult
-} from '@tanstack/react-query';
+  UseQueryResult,
+} from "@tanstack/react-query";
 
 import type {
+  ArtifactPreviewResponse,
   CancelExecutionResponse,
   Detail,
+  DownloadArtifactByPathParams,
+  DownloadArtifactsAsArchiveParams,
   ExecuteFlowResponse,
   ExecutionLockStatusResponse,
   ExecutionResponseDetail,
@@ -34,15 +34,13 @@ import type {
   HTTPValidationError,
   ListExecutionsParams,
   ListExecutionsResponse,
-  ReExecuteRequest
-} from '../../schemas';
+  PreviewArtifactByPathParams,
+  ReExecuteRequest,
+} from "../../schemas";
 
-import { customInstance } from '../../lib/custom-instance';
-
+import { customInstance } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
-
-
 
 /**
  * Fetch a calibration figure by its file path.
@@ -67,93 +65,523 @@ HTTPException
  * @summary Get a calibration figure by its path
  */
 export const getFigureByPath = (
-    params: GetFigureByPathParams,
- options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+  params: GetFigureByPathParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
 ) => {
-      
-      
-      return customInstance<void>(
-      {url: `/executions/figure`, method: 'GET',
-        params, signal
-    },
-      options);
-    }
-  
+  return customInstance<void>(
+    { url: `/executions/figure`, method: "GET", params, signal },
+    options,
+  );
+};
 
+export const getGetFigureByPathQueryKey = (params?: GetFigureByPathParams) => {
+  return [`/executions/figure`, ...(params ? [params] : [])] as const;
+};
 
-
-export const getGetFigureByPathQueryKey = (params?: GetFigureByPathParams,) => {
-    return [
-    `/executions/figure`, ...(params ? [params]: [])
-    ] as const;
-    }
-
-    
-export const getGetFigureByPathQueryOptions = <TData = Awaited<ReturnType<typeof getFigureByPath>>, TError = Detail | HTTPValidationError>(params: GetFigureByPathParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFigureByPath>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetFigureByPathQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFigureByPath>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: GetFigureByPathParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getFigureByPath>>, TError, TData>>;
+    request?: SecondParameter<typeof customInstance>;
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetFigureByPathQueryKey(params);
 
-  const queryKey =  queryOptions?.queryKey ?? getGetFigureByPathQueryKey(params);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFigureByPath>>> = ({ signal }) =>
+    getFigureByPath(params, requestOptions, signal);
 
-  
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFigureByPath>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFigureByPath>>> = ({ signal }) => getFigureByPath(params, requestOptions, signal);
+export type GetFigureByPathQueryResult = NonNullable<Awaited<ReturnType<typeof getFigureByPath>>>;
+export type GetFigureByPathQueryError = Detail | HTTPValidationError;
 
-      
-
-      
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFigureByPath>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetFigureByPathQueryResult = NonNullable<Awaited<ReturnType<typeof getFigureByPath>>>
-export type GetFigureByPathQueryError = Detail | HTTPValidationError
-
-
-export function useGetFigureByPath<TData = Awaited<ReturnType<typeof getFigureByPath>>, TError = Detail | HTTPValidationError>(
- params: GetFigureByPathParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFigureByPath>>, TError, TData>> & Pick<
+export function useGetFigureByPath<
+  TData = Awaited<ReturnType<typeof getFigureByPath>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: GetFigureByPathParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof getFigureByPath>>, TError, TData>> &
+      Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFigureByPath>>,
           TError,
           Awaited<ReturnType<typeof getFigureByPath>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetFigureByPath<TData = Awaited<ReturnType<typeof getFigureByPath>>, TError = Detail | HTTPValidationError>(
- params: GetFigureByPathParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFigureByPath>>, TError, TData>> & Pick<
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetFigureByPath<
+  TData = Awaited<ReturnType<typeof getFigureByPath>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: GetFigureByPathParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getFigureByPath>>, TError, TData>> &
+      Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFigureByPath>>,
           TError,
           Awaited<ReturnType<typeof getFigureByPath>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetFigureByPath<TData = Awaited<ReturnType<typeof getFigureByPath>>, TError = Detail | HTTPValidationError>(
- params: GetFigureByPathParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFigureByPath>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetFigureByPath<
+  TData = Awaited<ReturnType<typeof getFigureByPath>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: GetFigureByPathParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getFigureByPath>>, TError, TData>>;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 /**
  * @summary Get a calibration figure by its path
  */
 
-export function useGetFigureByPath<TData = Awaited<ReturnType<typeof getFigureByPath>>, TError = Detail | HTTPValidationError>(
- params: GetFigureByPathParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFigureByPath>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+export function useGetFigureByPath<
+  TData = Awaited<ReturnType<typeof getFigureByPath>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: GetFigureByPathParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getFigureByPath>>, TError, TData>>;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetFigureByPathQueryOptions(params, options);
 
-  const queryOptions = getGetFigureByPathQueryOptions(params,options)
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey ;
+  query.queryKey = queryOptions.queryKey;
 
   return query;
 }
 
+/**
+ * Download a calibration artifact such as figure JSON or raw NetCDF data.
+ * @summary Download a calibration artifact by its path
+ */
+export const downloadArtifactByPath = (
+  params: DownloadArtifactByPathParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<void>(
+    { url: `/executions/artifact`, method: "GET", params, signal },
+    options,
+  );
+};
 
+export const getDownloadArtifactByPathQueryKey = (params?: DownloadArtifactByPathParams) => {
+  return [`/executions/artifact`, ...(params ? [params] : [])] as const;
+};
+
+export const getDownloadArtifactByPathQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadArtifactByPath>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: DownloadArtifactByPathParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadArtifactByPath>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getDownloadArtifactByPathQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadArtifactByPath>>> = ({ signal }) =>
+    downloadArtifactByPath(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof downloadArtifactByPath>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type DownloadArtifactByPathQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadArtifactByPath>>
+>;
+export type DownloadArtifactByPathQueryError = Detail | HTTPValidationError;
+
+export function useDownloadArtifactByPath<
+  TData = Awaited<ReturnType<typeof downloadArtifactByPath>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: DownloadArtifactByPathParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadArtifactByPath>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadArtifactByPath>>,
+          TError,
+          Awaited<ReturnType<typeof downloadArtifactByPath>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useDownloadArtifactByPath<
+  TData = Awaited<ReturnType<typeof downloadArtifactByPath>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: DownloadArtifactByPathParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadArtifactByPath>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadArtifactByPath>>,
+          TError,
+          Awaited<ReturnType<typeof downloadArtifactByPath>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useDownloadArtifactByPath<
+  TData = Awaited<ReturnType<typeof downloadArtifactByPath>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: DownloadArtifactByPathParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadArtifactByPath>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Download a calibration artifact by its path
+ */
+
+export function useDownloadArtifactByPath<
+  TData = Awaited<ReturnType<typeof downloadArtifactByPath>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: DownloadArtifactByPathParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadArtifactByPath>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDownloadArtifactByPathQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Download multiple figure JSON and raw NetCDF artifacts as one ZIP file.
+ * @summary Download calibration artifacts as a ZIP archive
+ */
+export const downloadArtifactsAsArchive = (
+  params: DownloadArtifactsAsArchiveParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<Blob>(
+    { url: `/executions/artifacts/archive`, method: "GET", params, responseType: "blob", signal },
+    options,
+  );
+};
+
+export const getDownloadArtifactsAsArchiveQueryKey = (
+  params?: DownloadArtifactsAsArchiveParams,
+) => {
+  return [`/executions/artifacts/archive`, ...(params ? [params] : [])] as const;
+};
+
+export const getDownloadArtifactsAsArchiveQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadArtifactsAsArchive>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: DownloadArtifactsAsArchiveParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadArtifactsAsArchive>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getDownloadArtifactsAsArchiveQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadArtifactsAsArchive>>> = ({
+    signal,
+  }) => downloadArtifactsAsArchive(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof downloadArtifactsAsArchive>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type DownloadArtifactsAsArchiveQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadArtifactsAsArchive>>
+>;
+export type DownloadArtifactsAsArchiveQueryError = Detail | HTTPValidationError;
+
+export function useDownloadArtifactsAsArchive<
+  TData = Awaited<ReturnType<typeof downloadArtifactsAsArchive>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: DownloadArtifactsAsArchiveParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadArtifactsAsArchive>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadArtifactsAsArchive>>,
+          TError,
+          Awaited<ReturnType<typeof downloadArtifactsAsArchive>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useDownloadArtifactsAsArchive<
+  TData = Awaited<ReturnType<typeof downloadArtifactsAsArchive>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: DownloadArtifactsAsArchiveParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadArtifactsAsArchive>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadArtifactsAsArchive>>,
+          TError,
+          Awaited<ReturnType<typeof downloadArtifactsAsArchive>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useDownloadArtifactsAsArchive<
+  TData = Awaited<ReturnType<typeof downloadArtifactsAsArchive>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: DownloadArtifactsAsArchiveParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadArtifactsAsArchive>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Download calibration artifacts as a ZIP archive
+ */
+
+export function useDownloadArtifactsAsArchive<
+  TData = Awaited<ReturnType<typeof downloadArtifactsAsArchive>>,
+  TError = Detail | HTTPValidationError,
+>(
+  params: DownloadArtifactsAsArchiveParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof downloadArtifactsAsArchive>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDownloadArtifactsAsArchiveQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Return a size-limited table preview of a NetCDF calibration artifact.
+ * @summary Preview a NetCDF calibration artifact
+ */
+export const previewArtifactByPath = (
+  params: PreviewArtifactByPathParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ArtifactPreviewResponse>(
+    { url: `/executions/artifact/preview`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getPreviewArtifactByPathQueryKey = (params?: PreviewArtifactByPathParams) => {
+  return [`/executions/artifact/preview`, ...(params ? [params] : [])] as const;
+};
+
+export const getPreviewArtifactByPathQueryOptions = <
+  TData = Awaited<ReturnType<typeof previewArtifactByPath>>,
+  TError = Detail | Detail | HTTPValidationError,
+>(
+  params: PreviewArtifactByPathParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof previewArtifactByPath>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getPreviewArtifactByPathQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof previewArtifactByPath>>> = ({ signal }) =>
+    previewArtifactByPath(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof previewArtifactByPath>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type PreviewArtifactByPathQueryResult = NonNullable<
+  Awaited<ReturnType<typeof previewArtifactByPath>>
+>;
+export type PreviewArtifactByPathQueryError = Detail | Detail | HTTPValidationError;
+
+export function usePreviewArtifactByPath<
+  TData = Awaited<ReturnType<typeof previewArtifactByPath>>,
+  TError = Detail | Detail | HTTPValidationError,
+>(
+  params: PreviewArtifactByPathParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof previewArtifactByPath>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof previewArtifactByPath>>,
+          TError,
+          Awaited<ReturnType<typeof previewArtifactByPath>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function usePreviewArtifactByPath<
+  TData = Awaited<ReturnType<typeof previewArtifactByPath>>,
+  TError = Detail | Detail | HTTPValidationError,
+>(
+  params: PreviewArtifactByPathParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof previewArtifactByPath>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof previewArtifactByPath>>,
+          TError,
+          Awaited<ReturnType<typeof previewArtifactByPath>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function usePreviewArtifactByPath<
+  TData = Awaited<ReturnType<typeof previewArtifactByPath>>,
+  TError = Detail | Detail | HTTPValidationError,
+>(
+  params: PreviewArtifactByPathParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof previewArtifactByPath>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Preview a NetCDF calibration artifact
+ */
+
+export function usePreviewArtifactByPath<
+  TData = Awaited<ReturnType<typeof previewArtifactByPath>>,
+  TError = Detail | Detail | HTTPValidationError,
+>(
+  params: PreviewArtifactByPathParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof previewArtifactByPath>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getPreviewArtifactByPathQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
 
 /**
  * Fetch the current status of the execution lock.
@@ -175,92 +603,125 @@ ExecutionLockStatusResponse
  * @summary Get the execution lock status
  */
 export const getExecutionLockStatus = (
-    
- options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
 ) => {
-      
-      
-      return customInstance<ExecutionLockStatusResponse>(
-      {url: `/executions/lock-status`, method: 'GET', signal
-    },
-      options);
-    }
-  
-
-
+  return customInstance<ExecutionLockStatusResponse>(
+    { url: `/executions/lock-status`, method: "GET", signal },
+    options,
+  );
+};
 
 export const getGetExecutionLockStatusQueryKey = () => {
-    return [
-    `/executions/lock-status`
-    ] as const;
-    }
+  return [`/executions/lock-status`] as const;
+};
 
-    
-export const getGetExecutionLockStatusQueryOptions = <TData = Awaited<ReturnType<typeof getExecutionLockStatus>>, TError = HTTPValidationError>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionLockStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
+export const getGetExecutionLockStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
+  TError = HTTPValidationError,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getExecutionLockStatus>>, TError, TData>
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetExecutionLockStatusQueryKey();
 
-  const queryKey =  queryOptions?.queryKey ?? getGetExecutionLockStatusQueryKey();
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getExecutionLockStatus>>> = ({ signal }) =>
+    getExecutionLockStatus(requestOptions, signal);
 
-  
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getExecutionLockStatus>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExecutionLockStatus>>> = ({ signal }) => getExecutionLockStatus(requestOptions, signal);
+export type GetExecutionLockStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getExecutionLockStatus>>
+>;
+export type GetExecutionLockStatusQueryError = HTTPValidationError;
 
-      
-
-      
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExecutionLockStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetExecutionLockStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getExecutionLockStatus>>>
-export type GetExecutionLockStatusQueryError = HTTPValidationError
-
-
-export function useGetExecutionLockStatus<TData = Awaited<ReturnType<typeof getExecutionLockStatus>>, TError = HTTPValidationError>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionLockStatus>>, TError, TData>> & Pick<
+export function useGetExecutionLockStatus<
+  TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
+  TError = HTTPValidationError,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getExecutionLockStatus>>, TError, TData>
+    > &
+      Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getExecutionLockStatus>>,
           TError,
           Awaited<ReturnType<typeof getExecutionLockStatus>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetExecutionLockStatus<TData = Awaited<ReturnType<typeof getExecutionLockStatus>>, TError = HTTPValidationError>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionLockStatus>>, TError, TData>> & Pick<
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetExecutionLockStatus<
+  TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
+  TError = HTTPValidationError,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getExecutionLockStatus>>, TError, TData>
+    > &
+      Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getExecutionLockStatus>>,
           TError,
           Awaited<ReturnType<typeof getExecutionLockStatus>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetExecutionLockStatus<TData = Awaited<ReturnType<typeof getExecutionLockStatus>>, TError = HTTPValidationError>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionLockStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetExecutionLockStatus<
+  TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
+  TError = HTTPValidationError,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getExecutionLockStatus>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 /**
  * @summary Get the execution lock status
  */
 
-export function useGetExecutionLockStatus<TData = Awaited<ReturnType<typeof getExecutionLockStatus>>, TError = HTTPValidationError>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionLockStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+export function useGetExecutionLockStatus<
+  TData = Awaited<ReturnType<typeof getExecutionLockStatus>>,
+  TError = HTTPValidationError,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getExecutionLockStatus>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetExecutionLockStatusQueryOptions(options);
 
-  const queryOptions = getGetExecutionLockStatusQueryOptions(options)
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey ;
+  query.queryKey = queryOptions.queryKey;
 
   return query;
 }
-
-
 
 /**
  * List executions for a given chip with pagination.
@@ -285,93 +746,121 @@ ListExecutionsResponse
  * @summary List executions
  */
 export const listExecutions = (
-    params: ListExecutionsParams,
- options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+  params: ListExecutionsParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
 ) => {
-      
-      
-      return customInstance<ListExecutionsResponse>(
-      {url: `/executions`, method: 'GET',
-        params, signal
-    },
-      options);
-    }
-  
+  return customInstance<ListExecutionsResponse>(
+    { url: `/executions`, method: "GET", params, signal },
+    options,
+  );
+};
 
+export const getListExecutionsQueryKey = (params?: ListExecutionsParams) => {
+  return [`/executions`, ...(params ? [params] : [])] as const;
+};
 
-
-export const getListExecutionsQueryKey = (params?: ListExecutionsParams,) => {
-    return [
-    `/executions`, ...(params ? [params]: [])
-    ] as const;
-    }
-
-    
-export const getListExecutionsQueryOptions = <TData = Awaited<ReturnType<typeof listExecutions>>, TError = HTTPValidationError>(params: ListExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getListExecutionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listExecutions>>,
+  TError = HTTPValidationError,
+>(
+  params: ListExecutionsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutions>>, TError, TData>>;
+    request?: SecondParameter<typeof customInstance>;
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getListExecutionsQueryKey(params);
 
-  const queryKey =  queryOptions?.queryKey ?? getListExecutionsQueryKey(params);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listExecutions>>> = ({ signal }) =>
+    listExecutions(params, requestOptions, signal);
 
-  
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listExecutions>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listExecutions>>> = ({ signal }) => listExecutions(params, requestOptions, signal);
+export type ListExecutionsQueryResult = NonNullable<Awaited<ReturnType<typeof listExecutions>>>;
+export type ListExecutionsQueryError = HTTPValidationError;
 
-      
-
-      
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listExecutions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type ListExecutionsQueryResult = NonNullable<Awaited<ReturnType<typeof listExecutions>>>
-export type ListExecutionsQueryError = HTTPValidationError
-
-
-export function useListExecutions<TData = Awaited<ReturnType<typeof listExecutions>>, TError = HTTPValidationError>(
- params: ListExecutionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutions>>, TError, TData>> & Pick<
+export function useListExecutions<
+  TData = Awaited<ReturnType<typeof listExecutions>>,
+  TError = HTTPValidationError,
+>(
+  params: ListExecutionsParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutions>>, TError, TData>> &
+      Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listExecutions>>,
           TError,
           Awaited<ReturnType<typeof listExecutions>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListExecutions<TData = Awaited<ReturnType<typeof listExecutions>>, TError = HTTPValidationError>(
- params: ListExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutions>>, TError, TData>> & Pick<
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListExecutions<
+  TData = Awaited<ReturnType<typeof listExecutions>>,
+  TError = HTTPValidationError,
+>(
+  params: ListExecutionsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutions>>, TError, TData>> &
+      Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listExecutions>>,
           TError,
           Awaited<ReturnType<typeof listExecutions>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListExecutions<TData = Awaited<ReturnType<typeof listExecutions>>, TError = HTTPValidationError>(
- params: ListExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListExecutions<
+  TData = Awaited<ReturnType<typeof listExecutions>>,
+  TError = HTTPValidationError,
+>(
+  params: ListExecutionsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutions>>, TError, TData>>;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 /**
  * @summary List executions
  */
 
-export function useListExecutions<TData = Awaited<ReturnType<typeof listExecutions>>, TError = HTTPValidationError>(
- params: ListExecutionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+export function useListExecutions<
+  TData = Awaited<ReturnType<typeof listExecutions>>,
+  TError = HTTPValidationError,
+>(
+  params: ListExecutionsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listExecutions>>, TError, TData>>;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListExecutionsQueryOptions(params, options);
 
-  const queryOptions = getListExecutionsQueryOptions(params,options)
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey ;
+  query.queryKey = queryOptions.queryKey;
 
   return query;
 }
-
-
 
 /**
  * Return the execution detail by its ID.
@@ -392,92 +881,121 @@ ExecutionResponseDetail
  * @summary Get an execution by its ID
  */
 export const getExecution = (
-    executionId: string,
- options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+  executionId: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
 ) => {
-      
-      
-      return customInstance<ExecutionResponseDetail>(
-      {url: `/executions/${executionId}`, method: 'GET', signal
-    },
-      options);
-    }
-  
+  return customInstance<ExecutionResponseDetail>(
+    { url: `/executions/${executionId}`, method: "GET", signal },
+    options,
+  );
+};
 
+export const getGetExecutionQueryKey = (executionId?: string) => {
+  return [`/executions/${executionId}`] as const;
+};
 
-
-export const getGetExecutionQueryKey = (executionId?: string,) => {
-    return [
-    `/executions/${executionId}`
-    ] as const;
-    }
-
-    
-export const getGetExecutionQueryOptions = <TData = Awaited<ReturnType<typeof getExecution>>, TError = HTTPValidationError>(executionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetExecutionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getExecution>>,
+  TError = HTTPValidationError,
+>(
+  executionId: string,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>>;
+    request?: SecondParameter<typeof customInstance>;
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetExecutionQueryKey(executionId);
 
-  const queryKey =  queryOptions?.queryKey ?? getGetExecutionQueryKey(executionId);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getExecution>>> = ({ signal }) =>
+    getExecution(executionId, requestOptions, signal);
 
-  
+  return { queryKey, queryFn, enabled: !!executionId, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getExecution>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExecution>>> = ({ signal }) => getExecution(executionId, requestOptions, signal);
+export type GetExecutionQueryResult = NonNullable<Awaited<ReturnType<typeof getExecution>>>;
+export type GetExecutionQueryError = HTTPValidationError;
 
-      
-
-      
-
-   return  { queryKey, queryFn, enabled: !!(executionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetExecutionQueryResult = NonNullable<Awaited<ReturnType<typeof getExecution>>>
-export type GetExecutionQueryError = HTTPValidationError
-
-
-export function useGetExecution<TData = Awaited<ReturnType<typeof getExecution>>, TError = HTTPValidationError>(
- executionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>> & Pick<
+export function useGetExecution<
+  TData = Awaited<ReturnType<typeof getExecution>>,
+  TError = HTTPValidationError,
+>(
+  executionId: string,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>> &
+      Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getExecution>>,
           TError,
           Awaited<ReturnType<typeof getExecution>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetExecution<TData = Awaited<ReturnType<typeof getExecution>>, TError = HTTPValidationError>(
- executionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>> & Pick<
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetExecution<
+  TData = Awaited<ReturnType<typeof getExecution>>,
+  TError = HTTPValidationError,
+>(
+  executionId: string,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>> &
+      Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getExecution>>,
           TError,
           Awaited<ReturnType<typeof getExecution>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetExecution<TData = Awaited<ReturnType<typeof getExecution>>, TError = HTTPValidationError>(
- executionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetExecution<
+  TData = Awaited<ReturnType<typeof getExecution>>,
+  TError = HTTPValidationError,
+>(
+  executionId: string,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>>;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 /**
  * @summary Get an execution by its ID
  */
 
-export function useGetExecution<TData = Awaited<ReturnType<typeof getExecution>>, TError = HTTPValidationError>(
- executionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+export function useGetExecution<
+  TData = Awaited<ReturnType<typeof getExecution>>,
+  TError = HTTPValidationError,
+>(
+  executionId: string,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecution>>, TError, TData>>;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetExecutionQueryOptions(executionId, options);
 
-  const queryOptions = getGetExecutionQueryOptions(executionId,options)
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
 
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey ;
+  query.queryKey = queryOptions.queryKey;
 
   return query;
 }
-
-
 
 /**
  * Cancel a running or scheduled execution via Prefect.
@@ -503,65 +1021,83 @@ CancelExecutionResponse
  * @summary Cancel a running or scheduled execution
  */
 export const cancelExecution = (
-    flowRunId: string,
- options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+  flowRunId: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
 ) => {
-      
-      
-      return customInstance<CancelExecutionResponse>(
-      {url: `/executions/${flowRunId}/cancel`, method: 'POST', signal
-    },
-      options);
-    }
-  
+  return customInstance<CancelExecutionResponse>(
+    { url: `/executions/${flowRunId}/cancel`, method: "POST", signal },
+    options,
+  );
+};
 
+export const getCancelExecutionMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelExecution>>,
+    TError,
+    { flowRunId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelExecution>>,
+  TError,
+  { flowRunId: string },
+  TContext
+> => {
+  const mutationKey = ["cancelExecution"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
-export const getCancelExecutionMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelExecution>>, TError,{flowRunId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof cancelExecution>>, TError,{flowRunId: string}, TContext> => {
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelExecution>>,
+    { flowRunId: string }
+  > = (props) => {
+    const { flowRunId } = props ?? {};
 
-const mutationKey = ['cancelExecution'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+    return cancelExecution(flowRunId, requestOptions);
+  };
 
-      
+  return { mutationFn, ...mutationOptions };
+};
 
+export type CancelExecutionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelExecution>>
+>;
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelExecution>>, {flowRunId: string}> = (props) => {
-          const {flowRunId} = props ?? {};
+export type CancelExecutionMutationError = HTTPValidationError;
 
-          return  cancelExecution(flowRunId,requestOptions)
-        }
-
-        
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CancelExecutionMutationResult = NonNullable<Awaited<ReturnType<typeof cancelExecution>>>
-    
-    export type CancelExecutionMutationError = HTTPValidationError
-
-    /**
+/**
  * @summary Cancel a running or scheduled execution
  */
-export const useCancelExecution = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelExecution>>, TError,{flowRunId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof cancelExecution>>,
-        TError,
-        {flowRunId: string},
-        TContext
-      > => {
+export const useCancelExecution = <TError = HTTPValidationError, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof cancelExecution>>,
+      TError,
+      { flowRunId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof cancelExecution>>,
+  TError,
+  { flowRunId: string },
+  TContext
+> => {
+  const mutationOptions = getCancelExecutionMutationOptions(options);
 
-      const mutationOptions = getCancelExecutionMutationOptions(options);
-
-      return useMutation(mutationOptions, queryClient);
-    }
-    /**
+  return useMutation(mutationOptions, queryClient);
+};
+/**
  * Re-execute a flow using snapshot parameters from a previous execution.
 
 Parameters
@@ -584,65 +1120,86 @@ ExecuteFlowResponse
  * @summary Re-execute a flow from snapshot parameters
  */
 export const reExecuteFromSnapshot = (
-    executionId: string,
-    reExecuteRequest: ReExecuteRequest,
- options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+  executionId: string,
+  reExecuteRequest: ReExecuteRequest,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
 ) => {
-      
-      
-      return customInstance<ExecuteFlowResponse>(
-      {url: `/executions/${executionId}/re-execute`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: reExecuteRequest, signal
+  return customInstance<ExecuteFlowResponse>(
+    {
+      url: `/executions/${executionId}/re-execute`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: reExecuteRequest,
+      signal,
     },
-      options);
-    }
-  
+    options,
+  );
+};
 
+export const getReExecuteFromSnapshotMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
+    TError,
+    { executionId: string; data: ReExecuteRequest },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
+  TError,
+  { executionId: string; data: ReExecuteRequest },
+  TContext
+> => {
+  const mutationKey = ["reExecuteFromSnapshot"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
-export const getReExecuteFromSnapshotMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reExecuteFromSnapshot>>, TError,{executionId: string;data: ReExecuteRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof reExecuteFromSnapshot>>, TError,{executionId: string;data: ReExecuteRequest}, TContext> => {
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
+    { executionId: string; data: ReExecuteRequest }
+  > = (props) => {
+    const { executionId, data } = props ?? {};
 
-const mutationKey = ['reExecuteFromSnapshot'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+    return reExecuteFromSnapshot(executionId, data, requestOptions);
+  };
 
-      
+  return { mutationFn, ...mutationOptions };
+};
 
+export type ReExecuteFromSnapshotMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reExecuteFromSnapshot>>
+>;
+export type ReExecuteFromSnapshotMutationBody = ReExecuteRequest;
+export type ReExecuteFromSnapshotMutationError = HTTPValidationError;
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reExecuteFromSnapshot>>, {executionId: string;data: ReExecuteRequest}> = (props) => {
-          const {executionId,data} = props ?? {};
-
-          return  reExecuteFromSnapshot(executionId,data,requestOptions)
-        }
-
-        
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type ReExecuteFromSnapshotMutationResult = NonNullable<Awaited<ReturnType<typeof reExecuteFromSnapshot>>>
-    export type ReExecuteFromSnapshotMutationBody = ReExecuteRequest
-    export type ReExecuteFromSnapshotMutationError = HTTPValidationError
-
-    /**
+/**
  * @summary Re-execute a flow from snapshot parameters
  */
-export const useReExecuteFromSnapshot = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reExecuteFromSnapshot>>, TError,{executionId: string;data: ReExecuteRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
-        TError,
-        {executionId: string;data: ReExecuteRequest},
-        TContext
-      > => {
+export const useReExecuteFromSnapshot = <TError = HTTPValidationError, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
+      TError,
+      { executionId: string; data: ReExecuteRequest },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
+  TError,
+  { executionId: string; data: ReExecuteRequest },
+  TContext
+> => {
+  const mutationOptions = getReExecuteFromSnapshotMutationOptions(options);
 
-      const mutationOptions = getReExecuteFromSnapshotMutationOptions(options);
-
-      return useMutation(mutationOptions, queryClient);
-    }
-    
+  return useMutation(mutationOptions, queryClient);
+};

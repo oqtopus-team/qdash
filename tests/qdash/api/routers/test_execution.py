@@ -1,14 +1,18 @@
 """Tests for execution router endpoints."""
 
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
+from zipfile import ZipFile
 
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from pymongo.database import Database as PyMongoDatabase
 
+from qdash.common.raw_data import PreFitRawData
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
@@ -195,6 +199,89 @@ def test_get_figure_by_path_maps_container_calib_data_path(
 
     assert response.status_code == 200
     assert response.content == b"png"
+
+
+def test_download_artifact_by_path(
+    test_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    artifact = tmp_path / "raw_data.nc"
+    artifact.write_bytes(b"netcdf")
+
+    response = test_client.get("/executions/artifact", params={"path": str(artifact)})
+
+    assert response.status_code == 200
+    assert response.content == b"netcdf"
+    assert response.headers["content-disposition"] == 'attachment; filename="raw_data.nc"'
+
+
+def test_download_artifacts_as_archive(
+    test_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    figure_dir = tmp_path / "figures"
+    raw_dir = tmp_path / "raw"
+    figure_dir.mkdir()
+    raw_dir.mkdir()
+    figure = figure_dir / "artifact.json"
+    raw_data = raw_dir / "artifact.json"
+    figure.write_text('{"data": []}')
+    raw_data.write_text("raw")
+
+    response = test_client.get(
+        "/executions/artifacts/archive",
+        params=[("paths", str(figure)), ("paths", str(raw_data))],
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+    assert response.headers["content-disposition"] == 'attachment; filename="artifacts.zip"'
+    with ZipFile(BytesIO(response.content)) as archive:
+        assert archive.namelist() == ["artifact.json", "artifact_2.json"]
+        assert archive.read("artifact.json") == b'{"data": []}'
+        assert archive.read("artifact_2.json") == b"raw"
+
+
+def test_preview_artifact_by_path_returns_complex_table(
+    test_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    artifact = tmp_path / "raw_data.nc"
+    PreFitRawData(
+        target="Q00",
+        data=np.array([1 + 2j, 3 + 4j]),
+        axes={"sweep_range": np.array([10.0, 20.0])},
+        source_type="test.SweepData",
+    ).save_netcdf(artifact)
+
+    response = test_client.get("/executions/artifact/preview", params={"path": str(artifact)})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["filename"] == "raw_data.nc"
+    assert body["target"] == "Q00"
+    assert body["source_type"] == "test.SweepData"
+    assert body["shape"] == [2]
+    assert body["dtype"] == "complex"
+    assert body["columns"] == ["sweep_range", "real", "imag", "abs"]
+    assert body["rows"] == [
+        {"sweep_range": 10.0, "real": 1.0, "imag": 2.0, "abs": pytest.approx(5**0.5)},
+        {"sweep_range": 20.0, "real": 3.0, "imag": 4.0, "abs": 5.0},
+    ]
+    assert body["total_rows"] == 2
+    assert body["truncated"] is False
+
+
+def test_preview_artifact_by_path_rejects_non_netcdf(
+    test_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    artifact = tmp_path / "figure.json"
+    artifact.write_text("{}")
+
+    response = test_client.get("/executions/artifact/preview", params={"path": str(artifact)})
+
+    assert response.status_code == 400
 
 
 class TestCancelExecution:

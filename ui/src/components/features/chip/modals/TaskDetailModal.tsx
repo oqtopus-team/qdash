@@ -11,6 +11,7 @@ import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureC
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
+import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import {
@@ -105,6 +106,7 @@ export function TaskDetailModal({
         status: fetchedTaskData.status,
         figure_path: fetchedTaskData.figure_path,
         json_figure_path: fetchedTaskData.json_figure_path,
+        raw_data_path: fetchedTaskData.raw_data_path,
         input_parameters: fetchedTaskData.input_parameters,
         output_parameters: fetchedTaskData.output_parameters,
         run_parameters: fetchedTaskData.run_parameters,
@@ -183,6 +185,7 @@ export function TaskDetailModal({
       : [task.json_figure_path]
     : [];
   const currentJsonFigure = jsonFigures[subIndex] || null;
+  const rawDataPaths = task.raw_data_path ?? [];
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
@@ -289,6 +292,13 @@ export function TaskDetailModal({
                   <div className="font-medium">{task.elapsed_time}</div>
                 </div>
               )}
+            </div>
+          )}
+
+          {(jsonFigures.length > 0 || rawDataPaths.length > 0) && (
+            <div className="mb-6 rounded-xl bg-base-200 p-4">
+              <h4 className="mb-2 font-medium">Artifacts</h4>
+              <TaskArtifactDownloads jsonFigurePaths={jsonFigures} rawDataPaths={rawDataPaths} />
             </div>
           )}
 

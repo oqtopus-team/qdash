@@ -14,6 +14,7 @@ import { useGetExecution } from "@/client/execution/execution";
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import {
   ExecutionHistoryModalContent,
   type ExecutionHistoryMobileTab,
@@ -204,6 +205,7 @@ export function TaskHistoryModal({
         ? [selectedTask.json_figure_path]
         : []
     : [];
+  const rawDataPaths = selectedTask?.raw_data_path ?? [];
 
   const analysisContext: AnalysisContext | null = useMemo(() => {
     if (!selectedTask?.task_id) return null;
@@ -497,6 +499,7 @@ export function TaskHistoryModal({
               <span>{formatDateTime(String(selectedTask.end_at))}</span>
             </div>
           )}
+          <TaskArtifactDownloads jsonFigurePaths={jsonFigures} rawDataPaths={rawDataPaths} />
           {/* Provenance link and Ask AI */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
             <Link

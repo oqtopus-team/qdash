@@ -30,6 +30,7 @@ Attributes
     username (str): Username snapshot of the user who executed the task.
     figure_path (list[str]): List of figure paths.
     json_figure_path (list[str]): List of JSON figure paths.
+    raw_data_path (list[str]): List of raw data artifact paths.
     input_parameters (dict): Input parameters.
     output_parameters (dict): Output parameters.
     start_at (datetime | None): Start time.
@@ -50,6 +51,7 @@ export interface TaskResultResponse {
   username?: string;
   figure_path: string[];
   json_figure_path: string[];
+  raw_data_path: string[];
   input_parameters: TaskResultResponseInputParameters;
   output_parameters: TaskResultResponseOutputParameters;
   run_parameters?: TaskResultResponseRunParameters;

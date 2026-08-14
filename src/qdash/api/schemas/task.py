@@ -170,6 +170,7 @@ class TaskResultResponse(BaseModel):
         username (str): Username snapshot of the user who executed the task.
         figure_path (list[str]): List of figure paths.
         json_figure_path (list[str]): List of JSON figure paths.
+        raw_data_path (list[str]): List of raw data artifact paths.
         input_parameters (dict): Input parameters.
         output_parameters (dict): Output parameters.
         start_at (datetime | None): Start time.
@@ -191,6 +192,7 @@ class TaskResultResponse(BaseModel):
     username: str = ""
     figure_path: list[str]
     json_figure_path: list[str]
+    raw_data_path: list[str]
     input_parameters: dict[str, Any]
     output_parameters: dict[str, Any]
     run_parameters: dict[str, Any] = {}
