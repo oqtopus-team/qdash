@@ -7,10 +7,14 @@ Business logic is delegated to ExecutionService for better testability.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Annotated
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException
 
 from qdash.api.dependencies import get_execution_service, get_flow_service
@@ -21,6 +25,7 @@ from qdash.api.lib.project import (
 )
 from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
+    ArtifactPreviewResponse,
     CancelExecutionResponse,
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
@@ -28,6 +33,7 @@ from qdash.api.schemas.execution import (
     ReExecuteRequest,
 )
 from qdash.api.schemas.flow import ExecuteFlowResponse
+from qdash.api.services.artifact_preview_service import preview_netcdf
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.flow_service import FlowService
 from qdash.common.config.path_resolver import resolve_calib_data_path
@@ -74,6 +80,99 @@ def get_figure_by_path(path: str) -> FileResponse:
         )
     # FileResponse sets Content-Length, avoiding chunked encoding
     return FileResponse(resolved_path, media_type="image/png")
+
+
+@router.get(
+    "/executions/artifact",
+    responses={404: {"model": Detail}},
+    response_class=FileResponse,
+    summary="Download a calibration artifact by its path",
+    operation_id="downloadArtifactByPath",
+)
+def download_artifact_by_path(path: str) -> FileResponse:
+    """Download a calibration artifact such as figure JSON or raw NetCDF data."""
+    resolved_path = resolve_calib_data_path(path)
+    if not resolved_path.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    return FileResponse(resolved_path, filename=resolved_path.name)
+
+
+def _unique_archive_name(path: Path, used_names: set[str]) -> str:
+    """Return a stable, unique basename for a ZIP member."""
+    candidate = path.name
+    counter = 2
+    while candidate in used_names:
+        candidate = f"{path.stem}_{counter}{path.suffix}"
+        counter += 1
+    used_names.add(candidate)
+    return candidate
+
+
+@router.get(
+    "/executions/artifacts/archive",
+    responses={
+        200: {"content": {"application/zip": {"schema": {"type": "string", "format": "binary"}}}},
+        404: {"model": Detail},
+    },
+    response_class=FileResponse,
+    summary="Download calibration artifacts as a ZIP archive",
+    operation_id="downloadArtifactsAsArchive",
+)
+def download_artifacts_as_archive(
+    paths: Annotated[list[str], Query(min_length=1, max_length=100)],
+) -> FileResponse:
+    """Download multiple figure JSON and raw NetCDF artifacts as one ZIP file."""
+    resolved_paths: list[Path] = []
+    for path in paths:
+        resolved_path = resolve_calib_data_path(path)
+        if not resolved_path.exists():
+            raise HTTPException(status_code=404, detail=f"File not found: {path}")
+        resolved_paths.append(resolved_path)
+
+    with NamedTemporaryFile(delete=False, suffix=".zip") as temporary_file:
+        archive_path = Path(temporary_file.name)
+
+    try:
+        used_names: set[str] = set()
+        with ZipFile(archive_path, mode="w", compression=ZIP_DEFLATED) as zip_file:
+            for resolved_path in resolved_paths:
+                zip_file.write(
+                    resolved_path,
+                    arcname=_unique_archive_name(resolved_path, used_names),
+                )
+    except Exception:
+        archive_path.unlink(missing_ok=True)
+        raise
+
+    return FileResponse(
+        archive_path,
+        media_type="application/zip",
+        filename="artifacts.zip",
+        background=BackgroundTask(archive_path.unlink, missing_ok=True),
+    )
+
+
+@router.get(
+    "/executions/artifact/preview",
+    responses={400: {"model": Detail}, 404: {"model": Detail}},
+    response_model=ArtifactPreviewResponse,
+    summary="Preview a NetCDF calibration artifact",
+    operation_id="previewArtifactByPath",
+)
+def preview_artifact_by_path(path: str) -> ArtifactPreviewResponse:
+    """Return a size-limited table preview of a NetCDF calibration artifact."""
+    resolved_path = resolve_calib_data_path(path)
+    if not resolved_path.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    if resolved_path.suffix.lower() != ".nc":
+        raise HTTPException(status_code=400, detail="Only NetCDF (.nc) artifacts can be previewed")
+    try:
+        return preview_netcdf(resolved_path)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unable to preview NetCDF artifact: {error}",
+        ) from error
 
 
 @router.get(

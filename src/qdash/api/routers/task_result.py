@@ -7,7 +7,8 @@ from datetime import datetime  # noqa: TC003
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 from qdash.api.dependencies import get_flow_service, get_task_result_service
 from qdash.api.lib.project import (
@@ -739,15 +740,19 @@ def set_task_result_excluded(
     "/task-results/figures/download",
     summary="Download multiple figures as a ZIP file",
     operation_id="downloadFiguresAsZip",
+    response_class=FileResponse,
+    responses={
+        200: {"content": {"application/zip": {"schema": {"type": "string", "format": "binary"}}}}
+    },
 )
 def download_figures_as_zip(
     body: DownloadFiguresAsZipRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
-) -> StreamingResponse:
+) -> FileResponse:
     """Download multiple calibration figures as a ZIP file.
 
-    Creates a ZIP archive containing all requested figure files and returns it
-    as a streaming response.
+    Creates a ZIP archive on temporary storage and serves it without retaining
+    the completed archive in API worker memory.
 
     Parameters
     ----------
@@ -758,8 +763,8 @@ def download_figures_as_zip(
 
     Returns
     -------
-    StreamingResponse
-        ZIP archive containing all requested files
+    FileResponse
+        ZIP archive streamed from a temporary file
 
     Raises
     ------
@@ -767,7 +772,7 @@ def download_figures_as_zip(
         400 if no paths are provided or if any path does not exist
 
     """
-    zip_buffer, safe_filename = TaskResultService.create_figures_zip(
+    archive_path, safe_filename = TaskResultService.create_figures_zip(
         body.paths,
         body.filename,
         project_id=ctx.project_id,
@@ -775,8 +780,9 @@ def download_figures_as_zip(
         ai_review_bundle_task_ids=body.ai_review_bundle_task_ids,
     )
 
-    return StreamingResponse(
-        zip_buffer,
+    return FileResponse(
+        archive_path,
         media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename={safe_filename}"},
+        filename=safe_filename,
+        background=BackgroundTask(archive_path.unlink, missing_ok=True),
     )

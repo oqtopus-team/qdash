@@ -60,8 +60,8 @@ type TaskWithAiReview = Task & {
 
 const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
   figureImages: false,
-  jsonFigures: true,
-  rawData: false,
+  jsonFigures: false,
+  rawData: true,
   aiReviewNotes: false,
   aiReviewReplayBundles: false,
 };
@@ -103,6 +103,10 @@ function getPendingAiReviewTaskIds(
 function toPathList(paths: string[] | string | null | undefined): string[] {
   if (!paths) return [];
   return Array.isArray(paths) ? paths : [paths];
+}
+
+function toNetcdfPathList(paths: string[] | string | null | undefined): string[] {
+  return toPathList(paths).filter((path) => path.toLowerCase().endsWith(".nc"));
 }
 
 function requestErrorMessage(error: unknown): string | null {
@@ -408,7 +412,7 @@ export function QubitGrid({
       const task = taskResponse?.data?.result?.[qid];
       counts.figureImages += toPathList(task?.figure_path).length;
       counts.jsonFigures += toPathList(task?.json_figure_path).length;
-      counts.rawData += toPathList(task?.raw_data_path).length;
+      counts.rawData += toNetcdfPathList(task?.raw_data_path).length;
       if (task?.task_id && aiReviewBadgesByTaskId?.has(task.task_id)) {
         counts.aiReviewNotes += 1;
       }
@@ -584,7 +588,7 @@ export function QubitGrid({
         paths.push(...toPathList(task.json_figure_path));
       }
       if (downloadOptions.rawData) {
-        paths.push(...toPathList(task.raw_data_path));
+        paths.push(...toNetcdfPathList(task.raw_data_path));
       }
       if (downloadOptions.aiReviewNotes && task.task_id) {
         aiReviewTaskIds.push(task.task_id);
@@ -610,9 +614,7 @@ export function QubitGrid({
         { responseType: "blob" },
       );
 
-      const blob = new Blob([response.data as BlobPart], {
-        type: "application/zip",
-      });
+      const blob = response.data as Blob;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
