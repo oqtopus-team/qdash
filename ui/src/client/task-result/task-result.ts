@@ -1530,10 +1530,11 @@ export const downloadFiguresAsZip = (
 ) => {
       
       
-      return customInstance<unknown>(
+      return customInstance<Blob>(
       {url: `/task-results/figures/download`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: downloadFiguresAsZipRequest, signal
+      data: downloadFiguresAsZipRequest,
+        responseType: 'blob', signal
     },
       options);
     }

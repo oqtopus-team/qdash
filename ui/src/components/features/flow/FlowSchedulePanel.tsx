@@ -3,8 +3,11 @@
 import { useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
 
 import type { ScheduleFlowRequest, FlowScheduleSummary } from "@/schemas";
@@ -27,6 +30,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
   const [scheduledTime, setScheduledTime] = useState("");
   const [scheduleType, setScheduleType] = useState<"cron" | "one-time">("cron");
   const [isActive, setIsActive] = useState(true);
+  const [scheduleToDeleteId, setScheduleToDeleteId] = useState<string | null>(null);
 
   // Fetch schedules for this flow
   const { data: schedulesData, isLoading } = useQuery({
@@ -61,6 +65,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       queryClient.invalidateQueries({ queryKey: ["flow-schedules", flowName] });
       queryClient.invalidateQueries({ queryKey: ["flow-schedules"] });
       toast.success("Schedule deleted successfully!");
+      setScheduleToDeleteId(null);
     },
     onError: (error: Error) => {
       toast.error(`Failed to delete schedule: ${error.message}`);
@@ -87,9 +92,14 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
         toast.error("Please enter a cron expression");
         return;
       }
+      const trimmedCron = cronExpression.trim();
+      if (schedules.some((schedule) => schedule.cron === trimmedCron)) {
+        toast.error("This cron schedule already exists");
+        return;
+      }
       createScheduleMutation.mutate({
         data: {
-          cron: cronExpression.trim(),
+          cron: trimmedCron,
           active: isActive,
           parameters: {},
         },
@@ -119,10 +129,9 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
     }
   };
 
-  const handleDeleteSchedule = (scheduleId: string) => {
-    if (confirm("Are you sure you want to delete this schedule?")) {
-      deleteScheduleMutation.mutate({ scheduleId });
-    }
+  const handleConfirmDeleteSchedule = () => {
+    if (!scheduleToDeleteId) return;
+    deleteScheduleMutation.mutate({ scheduleId: scheduleToDeleteId });
   };
 
   return (
@@ -163,6 +172,9 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
             />
             <label className="label">
               <span className="label-text-alt text-xs">Timezone: Asia/Tokyo (JST)</span>
+            </label>
+            <label className="label py-0">
+              <span className="label-text-alt text-xs">You can add multiple cron schedules</span>
             </label>
           </div>
 
@@ -260,8 +272,10 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       >
         {createScheduleMutation.isPending ? (
           <span className="loading loading-spinner loading-xs"></span>
+        ) : scheduleType === "cron" ? (
+          "Add Cron Schedule"
         ) : (
-          `Create ${scheduleType === "cron" ? "Cron" : "One-time"} Schedule`
+          "Create One-time Schedule"
         )}
       </button>
 
@@ -324,14 +338,20 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                       />
                     </label>
                   )}
-                  <button
-                    onClick={() => handleDeleteSchedule(schedule.schedule_id)}
-                    className="btn btn-xs btn-ghost text-error"
-                    disabled={deleteScheduleMutation.isPending}
-                    title="Delete"
-                  >
-                    🗑
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setScheduleToDeleteId(schedule.schedule_id)}
+                        className="btn btn-xs btn-square btn-ghost text-error"
+                        disabled={deleteScheduleMutation.isPending}
+                        aria-label="Delete schedule"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete schedule</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             </div>
@@ -359,6 +379,17 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={scheduleToDeleteId !== null}
+        title="Delete schedule?"
+        description="This schedule will be permanently deleted. This action cannot be undone."
+        confirmLabel="Delete schedule"
+        onConfirm={handleConfirmDeleteSchedule}
+        onOpenChange={(open) => !open && setScheduleToDeleteId(null)}
+        pending={deleteScheduleMutation.isPending}
+        destructive
+      />
     </div>
   );
 }

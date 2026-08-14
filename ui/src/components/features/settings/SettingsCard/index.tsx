@@ -2,20 +2,22 @@
 
 import { useEffect, useState, useCallback } from "react";
 
-import { Toast } from "../Toast";
-
 import { useGetSettings } from "@/client/settings/settings";
+import { useToast } from "@/components/ui/Toast";
 import { SettingsResponse } from "@/schemas/settingsResponse";
 
 export function SettingsCard() {
   const [setting, setSetting] = useState<SettingsResponse | null>(null);
-  const [showToast, setShowToast] = useState(false);
+  const toast = useToast();
   const { data, isError, isLoading } = useGetSettings();
 
-  const handleCopy = useCallback((value: string) => {
-    navigator.clipboard.writeText(value);
-    setShowToast(true);
-  }, []);
+  const handleCopy = useCallback(
+    (value: string) => {
+      navigator.clipboard.writeText(value);
+      toast.success("Copied to clipboard!");
+    },
+    [toast],
+  );
 
   useEffect(() => {
     if (data) {
@@ -89,7 +91,6 @@ export function SettingsCard() {
           </div>
         )}
       </div>
-      {showToast && <Toast message="Copied to clipboard!" onClose={() => setShowToast(false)} />}
     </div>
   );
 }

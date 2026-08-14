@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { CheckCircle, AlertTriangle, Clock, HelpCircle, GitBranch } from "lucide-react";
 
 import type { Task } from "@/schemas";
@@ -11,7 +11,15 @@ import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureC
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
+import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/DropdownMenu";
 import {
   formatDate as formatDateUtil,
   formatTime as formatTimeUtil,
@@ -59,7 +67,6 @@ export function TaskDetailModal({
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [subIndex, setSubIndex] = useState(initialSubIndex);
-  const modalRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const resolveQid = (taskQid: string, qidRole?: string): string => {
@@ -77,33 +84,6 @@ export function TaskDetailModal({
     const q = encodeURIComponent(qidValue);
     return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
   };
-
-  // Handle keyboard navigation
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    },
-    [onClose],
-  );
-
-  // Focus management and keyboard handling
-  useEffect(() => {
-    if (isOpen) {
-      // Focus the close button when modal opens
-      closeButtonRef.current?.focus();
-      // Add keyboard listener
-      document.addEventListener("keydown", handleKeyDown);
-      // Prevent body scroll
-      document.body.style.overflow = "hidden";
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, handleKeyDown]);
 
   // Use generated API client hook when taskId is provided
   const {
@@ -126,6 +106,7 @@ export function TaskDetailModal({
         status: fetchedTaskData.status,
         figure_path: fetchedTaskData.figure_path,
         json_figure_path: fetchedTaskData.json_figure_path,
+        raw_data_path: fetchedTaskData.raw_data_path,
         input_parameters: fetchedTaskData.input_parameters,
         output_parameters: fetchedTaskData.output_parameters,
         run_parameters: fetchedTaskData.run_parameters,
@@ -143,28 +124,36 @@ export function TaskDetailModal({
   // Loading state
   if (loading && !taskProp) {
     return (
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-        <div className="bg-base-100 rounded-xl p-8">
-          <span className="loading loading-spinner loading-lg"></span>
-          <p className="mt-4 text-center">Loading task details...</p>
-        </div>
-      </div>
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-sm text-center">
+          <DialogTitle className="sr-only">Loading task details</DialogTitle>
+          <DialogDescription asChild>
+            <div>
+              <span className="loading loading-spinner loading-lg" />
+              <p className="mt-4">Loading task details...</p>
+            </div>
+          </DialogDescription>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   // Error state
   if (error) {
     return (
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
-        <div className="bg-base-100 rounded-xl p-8 max-w-md">
-          <div className="alert alert-error">
-            <span>Error: {error}</span>
-          </div>
-          <button onClick={onClose} className="btn btn-primary mt-4 w-full">
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Task details unavailable</DialogTitle>
+          <DialogDescription asChild>
+            <div className="alert alert-error mt-4">
+              <span>Error: {error}</span>
+            </div>
+          </DialogDescription>
+          <button type="button" onClick={onClose} className="btn btn-primary mt-4 w-full">
             Close
           </button>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -196,6 +185,7 @@ export function TaskDetailModal({
       : [task.json_figure_path]
     : [];
   const currentJsonFigure = jsonFigures[subIndex] || null;
+  const rawDataPaths = task.raw_data_path ?? [];
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
@@ -215,23 +205,22 @@ export function TaskDetailModal({
     variant === "detailed" && taskName ? `Task Details - ${taskName}` : `Result for QID ${qid}`;
 
   return (
-    <dialog
-      ref={modalRef}
-      className="modal modal-open modal-bottom sm:modal-middle"
-      aria-labelledby="modal-title"
-      aria-modal="true"
-      role="dialog"
-    >
-      <div
-        className="modal-box w-full sm:w-11/12 max-w-[112rem] h-[90vh] sm:h-[95vh] p-0 bg-base-100 overflow-hidden flex flex-col"
-        onClick={(event) => event.stopPropagation()}
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none w-full max-w-[112rem] h-[90vh] sm:h-[95vh] p-0 !overflow-hidden flex flex-col"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          closeButtonRef.current?.focus();
+        }}
       >
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <h2 id="modal-title" className="text-lg sm:text-2xl font-bold truncate">
+            <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
               {modalTitle}
-            </h2>
-            <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">QID {qid}</p>
+            </DialogTitle>
+            <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+              QID {qid}
+            </DialogDescription>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
             {getStatusBadge(task.status)}
@@ -303,6 +292,13 @@ export function TaskDetailModal({
                   <div className="font-medium">{task.elapsed_time}</div>
                 </div>
               )}
+            </div>
+          )}
+
+          {(jsonFigures.length > 0 || rawDataPaths.length > 0) && (
+            <div className="mb-6 rounded-xl bg-base-200 p-4">
+              <h4 className="mb-2 font-medium">Artifacts</h4>
+              <TaskArtifactDownloads jsonFigurePaths={jsonFigures} rawDataPaths={rawDataPaths} />
             </div>
           )}
 
@@ -432,11 +428,10 @@ export function TaskDetailModal({
                           </div>
                         )}
                         {task.run_parameters && Object.keys(task.run_parameters).length > 0 && (
-                          <div className="collapse collapse-arrow bg-base-200 rounded-xl">
-                            <input type="checkbox" />
-                            <div className="collapse-title font-medium text-sm py-3">
+                          <details className="collapse collapse-arrow bg-base-200 rounded-xl">
+                            <summary className="collapse-title font-medium text-sm py-3">
                               Run Parameters
-                            </div>
+                            </summary>
                             <div className="collapse-content">
                               <div className="space-y-1">
                                 {Object.entries(task.run_parameters).map(([key, value]) => {
@@ -465,7 +460,7 @@ export function TaskDetailModal({
                                 })}
                               </div>
                             </div>
-                          </div>
+                          </details>
                         )}
                         {task.message && (
                           <div className="card bg-base-200 p-4 rounded-xl">
@@ -720,48 +715,46 @@ export function TaskDetailModal({
                                     <div className="flex items-center gap-2 text-xs text-base-content/60">
                                       <span>↳ from</span>
                                       {paramValue.execution_id ? (
-                                        <div className="dropdown dropdown-top">
-                                          <button tabIndex={0} className="link link-primary">
-                                            {paramValue.task_name ||
-                                              `Execution ${paramValue.execution_id.slice(0, 8)}`}
-                                          </button>
-                                          <ul
-                                            tabIndex={0}
-                                            className="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-48 border border-base-300"
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <button type="button" className="link link-primary">
+                                              {paramValue.task_name ||
+                                                `Execution ${paramValue.execution_id.slice(0, 8)}`}
+                                            </button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent
+                                            side="top"
+                                            align="start"
+                                            className="w-48"
                                           >
-                                            <li>
-                                              <button
-                                                onClick={() => {
-                                                  router.push(
-                                                    `/executions/${paramValue.execution_id}`,
-                                                  );
-                                                }}
-                                              >
-                                                View Execution
-                                              </button>
-                                            </li>
-                                            <li>
-                                              <button
-                                                onClick={() => {
-                                                  const pv = paramValue as Record<string, unknown>;
-                                                  const parameterName =
-                                                    (pv?.parameter_name as string | undefined) ||
-                                                    key;
-                                                  const resolvedQid = resolveQid(
-                                                    qid,
-                                                    pv?.qid_role as string | undefined,
-                                                  );
-                                                  router.push(
-                                                    buildProvenanceUrl(parameterName, resolvedQid),
-                                                  );
-                                                  onClose();
-                                                }}
-                                              >
-                                                View Lineage
-                                              </button>
-                                            </li>
-                                          </ul>
-                                        </div>
+                                            <DropdownMenuItem
+                                              onSelect={() => {
+                                                router.push(
+                                                  `/executions/${paramValue.execution_id}`,
+                                                );
+                                              }}
+                                            >
+                                              View Execution
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                              onSelect={() => {
+                                                const pv = paramValue as Record<string, unknown>;
+                                                const parameterName =
+                                                  (pv?.parameter_name as string | undefined) || key;
+                                                const resolvedQid = resolveQid(
+                                                  qid,
+                                                  pv?.qid_role as string | undefined,
+                                                );
+                                                router.push(
+                                                  buildProvenanceUrl(parameterName, resolvedQid),
+                                                );
+                                                onClose();
+                                              }}
+                                            >
+                                              View Lineage
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
                                       ) : (
                                         <span>Unknown source</span>
                                       )}
@@ -866,12 +859,7 @@ export function TaskDetailModal({
             </button>
           )}
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose} aria-label="Close modal">
-          close
-        </button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }

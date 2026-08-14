@@ -13,6 +13,8 @@ import { useIssueAiReply } from "@/hooks/useIssueAiReply";
 import type { IssueResponse } from "@/schemas";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import {
@@ -54,6 +56,8 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
   const [editIssueContent, setEditIssueContent] = useState("");
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
   const [editReplyContent, setEditReplyContent] = useState("");
+  const [replyToDeleteId, setReplyToDeleteId] = useState<string | null>(null);
+  const [isDeletingReply, setIsDeletingReply] = useState(false);
   const { uploadImage } = useImageUpload();
   const { data: membersResponse } = useListProjectMembers(projectId ?? "", {
     query: { enabled: !!projectId },
@@ -158,9 +162,15 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
     }
   };
 
-  const handleDeleteReply = async (replyId: string) => {
-    if (!issue) return;
-    await deleteReply(issue.task_id, replyId);
+  const handleConfirmDeleteReply = async () => {
+    if (!issue || !replyToDeleteId) return;
+    setIsDeletingReply(true);
+    try {
+      await deleteReply(issue.task_id, replyToDeleteId);
+      setReplyToDeleteId(null);
+    } finally {
+      setIsDeletingReply(false);
+    }
   };
 
   const handleStartEditIssue = () => {
@@ -217,9 +227,19 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
     <div className="max-w-4xl mx-auto">
       {/* Back navigation + header */}
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => router.push("/issues")} className="btn btn-sm btn-ghost btn-square">
-          <ArrowLeft className="h-4 w-4" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => router.push("/issues")}
+              className="btn btn-sm btn-ghost btn-square"
+              aria-label="Back to issues"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Back to issues</TooltipContent>
+        </Tooltip>
         <div className="flex flex-col gap-1 flex-1 min-w-0">
           {issue.title != null &&
             (editingIssue ? (
@@ -246,13 +266,19 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
               <div className="flex items-center gap-1.5 min-w-0">
                 <h1 className="text-lg font-bold truncate">{issue.title}</h1>
                 {currentUser === issue.username && (
-                  <button
-                    onClick={handleStartEditIssue}
-                    className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-primary shrink-0"
-                    title="Edit issue"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={handleStartEditIssue}
+                        className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-primary shrink-0"
+                        aria-label="Edit issue"
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Edit issue</TooltipContent>
+                  </Tooltip>
                 )}
               </div>
             ))}
@@ -475,20 +501,32 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
                   </div>
                   {currentUser === reply.username && editingReplyId !== reply.id && (
                     <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleStartEditReply(reply)}
-                        className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-primary"
-                        title="Edit reply"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteReply(reply.id)}
-                        className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-error"
-                        title="Delete reply"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditReply(reply)}
+                            className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-primary"
+                            aria-label="Edit reply"
+                          >
+                            <Pencil className="h-3 w-3" aria-hidden="true" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit reply</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => setReplyToDeleteId(reply.id)}
+                            className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-error"
+                            aria-label="Delete reply"
+                          >
+                            <Trash2 className="h-3 w-3" aria-hidden="true" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete reply</TooltipContent>
+                      </Tooltip>
                     </div>
                   )}
                 </div>
@@ -558,6 +596,17 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
           mentionCandidates={mentionCandidates}
         />
       </div>
+
+      <ConfirmDialog
+        open={replyToDeleteId !== null}
+        title="Delete reply?"
+        description="This reply will be permanently deleted. This action cannot be undone."
+        confirmLabel="Delete reply"
+        onConfirm={handleConfirmDeleteReply}
+        onOpenChange={(open) => !open && setReplyToDeleteId(null)}
+        pending={isDeletingReply}
+        destructive
+      />
     </div>
   );
 }

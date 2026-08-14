@@ -25,4 +25,3 @@ class SettingsResponse(BaseModel):
     ui_port: int = 5714
     log_level: str = "INFO"
     timezone: str = "Asia/Tokyo"
-    enable_local_codex_agent: bool = False

@@ -176,27 +176,6 @@ services:
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
     networks:
       - custom_net
-  agent-worker:
-    build:
-      context: .
-      dockerfile: ./src/qdash/agent/Dockerfile
-      args:
-        CODEX_INSTALL_COMMAND: ${CODEX_INSTALL_COMMAND:-}
-    restart: unless-stopped
-    env_file:
-      - .env
-    profiles:
-      - agent
-    volumes:
-      - ./src/qdash/agent:/app/qdash/agent
-      - ./src/qdash/workflow/templates:/app/qdash/workflow/templates:ro
-      - ./config:/app/config:ro
-      - ./logs/agent:/app/logs
-    environment:
-      - PYTHONPATH=/app:/app/qdash
-      - ENABLE_LOCAL_CODEX_AGENT=true
-    networks:
-      - custom_net
   ui:
     build:
       context: .

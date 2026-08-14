@@ -317,6 +317,7 @@ describe("DashboardPageContent", () => {
     ]);
 
     render(<DashboardPageContent />);
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
 
     expect(screen.getAllByTestId("qubit-forum-label").map((item) => item.textContent)).toContain(
       "anomaly",
@@ -329,6 +330,7 @@ describe("DashboardPageContent", () => {
   it("opens the pinned summary modal from the empty qubit topology", () => {
     render(<DashboardPageContent />);
 
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
     fireEvent.click(screen.getAllByRole("button", { name: "Open qubit" })[0]);
 
     expect(screen.getByTestId("target-note-modal").textContent).toContain("0");
@@ -338,6 +340,7 @@ describe("DashboardPageContent", () => {
   it("opens the pinned summary modal from the empty coupling topology", () => {
     render(<DashboardPageContent />);
 
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
     fireEvent.click(screen.getAllByRole("button", { name: "Open coupling" })[0]);
 
     expect(screen.getByTestId("target-note-modal").textContent).toContain("0-1");
@@ -347,7 +350,9 @@ describe("DashboardPageContent", () => {
   it("opens the metric history modal for a qubit metric even when the metric value is missing", () => {
     render(<DashboardPageContent />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Open qubit" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: /1 qubit metric without data/ }));
+    fireEvent.click(screen.getAllByText("Show topology")[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Open qubit" }));
 
     expect(screen.getByTestId("metric-note-modal").textContent).toContain("0:t1");
     expect(screen.queryByTestId("target-note-modal")).toBeNull();
@@ -356,10 +361,34 @@ describe("DashboardPageContent", () => {
   it("opens the metric history modal for a coupling metric even when the metric value is missing", () => {
     render(<DashboardPageContent />);
 
+    fireEvent.click(screen.getByRole("button", { name: /1 coupling metric without data/ }));
+    fireEvent.click(screen.getByText("Show topology"));
     const couplingButtons = screen.getAllByRole("button", { name: "Open coupling" });
     fireEvent.click(couplingButtons[couplingButtons.length - 1]);
 
     expect(screen.getByTestId("metric-note-modal").textContent).toContain("0-1:zx90_gate_fidelity");
     expect(screen.queryByTestId("target-note-modal")).toBeNull();
+  });
+
+  it("summarizes metric availability before expanding the full table", () => {
+    render(<DashboardPageContent />);
+
+    expect(screen.getByText("0 with data")).toBeTruthy();
+    expect(screen.getByText("2 empty")).toBeTruthy();
+
+    const summary = screen.getByText("All Metrics Summary").closest("summary");
+    expect(summary).not.toBeNull();
+    fireEvent.click(summary!);
+    expect(summary?.parentElement?.hasAttribute("open")).toBe(true);
+  });
+
+  it("keeps empty metrics grouped until requested", () => {
+    render(<DashboardPageContent />);
+
+    expect(screen.queryByText("No values in the selected range")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /1 qubit metric without data/ }));
+
+    expect(screen.getByText("No values in the selected range")).toBeTruthy();
   });
 });

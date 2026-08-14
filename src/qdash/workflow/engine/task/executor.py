@@ -161,6 +161,27 @@ class TaskExecutor:
         """Run the main task logic for a batch of qubits."""
         return task.batch_run(backend, qids)
 
+    def _extract_raw_data(self, task: TaskProtocol, run_result: RunResult) -> list[Any]:
+        """Extract raw artifacts before task-specific postprocessing."""
+        extractor = getattr(task, "extract_raw_data", None)
+        if extractor is None:
+            return []
+        return list(extractor(run_result))
+
+    def _extract_batch_raw_data(
+        self,
+        task: TaskProtocol,
+        backend: BackendProtocol,
+        run_result: RunResult,
+        qids: list[str],
+    ) -> dict[str, list[Any]]:
+        """Extract raw artifacts grouped by qid before batch postprocessing."""
+        extractor = getattr(task, "extract_batch_raw_data", None)
+        if extractor is None:
+            return {qid: [] for qid in qids}
+        extracted = extractor(backend, run_result, qids)
+        return {qid: list(extracted.get(qid, [])) for qid in qids}
+
     def _run_postprocess(
         self,
         task: TaskProtocol,
@@ -170,6 +191,16 @@ class TaskExecutor:
     ) -> PostProcessResult:
         """Run task postprocessing."""
         return task.postprocess(backend, self.execution_id, run_result, qid)
+
+    def _save_raw_data(self, raw_data: list[Any], task_name: str, task_type: str, qid: str) -> None:
+        """Save raw artifacts and retain any paths already recorded."""
+        if not raw_data:
+            return
+        new_paths = self.data_saver.save_raw_data(raw_data, task_name, task_type, qid)
+        task_model = self.state_manager.get_task(task_name, task_type, qid)
+        self.state_manager.set_raw_data_paths(
+            task_name, task_type, qid, [*task_model.raw_data_path, *new_paths]
+        )
 
     def _save_artifacts(
         self,
@@ -188,10 +219,9 @@ class TaskExecutor:
 
         # Save raw data
         if postprocess_result.raw_data:
-            raw_paths = self.data_saver.save_raw_data(
-                postprocess_result.raw_data, task_name, task_type, qid
-            )
-            self.state_manager.set_raw_data_paths(task_name, task_type, qid, raw_paths)
+            task_model = self.state_manager.get_task(task_name, task_type, qid)
+            if not task_model.raw_data_path:
+                self._save_raw_data(postprocess_result.raw_data, task_name, task_type, qid)
 
     def _complete_task(
         self,
@@ -320,6 +350,10 @@ class TaskExecutor:
                 result.success = True
                 result.message = "Completed without run result"
                 return execution_service, result
+
+            # 3.5 Save raw Qubex results before task-specific postprocessing.
+            raw_data = self._extract_raw_data(task, run_result)
+            self._save_raw_data(raw_data, task_name, task_type, qid)
 
             # 4. Postprocess
             postprocess_result = self._run_postprocess(task, backend, run_result, qid)
@@ -532,6 +566,10 @@ class TaskExecutor:
                     result.success = True
                     result.message = "Completed without run result"
                 return execution_service, results
+
+            raw_data_by_qid = self._extract_batch_raw_data(task, backend, run_result, qids)
+            for qid in qids:
+                self._save_raw_data(raw_data_by_qid[qid], task_name, task_type, qid)
 
             for qid, result in results.items():
                 try:

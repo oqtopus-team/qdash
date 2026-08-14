@@ -3,61 +3,34 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, useCallback, useRef } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 import {
-  BarChart3,
-  BookMarked,
   BookOpen,
   ChevronLeft,
   ChevronRight,
-  Code,
-  Cpu,
-  Download,
   FileJson2,
-  Files,
-  GitBranch,
-  Inbox,
-  LayoutDashboard,
-  LayoutGrid,
-  ClipboardList,
-  Snowflake,
-  ListTodo,
   LogOut,
-  Brain,
-  CircleDot,
-  MessagesSquare,
   Moon,
   Settings,
-  ShieldCheck,
-  Bot,
-  ClipboardCheck,
   Sun,
   Workflow,
   X,
-  Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { DARK_THEMES } from "@/constants/themes";
+import { getNavigationSections } from "@/components/layout/navigation";
+import type { NavItem, NavSection } from "@/components/layout/navigation";
 
 const PREFECT_URL = process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
-
-type NavItem = {
-  href: string;
-  label: string;
-  title?: string;
-  icon: LucideIcon;
-  match?: "exact" | "prefix";
-  badge?: number;
-  visible?: boolean;
-};
 
 type ExternalNavItem = {
   href: string;
@@ -67,15 +40,10 @@ type ExternalNavItem = {
   visible?: boolean;
 };
 
-type NavSection = {
-  label: string;
-  items: NavItem[];
-};
-
 function SectionHeader({ label, visible }: { label: string; visible: boolean }) {
   if (!visible) return null;
   return (
-    <li className="menu-title text-xs font-semibold text-base-content/50 uppercase tracking-wider px-3 pt-3 pb-1">
+    <li className="menu-title px-3 pb-1 pt-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-base-content/50">
       {label}
     </li>
   );
@@ -109,6 +77,7 @@ function SidebarNavItem({
         href={item.href}
         className={isMobileOpen ? linkClass(active) : desktopLinkClass(active)}
         title={item.title ?? item.label}
+        aria-current={active ? "page" : undefined}
         onClick={onClick}
       >
         <Icon size={18} />
@@ -158,7 +127,10 @@ function SidebarExternalNavItem({
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const modalRef = useRef<HTMLDialogElement>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [logoutPending, setLogoutPending] = useState(false);
+  const desktopNavRef = useRef<HTMLElement>(null);
+  const mobileNavRef = useRef<HTMLElement>(null);
   const { isOpen, isMobileOpen, toggleSidebar, setMobileSidebarOpen } = useSidebar();
   const { canEdit } = useProject();
   const { user, logout: authLogout } = useAuth();
@@ -168,14 +140,17 @@ export function Sidebar() {
   const isAdmin = user?.system_role === "admin";
   const isDarkTheme = DARK_THEMES.includes(theme as (typeof DARK_THEMES)[number]);
 
+  useEffect(() => {
+    const navigation = isMobileOpen ? mobileNavRef.current : desktopNavRef.current;
+    navigation?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest" });
+  }, [pathname, isOpen, isMobileOpen]);
+
   const handleLogout = useCallback(async () => {
     await authLogout();
   }, [authLogout]);
 
   const openProfileModal = useCallback(() => {
-    if (modalRef.current) {
-      modalRef.current.showModal();
-    }
+    setProfileOpen(true);
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -183,7 +158,7 @@ export function Sidebar() {
   }, [isDarkTheme, setTheme]);
 
   const handleSettingsClick = useCallback(() => {
-    modalRef.current?.close();
+    setProfileOpen(false);
     if (isMobileOpen) {
       setMobileSidebarOpen(false);
     }
@@ -191,8 +166,13 @@ export function Sidebar() {
   }, [isMobileOpen, setMobileSidebarOpen, router]);
 
   const handleModalLogout = useCallback(async () => {
-    modalRef.current?.close();
-    await handleLogout();
+    setLogoutPending(true);
+    try {
+      await handleLogout();
+      setProfileOpen(false);
+    } finally {
+      setLogoutPending(false);
+    }
   }, [handleLogout]);
 
   // Close mobile sidebar when clicking a link
@@ -204,116 +184,26 @@ export function Sidebar() {
 
   // Mobile sidebar style
   const linkClass = (active: boolean) =>
-    `py-2.5 px-3 mx-1 my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
-      active ? "bg-neutral text-neutral-content" : "text-base-content hover:bg-base-300"
+    `relative min-h-10 px-3 mx-1 my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
+      active
+        ? "bg-primary/12 text-primary before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-primary"
+        : "text-base-content/75 hover:bg-base-300 hover:text-base-content"
     }`;
 
   // Desktop sidebar style
   const desktopLinkClass = (active: boolean) =>
-    `py-2.5 ${isOpen ? "px-3 mx-1" : "px-2 mx-1 justify-center"} my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
-      active ? "bg-neutral text-neutral-content" : "text-base-content hover:bg-base-300"
+    `relative min-h-9 ${isOpen ? "px-3 mx-1" : "px-2 mx-1 justify-center"} my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
+      active
+        ? "bg-primary/12 text-primary before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-primary"
+        : "text-base-content/75 hover:bg-base-300 hover:text-base-content"
     }`;
 
   const sectionHeaderVisible = isOpen || isMobileOpen;
-  const navSections: NavSection[] = [
-    {
-      label: "Overview",
-      items: [
-        {
-          href: "/inbox",
-          label: "Inbox",
-          icon: Inbox,
-          badge: unreadNotifications,
-        },
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/metrics", label: "Metrics", icon: LayoutGrid },
-        { href: "/chip", label: "Chip", icon: Cpu },
-        { href: "/analysis", label: "Analysis", icon: BarChart3 },
-        { href: "/chat", label: "AI Chat", icon: Bot },
-        {
-          href: "/provenance",
-          label: "Provenance",
-          icon: GitBranch,
-        },
-      ],
-    },
-    {
-      label: "Operate",
-      items: [
-        {
-          href: "/workflow",
-          label: "Workflow",
-          icon: Code,
-          match: "prefix",
-          visible: canEdit,
-        },
-        { href: "/execution", label: "Execution", icon: Zap },
-        {
-          href: "/task-results",
-          label: "Task Results",
-          icon: ClipboardList,
-          match: "prefix",
-        },
-        {
-          href: "/tasks",
-          label: "Tasks",
-          icon: ListTodo,
-          visible: canEdit,
-        },
-        { href: "/cryo", label: "Cryo", icon: Snowflake },
-        { href: "/import", label: "Import", icon: Download },
-      ],
-    },
-    {
-      label: "Collaborate",
-      items: [
-        { href: "/issues", label: "Issues", icon: CircleDot, match: "prefix" },
-        {
-          href: "/forum",
-          label: "Forum",
-          icon: MessagesSquare,
-          match: "prefix",
-        },
-        {
-          href: "/issue-knowledge",
-          label: "Knowledge",
-          icon: Brain,
-          match: "prefix",
-        },
-        {
-          href: "/ai-reviews",
-          label: "AI Reviews",
-          icon: ClipboardCheck,
-          match: "prefix",
-        },
-        {
-          href: "/task-knowledge",
-          label: "Task Knowledge",
-          icon: BookMarked,
-          match: "prefix",
-        },
-      ],
-    },
-    {
-      label: "Manage",
-      items: [
-        {
-          href: "/files",
-          label: "Files",
-          icon: Files,
-          match: "prefix",
-          visible: canEdit,
-        },
-        { href: "/settings", label: "Settings", icon: Settings },
-        {
-          href: "/admin",
-          label: "Admin",
-          icon: ShieldCheck,
-          visible: isAdmin,
-        },
-      ],
-    },
-  ];
+  const navSections: NavSection[] = getNavigationSections({
+    canEdit,
+    isAdmin,
+    unreadNotifications,
+  });
   const externalItems: ExternalNavItem[] = [
     {
       href: "https://oqtopus-team.github.io/qdash/",
@@ -339,19 +229,23 @@ export function Sidebar() {
     <>
       <ul className="menu p-2 py-0">
         {(isOpen || isMobileOpen) && (
-          <div className="flex justify-center items-center p-3">
-            <Link href="/" className="flex items-center" onClick={handleLinkClick}>
+          <li className="mb-1">
+            <Link
+              href="/"
+              className="flex min-h-16 items-center justify-center rounded-xl"
+              aria-label="QDash home"
+              onClick={handleLinkClick}
+            >
               <Image
                 src="/oqtopus_logo.png"
                 alt="Oqtopus Logo"
-                width={100}
-                height={25}
-                className="object-contain"
-                style={{ width: "auto", height: "auto" }}
+                width={72}
+                height={72}
+                className="h-16 w-16 object-contain"
                 priority
               />
             </Link>
-          </div>
+          </li>
         )}
 
         {navSections.map((section) => {
@@ -430,8 +324,15 @@ export function Sidebar() {
   );
 
   const userModal = (
-    <dialog ref={modalRef} className="modal modal-bottom sm:modal-middle">
-      <div className="modal-box w-full sm:w-96 sm:max-w-sm">
+    <Dialog
+      open={profileOpen}
+      onOpenChange={(open) => !open && !logoutPending && setProfileOpen(false)}
+    >
+      <DialogContent className="max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none sm:w-96 sm:max-w-sm">
+        <DialogTitle className="sr-only">User profile</DialogTitle>
+        <DialogDescription className="sr-only">
+          Manage theme, account settings, and sign out.
+        </DialogDescription>
         {/* Profile Section */}
         <div className="flex flex-col items-center py-4 border-b border-base-300">
           <div className="mb-3">
@@ -471,6 +372,7 @@ export function Sidebar() {
 
           {/* Settings Link */}
           <button
+            type="button"
             onClick={handleSettingsClick}
             className="btn btn-ghost w-full justify-start gap-3 h-12"
           >
@@ -480,29 +382,29 @@ export function Sidebar() {
 
           {/* Logout */}
           <button
+            type="button"
             onClick={handleModalLogout}
             className="btn btn-ghost w-full justify-start gap-3 h-12 text-error"
+            disabled={logoutPending}
           >
             <LogOut size={18} />
-            <span>Logout</span>
+            <span>{logoutPending ? "Logging out…" : "Logout"}</span>
           </button>
         </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button>close</button>
-      </form>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 
   return (
     <>
       {/* Desktop Sidebar */}
       <aside
-        className={`bg-base-200 h-full transition-all duration-300 hidden lg:flex lg:flex-col ${
-          isOpen ? "w-44" : "w-16"
+        aria-label="Primary navigation"
+        className={`hidden h-full border-r border-base-300 bg-base-200 transition-all duration-300 lg:flex lg:flex-col ${
+          isOpen ? "w-48" : "w-16"
         }`}
       >
-        <div className="flex justify-end p-2">
+        <div className="flex flex-shrink-0 justify-end p-2 pb-0">
           <button
             onClick={toggleSidebar}
             className="btn btn-ghost btn-sm btn-square"
@@ -511,21 +413,26 @@ export function Sidebar() {
             {isOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">{sidebarContent}</div>
+        <nav ref={desktopNavRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {sidebarContent}
+        </nav>
         {userSection}
       </aside>
 
       {/* Mobile Sidebar Overlay */}
       {isMobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          aria-label="Close navigation menu"
           onClick={() => setMobileSidebarOpen(false)}
         />
       )}
 
       {/* Mobile Sidebar Drawer */}
       <aside
-        className={`fixed top-0 left-0 h-full w-48 bg-base-200 z-50 transform transition-transform duration-300 lg:hidden flex flex-col ${
+        aria-label="Primary navigation"
+        className={`fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-base-300 bg-base-200 shadow-2xl transition-transform duration-300 lg:hidden ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -538,7 +445,9 @@ export function Sidebar() {
             <X size={20} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">{sidebarContent}</div>
+        <nav ref={mobileNavRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {sidebarContent}
+        </nav>
         {userSection}
       </aside>
 

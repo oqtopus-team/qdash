@@ -1564,6 +1564,174 @@
         }
       }
     },
+    "/executions/artifact": {
+      "get": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Download a calibration artifact by its path",
+        "description": "Download a calibration artifact such as figure JSON or raw NetCDF data.",
+        "operationId": "downloadArtifactByPath",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/executions/artifacts/archive": {
+      "get": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Download calibration artifacts as a ZIP archive",
+        "description": "Download multiple figure JSON and raw NetCDF artifacts as one ZIP file.",
+        "operationId": "downloadArtifactsAsArchive",
+        "parameters": [
+          {
+            "name": "paths",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 100,
+              "title": "Paths"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/executions/artifact/preview": {
+      "get": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Preview a NetCDF calibration artifact",
+        "description": "Return a size-limited table preview of a NetCDF calibration artifact.",
+        "operationId": "previewArtifactByPath",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/executions/lock-status": {
       "get": {
         "tags": [
@@ -7616,7 +7784,7 @@
           "task-result"
         ],
         "summary": "Download multiple figures as a ZIP file",
-        "description": "Download multiple calibration figures as a ZIP file.\n\nCreates a ZIP archive containing all requested figure files and returns it\nas a streaming response.\n\nParameters\n----------\nbody.paths : list[str]\n    List of absolute file paths to the calibration figures\nbody.filename : str\n    Filename for the ZIP archive (default: \"figures.zip\")\n\nReturns\n-------\nStreamingResponse\n    ZIP archive containing all requested files\n\nRaises\n------\nHTTPException\n    400 if no paths are provided or if any path does not exist",
+        "description": "Download multiple calibration figures as a ZIP file.\n\nCreates a ZIP archive on temporary storage and serves it without retaining\nthe completed archive in API worker memory.\n\nParameters\n----------\nbody.paths : list[str]\n    List of absolute file paths to the calibration figures\nbody.filename : str\n    Filename for the ZIP archive (default: \"figures.zip\")\n\nReturns\n-------\nFileResponse\n    ZIP archive streamed from a temporary file\n\nRaises\n------\nHTTPException\n    400 if no paths are provided or if any path does not exist",
         "operationId": "downloadFiguresAsZip",
         "security": [
           {
@@ -7655,8 +7823,11 @@
           "200": {
             "description": "Successful Response",
             "content": {
-              "application/json": {
-                "schema": {}
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
               }
             }
           },
@@ -10814,80 +10985,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExecuteFlowResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/flows/{name}/agent/codex": {
-      "post": {
-        "tags": [
-          "flow"
-        ],
-        "summary": "Edit a flow with host Codex",
-        "description": "Run the host Codex CLI against a temporary copy of a flow.",
-        "operationId": "runCodexFlowAgent",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          },
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RunCodexAgentRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RunCodexAgentResponse"
                 }
               }
             }
@@ -17904,6 +18001,100 @@
         ],
         "title": "ApplyAgentCandidateRequest",
         "description": "Dispatch a committed candidate for worker-side backend application."
+      },
+      "ArtifactPreviewResponse": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "shape": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Shape"
+          },
+          "dtype": {
+            "type": "string",
+            "title": "Dtype"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "shape",
+          "dtype",
+          "columns",
+          "rows",
+          "total_rows",
+          "truncated"
+        ],
+        "title": "ArtifactPreviewResponse",
+        "description": "Tabular preview of a NetCDF calibration artifact."
       },
       "BackendConfigResponse": {
         "properties": {
@@ -25961,81 +26152,6 @@
         "title": "RecommendedTaskResponse",
         "description": "Response model for a recommended recalibration task.\n\nAttributes\n----------\ntask_name : str\n    Name of the task to re-run\npriority : int\n    Priority level (1=highest, larger=lower priority)\naffected_parameters : list[str]\n    Parameters that would be recalibrated by this task\naffected_qids : list[str]\n    Qubit/coupling IDs affected\nreason : str\n    Human-readable explanation"
       },
-      "RunCodexAgentRequest": {
-        "properties": {
-          "code": {
-            "type": "string",
-            "title": "Code",
-            "description": "Current Python code content"
-          },
-          "prompt": {
-            "type": "string",
-            "title": "Prompt",
-            "description": "User editing request"
-          },
-          "context": {
-            "type": "string",
-            "title": "Context",
-            "description": "Additional workflow authoring context",
-            "default": ""
-          },
-          "flow_function_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Flow Function Name",
-            "description": "Expected public flow entrypoint to preserve"
-          }
-        },
-        "type": "object",
-        "required": [
-          "code",
-          "prompt"
-        ],
-        "title": "RunCodexAgentRequest",
-        "description": "Request to edit a flow with the host Codex CLI."
-      },
-      "RunCodexAgentResponse": {
-        "properties": {
-          "code": {
-            "type": "string",
-            "title": "Code",
-            "description": "Edited Python code content"
-          },
-          "summary": {
-            "type": "string",
-            "title": "Summary",
-            "description": "Codex final response or execution summary",
-            "default": ""
-          },
-          "diff": {
-            "type": "string",
-            "title": "Diff",
-            "description": "Unified diff between original and edited code",
-            "default": ""
-          },
-          "command": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Command",
-            "description": "Codex command that was executed"
-          }
-        },
-        "type": "object",
-        "required": [
-          "code",
-          "command"
-        ],
-        "title": "RunCodexAgentResponse",
-        "description": "Response from the host Codex workflow editing bridge."
-      },
       "SaveFileRequest": {
         "properties": {
           "path": {
@@ -26603,11 +26719,6 @@
             "type": "string",
             "title": "Timezone",
             "default": "Asia/Tokyo"
-          },
-          "enable_local_codex_agent": {
-            "type": "boolean",
-            "title": "Enable Local Codex Agent",
-            "default": false
           }
         },
         "type": "object",
@@ -27957,6 +28068,13 @@
             "type": "array",
             "title": "Json Figure Path"
           },
+          "raw_data_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Raw Data Path"
+          },
           "input_parameters": {
             "additionalProperties": true,
             "type": "object",
@@ -28060,11 +28178,12 @@
           "execution_id",
           "figure_path",
           "json_figure_path",
+          "raw_data_path",
           "input_parameters",
           "output_parameters"
         ],
         "title": "TaskResultResponse",
-        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    user_id (str | None): Internal ID of the user who executed the task.\n    username (str): Username snapshot of the user who executed the task.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time.\n    source_task_id (str | None): Parent task ID this was re-executed from.\n    re_executions (list[ReExecutionEntry]): Child task results from re-executions."
+        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    user_id (str | None): Internal ID of the user who executed the task.\n    username (str): Username snapshot of the user who executed the task.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    raw_data_path (list[str]): List of raw data artifact paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time.\n    source_task_id (str | None): Parent task ID this was re-executed from.\n    re_executions (list[ReExecutionEntry]): Child task results from re-executions."
       },
       "TimeSeriesData": {
         "properties": {

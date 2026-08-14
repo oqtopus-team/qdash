@@ -1,0 +1,50 @@
+[project]
+name = "qdash-client"
+description = "Python client for the QDash API"
+authors = [
+    {name = "OQTOPUS Team", email = "oqtopus-team@googlegroups.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dynamic = ["version"]
+dependencies = [
+    "httpx>=0.27.0",
+    "pydantic>=2.8.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy==2.3.0",
+    "pytest==9.0.3",
+    "pytest-asyncio==1.3.0",
+    "ruff==0.15.14",
+]
+
+[project.scripts]
+qdash-agent = "qdash.client.services.agent_cli:main"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+tag-pattern = "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
+fallback-version = "0.0.0"
+
+[tool.hatch.version.raw-options]
+root = "../.."
+version_scheme = "no-guess-dev"
+local_scheme = "no-local-version"
+
+[tool.hatch.version.raw-options.scm.git]
+describe_command = "git describe --dirty --tags --long --match v[0-9]*"
+
+[tool.hatch.build]
+exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qdash"]

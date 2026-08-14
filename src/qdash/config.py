@@ -31,10 +31,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # Timezone
     timezone: str = "Asia/Tokyo"
-    # Local agent integrations
-    enable_local_codex_agent: bool = False
 
-    @field_validator("slack_forum_notification", "enable_local_codex_agent", mode="before")
+    @field_validator("slack_forum_notification", mode="before")
     @classmethod
     def _empty_str_as_false(cls, value: object) -> object:
         """Treat unset env vars (empty strings) as False for boolean fields."""

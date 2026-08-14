@@ -79,16 +79,14 @@ export function ChipSelector({ selectedChip, onChipSelect }: ChipSelectorProps) 
   }
 
   const handleChange = (option: SingleValue<ChipOption>) => {
-    if (option) {
-      onChipSelect(option.value);
-    }
+    onChipSelect(option ? option.value : "");
   };
 
   return (
     <div style={{ minWidth }}>
       <Select<ChipOption>
         options={sortedOptions}
-        value={sortedOptions.find((option) => option.value === selectedChip)}
+        value={sortedOptions.find((option) => option.value === selectedChip) ?? null}
         onChange={handleChange}
         placeholder={PLACEHOLDER}
         className="text-base-content"

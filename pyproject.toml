@@ -30,6 +30,7 @@ packages = [
 [tool.ruff]
 line-length = 100
 exclude = ["tools", "scripts"]
+src = ["src", "clients/python/src"]
 target-version = "py310"
 lint.unfixable = ["F401"]
 lint.select = [
@@ -77,9 +78,8 @@ lint.ignore = [
 "src/qdash/api/routers/*.py" = ["TC001"]  # FastAPI dependency annotations need runtime imports
 "src/qdash/api/routers/auth.py" = ["S106"]  # "bearer" is standard token type
 "src/qdash/api/schemas/auth.py" = ["S105"]  # "bearer" is standard OAuth token type
-"src/qdash/client/services/models.py" = ["TC003", "S105"]  # Generated file; keep source untouched
+"clients/python/src/qdash/client/services/models.py" = ["TC003", "S105"]  # Generated file; keep source untouched
 "src/qdash/api/services/flow_service.py" = ["S603", "S607"]  # ruff format subprocess call
-"src/qdash/agent/runner.py" = ["S603"]  # Runs the configured local Codex binary
 "src/qdash/api/lib/topology_config.py" = ["S112"]  # Skip invalid config files
 "tests/**" = [
     "ANN201",
@@ -95,6 +95,20 @@ lint.ignore = [
     "S108",  # /tmp usage in tests is acceptable
     "RUF002", # Japanese in docstrings
 ]
+"clients/python/tests/**" = [
+    "ANN201",
+    "ANN205",
+    "ANN401",
+    "CPY001",
+    "D",
+    "PLC1901",
+    "PLR2004",
+    "PLR6301",
+    "S101",
+    "S106",  # Test data passwords
+    "S108",
+    "RUF002",
+]
 
 [tool.mypy]
 strict = true
@@ -107,11 +121,11 @@ exclude = ["tools", "scripts", "user_flows"]
 disable_error_code = ["misc", "override", "no-untyped-call", "redundant-cast"]
 # Use explicit package bases to avoid src.qdash vs qdash conflicts
 explicit_package_bases = true
-mypy_path = "src"
+mypy_path = ["src", "clients/python/src"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = "tests.*"
+module = ["tests.*", "clients.python.tests.*"]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 disallow_untyped_decorators = false
@@ -129,7 +143,7 @@ asyncio_default_fixture_loop_scope = "function"
 exclude-newer = "3 days"
 
 [tool.coverage.run]
-source = ["src/qdash"]
+source = ["src/qdash", "clients/python/src/qdash/client"]
 omit = [
     # Data models - primarily type definitions
     "src/qdash/datamodel/*",
@@ -138,7 +152,7 @@ omit = [
     # API schemas - request/response models
     "src/qdash/api/schemas/*",
     # Auto-generated client code
-    "src/qdash/client/*",
+    "clients/python/src/qdash/client/*",
     # Internal service modules
     "src/qdash/workflow/service/_internal/*",
     # Worker tasks
@@ -178,8 +192,8 @@ dev = [
 
 [tool.uv.workspace]
 members = [
+    "clients/python",
     "src/qdash/api",
-    "src/qdash/client",
     "src/qdash/workflow",
 ]
 

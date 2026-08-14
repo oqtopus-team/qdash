@@ -8,6 +8,7 @@ import { useAnalysisChat, type ChatMessage, type BlocksResult } from "@/hooks/us
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
 import {
   buildAnalysisModelOptions,
@@ -328,23 +329,47 @@ export function MiniChatWindow() {
           </span>
         </div>
         <div className="flex items-center gap-0.5">
-          <button
-            onClick={() => setMinimized((prev) => !prev)}
-            className="btn btn-ghost btn-xs btn-square"
-            title={minimized ? "Expand" : "Minimize"}
-          >
-            <Minus className="w-3 h-3" />
-          </button>
-          <button
-            onClick={handleExpand}
-            className="btn btn-ghost btn-xs btn-square"
-            title="Open in sidebar"
-          >
-            <Maximize2 className="w-3 h-3" />
-          </button>
-          <button onClick={closeMiniChat} className="btn btn-ghost btn-xs btn-square">
-            <X className="w-3.5 h-3.5" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setMinimized((prev) => !prev)}
+                className="btn btn-ghost btn-xs btn-square"
+                aria-label={minimized ? "Expand chat" : "Minimize chat"}
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {minimized ? "Expand chat" : "Minimize chat"}
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleExpand}
+                className="btn btn-ghost btn-xs btn-square"
+                aria-label="Open chat in sidebar"
+              >
+                <Maximize2 className="w-3 h-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Open in sidebar</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={closeMiniChat}
+                className="btn btn-ghost btn-xs btn-square"
+                aria-label="Close chat"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Close chat</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

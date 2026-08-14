@@ -22,6 +22,7 @@ import { useGetTaskResult, getGetTaskResultQueryKey } from "@/client/task/task";
 import { useCreateIssue, getGetTaskResultIssuesQueryKey } from "@/client/issue/issue";
 import { useQueryClient } from "@tanstack/react-query";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
@@ -40,6 +41,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import { useToast } from "@/components/ui/Toast";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
 
@@ -585,6 +587,17 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         </div>
       )}
 
+      {((taskResult.json_figure_path && taskResult.json_figure_path.length > 0) ||
+        (taskResult.raw_data_path && taskResult.raw_data_path.length > 0)) && (
+        <div className="mb-4 rounded-lg bg-base-200/50 p-4">
+          <h2 className="mb-3 text-sm font-semibold">Artifacts</h2>
+          <TaskArtifactDownloads
+            jsonFigurePaths={taskResult.json_figure_path}
+            rawDataPaths={taskResult.raw_data_path}
+          />
+        </div>
+      )}
+
       {/* Figure */}
       {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
         (taskResult.json_figure_path && taskResult.json_figure_path.length > 0)) && (
@@ -756,9 +769,20 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
 
       {/* Re-execute Confirmation Modal */}
       {showReExecuteModal && taskResult && (
-        <div className="modal modal-open">
-          <div className="modal-box max-w-2xl">
-            <h3 className="font-bold text-lg">Re-execute Task</h3>
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open && !reExecuteLoading) {
+              setShowReExecuteModal(false);
+              setReExecuteError(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl">
+            <DialogTitle>Re-execute Task</DialogTitle>
+            <DialogDescription className="sr-only">
+              Review and override task parameters before re-execution.
+            </DialogDescription>
             <div className="py-4 space-y-3">
               <p className="text-sm text-base-content/70">
                 Re-execute task <span className="font-semibold">{taskResult.task_name}</span> for
@@ -857,6 +881,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             </div>
             <div className="modal-action">
               <button
+                type="button"
                 className="btn btn-ghost"
                 onClick={() => {
                   setShowReExecuteModal(false);
@@ -867,6 +892,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
                 Cancel
               </button>
               <button
+                type="button"
                 className="btn btn-primary"
                 onClick={handleReExecute}
                 disabled={reExecuteLoading}
@@ -881,17 +907,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
                 )}
               </button>
             </div>
-          </div>
-          <div
-            className="modal-backdrop"
-            onClick={() => {
-              if (!reExecuteLoading) {
-                setShowReExecuteModal(false);
-                setReExecuteError(null);
-              }
-            }}
-          />
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

@@ -4,11 +4,12 @@
 # Specialized models for task result analysis (chevron patterns, Rabi, etc.).
 analysis_models:
   - provider: ollama
-    name: nvidia/Gemma-4-31B-IT-NVFP4 #gemma4:26b
-    # Ollama endpoint. Set OLLAMA_BASE_URL to your Ollama server URL,
-    # e.g. http://localhost:11434. QDash appends /v1 automatically.
+    name: nvidia/Gemma-4-31B-IT-NVFP4 # gemma4:26b
+    api_style: completion
+    # Ollama endpoint for LiteLLM. Set OLLAMA_BASE_URL to your Ollama server URL,
+    # e.g. http://localhost:11434.
     base_url: env:OLLAMA_BASE_URL
-    # Optional. If unset or missing, Ollama uses a dummy "ollama" API key.
+    # Optional. LiteLLM forwards this when set.
     api_key_env: OLLAMA_API_KEY
     # Keep the local VLM resident between automatic review requests and avoid
     # repeated cold model loads between short qdash reviews.
@@ -22,6 +23,7 @@ analysis_models:
     max_output_tokens: 4096
   - provider: ollama
     name: gemma4:31b
+    api_style: completion
     # Higher-stability local VLM fallback. It is slower than 26B but showed
     # fewer format failures in qdash review spot checks.
     base_url: env:OLLAMA_BASE_URL
@@ -35,8 +37,27 @@ analysis_models:
     max_output_tokens: 4096
   - provider: openai
     name: gpt-5.4
+    api_style: responses
     temperature: 0.7
     max_output_tokens: 4096
+
+  # - provider: vllm
+  #   name: Gemma-4-31B-IT-NVFP4
+  #   api_style: responses
+  #   base_url: env:VLLM_BASE_URL
+  #   api_key_env: VLLM_API_KEY
+  #   temperature: 1.0
+  #   top_p: 0.95
+  #   top_k: 64
+  #   reasoning_effort: none
+  #   disable_thinking_instruction: true
+  #   max_output_tokens: 2048
+
+  # - provider: bedrock
+  #   name: jp.anthropic.claude-sonnet-4-6
+  #   api_style: responses
+  #   temperature: 0.7
+  #   max_output_tokens: 4096
 
 # Metrics to include in multi-metric evaluation
 # Only these metrics will be used for overall chip health scoring

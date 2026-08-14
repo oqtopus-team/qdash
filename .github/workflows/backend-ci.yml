@@ -5,7 +5,6 @@ on:
     branches: [main, develop]
     paths:
       - "src/qdash/**"
-      - "!src/qdash/client/**"
       - "tests/**"
       - "pyproject.toml"
       - "uv.lock"
@@ -15,12 +14,14 @@ on:
     branches: [main, develop]
     paths:
       - "src/qdash/**"
-      - "!src/qdash/client/**"
       - "tests/**"
       - "pyproject.toml"
       - "uv.lock"
       - "Taskfile.yaml"
       - ".github/workflows/backend-ci.yml"
+
+env:
+  NODE_OPTIONS: --use-system-ca
 
 jobs:
   lint:

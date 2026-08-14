@@ -90,6 +90,8 @@ Prefer focused tests for narrow changes, then broader checks when touching share
 - Use named exports for ordinary components, hooks, utilities, and contexts. `page.tsx` and `layout.tsx` use default exports.
 - Use imports from established aliases and locations, especially `@/contexts/*`, `@/hooks/useUrlState` or `@/hooks/url-state`, and `@/lib/utils/*`.
 - Keep reusable primitives in `ui/src/components/ui/`, feature UI in `ui/src/components/features/`, charts in `ui/src/components/charts/`, and layout in `ui/src/components/layout/`.
+- Keep DaisyUI as the visual and theme foundation. Use the established Radix-based primitives in `ui/src/components/ui/` for interactions that need robust focus management, keyboard navigation, portals, dismissal, or collision-aware positioning.
+- Do not treat Radix as a wholesale DaisyUI replacement. Prefer DaisyUI for buttons, cards, inputs, badges, tables, and semantic colors; add a headless primitive only when the interaction behavior requires it.
 - Use TanStack Query for server state and `nuqs` for URL query state when matching existing patterns.
 - Use Lucide React icons where an icon is appropriate.
 - Follow `docs/development/ui/guidelines.md` and `docs/development/ui/design-policy.md` for implementation and visual design details.
