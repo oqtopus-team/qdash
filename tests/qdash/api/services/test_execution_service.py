@@ -122,8 +122,8 @@ class _FakeSyncClientContext:
     def __enter__(self) -> Any:
         return self._client
 
-    def __exit__(self, *args: Any) -> bool:
-        return False
+    def __exit__(self, *args: Any) -> None:
+        return None
 
 
 def _make_get_client(client: Any, calls: list[dict[str, Any]]) -> Any:
@@ -341,8 +341,12 @@ def test_list_executions_skips_executions_with_missing_or_invalid_flow_run_id(
     _make_service().list_executions(project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20)
 
     assert call_count == []
-    assert _reload_execution("exec-missing-note").status == "running"
-    assert _reload_execution("exec-bad-uuid").status == "running"
+    missing_note = _reload_execution("exec-missing-note")
+    bad_uuid = _reload_execution("exec-bad-uuid")
+    assert missing_note is not None
+    assert missing_note.status == "running"
+    assert bad_uuid is not None
+    assert bad_uuid.status == "running"
 
 
 def test_list_executions_returns_unreconciled_summaries_when_prefect_raises(
