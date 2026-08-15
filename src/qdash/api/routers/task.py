@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 
 from qdash.api.dependencies import get_flow_service, get_task_service
@@ -24,6 +24,11 @@ from qdash.api.schemas.task import (
 )
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.task_service import TaskService
+from qdash.common.config.backend import (
+    get_available_backends,
+    get_default_backend,
+    is_task_available,
+)
 
 router = APIRouter()
 
@@ -74,6 +79,18 @@ async def quick_run_task(
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
 ) -> ExecuteFlowResponse:
     """Execute one task without requiring a previous execution snapshot."""
+    backend_name = body.backend_name or get_default_backend()
+    if backend_name not in get_available_backends():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown backend: {backend_name}",
+        )
+    if not is_task_available(task_name, backend_name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Task '{task_name}' is not enabled for backend '{backend_name}'",
+        )
+
     return await flow_service.execute_single_task_from_snapshot(
         task_name=task_name,
         qid=body.qid,
@@ -81,7 +98,7 @@ async def quick_run_task(
         source_execution_id=None,
         username=ctx.user.username,
         project_id=ctx.project_id,
-        backend_name=body.backend_name,
+        backend_name=backend_name,
         parameter_overrides={"input": body.input_parameter_overrides},
         default_run_parameters={
             task_name: {

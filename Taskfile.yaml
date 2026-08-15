@@ -350,7 +350,10 @@ tasks:
     cmds:
       - |
         if command -v betterleaks >/dev/null 2>&1; then
-          betterleaks git . --verbose
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0=safe.directory \
+            GIT_CONFIG_VALUE_0="$PWD" \
+            betterleaks git . --verbose
         else
           echo "betterleaks not installed; skipping leak scan"
         fi

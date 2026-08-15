@@ -5,7 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from qdash.datamodel.task import InputParameterSpec, ParameterModel
+from qdash.datamodel.task import InputParameterModel as ParameterModel
+from qdash.datamodel.task import InputParameterSpec
+from qdash.datamodel.task import ParameterModel as BaseParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 
@@ -339,7 +341,7 @@ class TestLoadParametersFromDbCouplingTask:
             task._load_parameters_from_db(backend, "0-1")
 
         result = task.input_parameters["missing_param"]
-        assert isinstance(result, ParameterModel)
+        assert isinstance(result, BaseParameterModel)
         assert "not found" in result.description
 
     def test_required_database_parameter_raises_when_missing(self):

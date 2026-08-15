@@ -6,7 +6,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from qdash.datamodel.task import (
+    InputParameterModel,
     InputParameterSpec,
+    OutputParameterModel,
     ParameterModel,
     QubitTaskModel,
     RunParameterModel,
@@ -52,7 +54,7 @@ class MockTask:
         return self._task_type == "coupling"
 
     def preprocess(self, session: Any, qid: str) -> PreProcessResult:
-        return PreProcessResult(input_parameters={"param1": ParameterModel(value=1.0)})
+        return PreProcessResult(input_parameters={"param1": InputParameterModel(value=1.0)})
 
     def run(self, session: Any, qid: str) -> RunResult:
         return RunResult(raw_result={"data": [1, 2, 3]}, r2={"0": 0.95})
@@ -72,12 +74,12 @@ class MockTask:
         self, session: Any, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         return PostProcessResult(
-            output_parameters={"qubit_frequency": ParameterModel(value=5.0)},
+            output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)},
             figures=[],
             raw_data=[],
         )
 
-    def attach_task_id(self, task_id: str) -> dict[str, ParameterModel]:
+    def attach_task_id(self, task_id: str) -> dict[str, OutputParameterModel]:
         return {}
 
 
@@ -256,7 +258,7 @@ class TestTaskExecutorExecuteTask:
         )
         task.postprocess = MagicMock(  # type: ignore[method-assign]
             return_value=PostProcessResult(
-                output_parameters={"qubit_frequency": ParameterModel(value=5.0)},
+                output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)},
                 figures=[],
                 raw_data=[],
             )
@@ -286,13 +288,13 @@ class TestTaskExecutorExecuteTask:
         ) -> PostProcessResult:
             if qid == "0":
                 return PostProcessResult(
-                    output_parameters={"qubit_frequency": ParameterModel(value=0.0)},
+                    output_parameters={"qubit_frequency": OutputParameterModel(value=0.0)},
                     figures=[],
                     raw_data=[],
                     validation_error="Qubit frequency too low for qid=0",
                 )
             return PostProcessResult(
-                output_parameters={"qubit_frequency": ParameterModel(value=5.0)},
+                output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)},
                 figures=[],
                 raw_data=[],
             )

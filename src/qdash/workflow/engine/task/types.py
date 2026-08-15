@@ -12,7 +12,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
-from qdash.datamodel.task import CalibDataModel, ParameterModel
+from qdash.datamodel.task import CalibDataModel, OutputParameterModel
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 
 
@@ -71,7 +71,7 @@ class TaskProtocol(Protocol):
         """Run postprocessing."""
         ...
 
-    def attach_task_id(self, task_id: str) -> dict[str, ParameterModel]:
+    def attach_task_id(self, task_id: str) -> dict[str, OutputParameterModel]:
         """Attach task ID to output parameters."""
         ...
 

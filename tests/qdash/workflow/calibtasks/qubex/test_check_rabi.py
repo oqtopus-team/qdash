@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import pytest
 
 import qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_rabi as check_rabi_module
-from qdash.datamodel.task import ParameterModel
+from qdash.datamodel.task import InputParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_rabi import CheckRabi
 from qdash.workflow.engine.task.result_processor import R2ValidationError, TaskResultProcessor
@@ -28,8 +28,8 @@ def test_check_rabi_uses_r2_threshold_0_6() -> None:
 
 def test_check_rabi_run_uses_data_fit_r2_for_validation(monkeypatch: pytest.MonkeyPatch) -> None:
     task = CheckRabi()
-    task.input_parameters["qubit_frequency"] = ParameterModel(value=5.0, unit="GHz")
-    task.input_parameters["control_amplitude"] = ParameterModel(value=0.01, unit="a.u.")
+    task.input_parameters["qubit_frequency"] = InputParameterModel(value=5.0, unit="GHz")
+    task.input_parameters["control_amplitude"] = InputParameterModel(value=0.01, unit="a.u.")
     monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
 
     class DummyData:
@@ -57,7 +57,7 @@ def test_check_rabi_postprocess_marks_non_finite_frequency_failed_after_artifact
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task = CheckRabi()
-    task.input_parameters["control_amplitude"] = ParameterModel(value=0.0125, unit="a.u.")
+    task.input_parameters["control_amplitude"] = InputParameterModel(value=0.0125, unit="a.u.")
 
     class DummyIQPlotter:
         def __init__(self, state_centers):
