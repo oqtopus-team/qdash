@@ -38,6 +38,7 @@ def test_single_task_executor_pulls_config_before_reexecute(monkeypatch):
     assert captured["kwargs"]["enable_github_pull"] is True
     assert captured["kwargs"]["enable_github"] is True
     assert captured["kwargs"]["persist_output_parameters"] is True
+    assert captured["kwargs"]["use_lock"] is True
     assert "execution_id" not in captured["kwargs"]
     assert captured["finished"] is True
 

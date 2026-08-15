@@ -6,7 +6,8 @@ import ast
 import contextlib
 import json
 import logging
-from typing import TYPE_CHECKING
+import sys
+from pathlib import Path
 
 from fastapi import HTTPException
 
@@ -31,9 +32,6 @@ logger = logging.getLogger(__name__)
 
 TASK_METADATA_CACHE_VERSION = 3
 TASK_CATALOG_FILENAME = "task_catalog.json"
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class TaskFileService:
@@ -301,7 +299,11 @@ class TaskFileService:
         constants: dict[str, object] | None = None,
     ) -> dict[str, dict[str, object]]:
         """Extract literal RunParameterModel metadata without importing workflow code."""
-        return TaskFileService._extract_parameter_metadata(node, constants)
+        parameters = TaskFileService._extract_parameter_metadata(node, constants)
+        for metadata in parameters.values():
+            if "default_value" in metadata:
+                metadata["value"] = metadata.pop("default_value")
+        return parameters
 
     @staticmethod
     def _extract_parameter_metadata(
@@ -376,6 +378,53 @@ class TaskFileService:
         constants: dict[str, object] = {}
         safe_types = (str, int, float, bool, tuple, list)
         for node in tree.body:
+            if isinstance(node, ast.ImportFrom) and node.module:
+                module_path = Path(*node.module.split(".")).with_suffix(".py")
+                source_path = next(
+                    (
+                        Path(root) / module_path
+                        for root in sys.path
+                        if (Path(root) / module_path).is_file()
+                    ),
+                    None,
+                )
+                if source_path is not None:
+                    try:
+                        imported_tree = ast.parse(source_path.read_text(encoding="utf-8"))
+                    except (OSError, UnicodeDecodeError, SyntaxError):
+                        continue
+                    imported_constants: dict[str, object] = {}
+                    for imported_node in imported_tree.body:
+                        imported_target: ast.Name | None = None
+                        imported_value: ast.expr | None = None
+                        if (
+                            isinstance(imported_node, ast.Assign)
+                            and len(imported_node.targets) == 1
+                        ):
+                            imported_target = (
+                                imported_node.targets[0]
+                                if isinstance(imported_node.targets[0], ast.Name)
+                                else None
+                            )
+                            imported_value = imported_node.value
+                        elif isinstance(imported_node, ast.AnnAssign) and isinstance(
+                            imported_node.target, ast.Name
+                        ):
+                            imported_target = imported_node.target
+                            imported_value = imported_node.value
+                        if imported_target is None or imported_value is None:
+                            continue
+                        try:
+                            imported_literal = ast.literal_eval(imported_value)
+                        except (ValueError, TypeError):
+                            continue
+                        if isinstance(imported_literal, safe_types):
+                            imported_constants[imported_target.id] = imported_literal
+                    for imported_name in node.names:
+                        value = imported_constants.get(imported_name.name)
+                        if value is not None:
+                            constants[imported_name.asname or imported_name.name] = value
+                continue
             target: ast.Name | None = None
             value_node: ast.expr | None = None
             if isinstance(node, ast.Assign) and len(node.targets) == 1:
@@ -399,7 +448,7 @@ class TaskFileService:
         tasks = []
 
         try:
-            for item in directory.iterdir():
+            for item in sorted(directory.iterdir()):
                 if item.name.startswith(".") or item.name == "__pycache__":
                     continue
 

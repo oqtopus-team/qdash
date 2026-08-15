@@ -149,7 +149,7 @@ def test_list_task_info_extracts_input_parameter_metadata() -> None:
     tasks = service.list_task_info("fake").tasks
     task = next(t for t in tasks if t.name == "CheckRabi")
 
-    assert task.input_parameters["qubit_frequency"]["resolution"] == "database_required"
+    assert task.input_parameters["qubit_frequency"]["resolution"] == "default_only"
 
 
 def test_list_task_info_resolves_local_and_qubex_constants() -> None:

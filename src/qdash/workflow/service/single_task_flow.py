@@ -73,7 +73,7 @@ def single_task_executor(
         default_run_parameters=default_run_parameters,
         enable_github_pull=True,
         enable_github=update_params,
-        use_lock=False,
+        use_lock=True,
         parameter_overrides=parameter_overrides,
         source_task_id=source_task_id,
         snapshot_exempt_tasks={"Configure"} if reconfigure else None,

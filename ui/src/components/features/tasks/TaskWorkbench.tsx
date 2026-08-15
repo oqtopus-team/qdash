@@ -65,6 +65,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
   const [isStarting, setIsStarting] = useState(false);
   const [isReloadingInputs, setIsReloadingInputs] = useState(false);
   const [executionId, setExecutionId] = useState("");
+  const [submittedChipId, setSubmittedChipId] = useState("");
   const [submittedTarget, setSubmittedTarget] = useState("");
 
   useEffect(() => {
@@ -88,6 +89,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
     setReconfigure(false);
     setPersistOutputParameters(false);
     setExecutionId("");
+    setSubmittedChipId("");
     setSubmittedTarget("");
   }, [task]);
 
@@ -117,6 +119,10 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
     (executionQueryError as { response?: { status?: number } } | null)?.response?.status === 404;
 
   const execution = executionResponse?.data as ExecutionResponseDetail | undefined;
+  const isExecutionActive =
+    isStarting ||
+    (executionId.length > 0 &&
+      (!execution || ["running", "scheduled", "pending"].includes(execution.status)));
   const resultTasks = useMemo(
     () =>
       (execution?.task ?? []).filter(
@@ -169,6 +175,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
         update_params: false,
       });
       setExecutionId(response.data.execution_id);
+      setSubmittedChipId(chipId);
       setSubmittedTarget(requestedTarget);
       toast.success(`${task.name} started`);
     } catch (error: unknown) {
@@ -292,6 +299,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                     className="input input-bordered w-full"
                     value={target}
                     onChange={(event) => setTarget(event.target.value)}
+                    disabled={isExecutionActive}
                     placeholder="e.g. 0 or 0-1"
                   />
                 </label>
@@ -505,14 +513,14 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                           key={`${figure}-${index}`}
                           path={figure}
                           jsonFigurePath={jsonFigures[index]}
-                          qid={target}
+                          qid={submittedTarget}
                           className="h-full w-auto shrink-0 rounded object-contain"
                         />
                       ))
                     ) : resultTask?.task_id ? (
                       <TaskFigure
                         taskId={resultTask.task_id}
-                        qid={target}
+                        qid={submittedTarget}
                         className="h-full w-auto shrink-0 rounded object-contain"
                       />
                     ) : (
@@ -551,7 +559,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                     </button>
                     <Link
                       className="btn btn-sm btn-outline"
-                      href={`/execution/${encodeURIComponent(chipId)}/${encodeURIComponent(executionId)}`}
+                      href={`/execution/${encodeURIComponent(submittedChipId)}/${encodeURIComponent(executionId)}`}
                     >
                       <ExternalLink size={15} />
                       Full execution

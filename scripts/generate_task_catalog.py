@@ -1,77 +1,68 @@
-"""Generate API-facing task metadata from loaded workflow task classes."""
+"""Generate API-facing task metadata by statically parsing task source files."""
 
 from __future__ import annotations
 
 import argparse
-import inspect
 import json
-import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from pydantic import BaseModel
-
-# Importing workflow task classes currently initializes modules that read the
-# application settings. Catalog generation does not use those services, but it
-# still needs deterministic placeholder values in environments without a .env,
-# such as CI.
-os.environ.setdefault("ENV", "catalog")
-os.environ.setdefault("PREFECT_API_URL", "http://localhost:4200/api")
-os.environ.setdefault("POSTGRES_DATA_PATH", ".qdash/catalog/postgres")
-os.environ.setdefault("MONGO_DATA_PATH", ".qdash/catalog/mongo")
-os.environ.setdefault("CALIB_DATA_PATH", ".qdash/catalog/calib")
-
-from qdash.datamodel.task import InputParameterSpec, RunParameterSpec
-from qdash.workflow.calibtasks import BaseTask
+from qdash.api.services.task_file_service import TaskFileService
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from qdash.api.schemas.task_file import TaskInfo
 
 DEFAULT_OUTPUT = Path("src/qdash/workflow/calibtasks/task_catalog.json")
 
 
-def _serialize_parameters(parameters: Mapping[str, object]) -> dict[str, dict[str, Any]]:
-    serialized: dict[str, dict[str, Any]] = {}
-    for name, value in parameters.items():
-        if isinstance(value, (InputParameterSpec, BaseModel)):
-            metadata = value.model_dump(mode="json", exclude_defaults=True)
-            if isinstance(value, InputParameterSpec):
-                metadata["default_value"] = metadata.pop("default", None)
-            elif isinstance(value, RunParameterSpec):
-                metadata["value"] = metadata.pop("default", None)
-            serialized[name] = metadata
-        elif value is None:
-            serialized[name] = {}
-    return serialized
-
-
 def build_catalog(base_path: Path) -> dict[str, object]:
-    """Build deterministic task metadata for every registered backend."""
-    backends: dict[str, list[dict[str, object]]] = {}
-    for backend, registered_tasks in sorted(BaseTask.registry.items()):
-        tasks: list[dict[str, object]] = []
-        for name, task_class in sorted(registered_tasks.items()):
-            source_path = inspect.getsourcefile(task_class)
-            if source_path is None:
-                raise RuntimeError(f"Source file not found for {task_class.__name__}")
-            path = Path(source_path).resolve()
-            try:
-                file_path = str(path.relative_to((base_path / backend).resolve()))
-            except ValueError:
-                file_path = str(path.relative_to(base_path.resolve()))
-
-            tasks.append(
-                {
-                    "name": name,
-                    "class_name": task_class.__name__,
-                    "task_type": task_class.task_type,
-                    "description": inspect.getdoc(task_class),
-                    "file_path": file_path,
-                    "input_parameters": _serialize_parameters(task_class.input_spec),
-                    "run_parameters": _serialize_parameters(task_class.run_spec),
-                }
+    """Build deterministic task metadata without importing workflow modules."""
+    service = TaskFileService(calibtasks_base_path=base_path)
+    discovered_backends: dict[str, dict[str, TaskInfo]] = {}
+    for backend_path in sorted(base_path.iterdir()):
+        if not backend_path.is_dir() or backend_path.name.startswith("_"):
+            continue
+        discovered = service._collect_tasks_from_directory(backend_path, backend_path)
+        tasks_by_name: dict[str, TaskInfo] = {}
+        for task in discovered:
+            current = tasks_by_name.get(task.name)
+            task_score = (
+                task.file_path == "qubex_compat.py",
+                task.task_type is not None,
+                len(task.input_parameters) + len(task.run_parameters),
             )
-        backends[backend] = tasks
+            current_score = (
+                (
+                    current.file_path == "qubex_compat.py",
+                    current.task_type is not None,
+                    len(current.input_parameters) + len(current.run_parameters),
+                )
+                if current is not None
+                else (False, False, -1)
+            )
+            if current is None or task_score > current_score:
+                tasks_by_name[task.name] = task
+        discovered_backends[backend_path.name] = tasks_by_name
+
+    # Fake adapters inherit their parameter declarations from the production
+    # task. Resolve that inheritance from the already parsed qubex metadata.
+    qubex_tasks = discovered_backends.get("qubex", {})
+    for task in discovered_backends.get("fake", {}).values():
+        if task.file_path != "qubex_compat.py":
+            continue
+        inherited = qubex_tasks.get(task.name)
+        if inherited is None:
+            continue
+        task.task_type = task.task_type or inherited.task_type
+        task.input_parameters = task.input_parameters or inherited.input_parameters
+        task.run_parameters = task.run_parameters or inherited.run_parameters
+
+    backends: dict[str, list[dict[str, object]]] = {}
+    for backend, tasks_by_name in discovered_backends.items():
+        backends[backend] = [
+            task.model_dump(mode="json", exclude={"category", "enabled"})
+            for task in sorted(tasks_by_name.values(), key=lambda task: task.name)
+        ]
     return {"version": 1, "backends": backends}
 
 

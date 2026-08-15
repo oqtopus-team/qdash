@@ -396,6 +396,7 @@ tasks:
   ci-lint:
     desc: Check Python linting (no auto-fix)
     cmds:
+      - uv run scripts/generate_task_catalog.py --check
       - uv run ruff check .
       - uv run ruff format --check .
 
