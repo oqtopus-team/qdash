@@ -4,7 +4,10 @@ import numpy as np
 import plotly.graph_objects as go
 from qubex.analysis.util import calc_2q_gate_coherence_limit
 
-from qdash.datamodel.task import ParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -19,26 +22,41 @@ class Check2QGateCoherenceLimit(QubexTask):
     name: str = "Check2QGateCoherenceLimit"
     task_type: str = "coupling"
 
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "control_t1_average": ParameterModel(
-            parameter_name="t1_average", qid_role="control", unit="μs"
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "control_t1_average": InputParameterSpec.database_or_default(
+            default=0,
+            parameter_name="t1_average",
+            qid_role="control",
+            unit="μs",
         ),
-        "control_t2_echo_average": ParameterModel(
-            parameter_name="t2_echo_average", qid_role="control", unit="μs"
+        "control_t2_echo_average": InputParameterSpec.database_or_default(
+            default=0,
+            parameter_name="t2_echo_average",
+            qid_role="control",
+            unit="μs",
         ),
-        "target_t1_average": ParameterModel(
-            parameter_name="t1_average", qid_role="target", unit="μs"
+        "target_t1_average": InputParameterSpec.database_or_default(
+            default=0,
+            parameter_name="t1_average",
+            qid_role="target",
+            unit="μs",
         ),
-        "target_t2_echo_average": ParameterModel(
-            parameter_name="t2_echo_average", qid_role="target", unit="μs"
+        "target_t2_echo_average": InputParameterSpec.database_or_default(
+            default=0,
+            parameter_name="t2_echo_average",
+            qid_role="target",
+            unit="μs",
         ),
-        "zx90_gate_time": ParameterModel(
-            parameter_name="zx90_gate_time", qid_role="coupling", unit="ns"
+        "zx90_gate_time": InputParameterSpec.database_or_default(
+            default=0,
+            parameter_name="zx90_gate_time",
+            qid_role="coupling",
+            unit="ns",
         ),
     }
 
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "two_qubit_gate_coherence_limit": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "two_qubit_gate_coherence_limit": OutputParameterSpec(
             qid_role="coupling",
             unit="a.u.",
             description="2Q gate coherence limit fidelity",

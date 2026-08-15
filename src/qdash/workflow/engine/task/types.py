@@ -8,7 +8,7 @@ Centralising these definitions avoids circular imports between modules
 that need to reference TaskProtocol or TaskExecutionResult.
 """
 
-from typing import Any, ClassVar, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
@@ -23,8 +23,9 @@ class TaskProtocol(Protocol):
     name: str
     r2_threshold: float
     backend: str
-    input_parameters: ClassVar[dict[str, Any]]
-    run_parameters: ClassVar[dict[str, Any]]
+    input_parameters: dict[str, Any]
+    input_parameters_from_snapshot: bool
+    run_parameters: dict[str, Any]
 
     def get_name(self) -> str:
         """Get task name."""

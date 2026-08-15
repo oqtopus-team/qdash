@@ -3,7 +3,11 @@ from typing import Any, ClassVar
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -17,46 +21,46 @@ class CheckWaveform(QubexTask):
 
     name: str = "CheckWaveform"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "shots": RunParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=CALIBRATION_SHOTS,
+            default=CALIBRATION_SHOTS,
             description="Number of shots for waveform measurement",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Shot interval for waveform measurement",
         ),
-        "readout_amplitude": RunParameterModel(
+        "readout_amplitude": RunParameterSpec(
             unit="a.u.",
             value_type="float",
-            value=None,
+            default=None,
             description="Readout pulse amplitude. Uses qubex default when unset.",
         ),
-        "readout_duration": RunParameterModel(
+        "readout_duration": RunParameterSpec(
             unit="ns",
             value_type="float",
-            value=None,
+            default=None,
             description="Readout pulse duration. Uses qubex default when unset.",
         ),
-        "readout_pre_margin": RunParameterModel(
+        "readout_pre_margin": RunParameterSpec(
             unit="ns",
             value_type="float",
-            value=None,
+            default=None,
             description="Readout pre-margin. Uses qubex default when unset.",
         ),
-        "readout_post_margin": RunParameterModel(
+        "readout_post_margin": RunParameterSpec(
             unit="ns",
             value_type="float",
-            value=None,
+            default=None,
             description="Readout post-margin. Uses qubex default when unset.",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {}
 
     def _optional_run_parameter(self, name: str) -> Any:
         parameter = self.run_parameters[name]

@@ -4,7 +4,11 @@ import math
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from qdash.common.visualization.figure_metadata import set_figure_role
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -32,81 +36,81 @@ class CheckQubitSpectroscopy(QubexTask):
     name: str = "CheckQubitSpectroscopy"
     task_type: str = "qubit"
     timeout: int = 60 * 120
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "readout_frequency": None,  # Load from DB
-        "readout_amplitude": None,  # Load from DB
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.required_database(),
     }
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "frequency_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "frequency_range": RunParameterSpec(
             unit="GHz",
             value_type="np.arange",
-            value=(6.5, 9.75, 0.005),
+            default=(6.5, 9.75, 0.005),
             description=(
                 "Frequency range for qubit spectroscopy on the high band "
                 "(64Q chips). Used when chip_id does not contain '144'."
             ),
         ),
-        "frequency_range_low_band": RunParameterModel(
+        "frequency_range_low_band": RunParameterSpec(
             unit="GHz",
             value_type="np.arange",
-            value=(3.0, 5.75, 0.005),
+            default=(3.0, 5.75, 0.005),
             description=(
                 "Frequency range for qubit spectroscopy on the low band "
                 "(144Q chips). Used when chip_id contains '144'."
             ),
         ),
-        "readout_amplitude": RunParameterModel(
+        "readout_amplitude": RunParameterSpec(
             unit="a.u.",
             value_type="float",
-            value=0.04,
+            default=0.04,
             description="Readout amplitude used during the qubit spectroscopy sweep",
         ),
-        "binarize_threshold_sigma_plus": RunParameterModel(
+        "binarize_threshold_sigma_plus": RunParameterSpec(
             unit="a.u.",
             value_type="float",
-            value=3.0,
+            default=3.0,
             description="Positive threshold for binarization (in sigma units)",
         ),
-        "binarize_threshold_sigma_minus": RunParameterModel(
+        "binarize_threshold_sigma_minus": RunParameterSpec(
             unit="a.u.",
             value_type="float",
-            value=-2.0,
+            default=-2.0,
             description="Negative threshold for binarization (in sigma units)",
         ),
-        "top_power": RunParameterModel(
+        "top_power": RunParameterSpec(
             unit="dB",
             value_type="float",
-            value=0.0,
+            default=0.0,
             description="Reference power for height and moment calculation (should be > max(ys))",
         ),
-        "f01_height_min": RunParameterModel(
+        "f01_height_min": RunParameterSpec(
             unit="dB",
             value_type="float",
-            value=14.9,
+            default=14.9,
             description="Minimum height for f01 peak detection (in dB)",
         ),
-        "f12_distance_min": RunParameterModel(
+        "f12_distance_min": RunParameterSpec(
             unit="GHz",
             value_type="float",
-            value=0.125,
+            default=0.125,
             description="Minimum distance from f01 for f12 detection (in GHz)",
         ),
-        "f12_distance_max": RunParameterModel(
+        "f12_distance_max": RunParameterSpec(
             unit="GHz",
             value_type="float",
-            value=0.5,
+            default=0.5,
             description="Maximum distance from f01 for f12 detection (in GHz)",
         ),
-        "f12_height_min": RunParameterModel(
+        "f12_height_min": RunParameterSpec(
             unit="dB",
             value_type="float",
-            value=14.9,
+            default=14.9,
             description="Minimum height for f12 peak detection (in dB)",
         ),
-        "retry_with_trim": RunParameterModel(
+        "retry_with_trim": RunParameterSpec(
             unit="",
             value_type="str",
-            value="false",
+            default="false",
             description=(
                 "If 'true', drop the highest-power row and retry when no f01 is "
                 "detected on the first pass. If f01 is still not detected, drop "
@@ -114,27 +118,27 @@ class CheckQubitSpectroscopy(QubexTask):
                 "when the top rows are noisy."
             ),
         ),
-        "seed_amplitude_headroom_db": RunParameterModel(
+        "seed_amplitude_headroom_db": RunParameterSpec(
             unit="dB",
             value_type="float",
-            value=10.0,
+            default=10.0,
             description=(
                 "Headroom added on top of f01_repr_db before converting it to the "
                 "coarse_control_amplitude seed used by downstream chevron/amplitude tasks."
             ),
         ),
-        "max_coarse_control_amplitude": RunParameterModel(
+        "max_coarse_control_amplitude": RunParameterSpec(
             unit="a.u.",
             value_type="float",
-            value=1.0,
+            default=1.0,
             description=(
                 "Upper bound for the uplifted coarse_control_amplitude so strong "
                 "spectroscopy responses do not push the seed above a safe drive amplitude."
             ),
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "coarse_qubit_frequency": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "coarse_qubit_frequency": OutputParameterSpec(
             unit="GHz",
             description=(
                 "Coarse f01 estimate from spectroscopy (5 MHz grid). NOT a calibrated "
@@ -143,25 +147,25 @@ class CheckQubitSpectroscopy(QubexTask):
                 "frequency-refinement tasks."
             ),
         ),
-        "anharmonicity": ParameterModel(
+        "anharmonicity": OutputParameterSpec(
             unit="GHz",
             description="Anharmonicity alpha = f12 - f01 (typically negative for transmon)",
         ),
-        "f01_repr_db": ParameterModel(
+        "f01_repr_db": OutputParameterSpec(
             unit="dB",
             description=(
                 "Representative power level of the detected f01 peak; "
                 "the y-row at which the f01 mountain first develops a non-trivial width."
             ),
         ),
-        "f01_quality_level": ParameterModel(
+        "f01_quality_level": OutputParameterSpec(
             unit="a.u.",
             description=(
                 "Discrete quality score (0..len(f01_moment_thresholds)) for the "
                 "detected f01 peak. Higher = more confident."
             ),
         ),
-        "coarse_control_amplitude": ParameterModel(
+        "coarse_control_amplitude": OutputParameterSpec(
             unit="a.u.",
             description=(
                 "Coarse drive-amplitude threshold derived from f01_repr_db "
@@ -341,7 +345,7 @@ class CheckQubitSpectroscopy(QubexTask):
         label = self.get_qubit_label(backend, qid)
 
         readout_freq_param = self.input_parameters["readout_frequency"]
-        if readout_freq_param is None:
+        if readout_freq_param is None or readout_freq_param.value is None:
             raise ValueError("readout_frequency input parameter is required")
 
         with self._modified_qubit_readout_frequencies(

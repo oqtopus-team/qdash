@@ -151,7 +151,7 @@ def test_check_chevron_run_requires_db_readout_amplitude(monkeypatch) -> None:
     task = CheckChevron()
     task.input_parameters["coarse_qubit_frequency"] = ParameterModel(value=4.25, unit="GHz")
     task.input_parameters["readout_frequency"] = ParameterModel(value=6.1, unit="GHz")
-    task.input_parameters["readout_amplitude"] = None
+    task.input_parameters["readout_amplitude"] = ParameterModel(value=None)
 
     monkeypatch.setattr(task, "get_experiment", lambda _backend: _DummyExperiment())
 

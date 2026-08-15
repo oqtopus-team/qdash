@@ -1,9 +1,11 @@
 """Tests for QubexTask._load_parameters_from_db."""
 
-from typing import Any
+from typing import Any, ClassVar, cast
 from unittest.mock import MagicMock, patch
 
-from qdash.datamodel.task import ParameterModel
+import pytest
+
+from qdash.datamodel.task import InputParameterSpec, ParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 
@@ -12,6 +14,7 @@ class ConcreteQubexTask(QubexTask):
     """Concrete subclass of QubexTask for testing."""
 
     name: str = "TestTask"
+    task_type: str = "qubit"
 
     def run(self, backend: Any, qid: str) -> RunResult:
         return RunResult(raw_result={})
@@ -76,6 +79,77 @@ class TestLoadParametersFromDbQubitTask:
         param = task.input_parameters["qubit_frequency"]
         assert param is not None
         assert param.value == 4.8
+
+    def test_explicit_required_resolution_fails_without_database_value(self):
+        class RequiredInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "frequency": InputParameterSpec(
+                    resolution="database_required",
+                    user_override="allowed",
+                    default=None,
+                )
+            }
+
+        task = RequiredInputTask()
+        with patch(
+            "qdash.workflow.calibtasks.qubex.base.MongoQubitCalibrationRepository"
+        ) as mock_repo:
+            mock_repo.return_value.get_calibration_data.return_value = {}
+            with pytest.raises(ValueError, match="Required input parameter 'frequency'"):
+                task._load_parameters_from_db(_make_backend(), "0")
+
+    def test_database_or_default_uses_explicit_default(self):
+        class DefaultInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "amplitude": InputParameterSpec(
+                    resolution="database_or_default",
+                    user_override="allowed",
+                    default=0.25,
+                    unit="a.u.",
+                )
+            }
+
+        task = DefaultInputTask()
+        with patch(
+            "qdash.workflow.calibtasks.qubex.base.MongoQubitCalibrationRepository"
+        ) as mock_repo:
+            mock_repo.return_value.get_calibration_data.return_value = {}
+            task._load_parameters_from_db(_make_backend(), "0")
+
+        assert task.input_parameters["amplitude"].value == 0.25
+
+    def test_default_only_ignores_database_value(self):
+        class FixedInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "length": InputParameterSpec(
+                    resolution="default_only",
+                    user_override="forbidden",
+                    default=100,
+                    unit="ns",
+                )
+            }
+
+        task = FixedInputTask()
+        with patch(
+            "qdash.workflow.calibtasks.qubex.base.MongoQubitCalibrationRepository"
+        ) as mock_repo:
+            mock_repo.return_value.get_calibration_data.return_value = {"length": {"value": 200}}
+            task._load_parameters_from_db(_make_backend(), "0")
+
+        assert task.input_parameters["length"].value == 100
+
+    def test_preprocess_does_not_reload_database_after_snapshot_resolution(self):
+        task = ConcreteQubexTask()
+        task.input_parameters = {"frequency": ParameterModel(value=5.1, unit="GHz")}
+        task.input_parameters_from_snapshot = True
+
+        with patch(
+            "qdash.workflow.calibtasks.qubex.base.MongoQubitCalibrationRepository"
+        ) as mock_repo:
+            result = task.preprocess(_make_backend(), "0")
+
+        mock_repo.assert_not_called()
+        assert result.input_parameters["frequency"].value == 5.1
 
 
 class TestLoadParametersFromDbCouplingTask:
@@ -238,12 +312,9 @@ class TestLoadParametersFromDbCouplingTask:
         assert param.value == 1.23
 
     def test_parameter_not_found_creates_empty_parameter_model(self):
-        """When a parameter (with value None) is not found in any source,
-        an empty ParameterModel with description should be created."""
+        """Legacy None declarations retain their compatibility behavior."""
         task = ConcreteQubexTask()
-        task.input_parameters = {
-            "missing_param": None,
-        }
+        task.input_parameters = cast("Any", {"missing_param": None})
 
         control_qubit_data: dict[str, Any] = {}
         target_qubit_data: dict[str, Any] = {}
@@ -270,6 +341,27 @@ class TestLoadParametersFromDbCouplingTask:
         result = task.input_parameters["missing_param"]
         assert isinstance(result, ParameterModel)
         assert "not found" in result.description
+
+    def test_required_database_parameter_raises_when_missing(self):
+        task = ConcreteQubexTask()
+        task.input_parameters = {
+            "missing_param": ParameterModel(source="database", required=True, value=None),
+        }
+
+        backend = _make_backend()
+        with (
+            patch(
+                "qdash.workflow.calibtasks.qubex.base.MongoQubitCalibrationRepository"
+            ) as mock_qubit_repo,
+            patch(
+                "qdash.workflow.calibtasks.qubex.base.MongoCouplingCalibrationRepository"
+            ) as mock_coupling_repo,
+        ):
+            mock_qubit_repo.return_value.get_calibration_data.side_effect = [{}, {}]
+            mock_coupling_repo.return_value.get_calibration_data.return_value = {}
+
+            with pytest.raises(ValueError, match="Required input parameter 'missing_param'"):
+                task._load_parameters_from_db(backend, "0-1")
 
     def test_mixed_parameters_from_multiple_sources(self):
         """A coupling task with parameters from all three sources should load

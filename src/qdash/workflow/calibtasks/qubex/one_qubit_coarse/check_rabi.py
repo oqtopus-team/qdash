@@ -7,10 +7,13 @@ from qubex.analysis import IQPlotter
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
@@ -127,78 +130,67 @@ class CheckRabi(QubexTask):
     name: str = "CheckRabi"
     task_type: str = "qubit"
     r2_threshold: float = 0.6
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": None,
-        "control_amplitude": None,
-        "readout_frequency": None,
-        "readout_amplitude": ParameterModel(
-            value=DEFAULT_READOUT_AMPLITUDE, unit="a.u.", description="Readout amplitude"
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.required_database(),
+        "control_amplitude": InputParameterSpec.database_or_default(
+            default=DEFAULT_CONTROL_AMPLITUDE,
+            greater_than=CONTROL_AMPLITUDE_MIN,
+            less_than=CONTROL_AMPLITUDE_MAX,
+            unit="a.u.",
+            description="Control pulse amplitude",
         ),
-        "readout_length": ParameterModel(
-            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.database_or_default(
+            default=DEFAULT_READOUT_AMPLITUDE,
+            unit="a.u.",
+            description="Readout amplitude",
+        ),
+        "readout_length": InputParameterSpec.database_or_default(
+            default=DEFAULT_READOUT_DURATION,
+            unit="ns",
+            description="Readout pulse length",
         ),
     }
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "time_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "time_range": RunParameterSpec(
             unit="ns",
             value_type="range",
-            value=(0, 401, 8),
+            default=(0, 401, 8),
             description="Time range for Rabi oscillation",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=CALIBRATION_SHOTS,
+            default=CALIBRATION_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval for Rabi oscillation",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "rabi_amplitude": ParameterModel(unit="a.u.", description="Rabi oscillation amplitude"),
-        "rabi_frequency": ParameterModel(unit="MHz", description="Rabi oscillation frequency"),
-        "rabi_phase": ParameterModel(unit="a.u.", description="Rabi oscillation phase"),
-        "rabi_offset": ParameterModel(unit="a.u.", description="Rabi oscillation offset"),
-        "rabi_angle": ParameterModel(unit="degree", description="Rabi angle (in degree)"),
-        "rabi_noise": ParameterModel(unit="a.u.", description="Rabi oscillation noise"),
-        "rabi_distance": ParameterModel(unit="a.u.", description="Rabi distance"),
-        "rabi_reference_phase": ParameterModel(unit="a.u.", description="Rabi reference phase"),
-        "control_amplitude": ParameterModel(unit="a.u.", description="Control pulse amplitude"),
-        "maximum_rabi_frequency": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "rabi_amplitude": OutputParameterSpec(
+            unit="a.u.", description="Rabi oscillation amplitude"
+        ),
+        "rabi_frequency": OutputParameterSpec(unit="MHz", description="Rabi oscillation frequency"),
+        "rabi_phase": OutputParameterSpec(unit="a.u.", description="Rabi oscillation phase"),
+        "rabi_offset": OutputParameterSpec(unit="a.u.", description="Rabi oscillation offset"),
+        "rabi_angle": OutputParameterSpec(unit="degree", description="Rabi angle (in degree)"),
+        "rabi_noise": OutputParameterSpec(unit="a.u.", description="Rabi oscillation noise"),
+        "rabi_distance": OutputParameterSpec(unit="a.u.", description="Rabi distance"),
+        "rabi_reference_phase": OutputParameterSpec(
+            unit="a.u.", description="Rabi reference phase"
+        ),
+        "control_amplitude": OutputParameterSpec(
+            unit="a.u.", description="Control pulse amplitude"
+        ),
+        "maximum_rabi_frequency": OutputParameterSpec(
             unit="MHz/a.u.", description="Maximum Rabi frequency per unit control amplitude"
         ),
     }
-
-    def preprocess(self, backend: QubexBackend, qid: str) -> PreProcessResult:
-        """Preprocess with control_amplitude validation."""
-        result = super().preprocess(backend, qid)
-        param = self.input_parameters.get("control_amplitude")
-        value = param.value if param is not None else None
-        if (
-            value is None
-            or not isinstance(value, (int, float))
-            or math.isnan(value)
-            or value <= CONTROL_AMPLITUDE_MIN
-            or value >= CONTROL_AMPLITUDE_MAX
-        ):
-            print(
-                f"control_amplitude={value} is out of range "
-                f"({CONTROL_AMPLITUDE_MIN}, {CONTROL_AMPLITUDE_MAX}), "
-                f"using default={DEFAULT_CONTROL_AMPLITUDE}"
-            )
-            if param is None:
-                self.input_parameters["control_amplitude"] = ParameterModel(
-                    value=DEFAULT_CONTROL_AMPLITUDE,
-                    unit="a.u.",
-                    description="Control pulse amplitude (default)",
-                )
-            else:
-                param.value = DEFAULT_CONTROL_AMPLITUDE
-        return result
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -228,6 +220,8 @@ class CheckRabi(QubexTask):
         assert control_amplitude_param is not None
         default_amp = control_amplitude_param.value
         rabi_frequency = self.output_parameters["rabi_frequency"].value
+        if default_amp is None or rabi_frequency is None:
+            raise ValueError("Rabi parameters were not resolved during preprocessing")
         print("rabi frequency (MHz): ", self.output_parameters["rabi_frequency"].value)
         print("default amplitude (a.u.): ", control_amplitude_param.value)
         maximum_rabi_frequency = rabi_frequency / default_amp

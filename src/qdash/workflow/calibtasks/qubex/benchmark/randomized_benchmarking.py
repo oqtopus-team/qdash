@@ -3,7 +3,11 @@ from typing import ClassVar
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -17,43 +21,45 @@ class RandomizedBenchmarking(QubexTask):
 
     name: str = "RandomizedBenchmarking"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": None,  # Load from DB
-        "drag_hpi_amplitude": None,  # Load from DB
-        "drag_hpi_length": None,  # Load from DB
-        "drag_hpi_beta": None,  # Load from DB
-        "readout_amplitude": None,  # Load from DB
-        "readout_frequency": None,  # Load from DB
-        "readout_length": ParameterModel(
-            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.required_database(),
+        "drag_hpi_amplitude": InputParameterSpec.required_database(),
+        "drag_hpi_length": InputParameterSpec.required_database(),
+        "drag_hpi_beta": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_length": InputParameterSpec.database_or_default(
+            default=DEFAULT_READOUT_DURATION,
+            unit="ns",
+            description="Readout pulse length",
         ),
     }
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "n_trials": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "n_trials": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=10,
+            default=10,
             description="Number of trials",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=CALIBRATION_SHOTS,
+            default=CALIBRATION_SHOTS,
             description="Number of shots",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "average_gate_fidelity": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "average_gate_fidelity": OutputParameterSpec(
             unit="a.u.",
             description="Average gate fidelity",
         ),
-        "depolarizing_rate": ParameterModel(
+        "depolarizing_rate": OutputParameterSpec(
             unit="a.u.",
             description="Depolarization rate of the qubit",
         ),

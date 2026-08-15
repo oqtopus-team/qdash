@@ -4,7 +4,11 @@ import numpy as np
 import plotly.graph_objects as go
 from qubex.analysis.util import calc_1q_gate_coherence_limit
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -19,22 +23,22 @@ class Check1QGateCoherenceLimit(QubexTask):
     name: str = "Check1QGateCoherenceLimit"
     task_type: str = "qubit"
 
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "t1_average": None,  # Load from DB (μs)
-        "t2_echo_average": None,  # Load from DB (μs)
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "t1_average": InputParameterSpec.required_database(),
+        "t2_echo_average": InputParameterSpec.required_database(),
     }
 
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "drag_hpi_duration": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "drag_hpi_duration": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=16,
+            default=16,
             description="DRAG half-pi pulse duration",
         ),
     }
 
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "one_qubit_gate_coherence_limit": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "one_qubit_gate_coherence_limit": OutputParameterSpec(
             unit="a.u.",
             description="1Q gate coherence limit fidelity",
         ),

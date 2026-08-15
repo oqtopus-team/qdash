@@ -39,7 +39,7 @@ def test_bringup_tasks_declare_readout_amplitude_as_calibration_input() -> None:
         CheckCoarseChevron,
         CheckFineChevron,
     ):
-        assert "readout_amplitude" in task_cls.input_parameters
+        assert "readout_amplitude" in task_cls.input_spec
 
 
 def test_bringup_uses_adaptive_check_chevron_before_fine_refinement() -> None:

@@ -4,7 +4,11 @@ if TYPE_CHECKING:
     import plotly.graph_objs as go
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -18,35 +22,35 @@ class CheckReadoutFrequency(QubexTask):
 
     name: str = "CheckReadoutFrequency"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "detuning_range": RunParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "detuning_range": RunParameterSpec(
             unit="GHz",
             value_type="np.linspace",
-            value=(-0.01, 0.01, 21),
+            default=(-0.01, 0.01, 21),
             description="Detuning range",
         ),
-        "time_range": RunParameterModel(
+        "time_range": RunParameterSpec(
             unit="ns",
             value_type="range",
-            value=(0, 101, 4),
+            default=(0, 101, 4),
             description="Time range",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=DEFAULT_SHOTS,
+            default=DEFAULT_SHOTS,
             description="Number of shots",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "readout_frequency": ParameterModel(unit="GHz", description="Readout frequency"),
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "readout_frequency": OutputParameterSpec(unit="GHz", description="Readout frequency"),
     }
 
     def postprocess(

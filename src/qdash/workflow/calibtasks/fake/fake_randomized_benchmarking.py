@@ -5,7 +5,11 @@ from typing import ClassVar
 import numpy as np
 import plotly.graph_objects as go
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -38,52 +42,56 @@ class FakeRandomizedBenchmarking(FakeTask):
     task_type: str = "qubit"
     timeout: int = 300
 
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": ParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.default_only(
+            default=0,
             unit="GHz",
             description="Qubit frequency from CheckFineChevron",
         ),
-        "rabi_amplitude": ParameterModel(
+        "rabi_amplitude": InputParameterSpec.default_only(
+            default=0,
             unit="",
             description="Rabi amplitude from CheckRabi",
         ),
-        "t1": ParameterModel(
+        "t1": InputParameterSpec.default_only(
+            default=0,
             unit="μs",
             description="T1 relaxation time from CheckT1",
         ),
-        "t2_echo": ParameterModel(
+        "t2_echo": InputParameterSpec.default_only(
+            default=0,
             unit="μs",
             description="T2 echo dephasing time from CheckT2Echo",
         ),
     }
 
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "num_cliffords": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "num_cliffords": RunParameterSpec(
             unit="",
             value_type="list",
-            value=[1, 2, 4, 8, 16, 32, 64, 128, 256],
+            default=[1, 2, 4, 8, 16, 32, 64, 128, 256],
             description="Number of Clifford gates per sequence",
         ),
-        "num_seeds": RunParameterModel(
+        "num_seeds": RunParameterSpec(
             unit="",
             value_type="int",
-            value=20,
+            default=20,
             description="Number of random seeds per Clifford count",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="",
             value_type="int",
-            value=1024,
+            default=1024,
             description="Number of shots per circuit",
         ),
     }
 
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "gate_fidelity": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "gate_fidelity": OutputParameterSpec(
             unit="",
             description="Average Clifford gate fidelity",
         ),
-        "error_per_gate": ParameterModel(
+        "error_per_gate": OutputParameterSpec(
             unit="",
             description="Error per Clifford gate (1 - fidelity)",
         ),
