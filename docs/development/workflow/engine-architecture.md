@@ -271,6 +271,34 @@ class BaseBackend(ABC):
 
 The data flow (Preprocess → Run → Postprocess) and persistence flow (TaskStateManager, TaskHistoryRecorder, FilesystemCalibDataSaver, ExecutionService) are illustrated in the Task Executor Flow diagram above.
 
+## Execution Record Lifecycle
+
+An execution record exists from the moment a run is requested, not from the moment the flow process reaches `CalibService`.
+
+| Step | Actor | Effect |
+|------|-------|--------|
+| Trigger | API (`FlowService._create_scheduled_execution`) | Creates the `execution_history` row with `status=scheduled` and `note.flow_run_id`, immediately after the Prefect flow run is created |
+| Flow start | `CalibService._initialize()` | Claims that row via `MongoExecutionRepository.claim_scheduled_execution()` and reuses its `execution_id`; `scheduled` → `running` |
+| Flow end | `finish_calibration()` / `fail_calibration()` / `cancel_calibration()` | `running` → `completed` / `failed` / `cancelled` |
+
+The claim is a single atomic `find_one_and_update` guarded by `note.claimed_at`, so only the first session of a flow run adopts the row. Sessions with `skip_execution=True` never claim, because they do not persist an execution document. A flow that creates several executions (one per strategy invocation) adopts the pre-created row for the first one and allocates new IDs for the rest.
+
+Runs that do not go through the API — cron schedules, where the Prefect scheduler creates the flow run directly — have no pre-created row, so `CalibService` allocates the `execution_id` itself as before.
+
+### Reconciliation with Prefect
+
+Hooks only fire while the Prefect runner is alive. When the runner itself dies, nothing closes the execution and it stays `running` forever. `ExecutionService._reconcile_with_prefect()` (API) closes that gap: on every read of the execution list or detail, open executions holding a `note.flow_run_id` are looked up in Prefect in one batched query and finalized when their flow run has already reached a terminal state.
+
+| Prefect flow run state | Execution status | Result |
+|------------------------|------------------|--------|
+| `FAILED` / `CRASHED`   | `running` / `scheduled` | `failed`, non-terminal tasks closed |
+| `CANCELLED`            | `running` / `scheduled` | `cancelled`, non-terminal tasks closed |
+| `COMPLETED`            | `scheduled`      | `completed` — the flow never started a calibration execution |
+| `COMPLETED`            | `running`        | `failed` — the flow ended without closing its own record |
+| anything else, or flow run not found | any | unchanged |
+
+Both the hooks and the reconciliation share `qdash.repository.execution_finalizer.finalize_executions_by_flow_run_id()`.
+
 ## Cancellation
 
 ### Overview
@@ -306,7 +334,7 @@ The hook:
 
 QDash uses date-based execution IDs (`YYYYMMDD-NNN`), while Prefect uses UUIDs for flow runs. The bridge is:
 
-- At flow start, `CalibService._store_flow_run_id()` stores the Prefect UUID in `execution.note["flow_run_id"]`
+- The execution record carries the Prefect UUID in `execution.note["flow_run_id"]` from its first write — set by the API when it pre-creates the `scheduled` row, and by `CalibService._initialize()` for every execution the flow creates itself
 - The cancel API accepts the Prefect `flow_run_id` (UUID) directly
 - The `on_cancellation` hook uses `flow_run_id` to look up the QDash execution
 
@@ -320,13 +348,14 @@ QDash uses date-based execution IDs (`YYYYMMDD-NNN`), while Prefect uses UUIDs f
 
 ### CalibService Methods
 
-| Method                                | Purpose                                     |
-|---------------------------------------|---------------------------------------------|
-| `on_flow_cancellation()`              | Prefect hook — runs after SIGTERM            |
-| `cancel_calibration()`                | In-process cancellation (for exception path) |
-| `_cancel_executions_by_flow_run_id()` | Direct MongoDB update by flow_run_id         |
-| `_finalize_tasks_on_cancel()`         | Batch-update non-terminal tasks              |
-| `_is_cancellation(e)`                 | Detect CancelledRun/CancelledError exception |
+| Method                                     | Purpose                                       |
+|--------------------------------------------|-----------------------------------------------|
+| `on_flow_cancellation()`                   | Prefect hook — runs after SIGTERM              |
+| `on_flow_failure()` / `on_flow_crashed()`  | Prefect hooks for exceptions and crashes       |
+| `cancel_calibration()`                     | In-process cancellation (for exception path)   |
+| `finalize_executions_by_flow_run_id()`     | Shared finalizer in `qdash.repository.execution_finalizer` |
+| `_finalize_tasks_on_cancel()`              | Batch-update non-terminal tasks                |
+| `_is_cancellation(e)`                      | Detect CancelledRun/CancelledError exception   |
 
 ## Extension Points
 

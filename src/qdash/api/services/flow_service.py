@@ -25,12 +25,18 @@ from qdash.api.schemas.flow import (
     SaveFlowResponse,
 )
 from qdash.common.config.path_resolver import (
+    execution_calib_data_dir,
     resolve_user_flows_dir,
     resolve_workflow_service_dir,
     resolve_workflow_templates_dir,
     to_container_user_flow_path,
 )
+from qdash.common.utils.datetime import now
 from qdash.config import get_settings
+from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
+from qdash.datamodel.system_info import SystemInfoModel
+from qdash.repository import MongoExecutionRepository
+from qdash.repository.execution_id import generate_execution_id
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -405,6 +411,15 @@ class FlowService:
 
                 logger.info(f"Flow run created: {execution_id}")
 
+                self._create_scheduled_execution(
+                    project_id=project_id,
+                    username=username,
+                    chip_id=str(parameters.get("chip_id") or flow.chip_id or "").strip(),
+                    name=name,
+                    flow_run_id=execution_id,
+                    tags=parameters.get("tags") or flow.tags,
+                )
+
                 return ExecuteFlowResponse(
                     execution_id=execution_id,
                     flow_run_url=flow_run_url,
@@ -494,6 +509,15 @@ class FlowService:
                 qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
                 logger.info(f"Re-execution flow run created: {execution_id}")
+
+                self._create_scheduled_execution(
+                    project_id=project_id,
+                    username=username,
+                    chip_id=str(parameters.get("chip_id") or flow.chip_id or "").strip(),
+                    name=flow_name,
+                    flow_run_id=execution_id,
+                    tags=parameters.get("tags") or flow.tags,
+                )
 
                 return ExecuteFlowResponse(
                     execution_id=execution_id,
@@ -603,6 +627,15 @@ class FlowService:
                 qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
                 logger.info(f"Single-task flow run created: {execution_id}")
+
+                self._create_scheduled_execution(
+                    project_id=project_id,
+                    username=username,
+                    chip_id=chip_id,
+                    name=flow_name,
+                    flow_run_id=execution_id,
+                    tags=tags,
+                )
 
                 return ExecuteFlowResponse(
                     execution_id=execution_id,
@@ -799,6 +832,82 @@ class FlowService:
             raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
 
     # --- Private helpers ---
+
+    def _create_scheduled_execution(
+        self,
+        *,
+        project_id: str,
+        username: str,
+        chip_id: str | None,
+        name: str,
+        flow_run_id: str,
+        tags: list[str] | None = None,
+    ) -> str | None:
+        """Pre-create a scheduled execution row for a freshly created flow run.
+
+        This makes the run visible in execution history immediately, before the
+        flow process itself has had a chance to create its own execution record,
+        so that a run which fails or is orphaned before reaching that point can
+        still be found and closed (by the flow's own hooks or by reconciliation).
+
+        Parameters
+        ----------
+        project_id : str
+            The project ID.
+        username : str
+            The username who triggered the run.
+        chip_id : str | None
+            The chip ID targeted by the run. When it cannot be resolved,
+            no row is created.
+        name : str
+            Execution/flow name to record.
+        flow_run_id : str
+            The Prefect flow run ID, stored in ``note.flow_run_id``.
+        tags : list[str] | None
+            Tags to record on the execution.
+
+        Returns
+        -------
+        str | None
+            The generated execution ID, or None if the row could not be created.
+
+        """
+        if not chip_id:
+            logger.warning(
+                f"Skipping scheduled execution pre-creation for flow run "
+                f"{flow_run_id}: no chip_id could be resolved"
+            )
+            return None
+
+        try:
+            execution_id = generate_execution_id(username, chip_id, project_id=project_id)
+            calib_data_path = str(execution_calib_data_dir(username, execution_id))
+
+            model = ExecutionModel(
+                project_id=project_id,
+                username=username,
+                name=name,
+                execution_id=execution_id,
+                calib_data_path=calib_data_path,
+                note={"flow_run_id": flow_run_id},
+                status=ExecutionStatusModel.SCHEDULED,
+                tags=tags or [],
+                chip_id=chip_id,
+                start_at=now(),
+                end_at=None,
+                elapsed_time=None,
+                message="",
+                system_info=SystemInfoModel(),
+            )
+            MongoExecutionRepository().save(model)
+            return execution_id
+        except Exception:
+            logger.warning(
+                "Failed to pre-create scheduled execution for flow_run_id=%s",
+                flow_run_id,
+                exc_info=True,
+            )
+            return None
 
     def _get_project_flows_dir(self, project_id: str) -> Path:
         """Get a project's flows directory, create if not exists."""

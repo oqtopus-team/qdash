@@ -14,6 +14,7 @@ from uuid import UUID
 from bunnet import SortDirection
 from fastapi import HTTPException
 from prefect.client.orchestration import get_client
+from prefect.client.schemas.filters import FlowRunFilter, FlowRunFilterId
 from prefect.states import Cancelling
 
 from qdash.api.schemas.execution import (
@@ -23,14 +24,19 @@ from qdash.api.schemas.execution import (
     ExecutionResponseSummary,
     Task,
 )
-from qdash.common.utils.datetime import parse_elapsed_time
+from qdash.common.utils.datetime import now, parse_elapsed_time
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.repository.execution_finalizer import finalize_executions_by_flow_run_id
 
 if TYPE_CHECKING:
+    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
     from qdash.repository.execution_history import MongoExecutionHistoryRepository
     from qdash.repository.execution_lock import MongoExecutionLockRepository
 
 logger = logging.getLogger(__name__)
+
+_OPEN_EXECUTION_STATUSES = ("running", "scheduled")
+_RECONCILE_TIMEOUT_SECONDS = 5.0
 
 
 class ExecutionService:
@@ -89,6 +95,7 @@ class ExecutionService:
             skip=skip,
             limit=limit,
         )
+        self._reconcile_with_prefect(executions)
         return [
             ExecutionResponseSummary(
                 name=f"{execution.name}-{execution.execution_id}",
@@ -153,6 +160,8 @@ class ExecutionService:
         execution = self._history_repo.find_by_id(project_id, execution_id)
         if execution is None:
             return None
+
+        self._reconcile_with_prefect([execution])
 
         # Fetch tasks directly from task_result_history collection
         tasks = self._fetch_tasks_for_execution(project_id, execution_id)
@@ -298,6 +307,155 @@ class ExecutionService:
                 status_code=500,
                 detail=f"Failed to cancel execution: {e}",
             )
+
+    def _reconcile_with_prefect(self, executions: list[ExecutionHistoryDocument]) -> None:
+        """Close executions whose Prefect flow run has already finished.
+
+        When the Prefect runner dies before an execution's own closing hooks
+        run, the execution can be left ``running`` or ``scheduled`` in Mongo
+        forever (issue #1111). This cross-checks any still-open execution
+        against Prefect and finalizes it if the underlying flow run has
+        already reached a terminal state, patching the passed-in documents
+        in place so callers see the reconciled state without a second
+        database round trip.
+
+        Parameters
+        ----------
+        executions : list[ExecutionHistoryDocument]
+            Execution documents to reconcile. Only documents whose status is
+            "running" or "scheduled" and whose note contains a valid
+            ``flow_run_id`` are considered; others are left untouched.
+
+        """
+        try:
+            targets: dict[str, list[ExecutionHistoryDocument]] = {}
+            for doc in executions:
+                if doc.status not in _OPEN_EXECUTION_STATUSES:
+                    continue
+                flow_run_id = (doc.note or {}).get("flow_run_id")
+                if not flow_run_id or not isinstance(flow_run_id, str):
+                    continue
+                try:
+                    UUID(flow_run_id)
+                except ValueError:
+                    continue
+                targets.setdefault(flow_run_id, []).append(doc)
+
+            if not targets:
+                return
+
+            uuids = [UUID(flow_run_id) for flow_run_id in targets]
+            with get_client(
+                sync_client=True,
+                httpx_settings={"timeout": _RECONCILE_TIMEOUT_SECONDS},
+            ) as client:
+                runs = client.read_flow_runs(
+                    flow_run_filter=FlowRunFilter(id=FlowRunFilterId(any_=uuids)),
+                    limit=len(uuids),
+                )
+
+            run_states = {
+                str(run.id): (run.state.type.value.upper() if run.state else None) for run in runs
+            }
+
+            for flow_run_id, docs in targets.items():
+                project_id = docs[0].project_id
+                if not project_id:
+                    continue
+
+                state = run_states.get(flow_run_id)
+
+                if state in ("FAILED", "CRASHED"):
+                    message = (
+                        "Flow run failed before the execution was closed"
+                        if state == "FAILED"
+                        else "Flow run crashed before the execution was closed"
+                    )
+                    self._close_reconciled_docs(
+                        project_id=project_id,
+                        flow_run_id=flow_run_id,
+                        docs=docs,
+                        status="failed",
+                        message=message,
+                        close_tasks=True,
+                    )
+                elif state == "CANCELLED":
+                    self._close_reconciled_docs(
+                        project_id=project_id,
+                        flow_run_id=flow_run_id,
+                        docs=docs,
+                        status="cancelled",
+                        message="Execution was cancelled",
+                        close_tasks=True,
+                    )
+                elif state == "COMPLETED":
+                    scheduled_docs = [doc for doc in docs if doc.status == "scheduled"]
+                    running_docs = [doc for doc in docs if doc.status == "running"]
+                    if scheduled_docs:
+                        self._close_reconciled_docs(
+                            project_id=project_id,
+                            flow_run_id=flow_run_id,
+                            docs=scheduled_docs,
+                            status="completed",
+                            message="Flow run completed without starting a calibration execution",
+                            close_tasks=False,
+                        )
+                    if running_docs:
+                        self._close_reconciled_docs(
+                            project_id=project_id,
+                            flow_run_id=flow_run_id,
+                            docs=running_docs,
+                            status="failed",
+                            message="Flow run completed but the execution was never closed",
+                            close_tasks=True,
+                        )
+        except Exception:
+            logger.warning("Prefect reconciliation failed", exc_info=True)
+
+    @staticmethod
+    def _close_reconciled_docs(
+        *,
+        project_id: str,
+        flow_run_id: str,
+        docs: list[ExecutionHistoryDocument],
+        status: str,
+        message: str,
+        close_tasks: bool,
+    ) -> None:
+        """Finalize a group of same-flow-run-id executions and patch them in place.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier.
+        flow_run_id : str
+            The Prefect flow run ID shared by the given documents.
+        docs : list[ExecutionHistoryDocument]
+            Execution documents to finalize.
+        status : str
+            Terminal status to set.
+        message : str
+            Message to record.
+        close_tasks : bool
+            Whether to also close non-terminal task_result_history rows.
+
+        """
+        end_time = now()
+        for from_status in {doc.status for doc in docs}:
+            finalize_executions_by_flow_run_id(
+                project_id=project_id,
+                flow_run_id=flow_run_id,
+                status=status,
+                message=message,
+                from_statuses=(from_status,),
+                close_tasks=close_tasks,
+                context="prefect_reconcile",
+                logger=logger,
+            )
+        for doc in docs:
+            doc.status = status
+            doc.end_at = end_time
+            doc.message = message
 
     def _fetch_tasks_for_execution(
         self,
