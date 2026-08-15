@@ -106,6 +106,10 @@ export default withMermaid(
               link: "/user-guide/dashboard",
             },
             {
+              text: "Task Parameters",
+              link: "/user-guide/task-parameters",
+            },
+            {
               text: "Cryostats & Cool-downs",
               link: "/user-guide/cryo",
             },
@@ -154,6 +158,7 @@ export default withMermaid(
               items: [
                 { text: "Quickstart", link: "/development/workflow/quickstart" },
                 { text: "Engine Architecture", link: "/development/workflow/engine-architecture" },
+                { text: "Parameter Resolution", link: "/development/workflow/parameter-resolution" },
                 { text: "Testing", link: "/development/workflow/testing" },
               ],
             },
