@@ -3000,19 +3000,23 @@
           },
           "readout_amplitude": {
             "description": "Readout pulse amplitude. Uses qubex default when unset.",
-            "unit": "a.u."
+            "unit": "a.u.",
+            "value": null
           },
           "readout_duration": {
             "description": "Readout pulse duration. Uses qubex default when unset.",
-            "unit": "ns"
+            "unit": "ns",
+            "value": null
           },
           "readout_post_margin": {
             "description": "Readout post-margin. Uses qubex default when unset.",
-            "unit": "ns"
+            "unit": "ns",
+            "value": null
           },
           "readout_pre_margin": {
             "description": "Readout pre-margin. Uses qubex default when unset.",
-            "unit": "ns"
+            "unit": "ns",
+            "value": null
           },
           "shots": {
             "description": "Number of shots for waveform measurement",

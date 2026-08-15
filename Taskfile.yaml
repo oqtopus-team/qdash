@@ -19,6 +19,7 @@ tasks:
   generate:
     dotenv: [.env]
     cmds:
+      - uv run scripts/generate_task_catalog.py
       - |
         OPENAPI_TMP="$(mktemp)"
         ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
@@ -28,6 +29,11 @@ tasks:
       - cd ui && bun run fmt
       - cd ui && bun run lint:fix
     desc: Generate the TypeScript clients
+
+  generate-task-catalog:
+    desc: Generate task metadata catalog from workflow classes
+    cmds:
+      - uv run scripts/generate_task_catalog.py
 
   generate-python-schema:
     desc: Generate Python Pydantic schema models from OpenAPI

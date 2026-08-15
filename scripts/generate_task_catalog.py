@@ -21,7 +21,7 @@ os.environ.setdefault("POSTGRES_DATA_PATH", ".qdash/catalog/postgres")
 os.environ.setdefault("MONGO_DATA_PATH", ".qdash/catalog/mongo")
 os.environ.setdefault("CALIB_DATA_PATH", ".qdash/catalog/calib")
 
-from qdash.datamodel.task import CalibrationInputSpec
+from qdash.datamodel.task import InputParameterSpec, RunParameterSpec
 from qdash.workflow.calibtasks import BaseTask
 
 if TYPE_CHECKING:
@@ -33,8 +33,13 @@ DEFAULT_OUTPUT = Path("src/qdash/workflow/calibtasks/task_catalog.json")
 def _serialize_parameters(parameters: Mapping[str, object]) -> dict[str, dict[str, Any]]:
     serialized: dict[str, dict[str, Any]] = {}
     for name, value in parameters.items():
-        if isinstance(value, (CalibrationInputSpec, BaseModel)):
-            serialized[name] = value.model_dump(mode="json", exclude_defaults=True)
+        if isinstance(value, (InputParameterSpec, BaseModel)):
+            metadata = value.model_dump(mode="json", exclude_defaults=True)
+            if isinstance(value, InputParameterSpec):
+                metadata["default_value"] = metadata.pop("default", None)
+            elif isinstance(value, RunParameterSpec):
+                metadata["value"] = metadata.pop("default", None)
+            serialized[name] = metadata
         elif value is None:
             serialized[name] = {}
     return serialized

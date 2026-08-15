@@ -224,8 +224,8 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
 def test_extract_parameter_metadata_understands_named_spec_constructors() -> None:
     node = ast.parse(
         """{
-            "frequency": CalibrationInputSpec.required_database(unit="GHz"),
-            "amplitude": CalibrationInputSpec.database_or_default(
+            "frequency": InputParameterSpec.required_database(unit="GHz"),
+            "amplitude": InputParameterSpec.database_or_default(
                 default=0.1,
                 user_override="forbidden",
                 greater_than=0.0,
