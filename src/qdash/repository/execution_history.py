@@ -115,3 +115,13 @@ class MongoExecutionHistoryRepository:
         return ExecutionHistoryDocument.find_one(
             {"project_id": project_id, "execution_id": execution_id}
         ).run()
+
+    def find_by_flow_run_id(
+        self,
+        project_id: str,
+        flow_run_id: str,
+    ) -> ExecutionHistoryDocument | None:
+        """Find the QDash execution created by a Prefect flow run."""
+        return ExecutionHistoryDocument.find_one(
+            {"project_id": project_id, "note.flow_run_id": flow_run_id}
+        ).run()

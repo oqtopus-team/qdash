@@ -511,7 +511,7 @@ class FlowService:
         task_name: str,
         qid: str,
         chip_id: str,
-        source_execution_id: str,
+        source_execution_id: str | None,
         username: str,
         project_id: str,
         tags: list[str] | None = None,
@@ -521,6 +521,8 @@ class FlowService:
         persist_output_parameters: bool = True,
         reconfigure: bool = False,
         execution_name: str | None = None,
+        backend_name: str | None = None,
+        default_run_parameters: dict[str, Any] | None = None,
     ) -> ExecuteFlowResponse:
         """Execute a single task via the system single-task-executor deployment.
 
@@ -582,6 +584,8 @@ class FlowService:
             "persist_output_parameters": persist_output_parameters,
             "update_params": update_params,
             "reconfigure": reconfigure,
+            "backend_name": backend_name,
+            "default_run_parameters": default_run_parameters,
         }
 
         logger.info(

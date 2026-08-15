@@ -5761,6 +5761,80 @@
         }
       }
     },
+    "/tasks/{task_name}/execute": {
+      "post": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Execute a single task from the task catalog",
+        "description": "Execute one task without requiring a previous execution snapshot.",
+        "operationId": "quickRunTask",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuickRunTaskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{task_id}/result": {
       "get": {
         "tags": [
@@ -6005,157 +6079,6 @@
             "HTTPBearer": []
           }
         ]
-      }
-    },
-    "/task-files/tree": {
-      "get": {
-        "tags": [
-          "task-file"
-        ],
-        "summary": "Get file tree for a specific backend",
-        "description": "Get file tree structure for a specific backend directory.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n\nReturns:\n-------\n    File tree structure for the backend",
-        "operationId": "getTaskFileTree",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "backend",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Backend"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TaskFileTreeNode"
-                  },
-                  "title": "Response Gettaskfiletree"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/task-files/content": {
-      "get": {
-        "tags": [
-          "task-file"
-        ],
-        "summary": "Get task file content for viewing/editing",
-        "description": "Get task file content for viewing/editing.\n\nArgs:\n----\n    path: Relative path from CALIBTASKS_BASE_PATH\n\nReturns:\n-------\n    File content and metadata",
-        "operationId": "getTaskFileContent",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Gettaskfilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "task-file"
-        ],
-        "summary": "Save task file content",
-        "description": "Save task file content.\n\nArgs:\n----\n    request: Save file request with path and content\n\nReturns:\n-------\n    Success message",
-        "operationId": "saveTaskFileContent",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaveTaskFileRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Savetaskfilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
       }
     },
     "/task-files/backend-config": {
@@ -20720,15 +20643,6 @@
         "title": "FidelityCondition",
         "description": "Condition for fidelity filtering."
       },
-      "FileNodeType": {
-        "type": "string",
-        "enum": [
-          "file",
-          "directory"
-        ],
-        "title": "FileNodeType",
-        "description": "File node type enum."
-      },
       "FileTreeNode": {
         "properties": {
           "name": {
@@ -25008,6 +24922,23 @@
             "title": "Qid Role",
             "default": ""
           },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "database"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": false
+          },
           "value": {
             "anyOf": [
               {
@@ -25015,6 +24946,9 @@
               },
               {
                 "type": "integer"
+              },
+              {
+                "type": "null"
               }
             ],
             "title": "Value",
@@ -25059,7 +24993,7 @@
         },
         "type": "object",
         "title": "ParameterModel",
-        "description": "Calibration parameter model.\n\nUsed for both input_parameters (calibration dependencies) and\noutput_parameters (calibration outputs) in tasks.\n\nAttributes\n----------\n    parameter_name: The actual DB parameter name. If empty, the dict key is used.\n    qid_role: The qid role for 2-qubit tasks. One of:\n        - \"\" or \"self\": Use task's qid as-is (default, for 1-qubit tasks)\n        - \"control\": Use control qubit's qid (for 2-qubit tasks)\n        - \"target\": Use target qubit's qid (for 2-qubit tasks)\n        - \"coupling\": Use coupling qid as-is (for 2-qubit tasks)\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
+        "description": "Calibration parameter model.\n\nUsed for both input_parameters (calibration dependencies) and\noutput_parameters (calibration outputs) in tasks.\n\nAttributes\n----------\n    parameter_name: The actual DB parameter name. If empty, the dict key is used.\n    source: Explicit source for dependency resolution. ``\"database\"`` declares\n        that the value must be loaded from calibration state.\n    required: Whether resolution must fail when the declared source has no value.\n    qid_role: The qid role for 2-qubit tasks. One of:\n        - \"\" or \"self\": Use task's qid as-is (default, for 1-qubit tasks)\n        - \"control\": Use control qubit's qid (for 2-qubit tasks)\n        - \"target\": Use target qubit's qid (for 2-qubit tasks)\n        - \"coupling\": Use coupling qid as-is (for 2-qubit tasks)\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
       },
       "ParameterVersionResponse": {
         "properties": {
@@ -25659,6 +25593,61 @@
         ],
         "title": "QubitResponse",
         "description": "Response model for a single qubit."
+      },
+      "QuickRunTaskRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "backend_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Name"
+          },
+          "input_parameter_overrides": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input Parameter Overrides"
+          },
+          "run_parameter_overrides": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Run Parameter Overrides"
+          },
+          "reconfigure": {
+            "type": "boolean",
+            "title": "Reconfigure",
+            "default": false
+          },
+          "persist_output_parameters": {
+            "type": "boolean",
+            "title": "Persist Output Parameters",
+            "default": false
+          },
+          "update_params": {
+            "type": "boolean",
+            "title": "Update Params",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "qid"
+        ],
+        "title": "QuickRunTaskRequest",
+        "description": "Request to execute one task directly from the task catalog."
       },
       "ReExecuteRequest": {
         "properties": {
@@ -26281,25 +26270,6 @@
         ],
         "title": "SaveFlowResponse",
         "description": "Response after saving a flow."
-      },
-      "SaveTaskFileRequest": {
-        "properties": {
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "content": {
-            "type": "string",
-            "title": "Content"
-          }
-        },
-        "type": "object",
-        "required": [
-          "path",
-          "content"
-        ],
-        "title": "SaveTaskFileRequest",
-        "description": "Request model for saving task file content."
       },
       "ScheduleFlowRequest": {
         "properties": {
@@ -27154,43 +27124,6 @@
         "title": "TaskFileSettings",
         "description": "Task file settings model."
       },
-      "TaskFileTreeNode": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "type": {
-            "$ref": "#/components/schemas/FileNodeType"
-          },
-          "children": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/TaskFileTreeNode"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Children"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "path",
-          "type"
-        ],
-        "title": "TaskFileTreeNode",
-        "description": "Task file tree node model."
-      },
       "TaskHistoryResponse": {
         "properties": {
           "name": {
@@ -27264,6 +27197,22 @@
             "type": "boolean",
             "title": "Enabled",
             "default": true
+          },
+          "input_parameters": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Input Parameters"
+          },
+          "run_parameters": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Run Parameters"
           }
         },
         "type": "object",

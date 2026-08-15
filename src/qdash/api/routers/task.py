@@ -8,17 +8,21 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 
-from qdash.api.dependencies import get_task_service
+from qdash.api.dependencies import get_flow_service, get_task_service
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
+    get_project_context_editor,
 )
+from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task import (
     ListTaskKnowledgeResponse,
     ListTaskResponse,
+    QuickRunTaskRequest,
     TaskKnowledgeResponse,
     TaskResultResponse,
 )
+from qdash.api.services.flow_service import FlowService
 from qdash.api.services.task_service import TaskService
 
 router = APIRouter()
@@ -55,6 +59,40 @@ def list_tasks(
 
     """
     return service.list_tasks(ctx.project_id, backend=backend)
+
+
+@router.post(
+    "/tasks/{task_name}/execute",
+    response_model=ExecuteFlowResponse,
+    summary="Execute a single task from the task catalog",
+    operation_id="quickRunTask",
+)
+async def quick_run_task(
+    task_name: str,
+    body: QuickRunTaskRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    flow_service: Annotated[FlowService, Depends(get_flow_service)],
+) -> ExecuteFlowResponse:
+    """Execute one task without requiring a previous execution snapshot."""
+    return await flow_service.execute_single_task_from_snapshot(
+        task_name=task_name,
+        qid=body.qid,
+        chip_id=body.chip_id,
+        source_execution_id=None,
+        username=ctx.user.username,
+        project_id=ctx.project_id,
+        backend_name=body.backend_name,
+        parameter_overrides={"input": body.input_parameter_overrides},
+        default_run_parameters={
+            task_name: {
+                name: {"value": value} for name, value in body.run_parameter_overrides.items()
+            }
+        },
+        persist_output_parameters=body.persist_output_parameters,
+        update_params=body.update_params,
+        reconfigure=body.reconfigure,
+        execution_name=f"quick-run:{task_name}",
+    )
 
 
 @router.get(

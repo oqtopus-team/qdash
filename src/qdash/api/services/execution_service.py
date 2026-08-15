@@ -152,10 +152,15 @@ class ExecutionService:
         """
         execution = self._history_repo.find_by_id(project_id, execution_id)
         if execution is None:
+            # Flow dispatch endpoints return a Prefect flow-run ID before the
+            # worker has created its QDash execution. Accept that ID as an
+            # alias once the worker stores it in execution.note.flow_run_id.
+            execution = self._history_repo.find_by_flow_run_id(project_id, execution_id)
+        if execution is None:
             return None
 
         # Fetch tasks directly from task_result_history collection
-        tasks = self._fetch_tasks_for_execution(project_id, execution_id)
+        tasks = self._fetch_tasks_for_execution(project_id, execution.execution_id)
 
         return ExecutionResponseDetail(
             name=f"{execution.name}-{execution.execution_id}",

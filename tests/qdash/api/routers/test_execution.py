@@ -674,6 +674,24 @@ class TestListExecutions:
 class TestGetExecution:
     """Tests for GET /executions/{execution_id} endpoint."""
 
+    def test_get_execution_by_prefect_flow_run_id(
+        self,
+        test_client: TestClient,
+        sample_execution: ExecutionHistoryDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        """Resolve a dispatched Prefect flow run to its QDash execution."""
+        sample_execution.note = {"flow_run_id": "flow-run-001"}
+        sample_execution.save()
+
+        response = test_client.get(
+            "/executions/flow-run-001",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        assert response.json()["name"] == "test_flow-exec-001"
+
     def test_get_execution_not_found(
         self,
         test_client: TestClient,
