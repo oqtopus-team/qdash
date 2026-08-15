@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ParameterModelSource } from './parameterModelSource';
 import type { ParameterModelValue } from './parameterModelValue';
 
 /**
@@ -16,6 +17,9 @@ output_parameters (calibration outputs) in tasks.
 Attributes
 ----------
     parameter_name: The actual DB parameter name. If empty, the dict key is used.
+    source: Explicit source for dependency resolution. ``"database"`` declares
+        that the value must be loaded from calibration state.
+    required: Whether resolution must fail when the declared source has no value.
     qid_role: The qid role for 2-qubit tasks. One of:
         - "" or "self": Use task's qid as-is (default, for 1-qubit tasks)
         - "control": Use control qubit's qid (for 2-qubit tasks)
@@ -33,6 +37,8 @@ Attributes
 export interface ParameterModel {
   parameter_name?: string;
   qid_role?: string;
+  source?: ParameterModelSource;
+  required?: boolean;
   value?: ParameterModelValue;
   value_type?: string;
   error?: number;

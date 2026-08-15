@@ -6,26 +6,32 @@
  * OpenAPI spec version: 0.0.1
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
+  ExecuteFlowResponse,
   GetTaskKnowledgeParams,
   HTTPValidationError,
   ListTaskKnowledgeResponse,
   ListTaskResponse,
   ListTasksParams,
+  QuickRunTaskRequest,
   TaskKnowledgeResponse,
   TaskResultResponse
 } from '../../schemas';
@@ -145,6 +151,72 @@ export function useListTasks<TData = Awaited<ReturnType<typeof listTasks>>, TErr
 
 
 /**
+ * Execute one task without requiring a previous execution snapshot.
+ * @summary Execute a single task from the task catalog
+ */
+export const quickRunTask = (
+    taskName: string,
+    quickRunTaskRequest: QuickRunTaskRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<ExecuteFlowResponse>(
+      {url: `/tasks/${taskName}/execute`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: quickRunTaskRequest, signal
+    },
+      options);
+    }
+  
+
+
+export const getQuickRunTaskMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof quickRunTask>>, TError,{taskName: string;data: QuickRunTaskRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof quickRunTask>>, TError,{taskName: string;data: QuickRunTaskRequest}, TContext> => {
+
+const mutationKey = ['quickRunTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof quickRunTask>>, {taskName: string;data: QuickRunTaskRequest}> = (props) => {
+          const {taskName,data} = props ?? {};
+
+          return  quickRunTask(taskName,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type QuickRunTaskMutationResult = NonNullable<Awaited<ReturnType<typeof quickRunTask>>>
+    export type QuickRunTaskMutationBody = QuickRunTaskRequest
+    export type QuickRunTaskMutationError = HTTPValidationError
+
+    /**
+ * @summary Execute a single task from the task catalog
+ */
+export const useQuickRunTask = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof quickRunTask>>, TError,{taskName: string;data: QuickRunTaskRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof quickRunTask>>,
+        TError,
+        {taskName: string;data: QuickRunTaskRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getQuickRunTaskMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Get task result by task_id.
 
 Parameters

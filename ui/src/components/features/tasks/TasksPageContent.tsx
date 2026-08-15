@@ -1,79 +1,42 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Braces,
-  Copy,
-  FileCode2,
-  ListTree,
-  PanelLeft,
-  Pencil,
-  Plus,
-  Save,
-  Search,
-  X,
-} from "lucide-react";
-import { useToast } from "@/components/ui/Toast";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useQuery } from "@tanstack/react-query";
+import { Braces, Copy, PanelLeft, Search, X } from "lucide-react";
 
 import type {
-  TaskFileTreeNode,
-  SaveTaskFileRequest,
-  TaskInfo,
-  TaskFileBackend,
-  TaskFileSettings,
   ListTaskFileBackendsResponse,
   ListTaskInfoResponse,
-  GetTaskFileContent200,
-  SaveTaskFileContent200,
+  TaskFileBackend,
+  TaskFileSettings,
+  TaskInfo,
 } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
 import {
-  listTaskFileBackends,
-  getTaskFileTree,
-  getTaskFileContent,
-  saveTaskFileContent,
   getTaskFileSettings,
+  listTaskFileBackends,
   listTaskInfo,
 } from "@/client/task-file/task-file";
 import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
-import { PierreFileTree } from "@/components/ui/PierreFileTree";
+import { useToast } from "@/components/ui/Toast";
 
-const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
-
-type ViewMode = "files" | "tasks";
+import { TaskWorkbench } from "./TaskWorkbench";
 
 export function TasksPageContent() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
   const toast = useToast();
-
-  const [viewMode, setViewMode] = useState<ViewMode | null>(null);
   const [selectedBackend, setSelectedBackend] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState("");
-  const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState<{
-    type: "backend" | "file";
-    value: string;
-  } | null>(null);
-  const [isEditorLocked, setIsEditorLocked] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<TaskInfo | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [taskSearch, setTaskSearch] = useState("");
 
-  // Fetch settings (including default backend)
-  const { data: settingsData } = useQuery({
+  const { data: settingsData, isPending: isSettingsPending } = useQuery({
     queryKey: ["taskFileSettings"],
-    queryFn: () => getTaskFileSettings().then((res: AxiosResponse<TaskFileSettings>) => res.data),
+    queryFn: () =>
+      getTaskFileSettings().then((response: AxiosResponse<TaskFileSettings>) => response.data),
   });
 
-  // Fetch available backends
   const {
     data: backendsData,
     isLoading: isBackendsLoading,
@@ -81,191 +44,45 @@ export function TasksPageContent() {
   } = useQuery({
     queryKey: ["taskFileBackends"],
     queryFn: () =>
-      listTaskFileBackends().then((res: AxiosResponse<ListTaskFileBackendsResponse>) => res.data),
-  });
-
-  // Set default view mode when settings are loaded
-  useEffect(() => {
-    if (settingsData && viewMode === null) {
-      const defaultViewMode = settingsData.default_view_mode;
-      if (defaultViewMode === "files" || defaultViewMode === "tasks") {
-        setViewMode(defaultViewMode);
-      } else {
-        setViewMode("tasks"); // Default to tasks if not specified
-      }
-    }
-  }, [settingsData, viewMode]);
-
-  // Set default backend when loaded (from settings or first available)
-  useEffect(() => {
-    if (backendsData?.backends && backendsData.backends.length > 0 && !selectedBackend) {
-      // Use default from settings if available and exists in backends list
-      const defaultBackend = settingsData?.default_backend;
-      const backendExists = backendsData.backends.some(
-        (b: TaskFileBackend) => b.name === defaultBackend,
-      );
-      if (defaultBackend && backendExists) {
-        setSelectedBackend(defaultBackend);
-      } else {
-        setSelectedBackend(backendsData.backends[0].name);
-      }
-    }
-  }, [backendsData, settingsData, selectedBackend]);
-
-  // Fetch file tree for selected backend
-  const {
-    data: fileTreeData,
-    isLoading: isTreeLoading,
-    error: treeError,
-  } = useQuery({
-    queryKey: ["taskFileTree", selectedBackend],
-    queryFn: () =>
-      getTaskFileTree({ backend: selectedBackend! }).then(
-        (res: AxiosResponse<TaskFileTreeNode[]>) => res.data,
+      listTaskFileBackends().then(
+        (response: AxiosResponse<ListTaskFileBackendsResponse>) => response.data,
       ),
-    enabled: !!selectedBackend,
   });
 
-  // Fetch task list for selected backend
+  useEffect(() => {
+    if (isSettingsPending || !backendsData?.backends.length || selectedBackend) return;
+    const configuredBackend = settingsData?.default_backend;
+    const backend = backendsData.backends.find((item) => item.name === configuredBackend);
+    setSelectedBackend(backend?.name ?? backendsData.backends[0].name);
+  }, [backendsData?.backends, isSettingsPending, selectedBackend, settingsData?.default_backend]);
+
   const { data: taskListData, isLoading: isTaskListLoading } = useQuery({
     queryKey: ["taskList", selectedBackend, settingsData?.sort_order],
     queryFn: () =>
       listTaskInfo({
         backend: selectedBackend!,
         sort_order: settingsData?.sort_order ?? undefined,
-      }).then((res: AxiosResponse<ListTaskInfoResponse>) => res.data),
-    enabled: !!selectedBackend,
+      }).then((response: AxiosResponse<ListTaskInfoResponse>) => response.data),
+    enabled: Boolean(selectedBackend),
   });
-
-  // Fetch file content
-  const { data: fileContentData, isLoading: isContentLoading } = useQuery({
-    queryKey: ["taskFileContent", selectedFile],
-    queryFn: () =>
-      getTaskFileContent({ path: selectedFile || "" }).then(
-        (res: AxiosResponse<GetTaskFileContent200>) => res.data,
-      ),
-    enabled: !!selectedFile,
-  });
-
-  // Save mutation
-  const saveMutation = useMutation({
-    mutationFn: (request: SaveTaskFileRequest) =>
-      saveTaskFileContent(request).then((res: AxiosResponse<SaveTaskFileContent200>) => res.data),
-    onSuccess: () => {
-      setHasUnsavedChanges(false);
-      toast.success("File saved successfully!");
-      queryClient.invalidateQueries({
-        queryKey: ["taskFileContent", selectedFile],
-      });
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to save file: ${(error as Error)?.message}`);
-    },
-  });
-
-  // Update file content when loaded
-  useEffect(() => {
-    if (fileContentData?.content !== undefined && fileContentData?.content !== null) {
-      setFileContent(String(fileContentData.content));
-      setHasUnsavedChanges(false);
-    }
-  }, [fileContentData]);
-
-  const changeBackend = (backend: string) => {
-    setSelectedBackend(backend);
-    setSelectedFile(null);
-    setFileContent("");
-    setHasUnsavedChanges(false);
-    setIsEditorLocked(true);
-  };
-
-  const handleBackendChange = (backend: string) => {
-    if (hasUnsavedChanges) {
-      setPendingNavigation({ type: "backend", value: backend });
-      return;
-    }
-    changeBackend(backend);
-  };
-
-  const selectFile = (path: string) => {
-    // Prepend backend name to get full path
-    const fullPath = `${selectedBackend}/${path}`;
-    setSelectedFile(fullPath);
-    setHasUnsavedChanges(false);
-    setIsEditorLocked(true);
-  };
-
-  const handleFileSelect = (path: string) => {
-    if (hasUnsavedChanges) {
-      setPendingNavigation({ type: "file", value: path });
-      return;
-    }
-    selectFile(path);
-  };
 
   useEffect(() => {
-    if (!selectedBackend) return;
-    window.dispatchEvent(
-      new CustomEvent("qdash:task-backend-change", {
-        detail: { backend: selectedBackend },
-      }),
+    if (!taskListData?.tasks.length) return;
+
+    if (!selectedTask) {
+      setSelectedTask(taskListData.tasks.find((task) => task.enabled) ?? taskListData.tasks[0]);
+      return;
+    }
+
+    // Keep the selected task aligned with refetched metadata. Holding the old
+    // object here would leave parameter declarations stale until a full reload.
+    const refreshedTask = taskListData.tasks.find(
+      (task) => task.name === selectedTask.name && task.file_path === selectedTask.file_path,
     );
-  }, [selectedBackend]);
-
-  useEffect(() => {
-    const handleOpenTaskSource = (event: Event) => {
-      const detail = (event as CustomEvent<{ filePath?: string; backend?: string }>).detail;
-      if (!detail?.filePath || detail.backend !== selectedBackend) return;
-      if (hasUnsavedChanges) {
-        setPendingNavigation({ type: "file", value: detail.filePath });
-        return;
-      }
-      setSelectedFile(`${selectedBackend}/${detail.filePath}`);
-      setHasUnsavedChanges(false);
-      setIsEditorLocked(true);
-    };
-    window.addEventListener("qdash:open-task-source", handleOpenTaskSource);
-    return () => window.removeEventListener("qdash:open-task-source", handleOpenTaskSource);
-  }, [selectedBackend, hasUnsavedChanges]);
-
-  const handleTaskClick = (task: TaskInfo) => {
-    // Open the file containing this task
-    handleFileSelect(task.file_path);
-  };
-
-  const handleCopyTaskName = async (taskName: string) => {
-    try {
-      await navigator.clipboard.writeText(taskName);
-      toast.success(`Copied: ${taskName}`);
-    } catch {
-      toast.error("Failed to copy to clipboard");
+    if (refreshedTask && refreshedTask !== selectedTask) {
+      setSelectedTask(refreshedTask);
     }
-  };
-
-  const toggleEditorLock = () => {
-    setIsEditorLocked(!isEditorLocked);
-  };
-
-  const handleSave = () => {
-    if (!selectedFile) {
-      toast.error("No file selected");
-      return;
-    }
-
-    saveMutation.mutate({
-      path: selectedFile,
-      content: fileContent,
-    });
-  };
-
-  const handleContentChange = (value: string | undefined) => {
-    // Only mark as changed if editor is unlocked
-    if (isEditorLocked) {
-      return;
-    }
-    setFileContent(value || "");
-    setHasUnsavedChanges(true);
-  };
+  }, [selectedTask, taskListData?.tasks]);
 
   const filteredTasks = useMemo(() => {
     const tasks = taskListData?.tasks ?? [];
@@ -279,423 +96,167 @@ export function TasksPageContent() {
     );
   }, [taskListData?.tasks, taskSearch]);
 
-  // Group tasks by task_type
-  const groupedTasks = useMemo(() => {
-    return filteredTasks.reduce((acc: Record<string, TaskInfo[]>, task: TaskInfo) => {
-      const type = task.task_type || "other";
-      if (!acc[type]) {
-        acc[type] = [];
-      }
-      acc[type].push(task);
-      return acc;
-    }, {});
-  }, [filteredTasks]);
+  const groupedTasks = useMemo(
+    () =>
+      filteredTasks.reduce<Record<string, TaskInfo[]>>((groups, task) => {
+        const type = task.task_type || "other";
+        (groups[type] ??= []).push(task);
+        return groups;
+      }, {}),
+    [filteredTasks],
+  );
 
-  const renderTaskList = () => {
-    if (isTaskListLoading) {
-      return (
-        <div className="flex items-center justify-center py-4">
-          <span className="loading loading-spinner loading-sm"></span>
-        </div>
-      );
+  const copyTaskName = async (taskName: string) => {
+    try {
+      await navigator.clipboard.writeText(taskName);
+      toast.success(`Copied: ${taskName}`);
+    } catch {
+      toast.error("Failed to copy to clipboard");
     }
-
-    if (!taskListData?.tasks || taskListData.tasks.length === 0) {
-      return (
-        <div className="px-3 py-6 text-center text-xs text-base-content/50">No tasks found</div>
-      );
-    }
-
-    if (filteredTasks.length === 0) {
-      return (
-        <div className="px-4 py-8 text-center">
-          <p className="text-sm font-medium">No matching tasks</p>
-          <p className="mt-1 text-xs text-base-content/50">Try another name, type, or file path.</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-2">
-        {Object.entries(groupedTasks).map(([taskType, tasks]) => (
-          <details key={taskType} className="group" open>
-            <summary className="text-xs font-semibold text-base-content/60 px-3 py-1 cursor-pointer select-none hover:bg-base-200 uppercase tracking-wider flex items-center">
-              <span className="mr-1 transition-transform group-open:rotate-90">▸</span>
-              {taskType}
-              <span className="ml-2 text-base-content/40">({tasks.length})</span>
-            </summary>
-            <div className="space-y-0.5">
-              {tasks.map((task: TaskInfo) => (
-                <div key={`${task.file_path}-${task.name}`} className="group/item flex px-2">
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded px-1 py-1 text-left hover:bg-base-200"
-                    onClick={() => handleTaskClick(task)}
-                    aria-label={`Open source for ${task.name}`}
-                  >
-                    <Braces className="text-purple-400 flex-shrink-0" size={14} />
-                    <span className="text-sm text-base-content/80 truncate">{task.name}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyTaskName(task.name)}
-                    className="opacity-0 group-hover/item:opacity-100 group-focus-within/item:opacity-100 p-1 hover:bg-base-300 rounded transition-opacity"
-                    aria-label={`Copy ${task.name} task name`}
-                  >
-                    <Copy className="text-base-content/50 hover:text-base-content" size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </details>
-        ))}
-      </div>
-    );
   };
 
-  // Calculate line count
-  const lineCount = useMemo(() => {
-    return fileContent.split("\n").length;
-  }, [fileContent]);
-
-  if (isBackendsLoading) {
-    return <EditorPageSkeleton />;
-  }
+  if (isBackendsLoading) return <EditorPageSkeleton />;
 
   if (backendsError) {
     return (
       <div className="container mx-auto p-6">
         <div className="alert alert-error">
-          <span>Failed to load backends: {(backendsError as Error)?.message}</span>
+          <span>Failed to load backends: {(backendsError as Error).message}</span>
         </div>
-        <button onClick={() => router.push("/")} className="btn btn-ghost mt-4">
-          ← Back to Home
-        </button>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="h-[calc(100dvh-4rem)] flex flex-col bg-base-300">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
-              <span className="text-sm font-medium flex-shrink-0 hidden sm:inline">
-                Task Definitions
-              </span>
-              {selectedBackend && (
-                <>
-                  <span className="text-base-content/50 hidden sm:inline">/</span>
-                  <span className="text-sm text-info flex-shrink-0">{selectedBackend}</span>
-                </>
-              )}
-              {selectedFile && (
-                <>
-                  <span className="text-base-content/50">/</span>
-                  <span className="text-sm text-base-content/70 truncate">
-                    {selectedFile.replace(`${selectedBackend}/`, "")}
-                  </span>
-                </>
-              )}
-            </div>
-            {hasUnsavedChanges && <span className="text-xs text-warning flex-shrink-0">●</span>}
-          </div>
-          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-            {/* Backend selector */}
-            <select
-              value={selectedBackend || ""}
-              onChange={(e) => handleBackendChange(e.target.value)}
-              className="select select-sm select-bordered"
-            >
-              {backendsData?.backends?.map((backend: TaskFileBackend) => (
-                <option key={backend.name} value={backend.name}>
-                  {backend.name}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={toggleEditorLock}
-              className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-warning"}`}
-              title={isEditorLocked ? "Click to edit" : "Currently editing"}
-            >
-              <Pencil size={16} />
-              <span className="ml-1">{isEditorLocked ? "Edit" : "Editing"}</span>
-            </button>
-            <button
-              onClick={handleSave}
-              className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-success"}`}
-              disabled={
-                !selectedFile || !hasUnsavedChanges || saveMutation.isPending || isEditorLocked
-              }
-            >
-              {saveMutation.isPending ? (
-                <span className="loading loading-spinner loading-xs"></span>
-              ) : (
-                <>
-                  <Save size={16} />
-                  <span className="ml-1">Save</span>
-                </>
-              )}
-            </button>
-          </div>
+    <div className="flex h-[calc(100dvh-4rem)] flex-col bg-base-300">
+      <header className="flex items-center justify-between gap-3 border-b border-base-300 bg-base-200 px-4 py-2">
+        <div className="min-w-0">
+          <h1 className="text-sm font-medium">Tasks</h1>
+          <p className="truncate text-xs text-base-content/50">
+            Configure, run, and inspect calibration tasks
+          </p>
         </div>
+        <select
+          value={selectedBackend ?? ""}
+          onChange={(event) => {
+            setSelectedBackend(event.target.value);
+            setSelectedTask(null);
+          }}
+          className="select select-sm select-bordered"
+          aria-label="Task backend"
+        >
+          {backendsData?.backends.map((backend: TaskFileBackend) => (
+            <option key={backend.name} value={backend.name}>
+              {backend.name}
+            </option>
+          ))}
+        </select>
+      </header>
 
-        {/* Main content */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Sidebar */}
-          <div className="bg-base-100 border-r border-base-300 flex flex-shrink-0">
-            {/* Collapsible panel */}
-            <div
-              className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} flex flex-col transition-all duration-200 overflow-hidden`}
-            >
-              {/* Tab buttons */}
-              <div
-                className="flex border-b border-base-300"
-                role="tablist"
-                aria-label="Task browser"
-              >
-                <button
-                  role="tab"
-                  aria-selected={viewMode === "files"}
-                  onClick={() => setViewMode("files")}
-                  className={`flex-1 px-3 py-2 text-xs font-medium flex items-center justify-center gap-1 transition-colors whitespace-nowrap ${
-                    viewMode === "files"
-                      ? "text-base-content bg-base-100 border-b-2 border-primary"
-                      : "text-base-content/50 hover:text-base-content/80 hover:bg-base-200"
-                  }`}
-                >
-                  <ListTree size={14} />
-                  Files
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={viewMode === "tasks"}
-                  onClick={() => setViewMode("tasks")}
-                  className={`flex-1 px-3 py-2 text-xs font-medium flex items-center justify-center gap-1 transition-colors whitespace-nowrap ${
-                    viewMode === "tasks"
-                      ? "text-base-content bg-base-100 border-b-2 border-primary"
-                      : "text-base-content/50 hover:text-base-content/80 hover:bg-base-200"
-                  }`}
-                >
-                  <Braces size={14} />
-                  Tasks
-                </button>
-              </div>
-
-              {/* Content */}
-              <div className="flex min-h-0 flex-1 flex-col py-2">
-                {viewMode === null ? (
-                  <div className="flex items-center justify-center py-4">
-                    <span className="loading loading-spinner loading-sm"></span>
-                  </div>
-                ) : viewMode === "files" ? (
-                  <>
-                    <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
-                      EXPLORER
-                    </h2>
-                    <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
-                      {selectedBackend ? `${selectedBackend} Tasks` : "Select Backend"}
-                    </div>
-                    {isTreeLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <span className="loading loading-spinner loading-sm"></span>
-                      </div>
-                    ) : treeError ? (
-                      <div className="text-xs text-red-400 px-3">Error loading tree</div>
-                    ) : (
-                      fileTreeData && (
-                        <div className="min-h-0 flex-1">
-                          <PierreFileTree
-                            nodes={fileTreeData}
-                            onSelectFile={handleFileSelect}
-                            selectedPath={selectedFile?.replace(`${selectedBackend}/`, "")}
-                          />
-                        </div>
-                      )
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="px-3 pb-2">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <h2 className="text-xs font-bold tracking-wider text-base-content/60">
-                          TASKS
-                        </h2>
-                        <span className="text-xs text-base-content/45">
-                          {filteredTasks.length}/{taskListData?.tasks.length ?? 0}
-                        </span>
-                      </div>
-                      <label className="input input-sm input-bordered flex w-full items-center gap-2 bg-base-100">
-                        <Search className="h-3.5 w-3.5 shrink-0 text-base-content/40" />
-                        <input
-                          value={taskSearch}
-                          onChange={(event) => setTaskSearch(event.target.value)}
-                          className="min-w-0 grow text-sm"
-                          placeholder="Search tasks"
-                          aria-label="Search tasks"
-                        />
-                        {taskSearch && (
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-xs btn-square"
-                            onClick={() => setTaskSearch("")}
-                            aria-label="Clear task search"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </label>
-                    </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto">{renderTaskList()}</div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Toggle button - always visible */}
-            <div className="flex flex-col bg-transparent">
-              <button
-                onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-                className="px-2 py-2 text-base-content/50 hover:text-base-content hover:bg-base-200 transition-colors border-b border-base-300"
-                aria-label={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
-              >
-                <PanelLeft size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* Editor */}
-          <div className="flex-1 flex flex-col">
-            {selectedFile ? (
-              <>
-                {isContentLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <span className="loading loading-spinner loading-lg"></span>
-                  </div>
-                ) : (
-                  <Editor
-                    height="100%"
-                    language="python"
-                    theme="vs-dark"
-                    value={fileContent}
-                    onChange={handleContentChange}
-                    onMount={(editor, monaco) => {
-                      editor.onDidChangeCursorPosition((e) => {
-                        setCursorPosition({
-                          line: e.position.lineNumber,
-                          column: e.position.column,
-                        });
-                      });
-
-                      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-                        if (!isEditorLocked) {
-                          handleSave();
-                        }
-                      });
-                    }}
-                    options={{
-                      minimap: { enabled: true },
-                      fontSize: 14,
-                      lineNumbers: "on",
-                      automaticLayout: true,
-                      scrollBeyondLastLine: false,
-                      padding: { top: 16, bottom: 16 },
-                      wordWrap: "on",
-                      folding: true,
-                      renderLineHighlight: "all",
-                      cursorStyle: "line",
-                      cursorBlinking: "blink",
-                      readOnly: isEditorLocked,
-                      domReadOnly: isEditorLocked,
-                    }}
-                  />
-                )}
-              </>
-            ) : (
-              <div className="flex items-center justify-center h-full text-base-content/50">
-                <div className="text-center">
-                  <FileCode2 className="mx-auto mb-4 text-blue-400/50" size={64} />
-                  <p className="text-lg mb-2">No file selected</p>
-                  <p className="text-sm">Select a task or Python file from the sidebar</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Status bar */}
-        <div className="flex items-center justify-between px-4 py-1 bg-primary text-primary-content text-xs">
-          <div className="flex items-center gap-4">
-            {selectedFile && (
-              <>
-                <span>
-                  Ln {cursorPosition.line}, Col {cursorPosition.column}
+      <main className="flex min-h-0 flex-1 overflow-hidden">
+        <aside className="flex shrink-0 border-r border-base-300 bg-base-100">
+          <div
+            className={`${isSidebarVisible ? "w-64" : "w-0"} flex flex-col overflow-hidden transition-all duration-200`}
+          >
+            <div className="border-b border-base-300 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-xs font-bold tracking-wider text-base-content/60">TASKS</h2>
+                <span className="text-xs text-base-content/45">
+                  {filteredTasks.length}/{taskListData?.tasks.length ?? 0}
                 </span>
-                <span>Python</span>
-                <span>UTF-8</span>
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-4">
-            {selectedFile && <span>{lineCount} lines</span>}
-          </div>
-        </div>
+              </div>
+              <label className="input input-sm input-bordered flex w-full items-center gap-2 bg-base-100">
+                <Search className="h-3.5 w-3.5 shrink-0 text-base-content/40" />
+                <input
+                  value={taskSearch}
+                  onChange={(event) => setTaskSearch(event.target.value)}
+                  className="min-w-0 grow text-sm"
+                  placeholder="Search tasks"
+                  aria-label="Search tasks"
+                />
+                {taskSearch && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs btn-square"
+                    onClick={() => setTaskSearch("")}
+                    aria-label="Clear task search"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </label>
+            </div>
 
-        {/* Mobile FAB */}
-        <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">
-          <div tabIndex={0} role="button" className="btn btn-circle btn-primary shadow-lg">
-            <Plus size={20} />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              {isEditorLocked ? "Edit" : "Editing"}
-            </span>
-            <button
-              onClick={toggleEditorLock}
-              className={`btn btn-circle shadow-lg ${isEditorLocked ? "btn-outline bg-base-100" : "btn-warning"}`}
-            >
-              <Pencil size={20} />
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">Save</span>
-            <button
-              onClick={handleSave}
-              className={`btn btn-circle shadow-lg ${isEditorLocked ? "btn-outline bg-base-100" : "btn-success"}`}
-              disabled={
-                !selectedFile || !hasUnsavedChanges || saveMutation.isPending || isEditorLocked
-              }
-            >
-              {saveMutation.isPending ? (
-                <span className="loading loading-spinner loading-xs"></span>
+            <div className="min-h-0 flex-1 overflow-y-auto py-2">
+              {isTaskListLoading ? (
+                <div className="flex justify-center py-4">
+                  <span className="loading loading-spinner loading-sm" />
+                </div>
+              ) : filteredTasks.length === 0 ? (
+                <div className="px-4 py-8 text-center text-sm text-base-content/50">
+                  No tasks found
+                </div>
               ) : (
-                <Save size={20} />
+                <div className="space-y-2">
+                  {Object.entries(groupedTasks).map(([taskType, tasks]) => (
+                    <details key={taskType} className="group" open>
+                      <summary className="flex cursor-pointer select-none items-center px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/60 hover:bg-base-200">
+                        <span className="mr-1 transition-transform group-open:rotate-90">▸</span>
+                        {taskType}
+                        <span className="ml-2 text-base-content/40">({tasks.length})</span>
+                      </summary>
+                      <div className="space-y-0.5">
+                        {tasks.map((task) => (
+                          <div
+                            key={`${task.file_path}-${task.name}`}
+                            className="group/item flex px-2"
+                          >
+                            <button
+                              type="button"
+                              className={`flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-base-200 ${selectedTask?.name === task.name ? "bg-base-200" : ""}`}
+                              onClick={() => setSelectedTask(task)}
+                            >
+                              <Braces className="shrink-0 text-purple-400" size={14} />
+                              <span className="truncate text-sm text-base-content/80">
+                                {task.name}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => copyTaskName(task.name)}
+                              className="rounded p-1 opacity-0 transition-opacity hover:bg-base-300 group-hover/item:opacity-100 group-focus-within/item:opacity-100"
+                              aria-label={`Copy ${task.name} task name`}
+                            >
+                              <Copy size={14} className="text-base-content/50" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  ))}
+                </div>
               )}
-            </button>
+            </div>
           </div>
-        </div>
-      </div>
-      <ConfirmDialog
-        open={pendingNavigation !== null}
-        title="Discard unsaved changes?"
-        description={
-          pendingNavigation?.type === "backend"
-            ? "Your unsaved changes will be lost when you switch backends."
-            : "Your unsaved changes will be lost when you open another file."
-        }
-        confirmLabel={
-          pendingNavigation?.type === "backend" ? "Discard and switch" : "Discard and open"
-        }
-        onConfirm={() => {
-          if (pendingNavigation?.type === "backend") changeBackend(pendingNavigation.value);
-          if (pendingNavigation?.type === "file") selectFile(pendingNavigation.value);
-          setPendingNavigation(null);
-        }}
-        onOpenChange={(open) => !open && setPendingNavigation(null)}
-        destructive
-      />
-    </>
+          <button
+            onClick={() => setIsSidebarVisible((visible) => !visible)}
+            className="self-start border-b border-base-300 px-2 py-2 text-base-content/50 hover:bg-base-200 hover:text-base-content"
+            aria-label={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
+          >
+            <PanelLeft size={16} />
+          </button>
+        </aside>
+
+        <section className="min-w-0 flex-1">
+          {selectedTask && selectedBackend ? (
+            <TaskWorkbench task={selectedTask} backend={selectedBackend} />
+          ) : (
+            <div className="flex h-full items-center justify-center text-base-content/50">
+              Select a task to configure and run
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
   );
 }

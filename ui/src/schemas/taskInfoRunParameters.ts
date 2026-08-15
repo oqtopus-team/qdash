@@ -6,6 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type GetTaskFileContentParams = {
-path: string;
-};
+export type TaskInfoRunParameters = {[key: string]: { [key: string]: unknown }};
