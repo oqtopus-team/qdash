@@ -222,9 +222,16 @@ class ExecutionService:
 
         """
         status = self._lock_repo.get_lock_status(project_id)
-        if status is None:
-            return ExecutionLockStatusResponse(lock=False)
-        return ExecutionLockStatusResponse(lock=status)
+        latest = self._history_repo.find_latest_by_project(project_id)
+        if latest is None:
+            return ExecutionLockStatusResponse(lock=bool(status))
+        return ExecutionLockStatusResponse(
+            lock=bool(status),
+            execution_id=latest.execution_id,
+            chip_id=latest.chip_id,
+            name=latest.name,
+            status=latest.status,
+        )
 
     async def cancel_execution(
         self,

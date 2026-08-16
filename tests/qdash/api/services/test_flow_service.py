@@ -3,10 +3,34 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi import HTTPException
 
 from qdash.api.services import flow_service
 from qdash.api.services.flow_service import FlowService
 from qdash.common.config.path_resolver import resolve_workflow_path, to_container_user_flow_path
+
+
+@pytest.mark.asyncio
+async def test_execute_single_task_rejects_locked_project() -> None:
+    lock_repository = MagicMock()
+    lock_repository.is_locked.return_value = True
+    service = FlowService(
+        flow_repository=MagicMock(),
+        execution_lock_repository=lock_repository,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_single_task_from_snapshot(
+            task_name="CheckRabi",
+            qid="Q00",
+            chip_id="chip-1",
+            source_execution_id=None,
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert getattr(exc_info.value, "status_code", None) == 409
+    lock_repository.is_locked.assert_called_once_with("project-1")
 
 
 def test_resolve_workflow_path_uses_container_path_when_available(tmp_path: Path) -> None:

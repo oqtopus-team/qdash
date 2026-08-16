@@ -9,10 +9,7 @@ import type { ParameterModelSource } from './parameterModelSource';
 import type { ParameterModelValue } from './parameterModelValue';
 
 /**
- * Calibration parameter model.
-
-Used for both input_parameters (calibration dependencies) and
-output_parameters (calibration outputs) in tasks.
+ * Common persisted metadata for resolved calibration parameters.
 
 Attributes
 ----------

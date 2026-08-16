@@ -35,7 +35,7 @@ from qdash.config import get_settings
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from qdash.repository import MongoFlowRepository
+    from qdash.repository import MongoExecutionLockRepository, MongoFlowRepository
 
 logger = logging.getLogger("uvicorn.app")
 
@@ -59,9 +59,11 @@ class FlowService:
     def __init__(
         self,
         flow_repository: MongoFlowRepository,
+        execution_lock_repository: MongoExecutionLockRepository | None = None,
     ) -> None:
         """Initialize the service with a flow repository."""
         self._flow_repo = flow_repository
+        self._execution_lock_repo = execution_lock_repository
         self._project_flows_base_dir = USER_FLOWS_DIR
 
     async def save_flow(
@@ -558,6 +560,14 @@ class FlowService:
         """
         settings = get_settings()
         deployment_name = "single-task-executor/system-single-task"
+
+        if self._execution_lock_repo is not None and self._execution_lock_repo.is_locked(
+            project_id
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Another calibration execution is already running for this project",
+            )
 
         try:
             async with get_client() as client:

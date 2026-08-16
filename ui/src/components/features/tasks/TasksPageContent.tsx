@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
 import { Braces, Copy, PanelLeft, Search, X } from "lucide-react";
+import { parseAsString, useQueryState } from "nuqs";
 
 import type {
   ListTaskFileBackendsResponse,
@@ -26,8 +27,11 @@ import { TaskWorkbench } from "./TaskWorkbench";
 
 export function TasksPageContent() {
   const toast = useToast();
-  const [selectedBackend, setSelectedBackend] = useState<string | null>(null);
-  const [selectedTask, setSelectedTask] = useState<TaskInfo | null>(null);
+  const [selectedBackend, setSelectedBackend] = useQueryState("backend", parseAsString);
+  const [selectedTaskName, setSelectedTaskName] = useQueryState("task", parseAsString);
+  const [, setExecutionId] = useQueryState("execution", parseAsString);
+  const [, setExecutionChip] = useQueryState("executionChip", parseAsString);
+  const [, setExecutionTarget] = useQueryState("executionTarget", parseAsString);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [taskSearch, setTaskSearch] = useState("");
 
@@ -54,7 +58,13 @@ export function TasksPageContent() {
     const configuredBackend = settingsData?.default_backend;
     const backend = backendsData.backends.find((item) => item.name === configuredBackend);
     setSelectedBackend(backend?.name ?? backendsData.backends[0].name);
-  }, [backendsData?.backends, isSettingsPending, selectedBackend, settingsData?.default_backend]);
+  }, [
+    backendsData?.backends,
+    isSettingsPending,
+    selectedBackend,
+    setSelectedBackend,
+    settingsData?.default_backend,
+  ]);
 
   const { data: taskListData, isLoading: isTaskListLoading } = useQuery({
     queryKey: ["taskList", selectedBackend, settingsData?.sort_order],
@@ -66,23 +76,16 @@ export function TasksPageContent() {
     enabled: Boolean(selectedBackend),
   });
 
+  const selectedTask = useMemo(
+    () => taskListData?.tasks.find((task) => task.name === selectedTaskName) ?? null,
+    [selectedTaskName, taskListData?.tasks],
+  );
+
   useEffect(() => {
-    if (!taskListData?.tasks.length) return;
-
-    if (!selectedTask) {
-      setSelectedTask(taskListData.tasks.find((task) => task.enabled) ?? taskListData.tasks[0]);
-      return;
-    }
-
-    // Keep the selected task aligned with refetched metadata. Holding the old
-    // object here would leave parameter declarations stale until a full reload.
-    const refreshedTask = taskListData.tasks.find(
-      (task) => task.name === selectedTask.name && task.file_path === selectedTask.file_path,
-    );
-    if (refreshedTask && refreshedTask !== selectedTask) {
-      setSelectedTask(refreshedTask);
-    }
-  }, [selectedTask, taskListData?.tasks]);
+    if (!taskListData?.tasks.length || selectedTask) return;
+    const fallbackTask = taskListData.tasks.find((task) => task.enabled) ?? taskListData.tasks[0];
+    setSelectedTaskName(fallbackTask.name);
+  }, [selectedTask, setSelectedTaskName, taskListData?.tasks]);
 
   const filteredTasks = useMemo(() => {
     const tasks = taskListData?.tasks ?? [];
@@ -140,7 +143,10 @@ export function TasksPageContent() {
           value={selectedBackend ?? ""}
           onChange={(event) => {
             setSelectedBackend(event.target.value);
-            setSelectedTask(null);
+            setSelectedTaskName(null);
+            setExecutionId(null);
+            setExecutionChip(null);
+            setExecutionTarget(null);
           }}
           className="select select-sm select-bordered"
           aria-label="Task backend"
@@ -214,7 +220,7 @@ export function TasksPageContent() {
                             <button
                               type="button"
                               className={`flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-base-200 ${selectedTask?.name === task.name ? "bg-base-200" : ""}`}
-                              onClick={() => setSelectedTask(task)}
+                              onClick={() => setSelectedTaskName(task.name)}
                             >
                               <Braces className="shrink-0 text-purple-400" size={14} />
                               <span className="truncate text-sm text-base-content/80">

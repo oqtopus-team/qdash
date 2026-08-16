@@ -20323,6 +20323,50 @@
           "lock": {
             "type": "boolean",
             "title": "Lock"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
           }
         },
         "type": "object",
@@ -24993,7 +25037,7 @@
         },
         "type": "object",
         "title": "ParameterModel",
-        "description": "Calibration parameter model.\n\nUsed for both input_parameters (calibration dependencies) and\noutput_parameters (calibration outputs) in tasks.\n\nAttributes\n----------\n    parameter_name: The actual DB parameter name. If empty, the dict key is used.\n    source: Explicit source for dependency resolution. ``\"database\"`` declares\n        that the value must be loaded from calibration state.\n    required: Whether resolution must fail when the declared source has no value.\n    qid_role: The qid role for 2-qubit tasks. One of:\n        - \"\" or \"self\": Use task's qid as-is (default, for 1-qubit tasks)\n        - \"control\": Use control qubit's qid (for 2-qubit tasks)\n        - \"target\": Use target qubit's qid (for 2-qubit tasks)\n        - \"coupling\": Use coupling qid as-is (for 2-qubit tasks)\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
+        "description": "Common persisted metadata for resolved calibration parameters.\n\nAttributes\n----------\n    parameter_name: The actual DB parameter name. If empty, the dict key is used.\n    source: Explicit source for dependency resolution. ``\"database\"`` declares\n        that the value must be loaded from calibration state.\n    required: Whether resolution must fail when the declared source has no value.\n    qid_role: The qid role for 2-qubit tasks. One of:\n        - \"\" or \"self\": Use task's qid as-is (default, for 1-qubit tasks)\n        - \"control\": Use control qubit's qid (for 2-qubit tasks)\n        - \"target\": Use target qubit's qid (for 2-qubit tasks)\n        - \"coupling\": Use coupling qid as-is (for 2-qubit tasks)\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
       },
       "ParameterVersionResponse": {
         "properties": {

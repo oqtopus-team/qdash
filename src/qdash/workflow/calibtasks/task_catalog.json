@@ -365,11 +365,13 @@
           "interval": {
             "description": "Time interval for Rabi oscillation",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
             "description": "Number of shots for Rabi oscillation",
             "unit": "a.u.",
+            "value": 1024,
             "value_type": "int"
           },
           "time_range": {
@@ -686,6 +688,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -852,6 +855,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -962,6 +966,7 @@
           "interval": {
             "description": "Time interval for Rabi oscillation",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -1016,6 +1021,7 @@
           "interval": {
             "description": "Shot interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "readout_amplitude": {
@@ -1138,6 +1144,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -1197,6 +1204,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "repetitions": {
@@ -1256,6 +1264,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "repetitions": {
@@ -1277,6 +1286,7 @@
           "interval": {
             "description": "Time interval for Rabi oscillation",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -1388,6 +1398,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "repetitions": {
@@ -1428,6 +1439,7 @@
           "interval": {
             "description": "Time interval for Rabi oscillation",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -1449,6 +1461,7 @@
           "interval": {
             "description": "Time interval for Rabi oscillation",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -1503,6 +1516,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "repetitions": {
@@ -1524,11 +1538,13 @@
           "interval": {
             "description": "Time interval for Rabi oscillation",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
             "description": "Number of shots for Rabi oscillation",
             "unit": "a.u.",
+            "value": 1024,
             "value_type": "int"
           },
           "time_range": {
@@ -1573,11 +1589,13 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
             "description": "Number of shots",
             "unit": "a.u.",
+            "value": 1024,
             "value_type": "int"
           },
           "time_range": {
@@ -1744,6 +1762,7 @@
           "interval": {
             "description": "Time interval for Rabi oscillation",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -1814,11 +1833,13 @@
           "interval": {
             "description": "Time interval for Rabi oscillation",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
             "description": "Number of shots for Rabi oscillation",
             "unit": "a.u.",
+            "value": 1024,
             "value_type": "int"
           },
           "time_range": {
@@ -1880,11 +1901,13 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
             "description": "Number of shots",
             "unit": "a.u.",
+            "value": 1024,
             "value_type": "int"
           },
           "time_range": {
@@ -1995,6 +2018,7 @@
           "num_resonators": {
             "description": "Number of resonators to detect",
             "unit": "a.u.",
+            "value": 4,
             "value_type": "int"
           },
           "power_range": {
@@ -2032,6 +2056,7 @@
           "interval": {
             "description": "Measurement interval for simultaneous qubit spectroscopy",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "power_range": {
@@ -2105,16 +2130,23 @@
           "interval": {
             "description": "Time interval for T1 time",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
             "description": "Number of shots for T1 time",
             "unit": "",
+            "value": 1024,
             "value_type": "int"
           },
           "time_range": {
             "description": "Time range for T1 time",
             "unit": "ns",
+            "value": [
+              2.0,
+              5.698970004336019,
+              51
+            ],
             "value_type": "np.logspace"
           }
         },
@@ -2163,6 +2195,7 @@
           "interval": {
             "description": "Time interval for T1 time",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "n_runs": {
@@ -2174,11 +2207,17 @@
           "shots": {
             "description": "Number of shots for T1 time",
             "unit": "",
+            "value": 1024,
             "value_type": "int"
           },
           "time_range": {
             "description": "Time range for T1 time",
             "unit": "ns",
+            "value": [
+              2.0,
+              5.698970004336019,
+              51
+            ],
             "value_type": "np.logspace"
           }
         },
@@ -2227,16 +2266,23 @@
           "interval": {
             "description": "Time interval for T2 echo time",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
             "description": "Number of shots for T2 echo time",
             "unit": "",
+            "value": 1024,
             "value_type": "int"
           },
           "time_range": {
             "description": "Time range for T2 echo time",
             "unit": "ns",
+            "value": [
+              2.4771212547196626,
+              5.0,
+              51
+            ],
             "value_type": "np.logspace"
           }
         },
@@ -2285,6 +2331,7 @@
           "interval": {
             "description": "Time interval for T2 echo time",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "n_runs": {
@@ -2296,11 +2343,17 @@
           "shots": {
             "description": "Number of shots for T2 echo time",
             "unit": "",
+            "value": 1024,
             "value_type": "int"
           },
           "time_range": {
             "description": "Time range for T2 echo time",
             "unit": "ns",
+            "value": [
+              2.4771212547196626,
+              5.0,
+              51
+            ],
             "value_type": "np.logspace"
           }
         },
@@ -2316,6 +2369,7 @@
           "interval": {
             "description": "Shot interval for waveform measurement",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "readout_amplitude": {
@@ -2506,6 +2560,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "repetitions": {
@@ -2601,6 +2656,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -2656,6 +2712,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -2711,6 +2768,7 @@
           "interval": {
             "description": "Time interval for calibration",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -2760,6 +2818,7 @@
           "interval": {
             "description": "Time interval for calibration",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "pi_duration": {
@@ -2932,6 +2991,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -3009,6 +3069,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "n_trials": {
@@ -3074,6 +3135,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "shots": {
@@ -3111,6 +3173,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "n_trials": {
@@ -3176,6 +3239,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "n_trials": {
@@ -3348,6 +3412,7 @@
           "interval": {
             "description": "Time interval",
             "unit": "ns",
+            "value": 153600.0,
             "value_type": "int"
           },
           "n_trials": {

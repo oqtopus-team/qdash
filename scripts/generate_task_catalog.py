@@ -57,6 +57,17 @@ def build_catalog(base_path: Path) -> dict[str, object]:
         task.input_parameters = task.input_parameters or inherited.input_parameters
         task.run_parameters = task.run_parameters or inherited.run_parameters
 
+    unresolved_defaults = [
+        f"{backend}.{task.name}.{name}"
+        for backend, tasks_by_name in discovered_backends.items()
+        for task in tasks_by_name.values()
+        for name, metadata in task.run_parameters.items()
+        if "value" not in metadata
+    ]
+    if unresolved_defaults:
+        unresolved = ", ".join(unresolved_defaults)
+        raise RuntimeError(f"Run parameter defaults could not be resolved: {unresolved}")
+
     backends: dict[str, list[dict[str, object]]] = {}
     for backend, tasks_by_name in discovered_backends.items():
         backends[backend] = [

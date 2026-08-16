@@ -6,8 +6,11 @@ import ast
 import contextlib
 import json
 import logging
+import math
+import operator
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import HTTPException
 
@@ -29,6 +32,9 @@ from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.path_resolver import resolve_calibtasks_base_path
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 TASK_METADATA_CACHE_VERSION = 3
 TASK_CATALOG_FILENAME = "task_catalog.json"
@@ -365,82 +371,208 @@ class TaskFileService:
                 try:
                     metadata[metadata_key] = ast.literal_eval(keyword.value)
                 except (ValueError, TypeError):
-                    if isinstance(keyword.value, ast.Name) and constants:
-                        value = constants.get(keyword.value.id)
-                        if value is not None:
-                            metadata[metadata_key] = value
+                    with contextlib.suppress(ArithmeticError, TypeError, ValueError):
+                        metadata[metadata_key] = TaskFileService._evaluate_parameter_expression(
+                            keyword.value, constants or {}
+                        )
             parameters[key_node.value] = metadata
         return parameters
 
     @staticmethod
+    def _evaluate_parameter_expression(node: ast.expr, namespace: dict[str, object]) -> object:
+        """Evaluate the expression subset allowed in parameter declarations."""
+        safe_types = (str, int, float, bool, tuple, list)
+        binary_operators: dict[type[ast.operator], Callable[[Any, Any], Any]] = {
+            ast.Add: operator.add,
+            ast.Sub: operator.sub,
+            ast.Mult: operator.mul,
+            ast.Div: operator.truediv,
+            ast.FloorDiv: operator.floordiv,
+            ast.Mod: operator.mod,
+            ast.Pow: operator.pow,
+        }
+        unary_operators: dict[type[ast.unaryop], Callable[[Any], Any]] = {
+            ast.UAdd: operator.pos,
+            ast.USub: operator.neg,
+        }
+        math_functions: dict[str, Callable[..., float]] = {
+            "log": math.log,
+            "log10": math.log10,
+            "sqrt": math.sqrt,
+        }
+        if isinstance(node, ast.Constant) and isinstance(node.value, safe_types):
+            return node.value
+        if isinstance(node, (ast.Tuple, ast.List)):
+            values = [
+                TaskFileService._evaluate_parameter_expression(item, namespace)
+                for item in node.elts
+            ]
+            return tuple(values) if isinstance(node, ast.Tuple) else values
+        if isinstance(node, ast.Name) and node.id in namespace:
+            return namespace[node.id]
+        if isinstance(node, ast.BinOp) and type(node.op) in binary_operators:
+            return binary_operators[type(node.op)](
+                TaskFileService._evaluate_parameter_expression(node.left, namespace),
+                TaskFileService._evaluate_parameter_expression(node.right, namespace),
+            )
+        if isinstance(node, ast.UnaryOp) and type(node.op) in unary_operators:
+            return unary_operators[type(node.op)](
+                TaskFileService._evaluate_parameter_expression(node.operand, namespace)
+            )
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id in {"math", "np"}
+            and node.func.attr in math_functions
+            and not node.keywords
+        ):
+            return math_functions[node.func.attr](
+                *(
+                    cast("Any", TaskFileService._evaluate_parameter_expression(arg, namespace))
+                    for arg in node.args
+                )
+            )
+        raise ValueError("unsupported parameter expression")
+
+    @staticmethod
     def _collect_safe_constants(tree: ast.Module) -> dict[str, object]:
-        """Collect literal local constants without importing workflow dependencies."""
+        """Collect constants using a restricted, side-effect-free AST evaluator."""
+        binary_operators: dict[type[ast.operator], Callable[[Any, Any], Any]] = {
+            ast.Add: operator.add,
+            ast.Sub: operator.sub,
+            ast.Mult: operator.mul,
+            ast.Div: operator.truediv,
+            ast.FloorDiv: operator.floordiv,
+            ast.Mod: operator.mod,
+            ast.Pow: operator.pow,
+        }
+        unary_operators: dict[type[ast.unaryop], Callable[[Any], Any]] = {
+            ast.UAdd: operator.pos,
+            ast.USub: operator.neg,
+        }
+        math_functions: dict[str, Callable[..., float]] = {
+            "log": math.log,
+            "log10": math.log10,
+            "sqrt": math.sqrt,
+        }
         constants: dict[str, object] = {}
         safe_types = (str, int, float, bool, tuple, list)
-        for node in tree.body:
-            if isinstance(node, ast.ImportFrom) and node.module:
-                module_path = Path(*node.module.split(".")).with_suffix(".py")
-                source_path = next(
-                    (
-                        Path(root) / module_path
-                        for root in sys.path
-                        if (Path(root) / module_path).is_file()
-                    ),
-                    None,
+
+        def evaluate(node: ast.expr, namespace: dict[str, object]) -> object:
+            if isinstance(node, ast.Constant) and isinstance(node.value, safe_types):
+                return node.value
+            if isinstance(node, (ast.Tuple, ast.List)):
+                values = [evaluate(item, namespace) for item in node.elts]
+                return tuple(values) if isinstance(node, ast.Tuple) else values
+            if isinstance(node, ast.Name) and node.id in namespace:
+                return namespace[node.id]
+            if isinstance(node, ast.BinOp) and type(node.op) in binary_operators:
+                return binary_operators[type(node.op)](
+                    evaluate(node.left, namespace), evaluate(node.right, namespace)
                 )
-                if source_path is not None:
+            if isinstance(node, ast.UnaryOp) and type(node.op) in unary_operators:
+                return unary_operators[type(node.op)](evaluate(node.operand, namespace))
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id in {"math", "np"}
+                and node.func.attr in math_functions
+                and not node.keywords
+            ):
+                return math_functions[node.func.attr](
+                    *(cast("Any", evaluate(arg, namespace)) for arg in node.args)
+                )
+            raise ValueError("unsupported constant expression")
+
+        def collect(
+            module_tree: ast.Module,
+            visited: set[Path],
+            current_path: Path | None = None,
+        ) -> dict[str, object]:
+            collected: dict[str, object] = {}
+            assignments: list[tuple[str, ast.expr]] = []
+            imports: list[ast.ImportFrom] = []
+            for node in module_tree.body:
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    imports.append(node)
+                    continue
+                if isinstance(node, ast.Assign) and len(node.targets) == 1:
+                    if isinstance(node.targets[0], ast.Name):
+                        assignments.append((node.targets[0].id, node.value))
+                elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                    if node.value is not None:
+                        assignments.append((node.target.id, node.value))
+
+            def resolve_assignments() -> None:
+                pending = assignments.copy()
+                while pending:
+                    unresolved: list[tuple[str, ast.expr]] = []
+                    progress = False
+                    for name, value_node in pending:
+                        try:
+                            value = evaluate(value_node, collected)
+                        except (ArithmeticError, TypeError, ValueError):
+                            unresolved.append((name, value_node))
+                            continue
+                        if isinstance(value, safe_types):
+                            collected[name] = value
+                            progress = True
+                    if not progress:
+                        break
+                    pending = unresolved
+
+            resolve_assignments()
+            for node in imports:
+                requested_names = [name for name in node.names if name.name.isupper()]
+                if not requested_names:
+                    continue
+                if all(name.name in collected for name in requested_names):
+                    continue
+                if node.module:
+                    module_parts = Path(*node.module.split("."))
+                    candidates: list[Path] = []
+                    if node.level and current_path is not None:
+                        relative_root = current_path.parent
+                        for _ in range(node.level - 1):
+                            relative_root = relative_root.parent
+                        candidates.extend(
+                            [
+                                relative_root / module_parts.with_suffix(".py"),
+                                relative_root / module_parts / "__init__.py",
+                            ]
+                        )
+                    else:
+                        for root in sys.path:
+                            candidates.extend(
+                                [
+                                    Path(root) / module_parts.with_suffix(".py"),
+                                    Path(root) / module_parts / "__init__.py",
+                                ]
+                            )
+                    source_path = next(
+                        (path.resolve() for path in candidates if path.is_file()), None
+                    )
+                    if source_path is None or source_path in visited:
+                        continue
                     try:
                         imported_tree = ast.parse(source_path.read_text(encoding="utf-8"))
                     except (OSError, UnicodeDecodeError, SyntaxError):
                         continue
-                    imported_constants: dict[str, object] = {}
-                    for imported_node in imported_tree.body:
-                        imported_target: ast.Name | None = None
-                        imported_value: ast.expr | None = None
-                        if (
-                            isinstance(imported_node, ast.Assign)
-                            and len(imported_node.targets) == 1
-                        ):
-                            imported_target = (
-                                imported_node.targets[0]
-                                if isinstance(imported_node.targets[0], ast.Name)
-                                else None
-                            )
-                            imported_value = imported_node.value
-                        elif isinstance(imported_node, ast.AnnAssign) and isinstance(
-                            imported_node.target, ast.Name
-                        ):
-                            imported_target = imported_node.target
-                            imported_value = imported_node.value
-                        if imported_target is None or imported_value is None:
-                            continue
-                        try:
-                            imported_literal = ast.literal_eval(imported_value)
-                        except (ValueError, TypeError):
-                            continue
-                        if isinstance(imported_literal, safe_types):
-                            imported_constants[imported_target.id] = imported_literal
-                    for imported_name in node.names:
+                    imported_constants = collect(
+                        imported_tree,
+                        {*visited, source_path},
+                        source_path,
+                    )
+                    for imported_name in requested_names:
                         value = imported_constants.get(imported_name.name)
                         if value is not None:
-                            constants[imported_name.asname or imported_name.name] = value
-                continue
-            target: ast.Name | None = None
-            value_node: ast.expr | None = None
-            if isinstance(node, ast.Assign) and len(node.targets) == 1:
-                target = node.targets[0] if isinstance(node.targets[0], ast.Name) else None
-                value_node = node.value
-            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-                target = node.target
-                value_node = node.value
-            if target is None or value_node is None:
-                continue
-            try:
-                value = ast.literal_eval(value_node)
-            except (ValueError, TypeError):
-                continue
-            if isinstance(value, safe_types):
-                constants[target.id] = value
+                            collected[imported_name.asname or imported_name.name] = value
+            resolve_assignments()
+            return collected
+
+        constants.update(collect(tree, set()))
         return constants
 
     def _collect_tasks_from_directory(self, directory: Path, base_path: Path) -> list[TaskInfo]:

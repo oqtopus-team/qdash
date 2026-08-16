@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { ExternalLink, Play, RefreshCw, RotateCcw } from "lucide-react";
+import { ExternalLink, Lock, Play, RefreshCw, RotateCcw } from "lucide-react";
+import { parseAsString, useQueryState } from "nuqs";
 
 import type { ExecutionResponseDetail, TaskInfo } from "@/schemas";
 
 import { getChipCoupling, getChipQubit, useListChips } from "@/client/chip/chip";
-import { useGetExecution } from "@/client/execution/execution";
+import { useGetExecution, useGetExecutionLockStatus } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useToast } from "@/components/ui/Toast";
@@ -56,21 +57,40 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
   const chips = chipsData?.data?.chips ?? [];
   const defaultChipId = chips[0]?.chip_id ?? "";
 
-  const [chipId, setChipId] = useState("");
-  const [target, setTarget] = useState("");
+  const [chipIdQuery, setChipIdQuery] = useQueryState("chip", parseAsString);
+  const [targetQuery, setTargetQuery] = useQueryState("target", parseAsString);
+  const [executionIdQuery, setExecutionIdQuery] = useQueryState("execution", parseAsString);
+  const [submittedChipIdQuery, setSubmittedChipIdQuery] = useQueryState(
+    "executionChip",
+    parseAsString,
+  );
+  const [submittedTargetQuery, setSubmittedTargetQuery] = useQueryState(
+    "executionTarget",
+    parseAsString,
+  );
+  const chipId = chipIdQuery ?? "";
+  const target = targetQuery ?? "";
+  const executionId = executionIdQuery ?? "";
+  const submittedChipId = submittedChipIdQuery ?? "";
+  const submittedTarget = submittedTargetQuery ?? "";
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [runValues, setRunValues] = useState<Record<string, string>>({});
   const [reconfigure, setReconfigure] = useState(false);
   const [persistOutputParameters, setPersistOutputParameters] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isReloadingInputs, setIsReloadingInputs] = useState(false);
-  const [executionId, setExecutionId] = useState("");
-  const [submittedChipId, setSubmittedChipId] = useState("");
-  const [submittedTarget, setSubmittedTarget] = useState("");
+  const previousTask = useRef(`${backend}:${task.name}`);
+
+  const { data: lockStatus, isLoading: isLockStatusLoading } = useGetExecutionLockStatus({
+    query: {
+      refetchInterval: 5000,
+    },
+  });
+  const isExecutionLocked = lockStatus?.data.lock ?? false;
 
   useEffect(() => {
-    setChipId((current) => current || defaultChipId);
-  }, [defaultChipId]);
+    if (!chipIdQuery && defaultChipId) setChipIdQuery(defaultChipId);
+  }, [chipIdQuery, defaultChipId, setChipIdQuery]);
 
   useEffect(() => {
     setRunValues(
@@ -85,13 +105,24 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
         ]),
       ),
     );
-    setTarget("");
     setReconfigure(false);
     setPersistOutputParameters(false);
-    setExecutionId("");
-    setSubmittedChipId("");
-    setSubmittedTarget("");
-  }, [task]);
+    const taskKey = `${backend}:${task.name}`;
+    if (previousTask.current !== taskKey) {
+      setTargetQuery(null);
+      setExecutionIdQuery(null);
+      setSubmittedChipIdQuery(null);
+      setSubmittedTargetQuery(null);
+      previousTask.current = taskKey;
+    }
+  }, [
+    backend,
+    setExecutionIdQuery,
+    setSubmittedChipIdQuery,
+    setSubmittedTargetQuery,
+    setTargetQuery,
+    task,
+  ]);
 
   useEffect(() => {
     setInputValues(
@@ -174,9 +205,9 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
         persist_output_parameters: persistOutputParameters,
         update_params: false,
       });
-      setExecutionId(response.data.execution_id);
-      setSubmittedChipId(chipId);
-      setSubmittedTarget(requestedTarget);
+      setExecutionIdQuery(response.data.execution_id);
+      setSubmittedChipIdQuery(chipId);
+      setSubmittedTargetQuery(requestedTarget);
       toast.success(`${task.name} started`);
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
@@ -281,7 +312,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                   <select
                     className="select select-bordered w-full"
                     value={chipId}
-                    onChange={(event) => setChipId(event.target.value)}
+                    onChange={(event) => setChipIdQuery(event.target.value)}
                   >
                     <option value="" disabled>
                       Select a chip
@@ -298,7 +329,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                   <input
                     className="input input-bordered w-full"
                     value={target}
-                    onChange={(event) => setTarget(event.target.value)}
+                    onChange={(event) => setTargetQuery(event.target.value)}
                     disabled={isExecutionActive}
                     placeholder="e.g. 0 or 0-1"
                   />
@@ -430,17 +461,39 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                 </div>
               )}
 
+              {isExecutionLocked && (
+                <div className="alert alert-warning py-2 text-xs">
+                  Another calibration execution is running. Wait for it to finish before starting
+                  this task.
+                </div>
+              )}
+
               <button
-                className="btn btn-primary"
+                className={`btn ${isExecutionLocked ? "btn-disabled" : "btn-primary"}`}
                 onClick={handleRun}
-                disabled={isStarting || !task.enabled || !chipId || !target.trim()}
+                disabled={
+                  isStarting ||
+                  isLockStatusLoading ||
+                  isExecutionLocked ||
+                  isExecutionActive ||
+                  !task.enabled ||
+                  !chipId ||
+                  !target.trim()
+                }
+                title={
+                  isExecutionLocked
+                    ? "Execution locked - another calibration is running"
+                    : "Run task"
+                }
               >
                 {isStarting ? (
                   <span className="loading loading-spinner loading-sm" />
+                ) : isExecutionLocked ? (
+                  <Lock size={17} />
                 ) : (
                   <Play size={17} />
                 )}
-                Run task
+                {isExecutionLocked ? "Locked" : "Run task"}
               </button>
             </div>
           </section>
@@ -553,7 +606,14 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                     )}
 
                   <div className="flex flex-wrap justify-end gap-2">
-                    <button className="btn btn-sm btn-ghost" onClick={() => setExecutionId("")}>
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => {
+                        setExecutionIdQuery(null);
+                        setSubmittedChipIdQuery(null);
+                        setSubmittedTargetQuery(null);
+                      }}
+                    >
                       <RotateCcw size={15} />
                       Adjust and run again
                     </button>

@@ -2,6 +2,8 @@ import ast
 import json
 from pathlib import Path
 
+import pytest
+
 from qdash.api.dependencies import get_task_file_service
 from qdash.api.services.chip.service import _get_task_names_cached, get_task_names
 from qdash.api.services.task_file_service import TaskFileService
@@ -164,6 +166,16 @@ def test_list_task_info_resolves_local_and_qubex_constants() -> None:
     assert task.input_parameters["control_amplitude"]["default_value"] == 0.0125
     assert task.input_parameters["readout_length"]["default_value"] == DEFAULT_READOUT_DURATION
     assert task.run_parameters["shots"]["value"] == CALIBRATION_SHOTS
+    assert task.run_parameters["interval"]["value"] == 150 * 1024
+
+    check_t1 = next(
+        task for task in TaskFileService().list_task_info("qubex").tasks if task.name == "CheckT1"
+    )
+    assert check_t1.run_parameters["time_range"]["value"] == [
+        2.0,
+        pytest.approx(5.698970004336019),
+        51,
+    ]
 
 
 def test_list_task_info_prefers_generated_catalog(tmp_path: Path) -> None:

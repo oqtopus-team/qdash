@@ -49,6 +49,7 @@ backends:
       - CheckElectricalDelay
 
       # One Qubit Coarse Calibration
+      - CheckChevron
       - CheckCoarseChevron
       - CheckFineChevron
       - CheckQubit
@@ -131,6 +132,7 @@ categories:
     - CheckElectricalDelay
 
   "1Q Coarse":
+    - CheckChevron
     - CheckCoarseChevron
     - CheckFineChevron
     - ChevronPattern  # legacy alias of CheckFineChevron — kept for UI filtering of historical results

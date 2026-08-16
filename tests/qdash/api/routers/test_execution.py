@@ -16,6 +16,7 @@ from qdash.common.raw_data import PreFitRawData
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.flow import FlowDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
@@ -178,6 +179,40 @@ def sample_flow(test_project: ProjectDocument) -> FlowDocument:
 
 
 CANCEL_FLOW_RUN_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+
+def test_get_execution_lock_status_includes_latest_execution(
+    test_client: TestClient,
+    test_project: ProjectDocument,
+    auth_headers: dict[str, str],
+) -> None:
+    execution = ExecutionHistoryDocument(
+        project_id=test_project.project_id,
+        execution_id="exec-running",
+        name="quick-run:CheckChevron",
+        status="running",
+        chip_id="chip-1",
+        username="test_user",
+        tags=[],
+        note={},
+        calib_data_path="/tmp/calib",
+        message="running",
+        system_info=SystemInfoModel(),
+        start_at=datetime.now(tz=timezone.utc),
+    )
+    execution.insert()
+    ExecutionLockDocument.lock(test_project.project_id)
+
+    response = test_client.get("/executions/lock-status", headers=auth_headers)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "lock": True,
+        "execution_id": "exec-running",
+        "chip_id": "chip-1",
+        "name": "quick-run:CheckChevron",
+        "status": "running",
+    }
 
 
 def test_get_figure_by_path_maps_container_calib_data_path(

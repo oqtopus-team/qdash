@@ -131,10 +131,10 @@ class TestTaskValidationWithBackendConfig:
 
         # Tasks available in qubex backend (from backend.yaml)
         result = validate_task_name(
-            task_names=["CheckFineChevron", "CheckRabi"],
+            task_names=["CheckChevron", "CheckFineChevron", "CheckRabi"],
             backend="qubex",
         )
-        assert result == ["CheckFineChevron", "CheckRabi"]
+        assert result == ["CheckChevron", "CheckFineChevron", "CheckRabi"]
 
     def test_validate_task_name_fails_for_invalid(self):
         """Test that validation fails for invalid task names."""
