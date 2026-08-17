@@ -3,6 +3,8 @@
 import { Bot, Database, FileJson, FileText, Image, X } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+
 export interface DownloadOptions {
   figureImages: boolean;
   jsonFigures: boolean;
@@ -40,8 +42,6 @@ export function DownloadConfirmModal({
   onConfirm,
   onClose,
 }: DownloadConfirmModalProps) {
-  if (!isOpen) return null;
-
   const selectedItemCount =
     (options.figureImages ? counts.figureImages : 0) +
     (options.jsonFigures ? counts.jsonFigures : 0) +
@@ -54,16 +54,17 @@ export function DownloadConfirmModal({
   };
 
   return (
-    <div className="modal modal-open">
-      <div className="modal-box max-w-lg">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
+      <DialogContent className="max-w-lg">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="font-semibold text-lg">Download task artifacts</h3>
-            <p className="text-sm text-base-content/70 mt-1">
+            <DialogTitle className="font-semibold">Download task artifacts</DialogTitle>
+            <DialogDescription className="text-sm text-base-content/70 mt-1">
               {selectedCount} task result{selectedCount === 1 ? "" : "s"} selected
-            </p>
+            </DialogDescription>
           </div>
           <button
+            type="button"
             className="btn btn-sm btn-ghost btn-circle"
             onClick={onClose}
             disabled={isSubmitting}
@@ -90,7 +91,7 @@ export function DownloadConfirmModal({
           />
           <DownloadOptionRow
             icon={<Database className="h-4 w-4" />}
-            label="Raw data"
+            label="Raw data (NetCDF)"
             count={counts.rawData}
             checked={options.rawData}
             onToggle={() => toggle("rawData")}
@@ -112,10 +113,11 @@ export function DownloadConfirmModal({
         </div>
 
         <div className="modal-action">
-          <button className="btn btn-ghost" onClick={onClose} disabled={isSubmitting}>
+          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </button>
           <button
+            type="button"
             className="btn btn-primary"
             onClick={onConfirm}
             disabled={isSubmitting || selectedItemCount === 0}
@@ -124,11 +126,8 @@ export function DownloadConfirmModal({
             Download
           </button>
         </div>
-      </div>
-      <button className="modal-backdrop" onClick={isSubmitting ? undefined : onClose}>
-        close
-      </button>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

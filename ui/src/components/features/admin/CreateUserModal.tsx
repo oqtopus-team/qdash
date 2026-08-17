@@ -1,6 +1,11 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 
 type CreateUserModalProps = {
   onClose: () => void;
@@ -14,30 +19,43 @@ type CreateUserModalProps = {
   error: Error | unknown | null;
 };
 
+const createUserSchema = z.object({
+  username: z.string().trim().min(1, "Username is required"),
+  displayName: z.string().transform((value) => value.trim() || undefined),
+  organization: z.string().transform((value) => value.trim() || undefined),
+  createDefaultProject: z.boolean(),
+});
+
+type CreateUserFormInput = z.input<typeof createUserSchema>;
+type CreateUserFormData = z.output<typeof createUserSchema>;
+
 export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUserModalProps) {
-  const [username, setUsername] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [organization, setOrganization] = useState("");
-  const [createDefaultProject, setCreateDefaultProject] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+  const [createdUsername, setCreatedUsername] = useState("");
   const [copied, setCopied] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<CreateUserFormInput, unknown, CreateUserFormData>({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: {
+      username: "",
+      displayName: "",
+      organization: "",
+      createDefaultProject: false,
+    },
+  });
 
-  const handleSave = async () => {
-    setLocalError(null);
-
-    if (!username.trim()) {
-      setLocalError("Username is required");
-      return;
-    }
-
+  const handleSave = async (data: CreateUserFormData) => {
     try {
       const generatedPassword = await onSave({
-        username: username.trim(),
-        display_name: displayName.trim() || undefined,
-        organization: organization.trim() || undefined,
-        create_default_project: createDefaultProject,
+        username: data.username,
+        display_name: data.displayName,
+        organization: data.organization,
+        create_default_project: data.createDefaultProject,
       });
+      setCreatedUsername(data.username);
       setTemporaryPassword(generatedPassword);
     } catch {
       // Error is handled by the mutation.
@@ -51,13 +69,12 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const displayError =
-    localError || (error ? "Failed to create user. Username may already exist." : null);
+  const displayError = error ? "Failed to create user. Username may already exist." : null;
 
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box">
-        <h3 className="font-bold text-lg mb-4">Create New User</h3>
+    <Dialog open onOpenChange={(open) => !open && !isLoading && onClose()}>
+      <DialogContent>
+        <DialogTitle className="mb-4">Create New User</DialogTitle>
 
         {displayError && (
           <div className="alert alert-error mb-4">
@@ -69,8 +86,8 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
           <div className="space-y-4">
             <div className="alert alert-success">
               <span>
-                User <span className="font-mono font-semibold">{username}</span> was created. Share
-                this temporary password securely.
+                User <span className="font-mono font-semibold">{createdUsername}</span> was created.
+                Share this temporary password securely.
               </span>
             </div>
             <div className="form-control">
@@ -99,18 +116,25 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <form className="space-y-4" onSubmit={handleSubmit(handleSave)} noValidate>
             <div className="form-control">
               <label className="label">
                 <span className="label-text font-medium">Username *</span>
               </label>
               <input
                 type="text"
-                className="input input-bordered w-full"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
+                className={`input input-bordered w-full ${errors.username ? "input-error" : ""}`}
                 placeholder="Enter username"
+                autoComplete="username"
+                aria-invalid={Boolean(errors.username)}
+                aria-describedby={errors.username ? "create-user-username-error" : undefined}
+                {...register("username")}
               />
+              {errors.username && (
+                <p id="create-user-username-error" className="mt-1 text-sm text-error">
+                  {errors.username.message}
+                </p>
+              )}
             </div>
 
             <div className="form-control">
@@ -120,9 +144,9 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
               <input
                 type="text"
                 className="input input-bordered w-full"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
                 placeholder="Enter display name (optional)"
+                autoComplete="name"
+                {...register("displayName")}
               />
               <label className="label">
                 <span className="label-text-alt text-base-content/60">
@@ -138,9 +162,9 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
               <input
                 type="text"
                 className="input input-bordered w-full"
-                value={organization}
-                onChange={(event) => setOrganization(event.target.value)}
                 placeholder="Enter organization or affiliation (optional)"
+                autoComplete="organization"
+                {...register("organization")}
               />
             </div>
             <label className="form-control cursor-pointer rounded-lg border border-base-300 bg-base-100 p-3">
@@ -148,8 +172,7 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
                 <input
                   type="checkbox"
                   className="checkbox checkbox-primary mt-1"
-                  checked={createDefaultProject}
-                  onChange={(event) => setCreateDefaultProject(event.target.checked)}
+                  {...register("createDefaultProject")}
                 />
                 <div>
                   <div className="font-medium">Create default project</div>
@@ -159,23 +182,29 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
                 </div>
               </div>
             </label>
-          </div>
+            <div className="modal-action">
+              <button type="button" className="btn" onClick={onClose} disabled={isLoading}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={isLoading}>
+                {isLoading ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  "Create User"
+                )}
+              </button>
+            </div>
+          </form>
         )}
 
-        <div className="modal-action">
-          <button className="btn" onClick={onClose}>
-            {temporaryPassword ? "Close" : "Cancel"}
-          </button>
-          {!temporaryPassword && (
-            <button className="btn btn-primary" onClick={handleSave} disabled={isLoading}>
-              {isLoading ? <span className="loading loading-spinner loading-sm" /> : "Create User"}
+        {temporaryPassword && (
+          <div className="modal-action">
+            <button type="button" className="btn" onClick={onClose} disabled={isLoading}>
+              Close
             </button>
-          )}
-        </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

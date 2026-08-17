@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useId, useMemo, useState } from "react";
 
 import { ChevronDown, ChevronRight, Plus, Trash2, X } from "lucide-react";
 
@@ -10,6 +10,8 @@ import {
   useUnassignChipFromCooldown,
   useUpdateCooldown,
 } from "@/client/cooldown/cooldown";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { formatDate, toIsoSeconds } from "@/lib/utils/datetime";
 
 import { CooldownWiringSection } from "./CooldownWiringSection";
@@ -59,6 +61,8 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
   const assignMutation = useAssignChipToCooldown();
   const unassignMutation = useUnassignChipFromCooldown();
   const [chipToAdd, setChipToAdd] = useState("");
+  const [confirmation, setConfirmation] = useState<"end" | "delete" | null>(null);
+  const contentId = useId();
   const isActive = !cooldown.ended_at;
 
   // Dates: click-to-edit
@@ -89,20 +93,18 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
     onChange();
   };
 
-  const handleEnd = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm(`End cool-down ${cooldown.cooldown_id} now?`)) return;
+  const handleEnd = async () => {
     await updateMutation.mutateAsync({
       cooldownId: cooldown.cooldown_id,
       data: { ended_at: new Date().toISOString() },
     });
+    setConfirmation(null);
     onChange();
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm(`Delete cool-down ${cooldown.cooldown_id}?`)) return;
+  const handleDelete = async () => {
     await deleteMutation.mutateAsync({ cooldownId: cooldown.cooldown_id });
+    setConfirmation(null);
     onChange();
   };
 
@@ -131,56 +133,67 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
         isActive ? "border-success/40 bg-success/5" : "border-base-300 bg-base-100"
       }`}
     >
-      {/* Header row — always visible, clickable to toggle */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-base-200/40 rounded-t-xl"
-        aria-expanded={expanded}
-      >
-        {expanded ? (
-          <ChevronDown className="h-4 w-4 flex-shrink-0 text-base-content/50" />
-        ) : (
-          <ChevronRight className="h-4 w-4 flex-shrink-0 text-base-content/50" />
-        )}
-        <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
-          <span className="font-mono font-semibold text-sm">{cooldown.cooldown_id}</span>
-          <span className={`badge badge-xs ${isActive ? "badge-success" : "badge-ghost"}`}>
-            {isActive ? "active" : "ended"}
+      <div className={`flex items-center ${expanded ? "rounded-t-xl" : "rounded-xl"}`}>
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`min-w-0 flex flex-1 items-center gap-2 px-3 py-2 text-left hover:bg-base-200/40 ${
+            expanded ? "rounded-tl-xl" : "rounded-l-xl"
+          }`}
+          aria-expanded={expanded}
+          aria-controls={contentId}
+        >
+          {expanded ? (
+            <ChevronDown className="h-4 w-4 flex-shrink-0 text-base-content/50" />
+          ) : (
+            <ChevronRight className="h-4 w-4 flex-shrink-0 text-base-content/50" />
+          )}
+          <span className="min-w-0 flex flex-1 items-center gap-2 flex-wrap">
+            <span className="font-mono font-semibold text-sm">{cooldown.cooldown_id}</span>
+            <span className={`badge badge-xs ${isActive ? "badge-success" : "badge-ghost"}`}>
+              {isActive ? "active" : "ended"}
+            </span>
+            <span className="text-xs text-base-content/60 tabular-nums">
+              {formatDateRange(cooldown.started_at, cooldown.ended_at)}
+            </span>
+            <span className="text-xs text-base-content/50">
+              · {cooldown.chip_ids.length} chip
+              {cooldown.chip_ids.length !== 1 ? "s" : ""}
+            </span>
           </span>
-          <span className="text-xs text-base-content/60 tabular-nums">
-            {formatDateRange(cooldown.started_at, cooldown.ended_at)}
-          </span>
-          <span className="text-xs text-base-content/50">
-            · {cooldown.chip_ids.length} chip
-            {cooldown.chip_ids.length !== 1 ? "s" : ""}
-          </span>
-        </div>
-        <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        </button>
+        <div className="flex gap-1 flex-shrink-0 pr-2">
           {isActive && (
             <button
+              type="button"
               className="btn btn-xs btn-warning"
-              onClick={handleEnd}
+              onClick={() => setConfirmation("end")}
               disabled={updateMutation.isPending}
               title="End this cool-down (warm-up)"
             >
               End now
             </button>
           )}
-          <button
-            className="btn btn-xs btn-ghost text-error"
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending}
-            title="Delete this cool-down"
-          >
-            <Trash2 className="h-3 w-3" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="btn btn-xs btn-square btn-ghost text-error"
+                onClick={() => setConfirmation("delete")}
+                disabled={deleteMutation.isPending}
+                aria-label="Delete this cool-down"
+              >
+                <Trash2 className="h-3 w-3" aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Delete this cool-down</TooltipContent>
+          </Tooltip>
         </div>
-      </button>
+      </div>
 
       {/* Expanded body */}
       {expanded && (
-        <div className="px-4 pb-4 pt-1 space-y-4 border-t border-base-300">
+        <div id={contentId} className="px-4 pb-4 pt-1 space-y-4 border-t border-base-300">
           {/* Dates inline edit */}
           <div className="text-xs">
             <div className="text-base-content/60 font-semibold uppercase tracking-wide mb-1">
@@ -305,6 +318,20 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
           />
         </div>
       )}
+      <ConfirmDialog
+        open={confirmation !== null}
+        title={confirmation === "end" ? "End cool-down?" : "Delete cool-down?"}
+        description={
+          confirmation === "end"
+            ? `End cool-down ${cooldown.cooldown_id} now?`
+            : `Delete cool-down ${cooldown.cooldown_id}? This action cannot be undone.`
+        }
+        confirmLabel={confirmation === "end" ? "End cool-down" : "Delete cool-down"}
+        onConfirm={confirmation === "end" ? handleEnd : handleDelete}
+        onOpenChange={(open) => !open && setConfirmation(null)}
+        pending={updateMutation.isPending || deleteMutation.isPending}
+        destructive={confirmation === "delete"}
+      />
     </div>
   );
 });

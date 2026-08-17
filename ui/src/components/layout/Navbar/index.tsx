@@ -1,10 +1,18 @@
 "use client";
 
-import { Folder, FolderLock } from "lucide-react";
+import { ChevronDown, Folder, FolderLock } from "lucide-react";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/DropdownMenu";
 import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { GlobalCommandPalette } from "@/components/layout/GlobalCommandPalette";
 
 function HiddenIcon() {
   const { toggleMobileSidebar } = useSidebar();
@@ -47,71 +55,56 @@ function ProjectSelector() {
   }
 
   return (
-    <>
-      <div className="dropdown dropdown-bottom">
-        <div tabIndex={0} role="button" className="btn btn-ghost btn-sm gap-2">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="btn btn-ghost btn-sm gap-2">
           {currentProject ? (
             <Folder size={16} aria-hidden="true" />
           ) : (
             <FolderLock size={16} aria-hidden="true" />
           )}
           <span className="max-w-32 truncate">{currentProject?.name ?? "No projects"}</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="w-3 h-3"
+          <ChevronDown className="h-3 w-3" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-80 w-64">
+        {projects.length === 0 && (
+          <DropdownMenuLabel className="flex flex-col items-start gap-0.5 py-2">
+            <span className="font-medium text-base-content">No projects available</span>
+            <span className="font-normal text-base-content/60">
+              Ask an owner or admin for an invitation.
+            </span>
+          </DropdownMenuLabel>
+        )}
+        {projects.map((project) => (
+          <DropdownMenuItem
+            key={project.project_id}
+            className={`flex-col items-start gap-0.5 ${
+              currentProject?.project_id === project.project_id ? "bg-primary/10 text-primary" : ""
+            }`}
+            onSelect={() => switchProject(project.project_id)}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-          </svg>
-        </div>
-        <ul
-          tabIndex={0}
-          className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-64 max-h-80 overflow-y-auto"
-        >
-          {projects.length === 0 && (
-            <li>
-              <span className="menu-disabled flex flex-col items-start">
-                <span className="font-medium">No projects available</span>
-                <span className="text-xs opacity-60">Ask an owner or admin for an invitation.</span>
+            <span className="font-medium truncate w-full text-left">{project.name}</span>
+            {project.description && (
+              <span className="text-xs opacity-60 truncate w-full text-left">
+                {project.description}
               </span>
-            </li>
-          )}
-          {projects.map((project) => (
-            <li key={project.project_id}>
-              <button
-                className={`flex flex-col items-start ${
-                  currentProject?.project_id === project.project_id ? "active" : ""
-                }`}
-                onClick={() => {
-                  switchProject(project.project_id);
-                  (document.activeElement as HTMLElement)?.blur();
-                }}
-              >
-                <span className="font-medium truncate w-full text-left">{project.name}</span>
-                {project.description && (
-                  <span className="text-xs opacity-60 truncate w-full text-left">
-                    {project.description}
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </>
+            )}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 export function Navbar() {
   return (
-    <nav className="navbar w-full">
+    <nav className="navbar z-20 min-h-14 w-full border-b border-base-300 bg-base-100/95 px-3 backdrop-blur-sm sm:px-4">
       <div className="flex flex-1 md:gap-1 lg:gap-2 items-center">
         <HiddenIcon />
         <ProjectSelector />
         <EnvironmentBadge className="badge-sm sm:badge-md" />
+        <GlobalCommandPalette />
       </div>
     </nav>
   );

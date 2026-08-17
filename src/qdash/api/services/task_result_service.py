@@ -6,7 +6,6 @@ abstracting away the repository layer from the routers.
 
 from __future__ import annotations
 
-import io
 import logging
 import re
 import tempfile
@@ -1232,7 +1231,7 @@ class TaskResultService:
         project_id: str | None = None,
         ai_review_task_ids: list[str] | None = None,
         ai_review_bundle_task_ids: list[str] | None = None,
-    ) -> tuple[io.BytesIO, str]:
+    ) -> tuple[Path, str]:
         """Create a ZIP archive from the given file paths.
 
         Parameters
@@ -1244,8 +1243,8 @@ class TaskResultService:
 
         Returns
         -------
-        tuple[io.BytesIO, str]
-            (zip_buffer, safe_filename)
+        tuple[pathlib.Path, str]
+            (temporary archive path, safe filename)
 
         Raises
         ------
@@ -1274,23 +1273,27 @@ class TaskResultService:
                 detail += "..."
             raise HTTPException(status_code=400, detail=detail)
 
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for _, path in resolved_paths:
-                zf.write(path, path.name)
-            for entry_name, note_content in ai_review_entries:
-                zf.writestr(entry_name, note_content)
-            for entry_name, bundle_content in ai_review_bundle_entries:
-                zf.writestr(entry_name, bundle_content)
-        zip_buffer.seek(0)
-
         safe_filename = (
             "".join(c for c in filename if c.isalnum() or c in "._-").strip() or "figures.zip"
         )
         if not safe_filename.endswith(".zip"):
             safe_filename += ".zip"
 
-        return zip_buffer, safe_filename
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as temporary_file:
+            archive_path = Path(temporary_file.name)
+        try:
+            with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for _, path in resolved_paths:
+                    zf.write(path, path.name)
+                for entry_name, note_content in ai_review_entries:
+                    zf.writestr(entry_name, note_content)
+                for entry_name, bundle_content in ai_review_bundle_entries:
+                    zf.writestr(entry_name, bundle_content)
+        except Exception:
+            archive_path.unlink(missing_ok=True)
+            raise
+
+        return archive_path, safe_filename
 
     @staticmethod
     def _load_ai_review_note_entries(

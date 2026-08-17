@@ -73,6 +73,18 @@ const posts = await client.api.listForumPosts({ limit: 20 });
 
 Use the high-level methods for stable domain operations and polling helpers. Use `client.api` when an endpoint does not yet need a convenience method.
 
+## Forum Images
+
+Upload locally generated PNG, JPEG, GIF, or WebP images (up to 5 MB) using a Node `Blob` and filename:
+
+```ts
+const image = new Blob([imageBytes], { type: "image/png" });
+const { url } = await client.uploadForumImage(image, "analysis.png");
+```
+
+The returned `url` can be embedded in forum post Markdown. The client supplies multipart `FormData`,
+including the fetch-generated boundary, and applies the configured authentication and project headers.
+
 ## Agent Calibration
 
 ```ts
@@ -118,4 +130,4 @@ bun run check
 bun run build
 ```
 
-The first publish uses a temporary `NPM_TOKEN` repository secret because npm requires the package to exist before Trusted Publishing can be configured. After the first publish, configure `publish-qdash-typescript-client.yml` as the package trusted publisher and delete the secret. Release tags use `qdash-client-ts-v<version>`; the workflow derives the package version from the tag.
+The first publish uses a temporary `NPM_TOKEN` repository secret because npm requires the package to exist before Trusted Publishing can be configured. After the first publish, configure `publish-qdash-typescript-client.yml` as the package trusted publisher and delete the secret. QDash uses a single `v<version>` release tag for the application and both clients; the workflow derives the package version from that tag.

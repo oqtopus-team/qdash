@@ -11,9 +11,17 @@ import {
   ChevronDown,
   ChevronRight,
   RefreshCw,
+  Search,
 } from "lucide-react";
 
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/DropdownMenu";
 import { useCompareSeedValues, useImportSeedParameters } from "@/client/calibration/calibration";
 import type { SeedImportSource } from "@/schemas";
 
@@ -61,6 +69,10 @@ interface CompareData {
 
 export function SeedParametersPanel() {
   const [selectedChip, setSelectedChip] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"changes" | "all" | QubitData["status"]>(
+    "changes",
+  );
   const [expandedParams, setExpandedParams] = useState<Set<string>>(new Set());
   const [selectedQubits, setSelectedQubits] = useState<Record<string, Set<string>>>({});
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -73,6 +85,7 @@ export function SeedParametersPanel() {
   const {
     data: compareData,
     isLoading,
+    isError,
     refetch,
     isRefetching,
   } = useCompareSeedValues(selectedChip, undefined, {
@@ -160,6 +173,33 @@ export function SeedParametersPanel() {
   const selectedCount = useMemo(() => {
     return Object.values(selectedQubits).reduce((sum, set) => sum + set.size, 0);
   }, [selectedQubits]);
+
+  const visibleParameters = useMemo(() => {
+    if (!data?.parameters) return [];
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return Object.entries(data.parameters)
+      .filter(([paramName]) => paramName.toLowerCase().includes(normalizedQuery))
+      .map(([paramName, paramData]) => {
+        const qubits = Object.fromEntries(
+          Object.entries(paramData.qubits).filter(([, qubit]) => {
+            if (statusFilter === "all") return true;
+            if (statusFilter === "changes") return qubit.status !== "same";
+            return qubit.status === statusFilter;
+          }),
+        );
+        return [paramName, { ...paramData, qubits }] as const;
+      })
+      .filter(([, paramData]) => Object.keys(paramData.qubits).length > 0);
+  }, [data, searchQuery, statusFilter]);
+
+  const handleChipSelect = useCallback((chipId: string) => {
+    setSelectedChip(chipId);
+    setExpandedParams(new Set());
+    setSelectedQubits({});
+    setSearchQuery("");
+    setStatusFilter("changes");
+  }, []);
 
   // Count items that would be overwritten for a given mode
   const countOverwrites = useCallback(
@@ -288,13 +328,23 @@ export function SeedParametersPanel() {
           <label className="label">
             <span className="label-text">Target Chip</span>
           </label>
-          <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
+          <ChipSelector selectedChip={selectedChip} onChipSelect={handleChipSelect} />
         </div>
 
         {/* Loading State */}
         {isLoading && selectedChip && (
           <div className="flex justify-center py-8">
             <span className="loading loading-spinner loading-md"></span>
+          </div>
+        )}
+
+        {isError && selectedChip && (
+          <div className="alert alert-error mb-4" role="alert">
+            <AlertCircle className="h-5 w-5" />
+            <span className="flex-1">Failed to compare seed parameters for {selectedChip}.</span>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => refetch()}>
+              Retry
+            </button>
           </div>
         )}
 
@@ -331,12 +381,94 @@ export function SeedParametersPanel() {
           </div>
         )}
 
+        {data && counts.total > 0 && (
+          <div className="flex flex-col gap-3 rounded-xl border border-base-300 bg-base-100 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <label className="input input-sm input-bordered flex w-full items-center gap-2 sm:max-w-xs">
+              <Search className="h-4 w-4 text-base-content/40" aria-hidden="true" />
+              <input
+                type="search"
+                className="grow"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Find a parameter"
+                aria-label="Find a parameter"
+              />
+            </label>
+            <div className="flex items-center gap-2">
+              <label htmlFor="seed-status-filter" className="text-xs text-base-content/60">
+                Show
+              </label>
+              <select
+                id="seed-status-filter"
+                className="select select-sm select-bordered"
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as "changes" | "all" | QubitData["status"])
+                }
+              >
+                <option value="changes">Changes only</option>
+                <option value="new">New only</option>
+                <option value="different">Different only</option>
+                <option value="same">Same only</option>
+                <option value="all">All values</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {data && (counts.new > 0 || counts.different > 0) && (
+          <div className="sticky top-16 z-20 flex items-center justify-between gap-3 rounded-xl border border-base-300 bg-base-100/95 p-3 shadow-sm backdrop-blur">
+            <div className="text-xs text-base-content/60">
+              <span className="font-semibold text-base-content">
+                {visibleParameters.length} parameters shown
+              </span>
+              {selectedCount > 0 && <span> · {selectedCount} values selected</span>}
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="btn btn-primary btn-sm gap-2">
+                  {importMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="h-4 w-4" />
+                      Import
+                      <ChevronDown className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem
+                  onSelect={() => requestImport("all")}
+                  disabled={importMutation.isPending}
+                >
+                  Import All New/Different ({counts.new + counts.different})
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => requestImport("selected")}
+                  disabled={importMutation.isPending || selectedCount === 0}
+                >
+                  Import Selected Only ({selectedCount})
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+
         {/* Parameters List */}
-        {data && Object.keys(data.parameters).length > 0 && (
+        {data && Object.keys(data.parameters).length > 0 && visibleParameters.length > 0 && (
           <div className="space-y-2">
-            {Object.entries(data.parameters).map(([paramName, paramData]) => {
+            {visibleParameters.map(([paramName, paramData]) => {
               const isExpanded = expandedParams.has(paramName);
               const paramSelected = selectedQubits[paramName] || new Set();
+              const paramCounts = Object.values(paramData.qubits).reduce(
+                (result, qubit) => ({ ...result, [qubit.status]: result[qubit.status] + 1 }),
+                { new: 0, different: 0, same: 0 },
+              );
               const nonSameCount = Object.values(paramData.qubits).filter(
                 (q) => q.status !== "same",
               ).length;
@@ -360,6 +492,14 @@ export function SeedParametersPanel() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      {paramCounts.new > 0 && (
+                        <span className="badge badge-success badge-sm">{paramCounts.new} new</span>
+                      )}
+                      {paramCounts.different > 0 && (
+                        <span className="badge badge-warning badge-sm">
+                          {paramCounts.different} different
+                        </span>
+                      )}
                       {paramSelected.size > 0 && (
                         <span className="badge badge-primary badge-sm">
                           {paramSelected.size} selected
@@ -404,8 +544,8 @@ export function SeedParametersPanel() {
                             <tr>
                               <th className="w-8"></th>
                               <th>Qubit</th>
-                              <th>YAML Value</th>
-                              <th>QDash Value</th>
+                              <th>Incoming YAML</th>
+                              <th>Current QDash</th>
                               <th>Status</th>
                             </tr>
                           </thead>
@@ -413,7 +553,13 @@ export function SeedParametersPanel() {
                             {Object.entries(paramData.qubits).map(([qid, qubitData]) => (
                               <tr
                                 key={qid}
-                                className={qubitData.status === "same" ? "opacity-50" : ""}
+                                className={
+                                  qubitData.status === "same"
+                                    ? "opacity-50"
+                                    : qubitData.status === "different"
+                                      ? "bg-warning/5"
+                                      : ""
+                                }
                               >
                                 <td>
                                   <input
@@ -425,10 +571,20 @@ export function SeedParametersPanel() {
                                   />
                                 </td>
                                 <td className="font-mono">{qid}</td>
-                                <td className="font-mono text-xs">
+                                <td
+                                  className={`font-mono text-xs ${
+                                    qubitData.status === "same" ? "" : "font-semibold text-success"
+                                  }`}
+                                >
                                   {formatValue(qubitData.yaml_value)}
                                 </td>
-                                <td className="font-mono text-xs">
+                                <td
+                                  className={`font-mono text-xs ${
+                                    qubitData.status === "different"
+                                      ? "text-error line-through decoration-error/60"
+                                      : ""
+                                  }`}
+                                >
                                   {formatValue(qubitData.qdash_value)}
                                 </td>
                                 <td>
@@ -451,6 +607,16 @@ export function SeedParametersPanel() {
           </div>
         )}
 
+        {data && Object.keys(data.parameters).length > 0 && visibleParameters.length === 0 && (
+          <div className="rounded-xl border border-dashed border-base-300 py-10 text-center">
+            <Search className="mx-auto mb-2 h-8 w-8 text-base-content/25" aria-hidden="true" />
+            <p className="text-sm font-medium">No parameters match this view</p>
+            <p className="mt-1 text-xs text-base-content/60">
+              Try another search or status filter.
+            </p>
+          </div>
+        )}
+
         {/* Empty State */}
         {data && Object.keys(data.parameters).length === 0 && (
           <div className="text-center py-8 text-base-content/60">
@@ -466,59 +632,22 @@ export function SeedParametersPanel() {
           </div>
         )}
 
-        {/* Import Actions */}
-        {data && (counts.new > 0 || counts.different > 0) && (
-          <div className="card-actions justify-end mt-4 pt-4 border-t border-base-300">
-            <div className="dropdown dropdown-end">
-              <div tabIndex={0} role="button" className="btn btn-primary gap-2">
-                {importMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Importing...
-                  </>
-                ) : (
-                  <>
-                    <Database className="h-4 w-4" />
-                    Import
-                    <ChevronDown className="h-4 w-4" />
-                  </>
-                )}
-              </div>
-              <ul
-                tabIndex={0}
-                className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-56"
-              >
-                <li>
-                  <button onClick={() => requestImport("all")} disabled={importMutation.isPending}>
-                    Import All New/Different ({counts.new + counts.different})
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => requestImport("selected")}
-                    disabled={importMutation.isPending || selectedCount === 0}
-                  >
-                    Import Selected Only ({selectedCount})
-                  </button>
-                </li>
-              </ul>
-            </div>
-          </div>
-        )}
-
         {/* Overwrite Confirmation Dialog */}
         {confirmDialog.open && (
-          <div className="modal modal-open">
-            <div className="modal-box">
+          <Dialog
+            open
+            onOpenChange={(open) => !open && !importMutation.isPending && handleCancelImport()}
+          >
+            <DialogContent>
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-6 w-6 text-warning flex-shrink-0 mt-1" />
                 <div>
-                  <h3 className="font-bold text-lg">Confirm Overwrite</h3>
-                  <p className="py-4">
+                  <DialogTitle>Confirm Overwrite</DialogTitle>
+                  <DialogDescription className="py-4">
                     This will overwrite{" "}
                     <span className="font-bold text-warning">{confirmDialog.diffCount}</span>{" "}
                     existing calibration value(s) with YAML seed values.
-                  </p>
+                  </DialogDescription>
                   <p className="text-sm text-base-content/70">
                     Existing measured values will be replaced. This action cannot be undone.
                   </p>
@@ -526,6 +655,7 @@ export function SeedParametersPanel() {
               </div>
               <div className="modal-action">
                 <button
+                  type="button"
                   className="btn btn-ghost"
                   onClick={handleCancelImport}
                   disabled={importMutation.isPending}
@@ -533,6 +663,7 @@ export function SeedParametersPanel() {
                   Cancel
                 </button>
                 <button
+                  type="button"
                   className="btn btn-warning"
                   onClick={handleConfirmImport}
                   disabled={importMutation.isPending}
@@ -547,9 +678,8 @@ export function SeedParametersPanel() {
                   )}
                 </button>
               </div>
-            </div>
-            <div className="modal-backdrop" onClick={handleCancelImport}></div>
-          </div>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     </div>

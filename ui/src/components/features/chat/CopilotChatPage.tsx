@@ -24,6 +24,8 @@ import remarkGfm from "remark-gfm";
 import { useCopilotChat, type CopilotMessage, type CopilotSession } from "@/hooks/useCopilotChat";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
+import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
 import {
   buildChatModelOptions,
@@ -104,12 +106,7 @@ function AssessmentBadge({ assessment }: { assessment: string | null }) {
 
 function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"] }) {
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
-  const modalRef = useRef<HTMLDialogElement>(null);
-
-  const openPreview = useCallback((src: string) => {
-    setPreviewSrc(src);
-    modalRef.current?.showModal();
-  }, []);
+  const openPreview = useCallback((src: string) => setPreviewSrc(src), []);
 
   if (!imagesSent) return null;
   const { experiment_figure, experiment_figure_paths, expected_images, task_name } = imagesSent;
@@ -166,19 +163,7 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
           );
         })}
       </div>
-      <dialog ref={modalRef} className="modal">
-        <div className="modal-box max-w-3xl p-4">
-          {previewSrc && (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element -- modal preview uses arbitrary remote/API dimensions */}
-              <img src={previewSrc} alt="Preview" className="w-full h-auto" />
-            </>
-          )}
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
+      <ImagePreviewDialog src={previewSrc} onClose={() => setPreviewSrc(null)} />
     </div>
   );
 }
@@ -289,15 +274,19 @@ function SessionListItem({
             <span className="text-base-content/30">{formatTime(session.updatedAt)}</span>
           </div>
         </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 text-base-content/40 hover:text-error"
-          title="Delete session"
-          aria-label={`Delete ${session.title}`}
-        >
-          <Trash2 className="w-3 h-3" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 text-base-content/40 hover:text-error"
+              aria-label={`Delete ${session.title}`}
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Delete session</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
@@ -408,13 +397,19 @@ export function CopilotChatPage() {
               <MessageSquare className="w-4 h-4 text-base-content/60" />
               <span className="text-sm font-semibold">Sessions</span>
             </div>
-            <button
-              onClick={() => setShowSessionSidebar(false)}
-              className="btn btn-ghost btn-xs btn-square"
-              title="Hide sessions"
-            >
-              <PanelLeftClose className="w-4 h-4" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setShowSessionSidebar(false)}
+                  className="btn btn-ghost btn-xs btn-square"
+                  aria-label="Hide sessions"
+                >
+                  <PanelLeftClose className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Hide sessions</TooltipContent>
+            </Tooltip>
           </div>
 
           {/* New Session Button */}
@@ -448,13 +443,19 @@ export function CopilotChatPage() {
         {/* Chat Header */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-base-300/50 bg-base-100">
           {!showSessionSidebar && (
-            <button
-              onClick={() => setShowSessionSidebar(true)}
-              className="btn btn-ghost btn-sm btn-square"
-              title="Show sessions"
-            >
-              <PanelLeftOpen className="w-4 h-4" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setShowSessionSidebar(true)}
+                  className="btn btn-ghost btn-sm btn-square"
+                  aria-label="Show sessions"
+                >
+                  <PanelLeftOpen className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Show sessions</TooltipContent>
+            </Tooltip>
           )}
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
             <div className="w-6 h-6 rounded-lg chat-avatar-bot flex items-center justify-center">
@@ -463,10 +464,11 @@ export function CopilotChatPage() {
             <h2 className="text-sm font-bold truncate">{activeSession?.title || "AI Chat"}</h2>
           </div>
           {modelOptions.length > 1 && (
-            <label className="flex items-center gap-1 mr-1" title="Chat model">
+            <label className="flex items-center gap-1 mr-1">
               <Cpu className="w-3.5 h-3.5 text-base-content/40" />
+              <span className="sr-only">Chat model</span>
               <select
-                className="select select-bordered select-xs w-44 text-xs"
+                className="select select-bordered select-xs w-44 text-xs truncate appearance-auto"
                 value={selectedModel.key}
                 onChange={(event) => handleModelChange(event.target.value)}
                 disabled={isLoading}
@@ -480,14 +482,22 @@ export function CopilotChatPage() {
             </label>
           )}
           {messages.length > 0 && (
-            <button
-              onClick={clearActiveSession}
-              className="btn btn-ghost btn-xs gap-1 text-base-content/50 hover:text-error"
-              title="Clear messages"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Clear</span>
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={clearActiveSession}
+                  className="btn btn-ghost btn-xs gap-1 text-base-content/50 hover:text-error"
+                  aria-label="Clear messages"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline" aria-hidden="true">
+                    Clear
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Clear messages</TooltipContent>
+            </Tooltip>
           )}
         </div>
 

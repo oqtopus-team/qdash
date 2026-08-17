@@ -1015,6 +1015,21 @@ class FlowDocument(Document):
     tags: list[str] = []
 ```
 
+### SlackForumThreadDocument
+
+Tracks the Slack message posted for each root forum thread, enabling reply and status-change notifications to appear in the same Slack thread.
+
+Collection: `slack_forum_thread`
+
+```python
+class SlackForumThreadDocument(Document):
+    post_id: str          # Forum root post ObjectId (unique)
+    project_id: str
+    channel_id: str       # Slack channel where the message was posted
+    message_ts: str       # Slack message timestamp (used as thread_ts for replies)
+    system_info: SystemInfoModel
+```
+
 ---
 
 ## Entity Relationship Diagram (Conceptual)

@@ -4,13 +4,13 @@ on:
   pull_request:
     branches: [develop]
     paths:
-      - "src/qdash/client/**"
+      - "clients/python/**"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/publish-qdash-client.yml"
   push:
     tags:
-      - "qdash-client-v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
 
 permissions:
@@ -37,6 +37,15 @@ jobs:
       - name: Build package
         run: uv build --package qdash-client --out-dir dist
 
+      - name: Run tests
+        run: uv run --package qdash-client pytest clients/python/tests -v
+
+      - name: Run lint and type checks
+        run: |
+          uv run --package qdash-client ruff check clients/python
+          uv run --package qdash-client ruff format --check clients/python
+          uv run --package qdash-client mypy clients/python/src/qdash/client clients/python/tests
+
       - name: Upload package artifact
         uses: actions/upload-artifact@v6
         with:
@@ -48,7 +57,7 @@ jobs:
     name: Publish to PyPI
     runs-on: ubuntu-latest
     needs: build
-    if: startsWith(github.ref, 'refs/tags/qdash-client-v')
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
       id-token: write

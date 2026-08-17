@@ -7,7 +7,7 @@ import logging
 from functools import partial
 from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
 from qdash.api.dependencies import get_forum_service
@@ -24,6 +24,7 @@ from qdash.api.schemas.forum import (
     ForumCategoryCreate,
     ForumCategoryResponse,
     ForumCategoryUpdate,
+    ForumImageUploadResponse,
     ForumPostCreate,
     ForumPostResponse,
     ForumPostUpdate,
@@ -215,6 +216,7 @@ def list_forum_posts(
 )
 def create_forum_post(
     body: ForumPostCreate,
+    background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> ForumPostResponse:
@@ -234,6 +236,7 @@ def create_forum_post(
         cooldown_id=body.cooldown_id,
         assignee_username=body.assignee_username,
         status=body.status,
+        background_tasks=background_tasks,
     )
 
 
@@ -273,16 +276,17 @@ def get_forum_post_replies(
     "/forum/upload-image",
     summary="Upload an image for a forum post",
     operation_id="uploadForumImage",
-    include_in_schema=False,
+    response_model=ForumImageUploadResponse,
+    responses={400: {"description": "Unsupported image type or image exceeds the 5 MB limit"}},
 )
 async def upload_forum_image(
     file: UploadFile,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
-) -> dict[str, str]:
+) -> ForumImageUploadResponse:
     """Upload an image to attach to a forum post. Returns the image URL."""
     data = await file.read()
     url = ForumService.upload_image(data, file.content_type or "")
-    return {"url": url}
+    return ForumImageUploadResponse(url=url)
 
 
 @public_router.get(
@@ -421,6 +425,7 @@ async def forum_ai_reply_stream(
 def update_forum_post(
     post_id: str,
     body: ForumPostUpdate,
+    background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> ForumPostResponse:
@@ -454,6 +459,7 @@ def update_forum_post(
         update_assignee_context=update_assignee_context,
         update_status_context=update_status_context,
         role=ctx.role,
+        background_tasks=background_tasks,
     )
 
 
@@ -485,6 +491,7 @@ def delete_forum_post(
 )
 def close_forum_post(
     post_id: str,
+    background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> SuccessResponse:
@@ -494,6 +501,7 @@ def close_forum_post(
         post_id=post_id,
         username=ctx.user.username,
         role=ctx.role,
+        background_tasks=background_tasks,
     )
 
 
@@ -505,6 +513,7 @@ def close_forum_post(
 )
 def reopen_forum_post(
     post_id: str,
+    background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> SuccessResponse:
@@ -514,4 +523,5 @@ def reopen_forum_post(
         post_id=post_id,
         username=ctx.user.username,
         role=ctx.role,
+        background_tasks=background_tasks,
     )

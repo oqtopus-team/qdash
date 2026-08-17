@@ -1,0 +1,319 @@
+"""Tests for ForumService Slack notification integration."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
+
+from qdash.api.services.forum_service import ForumService
+
+if TYPE_CHECKING:
+    from qdash.api.services.slack_notification_service import SlackNotificationService
+    from qdash.dbmodel.forum import ForumPostDocument
+
+
+class _SlackRecorder:
+    """Test double that records Slack notification calls."""
+
+    def __init__(self) -> None:
+        """Initialize empty call recorders."""
+        self.post_calls: list[dict[str, Any]] = []
+        self.reply_calls: list[dict[str, Any]] = []
+        self.status_calls: list[dict[str, Any]] = []
+
+    def notify_forum_post(self, *, post: ForumPostDocument, actor_username: str) -> None:
+        """Record a forum post notification call."""
+        self.post_calls.append({"post": post, "actor_username": actor_username})
+
+    def notify_forum_reply(
+        self,
+        *,
+        reply_post: ForumPostDocument,
+        root_post_id: str,
+        actor_username: str,
+    ) -> None:
+        """Record a forum reply notification call."""
+        self.reply_calls.append(
+            {
+                "reply_post": reply_post,
+                "root_post_id": root_post_id,
+                "actor_username": actor_username,
+            }
+        )
+
+    def notify_forum_status_change(
+        self,
+        *,
+        post: ForumPostDocument,
+        actor_username: str,
+        status: str,
+    ) -> None:
+        """Record a status-change notification call."""
+        self.status_calls.append({"post": post, "actor_username": actor_username, "status": status})
+
+
+def test_create_root_post_notifies_slack(init_db) -> None:
+    """Creating a root post triggers a Slack post notification."""
+    slack = _SlackRecorder()
+    service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
+
+    service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+
+    assert len(slack.post_calls) == 1
+    assert slack.post_calls[0]["actor_username"] == "alice"
+    assert slack.post_calls[0]["post"].parent_id is None
+
+
+def test_create_reply_notifies_slack_reply(init_db) -> None:
+    """Creating a reply triggers a Slack thread-reply notification."""
+    slack = _SlackRecorder()
+    service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
+
+    root = service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+    slack.post_calls.clear()
+
+    service.create_post(
+        project_id="project-1",
+        username="bob",
+        category="qubit",
+        title=None,
+        content="Reply content",
+        parent_id=root.id,
+    )
+
+    assert slack.post_calls == []
+    assert len(slack.reply_calls) == 1
+    assert slack.reply_calls[0]["actor_username"] == "bob"
+    assert slack.reply_calls[0]["root_post_id"] == root.id
+
+
+def test_create_post_no_slack_notification_when_no_service(init_db) -> None:
+    """ForumService without slack_notification_service must not raise."""
+    service = ForumService(slack_notification_service=None)
+
+    root = service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+    service.create_post(
+        project_id="project-1",
+        username="bob",
+        category="qubit",
+        title=None,
+        content="Reply",
+        parent_id=root.id,
+    )
+
+
+def test_save_ai_reply_notifies_slack_reply(init_db) -> None:
+    """Saving an AI reply triggers a Slack thread-reply notification as qdash."""
+    slack = _SlackRecorder()
+    service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
+
+    root = service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+    slack.post_calls.clear()
+
+    service.save_ai_reply(
+        project_id="project-1",
+        parent_id=root.id,
+        content="AI reply content",
+    )
+
+    assert len(slack.reply_calls) == 1
+    assert slack.reply_calls[0]["actor_username"] == "qdash"
+    assert slack.reply_calls[0]["root_post_id"] == root.id
+
+
+def test_close_post_notifies_slack_status_change(init_db) -> None:
+    """Closing a post triggers a resolved status-change notification."""
+    from qdash.datamodel.project import ProjectRole
+
+    slack = _SlackRecorder()
+    service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
+
+    root = service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+    slack.post_calls.clear()
+
+    service.close_post(
+        project_id="project-1",
+        post_id=root.id,
+        username="alice",
+        role=ProjectRole.OWNER,
+    )
+
+    assert len(slack.status_calls) == 1
+    assert slack.status_calls[0]["status"] == "resolved"
+    assert slack.status_calls[0]["actor_username"] == "alice"
+
+
+def test_reopen_post_notifies_slack_status_change(init_db) -> None:
+    """Reopening a post triggers an open status-change notification."""
+    from qdash.datamodel.project import ProjectRole
+
+    slack = _SlackRecorder()
+    service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
+
+    root = service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+    service.close_post(
+        project_id="project-1",
+        post_id=root.id,
+        username="alice",
+        role=ProjectRole.OWNER,
+    )
+    slack.status_calls.clear()
+
+    service.reopen_post(
+        project_id="project-1",
+        post_id=root.id,
+        username="alice",
+        role=ProjectRole.OWNER,
+    )
+
+    assert len(slack.status_calls) == 1
+    assert slack.status_calls[0]["status"] == "open"
+    assert slack.status_calls[0]["actor_username"] == "alice"
+
+
+def test_update_post_status_change_notifies_slack(init_db) -> None:
+    """Updating a post's status triggers a status-change notification."""
+    from qdash.datamodel.project import ProjectRole
+
+    slack = _SlackRecorder()
+    service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
+
+    root = service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+    slack.post_calls.clear()
+
+    service.update_post(
+        project_id="project-1",
+        post_id=root.id,
+        username="alice",
+        category=None,
+        title=None,
+        content="Root content",
+        status="resolved",
+        update_status_context=True,
+        role=ProjectRole.OWNER,
+    )
+
+    assert len(slack.status_calls) == 1
+    assert slack.status_calls[0]["status"] == "resolved"
+    assert slack.status_calls[0]["actor_username"] == "alice"
+
+
+def test_update_post_status_change_defers_slack_via_background_tasks(init_db) -> None:
+    """Status-change notification is queued on BackgroundTasks when provided."""
+    from fastapi import BackgroundTasks
+
+    from qdash.datamodel.project import ProjectRole
+
+    slack = _SlackRecorder()
+    service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
+
+    root = service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+    slack.post_calls.clear()
+
+    background_tasks = BackgroundTasks()
+    service.update_post(
+        project_id="project-1",
+        post_id=root.id,
+        username="alice",
+        category=None,
+        title=None,
+        content="Root content",
+        status="investigating",
+        update_status_context=True,
+        role=ProjectRole.OWNER,
+        background_tasks=background_tasks,
+    )
+
+    # The notification is queued on the response's background tasks, not sent inline.
+    assert slack.status_calls == []
+    assert len(background_tasks.tasks) == 1
+    task = background_tasks.tasks[0]
+    assert task.func == slack.notify_forum_status_change
+    assert task.kwargs["status"] == "investigating"
+
+
+def test_update_post_same_status_does_not_notify_slack(init_db) -> None:
+    """Updating a post without changing its status sends no notification."""
+    from qdash.datamodel.project import ProjectRole
+
+    slack = _SlackRecorder()
+    service = ForumService(slack_notification_service=cast("SlackNotificationService", slack))
+
+    root = service.create_post(
+        project_id="project-1",
+        username="alice",
+        category="qubit",
+        title="T1 drift",
+        content="Root content",
+        parent_id=None,
+    )
+    slack.post_calls.clear()
+
+    service.update_post(
+        project_id="project-1",
+        post_id=root.id,
+        username="alice",
+        category=None,
+        title=None,
+        content="Edited content",
+        status="open",
+        update_status_context=True,
+        role=ProjectRole.OWNER,
+    )
+
+    assert slack.status_calls == []

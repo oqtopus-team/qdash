@@ -226,12 +226,12 @@ tasks:
   test:
     desc: Run all Python tests
     cmds:
-      - uv run pytest tests/ -v
+      - uv run pytest tests/ clients/python/tests/ -v
 
   test-fast:
     desc: Run tests, stop on first failure
     cmds:
-      - uv run pytest tests/ -v -x --tb=short
+      - uv run pytest tests/ clients/python/tests/ -v -x --tb=short
 
   test-api:
     desc: Run API router tests
@@ -241,7 +241,7 @@ tasks:
   test-client:
     desc: Run Python client tests
     cmds:
-      - uv run pytest tests/qdash/client/ -v
+      - uv run pytest clients/python/tests/ -v
 
   test-client-ts:
     desc: Run TypeScript client checks
@@ -268,12 +268,12 @@ tasks:
   test-coverage:
     desc: Run tests with coverage report
     cmds:
-      - uv run pytest tests/ --cov=src/qdash --cov-report=term --cov-report=html
+      - uv run pytest tests/ clients/python/tests/ --cov=src/qdash --cov=clients/python/src/qdash/client --cov-report=term --cov-report=html
 
   test-parallel:
     desc: Run tests in parallel (requires pytest-xdist)
     cmds:
-      - uv run pytest tests/ -v -n auto
+      - uv run pytest tests/ clients/python/tests/ -v -n auto
 
   test-watch:
     desc: Run tests in watch mode (requires pytest-watch)
@@ -300,7 +300,7 @@ tasks:
   build-docs:
     dir: docs
     cmds:
-      - npm run docs:build
+      - bun run docs:build
 
   # =============================================================================
   # Linting & Formatting (local development - auto-fix)
@@ -393,12 +393,12 @@ tasks:
   ci-typecheck:
     desc: Run mypy type checking
     cmds:
-      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow tests
+      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow clients/python/src/qdash/client clients/python/tests tests
 
   ci-test:
     desc: Run all tests with coverage
     cmds:
-      - uv run pytest tests/ -v --tb=short --cov=src/qdash --cov-report=xml --cov-report=term
+      - uv run pytest tests/ clients/python/tests/ -v --tb=short --cov=src/qdash --cov=clients/python/src/qdash/client --cov-report=xml --cov-report=term
 
   knip:
     desc: Check for unused exports, dependencies, and files in UI

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Download, Bot, LoaderCircle, X, Maximize2, Move } from "lucide-react";
+import { Check, Download, Bot, LoaderCircle, X, Maximize2, Minimize, Move } from "lucide-react";
 import { useMemo, useState, useRef, useCallback, memo, useEffect, type KeyboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
@@ -19,8 +19,10 @@ import {
 } from "@/components/features/chip/DownloadConfirmModal";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskHistoryModal } from "@/components/features/chip/modals/TaskHistoryModal";
+import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
@@ -58,8 +60,8 @@ type TaskWithAiReview = Task & {
 
 const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
   figureImages: false,
-  jsonFigures: true,
-  rawData: false,
+  jsonFigures: false,
+  rawData: true,
   aiReviewNotes: false,
   aiReviewReplayBundles: false,
 };
@@ -101,6 +103,10 @@ function getPendingAiReviewTaskIds(
 function toPathList(paths: string[] | string | null | undefined): string[] {
   if (!paths) return [];
   return Array.isArray(paths) ? paths : [paths];
+}
+
+function toNetcdfPathList(paths: string[] | string | null | undefined): string[] {
+  return toPathList(paths).filter((path) => path.toLowerCase().endsWith(".nc"));
 }
 
 function requestErrorMessage(error: unknown): string | null {
@@ -406,7 +412,7 @@ export function QubitGrid({
       const task = taskResponse?.data?.result?.[qid];
       counts.figureImages += toPathList(task?.figure_path).length;
       counts.jsonFigures += toPathList(task?.json_figure_path).length;
-      counts.rawData += toPathList(task?.raw_data_path).length;
+      counts.rawData += toNetcdfPathList(task?.raw_data_path).length;
       if (task?.task_id && aiReviewBadgesByTaskId?.has(task.task_id)) {
         counts.aiReviewNotes += 1;
       }
@@ -455,6 +461,7 @@ export function QubitGrid({
     row: number;
     col: number;
   } | null>(null);
+  const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
 
   // LOD: store zoom scale, compute visibility flags from effective cell size.
   // Initialize to a conservative value; will be updated on first transform.
@@ -479,8 +486,8 @@ export function QubitGrid({
   const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
     cols: displayCols,
     rows: displayRows,
-    reservedHeight: { mobile: 300, desktop: 350 },
-    deps: [taskResponse, topologyQubits, zoomMode, selectedRegion],
+    reservedHeight: isFullscreen ? { mobile: 160, desktop: 180 } : { mobile: 300, desktop: 350 },
+    deps: [taskResponse, topologyQubits, zoomMode, selectedRegion, isFullscreen],
   });
 
   // Debounced scale update to avoid excessive re-renders during zoom
@@ -501,10 +508,28 @@ export function QubitGrid({
   const rangeLabel = taskRangeLabel(selectedDate, startAt, endAt);
   const errorDetail = requestErrorMessage(taskError);
 
+  const containerClass = isFullscreen
+    ? "fixed inset-0 z-[60] flex flex-col h-screen w-screen space-y-2 bg-base-100 p-4 overflow-hidden"
+    : "flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8";
+
   if (isLoadingTask)
     return (
-      <div className="w-full flex justify-center py-12">
-        <span className="loading loading-spinner loading-lg"></span>
+      <div className={containerClass}>
+        {isFullscreen && (
+          <div className="flex justify-end">
+            <button
+              onClick={exitFullscreen}
+              className="btn btn-sm btn-square btn-ghost"
+              title="Exit fullscreen (Esc)"
+              aria-label="Exit fullscreen"
+            >
+              <Minimize className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        <div className="w-full flex flex-1 items-center justify-center py-12">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
       </div>
     );
 
@@ -563,7 +588,7 @@ export function QubitGrid({
         paths.push(...toPathList(task.json_figure_path));
       }
       if (downloadOptions.rawData) {
-        paths.push(...toPathList(task.raw_data_path));
+        paths.push(...toNetcdfPathList(task.raw_data_path));
       }
       if (downloadOptions.aiReviewNotes && task.task_id) {
         aiReviewTaskIds.push(task.task_id);
@@ -589,9 +614,7 @@ export function QubitGrid({
         { responseType: "blob" },
       );
 
-      const blob = new Blob([response.data as BlobPart], {
-        type: "application/zip",
-      });
+      const blob = response.data as Blob;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -924,7 +947,7 @@ export function QubitGrid({
   );
 
   return (
-    <div className="flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8">
+    <div className={containerClass}>
       {isFetchingTask && !isLoadingTask && (
         <div className="alert alert-info py-2 text-sm">
           <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -1173,6 +1196,7 @@ export function QubitGrid({
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
       >
+        <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
         {viewMode === "pan-zoom" ? (
           <TransformWrapper
             initialScale={initialScale}
@@ -1181,12 +1205,13 @@ export function QubitGrid({
             wheel={{ step: 0.08 }}
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
-            panning={{ velocityDisabled: false }}
+            panning={{ velocityDisabled: true }}
             smooth={false}
+            limitToBounds={false}
             centerOnInit={true}
             onTransform={handleTransform}
           >
-            <GridZoomControls />
+            <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{

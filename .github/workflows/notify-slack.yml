@@ -1,0 +1,46 @@
+name: Notify Slack
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ !endsWith(github.actor, '[bot]') &&
+          !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+            github.event.comment.author_association ||
+            github.event.pull_request.author_association ||
+            github.event.issue.author_association) }}
+    env:
+      KIND: >-
+        ${{ github.event_name == 'issues' && 'Issue opened' ||
+        github.event_name == 'pull_request_target' && 'PR opened' ||
+        github.event.issue.pull_request && 'PR commented' || 'Issue commented' }}
+      ACTOR: ${{ github.actor }}
+      URL: >-
+        ${{ github.event.comment.html_url ||
+        github.event.pull_request.html_url ||
+        github.event.issue.html_url }}
+      TITLE: ${{ github.event.issue.title || github.event.pull_request.title }}
+      BODY: ${{ github.event.comment.body || github.event.pull_request.body || github.event.issue.body }}
+    steps:
+      - name: Send to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg kind "$KIND" \
+            --arg actor "$ACTOR" \
+            --arg url "$URL" \
+            --arg title "$TITLE" \
+            --arg body "$BODY" \
+            '{text: "*\($kind)* by \($actor)\n<\($url)|\($title)>\n\($body | .[0:300])"}')
+          curl -sS --fail-with-body -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$SLACK_WEBHOOK_URL"

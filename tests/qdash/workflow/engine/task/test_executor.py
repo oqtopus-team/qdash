@@ -54,6 +54,14 @@ class MockTask:
     def batch_run(self, session: Any, qids: list[str]) -> RunResult:
         return RunResult(raw_result={qid: {"data": [1, 2, 3]} for qid in qids})
 
+    def extract_raw_data(self, run_result: RunResult) -> list[Any]:
+        return []
+
+    def extract_batch_raw_data(
+        self, session: Any, run_result: RunResult, qids: list[str]
+    ) -> dict[str, list[Any]]:
+        return {qid: [] for qid in qids}
+
     def postprocess(
         self, session: Any, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
@@ -276,6 +284,34 @@ class TestTaskExecutorExecuteTask:
         mock_state_manager.update_task_status_to_failed.assert_called()
         mock_state_manager.update_task_status_to_completed.assert_called()
 
+    def test_execute_batch_saves_qid_raw_data_before_postprocess(
+        self, executor: TaskExecutor, mock_data_saver: MagicMock
+    ) -> None:
+        """Test batch artifacts are distributed and saved before postprocessing."""
+        task = MockTask()
+        events: list[str] = []
+        task.extract_batch_raw_data = MagicMock(  # type: ignore[method-assign]
+            return_value={"0": [{"raw": [1]}], "4": [{"raw": [2]}]}
+        )
+        original_postprocess = task.postprocess
+
+        def record_postprocess(*args: Any) -> PostProcessResult:
+            events.append(f"postprocess:{args[-1]}")
+            return original_postprocess(*args)
+
+        def record_save(raw_data: list[Any], _name: str, _type: str, qid: str) -> list[str]:
+            events.append(f"save:{qid}")
+            return [f"/{qid}.nc"]
+
+        task.postprocess = MagicMock(side_effect=record_postprocess)  # type: ignore[method-assign]
+        mock_data_saver.save_raw_data.side_effect = record_save
+        session: Any = MockSession()
+
+        executor.execute_batch(task, session, ["0", "4"])
+
+        task.extract_batch_raw_data.assert_called_once()
+        assert events == ["save:0", "save:4", "postprocess:0", "postprocess:4"]
+
     def test_execute_task_validates_r2(
         self, executor: TaskExecutor, mock_result_processor: MagicMock
     ) -> None:
@@ -390,6 +426,33 @@ class TestTaskExecutorExecuteTask:
         executor.execute_task(task, session, "0")
 
         mock_data_saver.save_figures.assert_called_once()
+
+    def test_execute_task_saves_extracted_raw_data_before_postprocess(
+        self, executor: TaskExecutor, mock_data_saver: MagicMock
+    ) -> None:
+        """Test run-result artifacts are persisted before postprocessing."""
+        task = MockTask()
+        events: list[str] = []
+        task.extract_raw_data = MagicMock(return_value=[{"raw": [1, 2]}])  # type: ignore[method-assign]
+        original_postprocess = task.postprocess
+
+        def record_postprocess(*args: Any) -> PostProcessResult:
+            events.append("postprocess")
+            return original_postprocess(*args)
+
+        def record_save(*args: Any) -> list[str]:
+            events.append("save")
+            return []
+
+        task.postprocess = MagicMock(  # type: ignore[method-assign]
+            side_effect=record_postprocess
+        )
+        mock_data_saver.save_raw_data.side_effect = record_save
+        session: Any = MockSession()
+
+        executor.execute_task(task, session, "0")
+
+        assert events == ["save", "postprocess"]
 
     def test_execute_task_saves_raw_data(
         self, executor: TaskExecutor, mock_data_saver: MagicMock

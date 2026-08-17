@@ -56,9 +56,9 @@ class CheckOptimalReadoutFrequency(QubexTask):
         with self._apply_frequency_override(backend, qid):
             result = exp.find_optimal_readout_frequency(
                 target=label,
-                frequency_width=0.05,
                 n_shots=self.run_parameters["shots"].get_value(),
                 shot_interval=self.run_parameters["interval"].get_value(),
+                objective="fidelity",
             )
 
         self.save_calibration(backend)

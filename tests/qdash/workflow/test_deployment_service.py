@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import HTTPException
 
 from qdash.workflow import deployment_service
 from qdash.workflow.deployment_service import (
@@ -295,3 +296,136 @@ async def test_register_deployment_continues_when_reading_old_deployment_fails(
     assert client.create_deployment_kwargs is not None
     assert client.create_deployment_kwargs["schedules"] is None
     assert client.create_deployment_kwargs["parameters"] is None
+
+
+def _fake_schedule(
+    schedule_id: uuid.UUID, cron: str, timezone: str, active: bool = True
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=schedule_id,
+        schedule=SimpleNamespace(cron=cron, timezone=timezone),
+        active=active,
+        created=None,
+    )
+
+
+class _ScheduleFakeClient:
+    """Fake Prefect client for exercising ``set_schedule``."""
+
+    def __init__(
+        self,
+        deployment: object,
+        existing_schedules: list[SimpleNamespace],
+        created_schedules: list[SimpleNamespace],
+    ) -> None:
+        self.read_deployment = AsyncMock(return_value=deployment)
+        self.read_deployment_schedules = AsyncMock(return_value=existing_schedules)
+        self.delete_deployment_schedule = AsyncMock()
+        self.create_deployment_schedules = AsyncMock(return_value=created_schedules)
+
+
+@pytest.mark.asyncio
+async def test_set_schedule_appends_without_deleting_existing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A new cron schedule is appended; existing schedules are left in place (#795)."""
+    deployment_id = uuid.UUID("44444444-4444-4444-4444-444444444444")
+    deployment = SimpleNamespace(name="myflow")
+    existing = _fake_schedule(
+        uuid.UUID("55555555-5555-5555-5555-555555555555"), "0 1 * * *", "Asia/Tokyo"
+    )
+    new_schedule_id = uuid.UUID("66666666-6666-6666-6666-666666666666")
+    created = [_fake_schedule(new_schedule_id, "0 2 * * *", "Asia/Tokyo")]
+    client = _ScheduleFakeClient(deployment, [existing], created)
+    monkeypatch.setattr(deployment_service, "get_client", lambda: _SharedClientCtx(client))
+
+    request = deployment_service.SetScheduleRequest(
+        deployment_id=str(deployment_id),
+        cron="0 2 * * *",
+        timezone="Asia/Tokyo",
+        active=True,
+    )
+
+    response = await deployment_service.set_schedule(request)
+
+    client.delete_deployment_schedule.assert_not_called()
+    client.create_deployment_schedules.assert_awaited_once()
+    await_args = client.create_deployment_schedules.await_args
+    assert await_args is not None
+    assert await_args.args[0] == deployment_id
+    assert response.schedule_id == str(new_schedule_id)
+    assert response.cron == "0 2 * * *"
+
+
+@pytest.mark.asyncio
+async def test_set_schedule_duplicate_cron_and_timezone_raises_409(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Adding a schedule with the same cron + timezone as an existing one is rejected (#795)."""
+    deployment_id = uuid.UUID("77777777-7777-7777-7777-777777777777")
+    deployment = SimpleNamespace(name="myflow")
+    existing = _fake_schedule(
+        uuid.UUID("88888888-8888-8888-8888-888888888888"), "0 2 * * *", "Asia/Tokyo"
+    )
+    client = _ScheduleFakeClient(deployment, [existing], created_schedules=[])
+    monkeypatch.setattr(deployment_service, "get_client", lambda: _SharedClientCtx(client))
+
+    request = deployment_service.SetScheduleRequest(
+        deployment_id=str(deployment_id),
+        cron="0 2 * * *",
+        timezone="Asia/Tokyo",
+        active=True,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await deployment_service.set_schedule(request)
+
+    assert exc_info.value.status_code == 409
+    client.create_deployment_schedules.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_set_schedule_response_includes_created_schedule_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The response surfaces the Prefect-assigned id of the newly created schedule (#795)."""
+    deployment_id = uuid.UUID("99999999-9999-9999-9999-999999999999")
+    deployment = SimpleNamespace(name="myflow")
+    new_schedule_id = uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    created = [_fake_schedule(new_schedule_id, "0 3 * * *", "UTC")]
+    client = _ScheduleFakeClient(deployment, [], created)
+    monkeypatch.setattr(deployment_service, "get_client", lambda: _SharedClientCtx(client))
+
+    request = deployment_service.SetScheduleRequest(
+        deployment_id=str(deployment_id),
+        cron="0 3 * * *",
+        timezone="UTC",
+        active=False,
+    )
+
+    response = await deployment_service.set_schedule(request)
+
+    assert response.schedule_id == str(new_schedule_id)
+    assert response.active is False
+
+
+@pytest.mark.asyncio
+async def test_set_schedule_handles_empty_created_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If Prefect returns no created schedules, schedule_id falls back to None."""
+    deployment_id = uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    deployment = SimpleNamespace(name="myflow")
+    client = _ScheduleFakeClient(deployment, [], [])
+    monkeypatch.setattr(deployment_service, "get_client", lambda: _SharedClientCtx(client))
+
+    request = deployment_service.SetScheduleRequest(
+        deployment_id=str(deployment_id),
+        cron="0 4 * * *",
+        timezone="UTC",
+        active=True,
+    )
+
+    response = await deployment_service.set_schedule(request)
+
+    assert response.schedule_id is None

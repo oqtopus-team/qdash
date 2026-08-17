@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { Plus, X } from "lucide-react";
+import { AlertCircle, CircleDot, Cpu, Plus, Refrigerator, RotateCcw, X } from "lucide-react";
 
 import { useListChips } from "@/client/chip/chip";
 import {
@@ -16,6 +16,7 @@ import {
   useListCryostats,
 } from "@/client/cryostat/cryostat";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,13 +25,23 @@ import { CryostatCard } from "./CryostatCard";
 
 export function CryoPageContent() {
   const queryClient = useQueryClient();
-  const { data: cryostatsData, isLoading: cryostatsLoading } = useListCryostats();
-  const { data: cooldownsData, isLoading: cooldownsLoading } = useListCooldowns();
+  const {
+    data: cryostatsData,
+    isLoading: cryostatsLoading,
+    isError: cryostatsError,
+    refetch: refetchCryostats,
+  } = useListCryostats();
+  const {
+    data: cooldownsData,
+    isLoading: cooldownsLoading,
+    isError: cooldownsError,
+    refetch: refetchCooldowns,
+  } = useListCooldowns();
   const { data: chipsData } = useListChips();
 
-  const cryostats = cryostatsData?.data?.cryostats ?? [];
+  const cryostats = useMemo(() => cryostatsData?.data?.cryostats ?? [], [cryostatsData]);
   const cooldowns = useMemo(() => cooldownsData?.data?.cooldowns ?? [], [cooldownsData]);
-  const chips = chipsData?.data?.chips ?? [];
+  const chips = useMemo(() => chipsData?.data?.chips ?? [], [chipsData]);
 
   const cooldownsByCryo = useMemo(() => {
     const map: Record<string, typeof cooldowns> = {};
@@ -50,7 +61,22 @@ export function CryoPageContent() {
   const [newCooldownFor, setNewCooldownFor] = useState<string | null>(null);
 
   const isLoading = cryostatsLoading || cooldownsLoading;
+  const isError = cryostatsError || cooldownsError;
   const showNewCryostatHeaderBtn = cryostats.length > 0;
+
+  const overview = useMemo(() => {
+    const activeCooldowns = cooldowns.filter((cooldown) => !cooldown.ended_at);
+    return {
+      activeCooldowns: activeCooldowns.length,
+      loadedChips: new Set(activeCooldowns.flatMap((cooldown) => cooldown.chip_ids)).size,
+      attentionCryostats: cryostats.filter((cryo) => cryo.status !== "active").length,
+    };
+  }, [cooldowns, cryostats]);
+
+  const retry = () => {
+    void refetchCryostats();
+    void refetchCooldowns();
+  };
 
   return (
     <PageContainer>
@@ -74,6 +100,21 @@ export function CryoPageContent() {
 
         {isLoading ? (
           <CryoLoadingSkeleton />
+        ) : isError ? (
+          <div className="alert alert-error" role="alert">
+            <AlertCircle className="h-5 w-5" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold">Failed to load cryogenic operations</div>
+              <div className="text-sm opacity-80">
+                Cryostats or cool-down history could not be retrieved. Existing data has not been
+                changed.
+              </div>
+            </div>
+            <button type="button" className="btn btn-sm btn-ghost gap-1" onClick={retry}>
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              Retry
+            </button>
+          </div>
         ) : cryostats.length === 0 ? (
           <EmptyState
             title="No cryostats yet"
@@ -91,17 +132,25 @@ export function CryoPageContent() {
             }
           />
         ) : (
-          <div className="divide-y divide-base-300">
-            {cryostats.map((cryo) => (
-              <CryostatCard
-                key={cryo.cryo_id}
-                cryo={cryo}
-                cooldowns={cooldownsByCryo[cryo.cryo_id] ?? []}
-                allChips={chips.map((c) => c.chip_id)}
-                onChange={invalidate}
-                onCreateCooldown={() => setNewCooldownFor(cryo.cryo_id)}
-              />
-            ))}
+          <div className="space-y-6">
+            <CryoOverview
+              cryostats={cryostats.length}
+              activeCooldowns={overview.activeCooldowns}
+              loadedChips={overview.loadedChips}
+              attentionCryostats={overview.attentionCryostats}
+            />
+            <div className="divide-y divide-base-300">
+              {cryostats.map((cryo) => (
+                <CryostatCard
+                  key={cryo.cryo_id}
+                  cryo={cryo}
+                  cooldowns={cooldownsByCryo[cryo.cryo_id] ?? []}
+                  allChips={chips.map((c) => c.chip_id)}
+                  onChange={invalidate}
+                  onCreateCooldown={() => setNewCooldownFor(cryo.cryo_id)}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -117,6 +166,56 @@ export function CryoPageContent() {
         />
       )}
     </PageContainer>
+  );
+}
+
+function CryoOverview({
+  cryostats,
+  activeCooldowns,
+  loadedChips,
+  attentionCryostats,
+}: {
+  cryostats: number;
+  activeCooldowns: number;
+  loadedChips: number;
+  attentionCryostats: number;
+}) {
+  const items = [
+    { label: "Cryostats", value: cryostats, icon: Refrigerator },
+    { label: "Cooling now", value: activeCooldowns, icon: CircleDot, active: true },
+    { label: "Chips loaded", value: loadedChips, icon: Cpu },
+    {
+      label: "Need attention",
+      value: attentionCryostats,
+      icon: AlertCircle,
+      warning: attentionCryostats > 0,
+    },
+  ];
+
+  return (
+    <section
+      aria-label="Cryogenic operations overview"
+      className="grid grid-cols-2 lg:grid-cols-4 gap-2"
+    >
+      {items.map(({ label, value, icon: Icon, active, warning }) => (
+        <div key={label} className="rounded-xl border border-base-300 bg-base-100 px-3 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-base-content/60">{label}</span>
+            <Icon
+              className={`h-4 w-4 ${
+                warning
+                  ? "text-warning"
+                  : active && value > 0
+                    ? "text-success"
+                    : "text-base-content/35"
+              }`}
+              aria-hidden="true"
+            />
+          </div>
+          <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -174,7 +273,7 @@ function NewCryostatModal({ onClose, onCreated }: { onClose: () => void; onCreat
   };
 
   return (
-    <ModalShell title="New cryostat" onClose={onClose}>
+    <ModalShell title="New cryostat" onClose={onClose} pending={create.isPending}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Cryo ID" required>
           <input
@@ -255,7 +354,7 @@ function NewCooldownModal({
   };
 
   return (
-    <ModalShell title={`New cool-down · ${cryoId}`} onClose={onClose}>
+    <ModalShell title={`New cool-down · ${cryoId}`} onClose={onClose} pending={create.isPending}>
       <Field label="Cooldown ID" required>
         <input
           className="input input-sm input-bordered w-full"
@@ -283,28 +382,31 @@ function ModalShell({
   title,
   onClose,
   children,
+  pending = false,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  pending?: boolean;
 }) {
   return (
-    <div
-      className="modal modal-open"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="modal-box w-full max-w-2xl">
+    <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
+      <DialogContent className="max-w-2xl">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-bold">{title}</h3>
-          <button className="btn btn-ghost btn-sm btn-square" onClick={onClose} aria-label="Close">
+          <DialogTitle>{title}</DialogTitle>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm btn-square"
+            onClick={onClose}
+            disabled={pending}
+            aria-label="Close"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
         {children}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -345,10 +447,15 @@ function ModalFooter({
 }) {
   return (
     <div className="modal-action mt-4">
-      <button className="btn btn-sm btn-ghost" onClick={onCancel}>
+      <button type="button" className="btn btn-sm btn-ghost" onClick={onCancel} disabled={pending}>
         Cancel
       </button>
-      <button className="btn btn-sm btn-primary" onClick={onSubmit} disabled={disabled}>
+      <button
+        type="button"
+        className="btn btn-sm btn-primary"
+        onClick={onSubmit}
+        disabled={disabled}
+      >
         {pending ? "Creating…" : submitLabel}
       </button>
     </div>

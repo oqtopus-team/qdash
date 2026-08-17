@@ -2,6 +2,7 @@ import math
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
+import numpy as np
 import plotly.graph_objects as go
 import pytest
 
@@ -36,10 +37,11 @@ def test_check_rabi_run_uses_data_fit_r2_for_validation(monkeypatch: pytest.Monk
 
     result = SimpleNamespace(
         data={"Q01": DummyData()},
-        rabi_params={"Q01": SimpleNamespace(r2=0.95)},
+        rabi_params={"Q01": SimpleNamespace(r2=np.float32(0.95))},
     )
     exp = SimpleNamespace(
         params=SimpleNamespace(readout_amplitude={}),
+        ctx=SimpleNamespace(store_rabi_params=lambda _params: None),
         get_qubit_label=lambda _qid: "Q01",
         obtain_rabi_params=lambda **_kwargs: result,
     )
@@ -47,6 +49,7 @@ def test_check_rabi_run_uses_data_fit_r2_for_validation(monkeypatch: pytest.Monk
 
     run_result = task.run(cast("QubexBackend", backend), "1")
 
+    assert isinstance(result.rabi_params["Q01"].r2, float)
     assert run_result.r2 == {"1": 0.127}
 
 
@@ -107,5 +110,5 @@ def test_check_rabi_postprocess_marks_non_finite_frequency_failed_after_artifact
     )
 
     assert result.figures
-    assert result.raw_data
+    assert result.raw_data == []
     assert result.validation_error == "CheckRabi produced non-finite frequency for Q01: nan"

@@ -1,211 +1,185 @@
 "use client";
 
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-
-import { Toast } from "../Toast";
+import { Eye, EyeOff, Info } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { getGetCurrentUserQueryKey, useChangePassword } from "@/client/auth/auth";
+import { useToast } from "@/components/ui/Toast";
 
-const EyeIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-    className="w-5 h-5"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-    />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
+const passwordChangeSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: z.string().min(4, "New password must be at least 4 characters"),
+    confirmPassword: z.string().min(1, "Please confirm your new password"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "New passwords do not match",
+    path: ["confirmPassword"],
+  });
 
-const EyeSlashIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-    className="w-5 h-5"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"
-    />
-  </svg>
-);
+type PasswordChangeFormData = z.infer<typeof passwordChangeSchema>;
+type PasswordField = keyof PasswordChangeFormData;
+
+interface PasswordInputProps {
+  field: PasswordField;
+  label: string;
+  placeholder: string;
+  visible: boolean;
+  onToggleVisibility: () => void;
+  register: ReturnType<typeof useForm<PasswordChangeFormData>>["register"];
+  error?: string;
+}
+
+function PasswordInput({
+  field,
+  label,
+  placeholder,
+  visible,
+  onToggleVisibility,
+  register,
+  error,
+}: PasswordInputProps) {
+  const errorId = `${field}-error`;
+
+  return (
+    <div className="form-control w-full">
+      <label className="label" htmlFor={field}>
+        <span className="label-text">{label}</span>
+      </label>
+      <label
+        className={`input input-bordered flex w-full items-center gap-2 ${error ? "input-error" : ""}`}
+      >
+        <input
+          id={field}
+          type={visible ? "text" : "password"}
+          className="grow"
+          placeholder={placeholder}
+          autoComplete={field === "currentPassword" ? "current-password" : "new-password"}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+          {...register(field)}
+        />
+        <button
+          type="button"
+          className="btn btn-ghost btn-xs btn-square"
+          onClick={onToggleVisibility}
+          aria-label={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`}
+        >
+          {visible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+        </button>
+      </label>
+      {error && (
+        <p id={errorId} className="mt-1 text-sm text-error">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function PasswordChangeCard() {
   const queryClient = useQueryClient();
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
-
+  const toast = useToast();
+  const [visibleFields, setVisibleFields] = useState<Set<PasswordField>>(new Set());
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<PasswordChangeFormData>({
+    resolver: zodResolver(passwordChangeSchema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
+  });
   const changePasswordMutation = useChangePassword({
     mutation: {
       onSuccess: () => {
-        setToast({
-          message: "Password changed successfully!",
-          type: "success",
-        });
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-        queryClient.invalidateQueries({
-          queryKey: getGetCurrentUserQueryKey(),
-        });
+        toast.success("Password changed successfully!");
+        reset();
+        queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() });
       },
       onError: (error: unknown) => {
         const errorMessage =
           error instanceof Error
             ? error.message
             : "Failed to change password. Please check your current password.";
-        setToast({ message: errorMessage, type: "error" });
+        toast.error(errorMessage);
       },
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const toggleVisibility = (field: PasswordField) => {
+    setVisibleFields((current) => {
+      const next = new Set(current);
+      if (next.has(field)) next.delete(field);
+      else next.add(field);
+      return next;
+    });
+  };
 
-    if (newPassword !== confirmPassword) {
-      setToast({ message: "New passwords do not match", type: "error" });
-      return;
-    }
-
-    if (newPassword.length < 4) {
-      setToast({
-        message: "New password must be at least 4 characters",
-        type: "error",
-      });
-      return;
-    }
-
+  const submit = (data: PasswordChangeFormData) => {
     changePasswordMutation.mutate({
-      data: {
-        current_password: currentPassword,
-        new_password: newPassword,
-      },
+      data: { current_password: data.currentPassword, new_password: data.newPassword },
     });
   };
 
   return (
     <div className="card bg-base-200 shadow-lg">
       <div className="card-body">
-        <h2 className="card-title text-xl mb-4">Change Password</h2>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <label className="form-control w-full">
-            <div className="label">
-              <span className="label-text">Current Password</span>
-            </div>
-            <label className="input input-bordered flex items-center gap-2 w-full">
-              <input
-                type={showCurrentPassword ? "text" : "password"}
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="grow"
-                placeholder="Enter current password"
-                required
-              />
-              <button
-                type="button"
-                className="btn btn-ghost btn-xs btn-square"
-                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-              >
-                {showCurrentPassword ? <EyeSlashIcon /> : <EyeIcon />}
-              </button>
-            </label>
-          </label>
-
-          <label className="form-control w-full">
-            <div className="label">
-              <span className="label-text">New Password</span>
-            </div>
-            <label className="input input-bordered flex items-center gap-2 w-full">
-              <input
-                type={showNewPassword ? "text" : "password"}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="grow"
-                placeholder="Enter new password"
-                required
-                minLength={4}
-              />
-              <button
-                type="button"
-                className="btn btn-ghost btn-xs btn-square"
-                onClick={() => setShowNewPassword(!showNewPassword)}
-              >
-                {showNewPassword ? <EyeSlashIcon /> : <EyeIcon />}
-              </button>
-            </label>
-          </label>
-
-          <label className="form-control w-full">
-            <div className="label">
-              <span className="label-text">Confirm New Password</span>
-            </div>
-            <label className="input input-bordered flex items-center gap-2 w-full">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="grow"
-                placeholder="Confirm new password"
-                required
-                minLength={4}
-              />
-              <button
-                type="button"
-                className="btn btn-ghost btn-xs btn-square"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                {showConfirmPassword ? <EyeSlashIcon /> : <EyeIcon />}
-              </button>
-            </label>
-          </label>
+        <h2 className="card-title mb-4 text-xl">Change Password</h2>
+        <form onSubmit={handleSubmit(submit)} className="flex flex-col gap-4" noValidate>
+          <PasswordInput
+            field="currentPassword"
+            label="Current Password"
+            placeholder="Enter current password"
+            visible={visibleFields.has("currentPassword")}
+            onToggleVisibility={() => toggleVisibility("currentPassword")}
+            register={register}
+            error={errors.currentPassword?.message}
+          />
+          <PasswordInput
+            field="newPassword"
+            label="New Password"
+            placeholder="Enter new password"
+            visible={visibleFields.has("newPassword")}
+            onToggleVisibility={() => toggleVisibility("newPassword")}
+            register={register}
+            error={errors.newPassword?.message}
+          />
+          <PasswordInput
+            field="confirmPassword"
+            label="Confirm New Password"
+            placeholder="Confirm new password"
+            visible={visibleFields.has("confirmPassword")}
+            onToggleVisibility={() => toggleVisibility("confirmPassword")}
+            register={register}
+            error={errors.confirmPassword?.message}
+          />
 
           <div className="alert alert-info mt-2">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              className="stroke-current shrink-0 w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
+            <Info className="h-6 w-6 shrink-0" aria-hidden="true" />
             <span className="text-sm">Password must be at least 4 characters long.</span>
           </div>
 
           <button
             type="submit"
-            className={`btn btn-primary mt-2 ${changePasswordMutation.isPending ? "loading" : ""}`}
+            className="btn btn-primary mt-2"
             disabled={changePasswordMutation.isPending}
           >
-            {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
+            {changePasswordMutation.isPending ? (
+              <>
+                <span className="loading loading-spinner loading-sm" aria-hidden="true" />
+                Changing...
+              </>
+            ) : (
+              "Change Password"
+            )}
           </button>
         </form>
       </div>
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

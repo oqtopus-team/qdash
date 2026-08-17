@@ -2,7 +2,16 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-import { ExternalLink, ArrowUpRight, StopCircle, UserRound } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowUpRight,
+  BarChart3,
+  ChevronDown,
+  ExternalLink,
+  StopCircle,
+  UserRound,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 
 import { formatDate, formatDateTime } from "@/lib/utils/datetime";
@@ -40,15 +49,41 @@ function formatActorLabel(actor?: ActorFields | null) {
   return actor?.user_id || "Unknown";
 }
 
+function getStatusLabel(status: string) {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function getStatusBadgeClass(status: string) {
+  switch (status) {
+    case "running":
+      return "badge-info";
+    case "completed":
+      return "badge-success";
+    case "scheduled":
+    case "pending":
+      return "badge-warning";
+    case "failed":
+      return "badge-error";
+    default:
+      return "badge-ghost";
+  }
+}
+
 function PaginationControls({
   currentPage,
   setCurrentPage,
   hasMore,
+  totalPages,
 }: {
   currentPage: number;
   setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
   hasMore: boolean;
+  totalPages?: number;
 }) {
+  const isNextDisabled = totalPages !== undefined ? currentPage >= totalPages : !hasMore;
+  const pageLabel =
+    totalPages !== undefined ? `Page ${currentPage} of ${totalPages}` : `Page ${currentPage}`;
+
   return (
     <div className="flex justify-center items-center gap-2 sm:gap-4 my-3 sm:my-4 px-4">
       <button
@@ -58,10 +93,10 @@ function PaginationControls({
       >
         Prev
       </button>
-      <span className="text-xs sm:text-sm">Page {currentPage}</span>
+      <span className="text-xs sm:text-sm">{pageLabel}</span>
       <button
         onClick={() => setCurrentPage((prev) => prev + 1)}
-        disabled={!hasMore}
+        disabled={isNextDisabled}
         className="btn btn-xs sm:btn-sm btn-outline"
       >
         Next
@@ -82,6 +117,7 @@ export function ExecutionPageContent() {
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showDurationBreakdown, setShowDurationBreakdown] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -162,6 +198,33 @@ export function ExecutionPageContent() {
     });
   }, [executionData, selectedDate]);
 
+  const statusSummary = useMemo(
+    () => ({
+      total: cardData.length,
+      running: cardData.filter((execution) =>
+        ["running", "scheduled", "pending"].includes(execution.status),
+      ).length,
+      failed: cardData.filter((execution) => execution.status === "failed").length,
+      completed: cardData.filter((execution) => execution.status === "completed").length,
+    }),
+    [cardData],
+  );
+
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !showCancelConfirm) {
+        setIsSidebarOpen(false);
+        setSelectedExecutionId(null);
+        setExpandedTaskIndex(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isSidebarOpen, showCancelConfirm]);
+
   // Chip selection change handler
   const handleChipChange = (chipId: string) => {
     setSelectedChip(chipId || null);
@@ -177,7 +240,20 @@ export function ExecutionPageContent() {
   };
 
   if (isLoading) return <ExecutionPageSkeleton />;
-  if (isError) return <div>Error</div>;
+  if (isError) {
+    return (
+      <PageContainer>
+        <PageHeader
+          title="Execution History"
+          description="Monitor workflow runs and task results"
+        />
+        <div role="alert" className="alert alert-error">
+          <AlertCircle className="h-5 w-5" />
+          <span>Execution history could not be loaded. Please try again.</span>
+        </div>
+      </PageContainer>
+    );
+  }
 
   // Generate unique key for execution
   const getExecutionKey = (execution: ExecutionResponseSummary) => `${execution.execution_id}`;
@@ -221,22 +297,26 @@ export function ExecutionPageContent() {
   const getStatusBorderStyle = (status: string) => {
     switch (status) {
       case "running":
-        return "border-l-4 border-info";
+        return "border-l-4 border-l-info";
       case "completed":
-        return "border-l-4 border-success";
+        return "border-l-4 border-l-success";
       case "scheduled":
-        return "border-l-4 border-warning";
+        return "border-l-4 border-l-warning";
       case "failed":
-        return "border-l-4 border-error";
+        return "border-l-4 border-l-error";
       case "cancelled":
-        return "border-l-4 border-neutral";
+        return "border-l-4 border-l-neutral";
       default:
-        return "border-l-4 border-base-300";
+        return "border-l-4 border-l-base-300";
     }
   };
 
   const hasMorePages =
     !!executionData?.data?.executions && executionData.data.executions.length >= itemsPerPage;
+
+  const total = executionData?.data?.total;
+  const totalPages = total != null ? Math.max(1, Math.ceil(total / itemsPerPage)) : undefined;
+  const shouldShowPagination = currentPage > 1 || hasMorePages || (totalPages ?? 1) > 1;
 
   return (
     <PageContainer>
@@ -256,110 +336,155 @@ export function ExecutionPageContent() {
           </PageFiltersBar.Item>
         </PageFiltersBar.Group>
       </PageFiltersBar>
-      {/* Statistics display */}
-      <ExecutionDurationBreakdown
-        executions={cardData}
-        selectedTag={selectedTag}
-        onTagSelect={setSelectedTag}
-        allItemsHref={`/execution/durations${selectedChip ? `?chip=${encodeURIComponent(selectedChip)}` : ""}`}
-      />
-      {/* Pagination controls - Top */}
-      <PaginationControls
-        currentPage={currentPage}
-        setCurrentPage={setCurrentPage}
-        hasMore={hasMorePages}
-      />
-      <div className="grid grid-cols-1 gap-1.5 sm:gap-2">
-        {cardData.map((execution) => {
-          const executionKey = getExecutionKey(execution);
-          const isSelected = selectedExecutionId === execution.execution_id;
-          const statusBorderStyle = getStatusBorderStyle(execution.status);
+      <section aria-label="Execution status summary" className="mb-4 sm:mb-6">
+        <div className="stats stats-horizontal w-full overflow-x-auto border border-base-300 bg-base-100 shadow-sm">
+          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
+            <div className="stat-title text-xs">Total</div>
+            <div className="stat-value text-2xl">{statusSummary.total}</div>
+          </div>
+          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
+            <div className="stat-title text-xs">Running</div>
+            <div className="stat-value text-2xl text-info">{statusSummary.running}</div>
+          </div>
+          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
+            <div className="stat-title text-xs">Failed</div>
+            <div className="stat-value text-2xl text-error">{statusSummary.failed}</div>
+          </div>
+          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
+            <div className="stat-title text-xs">Completed</div>
+            <div className="stat-value text-2xl text-success">{statusSummary.completed}</div>
+          </div>
+        </div>
+      </section>
+      <section className="mb-6" aria-labelledby="duration-breakdown-heading">
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 rounded-box border border-base-300 bg-base-100 px-4 py-3 text-left transition-colors hover:bg-base-200/50"
+          aria-expanded={showDurationBreakdown}
+          aria-controls="duration-breakdown-content"
+          onClick={() => setShowDurationBreakdown((value) => !value)}
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <BarChart3 className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span id="duration-breakdown-heading" className="block font-semibold">
+              Task duration breakdown
+            </span>
+            <span className="block text-sm text-base-content/60">
+              Compare task timing across the current execution set
+            </span>
+          </span>
+          <ChevronDown
+            className={`h-5 w-5 shrink-0 transition-transform ${showDurationBreakdown ? "rotate-180" : ""}`}
+          />
+        </button>
+        {showDurationBreakdown && (
+          <div id="duration-breakdown-content" className="mt-3">
+            <ExecutionDurationBreakdown
+              executions={cardData}
+              selectedTag={selectedTag}
+              onTagSelect={setSelectedTag}
+              allItemsHref={`/execution/durations${selectedChip ? `?chip=${encodeURIComponent(selectedChip)}` : ""}`}
+            />
+          </div>
+        )}
+      </section>
+      <section aria-labelledby="recent-executions-heading">
+        <div className="mb-3">
+          <h2 id="recent-executions-heading" className="text-lg font-semibold">
+            Recent executions
+          </h2>
+          <p className="text-sm text-base-content/60">
+            {total != null
+              ? `${total} execution${total === 1 ? "" : "s"}`
+              : `${cardData.length} shown`}
+          </p>
+        </div>
+        {cardData.length === 0 && (
+          <div className="rounded-box border border-dashed border-base-300 bg-base-100 px-6 py-12 text-center">
+            <h3 className="font-semibold">No executions found</h3>
+            <p className="mt-1 text-sm text-base-content/60">
+              Try another chip or date to view execution history.
+            </p>
+          </div>
+        )}
+        <div className="grid grid-cols-1 gap-2">
+          {cardData.map((execution) => {
+            const executionKey = getExecutionKey(execution);
+            const isSelected = selectedExecutionId === execution.execution_id;
+            const statusBorderStyle = getStatusBorderStyle(execution.status);
 
-          return (
-            <div
-              key={executionKey}
-              role="button"
-              tabIndex={0}
-              className={`p-2 sm:p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden bg-base-100 float-hover ${
-                isSelected ? "transform scale-100" : "sm:transform sm:scale-95"
-              } ${statusBorderStyle}`}
-              onClick={() => handleCardClick(execution)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleCardClick(execution);
-                }
-              }}
-            >
-              {isSelected && (
-                <div className="absolute inset-0 bg-primary opacity-10 pointer-events-none transition-opacity duration-500" />
-              )}
-              <div className="relative z-10 w-full">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-sm sm:text-xl font-semibold truncate">{execution.name}</h2>
-                  <span
-                    className={`text-xs sm:text-sm font-semibold flex-shrink-0 ${
-                      execution.status === "running"
-                        ? "text-info status-pulse"
-                        : execution.status === "completed"
-                          ? "text-success"
-                          : execution.status === "scheduled"
-                            ? "text-warning"
-                            : execution.status === "cancelled"
-                              ? "text-neutral"
-                              : "text-error"
-                    }`}
-                  >
-                    {execution.status === "running"
-                      ? "Running"
-                      : execution.status === "completed"
-                        ? "Completed"
-                        : execution.status === "scheduled"
-                          ? "Scheduled"
-                          : execution.status === "cancelled"
-                            ? "Cancelled"
-                            : "Failed"}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-xs sm:text-sm text-base-content/60">
-                  <span>{formatDateTime(execution.start_at)}</span>
-                  {execution.elapsed_time && (
-                    <span className="hidden sm:inline">Duration: {execution.elapsed_time}</span>
-                  )}
-                  {execution.elapsed_time && (
-                    <span className="sm:hidden">{execution.elapsed_time}</span>
-                  )}
-                  <span className="inline-flex items-center gap-1 min-w-0">
-                    <UserRound className="h-3 w-3 flex-shrink-0" />
-                    <span className="truncate">{formatActorLabel(execution)}</span>
-                  </span>
+            return (
+              <div
+                key={executionKey}
+                role="button"
+                tabIndex={0}
+                aria-label={`View ${execution.name} execution details`}
+                className={`relative flex cursor-pointer overflow-hidden rounded-box border border-base-200 bg-base-100 p-3 shadow-sm transition-colors hover:border-primary/40 hover:bg-base-200/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:p-4 ${statusBorderStyle}`}
+                onClick={() => handleCardClick(execution)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleCardClick(execution);
+                  }
+                }}
+              >
+                {isSelected && (
+                  <div className="absolute inset-0 bg-primary opacity-10 pointer-events-none transition-opacity duration-500" />
+                )}
+                <div className="relative z-10 w-full">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="truncate text-sm font-semibold sm:text-base">
+                      {execution.name}
+                    </h3>
+                    <span
+                      className={`badge badge-sm flex-shrink-0 ${getStatusBadgeClass(execution.status)} ${execution.status === "running" ? "status-pulse" : ""}`}
+                    >
+                      {getStatusLabel(execution.status)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-xs sm:text-sm text-base-content/60">
+                    <span>{formatDateTime(execution.start_at)}</span>
+                    {execution.elapsed_time && (
+                      <span className="hidden sm:inline">Duration: {execution.elapsed_time}</span>
+                    )}
+                    {execution.elapsed_time && (
+                      <span className="sm:hidden">{execution.elapsed_time}</span>
+                    )}
+                    <span className="inline-flex items-center gap-1 min-w-0">
+                      <UserRound className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">{formatActorLabel(execution)}</span>
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-      {/* Pagination controls - Bottom */}
-      <PaginationControls
-        currentPage={currentPage}
-        setCurrentPage={setCurrentPage}
-        hasMore={hasMorePages}
-      />
-      {/* Sidebar */}
-      <div
-        className={`fixed right-0 top-0 w-full sm:w-3/4 lg:w-2/5 h-full bg-base-100 shadow-xl border-l overflow-y-auto p-4 sm:p-6 transition-transform duration-300 z-50 ${
-          isSidebarOpen ? "transform translate-x-0" : "transform translate-x-full"
-        }`}
+            );
+          })}
+        </div>
+        {shouldShowPagination && (
+          <PaginationControls
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            hasMore={hasMorePages}
+            totalPages={totalPages}
+          />
+        )}
+      </section>
+      <aside
+        aria-label="Execution details"
+        aria-hidden={!isSidebarOpen}
+        className={`fixed right-0 top-0 z-50 h-full w-full overflow-y-auto border-l border-base-300 bg-base-100 p-4 shadow-xl transition-transform duration-300 sm:w-3/4 sm:p-6 lg:w-2/5 ${isSidebarOpen ? "translate-x-0" : "translate-x-full"}`}
       >
         <button
           onClick={handleCloseSidebar}
-          className="btn btn-ghost btn-sm btn-circle absolute top-3 right-3 sm:top-4 sm:right-4"
-          aria-label="Close sidebar"
+          className="btn btn-ghost btn-sm btn-circle absolute top-3 right-3 z-10 sm:top-4 sm:right-4"
+          aria-label="Close execution details"
         >
-          ✕
+          <X className="h-4 w-4" />
         </button>
         {selectedExecutionId && (
-          <>
+          <div>
             <div className="p-2 sm:p-4 bg-base-100 mb-4 sm:mb-6">
               <h2 className="text-lg sm:text-2xl font-bold pr-8">
                 {cardData.find((exec) => getExecutionKey(exec) === selectedExecutionId)?.name}
@@ -507,9 +632,9 @@ export function ExecutionPageContent() {
                   );
                 })}
             </div>
-          </>
+          </div>
         )}
-      </div>
+      </aside>
       <CancelExecutionModal
         isOpen={showCancelConfirm}
         isPending={cancelMutation.isPending}

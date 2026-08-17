@@ -179,6 +179,7 @@ class TaskService:
             username=task_result.username,
             figure_path=task_result.figure_path,
             json_figure_path=task_result.json_figure_path,
+            raw_data_path=task_result.raw_data_path,
             input_parameters=task_result.input_parameters,
             output_parameters=task_result.output_parameters,
             run_parameters=task_result.run_parameters,

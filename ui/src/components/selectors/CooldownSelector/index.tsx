@@ -112,14 +112,16 @@ export function CooldownSelector({
   };
 
   return (
-    <Select<CooldownOption>
-      options={options}
-      value={selectedOption}
-      onChange={handleChange}
-      placeholder={placeholder}
-      isClearable={false}
-      className="text-base-content"
-      styles={styles}
-    />
+    <div className="cooldown-selector-control">
+      <Select<CooldownOption>
+        options={options}
+        value={selectedOption}
+        onChange={handleChange}
+        placeholder={placeholder}
+        isClearable={false}
+        className="text-base-content"
+        styles={styles}
+      />
+    </div>
   );
 }

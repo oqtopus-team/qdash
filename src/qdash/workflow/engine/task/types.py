@@ -54,6 +54,16 @@ class TaskProtocol(Protocol):
         """Run the task for a batch of qubits."""
         ...
 
+    def extract_raw_data(self, run_result: RunResult) -> list[Any]:
+        """Extract serializable artifacts before postprocessing."""
+        ...
+
+    def extract_batch_raw_data(
+        self, backend: Any, run_result: RunResult, qids: list[str]
+    ) -> dict[str, list[Any]]:
+        """Extract serializable artifacts grouped by qid from a batch result."""
+        ...
+
     def postprocess(
         self, backend: Any, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:

@@ -182,6 +182,19 @@ QDash uses DaisyUI's semantic color system. **Never use hardcoded colors**.
 
 ## Component Design
 
+### Interaction and Visual Layers
+
+DaisyUI remains QDash's visual foundation. Radix UI supplies behavior for complex interactive components; it does not replace the DaisyUI design system.
+
+Use this decision rule:
+
+1. Start with DaisyUI classes and semantic colors for appearance.
+2. For modal focus management, keyboard-operated menus, portal rendering, dismissal behavior, or viewport collision handling, use the shared Radix-based primitive under `ui/src/components/ui/`.
+3. Keep feature components independent of Radix implementation details by importing shared components such as `Dialog` and `DropdownMenu`.
+4. Preserve DaisyUI semantic colors in headless primitives. Do not introduce fixed light- or dark-mode colors.
+
+Avoid raw DaisyUI CSS dropdown or modal patterns when a shared Radix primitive already exists. Also avoid replacing simple buttons, cards, inputs, badges, or tables with unstyled headless components.
+
 ### DaisyUI Component Classes
 
 Use DaisyUI's component classes as the foundation:
@@ -554,4 +567,3 @@ const ranks = {
 <button className="bg-blue-500">Submit</button>       // Use btn-primary
 <span className="text-green-500">Success!</span>      // Use text-success
 ```
-
