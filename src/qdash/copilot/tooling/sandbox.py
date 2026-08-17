@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import sys
+from pathlib import Path
 from typing import Any
 
 from qdash.copilot.tooling.sandbox_core import (
@@ -13,11 +14,18 @@ from qdash.copilot.tooling.sandbox_core import (
     MAX_OUTPUT_BYTES,
     MAX_WORKER_INPUT_BYTES,
     MAX_WORKER_OUTPUT_BYTES,
+    WORKER_STARTUP_GRACE_SECONDS,
     SandboxChartSpec,
     SandboxResult,
 )
 
 logger = logging.getLogger(__name__)
+
+# Run the worker as a standalone script, not as ``-m qdash.copilot.tooling.sandbox_worker``:
+# importing it through the package would execute ``qdash.copilot.__init__`` (litellm) and
+# add ~2.3s to every sandbox call, which used to eat the whole timeout budget.
+WORKER_SCRIPT = Path(__file__).resolve().parent / "sandbox_worker.py"
+WORKER_WALL_TIMEOUT_SECONDS = EXECUTION_TIMEOUT_SECONDS + WORKER_STARTUP_GRACE_SECONDS
 
 __all__ = ["SandboxChartSpec", "SandboxResult", "execute_python_analysis"]
 
@@ -45,8 +53,7 @@ async def execute_python_analysis(
 
     process = await asyncio.create_subprocess_exec(
         sys.executable,
-        "-m",
-        "qdash.copilot.tooling.sandbox_worker",
+        str(WORKER_SCRIPT),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -55,11 +62,18 @@ async def execute_python_analysis(
     try:
         stdout, stderr = await asyncio.wait_for(
             process.communicate(request_bytes),
-            timeout=EXECUTION_TIMEOUT_SECONDS + 1,
+            timeout=WORKER_WALL_TIMEOUT_SECONDS,
         )
     except TimeoutError:
         process.kill()
         await process.wait()
+        logger.warning(
+            "Python sandbox worker exceeded the %ds wall-clock budget (execution timeout %ds "
+            "+ %ds startup grace)",
+            WORKER_WALL_TIMEOUT_SECONDS,
+            EXECUTION_TIMEOUT_SECONDS,
+            WORKER_STARTUP_GRACE_SECONDS,
+        )
         return _error(f"Execution timed out after {EXECUTION_TIMEOUT_SECONDS} seconds")
 
     stderr_text = stderr.decode("utf-8", errors="replace").strip()

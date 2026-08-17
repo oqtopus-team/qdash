@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any
 
 import pytest
 
 from qdash.copilot.agent_runtime.execution import execute_tool_executor, wrap_tool_executors
-from qdash.copilot.tooling.sandbox import execute_python_analysis
+from qdash.copilot.tooling.sandbox import WORKER_SCRIPT, execute_python_analysis
 from qdash.copilot.tooling.sandbox_core import EXECUTION_TIMEOUT_SECONDS, MAX_OUTPUT_BYTES
+
+# The worker must stay a standalone script: importing it through the qdash package
+# executes qdash.copilot.__init__ (litellm), which adds ~2.3s to every call.
+MAX_STARTUP_OVERHEAD_SECONDS = 1.5
 
 
 @pytest.mark.asyncio
@@ -127,6 +132,20 @@ async def test_execute_python_analysis_does_not_block_event_loop() -> None:
     assert result["error"] == f"Execution timed out after {EXECUTION_TIMEOUT_SECONDS} seconds"
 
 
+def test_worker_script_exists() -> None:
+    assert WORKER_SCRIPT.is_file()
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_starts_worker_without_qdash_imports() -> None:
+    started = time.perf_counter()
+    result = await execute_python_analysis('result = {"output": "ok"}')
+    elapsed = time.perf_counter() - started
+
+    assert result["error"] is None
+    assert elapsed < MAX_STARTUP_OVERHEAD_SECONDS
+
+
 @pytest.mark.asyncio
 async def test_execute_python_analysis_reaps_worker_process() -> None:
     result = await execute_python_analysis('result = {"output": "done"}')
@@ -136,7 +155,7 @@ async def test_execute_python_analysis_reaps_worker_process() -> None:
     current_process = await asyncio.create_subprocess_exec(
         "pgrep",
         "-f",
-        "qdash.copilot.tooling.sandbox_worker",
+        WORKER_SCRIPT.name,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

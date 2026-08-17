@@ -1,4 +1,11 @@
-"""Worker process entry point for Copilot Python sandbox execution."""
+"""Worker process entry point for Copilot Python sandbox execution.
+
+This module is launched as a standalone script (``python <path>/sandbox_worker.py``)
+rather than with ``python -m qdash.copilot.tooling.sandbox_worker``: importing it as
+part of the ``qdash`` package would execute ``qdash.copilot.__init__``, which pulls in
+litellm and costs ~2.3s of interpreter startup on every sandbox call. ``sandbox_core``
+is therefore imported as a sibling module from this file's own directory.
+"""
 
 from __future__ import annotations
 
@@ -6,16 +13,23 @@ import json
 import logging
 import resource
 import sys
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from qdash.copilot.tooling.sandbox_core import (
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from sandbox_core import (
     EXECUTION_TIMEOUT_SECONDS,
     MAX_WORKER_INPUT_BYTES,
     MAX_WORKER_OUTPUT_BYTES,
     MEMORY_LIMIT_BYTES,
-    SandboxResult,
+    WORKER_STARTUP_GRACE_SECONDS,
     execute_python_analysis_in_process,
 )
+
+if TYPE_CHECKING:
+    # Type-only: the runtime import above deliberately bypasses the qdash package.
+    from qdash.copilot.tooling.sandbox_core import SandboxResult
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +40,9 @@ def _error(message: str) -> SandboxResult:
 
 def _apply_resource_limits() -> None:
     try:
-        cpu_seconds = max(1, EXECUTION_TIMEOUT_SECONDS + 1)
+        # Keep the CPU limit above the in-process SIGALRM budget so the alarm gets a
+        # chance to return a proper error instead of the kernel killing us on SIGXCPU.
+        cpu_seconds = max(1, EXECUTION_TIMEOUT_SECONDS + WORKER_STARTUP_GRACE_SECONDS)
         resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
     except (OSError, ValueError) as exc:
         logger.warning("Failed to apply CPU limit: %s", exc)
