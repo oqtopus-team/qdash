@@ -132,7 +132,7 @@ class MockExecutionLockRepository:
     def is_locked(self, project_id: str) -> bool:
         return False
 
-    def lock(self, project_id: str) -> None:
+    def lock(self, project_id: str, execution_id: str | None = None) -> None:
         pass
 
     def unlock(self, project_id: str) -> None:

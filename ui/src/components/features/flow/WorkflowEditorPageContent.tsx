@@ -771,9 +771,7 @@ export function WorkflowEditorPageContent() {
             </button>
             {canCancel && (
               <button
-                onClick={() =>
-                  lastFlowRunId && cancelMutation.mutate({ flowRunId: lastFlowRunId })
-                }
+                onClick={() => lastFlowRunId && cancelMutation.mutate({ flowRunId: lastFlowRunId })}
                 className="btn btn-sm btn-error btn-outline"
                 disabled={cancelMutation.isPending}
                 title="Cancel the running execution"
@@ -1454,9 +1452,7 @@ export function WorkflowEditorPageContent() {
                 Cancel
               </span>
               <button
-                onClick={() =>
-                  lastFlowRunId && cancelMutation.mutate({ flowRunId: lastFlowRunId })
-                }
+                onClick={() => lastFlowRunId && cancelMutation.mutate({ flowRunId: lastFlowRunId })}
                 className="btn btn-circle btn-error btn-outline shadow-lg"
                 disabled={cancelMutation.isPending}
               >
