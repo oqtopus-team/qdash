@@ -1083,13 +1083,15 @@ class ExecutionLockRepository(Protocol):
         """
         ...
 
-    def lock(self, project_id: str) -> None:
+    def lock(self, project_id: str, execution_id: str | None = None) -> None:
         """Acquire the execution lock.
 
         Parameters
         ----------
         project_id : str
             The project identifier
+        execution_id : str | None
+            The execution that owns the lock, if known
 
         """
         ...

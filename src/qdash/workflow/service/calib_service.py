@@ -70,8 +70,28 @@ def _is_cancellation(exc: BaseException) -> bool:
     return any(cls.__name__ in ("CancelledRun", "CancelledError") for cls in type(exc).__mro__)
 
 
-def _run_terminal_hook(hook_name: str, flow_run: Any, status: str, message: str) -> None:
-    """Close executions belonging to a finished flow run."""
+def _run_terminal_hook(
+    hook_name: str,
+    flow_run: Any,
+    status: str,
+    message: str,
+    *,
+    release_lock: bool = True,
+) -> None:
+    """Close executions belonging to a finished flow run.
+
+    Args:
+        hook_name: Name of the calling hook, used as the finalizer's log context.
+        flow_run: The Prefect flow run whose parameters identify the project
+            and whose id identifies the executions to close.
+        status: Terminal status to set on any executions left open.
+        message: Message to record on the closed executions.
+        release_lock: Whether the finalizer should also release the project's
+            execution lock. Must be ``False`` for flows built with
+            ``use_lock=False``, since they never acquired the lock and must
+            not clear one held by an unrelated running calibration.
+
+    """
     _logger = logging.getLogger(__name__)
     try:
         params = flow_run.parameters or {}
@@ -95,6 +115,7 @@ def _run_terminal_hook(hook_name: str, flow_run: Any, status: str, message: str)
             message=message,
             context=hook_name,
             logger=_logger,
+            release_lock=release_lock,
         )
     except Exception:
         _logger.error("%s failed", hook_name, exc_info=True)
@@ -135,6 +156,54 @@ def on_flow_crashed(flow: Any, flow_run: Any, state: Any) -> None:
     )
 
 
+def on_flow_cancellation_keep_lock(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_cancellation hook for flows that do not acquire the project execution lock.
+
+    Behaves like ``on_flow_cancellation`` but never releases the project
+    execution lock, for use by flows built with ``use_lock=False`` that
+    never acquired it in the first place.
+    """
+    _run_terminal_hook(
+        "on_flow_cancellation_keep_lock",
+        flow_run,
+        "cancelled",
+        "Execution was cancelled",
+        release_lock=False,
+    )
+
+
+def on_flow_failure_keep_lock(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_failure hook for flows that do not acquire the project execution lock.
+
+    Behaves like ``on_flow_failure`` but never releases the project
+    execution lock, for use by flows built with ``use_lock=False`` that
+    never acquired it in the first place.
+    """
+    _run_terminal_hook(
+        "on_flow_failure_keep_lock",
+        flow_run,
+        "failed",
+        "Flow run failed before the execution was closed",
+        release_lock=False,
+    )
+
+
+def on_flow_crashed_keep_lock(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_crashed hook for flows that do not acquire the project execution lock.
+
+    Behaves like ``on_flow_crashed`` but never releases the project
+    execution lock, for use by flows built with ``use_lock=False`` that
+    never acquired it in the first place.
+    """
+    _run_terminal_hook(
+        "on_flow_crashed_keep_lock",
+        flow_run,
+        "failed",
+        "Flow run crashed before the execution was closed",
+        release_lock=False,
+    )
+
+
 __all__ = [
     "CalibService",
     # Re-exported for backward compatibility (used by strategy.py, two_qubit.py)
@@ -143,8 +212,11 @@ __all__ = [
     "get_session",
     "init_calibration",
     "on_flow_cancellation",
+    "on_flow_cancellation_keep_lock",
     "on_flow_crashed",
+    "on_flow_crashed_keep_lock",
     "on_flow_failure",
+    "on_flow_failure_keep_lock",
 ]
 
 
@@ -448,7 +520,7 @@ class CalibService:
             if self._lock_repo.is_locked(project_id=self.project_id):
                 msg = "Calibration is already running. Cannot start a new session."
                 raise RuntimeError(msg)
-            self._lock_repo.lock(project_id=self.project_id)
+            self._lock_repo.lock(project_id=self.project_id, execution_id=self.execution_id)
             self._lock_acquired = True
 
         # Wrap all initialization in try/except to ensure lock is released on failure

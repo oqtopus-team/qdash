@@ -328,7 +328,7 @@ The hook:
 3. Finds the execution by `note.flow_run_id` in `execution_history`
 4. Updates all non-terminal tasks (running/scheduled/pending) to `cancelled`
 5. Sets the execution status to `cancelled`
-6. Releases the execution lock
+6. Releases the execution lock, but only when it is unowned or owned by the execution being closed
 
 ### flow_run_id Bridge
 

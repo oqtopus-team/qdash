@@ -22,6 +22,7 @@ def test_execution_calib_data_dir_raises_for_missing_separator() -> None:
 
 
 def test_resolve_calib_data_path_returns_existing_path(tmp_path: Path) -> None:
+    """A path that already exists is returned unchanged."""
     figure = tmp_path / "figure.png"
     figure.write_bytes(b"png")
 
@@ -32,6 +33,7 @@ def test_resolve_calib_data_path_maps_container_calib_data_path(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
+    """A container calib_data path is remapped onto the host CALIB_DATA_PATH."""
     local_base = tmp_path / "calib_data"
     figure = local_base / "proj-1" / "figure.png"
     figure.parent.mkdir(parents=True)
@@ -44,6 +46,7 @@ def test_resolve_calib_data_path_maps_container_calib_data_path(
 
 
 def test_resolve_calib_data_path_leaves_unmapped_missing_path(monkeypatch) -> None:
+    """A missing path outside the container calib_data tree is returned unchanged."""
     monkeypatch.delenv("CALIB_DATA_PATH", raising=False)
 
     resolved = resolve_calib_data_path("/tmp/missing/figure.png")

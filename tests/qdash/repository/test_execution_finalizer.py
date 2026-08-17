@@ -218,8 +218,8 @@ def test_close_tasks_false_leaves_tasks_untouched(init_db) -> None:
     assert task.status == "running"
 
 
-def test_release_lock_true_unlocks_project(init_db) -> None:
-    """release_lock=True flips a locked ExecutionLockDocument to unlocked."""
+def test_release_lock_true_unlocks_unowned_project(init_db) -> None:
+    """release_lock=True flips a locked-but-unowned ExecutionLockDocument to unlocked."""
     _make_execution(status="running")
     ExecutionLockDocument(project_id=PROJECT_ID, locked=True).save()
 
@@ -234,6 +234,55 @@ def test_release_lock_true_unlocks_project(init_db) -> None:
     lock = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
     assert lock is not None
     assert lock.locked is False
+    assert lock.execution_id is None
+
+
+def test_release_lock_owned_by_closed_execution_unlocks_project(init_db) -> None:
+    """A lock owned by the execution being closed is released."""
+    _make_execution(status="running", execution_id="exec-1")
+    ExecutionLockDocument(project_id=PROJECT_ID, locked=True, execution_id="exec-1").save()
+
+    finalize_executions_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+        status="failed",
+        message="boom",
+        release_lock=True,
+    )
+
+    lock = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert lock is not None
+    assert lock.locked is False
+    assert lock.execution_id is None
+
+
+def test_release_lock_owned_by_other_execution_stays_locked(init_db) -> None:
+    """A lock owned by a different, still-running execution is not released.
+
+    Regression test for the finding where a delayed finalizer for one
+    execution could clear the lock of a newer, unrelated execution that had
+    since acquired it.
+    """
+    _make_execution(status="running", execution_id="exec-1")
+    ExecutionLockDocument(project_id=PROJECT_ID, locked=True, execution_id="exec-other").save()
+
+    closed = finalize_executions_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+        status="failed",
+        message="boom",
+        release_lock=True,
+    )
+
+    assert closed == ["exec-1"]
+    execution = _reload_execution()
+    assert execution is not None
+    assert execution.status == "failed"
+
+    lock = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert lock is not None
+    assert lock.locked is True
+    assert lock.execution_id == "exec-other"
 
 
 def test_release_lock_false_leaves_lock_untouched(init_db) -> None:

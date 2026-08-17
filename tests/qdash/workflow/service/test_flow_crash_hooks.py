@@ -18,10 +18,12 @@ from unittest.mock import patch
 
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
     on_flow_crashed,
+    on_flow_crashed_keep_lock,
     on_flow_failure,
 )
 
@@ -131,6 +133,34 @@ def test_on_flow_crashed_closes_running_execution_and_open_tasks(init_db) -> Non
     completed = _reload_task("task-completed")
     assert completed is not None
     assert completed.status == "completed"
+
+
+def test_on_flow_crashed_keep_lock_closes_execution_without_releasing_lock(init_db) -> None:
+    """on_flow_crashed_keep_lock closes the execution like on_flow_crashed but leaves the lock alone."""
+    _make_execution(status="running")
+    _make_task(status="running", task_id="task-running")
+    _make_task(status="completed", task_id="task-completed")
+    ExecutionLockDocument(project_id=PROJECT_ID, locked=True, execution_id="exec-1").save()
+
+    on_flow_crashed_keep_lock(None, _fake_flow_run(), None)
+
+    execution = _reload_execution()
+    assert execution is not None
+    assert execution.status == "failed"
+    assert execution.end_at is not None
+
+    running = _reload_task("task-running")
+    assert running is not None
+    assert running.status == "failed"
+    assert running.end_at is not None
+
+    completed = _reload_task("task-completed")
+    assert completed is not None
+    assert completed.status == "completed"
+
+    lock = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert lock is not None
+    assert lock.locked is True
 
 
 def test_on_flow_cancellation_closes_execution_as_cancelled(init_db) -> None:

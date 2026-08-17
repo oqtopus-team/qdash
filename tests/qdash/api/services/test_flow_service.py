@@ -164,7 +164,7 @@ async def test_execute_single_task_from_snapshot_creates_scheduled_execution(
 
     monkeypatch.setattr(flow_service, "get_client", FakeClientContext)
 
-    await FlowService(flow_repository=MagicMock()).execute_single_task_from_snapshot(
+    response = await FlowService(flow_repository=MagicMock()).execute_single_task_from_snapshot(
         task_name="CheckRabi",
         qid="Q00",
         chip_id="chip-1",
@@ -180,6 +180,10 @@ async def test_execute_single_task_from_snapshot_creates_scheduled_execution(
     assert kwargs["flow_run_id"] == "flow-run-1"
     assert kwargs["project_id"] == "project-1"
     assert kwargs["username"] == "operator"
+    assert response.execution_id == "exec-1"
+    assert response.flow_run_id == "flow-run-1"
+    assert "flow-run-1" in response.flow_run_url
+    assert response.qdash_ui_url.endswith("/execution/chip-1/exec-1")
 
 
 def _make_fake_flow(
@@ -245,7 +249,7 @@ async def test_execute_flow_resolves_chip_id_from_request_parameters(
     flow_repo = MagicMock()
     flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="fallback-chip")
 
-    await FlowService(flow_repository=flow_repo).execute_flow(
+    response = await FlowService(flow_repository=flow_repo).execute_flow(
         name="my-flow",
         request=ExecuteFlowRequest(parameters={"chip_id": "explicit-chip"}),
         username="operator",
@@ -253,6 +257,10 @@ async def test_execute_flow_resolves_chip_id_from_request_parameters(
     )
 
     assert captured_calls[0]["chip_id"] == "explicit-chip"
+    assert response.execution_id == "exec-1"
+    assert response.flow_run_id == "flow-run-2"
+    assert "flow-run-2" in response.flow_run_url
+    assert response.qdash_ui_url.endswith("/execution/explicit-chip/exec-1")
 
 
 @pytest.mark.asyncio
@@ -275,7 +283,7 @@ async def test_execute_flow_falls_back_to_flow_chip_id(
     flow_repo = MagicMock()
     flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="fallback-chip")
 
-    await FlowService(flow_repository=flow_repo).execute_flow(
+    response = await FlowService(flow_repository=flow_repo).execute_flow(
         name="my-flow",
         request=ExecuteFlowRequest(parameters={}),
         username="operator",
@@ -283,6 +291,75 @@ async def test_execute_flow_falls_back_to_flow_chip_id(
     )
 
     assert captured_calls[0]["chip_id"] == "fallback-chip"
+    assert response.execution_id == "exec-1"
+    assert response.flow_run_id == "flow-run-3"
+    assert "flow-run-3" in response.flow_run_url
+    assert response.qdash_ui_url.endswith("/execution/fallback-chip/exec-1")
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_falls_back_to_flow_run_id_when_execution_not_precreated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """execute_flow falls back to the flow-run id when no execution row could be pre-created."""
+
+    def _stub(self: FlowService, **kwargs: object) -> None:
+        """Simulate a failed scheduled-execution pre-creation."""
+
+    monkeypatch.setattr(FlowService, "_create_scheduled_execution", _stub)
+    monkeypatch.setattr(
+        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-4")
+    )
+
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="")
+
+    response = await FlowService(flow_repository=flow_repo).execute_flow(
+        name="my-flow",
+        request=ExecuteFlowRequest(parameters={}),
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert response.execution_id == "flow-run-4"
+    assert response.flow_run_id == "flow-run-4"
+    assert "flow-run-4" in response.flow_run_url
+    assert response.qdash_ui_url.endswith("/execution")
+
+
+@pytest.mark.asyncio
+async def test_re_execute_from_snapshot_returns_qdash_execution_details(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """re_execute_from_snapshot returns the QDash execution id, flow-run id, and URLs."""
+    captured_calls: list[dict[str, object]] = []
+
+    def _stub(self: FlowService, **kwargs: object) -> str:
+        """Record the scheduled-execution kwargs and return a fake execution id."""
+        captured_calls.append(kwargs)
+        return "exec-1"
+
+    monkeypatch.setattr(FlowService, "_create_scheduled_execution", _stub)
+    monkeypatch.setattr(
+        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-5")
+    )
+
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="snapshot-chip")
+
+    response = await FlowService(flow_repository=flow_repo).re_execute_from_snapshot(
+        flow_name="my-flow",
+        source_execution_id="source-exec-1",
+        parameter_overrides={},
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert captured_calls[0]["chip_id"] == "snapshot-chip"
+    assert response.execution_id == "exec-1"
+    assert response.flow_run_id == "flow-run-5"
+    assert "flow-run-5" in response.flow_run_url
+    assert response.qdash_ui_url.endswith("/execution/snapshot-chip/exec-1")
 
 
 def test_create_scheduled_execution_returns_none_when_chip_id_empty() -> None:

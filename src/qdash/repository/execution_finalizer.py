@@ -38,7 +38,9 @@ def finalize_executions_by_flow_run_id(
         message: Message to record on matched executions (and tasks, if closed)
         from_statuses: Execution statuses eligible to be closed
         close_tasks: Whether to also close open TaskResultHistoryDocument rows
-        release_lock: Whether to release the project's ExecutionLockDocument
+        release_lock: Whether to release the project's ExecutionLockDocument. Only
+            released when the lock is unowned or owned by one of the closed
+            executions.
         context: Label used in log messages to identify the caller
         logger: Logger to use. Defaults to a module-level logger.
 
@@ -118,9 +120,19 @@ def finalize_executions_by_flow_run_id(
         try:
             lock_doc = ExecutionLockDocument.find_one({"project_id": project_id}).run()
             if lock_doc and lock_doc.locked:
-                lock_doc.locked = False
-                lock_doc.save()
-                logger.info("Released execution lock for project %s", project_id)
+                owner = lock_doc.execution_id
+                if owner is not None and owner not in closed_execution_ids:
+                    logger.info(
+                        "%s: execution lock for project %s is owned by %s, leaving it locked",
+                        context,
+                        project_id,
+                        owner,
+                    )
+                else:
+                    lock_doc.locked = False
+                    lock_doc.execution_id = None
+                    lock_doc.save()
+                    logger.info("Released execution lock for project %s", project_id)
         except Exception:
             logger.warning("Failed to release execution lock", exc_info=True)
 

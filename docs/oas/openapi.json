@@ -20291,7 +20291,12 @@
           "execution_id": {
             "type": "string",
             "title": "Execution Id",
-            "description": "Execution ID"
+            "description": "QDash execution ID (falls back to the Prefect flow run ID when no execution row could be pre-created)"
+          },
+          "flow_run_id": {
+            "type": "string",
+            "title": "Flow Run Id",
+            "description": "Prefect flow run ID"
           },
           "flow_run_url": {
             "type": "string",
@@ -20312,6 +20317,7 @@
         "type": "object",
         "required": [
           "execution_id",
+          "flow_run_id",
           "flow_run_url",
           "qdash_ui_url",
           "message"

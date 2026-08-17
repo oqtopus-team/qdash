@@ -25,6 +25,7 @@ class InMemoryExecutionLockRepository:
     def __init__(self) -> None:
         """Initialize with empty storage."""
         self._locks: dict[str, bool] = {}
+        self._owners: dict[str, str | None] = {}
 
     def is_locked(self, project_id: str) -> bool:
         """Check if the project is currently locked.
@@ -42,16 +43,19 @@ class InMemoryExecutionLockRepository:
         """
         return self._locks.get(project_id, False)
 
-    def lock(self, project_id: str) -> None:
+    def lock(self, project_id: str, execution_id: str | None = None) -> None:
         """Acquire the execution lock.
 
         Parameters
         ----------
         project_id : str
             The project identifier
+        execution_id : str | None
+            The execution that owns the lock, if known
 
         """
         self._locks[project_id] = True
+        self._owners[project_id] = execution_id
 
     def unlock(self, project_id: str) -> None:
         """Release the execution lock.
@@ -63,7 +67,9 @@ class InMemoryExecutionLockRepository:
 
         """
         self._locks[project_id] = False
+        self._owners[project_id] = None
 
     def clear(self) -> None:
         """Clear all locks (useful for test setup/teardown)."""
         self._locks.clear()
+        self._owners.clear()

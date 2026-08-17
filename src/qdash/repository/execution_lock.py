@@ -63,16 +63,18 @@ class MongoExecutionLockRepository:
         result: bool | None = ExecutionLockDocument.get_lock_status(project_id=project_id)
         return result
 
-    def lock(self, project_id: str) -> None:
+    def lock(self, project_id: str, execution_id: str | None = None) -> None:
         """Acquire the execution lock.
 
         Parameters
         ----------
         project_id : str
             The project identifier
+        execution_id : str | None
+            The execution that owns the lock, if known
 
         """
-        ExecutionLockDocument.lock(project_id=project_id)
+        ExecutionLockDocument.lock(project_id=project_id, execution_id=execution_id)
 
     def unlock(self, project_id: str) -> None:
         """Release the execution lock.
