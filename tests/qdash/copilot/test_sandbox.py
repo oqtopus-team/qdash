@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import sys
 import time
 from typing import Any
 
@@ -49,6 +51,45 @@ async def test_execute_python_analysis_rejects_unapproved_import() -> None:
     assert result["output"] is None
     assert result["chart"] is None
     assert result["error"] == "Import of 'os' is not allowed"
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_rejects_syntax_error() -> None:
+    result = await execute_python_analysis("result = (")
+
+    assert result["output"] is None
+    assert result["error"] is not None
+    assert result["error"].startswith("SyntaxError:")
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_rejects_invalid_code_without_spawning_worker(
+    monkeypatch,
+) -> None:
+    async def fail_create_subprocess_exec(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("worker must not be spawned for statically rejected code")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fail_create_subprocess_exec)
+
+    assert (await execute_python_analysis('eval("1 + 1")'))[
+        "error"
+    ] == "Call to 'eval' is not allowed"
+    assert (await execute_python_analysis("import os"))["error"] == "Import of 'os' is not allowed"
+
+
+@pytest.mark.asyncio
+async def test_worker_revalidates_code_independently() -> None:
+    """The worker keeps its own validation layer even though the parent validates first."""
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        str(WORKER_SCRIPT),
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _stderr = await process.communicate(json.dumps({"code": "import os"}).encode())
+
+    assert json.loads(stdout)["error"] == "Import of 'os' is not allowed"
 
 
 @pytest.mark.asyncio

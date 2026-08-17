@@ -128,8 +128,12 @@ def _timeout_handler(signum: int, frame: Any) -> None:
     raise _TimeoutError(f"Execution timed out after {EXECUTION_TIMEOUT_SECONDS} seconds")
 
 
-def _validate_ast(code: str) -> str | None:
-    """Validate code using AST analysis."""
+def validate_code(code: str) -> str | None:
+    """Validate code using AST analysis.
+
+    Pure and side-effect free, so the parent process runs it before spawning a worker.
+    The worker runs it again as an independent defence layer.
+    """
     try:
         tree = ast.parse(code)
     except SyntaxError as e:
@@ -180,7 +184,7 @@ def execute_python_analysis_in_process(
     context_data: dict[str, Any] | None = None,
 ) -> SandboxResult:
     """Execute Python analysis code inside the sandbox worker process."""
-    error = _validate_ast(code)
+    error = validate_code(code)
     if error is not None:
         return {"output": None, "chart": None, "error": error}
 

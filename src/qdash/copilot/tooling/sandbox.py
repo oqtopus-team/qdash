@@ -17,6 +17,7 @@ from qdash.copilot.tooling.sandbox_core import (
     WORKER_STARTUP_GRACE_SECONDS,
     SandboxChartSpec,
     SandboxResult,
+    validate_code,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,12 @@ async def execute_python_analysis(
     context_data: dict[str, Any] | None = None,
 ) -> SandboxResult:
     """Execute Python analysis code in a disposable sandbox worker process."""
+    # Reject statically-detectable violations here: validation is pure, and returning
+    # early avoids serializing the data store and spawning a process the code can never use.
+    validation_error = validate_code(code)
+    if validation_error is not None:
+        return _error(validation_error)
+
     try:
         request_bytes = json.dumps(
             {"code": code, "context_data": context_data or {}},
