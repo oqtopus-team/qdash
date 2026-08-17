@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import resource
+import signal
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -51,6 +52,20 @@ def _apply_resource_limits() -> None:
         resource.setrlimit(resource.RLIMIT_AS, (MEMORY_LIMIT_BYTES, MEMORY_LIMIT_BYTES))
     except (OSError, ValueError) as exc:
         logger.warning("Failed to apply memory limit: %s", exc)
+
+    # Analysis code has no legitimate reason to create files, and allowed libraries such as
+    # pandas can write anywhere the API user can. RLIMIT_FSIZE=0 blocks writes to regular
+    # files (pipes, so stdin/stdout/stderr, are unaffected). SIGXFSZ is ignored first so a
+    # blocked write raises OSError in the offending call instead of killing the worker.
+    if hasattr(signal, "SIGXFSZ"):
+        try:
+            signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
+        except (OSError, ValueError) as exc:
+            logger.warning("Failed to ignore SIGXFSZ: %s", exc)
+    try:
+        resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))
+    except (OSError, ValueError) as exc:
+        logger.warning("Failed to apply file size limit: %s", exc)
 
 
 def _read_request() -> tuple[str | None, dict[str, Any] | None, str | None]:

@@ -4,12 +4,13 @@ import asyncio
 import json
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
 import pytest
 
 from qdash.copilot.agent_runtime.execution import execute_tool_executor, wrap_tool_executors
-from qdash.copilot.tooling.sandbox import WORKER_SCRIPT, execute_python_analysis
+from qdash.copilot.tooling.sandbox import WORKER_SCRIPT, _worker_env, execute_python_analysis
 from qdash.copilot.tooling.sandbox_core import EXECUTION_TIMEOUT_SECONDS, MAX_OUTPUT_BYTES
 
 # The worker must stay a standalone script: importing it through the qdash package
@@ -175,6 +176,49 @@ async def test_execute_python_analysis_does_not_block_event_loop() -> None:
 
 def test_worker_script_exists() -> None:
     assert WORKER_SCRIPT.is_file()
+
+
+def test_worker_env_drops_parent_environment(monkeypatch) -> None:
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "super-secret")
+    monkeypatch.setenv("PYTHONPATH", "/app:/app/qdash")
+
+    env = _worker_env("/tmp/workdir")
+
+    assert "AWS_SECRET_ACCESS_KEY" not in env
+    assert "PYTHONPATH" not in env
+    assert env["HOME"] == "/tmp/workdir"
+    assert env["TMPDIR"] == "/tmp/workdir"
+
+
+@pytest.mark.skipif(not Path("/proc/self/environ").exists(), reason="requires procfs")
+@pytest.mark.asyncio
+async def test_worker_does_not_leak_parent_environment(monkeypatch) -> None:
+    """Allowed libraries can read /proc/self/environ, so the worker must not inherit secrets."""
+    monkeypatch.setenv("QDASH_TEST_SECRET", "super-secret-value")
+
+    result = await execute_python_analysis(
+        "import pandas as pd\n"
+        'env = pd.read_csv("/proc/self/environ", sep="\\x00", header=None, engine="python")\n'
+        'result = {"output": str(env.values.tolist())}'
+    )
+
+    assert result["error"] is None
+    assert result["output"] is not None
+    assert "super-secret-value" not in result["output"]
+    assert "PATH=/usr/bin:/bin" in result["output"]
+
+
+@pytest.mark.asyncio
+async def test_worker_cannot_write_files() -> None:
+    result = await execute_python_analysis(
+        "import pandas as pd\n"
+        'pd.DataFrame({"a": list(range(100))}).to_csv("evil.csv")\n'
+        'result = {"output": "wrote file"}'
+    )
+
+    assert result["output"] is None
+    assert result["error"] is not None
+    assert "File too large" in result["error"]
 
 
 @pytest.mark.asyncio

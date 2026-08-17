@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,26 @@ def _error(message: str) -> SandboxResult:
     return {"output": None, "chart": None, "error": message}
 
 
+def _worker_env(workdir: str) -> dict[str, str]:
+    """Build the minimal environment for the worker process.
+
+    The API process holds database and cloud credentials in its environment, and sandboxed
+    code can read ``/proc/self/environ`` through allowed libraries (``pandas.read_csv``
+    and friends), so the worker inherits nothing from the parent. Interpreter and package
+    resolution come from ``sys.executable``, not from ``PYTHONPATH``.
+    """
+    return {
+        "PATH": "/usr/bin:/bin",
+        "HOME": workdir,
+        "TMPDIR": workdir,
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        # Writes are blocked by RLIMIT_FSIZE; skip bytecode writes rather than fail them.
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+    }
+
+
 async def execute_python_analysis(
     code: str,
     context_data: dict[str, Any] | None = None,
@@ -58,12 +79,27 @@ async def execute_python_analysis(
     if len(request_bytes) > MAX_WORKER_INPUT_BYTES:
         return _error(f"Sandbox input is too large (limit {MAX_WORKER_INPUT_BYTES} bytes)")
 
+    # A throwaway directory per call: it is the worker's cwd, HOME and TMPDIR, so relative
+    # paths and library scratch files never resolve into the API process's own directories.
+    with tempfile.TemporaryDirectory(
+        prefix="qdash-sandbox-", ignore_cleanup_errors=True
+    ) as workdir:
+        return await _run_worker(request_bytes, workdir)
+
+
+async def _run_worker(request_bytes: bytes, workdir: str) -> SandboxResult:
+    """Run the sandbox worker process and decode its response."""
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         str(WORKER_SCRIPT),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        cwd=workdir,
+        env=_worker_env(workdir),
+        # Detach from the API process group so terminal/process-group signals are not
+        # delivered to sandboxed code, and the worker can be signalled independently.
+        start_new_session=True,
     )
 
     try:
