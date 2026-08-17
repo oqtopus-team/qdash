@@ -37,13 +37,8 @@ def _error(message: str) -> SandboxResult:
 
 
 def _worker_env(workdir: str) -> dict[str, str]:
-    """Build the minimal environment for the worker process.
+    """Build the minimal environment for the worker process."""
 
-    The API process holds database and cloud credentials in its environment, and sandboxed
-    code can read ``/proc/self/environ`` through allowed libraries (``pandas.read_csv``
-    and friends), so the worker inherits nothing from the parent. Interpreter and package
-    resolution come from ``sys.executable``, not from ``PYTHONPATH``.
-    """
     return {
         "PATH": "/usr/bin:/bin",
         "HOME": workdir,
@@ -52,6 +47,11 @@ def _worker_env(workdir: str) -> dict[str, str]:
         "LC_ALL": "C.UTF-8",
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONNOUSERSITE": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "OMP_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "NUMEXPR_NUM_THREADS": "1",
+        "VECLIB_MAXIMUM_THREADS": "1",
     }
 
 
@@ -108,6 +108,29 @@ def _kill_worker(process: asyncio.subprocess.Process) -> None:
             process.kill()
 
 
+_SIGNAL_HINTS = {
+    "SIGXCPU": (
+        " (the sandbox CPU budget was exhausted; the analysis is too CPU-heavy - reduce the "
+        "data volume or vectorize the computation)"
+    ),
+    "SIGKILL": " (killed by the operating system, most likely out of memory)",
+    "SIGSEGV": " (the worker crashed; this is a sandbox bug, not an error in the analysis code)",
+}
+
+
+def _exit_status_text(returncode: int | None) -> str:
+    """Describe how the worker terminated. """
+    if returncode is None:
+        return "did not report an exit status"
+    if returncode >= 0:
+        return f"exited with code {returncode}"
+    try:
+        name = signal.Signals(-returncode).name
+    except ValueError:
+        return f"was killed by signal {-returncode}"
+    return f"was killed by {name}{_SIGNAL_HINTS.get(name, '')}"
+
+
 async def _run_worker(request_bytes: bytes, workdir: str) -> SandboxResult:
     """Run the sandbox worker process and decode its response."""
     process = await asyncio.create_subprocess_exec(
@@ -146,9 +169,13 @@ async def _run_worker(request_bytes: bytes, workdir: str) -> SandboxResult:
     if stderr_text:
         logger.warning("Python sandbox worker stderr: %s", stderr_text[:MAX_OUTPUT_BYTES])
 
-    if process.returncode != 0:
+    returncode = process.returncode
+    if returncode != 0:
         detail = f": {stderr_text[:1000]}" if stderr_text else ""
-        return _error(f"Sandbox worker exited with code {process.returncode}{detail}")
+        status = _exit_status_text(returncode)
+        if returncode is None or returncode < 0:
+            logger.warning("Python sandbox worker pid %d %s", process.pid, status)
+        return _error(f"Sandbox worker {status}{detail}")
 
     if len(stdout) > MAX_WORKER_OUTPUT_BYTES:
         return _error(f"Sandbox response is too large (limit {MAX_WORKER_OUTPUT_BYTES} bytes)")

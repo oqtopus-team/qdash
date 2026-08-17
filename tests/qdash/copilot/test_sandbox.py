@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import signal
 import sys
 import time
 from pathlib import Path
@@ -12,7 +13,11 @@ import pytest
 from qdash.copilot.agent_runtime.execution import execute_tool_executor, wrap_tool_executors
 from qdash.copilot.tooling import sandbox
 from qdash.copilot.tooling.sandbox import WORKER_SCRIPT, _worker_env, execute_python_analysis
-from qdash.copilot.tooling.sandbox_core import EXECUTION_TIMEOUT_SECONDS, MAX_OUTPUT_BYTES
+from qdash.copilot.tooling.sandbox_core import (
+    EXECUTION_TIMEOUT_SECONDS,
+    MAX_OUTPUT_BYTES,
+    MEMORY_LIMIT_BYTES,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -162,6 +167,24 @@ async def test_execute_python_analysis_returns_error_for_worker_crash(monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_execute_python_analysis_reports_signal_name_for_killed_worker(monkeypatch) -> None:
+    """A signalled worker reports its signal: '-24' alone reads like an exit code, not SIGXCPU."""
+
+    async def fake_create_subprocess_exec(*_args: Any, **_kwargs: Any) -> Any:
+        return _FakeProcess(returncode=-signal.SIGXCPU, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+
+    result = await execute_python_analysis("print('unused')")
+
+    assert result["output"] is None
+    assert result["error"] is not None
+    assert "SIGXCPU" in result["error"]
+    assert "CPU budget" in result["error"]
+    assert "code -24" not in result["error"]
+
+
+@pytest.mark.asyncio
 async def test_execute_python_analysis_returns_error_for_invalid_worker_json(monkeypatch) -> None:
     async def fake_create_subprocess_exec(*_args: Any, **_kwargs: Any) -> Any:
         return _FakeProcess(returncode=0, stdout=b"not json", stderr=b"")
@@ -235,6 +258,24 @@ def test_worker_env_drops_parent_environment(monkeypatch) -> None:
     assert env["TMPDIR"] == "/tmp/workdir"
 
 
+def test_worker_env_pins_blas_thread_counts() -> None:
+    """Unpinned BLAS reserves per-core buffers that overshoot RLIMIT_AS and end in SIGXCPU.
+
+    Asserted on the env rather than on an observed thread count so the guard also holds on
+    the few-core CI runners, where an unpinned worker still fits under the memory limit.
+    """
+    env = _worker_env("/tmp/workdir")
+
+    for name in (
+        "OPENBLAS_NUM_THREADS",
+        "OMP_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+        "VECLIB_MAXIMUM_THREADS",
+    ):
+        assert env[name] == "1", name
+
+
 @pytest.mark.skipif(not Path("/proc/self/environ").exists(), reason="requires procfs")
 @pytest.mark.asyncio
 async def test_worker_does_not_leak_parent_environment(monkeypatch) -> None:
@@ -251,6 +292,7 @@ async def test_worker_does_not_leak_parent_environment(monkeypatch) -> None:
     assert result["output"] is not None
     assert "super-secret-value" not in result["output"]
     assert "PATH=/usr/bin:/bin" in result["output"]
+    assert "OPENBLAS_NUM_THREADS=1" in result["output"]
 
 
 @pytest.mark.asyncio
@@ -264,6 +306,36 @@ async def test_worker_cannot_write_files() -> None:
     assert result["output"] is None
     assert result["error"] is not None
     assert "File too large" in result["error"]
+
+
+@pytest.mark.skipif(not Path("/proc/self/status").exists(), reason="requires procfs")
+@pytest.mark.asyncio
+async def test_worker_analysis_with_scipy_stays_single_threaded() -> None:
+    """scipy analysis must run, and stay well inside RLIMIT_AS, whatever the host core count.
+
+    Importing scipy used to fail outright on many-core hosts: OpenBLAS reserved a per-core
+    buffer set that overshot RLIMIT_AS, then spun retrying the mmap until SIGXCPU. The peak
+    address space is asserted as the canary for that failure mode, since a thread count is
+    only conclusive on a machine with cores to spare.
+    """
+    result = await execute_python_analysis(
+        "import numpy as np\n"
+        "import pandas as pd\n"
+        "import scipy.stats as st\n"
+        "df = pd.DataFrame({'x': np.arange(200.0), 'y': np.arange(200.0) * 2})\n"
+        "r = st.pearsonr(df['x'], df['y'])\n"
+        "status = pd.read_csv('/proc/self/status', sep='\\x00', header=None, engine='python')\n"
+        "lines = [x for x in status[0].tolist() if x.startswith(('Threads', 'VmPeak'))]\n"
+        'result = {"output": f"{round(float(r[0]), 3)} | " + " ".join(lines)}'
+    )
+
+    assert result["error"] is None
+    assert result["output"] is not None
+    assert result["output"].startswith("1.0 |")
+    threads = int(result["output"].split("Threads:")[1].split()[0])
+    vm_peak_bytes = int(result["output"].split("VmPeak:")[1].split()[0]) * 1024
+    assert threads <= 2, f"BLAS thread pinning is not in effect: {result['output']}"
+    assert vm_peak_bytes < MEMORY_LIMIT_BYTES * 0.6, result["output"]
 
 
 @pytest.mark.asyncio
@@ -352,6 +424,7 @@ async def test_wrap_tool_executors_collects_chart_from_async_python_executor() -
 class _FakeProcess:
     def __init__(self, *, returncode: int, stdout: bytes, stderr: bytes) -> None:
         self.returncode = returncode
+        self.pid = 424242
         self._stdout = stdout
         self._stderr = stderr
         self.killed = False

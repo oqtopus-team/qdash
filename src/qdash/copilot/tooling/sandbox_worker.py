@@ -20,11 +20,10 @@ from typing import TYPE_CHECKING, Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from sandbox_core import (
-    EXECUTION_TIMEOUT_SECONDS,
     MAX_WORKER_INPUT_BYTES,
     MAX_WORKER_OUTPUT_BYTES,
     MEMORY_LIMIT_BYTES,
-    WORKER_STARTUP_GRACE_SECONDS,
+    WORKER_CPU_LIMIT_SECONDS,
     execute_python_analysis_in_process,
 )
 
@@ -40,7 +39,7 @@ def _error(message: str) -> SandboxResult:
 
 def _apply_resource_limits() -> None:
     try:
-        cpu_seconds = max(1, EXECUTION_TIMEOUT_SECONDS + WORKER_STARTUP_GRACE_SECONDS)
+        cpu_seconds = max(1, WORKER_CPU_LIMIT_SECONDS)
         resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
     except (OSError, ValueError) as exc:
         logger.warning("Failed to apply CPU limit: %s", exc)
