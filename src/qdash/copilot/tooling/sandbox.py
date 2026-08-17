@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
+import os
+import signal
 import sys
 import tempfile
 from pathlib import Path
@@ -87,6 +90,24 @@ async def execute_python_analysis(
         return await _run_worker(request_bytes, workdir)
 
 
+def _kill_worker(process: asyncio.subprocess.Process) -> None:
+    """Kill the worker and anything it spawned.
+
+    The worker leads its own session (``start_new_session=True``), so its pid doubles as a
+    process group id and one ``killpg`` covers descendants too.
+    """
+    if process.returncode is not None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError) as exc:
+        logger.debug(
+            "killpg on sandbox worker %d failed (%s); killing the process", process.pid, exc
+        )
+        with contextlib.suppress(ProcessLookupError):
+            process.kill()
+
+
 async def _run_worker(request_bytes: bytes, workdir: str) -> SandboxResult:
     """Run the sandbox worker process and decode its response."""
     process = await asyncio.create_subprocess_exec(
@@ -108,7 +129,7 @@ async def _run_worker(request_bytes: bytes, workdir: str) -> SandboxResult:
             timeout=WORKER_WALL_TIMEOUT_SECONDS,
         )
     except TimeoutError:
-        process.kill()
+        _kill_worker(process)
         await process.wait()
         logger.warning(
             "Python sandbox worker exceeded the %ds wall-clock budget (execution timeout %ds "
@@ -118,6 +139,13 @@ async def _run_worker(request_bytes: bytes, workdir: str) -> SandboxResult:
             WORKER_STARTUP_GRACE_SECONDS,
         )
         return _error(f"Execution timed out after {EXECUTION_TIMEOUT_SECONDS} seconds")
+    except asyncio.CancelledError:
+        # The caller went away (e.g. the SSE client disconnected). Without this the worker
+        # keeps burning CPU until its own alarm fires. Kill without awaiting: the event loop
+        # reaps the child, and awaiting while cancelled is not guaranteed to resume.
+        logger.info("Python sandbox worker cancelled; killing pid %d", process.pid)
+        _kill_worker(process)
+        raise
 
     stderr_text = stderr.decode("utf-8", errors="replace").strip()
     if stderr_text:

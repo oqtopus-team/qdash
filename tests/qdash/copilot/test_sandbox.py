@@ -5,13 +5,16 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from qdash.copilot.agent_runtime.execution import execute_tool_executor, wrap_tool_executors
 from qdash.copilot.tooling.sandbox import WORKER_SCRIPT, _worker_env, execute_python_analysis
 from qdash.copilot.tooling.sandbox_core import EXECUTION_TIMEOUT_SECONDS, MAX_OUTPUT_BYTES
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # The worker must stay a standalone script: importing it through the qdash package
 # executes qdash.copilot.__init__ (litellm), which adds ~2.3s to every call.
@@ -231,22 +234,48 @@ async def test_execute_python_analysis_starts_worker_without_qdash_imports() -> 
     assert elapsed < MAX_STARTUP_OVERHEAD_SECONDS
 
 
-@pytest.mark.asyncio
-async def test_execute_python_analysis_reaps_worker_process() -> None:
-    result = await execute_python_analysis('result = {"output": "done"}')
-
-    assert result["error"] is None
-
-    current_process = await asyncio.create_subprocess_exec(
+async def _worker_pids() -> set[str]:
+    process = await asyncio.create_subprocess_exec(
         "pgrep",
         "-f",
         WORKER_SCRIPT.name,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, _stderr = await current_process.communicate()
-    worker_pids = [pid for pid in stdout.decode().splitlines() if pid]
-    assert worker_pids == []
+    stdout, _stderr = await process.communicate()
+    return {pid for pid in stdout.decode().splitlines() if pid}
+
+
+async def _wait_until(condition: Callable[[set[str]], bool], timeout: float = 5.0) -> set[str]:
+    deadline = time.monotonic() + timeout
+    pids = await _worker_pids()
+    while not condition(pids) and time.monotonic() < deadline:
+        await asyncio.sleep(0.05)
+        pids = await _worker_pids()
+    return pids
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_reaps_worker_process() -> None:
+    result = await execute_python_analysis('result = {"output": "done"}')
+
+    assert result["error"] is None
+    assert await _worker_pids() == set()
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_kills_worker_on_cancellation() -> None:
+    """A disconnected caller must not leave the worker spinning until its own alarm fires."""
+    task = asyncio.create_task(execute_python_analysis("while True:\n    pass"))
+    running = await _wait_until(bool)
+    assert running, "worker did not start"
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    remaining = await _wait_until(lambda pids: not (pids & running))
+    assert not (remaining & running)
 
 
 @pytest.mark.asyncio
