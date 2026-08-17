@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 from uuid import UUID
 
 from bunnet import SortDirection
@@ -37,6 +37,69 @@ logger = logging.getLogger(__name__)
 
 _OPEN_EXECUTION_STATUSES = ("running", "scheduled")
 _RECONCILE_TIMEOUT_SECONDS = 5.0
+
+
+class _ReconcileOutcome(NamedTuple):
+    """How an open execution should be closed when its flow run is already terminal."""
+
+    status: str
+    message: str
+    close_tasks: bool
+
+
+_TERMINAL_STATE_OUTCOMES: dict[str, _ReconcileOutcome] = {
+    "FAILED": _ReconcileOutcome(
+        "failed", "Flow run failed before the execution was closed", close_tasks=True
+    ),
+    "CRASHED": _ReconcileOutcome(
+        "failed", "Flow run crashed before the execution was closed", close_tasks=True
+    ),
+    "CANCELLED": _ReconcileOutcome("cancelled", "Execution was cancelled", close_tasks=True),
+}
+
+_COMPLETED_STATE_OUTCOMES: dict[str, _ReconcileOutcome] = {
+    "scheduled": _ReconcileOutcome(
+        "completed",
+        "Flow run completed without starting a calibration execution",
+        close_tasks=False,
+    ),
+    "running": _ReconcileOutcome(
+        "failed", "Flow run completed but the execution was never closed", close_tasks=True
+    ),
+}
+
+
+def _reconcile_outcome(
+    flow_run_state: str | None, execution_status: str
+) -> _ReconcileOutcome | None:
+    """Resolve how to close one execution, or None to leave it open.
+
+    A completed flow run means different things depending on how far the
+    execution got: a ``scheduled`` row was never picked up and is simply
+    completed, while a ``running`` row should have been closed by the flow
+    itself and is therefore failed. Every other terminal state closes the
+    execution the same way regardless of how far it got.
+
+    Parameters
+    ----------
+    flow_run_state : str | None
+        The Prefect flow run state type, or None when Prefect did not
+        report the run.
+    execution_status : str
+        The current status of the execution document.
+
+    Returns
+    -------
+    _ReconcileOutcome | None
+        The terminal status, message and task handling to apply, or None
+        when the execution should be left untouched.
+
+    """
+    if flow_run_state == "COMPLETED":
+        return _COMPLETED_STATE_OUTCOMES.get(execution_status)
+    if flow_run_state is None:
+        return None
+    return _TERMINAL_STATE_OUTCOMES.get(flow_run_state)
 
 
 class ExecutionService:
@@ -365,50 +428,21 @@ class ExecutionService:
 
                 state = run_states.get(flow_run_id)
 
-                if state in ("FAILED", "CRASHED"):
-                    message = (
-                        "Flow run failed before the execution was closed"
-                        if state == "FAILED"
-                        else "Flow run crashed before the execution was closed"
-                    )
+                by_outcome: dict[_ReconcileOutcome, list[ExecutionHistoryDocument]] = {}
+                for doc in docs:
+                    outcome = _reconcile_outcome(state, doc.status)
+                    if outcome is not None:
+                        by_outcome.setdefault(outcome, []).append(doc)
+
+                for outcome, outcome_docs in by_outcome.items():
                     self._close_reconciled_docs(
                         project_id=project_id,
                         flow_run_id=flow_run_id,
-                        docs=docs,
-                        status="failed",
-                        message=message,
-                        close_tasks=True,
+                        docs=outcome_docs,
+                        status=outcome.status,
+                        message=outcome.message,
+                        close_tasks=outcome.close_tasks,
                     )
-                elif state == "CANCELLED":
-                    self._close_reconciled_docs(
-                        project_id=project_id,
-                        flow_run_id=flow_run_id,
-                        docs=docs,
-                        status="cancelled",
-                        message="Execution was cancelled",
-                        close_tasks=True,
-                    )
-                elif state == "COMPLETED":
-                    scheduled_docs = [doc for doc in docs if doc.status == "scheduled"]
-                    running_docs = [doc for doc in docs if doc.status == "running"]
-                    if scheduled_docs:
-                        self._close_reconciled_docs(
-                            project_id=project_id,
-                            flow_run_id=flow_run_id,
-                            docs=scheduled_docs,
-                            status="completed",
-                            message="Flow run completed without starting a calibration execution",
-                            close_tasks=False,
-                        )
-                    if running_docs:
-                        self._close_reconciled_docs(
-                            project_id=project_id,
-                            flow_run_id=flow_run_id,
-                            docs=running_docs,
-                            status="failed",
-                            message="Flow run completed but the execution was never closed",
-                            close_tasks=True,
-                        )
         except Exception:
             logger.warning("Prefect reconciliation failed", exc_info=True)
 

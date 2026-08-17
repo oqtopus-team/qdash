@@ -3,6 +3,11 @@
 These tests verify the CalibService API and helper functions for custom calibration flows.
 """
 
+import re
+import sys
+from dataclasses import dataclass
+from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -14,6 +19,8 @@ from qdash.workflow.service.calib_service import (
     init_calibration,
 )
 from qdash.workflow.service.session_context import clear_current_session
+from qdash.workflow.service.steps import Step
+from qdash.workflow.service.targets import QubitTargets
 
 
 class MockExecutionService:
@@ -147,6 +154,61 @@ class MockUserRepository:
         return None
 
 
+class FakeExecutionRepository:
+    """Fake MongoExecutionRepository recording claim_scheduled_execution calls."""
+
+    def __init__(self, claimed_execution_id: str | None) -> None:
+        """Store the execution id this fake should return when a claim is attempted."""
+        self.claimed_execution_id = claimed_execution_id
+        self.calls: list[dict[str, str]] = []
+
+    def claim_scheduled_execution(self, *, project_id: str, flow_run_id: str) -> str | None:
+        """Record the call and return the pre-configured claimed execution id."""
+        self.calls.append({"project_id": project_id, "flow_run_id": flow_run_id})
+        return self.claimed_execution_id
+
+
+class FakeExecutionCounterRepository:
+    """Fake ExecutionCounterRepository returning a fixed next index without touching Mongo."""
+
+    def __init__(self, next_index: int) -> None:
+        """Store the fixed index this fake should return from get_next_index."""
+        self.next_index = next_index
+
+    def get_next_index(self, date: str, username: str, chip_id: str, project_id: str | None) -> int:
+        """Return the pre-configured next index."""
+        return self.next_index
+
+    def get_dates_for_chip(self, project_id: str, chip_id: str) -> list[str]:
+        """Return an empty list; unused by these tests."""
+        return []
+
+
+def _stub_prefect_flow_run_context(monkeypatch: pytest.MonkeyPatch, flow_run_id: str) -> None:
+    """Register a fake prefect.context module exposing a flow run with the given id."""
+    monkeypatch.setitem(
+        sys.modules,
+        "prefect.context",
+        SimpleNamespace(
+            get_run_context=lambda: SimpleNamespace(flow_run=SimpleNamespace(id=flow_run_id))
+        ),
+    )
+
+
+@dataclass
+class BoomStep(Step):
+    """Step whose execute() always raises, to exercise the pipeline-abort logging path."""
+
+    @property
+    def name(self) -> str:
+        """Return a fixed step name for identification."""
+        return "boom"
+
+    def execute(self, service: Any, targets: Any, ctx: Any) -> Any:
+        """Raise a RuntimeError to simulate a step failing mid-pipeline."""
+        raise RuntimeError("boom")
+
+
 @pytest.fixture(autouse=True)
 def clear_session_state():
     """Clear session state before and after each test."""
@@ -240,6 +302,51 @@ class TestCalibServiceInitialization:
 
         assert session.execution_service is not None
         assert "python_flow" in session.execution_service.tags
+
+    def test_initialize_adopts_claimed_scheduled_execution(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
+    ):
+        """A scheduled execution claimed by flow_run_id is adopted as the session's execution_id."""
+        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
+        fake_repo = FakeExecutionRepository(claimed_execution_id="20240101-777")
+        monkeypatch.setattr("qdash.repository.MongoExecutionRepository", lambda: fake_repo)
+
+        session = CalibService(
+            username="test_user",
+            chip_id="chip_1",
+            qids=["0"],
+            project_id="test_project",
+            lock_repo=mock_lock_repo,
+            user_repo=mock_user_repo,
+        )
+
+        assert session.execution_id == "20240101-777"
+        assert session.note is not None
+        assert session.note["flow_run_id"] == "flow-run-9"
+        assert fake_repo.calls == [{"project_id": "test_project", "flow_run_id": "flow-run-9"}]
+
+    def test_initialize_generates_execution_id_when_nothing_claimed(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
+    ):
+        """With no scheduled execution to claim, _initialize falls back to generate_execution_id."""
+        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
+        fake_repo = FakeExecutionRepository(claimed_execution_id=None)
+        monkeypatch.setattr("qdash.repository.MongoExecutionRepository", lambda: fake_repo)
+        fake_counter_repo = FakeExecutionCounterRepository(next_index=7)
+
+        session = CalibService(
+            username="test_user",
+            chip_id="chip_1",
+            qids=["0"],
+            project_id="test_project",
+            lock_repo=mock_lock_repo,
+            user_repo=mock_user_repo,
+            counter_repo=fake_counter_repo,
+        )
+
+        assert fake_repo.calls == [{"project_id": "test_project", "flow_run_id": "flow-run-9"}]
+        assert session.execution_id is not None
+        assert re.fullmatch(r"\d{8}-007", session.execution_id)
 
 
 class TestCalibServiceParameterManagement:
@@ -458,3 +565,24 @@ class TestGlobalSessionHelpers:
 
         assert session.execution_service is not None
         assert session.execution_service.completed is True  # type: ignore[attr-defined]
+
+
+class TestRunPipelineFailureLogging:
+    """Test that _run_pipeline logs the abort reason and re-raises on step failure."""
+
+    def test_run_pipeline_logs_and_reraises_on_step_failure(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+    ):
+        """A step raising during execute() propagates after the abort is logged."""
+        session = CalibService(
+            username="test_user",
+            execution_id="20240101-001",
+            chip_id="chip_1",
+            qids=["0"],
+            project_id="test_project",
+            lock_repo=mock_lock_repo,
+            user_repo=mock_user_repo,
+        )
+
+        with pytest.raises(RuntimeError, match="boom"):
+            session._run_pipeline(QubitTargets(["0"]), [BoomStep()])

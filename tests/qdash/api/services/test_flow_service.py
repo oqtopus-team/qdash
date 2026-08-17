@@ -403,6 +403,25 @@ def test_create_scheduled_execution_swallows_exceptions(
     assert result is None
 
 
+@pytest.mark.parametrize(
+    ("chip_id", "execution_id", "expected_suffix"),
+    [
+        ("chip-1", "exec-1", "/execution/chip-1/exec-1"),
+        ("chip-1", None, "/execution/chip-1"),
+        (None, "exec-1", "/execution"),
+    ],
+)
+def test_build_qdash_ui_url_branches(
+    chip_id: str | None,
+    execution_id: str | None,
+    expected_suffix: str,
+) -> None:
+    """_build_qdash_ui_url covers the chip+execution, chip-only, and no-chip branches."""
+    url = FlowService._build_qdash_ui_url(8000, chip_id, execution_id)
+
+    assert url == f"http://localhost:8000{expected_suffix}"
+
+
 def test_create_scheduled_execution_persists_execution_history(init_db: object) -> None:
     """_create_scheduled_execution persists a scheduled execution history document."""
     service = FlowService(flow_repository=MagicMock())
