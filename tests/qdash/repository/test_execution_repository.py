@@ -22,13 +22,13 @@ def repository() -> MongoExecutionRepository:
     return MongoExecutionRepository(database=DATABASE_NAME)
 
 
-def _collection_for(client: mongomock.MongoClient) -> Any:
+def _collection_for(client: mongomock.MongoClient[Any]) -> Any:
     """Return the execution history collection within the given mongomock client."""
     return client[DATABASE_NAME][ExecutionHistoryDocument.Settings.name]
 
 
 def _insert_execution(
-    client: mongomock.MongoClient,
+    client: mongomock.MongoClient[Any],
     *,
     execution_id: str = "exec-1",
     project_id: str | None = PROJECT_ID,
@@ -54,7 +54,7 @@ def _insert_execution(
 
 def test_claims_matching_scheduled_execution(repository: MongoExecutionRepository) -> None:
     """A matching scheduled, unclaimed execution is claimed and stamped with claimed_at."""
-    client: mongomock.MongoClient = mongomock.MongoClient()
+    client: mongomock.MongoClient[Any] = mongomock.MongoClient()
     _insert_execution(client)
 
     with patch.object(repository, "_get_client", return_value=client):
@@ -81,7 +81,7 @@ def test_returns_none_when_nothing_matches(
     repository: MongoExecutionRepository, insert_kwargs: dict[str, Any]
 ) -> None:
     """No matching row means claim_scheduled_execution returns None without raising."""
-    client: mongomock.MongoClient = mongomock.MongoClient()
+    client: mongomock.MongoClient[Any] = mongomock.MongoClient()
     _insert_execution(client, **insert_kwargs)
 
     with patch.object(repository, "_get_client", return_value=client):
