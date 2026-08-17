@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
@@ -19,6 +21,7 @@ def _make_execution(
     flow_run_id: str | None = FLOW_RUN_ID,
     project_id: str | None = PROJECT_ID,
 ) -> ExecutionHistoryDocument:
+    """Create and save an ExecutionHistoryDocument fixture with the given status."""
     note = {"flow_run_id": flow_run_id} if flow_run_id is not None else {}
     doc = ExecutionHistoryDocument(
         project_id=project_id,
@@ -44,6 +47,7 @@ def _make_task(
     execution_id: str = "exec-1",
     project_id: str | None = PROJECT_ID,
 ) -> TaskResultHistoryDocument:
+    """Create and save a TaskResultHistoryDocument fixture with the given status."""
     doc = TaskResultHistoryDocument(
         project_id=project_id,
         username="tester",
@@ -73,12 +77,14 @@ def _make_task(
 def _reload_execution(
     execution_id: str = "exec-1", project_id: str = PROJECT_ID
 ) -> ExecutionHistoryDocument | None:
+    """Reload the execution document with the given execution_id from the database."""
     return ExecutionHistoryDocument.find_one(
         {"project_id": project_id, "execution_id": execution_id}
     ).run()
 
 
 def _reload_task(task_id: str, project_id: str = PROJECT_ID) -> TaskResultHistoryDocument | None:
+    """Reload the task document with the given task_id from the database."""
     return TaskResultHistoryDocument.find_one({"project_id": project_id, "task_id": task_id}).run()
 
 
@@ -258,3 +264,25 @@ def test_returns_empty_list_when_nothing_matches(init_db) -> None:
     )
 
     assert closed == []
+
+
+def test_release_lock_swallows_lookup_failure(init_db) -> None:
+    """A lock lookup failure is logged and swallowed, not raised."""
+    _make_execution(status="running")
+
+    with patch(
+        "qdash.repository.execution_finalizer.ExecutionLockDocument.find_one",
+        side_effect=RuntimeError("boom"),
+    ):
+        closed = finalize_executions_by_flow_run_id(
+            project_id=PROJECT_ID,
+            flow_run_id=FLOW_RUN_ID,
+            status="failed",
+            message="boom",
+            release_lock=True,
+        )
+
+    assert closed == ["exec-1"]
+    execution = _reload_execution()
+    assert execution is not None
+    assert execution.status == "failed"

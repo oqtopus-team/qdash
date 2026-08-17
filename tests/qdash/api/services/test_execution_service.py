@@ -19,6 +19,7 @@ CHIP_ID = "chip-1"
 
 
 def _make_service() -> ExecutionService:
+    """Create an ExecutionService backed by real Mongo repositories."""
     return ExecutionService(
         execution_history_repository=MongoExecutionHistoryRepository(),
         execution_lock_repository=MongoExecutionLockRepository(),
@@ -33,6 +34,7 @@ def _make_execution(
     project_id: str = PROJECT_ID,
     chip_id: str = CHIP_ID,
 ) -> ExecutionHistoryDocument:
+    """Create and save an ExecutionHistoryDocument with the given status and note."""
     doc = ExecutionHistoryDocument(
         project_id=project_id,
         username="tester",
@@ -57,6 +59,7 @@ def _make_task(
     status: str,
     project_id: str = PROJECT_ID,
 ) -> TaskResultHistoryDocument:
+    """Create and save a TaskResultHistoryDocument with the given status."""
     doc = TaskResultHistoryDocument(
         project_id=project_id,
         username="tester",
@@ -86,48 +89,65 @@ def _make_task(
 def _reload_execution(
     execution_id: str, project_id: str = PROJECT_ID
 ) -> ExecutionHistoryDocument | None:
+    """Reload an ExecutionHistoryDocument by execution_id from the database."""
     return ExecutionHistoryDocument.find_one(
         {"project_id": project_id, "execution_id": execution_id}
     ).run()
 
 
 def _reload_task(task_id: str, project_id: str = PROJECT_ID) -> TaskResultHistoryDocument | None:
+    """Reload a TaskResultHistoryDocument by task_id from the database."""
     return TaskResultHistoryDocument.find_one({"project_id": project_id, "task_id": task_id}).run()
 
 
 def _make_run(flow_run_id: str, state_type: str | None) -> SimpleNamespace:
+    """Build a fake Prefect flow run with the given id and optional state type."""
     state = SimpleNamespace(type=SimpleNamespace(value=state_type)) if state_type else None
     return SimpleNamespace(id=UUID(flow_run_id), state=state)
 
 
 class _FakeSyncClient:
+    """A fake Prefect sync client that returns a fixed list of flow runs."""
+
     def __init__(self, runs: list[SimpleNamespace]) -> None:
+        """Store the flow runs to return and initialize the call log."""
         self._runs = runs
         self.calls: list[dict[str, Any]] = []
 
     def read_flow_runs(self, **kwargs: Any) -> list[SimpleNamespace]:
+        """Record the call kwargs and return the configured flow runs."""
         self.calls.append(kwargs)
         return self._runs
 
 
 class _RaisingSyncClient:
+    """A fake Prefect sync client whose read_flow_runs always raises."""
+
     def read_flow_runs(self, **kwargs: Any) -> list[SimpleNamespace]:
+        """Raise RuntimeError to simulate Prefect being unavailable."""
         raise RuntimeError("prefect unavailable")
 
 
 class _FakeSyncClientContext:
+    """A context manager that yields a fixed fake Prefect client."""
+
     def __init__(self, client: Any) -> None:
+        """Store the client to yield on enter."""
         self._client = client
 
     def __enter__(self) -> Any:
+        """Return the stored fake client."""
         return self._client
 
     def __exit__(self, *args: Any) -> None:
-        return None
+        """Exit the context without suppressing exceptions."""
 
 
 def _make_get_client(client: Any, calls: list[dict[str, Any]]) -> Any:
+    """Build a fake get_client callable that returns client wrapped in a context manager."""
+
     def _get_client(**kwargs: Any) -> _FakeSyncClientContext:
+        """Record the call kwargs and return the fake client context manager."""
         calls.append(kwargs)
         return _FakeSyncClientContext(client)
 
@@ -137,6 +157,7 @@ def _make_get_client(client: Any, calls: list[dict[str, Any]]) -> Any:
 def test_list_executions_closes_running_execution_on_failed_flow_run(
     monkeypatch: Any, init_db: Any
 ) -> None:
+    """A running execution with a FAILED flow run is closed and its running task fails."""
     flow_run_id = str(uuid4())
     _make_execution(execution_id="exec-1", status="running", note={"flow_run_id": flow_run_id})
     _make_task(task_id="task-1", execution_id="exec-1", status="running")
@@ -170,6 +191,7 @@ def test_list_executions_closes_running_execution_on_failed_flow_run(
 def test_list_executions_closes_running_execution_on_crashed_flow_run(
     monkeypatch: Any, init_db: Any
 ) -> None:
+    """A running execution with a CRASHED flow run is closed and its running task fails."""
     flow_run_id = str(uuid4())
     _make_execution(execution_id="exec-1", status="running", note={"flow_run_id": flow_run_id})
     _make_task(task_id="task-1", execution_id="exec-1", status="running")
@@ -195,6 +217,7 @@ def test_list_executions_closes_running_execution_on_crashed_flow_run(
 def test_list_executions_closes_running_execution_on_cancelled_flow_run(
     monkeypatch: Any, init_db: Any
 ) -> None:
+    """A running execution with a CANCELLED flow run is closed and its running task cancels."""
     flow_run_id = str(uuid4())
     _make_execution(execution_id="exec-1", status="running", note={"flow_run_id": flow_run_id})
     _make_task(task_id="task-1", execution_id="exec-1", status="running")
@@ -220,6 +243,7 @@ def test_list_executions_closes_running_execution_on_cancelled_flow_run(
 def test_list_executions_completes_scheduled_execution_without_closing_its_tasks(
     monkeypatch: Any, init_db: Any
 ) -> None:
+    """A scheduled execution with a COMPLETED flow run completes without closing its task."""
     flow_run_id = str(uuid4())
     _make_execution(execution_id="exec-1", status="scheduled", note={"flow_run_id": flow_run_id})
     _make_task(task_id="task-1", execution_id="exec-1", status="running")
@@ -245,6 +269,7 @@ def test_list_executions_completes_scheduled_execution_without_closing_its_tasks
 def test_list_executions_fails_running_execution_on_completed_flow_run(
     monkeypatch: Any, init_db: Any
 ) -> None:
+    """A running execution whose flow run COMPLETED is marked failed along with its task."""
     flow_run_id = str(uuid4())
     _make_execution(execution_id="exec-1", status="running", note={"flow_run_id": flow_run_id})
     _make_task(task_id="task-1", execution_id="exec-1", status="running")
@@ -270,6 +295,7 @@ def test_list_executions_fails_running_execution_on_completed_flow_run(
 def test_list_executions_leaves_execution_untouched_when_flow_run_still_running(
     monkeypatch: Any, init_db: Any
 ) -> None:
+    """A running execution whose flow run is still RUNNING is left untouched."""
     flow_run_id = str(uuid4())
     _make_execution(execution_id="exec-1", status="running", note={"flow_run_id": flow_run_id})
 
@@ -291,6 +317,7 @@ def test_list_executions_leaves_execution_untouched_when_flow_run_still_running(
 def test_list_executions_leaves_execution_untouched_when_prefect_omits_flow_run(
     monkeypatch: Any, init_db: Any
 ) -> None:
+    """A running execution is left untouched when Prefect returns no matching flow run."""
     flow_run_id = str(uuid4())
     _make_execution(execution_id="exec-1", status="running", note={"flow_run_id": flow_run_id})
 
@@ -312,6 +339,7 @@ def test_list_executions_leaves_execution_untouched_when_prefect_omits_flow_run(
 def test_list_executions_skips_prefect_when_no_open_executions(
     monkeypatch: Any, init_db: Any
 ) -> None:
+    """Prefect is not queried when no execution is running or scheduled."""
     _make_execution(execution_id="exec-1", status="completed", note={})
 
     call_count: list[dict[str, Any]] = []
@@ -329,6 +357,7 @@ def test_list_executions_skips_prefect_when_no_open_executions(
 def test_list_executions_skips_executions_with_missing_or_invalid_flow_run_id(
     monkeypatch: Any, init_db: Any
 ) -> None:
+    """Executions with a missing or invalid flow_run_id are skipped without querying Prefect."""
     _make_execution(execution_id="exec-missing-note", status="running", note={})
     _make_execution(
         execution_id="exec-bad-uuid", status="running", note={"flow_run_id": "not-a-uuid"}
@@ -352,6 +381,7 @@ def test_list_executions_skips_executions_with_missing_or_invalid_flow_run_id(
 def test_list_executions_returns_unreconciled_summaries_when_prefect_raises(
     monkeypatch: Any, init_db: Any
 ) -> None:
+    """A running execution is left untouched when the Prefect client raises."""
     flow_run_id = str(uuid4())
     _make_execution(execution_id="exec-1", status="running", note={"flow_run_id": flow_run_id})
 
@@ -372,6 +402,7 @@ def test_list_executions_returns_unreconciled_summaries_when_prefect_raises(
 
 
 def test_get_execution_reconciles_crashed_flow_run(monkeypatch: Any, init_db: Any) -> None:
+    """get_execution reconciles a CRASHED flow run, marking the execution and task failed."""
     flow_run_id = str(uuid4())
     _make_execution(execution_id="exec-1", status="running", note={"flow_run_id": flow_run_id})
     _make_task(task_id="task-1", execution_id="exec-1", status="running")
@@ -390,3 +421,23 @@ def test_get_execution_reconciles_crashed_flow_run(monkeypatch: Any, init_db: An
     reloaded = _reload_execution("exec-1")
     assert reloaded is not None
     assert reloaded.status == "failed"
+
+
+def test_reconcile_skips_execution_without_project_id(monkeypatch: Any, init_db: Any) -> None:
+    """_reconcile_with_prefect leaves an execution without a project_id untouched."""
+    flow_run_id = str(uuid4())
+    doc = _make_execution(
+        execution_id="exec-1",
+        status="running",
+        note={"flow_run_id": flow_run_id},
+        project_id="",
+    )
+
+    call_count: list[dict[str, Any]] = []
+    client = _FakeSyncClient([_make_run(flow_run_id, "FAILED")])
+    monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
+
+    _make_service()._reconcile_with_prefect([doc])
+
+    assert doc.status == "running"
+    assert doc.end_at is None

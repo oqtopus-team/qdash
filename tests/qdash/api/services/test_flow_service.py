@@ -16,6 +16,7 @@ from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 
 
 def test_resolve_workflow_path_uses_container_path_when_available(tmp_path: Path) -> None:
+    """resolve_workflow_path returns the container path when it exists."""
     container_path = tmp_path / "templates"
     container_path.mkdir()
 
@@ -25,6 +26,7 @@ def test_resolve_workflow_path_uses_container_path_when_available(tmp_path: Path
 def test_resolve_workflow_path_falls_back_to_repo_local_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """resolve_workflow_path falls back to the repo-local templates directory."""
     repo_root = Path(__file__).resolve().parents[4]
     monkeypatch.chdir(repo_root)
 
@@ -37,6 +39,7 @@ def test_to_deployment_service_path_maps_host_user_flow_path(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    """to_container_user_flow_path maps a host user-flow path to its container path."""
     host_user_flows = tmp_path / "src/qdash/workflow/user_flows"
     flow_path = host_user_flows / "project-1" / "myflow.py"
     assert to_container_user_flow_path(flow_path, runtime_user_flows_dir=host_user_flows) == Path(
@@ -45,6 +48,7 @@ def test_to_deployment_service_path_maps_host_user_flow_path(
 
 
 def test_to_deployment_service_path_leaves_unrelated_path_unchanged() -> None:
+    """_to_deployment_service_path leaves an unrelated path unchanged."""
     file_path = Path("/tmp/myflow.py")
 
     assert flow_service._to_deployment_service_path(file_path) == file_path
@@ -54,6 +58,7 @@ def test_to_deployment_service_path_leaves_unrelated_path_unchanged() -> None:
 async def test_list_templates_uses_resolved_templates_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """list_templates returns templates loaded from the resolved templates metadata file."""
     repo_root = Path(__file__).resolve().parents[4]
     templates_dir = repo_root / "src/qdash/workflow/templates"
     monkeypatch.setattr(flow_service, "TEMPLATES_DIR", templates_dir)
@@ -77,24 +82,33 @@ async def test_execute_single_task_uses_requested_execution_name(
     execution_name: str | None,
     expected_flow_name: str,
 ) -> None:
+    """execute_single_task_from_snapshot uses the requested execution name as the flow name."""
     captured_parameters: list[dict[str, object]] = []
 
     class FakeClient:
+        """Fake Prefect client that captures flow run creation parameters."""
+
         async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
+            """Return a stub deployment regardless of the requested name."""
             return SimpleNamespace(id="deployment-1")
 
         async def create_flow_run_from_deployment(self, **kwargs: object) -> SimpleNamespace:
+            """Record the flow run parameters and return a stub flow run."""
             parameters = kwargs["parameters"]
             assert isinstance(parameters, dict)
             captured_parameters.append(parameters)
             return SimpleNamespace(id="flow-run-1")
 
     class FakeClientContext:
+        """Fake async context manager that yields a FakeClient."""
+
         async def __aenter__(self) -> FakeClient:
+            """Return a new FakeClient instance."""
             return FakeClient()
 
         async def __aexit__(self, *_args: object) -> None:
-            return None
+            """Do nothing on context exit."""
+            return
 
     monkeypatch.setattr(flow_service, "get_client", FakeClientContext)
 
@@ -116,27 +130,37 @@ async def test_execute_single_task_uses_requested_execution_name(
 async def test_execute_single_task_from_snapshot_creates_scheduled_execution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """execute_single_task_from_snapshot creates a scheduled execution."""
     captured_calls: list[dict[str, object]] = []
 
     def _stub(self: FlowService, **kwargs: object) -> str:
+        """Record the scheduled-execution kwargs and return a fake execution id."""
         captured_calls.append(kwargs)
         return "exec-1"
 
     monkeypatch.setattr(FlowService, "_create_scheduled_execution", _stub)
 
     class FakeClient:
+        """Fake Prefect client that returns stub deployment and flow run objects."""
+
         async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
+            """Return a stub deployment regardless of the requested name."""
             return SimpleNamespace(id="deployment-1")
 
         async def create_flow_run_from_deployment(self, **kwargs: object) -> SimpleNamespace:
+            """Return a stub flow run."""
             return SimpleNamespace(id="flow-run-1")
 
     class FakeClientContext:
+        """Fake async context manager that yields a FakeClient."""
+
         async def __aenter__(self) -> FakeClient:
+            """Return a new FakeClient instance."""
             return FakeClient()
 
         async def __aexit__(self, *_args: object) -> None:
-            return None
+            """Do nothing on context exit."""
+            return
 
     monkeypatch.setattr(flow_service, "get_client", FakeClientContext)
 
@@ -164,6 +188,7 @@ def _make_fake_flow(
     default_parameters: dict[str, object] | None = None,
     tags: list[str] | None = None,
 ) -> SimpleNamespace:
+    """Build a fake flow object with the given chip id, default parameters, and tags."""
     return SimpleNamespace(
         deployment_id="deployment-1",
         default_parameters=default_parameters or {},
@@ -173,31 +198,42 @@ def _make_fake_flow(
 
 
 class _FakeExecuteFlowClient:
+    """Fake Prefect client that returns a flow run with a fixed id."""
+
     def __init__(self, flow_run_id: str) -> None:
+        """Store the flow run id to return from create_flow_run_from_deployment."""
         self._flow_run_id = flow_run_id
 
     async def create_flow_run_from_deployment(self, **kwargs: object) -> SimpleNamespace:
+        """Return a stub flow run with the stored id."""
         return SimpleNamespace(id=self._flow_run_id)
 
 
 class _FakeExecuteFlowClientContext:
+    """Fake async context manager that yields a _FakeExecuteFlowClient."""
+
     def __init__(self, flow_run_id: str) -> None:
+        """Store the flow run id to pass to the fake client."""
         self._flow_run_id = flow_run_id
 
     async def __aenter__(self) -> _FakeExecuteFlowClient:
+        """Return a new _FakeExecuteFlowClient instance."""
         return _FakeExecuteFlowClient(self._flow_run_id)
 
     async def __aexit__(self, *_args: object) -> None:
-        return None
+        """Do nothing on context exit."""
+        return
 
 
 @pytest.mark.asyncio
 async def test_execute_flow_resolves_chip_id_from_request_parameters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """execute_flow uses the chip_id from request parameters over the flow's default chip_id."""
     captured_calls: list[dict[str, object]] = []
 
     def _stub(self: FlowService, **kwargs: object) -> str:
+        """Record the scheduled-execution kwargs and return a fake execution id."""
         captured_calls.append(kwargs)
         return "exec-1"
 
@@ -223,9 +259,11 @@ async def test_execute_flow_resolves_chip_id_from_request_parameters(
 async def test_execute_flow_falls_back_to_flow_chip_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """execute_flow falls back to the flow's chip_id when request parameters omit it."""
     captured_calls: list[dict[str, object]] = []
 
     def _stub(self: FlowService, **kwargs: object) -> str:
+        """Record the scheduled-execution kwargs and return a fake execution id."""
         captured_calls.append(kwargs)
         return "exec-1"
 
@@ -248,6 +286,7 @@ async def test_execute_flow_falls_back_to_flow_chip_id(
 
 
 def test_create_scheduled_execution_returns_none_when_chip_id_empty() -> None:
+    """_create_scheduled_execution returns None when chip_id is empty."""
     service = FlowService(flow_repository=MagicMock())
 
     result = service._create_scheduled_execution(
@@ -264,7 +303,10 @@ def test_create_scheduled_execution_returns_none_when_chip_id_empty() -> None:
 def test_create_scheduled_execution_swallows_exceptions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """_create_scheduled_execution returns None when an internal call raises."""
+
     def _boom(*_args: object, **_kwargs: object) -> str:
+        """Raise a RuntimeError to simulate an internal failure."""
         raise RuntimeError("boom")
 
     monkeypatch.setattr(flow_service, "generate_execution_id", _boom)
@@ -283,6 +325,7 @@ def test_create_scheduled_execution_swallows_exceptions(
 
 
 def test_create_scheduled_execution_persists_execution_history(init_db: object) -> None:
+    """_create_scheduled_execution persists a scheduled execution history document."""
     service = FlowService(flow_repository=MagicMock())
 
     execution_id = service._create_scheduled_execution(

@@ -608,6 +608,11 @@ def _get_dask_task_runner(n_workers: int = _DEFAULT_DASK_WORKERS) -> Any:
     )
 
 
+def _dask_workers_for(item_count: int) -> int:
+    """Clamp worker count to the number of items actually submitted."""
+    return max(1, min(_DEFAULT_DASK_WORKERS, item_count))
+
+
 def _qubit_batch_task_run_name(parameters: dict[str, Any]) -> str:
     qids = parameters.get("qids", [])
     return f"simultaneous-Q{'-'.join(map(str, qids))}"
@@ -652,7 +657,7 @@ def run_qubit_batch_calibration_isolated(
     parent flow process.
     """
 
-    @flow(task_runner=_get_dask_task_runner())
+    @flow(task_runner=_get_dask_task_runner(1))
     def _run_qubit_batch_flow(
         qids: list[str],
         tasks: list[str],
@@ -690,7 +695,7 @@ def run_mux_calibrations_parallel(
     """
 
     # Define flow dynamically to avoid import errors when prefect-dask not installed
-    @flow(task_runner=_get_dask_task_runner())
+    @flow(task_runner=_get_dask_task_runner(_dask_workers_for(len(mux_groups))))
     def _run_mux_parallel_flow(
         mux_groups: list[list[str]],
         tasks: list[str],
@@ -747,7 +752,7 @@ def run_qubit_calibrations_parallel(
     """
 
     # Define flow dynamically to avoid import errors when prefect-dask not installed
-    @flow(task_runner=_get_dask_task_runner())
+    @flow(task_runner=_get_dask_task_runner(_dask_workers_for(len(qids))))
     def _run_qubit_parallel_flow(
         qids: list[str],
         tasks: list[str],
@@ -893,7 +898,7 @@ def run_groups_with_retry_parallel(
     """
 
     # Define flow dynamically to avoid import errors when prefect-dask not installed
-    @flow(task_runner=_get_dask_task_runner())
+    @flow(task_runner=_get_dask_task_runner(_dask_workers_for(len(groups))))
     def _run_groups_retry_parallel_flow(
         groups: list[list[str]],
         tasks: list[str],
@@ -952,7 +957,7 @@ def run_coupling_calibrations_parallel(
     """
 
     # Define flow dynamically to avoid import errors when prefect-dask not installed
-    @flow(task_runner=_get_dask_task_runner())
+    @flow(task_runner=_get_dask_task_runner(_dask_workers_for(len(coupling_qids))))
     def _run_coupling_parallel_flow(
         coupling_qids: list[str],
         tasks: list[str],

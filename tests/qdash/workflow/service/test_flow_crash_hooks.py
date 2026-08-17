@@ -36,6 +36,7 @@ def _make_execution(
     flow_run_id: str = FLOW_RUN_ID,
     project_id: str = PROJECT_ID,
 ) -> ExecutionHistoryDocument:
+    """Create and save an ExecutionHistoryDocument with the given status."""
     doc = ExecutionHistoryDocument(
         project_id=project_id,
         username="tester",
@@ -60,6 +61,7 @@ def _make_task(
     execution_id: str = "exec-1",
     project_id: str = PROJECT_ID,
 ) -> TaskResultHistoryDocument:
+    """Create and save a TaskResultHistoryDocument with the given status."""
     doc = TaskResultHistoryDocument(
         project_id=project_id,
         username="tester",
@@ -89,6 +91,7 @@ def _make_task(
 def _fake_flow_run(
     *, flow_run_id: str = FLOW_RUN_ID, project_id: str | None = PROJECT_ID
 ) -> SimpleNamespace:
+    """Build a stub Prefect flow run carrying the given id and project_id parameter."""
     parameters = {"project_id": project_id} if project_id is not None else {}
     return SimpleNamespace(id=flow_run_id, parameters=parameters)
 
@@ -96,12 +99,14 @@ def _fake_flow_run(
 def _reload_execution(
     execution_id: str = "exec-1", project_id: str = PROJECT_ID
 ) -> ExecutionHistoryDocument | None:
+    """Fetch the execution history document matching the given project and execution id."""
     return ExecutionHistoryDocument.find_one(
         {"project_id": project_id, "execution_id": execution_id}
     ).run()
 
 
 def _reload_task(task_id: str, project_id: str = PROJECT_ID) -> TaskResultHistoryDocument | None:
+    """Fetch the task result history document matching the given project and task id."""
     return TaskResultHistoryDocument.find_one({"project_id": project_id, "task_id": task_id}).run()
 
 
