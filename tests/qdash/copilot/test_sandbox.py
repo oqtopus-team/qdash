@@ -10,14 +10,13 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from qdash.copilot.agent_runtime.execution import execute_tool_executor, wrap_tool_executors
+from qdash.copilot.tooling import sandbox
 from qdash.copilot.tooling.sandbox import WORKER_SCRIPT, _worker_env, execute_python_analysis
 from qdash.copilot.tooling.sandbox_core import EXECUTION_TIMEOUT_SECONDS, MAX_OUTPUT_BYTES
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-# The worker must stay a standalone script: importing it through the qdash package
-# executes qdash.copilot.__init__ (litellm), which adds ~2.3s to every call.
 MAX_STARTUP_OVERHEAD_SECONDS = 1.5
 
 
@@ -55,6 +54,49 @@ async def test_execute_python_analysis_rejects_unapproved_import() -> None:
     assert result["output"] is None
     assert result["chart"] is None
     assert result["error"] == "Import of 'os' is not allowed"
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_accepts_multi_megabyte_context_data() -> None:
+    """The data store accumulates per stored tool call; a few MB must not break analysis."""
+    context_data = {
+        f"param_{p}": {
+            "qubits": [
+                {
+                    "qid": str(q),
+                    "timeseries": [
+                        {"value": 45.234567, "timestamp": "2026-01-01T12:00:00Z"} for _ in range(50)
+                    ],
+                }
+                for q in range(144)
+            ]
+        }
+        for p in range(6)
+    }
+    assert len(json.dumps(context_data).encode()) > 2 * 1024 * 1024
+
+    result = await execute_python_analysis(
+        'rows = [t["value"] for v in data.values() for q in v["qubits"] for t in q["timeseries"]]\n'
+        'result = {"output": str(len(rows))}',
+        context_data,
+    )
+
+    assert result["error"] is None
+    assert result["output"] == str(6 * 144 * 50)
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_rejects_oversized_context_data(monkeypatch) -> None:
+    monkeypatch.setattr(sandbox, "MAX_WORKER_INPUT_BYTES", 1024)
+
+    result = await execute_python_analysis(
+        'result = {"output": "ok"}', {"big": ["x" * 100 for _ in range(100)]}
+    )
+
+    assert result["output"] is None
+    assert result["error"] is not None
+    assert result["error"].startswith("Sandbox input is too large")
+    assert "last_n" in result["error"]
 
 
 @pytest.mark.asyncio

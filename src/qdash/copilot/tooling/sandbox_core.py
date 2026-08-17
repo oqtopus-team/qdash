@@ -9,12 +9,9 @@ from contextlib import redirect_stdout
 from typing import Any, TypedDict
 
 EXECUTION_TIMEOUT_SECONDS = 5
-# Wall-clock budget granted to the worker on top of the execution timeout, to
-# absorb interpreter startup. The worker is launched as a standalone script so
-# startup is ~0.05s, but a cold page cache or a loaded host can be slower.
 WORKER_STARTUP_GRACE_SECONDS = 5
 MAX_OUTPUT_BYTES = 100 * 1024
-MAX_WORKER_INPUT_BYTES = 2 * 1024 * 1024
+MAX_WORKER_INPUT_BYTES = 16 * 1024 * 1024
 MAX_WORKER_OUTPUT_BYTES = 256 * 1024
 MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024
 

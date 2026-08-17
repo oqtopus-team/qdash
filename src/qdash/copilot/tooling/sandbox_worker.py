@@ -29,7 +29,6 @@ from sandbox_core import (
 )
 
 if TYPE_CHECKING:
-    # Type-only: the runtime import above deliberately bypasses the qdash package.
     from qdash.copilot.tooling.sandbox_core import SandboxResult
 
 logger = logging.getLogger(__name__)
@@ -41,8 +40,6 @@ def _error(message: str) -> SandboxResult:
 
 def _apply_resource_limits() -> None:
     try:
-        # Keep the CPU limit above the in-process SIGALRM budget so the alarm gets a
-        # chance to return a proper error instead of the kernel killing us on SIGXCPU.
         cpu_seconds = max(1, EXECUTION_TIMEOUT_SECONDS + WORKER_STARTUP_GRACE_SECONDS)
         resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
     except (OSError, ValueError) as exc:
@@ -53,10 +50,6 @@ def _apply_resource_limits() -> None:
     except (OSError, ValueError) as exc:
         logger.warning("Failed to apply memory limit: %s", exc)
 
-    # Analysis code has no legitimate reason to create files, and allowed libraries such as
-    # pandas can write anywhere the API user can. RLIMIT_FSIZE=0 blocks writes to regular
-    # files (pipes, so stdin/stdout/stderr, are unaffected). SIGXFSZ is ignored first so a
-    # blocked write raises OSError in the offending call instead of killing the worker.
     if hasattr(signal, "SIGXFSZ"):
         try:
             signal.signal(signal.SIGXFSZ, signal.SIG_IGN)

@@ -26,9 +26,6 @@ from qdash.copilot.tooling.sandbox_core import (
 
 logger = logging.getLogger(__name__)
 
-# Run the worker as a standalone script, not as ``-m qdash.copilot.tooling.sandbox_worker``:
-# importing it through the package would execute ``qdash.copilot.__init__`` (litellm) and
-# add ~2.3s to every sandbox call, which used to eat the whole timeout budget.
 WORKER_SCRIPT = Path(__file__).resolve().parent / "sandbox_worker.py"
 WORKER_WALL_TIMEOUT_SECONDS = EXECUTION_TIMEOUT_SECONDS + WORKER_STARTUP_GRACE_SECONDS
 
@@ -53,10 +50,17 @@ def _worker_env(workdir: str) -> dict[str, str]:
         "TMPDIR": workdir,
         "LANG": "C.UTF-8",
         "LC_ALL": "C.UTF-8",
-        # Writes are blocked by RLIMIT_FSIZE; skip bytecode writes rather than fail them.
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONNOUSERSITE": "1",
     }
+
+
+def _serialize_request(code: str, context_data: dict[str, Any]) -> bytes:
+    return json.dumps(
+        {"code": code, "context_data": context_data},
+        ensure_ascii=False,
+        default=str,
+    ).encode("utf-8")
 
 
 async def execute_python_analysis(
@@ -64,26 +68,22 @@ async def execute_python_analysis(
     context_data: dict[str, Any] | None = None,
 ) -> SandboxResult:
     """Execute Python analysis code in a disposable sandbox worker process."""
-    # Reject statically-detectable violations here: validation is pure, and returning
-    # early avoids serializing the data store and spawning a process the code can never use.
     validation_error = validate_code(code)
     if validation_error is not None:
         return _error(validation_error)
 
     try:
-        request_bytes = json.dumps(
-            {"code": code, "context_data": context_data or {}},
-            ensure_ascii=False,
-            default=str,
-        ).encode("utf-8")
+        request_bytes = await asyncio.to_thread(_serialize_request, code, context_data or {})
     except (TypeError, ValueError) as exc:
         return _error(f"Sandbox input is not JSON serializable: {exc}")
 
     if len(request_bytes) > MAX_WORKER_INPUT_BYTES:
-        return _error(f"Sandbox input is too large (limit {MAX_WORKER_INPUT_BYTES} bytes)")
+        return _error(
+            f"Sandbox input is too large ({len(request_bytes) / 1024 / 1024:.1f} MB, limit "
+            f"{MAX_WORKER_INPUT_BYTES / 1024 / 1024:.0f} MB). Fetch fewer parameters, or use "
+            "a smaller last_n or a qids subset, before running the analysis."
+        )
 
-    # A throwaway directory per call: it is the worker's cwd, HOME and TMPDIR, so relative
-    # paths and library scratch files never resolve into the API process's own directories.
     with tempfile.TemporaryDirectory(
         prefix="qdash-sandbox-", ignore_cleanup_errors=True
     ) as workdir:
@@ -118,8 +118,6 @@ async def _run_worker(request_bytes: bytes, workdir: str) -> SandboxResult:
         stderr=asyncio.subprocess.PIPE,
         cwd=workdir,
         env=_worker_env(workdir),
-        # Detach from the API process group so terminal/process-group signals are not
-        # delivered to sandboxed code, and the worker can be signalled independently.
         start_new_session=True,
     )
 
@@ -140,9 +138,6 @@ async def _run_worker(request_bytes: bytes, workdir: str) -> SandboxResult:
         )
         return _error(f"Execution timed out after {EXECUTION_TIMEOUT_SECONDS} seconds")
     except asyncio.CancelledError:
-        # The caller went away (e.g. the SSE client disconnected). Without this the worker
-        # keeps burning CPU until its own alarm fires. Kill without awaiting: the event loop
-        # reaps the child, and awaiting while cancelled is not guaranteed to resume.
         logger.info("Python sandbox worker cancelled; killing pid %d", process.pid)
         _kill_worker(process)
         raise
