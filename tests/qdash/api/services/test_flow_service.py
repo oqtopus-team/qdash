@@ -257,6 +257,7 @@ async def test_execute_flow_resolves_chip_id_from_request_parameters(
     )
 
     assert captured_calls[0]["chip_id"] == "explicit-chip"
+    assert captured_calls[0]["flow_run_id"] == "flow-run-2"
     assert response.execution_id == "exec-1"
     assert response.flow_run_id == "flow-run-2"
     assert "flow-run-2" in response.flow_run_url
@@ -291,6 +292,7 @@ async def test_execute_flow_falls_back_to_flow_chip_id(
     )
 
     assert captured_calls[0]["chip_id"] == "fallback-chip"
+    assert captured_calls[0]["flow_run_id"] == "flow-run-3"
     assert response.execution_id == "exec-1"
     assert response.flow_run_id == "flow-run-3"
     assert "flow-run-3" in response.flow_run_url

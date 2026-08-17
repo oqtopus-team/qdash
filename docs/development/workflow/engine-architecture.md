@@ -285,6 +285,8 @@ The claim is a single atomic `find_one_and_update` guarded by `note.claimed_at`,
 
 Runs that do not go through the API — cron schedules, where the Prefect scheduler creates the flow run directly — have no pre-created row, so `CalibService` allocates the `execution_id` itself as before.
 
+Pre-creation is best effort. It is skipped when no `chip_id` can be resolved, and any failure is logged and swallowed: the Prefect flow run already exists at that point, and a bookkeeping failure is not a reason to cancel a healthy calibration. Such a run simply falls back to the cron-schedule path above — `CalibService` allocates its own `execution_id` at flow start — and the API response reports the Prefect flow run ID as `execution_id` until then.
+
 ### Reconciliation with Prefect
 
 Hooks only fire while the Prefect runner is alive. When the runner itself dies, nothing closes the execution and it stays `running` forever. `ExecutionService._reconcile_with_prefect()` (API) closes that gap: on every read of the execution list or detail, open executions holding a `note.flow_run_id` are looked up in Prefect in one batched query and finalized when their flow run has already reached a terminal state.

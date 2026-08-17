@@ -439,5 +439,11 @@ def test_reconcile_skips_execution_without_project_id(monkeypatch: Any, init_db:
 
     _make_service()._reconcile_with_prefect([doc])
 
+    assert len(call_count) == 1
     assert doc.status == "running"
     assert doc.end_at is None
+
+    reloaded = _reload_execution("exec-1", project_id="")
+    assert reloaded is not None
+    assert reloaded.status == "running"
+    assert reloaded.end_at is None
