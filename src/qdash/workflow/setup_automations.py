@@ -22,10 +22,10 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from prefect.client.orchestration import get_client
+from prefect.client.schemas.objects import StateType
 from prefect.events.actions import ChangeFlowRunState
 from prefect.events.schemas.automations import AutomationCore, EventTrigger, Posture
 from prefect.events.schemas.events import ResourceSpecification
-from prefect.states import StateType
 
 if TYPE_CHECKING:
     from prefect.client.orchestration import PrefectClient
