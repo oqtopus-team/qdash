@@ -433,7 +433,7 @@ class TaskExecutor:
                                     task_name, task_type, qid
                                 )
                             backend_success = False
-                            r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f}"
+                            r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f} (threshold = {task.r2_threshold})"
 
                     if not backend_success and postprocess_result.output_parameters:
                         self.state_manager.clear_output_parameters(task_name, task_type, qid)
@@ -645,7 +645,7 @@ class TaskExecutor:
                                         task_name, task_type, qid
                                     )
                                 backend_success = False
-                                r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f}"
+                                r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f} (threshold = {task.r2_threshold})"
 
                         if not backend_success and postprocess_result.output_parameters:
                             self.state_manager.clear_output_parameters(task_name, task_type, qid)
