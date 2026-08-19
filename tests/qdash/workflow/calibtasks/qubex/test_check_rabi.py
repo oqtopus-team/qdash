@@ -97,6 +97,7 @@ def test_check_rabi_postprocess_marks_non_finite_frequency_failed_after_artifact
                 angle=180.0,
                 noise=0.0,
                 distance=1.0,
+                r2=0.95,
                 reference_phase=0.0,
             )
         },
@@ -112,3 +113,61 @@ def test_check_rabi_postprocess_marks_non_finite_frequency_failed_after_artifact
     assert result.figures
     assert result.raw_data == []
     assert result.validation_error == "CheckRabi produced non-finite frequency for Q01: nan"
+
+
+def test_check_rabi_postprocess_rejects_low_rabi_param_r2(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = CheckRabi()
+    task.input_parameters["control_amplitude"] = InputParameterModel(value=0.0125, unit="a.u.")
+
+    class DummyIQPlotter:
+        def __init__(self, state_centers):
+            self._widget = go.Figure()
+
+        def update(self, data):
+            return None
+
+    class DummyData:
+        data = {"iq": [0.0, 1.0]}
+
+        def fit(self):
+            return {
+                "amplitude_err": 0.0,
+                "frequency_err": 0.0,
+                "phase_err": 0.0,
+                "offset_err": 0.0,
+                "fig": go.Figure(),
+            }
+
+    monkeypatch.setattr(check_rabi_module, "IQPlotter", DummyIQPlotter)
+    monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q01")
+    monkeypatch.setattr(
+        task, "get_experiment", lambda _backend: SimpleNamespace(state_centers={})
+    )
+    raw_result = SimpleNamespace(
+        data={"Q01": DummyData()},
+        rabi_params={
+            "Q01": SimpleNamespace(
+                amplitude=1.0,
+                frequency=0.02,
+                phase=0.1,
+                offset=0.2,
+                angle=180.0,
+                noise=0.01,
+                distance=0.9,
+                r2=0.59,
+                reference_phase=0.3,
+            )
+        },
+    )
+
+    result = task.postprocess(
+        cast("QubexBackend", SimpleNamespace()),
+        "exec-1",
+        RunResult(raw_result=raw_result, r2={"1": 0.95}),
+        "1",
+    )
+
+    assert result.output_parameters["rabi_r2"].value == 0.59
+    assert result.validation_error == "CheckRabi produced rabi_r2 below 0.6 for Q01: 0.59"

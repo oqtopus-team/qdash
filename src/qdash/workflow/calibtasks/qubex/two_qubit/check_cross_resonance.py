@@ -49,20 +49,17 @@ class CheckCrossResonance(QubexTask):
             qid_role="control",
             unit="GHz",
         ),
-        "control_drag_hpi_amplitude": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_amplitude": InputParameterSpec.required_database(
             parameter_name="drag_hpi_amplitude",
             qid_role="control",
             unit="a.u.",
         ),
-        "control_drag_hpi_length": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_length": InputParameterSpec.required_database(
             parameter_name="drag_hpi_length",
             qid_role="control",
             unit="ns",
         ),
-        "control_drag_hpi_beta": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_beta": InputParameterSpec.required_database(
             parameter_name="drag_hpi_beta",
             qid_role="control",
             unit="a.u.",
@@ -135,6 +132,9 @@ class CheckCrossResonance(QubexTask):
         "zx_rotation_rate": OutputParameterSpec(
             qid_role="coupling", unit="a.u.", description="ZX rotation rate."
         ),
+        "cr_ramptime": OutputParameterSpec(
+            qid_role="coupling", unit="ns", description="CR pulse ramp time."
+        ),
     }
 
     def _plot_coeffs_history(self, coeffs_history: dict[str, Any], label: str) -> go.Figure:
@@ -171,6 +171,7 @@ class CheckCrossResonance(QubexTask):
         self.output_parameters["cancel_beta"].value = result["cancel_beta"]
         self.output_parameters["rotary_amplitude"].value = result["rotary_amplitude"]
         self.output_parameters["zx_rotation_rate"].value = result["zx_rotation_rate"]
+        self.output_parameters["cr_ramptime"].value = result["cr_ramptime"]
 
         output_parameters = self.attach_execution_id(execution_id)
         fig = self._plot_coeffs_history(result["coeffs_history"], label=label)
@@ -243,6 +244,7 @@ class CheckCrossResonance(QubexTask):
             "cancel_beta": fit_result["cancel_beta"],
             "rotary_amplitude": fit_result["rotary_amplitude"],
             "zx_rotation_rate": fit_result["zx_rotation_rate"],
+            "cr_ramptime": fit_result["ramptime"],
             "coeffs_history": raw_result["coeffs_history"],
             "figs_history": raw_result.data["figs_history"],
         }
