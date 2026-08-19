@@ -25,6 +25,7 @@ from qdash.api.schemas.task_file import (
 from qdash.common.config.backend import (
     get_default_backend,
     get_task_category,
+    get_task_groups,
     get_tasks,
     load_backend_config,
 )
@@ -119,13 +120,14 @@ class TaskFileService:
         """
         try:
             config = load_backend_config()
+            default_backend = get_default_backend()
             return BackendConfigResponse(
-                default_backend=get_default_backend(),
+                default_backend=default_backend,
                 backends={
-                    name: {"description": b.description, "tasks": b.tasks}
+                    name: {"description": b.description, "tasks": get_tasks(name)}
                     for name, b in config.backends.items()
                 },
-                categories=config.categories,
+                categories=get_task_groups(default_backend),
             )
         except Exception as e:
             logger.warning(f"Failed to load backend config: {e}")
@@ -183,7 +185,7 @@ class TaskFileService:
         available_tasks = set(get_tasks(backend))
         enriched_tasks = []
         for task in tasks:
-            task.category = get_task_category(task.name)
+            task.category = get_task_category(task.name, backend)
             task.enabled = task.name in available_tasks
             enriched_tasks.append(task)
 
@@ -195,7 +197,10 @@ class TaskFileService:
         elif sort_order == "file_path":
             enriched_tasks.sort(key=lambda t: (t.file_path, t.name))
         elif sort_order == "category":
-            enriched_tasks.sort(key=lambda t: (t.category or "zzz", t.name))
+            task_order = {task_name: index for index, task_name in enumerate(get_tasks(backend))}
+            enriched_tasks.sort(
+                key=lambda task: (task_order.get(task.name, len(task_order)), task.name)
+            )
         else:
             enriched_tasks.sort(key=lambda t: (t.task_type or "", t.name))
 

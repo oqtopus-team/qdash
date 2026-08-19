@@ -140,8 +140,28 @@ def test_list_task_info_includes_simultaneous_qubit_spectroscopy_as_qubit() -> N
 
     assert task.task_type == "qubit"
     assert task.enabled is True
-    assert task.category == "CW Measurements"
+    assert task.category == "CW"
     assert task.run_parameters
+
+
+def test_list_task_info_uses_configured_category_and_task_order() -> None:
+    clear_backend_config_cache()
+
+    tasks = TaskFileService().list_task_info("qubex", sort_order="category").tasks
+    enabled_tasks = [task for task in tasks if task.enabled]
+
+    assert [task.category for task in enabled_tasks[:3]] == ["One Qubit"] * 3
+    assert [task.name for task in enabled_tasks[:3]] == [
+        "CheckChevron",
+        "CheckCoarseChevron",
+        "CheckFineChevron",
+    ]
+    assert list(dict.fromkeys(task.category for task in enabled_tasks)) == [
+        "One Qubit",
+        "Two Qubit",
+        "CW",
+        "Other",
+    ]
 
 
 def test_list_task_info_extracts_input_parameter_metadata() -> None:

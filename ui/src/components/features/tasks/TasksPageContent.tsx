@@ -102,8 +102,8 @@ export function TasksPageContent() {
   const groupedTasks = useMemo(
     () =>
       filteredTasks.reduce<Record<string, TaskInfo[]>>((groups, task) => {
-        const type = task.task_type || "other";
-        (groups[type] ??= []).push(task);
+        const category = task.category || "Other";
+        (groups[category] ??= []).push(task);
         return groups;
       }, {}),
     [filteredTasks],
@@ -204,11 +204,11 @@ export function TasksPageContent() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {Object.entries(groupedTasks).map(([taskType, tasks]) => (
-                    <details key={taskType} className="group" open>
+                  {Object.entries(groupedTasks).map(([category, tasks]) => (
+                    <details key={category} className="group" open>
                       <summary className="flex cursor-pointer select-none items-center px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/60 hover:bg-base-200">
                         <span className="mr-1 transition-transform group-open:rotate-90">▸</span>
-                        {taskType}
+                        {category}
                         <span className="ml-2 text-base-content/40">({tasks.length})</span>
                       </summary>
                       <div className="space-y-0.5">

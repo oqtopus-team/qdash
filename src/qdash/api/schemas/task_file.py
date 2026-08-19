@@ -21,7 +21,7 @@ class TaskFileSettings(BaseModel):
 
     default_backend: str | None = None
     default_view_mode: str | None = None  # "tasks" or "files"
-    sort_order: str | None = None  # "type_then_name", "name_only", "file_path"
+    sort_order: str | None = None  # "category", "type_then_name", "name_only", "file_path"
 
 
 class TaskInfo(BaseModel):
