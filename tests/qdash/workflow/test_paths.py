@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 # Import the leaf module without executing qdash.workflow.__init__, which eagerly
 # imports Prefect/Dask and makes this pure path test depend on process discovery.
 _SPEC = importlib.util.spec_from_file_location(
@@ -20,8 +22,15 @@ def test_project_scoped_calibration_paths() -> None:
         "/calib/projects/proj-1/chips/chip-1/shared/classifier"
     )
     assert resolver.execution_data_dir("proj-1", "chip-1", "20240101-001") == Path(
-        "/calib/projects/proj-1/chips/chip-1/executions/20240101-001"
+        "/calib/projects/proj-1/chips/chip-1/executions/20240101/001"
     )
+
+
+def test_execution_data_dir_rejects_malformed_execution_id() -> None:
+    resolver = PathResolver(calib_data_base=Path("/calib"))
+
+    with pytest.raises(ValueError, match="Invalid execution_id"):
+        resolver.execution_data_dir("proj-1", "chip-1", "invalid")
 
 
 def test_legacy_user_data_dir_remains_available_for_migration() -> None:
