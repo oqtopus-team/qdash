@@ -98,6 +98,17 @@ def test_preprocess_fails_explicitly_when_rabi_inputs_are_missing() -> None:
         task.preprocess(cast("QubexBackend", backend), "1")
 
 
+def test_restore_rabi_context_rejects_low_quality_database_value() -> None:
+    task = _configured_task()
+    task.input_parameters["rabi_r2"] = InputParameterModel(value=0.59)
+    exp = RecordingExperiment({"Q01": "previous-valid-context"})
+
+    with pytest.raises(ValueError, match=r"rabi_r2 greater than or equal to 0\.6"):
+        task._restore_rabi_context(cast("QubexBackend", _backend_for(exp)), "1")
+
+    assert exp.rabi_context == {"Q01": "previous-valid-context"}
+
+
 @pytest.mark.parametrize(
     "task_type",
     [CreateHPIPulse, CreatePIPulse, CreateDRAGHPIPulse, CreateDRAGPIPulse],

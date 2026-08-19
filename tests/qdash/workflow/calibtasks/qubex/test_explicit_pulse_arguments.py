@@ -88,6 +88,7 @@ def test_check_cross_resonance_passes_control_x90_explicitly(
         calib_note=SimpleNamespace(get_cr_param=lambda _label: cr_param),
     )
     monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
+    monkeypatch.setattr(task, "_restore_qubit_pulse_context", lambda _backend, _qid: None)
 
     task.run(cast("QubexBackend", _backend_for(exp)), "0-1")
 

@@ -283,8 +283,9 @@ class CheckRabi(QubexTask):
             store_params=False,
         )
 
-        _store_rabi_params(exp, result)
-        self.save_calibration(backend)
+        if _rabi_validation_error(result, label) is None:
+            _store_rabi_params(exp, result)
+            self.save_calibration(backend)
         r2_candidates = _extract_rabi_r2_candidates(result, label)
         r2 = _extract_rabi_r2(result, label)
         logger.warning(

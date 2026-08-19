@@ -225,6 +225,10 @@ class CreateZX90(QubexTask):
                 f"CreateZX90 zx90_gate_time for {qid}",
                 minimum=0.0,
             ),
+            finite_value_error(
+                self.output_parameters["cr_ramptime"].value,
+                f"CreateZX90 cr_ramptime for {qid}",
+            ),
         )
         return PostProcessResult(
             output_parameters=output_parameters,

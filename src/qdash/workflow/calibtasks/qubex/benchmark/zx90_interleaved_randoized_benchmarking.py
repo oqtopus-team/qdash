@@ -188,6 +188,8 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
+        self._restore_qubit_pulse_context(backend, qid)
+        self._restore_cr_context(backend, qid)
         label = "-".join(
             [exp.get_qubit_label(int(q)) for q in qid.split("-")]
         )  # e.g., "0-1" → "Q00-Q01"

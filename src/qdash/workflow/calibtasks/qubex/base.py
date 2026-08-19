@@ -1,3 +1,4 @@
+import math
 from collections.abc import Generator, Mapping
 from contextlib import ExitStack, contextmanager
 from typing import TYPE_CHECKING, Any
@@ -104,6 +105,12 @@ class QubexTask(BaseTask):
         values = self._resolved_input_values(names)
         if values is None:
             return
+        rabi_r2 = values["rabi_r2"]
+        if not math.isfinite(rabi_r2) or rabi_r2 < 0.6:
+            raise ValueError(
+                f"{self.name} requires finite rabi_r2 greater than or equal to 0.6; "
+                f"got {rabi_r2}"
+            )
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         rabi_param = RabiParam(
@@ -115,7 +122,7 @@ class QubexTask(BaseTask):
             noise=values["rabi_noise"],
             angle=values["rabi_angle"],
             distance=values["rabi_distance"],
-            r2=values["rabi_r2"],
+            r2=rabi_r2,
             reference_phase=values["rabi_reference_phase"],
         )
         exp.store_rabi_params({label: rabi_param})

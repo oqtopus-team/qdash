@@ -209,6 +209,10 @@ class CheckCrossResonance(QubexTask):
                 self.output_parameters["zx_rotation_rate"].value,
                 f"CheckCrossResonance zx_rotation_rate for {label}",
             ),
+            finite_value_error(
+                self.output_parameters["cr_ramptime"].value,
+                f"CheckCrossResonance cr_ramptime for {label}",
+            ),
         )
         return PostProcessResult(
             output_parameters=output_parameters,
@@ -225,6 +229,7 @@ class CheckCrossResonance(QubexTask):
         control, target = (
             exp.get_qubit_label(int(q)) for q in qid.split("-")
         )  # e.g., "0-1" → "Q00","Q01"
+        self._restore_qubit_pulse_context(backend, qid)
         x90 = {control: exp.drag_hpi_pulse[control]}
 
         raw_result = exp.obtain_cr_params(

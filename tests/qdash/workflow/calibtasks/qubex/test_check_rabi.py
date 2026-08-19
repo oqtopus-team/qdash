@@ -1,6 +1,7 @@
 import math
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
+from unittest.mock import MagicMock
 
 import numpy as np
 import plotly.graph_objects as go
@@ -37,7 +38,19 @@ def test_check_rabi_run_uses_data_fit_r2_for_validation(monkeypatch: pytest.Monk
 
     result = SimpleNamespace(
         data={"Q01": DummyData()},
-        rabi_params={"Q01": SimpleNamespace(r2=np.float32(0.95))},
+        rabi_params={
+            "Q01": SimpleNamespace(
+                amplitude=0.4,
+                frequency=0.02,
+                phase=0.1,
+                offset=0.2,
+                angle=180.0,
+                noise=0.01,
+                distance=0.9,
+                r2=np.float32(0.95),
+                reference_phase=0.3,
+            )
+        },
     )
     exp = SimpleNamespace(
         params=SimpleNamespace(readout_amplitude={}),
@@ -51,6 +64,51 @@ def test_check_rabi_run_uses_data_fit_r2_for_validation(monkeypatch: pytest.Monk
 
     assert isinstance(result.rabi_params["Q01"].r2, float)
     assert run_result.r2 == {"1": 0.127}
+
+
+def test_check_rabi_run_does_not_store_rejected_rabi_params(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = CheckRabi()
+    task.input_parameters["qubit_frequency"] = InputParameterModel(value=5.0, unit="GHz")
+    task.input_parameters["control_amplitude"] = InputParameterModel(value=0.01, unit="a.u.")
+    store_rabi_params = MagicMock()
+    save_calibration = MagicMock()
+    monkeypatch.setattr(task, "save_calibration", save_calibration)
+
+    class DummyData:
+        r2 = 0.95
+
+    result = SimpleNamespace(
+        data={"Q01": DummyData()},
+        rabi_params={
+            "Q01": SimpleNamespace(
+                amplitude=0.4,
+                frequency=0.02,
+                phase=0.1,
+                offset=0.2,
+                angle=180.0,
+                noise=0.01,
+                distance=0.9,
+                r2=0.59,
+                reference_phase=0.3,
+            )
+        },
+    )
+    exp = SimpleNamespace(
+        params=SimpleNamespace(readout_amplitude={}),
+        ctx=SimpleNamespace(store_rabi_params=store_rabi_params),
+        get_qubit_label=lambda _qid: "Q01",
+        obtain_rabi_params=lambda **_kwargs: result,
+    )
+
+    run_result = task.run(
+        cast("QubexBackend", SimpleNamespace(get_instance=lambda: exp)), "1"
+    )
+
+    assert run_result.raw_result is result
+    store_rabi_params.assert_not_called()
+    save_calibration.assert_not_called()
 
 
 def test_check_rabi_postprocess_marks_non_finite_frequency_failed_after_artifacts(
