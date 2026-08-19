@@ -3,10 +3,19 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Final, Literal, Self
+from typing import Annotated, Any, Final, Literal, Self
 
 import numpy as np
-from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    WithJsonSchema,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from qdash.common.utils.datetime import format_elapsed_time, format_iso, now, parse_elapsed_time
 from qdash.datamodel.system_info import SystemInfoModel
@@ -285,6 +294,67 @@ class InputParameterModel(ParameterModel):
 
 class OutputParameterModel(ParameterModel):
     """Output parameter produced by one task instance."""
+
+
+class TaskResultParameterModel(BaseModel):
+    """Flexible parameter persisted in task-result history."""
+
+    parameter_name: str = ""
+    qid_role: str = ""
+    source: Literal["database"] | None = None
+    required: bool = False
+    value: Any = None
+    value_type: str = ""
+    error: float = 0
+    unit: str = ""
+    description: str = ""
+    calibrated_at: datetime | None = None
+    execution_id: str = ""
+    task_id: str = ""
+
+    model_config = ConfigDict(extra="allow")
+
+
+class TaskResultInputParameterModel(TaskResultParameterModel):
+    """Input parameter persisted in task-result history."""
+
+
+class TaskResultOutputParameterModel(TaskResultParameterModel):
+    """Output parameter persisted in task-result history with DB comparison metadata."""
+
+    previous_database_value: Any = None
+    database_updated: bool = False
+
+
+def _validate_task_result_input_parameter(value: Any) -> Any:
+    """Validate a history input parameter while retaining dictionary compatibility."""
+    if hasattr(value, "model_dump"):
+        value = value.model_dump()
+    if not isinstance(value, dict):
+        return value
+    return TaskResultInputParameterModel.model_validate(value).model_dump(exclude_unset=True)
+
+
+def _validate_task_result_output_parameter(value: Any) -> Any:
+    """Validate a history parameter while retaining dictionary compatibility."""
+    if hasattr(value, "model_dump"):
+        value = value.model_dump()
+    if not isinstance(value, dict):
+        return value
+    return TaskResultOutputParameterModel.model_validate(value).model_dump(exclude_unset=True)
+
+
+TaskResultOutputParameter = Annotated[
+    Any,
+    BeforeValidator(_validate_task_result_output_parameter),
+    WithJsonSchema(TaskResultOutputParameterModel.model_json_schema()),
+]
+
+TaskResultInputParameter = Annotated[
+    Any,
+    BeforeValidator(_validate_task_result_input_parameter),
+    WithJsonSchema(TaskResultInputParameterModel.model_json_schema()),
+]
 
 
 class OutputParameterSpec(ParameterSpec):

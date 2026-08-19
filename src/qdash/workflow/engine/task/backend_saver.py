@@ -9,11 +9,13 @@ Extracted from TaskExecutor to isolate backend-specific persistence concerns.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from copy import deepcopy
+from typing import TYPE_CHECKING, Any, cast
 
 from qdash.workflow.engine.params_updater import get_params_updater
 
 if TYPE_CHECKING:
+    from qdash.datamodel.task import TaskResultOutputParameter
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.execution.service import ExecutionService
     from qdash.workflow.engine.task.state_manager import TaskStateManager
@@ -126,6 +128,7 @@ class BackendSaver:
         from qdash.repository import MongoQubitCalibrationRepository
 
         qubit_repo = MongoQubitCalibrationRepository()
+        previous_data = self._get_previous_calibration_data(qubit_repo, execution_service, qid)
         qubit_repo.update_calib_data(
             username=self._username,
             qid=qid,
@@ -136,6 +139,7 @@ class BackendSaver:
         # Note: calib_data is already updated by put_output_parameters
         if backend is not None:
             self._update_backend_params(backend, execution_service, qid, output_parameters)
+        self._attach_previous_database_values(task_model, output_parameters, previous_data)
 
     def _save_qubex(
         self,
@@ -199,6 +203,9 @@ class BackendSaver:
         # Save to the authoritative calibration database only when persistence is enabled.
         if output_parameters:
             if task.is_qubit_task():
+                previous_data = self._get_previous_calibration_data(
+                    qubit_repo, execution_service, qid
+                )
                 qubit_repo.update_calib_data(
                     username=self._username,
                     qid=qid,
@@ -206,7 +213,11 @@ class BackendSaver:
                     output_parameters=output_parameters,
                     project_id=execution_service.project_id,
                 )
+                self._attach_previous_database_values(task_model, output_parameters, previous_data)
             elif task.is_coupling_task():
+                previous_data = self._get_previous_calibration_data(
+                    coupling_repo, execution_service, qid
+                )
                 coupling_repo.update_calib_data(
                     username=self._username,
                     qid=qid,
@@ -214,6 +225,7 @@ class BackendSaver:
                     output_parameters=output_parameters,
                     project_id=execution_service.project_id,
                 )
+                self._attach_previous_database_values(task_model, output_parameters, previous_data)
 
         # Update backend params on success, or when force_update_params is enabled
         if not success and not self._force_update_params:
@@ -258,3 +270,51 @@ class BackendSaver:
             updater.update(qid, output_parameters)
         except Exception as exc:
             logger.warning("Failed to update backend params for qid=%s: %s", qid, exc)
+
+    @staticmethod
+    def _attach_previous_database_values(
+        task_model: Any,
+        output_parameters: dict[str, Any],
+        previous_data: dict[str, Any],
+    ) -> None:
+        """Add pre-update database values to the history-facing task result."""
+        compared_parameters: dict[str, TaskResultOutputParameter] = {}
+        for name, parameter in output_parameters.items():
+            if hasattr(parameter, "model_dump"):
+                current = parameter.model_dump()
+            elif isinstance(parameter, dict):
+                current = deepcopy(parameter)
+            else:
+                current = {"value": deepcopy(parameter)}
+
+            previous = previous_data.get(name)
+            previous_value = previous.get("value") if isinstance(previous, dict) else previous
+            current["previous_database_value"] = deepcopy(previous_value)
+            current["database_updated"] = True
+            compared_parameters[name] = current
+
+        task_model.output_parameters = compared_parameters
+
+    def _get_previous_calibration_data(
+        self,
+        repository: Any,
+        execution_service: ExecutionService,
+        qid: str,
+    ) -> dict[str, Any]:
+        """Load pre-update calibration data for project-scoped and legacy executions."""
+        if execution_service.project_id is not None:
+            return cast(
+                "dict[str, Any]",
+                repository.get_calibration_data(
+                    project_id=execution_service.project_id,
+                    chip_id=execution_service.chip_id,
+                    qid=qid,
+                ),
+            )
+
+        calibration = repository.find_one(
+            username=self._username,
+            chip_id=execution_service.chip_id,
+            qid=qid,
+        )
+        return dict(calibration.data) if calibration is not None else {}

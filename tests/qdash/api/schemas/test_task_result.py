@@ -142,3 +142,73 @@ class TestTaskResultRunParameters:
         result = TaskResult()
         data = result.model_dump(exclude_none=True)
         assert "run_parameters" not in data
+
+
+class TestTaskResultOutputParameters:
+    """Test typed output parameter history metadata."""
+
+    def test_output_parameter_stays_dictionary_compatible(self) -> None:
+        result = TaskResult(
+            output_parameters={
+                "readout_frequency": {
+                    "value": 6.123,
+                    "unit": "GHz",
+                    "previous_database_value": 5.987,
+                    "database_updated": True,
+                    "legacy_metadata": "preserved",
+                }
+            }
+        )
+
+        assert result.output_parameters is not None
+        parameter = result.output_parameters["readout_frequency"]
+        assert isinstance(parameter, dict)
+        assert parameter.get("previous_database_value") == 5.987
+        assert parameter["legacy_metadata"] == "preserved"
+
+    def test_legacy_output_remains_unchanged(self) -> None:
+        result = TaskResult(
+            output_parameters={
+                "frequency": {"value": 5.0, "unit": "GHz"},
+                "label": "legacy metadata",
+            }
+        )
+
+        assert result.output_parameters is not None
+        parameter = result.output_parameters["frequency"]
+        assert "database_updated" not in parameter
+        assert "previous_database_value" not in parameter
+        assert result.output_parameters["label"] == "legacy metadata"
+
+    def test_comparison_fields_are_in_json_schema(self) -> None:
+        schema = str(TaskResult.model_json_schema())
+
+        assert "previous_database_value" in schema
+        assert "database_updated" in schema
+
+
+class TestTaskResultInputParameters:
+    """Test typed input parameter history snapshots."""
+
+    def test_input_parameter_accepts_sweep_values_and_stays_a_dict(self) -> None:
+        result = TaskResult(
+            input_parameters={
+                "frequency_range": {
+                    "value": [4.8, 5.0, 5.2],
+                    "unit": "GHz",
+                    "task_metadata": {"points": 3},
+                }
+            }
+        )
+
+        assert result.input_parameters is not None
+        parameter = result.input_parameters["frequency_range"]
+        assert isinstance(parameter, dict)
+        assert parameter["value"] == [4.8, 5.0, 5.2]
+        assert parameter["task_metadata"] == {"points": 3}
+
+    def test_input_fields_are_in_json_schema(self) -> None:
+        schema = str(TaskResult.model_json_schema())
+
+        assert "value_type" in schema
+        assert "description" in schema
