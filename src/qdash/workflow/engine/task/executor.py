@@ -500,7 +500,11 @@ class TaskExecutor:
                 self.history_recorder.record_task_result(
                     executed_task, execution_service.to_datamodel()
                 )
-                self.history_recorder.create_chip_history_snapshot(self.username)
+                self.history_recorder.create_chip_history_snapshot(
+                    self.username,
+                    chip_id=execution_service.chip_id,
+                    project_id=execution_service.project_id,
+                )
                 execution_service = self._update_execution(execution_service)
 
         result.calib_data_delta = self.state_manager.calib_data
@@ -696,7 +700,11 @@ class TaskExecutor:
                         executed_task, execution_service.to_datamodel()
                     )
             if execution_service is not None:
-                self.history_recorder.create_chip_history_snapshot(self.username)
+                self.history_recorder.create_chip_history_snapshot(
+                    self.username,
+                    chip_id=execution_service.chip_id,
+                    project_id=execution_service.project_id,
+                )
                 execution_service = self._update_execution(execution_service)
 
         for result in results.values():

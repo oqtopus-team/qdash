@@ -26,7 +26,12 @@ class MongoChipHistoryRepository:
 
     """
 
-    def create_history(self, username: str, chip_id: str | None = None) -> None:
+    def create_history(
+        self,
+        username: str,
+        chip_id: str | None = None,
+        project_id: str | None = None,
+    ) -> None:
         """Create a chip history snapshot.
 
         Parameters
@@ -36,9 +41,14 @@ class MongoChipHistoryRepository:
         chip_id : str, optional
             The specific chip ID to create history for.
             If None, uses the current (most recently installed) chip.
+        project_id : str, optional
+            The owning project ID. When both project_id and chip_id are set,
+            the chip is resolved by project and chip instead of by username.
 
         """
-        if chip_id is not None:
+        if project_id is not None and chip_id is not None:
+            chip_doc = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
+        elif chip_id is not None:
             chip_doc = ChipDocument.get_chip_by_id(username=username, chip_id=chip_id)
         else:
             try:

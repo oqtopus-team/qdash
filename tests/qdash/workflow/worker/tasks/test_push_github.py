@@ -2,6 +2,8 @@
 
 import logging
 from pathlib import Path
+from types import SimpleNamespace
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -249,6 +251,80 @@ class TestGitHubIntegrationPushFilesSync:
         assert result["calib_note"] == "abc12345"
         assert result["all_params"] == {"error": "push failed"}
         sync_local.assert_not_called()
+
+    def test_push_calib_note_reads_latest_note_from_project_across_users(self, tmp_path: Path):
+        """A later actor must publish the project's shared note, not their own stale note."""
+        from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
+
+        integration = GitHubIntegration.__new__(GitHubIntegration)
+        integration.username = "bob"
+        integration.chip_id = "chip-1"
+        integration.execution_id = "20260819-001"
+        integration.project_id = "proj-1"
+        integration.logger = MagicMock()
+        note_repo = MagicMock()
+        note_repo.find_latest_master.return_value = SimpleNamespace(note={"actor": "alice"})
+        paths = SimpleNamespace(calib_note_json=lambda _chip_id: tmp_path / "calib_note.json")
+
+        with (
+            patch(
+                "qdash.repository.MongoCalibrationNoteRepository",
+                return_value=note_repo,
+            ),
+            patch("qdash.workflow.service.github.get_qubex_paths", return_value=paths),
+            patch(
+                "qdash.workflow.worker.tasks.push_github.push_github",
+                return_value="abc123",
+            ),
+        ):
+            config = cast(
+                "GitHubPushConfig",
+                SimpleNamespace(commit_message=None, branch="develop"),
+            )
+            result = integration._push_calib_note(config)
+
+        assert result == "abc123"
+        note_repo.find_latest_master.assert_called_once_with(
+            chip_id="chip-1", project_id="proj-1", username=None
+        )
+        assert '"actor": "alice"' in (tmp_path / "calib_note.json").read_text()
+
+    def test_push_props_uses_session_project(self, tmp_path: Path):
+        """Properties must be generated from the session's non-default project."""
+        from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
+
+        integration = GitHubIntegration.__new__(GitHubIntegration)
+        integration.username = "bob"
+        integration.chip_id = "chip-1"
+        integration.execution_id = "20260819-001"
+        integration.project_id = "shared-project"
+        integration.logger = MagicMock()
+        paths = SimpleNamespace(props_yaml=lambda _chip_id: tmp_path / "props.yaml")
+
+        with (
+            patch("qdash.workflow.service.github.get_qubex_paths", return_value=paths),
+            patch(
+                "qdash.workflow.worker.flows.push_props.create_props.create_chip_properties"
+            ) as create_properties,
+            patch(
+                "qdash.workflow.worker.tasks.push_github.push_github",
+                return_value="abc123",
+            ),
+        ):
+            config = cast(
+                "GitHubPushConfig",
+                SimpleNamespace(commit_message=None, branch="develop"),
+            )
+            result = integration._push_props(config)
+
+        assert result == "abc123"
+        create_properties.assert_called_once_with(
+            username="bob",
+            source_path=str(tmp_path / "props.yaml"),
+            target_path=str(tmp_path / "props.yaml"),
+            chip_id="chip-1",
+            project_id="shared-project",
+        )
 
     def test_does_not_sync_local_repo_when_nothing_changed(self):
         """No-op grouped pushes do not need to reset the local repository."""

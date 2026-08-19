@@ -508,7 +508,12 @@ class ChipRepository(Protocol):
 class ChipHistoryRepository(Protocol):
     """Protocol for chip history recording operations."""
 
-    def create_history(self, username: str, chip_id: str | None = None) -> None:
+    def create_history(
+        self,
+        username: str,
+        chip_id: str | None = None,
+        project_id: str | None = None,
+    ) -> None:
         """Create a chip history snapshot.
 
         Parameters
@@ -982,7 +987,7 @@ class ExecutionCounterRepository(Protocol):
     """Protocol for execution counter operations.
 
     This repository provides atomic counter generation for execution IDs.
-    The counter is scoped by date, username, chip_id, and project_id.
+    The counter is scoped by date, chip_id, and project_id.
 
     Example
     -------

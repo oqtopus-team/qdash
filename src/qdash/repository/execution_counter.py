@@ -16,7 +16,7 @@ class MongoExecutionCounterRepository:
     """MongoDB implementation of ExecutionCounterRepository.
 
     This class provides atomic counter generation for execution IDs,
-    scoped by date, username, chip_id, and project_id.
+    scoped by date, chip_id, and project_id. Username records the latest actor.
 
     Example
     -------

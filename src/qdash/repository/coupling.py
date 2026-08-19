@@ -167,15 +167,11 @@ class MongoCouplingCalibrationRepository:
         qid: str,
     ) -> dict[str, Any]:
         """Get the data from the same document resolution path used by updates."""
-        doc = None
-        if project_id:
-            doc = CouplingDocument.find_one(
-                {"project_id": project_id, "chip_id": chip_id, "qid": qid}
-            ).run()
-        if doc is None:
-            doc = CouplingDocument.find_one(
-                {"username": username, "chip_id": chip_id, "qid": qid}
-            ).run()
+        if project_id is not None:
+            query = {"project_id": project_id, "chip_id": chip_id, "qid": qid}
+        else:
+            query = {"username": username, "chip_id": chip_id, "qid": qid}
+        doc = CouplingDocument.find_one(query).run()
         return dict(doc.data) if doc is not None else {}
 
     def _to_model(self, doc: CouplingDocument, project_id: str | None) -> CouplingModel:

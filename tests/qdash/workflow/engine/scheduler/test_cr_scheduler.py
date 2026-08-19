@@ -117,6 +117,21 @@ def test_scheduler_default_wiring_path():
     assert scheduler.wiring_config_path is None
 
 
+def test_scheduler_loads_chip_from_project_scope(mock_chip):
+    chip_repo = MagicMock()
+    chip_repo.find_by_id.return_value = mock_chip
+    scheduler = CRScheduler(
+        username="bob",
+        chip_id="test_chip",
+        project_id="proj-1",
+        chip_repo=chip_repo,
+    )
+
+    assert scheduler._load_chip_data() is mock_chip
+    chip_repo.find_by_id.assert_called_once_with("proj-1", "test_chip")
+    chip_repo.get_current_chip.assert_not_called()
+
+
 # MUX conflict detection tests
 def test_build_mux_conflict_map(mock_wiring_config):
     """Test MUX conflict map construction."""

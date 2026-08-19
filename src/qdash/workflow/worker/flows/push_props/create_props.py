@@ -149,21 +149,27 @@ def get_chip_properties(
 
 
 def create_chip_properties(
-    username: str, source_path: str, target_path: str, chip_id: str = "64Qv1"
+    username: str,
+    source_path: str,
+    target_path: str,
+    chip_id: str = "64Qv1",
+    project_id: str | None = None,
 ) -> None:
     """Create and write chip properties to a YAML file."""
     initialize()
     from qdash.repository import MongoChipRepository
+    from qdash.repository.user import MongoUserRepository
 
     chip_repo = MongoChipRepository()
-    chip = chip_repo.get_current_chip(username=username)
+    if project_id is None:
+        project_id = MongoUserRepository().get_default_project_id(username)
+    if project_id is None:
+        raise ValueError(f"Could not resolve project_id for user {username}")
+    chip = chip_repo.find_by_id(project_id=project_id, chip_id=chip_id)
     if chip is None:
-        raise ValueError(f"Chip not found for user {username}")
+        raise ValueError(f"Chip {chip_id} not found in project {project_id}")
 
     # Fetch qubit and coupling models from individual documents (scalable)
-    project_id = chip.project_id
-    if project_id is None:
-        raise ValueError(f"Chip {chip_id} has no project_id")
     qubit_models = chip_repo.get_all_qubit_models(project_id, chip_id)
     coupling_models = chip_repo.get_all_coupling_models(project_id, chip_id)
 

@@ -159,6 +159,13 @@ class TestInMemoryExecutionCounterRepository:
         assert index2 == 1
         assert index3 == 2
 
+    def test_get_next_index_requires_project_id(self):
+        """Test in-memory behavior matches the production project requirement."""
+        repo = InMemoryExecutionCounterRepository()
+
+        with pytest.raises(ValueError, match="project_id is required"):
+            repo.get_next_index("20240101", "alice", "chip_1", None)
+
     def test_different_keys_have_separate_counters(self):
         """Test different key combinations have separate counters."""
         repo = InMemoryExecutionCounterRepository()
@@ -170,9 +177,13 @@ class TestInMemoryExecutionCounterRepository:
         assert index1 == 0
         assert index2 == 0
 
-        # Different users
+        # Different users in the same project/chip share the counter.
         index3 = repo.get_next_index("20240101", "bob", "chip_1", "proj-1")
-        assert index3 == 0
+        assert index3 == 1
+
+        # Different projects have separate counters.
+        index4 = repo.get_next_index("20240101", "bob", "chip_1", "proj-2")
+        assert index4 == 0
 
     def test_clear(self):
         """Test clearing repository."""
