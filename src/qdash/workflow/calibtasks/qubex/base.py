@@ -109,9 +109,7 @@ class QubexTask(BaseTask):
         rabi_param = RabiParam(
             target=label,
             amplitude=values["rabi_amplitude"],
-            frequency=(
-                values["maximum_rabi_frequency"] * values["control_amplitude"] / 1000
-            ),
+            frequency=(values["maximum_rabi_frequency"] * values["control_amplitude"] / 1000),
             phase=values["rabi_phase"],
             offset=values["rabi_offset"],
             noise=values["rabi_noise"],
@@ -142,9 +140,7 @@ class QubexTask(BaseTask):
             }
 
         for prefix, label in role_labels.items():
-            hpi = self._resolved_input_values(
-                (f"{prefix}hpi_amplitude", f"{prefix}hpi_length")
-            )
+            hpi = self._resolved_input_values((f"{prefix}hpi_amplitude", f"{prefix}hpi_length"))
             if hpi is not None:
                 exp.calib_note.update_hpi_param(
                     label,

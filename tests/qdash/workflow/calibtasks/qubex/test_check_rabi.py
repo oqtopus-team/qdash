@@ -142,9 +142,7 @@ def test_check_rabi_postprocess_rejects_low_rabi_param_r2(
 
     monkeypatch.setattr(check_rabi_module, "IQPlotter", DummyIQPlotter)
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q01")
-    monkeypatch.setattr(
-        task, "get_experiment", lambda _backend: SimpleNamespace(state_centers={})
-    )
+    monkeypatch.setattr(task, "get_experiment", lambda _backend: SimpleNamespace(state_centers={}))
     raw_result = SimpleNamespace(
         data={"Q01": DummyData()},
         rabi_params={

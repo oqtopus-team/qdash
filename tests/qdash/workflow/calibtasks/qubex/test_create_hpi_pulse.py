@@ -107,8 +107,7 @@ def test_rabi_dependent_create_tasks_require_complete_database_context(
 ) -> None:
     assert set(task_type.input_spec) >= RABI_DEPENDENCIES
     assert all(
-        task_type.input_spec[name].resolution == "database_required"
-        for name in RABI_DEPENDENCIES
+        task_type.input_spec[name].resolution == "database_required" for name in RABI_DEPENDENCIES
     )
 
 
@@ -125,6 +124,5 @@ def test_create_zx90_requires_complete_cr_database_context() -> None:
     }
 
     assert all(
-        CreateZX90.input_spec[name].resolution == "database_required"
-        for name in cr_dependencies
+        CreateZX90.input_spec[name].resolution == "database_required" for name in cr_dependencies
     )
