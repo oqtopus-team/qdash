@@ -121,17 +121,25 @@ class GitHubIntegration:
         ```
     """
 
-    def __init__(self, username: str, chip_id: str, execution_id: str) -> None:
+    def __init__(
+        self,
+        username: str,
+        chip_id: str,
+        execution_id: str,
+        project_id: str | None = None,
+    ) -> None:
         """Initialize GitHub integration.
 
         Args:
             username: Username for the calibration session
             chip_id: Target chip ID
             execution_id: Unique execution identifier
+            project_id: Project owning the shared calibration state
         """
         self.username = username
         self.chip_id = chip_id
         self.execution_id = execution_id
+        self.project_id = project_id
         self.logger = get_run_logger()
 
     @staticmethod
@@ -279,11 +287,13 @@ class GitHubIntegration:
         repo = MongoCalibrationNoteRepository()
         latest_note = repo.find_latest_master(
             chip_id=self.chip_id,
-            username=self.username,
+            project_id=self.project_id,
+            username=None if self.project_id else self.username,
         )
 
         if latest_note is None:
-            msg = f"No master calibration note found in MongoDB for user {self.username}"
+            scope = f"project {self.project_id}" if self.project_id else f"user {self.username}"
+            msg = f"No master calibration note found in MongoDB for {scope}"
             raise FileNotFoundError(msg)
 
         master_note = latest_note.note

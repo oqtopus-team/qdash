@@ -56,7 +56,6 @@ class CouplingDocument(Document):
                     ("project_id", ASCENDING),
                     ("chip_id", ASCENDING),
                     ("qid", ASCENDING),
-                    ("username", ASCENDING),
                 ],
                 unique=True,
             ),
@@ -98,12 +97,13 @@ class CouplingDocument(Document):
         if coupling_doc is None:
             raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
         coupling_doc.user_id = cls._user_id_for_username(username)
+        coupling_doc.username = username
         coupling_doc.data = CouplingDocument.merge_calib_data(coupling_doc.data, output_parameters)
         coupling_doc.system_info.update_time()
         coupling_doc.save()
         # Create history entry for the updated coupling
         coupling_model = CouplingModel(
-            project_id=project_id,
+            project_id=coupling_doc.project_id,
             user_id=coupling_doc.user_id,
             qid=qid,
             chip_id=chip_id,

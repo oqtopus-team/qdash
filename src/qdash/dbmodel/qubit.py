@@ -56,7 +56,6 @@ class QubitDocument(Document):
                     ("project_id", ASCENDING),
                     ("chip_id", ASCENDING),
                     ("qid", ASCENDING),
-                    ("username", ASCENDING),
                 ],
                 unique=True,
             ),
@@ -97,12 +96,13 @@ class QubitDocument(Document):
             raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
         # Merge new calibration data into the existing data
         qubit_doc.user_id = cls._user_id_for_username(username)
+        qubit_doc.username = username
         qubit_doc.data = QubitDocument.merge_calib_data(qubit_doc.data, output_parameters)
         qubit_doc.system_info.update_time()
         qubit_doc.save()
         # Create history entry for the updated qubit
         qubit_model = QubitModel(
-            project_id=project_id,
+            project_id=qubit_doc.project_id,
             user_id=qubit_doc.user_id,
             qid=qid,
             chip_id=chip_id,

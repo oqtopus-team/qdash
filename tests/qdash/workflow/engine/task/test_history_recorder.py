@@ -129,7 +129,9 @@ class TestTaskHistoryRecorder:
         """Test create_chip_history_snapshot calls the repository."""
         recorder.create_chip_history_snapshot("test-user")
 
-        mock_repos["chip_history"].create_history.assert_called_once_with("test-user")
+        mock_repos["chip_history"].create_history.assert_called_once_with(
+            username="test-user", chip_id=None, project_id=None
+        )
 
     def test_record_completed_task_calls_all_repos(
         self, recorder, mock_repos, sample_task, sample_execution_model
@@ -148,7 +150,11 @@ class TestTaskHistoryRecorder:
 
         mock_repos["task_result_history"].save.assert_called_once()
         mock_repos["chip"].update_chip_data.assert_called_once()
-        mock_repos["chip_history"].create_history.assert_called_once()
+        mock_repos["chip_history"].create_history.assert_called_once_with(
+            username="test-user",
+            chip_id="test-chip",
+            project_id=sample_execution_model.project_id,
+        )
 
     def test_record_completed_task_skips_history_when_disabled(
         self, recorder, mock_repos, sample_task, sample_execution_model

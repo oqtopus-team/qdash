@@ -11,6 +11,7 @@ def push_props(
     chip_id: str = "64Qv1",
     commit_message: str = "Update props.yaml",
     branch: str = "main",
+    project_id: str | None = None,
 ) -> str:
     """Push local chip_properties.yaml to the GitHub repository.
 
@@ -31,6 +32,10 @@ def push_props(
     source_path = str(get_qubex_paths().props_yaml(chip_id))
     repo_subpath = f"{chip_id}/params/props.yaml"
     create_chip_properties(
-        username=username, source_path=source_path, target_path=source_path, chip_id=chip_id
+        username=username,
+        source_path=source_path,
+        target_path=source_path,
+        chip_id=chip_id,
+        project_id=project_id,
     )
     return str(push_github(source_path, repo_subpath, commit_message, branch))

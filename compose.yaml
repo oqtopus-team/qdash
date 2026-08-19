@@ -13,6 +13,34 @@ services:
       MONGO_INIT_DATABASE: qubex
     volumes:
       - ${MONGO_DATA_PATH:-./mongo_data/data/db}:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 })'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - custom_net
+  calibration-migration:
+    build:
+      context: .
+      dockerfile: ./src/qdash/api/Dockerfile
+    restart: "no"
+    env_file:
+      - .env
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - ./src/qdash/dbmodel:/app/qdash/dbmodel
+      - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
+    command: python -m qdash.dbmodel.migration project-scoped-calibration --execute
+    environment:
+      - PYTHONPATH=/app
+      - CALIB_DATA_PATH=/app/calib_data
     networks:
       - custom_net
   mongo-express:
@@ -75,7 +103,10 @@ services:
     env_file:
       - .env
     depends_on:
-      - prefect-server
+      prefect-server:
+        condition: service_started
+      calibration-migration:
+        condition: service_completed_successfully
     volumes:
       - ./src/qdash/workflow:/app/qdash/workflow
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (also used by api)
@@ -105,8 +136,12 @@ services:
     env_file:
       - .env
     depends_on:
-      - prefect-server
-      - deployment-service
+      prefect-server:
+        condition: service_started
+      deployment-service:
+        condition: service_started
+      calibration-migration:
+        condition: service_completed_successfully
     volumes:
       - ./src/qdash/workflow:/app/qdash/workflow
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis
@@ -165,9 +200,14 @@ services:
           path: ./src/qdash/api
           target: /app/api
     depends_on:
-      - mongo
-      - prefect-server
-      - deployment-service
+      mongo:
+        condition: service_healthy
+      prefect-server:
+        condition: service_started
+      deployment-service:
+        condition: service_started
+      calibration-migration:
+        condition: service_completed_successfully
     environment:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/api:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
       - CALIB_DATA_PATH=/app/calib_data

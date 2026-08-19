@@ -52,7 +52,7 @@ class InMemoryExecutionCounterRepository:
             The next index (0 on first call, then 1, 2, 3...)
 
         """
-        counter_key = f"{date}:{username}:{chip_id}:{project_id}"
+        counter_key = f"{date}:{chip_id}:{project_id}"
         current = self._counters.get(counter_key, -1)
         next_index = current + 1
         self._counters[counter_key] = next_index

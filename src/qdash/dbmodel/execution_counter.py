@@ -30,7 +30,6 @@ class ExecutionCounterDocument(Document):
                 [
                     ("project_id", ASCENDING),
                     ("date", ASCENDING),
-                    ("username", ASCENDING),
                     ("chip_id", ASCENDING),
                 ],
                 unique=True,
@@ -55,10 +54,10 @@ class ExecutionCounterDocument(Document):
         project_id: str,
         user_id: str | None = None,
     ) -> int:
-        """Get the next index for the given date, username and chip_id combination.
+        """Get the next index for a project chip and date.
 
         Uses atomic findAndModify to prevent race conditions in concurrent executions.
-        Index starts from 0 on the first call for a given date/username/chip_id combination.
+        Index starts from 0 on the first call for a project/date/chip combination.
 
         Args:
         ----
@@ -81,9 +80,8 @@ class ExecutionCounterDocument(Document):
         resolved_user_id = user_id or cls._user_id_for_username(username)
         for attempt in range(max_retries):
             # First, try to find existing document
-            doc = cls.find_one(
-                {"project_id": project_id, "date": date, "username": username, "chip_id": chip_id}
-            ).run()
+            counter_key = {"project_id": project_id, "date": date, "chip_id": chip_id}
+            doc = cls.find_one(counter_key).run()
 
             if doc is None:
                 # Try to create initial document with index 0
@@ -106,8 +104,11 @@ class ExecutionCounterDocument(Document):
 
             # Document exists - use atomic increment
             result = cls.get_motor_collection().find_one_and_update(
-                {"project_id": project_id, "date": date, "username": username, "chip_id": chip_id},
-                {"$inc": {"index": 1}, "$set": {"user_id": resolved_user_id}},
+                counter_key,
+                {
+                    "$inc": {"index": 1},
+                    "$set": {"username": username, "user_id": resolved_user_id},
+                },
                 return_document=ReturnDocument.AFTER,
             )
 

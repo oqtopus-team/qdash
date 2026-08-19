@@ -190,11 +190,9 @@ class MongoChipRepository:
             The user performing the update
 
         """
-        ChipDocument.update_chip_data(
-            chip_id=chip_id,
-            calib_data=calib_data,
-            username=username,
-        )
+        # Calibration values live in the project-scoped qubit and coupling
+        # collections. Retain this compatibility hook as an intentional no-op.
+        _ = chip_id, calib_data, username
 
     def _to_model(self, doc: ChipDocument) -> ChipModel:
         """Convert a document to a domain model.
@@ -771,9 +769,10 @@ class MongoChipRepository:
             Map of qubit ID to QubitDocument
 
         """
+        # ``username`` is retained for source compatibility. Calibration state is
+        # shared by all members of the project.
+        _ = username
         query = {"project_id": project_id, "chip_id": chip_id}
-        if username is not None:
-            query["username"] = username
         docs = list(QubitDocument.find(query).run())
         return {doc.qid: doc for doc in docs}
 
@@ -798,9 +797,8 @@ class MongoChipRepository:
             Map of coupling ID to CouplingDocument
 
         """
+        _ = username
         query = {"project_id": project_id, "chip_id": chip_id}
-        if username is not None:
-            query["username"] = username
         docs = list(CouplingDocument.find(query).run())
         return {doc.qid: doc for doc in docs}
 

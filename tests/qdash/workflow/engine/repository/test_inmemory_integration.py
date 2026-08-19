@@ -50,8 +50,8 @@ class TestGenerateExecutionIdWithInMemory:
         assert id2.endswith("-001")
         assert id3.endswith("-002")
 
-    def test_generate_execution_id_different_users_independent(self):
-        """Test that different users have independent counters."""
+    def test_generate_execution_id_different_users_share_project_chip_counter(self):
+        """Project collaborators share one execution counter for a chip."""
         from qdash.workflow.service.calib_service import generate_execution_id
 
         counter_repo = InMemoryExecutionCounterRepository()
@@ -69,9 +69,8 @@ class TestGenerateExecutionIdWithInMemory:
             counter_repo=counter_repo,
         )
 
-        # Both should start at 000
         assert id_alice.endswith("-000")
-        assert id_bob.endswith("-000")
+        assert id_bob.endswith("-001")
 
 
 class TestExecutionLockWithInMemory:

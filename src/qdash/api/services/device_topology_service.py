@@ -156,16 +156,12 @@ class DeviceTopologyService:
         drag_hpi_params = latest.note["drag_hpi_params"]
         drag_pi_params = latest.note["drag_pi_params"]
 
-        chip_model = self._chip_repo.get_current_chip(username=latest.username)
+        chip_model = self._chip_repo.find_by_id(project_id=project_id, chip_id=latest.chip_id)
         if chip_model is None:
-            raise ValueError(f"No chip found for user {latest.username}")
+            raise ValueError(f"Chip {latest.chip_id} not found in project {project_id}")
 
-        qubit_models = self._chip_repo.get_all_qubit_models(
-            project_id, chip_model.chip_id, username=chip_model.username
-        )
-        coupling_models = self._chip_repo.get_all_coupling_models(
-            project_id, chip_model.chip_id, username=chip_model.username
-        )
+        qubit_models = self._chip_repo.get_all_qubit_models(project_id, chip_model.chip_id)
+        coupling_models = self._chip_repo.get_all_coupling_models(project_id, chip_model.chip_id)
 
         topology = load_topology(chip_model.topology_id)
         sorted_physical_ids = sorted(request.qubits, key=int)

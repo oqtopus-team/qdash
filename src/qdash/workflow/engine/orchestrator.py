@@ -280,14 +280,19 @@ class CalibOrchestrator:
         # Update chip history
         if update_chip_history:
             try:
+                assert config.project_id is not None
                 chip_repo = MongoChipRepository()
-                chip = chip_repo.get_chip_by_id(username=config.username, chip_id=config.chip_id)
+                chip = chip_repo.find_by_id(project_id=config.project_id, chip_id=config.chip_id)
                 if chip is not None:
                     history_repo = MongoChipHistoryRepository()
-                    history_repo.create_history(username=config.username, chip_id=config.chip_id)
+                    history_repo.create_history(
+                        username=config.username,
+                        chip_id=config.chip_id,
+                        project_id=config.project_id,
+                    )
                 else:
                     logger.warning(
-                        f"Chip '{config.chip_id}' not found for user '{config.username}', "
+                        f"Chip '{config.chip_id}' not found in project '{config.project_id}', "
                         "skipping history update"
                     )
             except Exception as e:

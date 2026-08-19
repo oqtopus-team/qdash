@@ -62,7 +62,6 @@ class CalibrationNoteDocument(Document):
                     ("project_id", ASCENDING),
                     ("execution_id", ASCENDING),
                     ("task_id", ASCENDING),
-                    ("username", ASCENDING),
                     ("chip_id", ASCENDING),
                 ],
                 unique=True,
@@ -113,7 +112,6 @@ class CalibrationNoteDocument(Document):
             "project_id": project_id,
             "execution_id": execution_id,
             "task_id": task_id,
-            "username": username,
             "chip_id": chip_id,
         }
 
@@ -123,6 +121,7 @@ class CalibrationNoteDocument(Document):
         update = {
             "$set": {
                 "user_id": user_id,
+                "username": username,
                 "note": note,
                 "timestamp": timestamp,
             },
@@ -131,7 +130,6 @@ class CalibrationNoteDocument(Document):
                 "project_id": project_id,
                 "execution_id": execution_id,
                 "task_id": task_id,
-                "username": username,
                 "chip_id": chip_id,
             },
         }

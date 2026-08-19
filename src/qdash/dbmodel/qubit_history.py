@@ -58,7 +58,6 @@ class QubitHistoryDocument(Document):
                     ("project_id", ASCENDING),
                     ("chip_id", ASCENDING),
                     ("qid", ASCENDING),
-                    ("username", ASCENDING),
                     ("recorded_date", ASCENDING),
                 ],
                 unique=True,
@@ -103,13 +102,13 @@ class QubitHistoryDocument(Document):
                 "project_id": qubit.project_id,
                 "chip_id": qubit.chip_id,
                 "qid": qubit.qid,
-                "username": username,
                 "recorded_date": today,
             }
         ).run()
         if existing_history:
             history = existing_history
             history.user_id = user_id
+            history.username = username
             history.data = qubit.data
             history.status = qubit.status
             history.cooldown_id = cooldown_id

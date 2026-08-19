@@ -51,7 +51,12 @@ class ChipRepoProtocol(Protocol):
 class ChipHistoryRepoProtocol(Protocol):
     """Protocol for chip history repository."""
 
-    def create_history(self, username: str) -> None:
+    def create_history(
+        self,
+        username: str,
+        chip_id: str | None = None,
+        project_id: str | None = None,
+    ) -> None:
         """Create chip history."""
         ...
 
@@ -193,7 +198,13 @@ class TaskHistoryRecorder:
             logger.error(f"Failed to update chip data: {e}")
             raise
 
-    def create_chip_history_snapshot(self, username: str) -> None:
+    def create_chip_history_snapshot(
+        self,
+        username: str,
+        *,
+        chip_id: str | None = None,
+        project_id: str | None = None,
+    ) -> None:
         """Create a chip history snapshot.
 
         Parameters
@@ -208,7 +219,11 @@ class TaskHistoryRecorder:
 
         """
         try:
-            self.chip_history_repo.create_history(username)
+            self.chip_history_repo.create_history(
+                username=username,
+                chip_id=chip_id,
+                project_id=project_id,
+            )
         except Exception as e:
             logger.error(f"Failed to create chip history snapshot: {e}")
             # Don't raise - this shouldn't block the workflow
@@ -253,4 +268,8 @@ class TaskHistoryRecorder:
 
         # Create chip history snapshot if requested
         if create_history:
-            self.create_chip_history_snapshot(username)
+            self.create_chip_history_snapshot(
+                username,
+                chip_id=chip_id,
+                project_id=execution_model.project_id,
+            )
