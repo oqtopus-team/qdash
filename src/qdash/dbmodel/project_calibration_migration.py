@@ -15,7 +15,8 @@ if TYPE_CHECKING:
     from pymongo.database import Database
 
 MIGRATION_ID = "project-scoped-calibration-v1"
-ARTIFACT_MIGRATION_ID = "project-scoped-calibration-artifacts-v1"
+SCOPE_BACKFILL_MIGRATION_ID = "project-scoped-calibration-scope-backfill-v1"
+ARTIFACT_MIGRATION_ID = "project-scoped-calibration-artifacts-date-layout-v2"
 MIGRATION_LOCK_LEASE = timedelta(minutes=30)
 
 _SHARED_COLLECTIONS: dict[str, tuple[str, ...]] = {
@@ -27,6 +28,19 @@ _SHARED_COLLECTIONS: dict[str, tuple[str, ...]] = {
     "coupling_history": ("project_id", "chip_id", "qid", "recorded_date"),
     "calibration_note": ("project_id", "execution_id", "task_id", "chip_id"),
 }
+
+
+def _ensure_migration_archive_index(database: Database[Any]) -> None:
+    """Install the lookup index used by idempotent migration archive writes."""
+    database["migration_archive"].create_index(
+        [
+            ("migration_id", ASCENDING),
+            ("source_collection", ASCENDING),
+            ("source_id", ASCENDING),
+            ("migration_kind", ASCENDING),
+        ],
+        name="migration_archive_lookup_idx",
+    )
 
 
 def _as_datetime(value: Any) -> datetime | None:
@@ -99,11 +113,107 @@ def _merged_shared_fields(collection_name: str, documents: list[dict[str, Any]])
     return {"note": merged}
 
 
-def _invalid_scope_count(
+def _is_missing_scope_value(value: Any) -> bool:
+    return value is None or value == ""
+
+
+def _resolve_legacy_project_id(database: Database[Any], document: dict[str, Any]) -> str | None:
+    """Resolve a legacy user's project only when the stored ownership is unambiguous."""
+    user_query: dict[str, Any] | None = None
+    if document.get("user_id"):
+        user_query = {"user_id": document["user_id"]}
+    elif document.get("username"):
+        user_query = {"username": document["username"]}
+
+    if user_query is not None:
+        user = database["user"].find_one(user_query, {"default_project_id": 1})
+        if user and not _is_missing_scope_value(user.get("default_project_id")):
+            return str(user["default_project_id"])
+
+    membership_query: dict[str, Any] | None = None
+    if document.get("user_id"):
+        membership_query = {"user_id": document["user_id"], "status": "active"}
+    elif document.get("username"):
+        membership_query = {"username": document["username"], "status": "active"}
+    if membership_query is None:
+        return None
+
+    project_ids = database["project_membership"].distinct("project_id", membership_query)
+    valid_project_ids = [project_id for project_id in project_ids if project_id]
+    return str(valid_project_ids[0]) if len(valid_project_ids) == 1 else None
+
+
+def _resolve_calibration_note_chip_id(
+    database: Database[Any], document: dict[str, Any]
+) -> str | None:
+    """Resolve a legacy note's chip from its uniquely scoped execution."""
+    project_id = document.get("project_id")
+    execution_id = document.get("execution_id")
+    if not project_id or not execution_id:
+        return None
+    chip_ids = database["execution_history"].distinct(
+        "chip_id",
+        {"project_id": project_id, "execution_id": execution_id},
+    )
+    valid_chip_ids = [chip_id for chip_id in chip_ids if chip_id]
+    return str(valid_chip_ids[0]) if len(valid_chip_ids) == 1 else None
+
+
+def _scope_backfill_plan(
     database: Database[Any], collection_name: str, keys: tuple[str, ...]
-) -> int:
+) -> tuple[list[tuple[dict[str, Any], dict[str, Any]]], int]:
+    """Plan safe project scope repairs and count documents that remain invalid."""
     invalid_fields = [{"$or": [{key: {"$exists": False}}, {key: None}, {key: ""}]} for key in keys]
-    return database[collection_name].count_documents({"$or": invalid_fields})
+    documents = database[collection_name].find({"$or": invalid_fields})
+    plan: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    unresolved = 0
+    for document in documents:
+        updates: dict[str, Any] = {}
+        if "project_id" in keys and _is_missing_scope_value(document.get("project_id")):
+            project_id = _resolve_legacy_project_id(database, document)
+            if project_id is not None:
+                updates["project_id"] = project_id
+        projected = {**document, **updates}
+        if collection_name == "calibration_note" and _is_missing_scope_value(
+            projected.get("chip_id")
+        ):
+            chip_id = _resolve_calibration_note_chip_id(database, projected)
+            if chip_id is not None:
+                updates["chip_id"] = chip_id
+                projected["chip_id"] = chip_id
+        if any(_is_missing_scope_value(projected.get(key)) for key in keys):
+            unresolved += 1
+        elif updates:
+            plan.append((document, updates))
+    return plan, unresolved
+
+
+def _apply_scope_backfill(
+    database: Database[Any],
+    plans: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]],
+    *,
+    migrated_at: datetime,
+) -> None:
+    archive = database["migration_archive"]
+    for collection_name, collection_plan in plans.items():
+        collection = database[collection_name]
+        for document, updates in collection_plan:
+            archive.update_one(
+                {
+                    "migration_id": SCOPE_BACKFILL_MIGRATION_ID,
+                    "source_collection": collection_name,
+                    "source_id": document["_id"],
+                },
+                {
+                    "$setOnInsert": {
+                        "migrated_at": migrated_at,
+                        "document": document,
+                        "backfilled_fields": updates,
+                    }
+                },
+                upsert=True,
+            )
+            collection.update_one({"_id": document["_id"]}, {"$set": updates})
 
 
 def _duplicates(
@@ -155,6 +265,7 @@ def migrate_project_scoped_calibration(
     Losing documents are copied verbatim to ``migration_archive`` before deletion.
     Re-running the migration is safe; completed migrations return immediately.
     """
+    _ensure_migration_archive_index(database)
     ledger = database["migration_ledger"]
     if ledger.find_one({"migration_id": MIGRATION_ID, "status": "completed"}):
         if not dry_run:
@@ -170,9 +281,12 @@ def migrate_project_scoped_calibration(
     }
     plans: dict[str, list[tuple[dict[str, Any], list[dict[str, Any]]]]] = {}
     invalid_scope: dict[str, int] = {}
+    scope_backfills: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
     for collection_name, keys in _SHARED_COLLECTIONS.items():
         collection = database[collection_name]
-        invalid_scope[collection_name] = _invalid_scope_count(database, collection_name, keys)
+        backfill_plan, unresolved = _scope_backfill_plan(database, collection_name, keys)
+        scope_backfills[collection_name] = backfill_plan
+        invalid_scope[collection_name] = unresolved
         plans[collection_name] = []
         archived = 0
         for duplicate in _duplicates(database, collection_name, keys):
@@ -187,10 +301,16 @@ def migrate_project_scoped_calibration(
         }
 
     counter_groups = _duplicates(database, "execution_counter", ("project_id", "date", "chip_id"))
-    invalid_scope["execution_counter"] = _invalid_scope_count(
+    counter_backfills, counter_unresolved = _scope_backfill_plan(
         database, "execution_counter", ("project_id", "date", "chip_id")
     )
+    scope_backfills["execution_counter"] = counter_backfills
+    invalid_scope["execution_counter"] = counter_unresolved
     stats["invalid_scope_documents"] = invalid_scope
+    stats["scope_backfill_documents"] = {
+        collection_name: len(collection_plan)
+        for collection_name, collection_plan in scope_backfills.items()
+    }
     stats["collections"]["execution_counter"] = {
         "duplicate_groups": len(counter_groups),
         "documents_to_archive": sum(group["count"] - 1 for group in counter_groups),
@@ -199,8 +319,18 @@ def migrate_project_scoped_calibration(
         return stats
     invalid_total = sum(invalid_scope.values())
     if invalid_total:
+        unresolved_counts = {
+            collection_name: count for collection_name, count in invalid_scope.items() if count
+        }
+        planned_backfills = {
+            collection_name: len(collection_plan)
+            for collection_name, collection_plan in scope_backfills.items()
+            if collection_plan
+        }
         raise RuntimeError(
-            f"Cannot migrate {invalid_total} calibration document(s) with missing scope fields"
+            f"Cannot migrate {invalid_total} calibration document(s) with missing scope fields; "
+            f"unresolved_by_collection={unresolved_counts}; "
+            f"planned_project_backfills={planned_backfills}"
         )
 
     lock = database["migration_lock"]
@@ -224,6 +354,32 @@ def migrate_project_scoped_calibration(
     archive = database["migration_archive"]
     try:
         migrated_at = datetime.now(timezone.utc)
+        _apply_scope_backfill(database, scope_backfills, migrated_at=migrated_at)
+
+        # Backfilled project IDs can introduce new project-scoped duplicate groups.
+        # Recalculate the consolidation plan against the repaired documents.
+        for collection_name, keys in _SHARED_COLLECTIONS.items():
+            collection = database[collection_name]
+            plans[collection_name] = []
+            archived = 0
+            for duplicate in _duplicates(database, collection_name, keys):
+                documents = list(collection.find({"_id": {"$in": duplicate["ids"]}}))
+                winner = _winner(documents)
+                losers = [doc for doc in documents if doc["_id"] != winner["_id"]]
+                plans[collection_name].append((winner, losers))
+                archived += len(losers)
+            stats["collections"][collection_name] = {
+                "duplicate_groups": len(plans[collection_name]),
+                "documents_to_archive": archived,
+            }
+        counter_groups = _duplicates(
+            database, "execution_counter", ("project_id", "date", "chip_id")
+        )
+        stats["collections"]["execution_counter"] = {
+            "duplicate_groups": len(counter_groups),
+            "documents_to_archive": sum(group["count"] - 1 for group in counter_groups),
+        }
+
         for collection_name, groups in plans.items():
             collection = database[collection_name]
             for winner, losers in groups:
@@ -482,8 +638,10 @@ def migrate_calibration_files(
     allow_missing: bool = False,
 ) -> dict[str, int]:
     """Copy legacy user artifacts to project-chip paths without deleting sources."""
+    _ensure_migration_archive_index(database)
     stats = {
         "copied": 0,
+        "moved": 0,
         "identical": 0,
         "conflicts": 0,
         "missing": 0,
@@ -505,23 +663,23 @@ def migrate_calibration_files(
         except ValueError:
             stats["missing"] += 1
             continue
-        source = base_path / username / date_str / index
-        target = (
-            base_path
-            / "projects"
-            / execution["project_id"]
-            / "chips"
-            / execution["chip_id"]
-            / "executions"
-            / execution_id
+        legacy_source = base_path / username / date_str / index
+        project_chip_path = (
+            base_path / "projects" / execution["project_id"] / "chips" / execution["chip_id"]
         )
+        flat_source = project_chip_path / "executions" / execution_id
+        target = project_chip_path / "executions" / date_str / index
         if execution.get("calib_data_path") == str(target) and target.is_dir():
             continue
+        source = flat_source if flat_source.is_dir() else legacy_source
         if not source.is_dir():
             stats["missing"] += 1
             continue
         if dry_run:
-            stats["copied"] += sum(1 for path in source.rglob("*") if path.is_file())
+            if source == flat_source and not target.exists():
+                stats["moved"] += 1
+            else:
+                stats["copied"] += sum(1 for path in source.rglob("*") if path.is_file())
             stats["database_records_updated"] += _migrate_execution_document_paths(
                 database,
                 execution=execution,
@@ -530,13 +688,18 @@ def migrate_calibration_files(
                 dry_run=True,
             )
             continue
-        copied = _copy_tree_without_overwrite(
-            source,
-            target,
-            target / ".migration_conflicts" / username,
-        )
-        for key, count in copied.items():
-            stats[key] += count
+        if source == flat_source and not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            source.rename(target)
+            stats["moved"] += 1
+        else:
+            copied = _copy_tree_without_overwrite(
+                source,
+                target,
+                target / ".migration_conflicts" / username,
+            )
+            for key, count in copied.items():
+                stats[key] += count
         stats["database_records_updated"] += _migrate_execution_document_paths(
             database,
             execution=execution,

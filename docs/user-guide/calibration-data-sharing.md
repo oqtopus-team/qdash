@@ -49,7 +49,7 @@ new execution does not overwrite an earlier execution's result or artifact refer
 On a standard deployment, execution artifacts use this layout:
 
 ```text
-calib_data/projects/{project_id}/chips/{chip_id}/executions/{execution_id}/
+calib_data/projects/{project_id}/chips/{chip_id}/executions/{date}/{index}/
 ```
 
 Classifier files are reusable chip state rather than execution output, so they use a shared path:
