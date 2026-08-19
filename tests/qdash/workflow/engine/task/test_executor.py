@@ -247,6 +247,23 @@ class TestTaskExecutorExecuteTask:
         assert result["message"] == "Completed without run result"
         mock_state_manager.update_task_status_to_completed.assert_called_once()
 
+    def test_execute_records_chip_history_in_execution_project(
+        self, executor: TaskExecutor
+    ) -> None:
+        """Test single-task history uses the execution's project and chip scope."""
+        task = MockTask()
+        task.run = MagicMock(return_value=None)  # type: ignore[method-assign]
+        session: Any = MockSession()
+        execution_service = MagicMock(project_id="proj-1", chip_id="chip-1")
+        execution_service.merge_calib_data.return_value = execution_service
+        executor.history_recorder = MagicMock()
+
+        executor.execute(task, session, "0", execution_service)
+
+        executor.history_recorder.create_chip_history_snapshot.assert_called_once_with(
+            "admin", chip_id="chip-1", project_id="proj-1"
+        )
+
     def test_execute_batch_calls_batch_run_once(
         self, executor: TaskExecutor, mock_state_manager: MagicMock
     ) -> None:
@@ -273,6 +290,23 @@ class TestTaskExecutorExecuteTask:
         task.run.assert_not_called()
         assert mock_state_manager.start_task.call_count == 2
         assert mock_state_manager.end_task.call_count == 2
+
+    def test_execute_batch_records_chip_history_in_execution_project(
+        self, executor: TaskExecutor
+    ) -> None:
+        """Test batch history uses the execution's project and chip scope."""
+        task = MockTask()
+        task.batch_run = MagicMock(return_value=None)  # type: ignore[method-assign]
+        session: Any = MockSession()
+        execution_service = MagicMock(project_id="proj-1", chip_id="chip-1")
+        execution_service.merge_calib_data.return_value = execution_service
+        executor.history_recorder = MagicMock()
+
+        executor.execute_batch(task, session, ["0", "4"], execution_service)
+
+        executor.history_recorder.create_chip_history_snapshot.assert_called_once_with(
+            "admin", chip_id="chip-1", project_id="proj-1"
+        )
 
     def test_execute_batch_continues_after_qid_validation_error(
         self, executor: TaskExecutor, mock_state_manager: MagicMock

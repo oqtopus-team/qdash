@@ -165,15 +165,11 @@ class MongoQubitCalibrationRepository:
         qid: str,
     ) -> dict[str, Any]:
         """Get the data from the same document resolution path used by updates."""
-        doc = None
-        if project_id:
-            doc = QubitDocument.find_one(
-                {"project_id": project_id, "chip_id": chip_id, "qid": qid}
-            ).run()
-        if doc is None:
-            doc = QubitDocument.find_one(
-                {"username": username, "chip_id": chip_id, "qid": qid}
-            ).run()
+        if project_id is not None:
+            query = {"project_id": project_id, "chip_id": chip_id, "qid": qid}
+        else:
+            query = {"username": username, "chip_id": chip_id, "qid": qid}
+        doc = QubitDocument.find_one(query).run()
         return dict(doc.data) if doc is not None else {}
 
     def _to_model(self, doc: QubitDocument, project_id: str | None) -> QubitModel:

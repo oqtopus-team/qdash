@@ -14,6 +14,7 @@ def push_calib_note(
     chip_id: str = "64Qv1",
     commit_message: str = "Update calib_note.json",
     branch: str = "main",
+    project_id: str | None = None,
 ) -> str:
     """Push local calib_note.json to the GitHub repository.
 
@@ -39,10 +40,17 @@ def push_calib_note(
     repo_subpath = f"{chip_id}/calibration/calib_note.json"
 
     repo = MongoCalibrationNoteRepository()
-    latest_note = repo.find_latest_master(chip_id=chip_id, username=username)
+    if project_id is None:
+        from qdash.repository import MongoUserRepository
+
+        project_id = MongoUserRepository().get_default_project_id(username)
+    if project_id is None:
+        raise ValueError(f"Could not resolve project_id for user {username}")
+
+    latest_note = repo.find_latest_master(chip_id=chip_id, project_id=project_id)
 
     if latest_note is None:
-        msg = f"No master calibration note found for user {username}"
+        msg = f"No master calibration note found for project {project_id} and chip {chip_id}"
         raise ValueError(msg)
 
     calib_note = latest_note.note

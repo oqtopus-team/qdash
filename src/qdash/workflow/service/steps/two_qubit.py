@@ -94,6 +94,7 @@ class CustomTwoQubit(CalibrationStep):
                 service.username,
                 service.chip_id,
                 wiring_config_path=wiring_config_path,
+                project_id=service.project_id,
             )
             schedule = scheduler.generate(
                 candidate_qubits=candidate_qubits,
@@ -333,6 +334,7 @@ class GenerateCRSchedule(TransformStep):
             service.username,
             service.chip_id,
             wiring_config_path=wiring_config_path,
+            project_id=service.project_id,
         )
         schedule = scheduler.generate(
             candidate_qubits=candidate_qubits,
@@ -415,6 +417,7 @@ class TwoQubitCalibration(CalibrationStep):
                 service.username,
                 service.chip_id,
                 wiring_config_path=wiring_config_path,
+                project_id=service.project_id,
             )
             schedule = scheduler.generate(
                 candidate_qubits=candidate_qubits,

@@ -460,6 +460,7 @@ class CalibService:
             username=self.username,
             chip_id=self.chip_id,
             execution_id=self.execution_id,
+            project_id=self.project_id,
         )
 
         # Setup github_push_config if not provided
@@ -1042,13 +1043,17 @@ class CalibService:
             )
 
             chip_repo = MongoChipRepository()
-            chip = chip_repo.get_chip_by_id(username=self.username, chip_id=self.chip_id)
+            chip = chip_repo.find_by_id(project_id=self.project_id, chip_id=self.chip_id)
             if chip is not None:
                 history_repo = MongoChipHistoryRepository()
-                history_repo.create_history(username=self.username, chip_id=self.chip_id)
+                history_repo.create_history(
+                    username=self.username,
+                    chip_id=self.chip_id,
+                    project_id=self.project_id,
+                )
             else:
                 logger.warning(
-                    f"Chip '{self.chip_id}' not found for user '{self.username}', "
+                    f"Chip '{self.chip_id}' not found in project '{self.project_id}', "
                     "skipping history update"
                 )
         except Exception as e:

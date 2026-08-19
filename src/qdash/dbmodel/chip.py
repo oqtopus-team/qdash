@@ -67,7 +67,7 @@ class ChipDocument(Document):
         name = "chip"
         indexes: ClassVar = [
             IndexModel(
-                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("username", ASCENDING)],
+                [("project_id", ASCENDING), ("chip_id", ASCENDING)],
                 unique=True,
             ),
             IndexModel(

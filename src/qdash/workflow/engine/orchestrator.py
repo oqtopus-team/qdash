@@ -41,6 +41,7 @@ class CalibOrchestrator:
         ```python
         config = CalibConfig(
             username="alice",
+            project_id="proj-1",
             chip_id="64Qv3",
             qids=["0", "1"],
             execution_id="20240101-001",
@@ -186,7 +187,7 @@ class CalibOrchestrator:
         """Create the calibration directory structure."""
         config = self.config
         Path(config.calib_data_path).mkdir(parents=True, exist_ok=True)
-        Path(config.classifier_dir).mkdir(exist_ok=True)
+        Path(config.classifier_dir).mkdir(parents=True, exist_ok=True)
         Path(f"{config.calib_data_path}/task").mkdir(exist_ok=True)
         Path(f"{config.calib_data_path}/fig").mkdir(exist_ok=True)
         Path(f"{config.calib_data_path}/calib").mkdir(exist_ok=True)
@@ -280,14 +281,19 @@ class CalibOrchestrator:
         # Update chip history
         if update_chip_history:
             try:
+                assert config.project_id is not None
                 chip_repo = MongoChipRepository()
-                chip = chip_repo.get_chip_by_id(username=config.username, chip_id=config.chip_id)
+                chip = chip_repo.find_by_id(project_id=config.project_id, chip_id=config.chip_id)
                 if chip is not None:
                     history_repo = MongoChipHistoryRepository()
-                    history_repo.create_history(username=config.username, chip_id=config.chip_id)
+                    history_repo.create_history(
+                        username=config.username,
+                        chip_id=config.chip_id,
+                        project_id=config.project_id,
+                    )
                 else:
                     logger.warning(
-                        f"Chip '{config.chip_id}' not found for user '{config.username}', "
+                        f"Chip '{config.chip_id}' not found in project '{config.project_id}', "
                         "skipping history update"
                     )
             except Exception as e:
