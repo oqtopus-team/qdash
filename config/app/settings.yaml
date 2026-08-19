@@ -42,5 +42,5 @@ ui:
     default_view_mode: tasks
 
     # Task list sort order
-    # Options: type_then_name, name_only, file_path
-    sort_order: type_then_name
+    # Options: category, type_then_name, name_only, file_path
+    sort_order: category

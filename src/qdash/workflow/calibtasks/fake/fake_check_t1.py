@@ -5,7 +5,11 @@ from typing import ClassVar
 import numpy as np
 import plotly.graph_objects as go
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -35,34 +39,36 @@ class FakeCheckT1(FakeTask):
     task_type: str = "qubit"
     timeout: int = 120
 
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": ParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.default_only(
+            default=0,
             unit="GHz",
             description="Qubit frequency from CheckFineChevron",
         ),
-        "hpi_amplitude": ParameterModel(
+        "hpi_amplitude": InputParameterSpec.default_only(
+            default=0,
             unit="a.u.",
             description="Half-pi pulse amplitude from CheckHPI",
         ),
     }
 
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "time_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "time_range": RunParameterSpec(
             unit="ns",
             value_type="np.logspace",
-            value=(2, 5.7, 51),  # 100 ns to 500 μs
+            default=(2, 5.7, 51),  # 100 ns to 500 μs
             description="Time range for T1 measurement (log scale)",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="",
             value_type="int",
-            value=1024,
+            default=1024,
             description="Number of shots",
         ),
     }
 
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "t1": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "t1": OutputParameterSpec(
             unit="μs",
             description="T1 relaxation time",
         ),

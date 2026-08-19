@@ -5,7 +5,11 @@ from typing import ClassVar
 import numpy as np
 import plotly.graph_objects as go
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -37,50 +41,51 @@ class FakeCheckRabi(FakeTask):
     task_type: str = "qubit"
     timeout: int = 60
 
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": ParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.default_only(
+            default=0,
             unit="GHz",
             description="Qubit frequency from CheckFineChevron",
         ),
     }
 
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "time_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "time_range": RunParameterSpec(
             unit="ns",
             value_type="range",
-            value=(0, 401, 8),
+            default=(0, 401, 8),
             description="Time range for Rabi oscillation",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="",
             value_type="int",
-            value=1024,
+            default=1024,
             description="Number of shots",
         ),
     }
 
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "rabi_amplitude": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "rabi_amplitude": OutputParameterSpec(
             unit="a.u.",
             description="Rabi oscillation amplitude",
         ),
-        "rabi_frequency": ParameterModel(
+        "rabi_frequency": OutputParameterSpec(
             unit="MHz",
             description="Rabi oscillation frequency",
         ),
-        "rabi_phase": ParameterModel(
+        "rabi_phase": OutputParameterSpec(
             unit="rad",
             description="Rabi oscillation phase",
         ),
-        "rabi_offset": ParameterModel(
+        "rabi_offset": OutputParameterSpec(
             unit="a.u.",
             description="Rabi oscillation offset",
         ),
-        "control_amplitude": ParameterModel(
+        "control_amplitude": OutputParameterSpec(
             unit="a.u.",
             description="Control pulse amplitude",
         ),
-        "maximum_rabi_frequency": ParameterModel(
+        "maximum_rabi_frequency": OutputParameterSpec(
             unit="MHz/a.u.",
             description="Maximum Rabi frequency per unit control amplitude",
         ),

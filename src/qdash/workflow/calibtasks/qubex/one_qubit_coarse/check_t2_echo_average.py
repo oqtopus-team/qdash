@@ -10,7 +10,11 @@ from qubex.measurement.measurement_defaults import (
     DEFAULT_SHOTS,
 )
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -30,47 +34,49 @@ class CheckT2EchoAverage(QubexTask):
     task_type: str = "qubit"
     timeout: int = 60 * 240  # 4 hours
 
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": None,
-        "hpi_amplitude": None,
-        "hpi_length": None,
-        "readout_amplitude": None,
-        "readout_frequency": None,
-        "readout_length": ParameterModel(
-            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.required_database(),
+        "hpi_amplitude": InputParameterSpec.required_database(),
+        "hpi_length": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_length": InputParameterSpec.database_or_default(
+            default=DEFAULT_READOUT_DURATION,
+            unit="ns",
+            description="Readout pulse length",
         ),
     }
 
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "time_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "time_range": RunParameterSpec(
             unit="ns",
             value_type="np.logspace",
-            value=(np.log10(300), np.log10(100 * 1000), 51),
+            default=(np.log10(300), np.log10(100 * 1000), 51),
             description="Time range for T2 echo time",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="",
             value_type="int",
-            value=DEFAULT_SHOTS,
+            default=DEFAULT_SHOTS,
             description="Number of shots for T2 echo time",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval for T2 echo time",
         ),
-        "n_runs": RunParameterModel(
+        "n_runs": RunParameterSpec(
             unit="",
             value_type="int",
-            value=10,
+            default=10,
             description="Number of T2 echo measurement repetitions",
         ),
     }
 
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "t2_echo_average": ParameterModel(unit="μs", description="Mean T2 echo time"),
-        "t2_echo_std": ParameterModel(unit="μs", description="T2 echo standard deviation"),
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "t2_echo_average": OutputParameterSpec(unit="μs", description="Mean T2 echo time"),
+        "t2_echo_std": OutputParameterSpec(unit="μs", description="T2 echo standard deviation"),
     }
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:

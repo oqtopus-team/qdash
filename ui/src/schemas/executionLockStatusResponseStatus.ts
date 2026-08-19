@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type GetTaskFileContent200 = { [key: string]: unknown };
+export type ExecutionLockStatusResponseStatus = string | null;

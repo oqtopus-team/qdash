@@ -6,11 +6,13 @@ validation of task outputs, R² checks, and fidelity validation.
 
 import logging
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, TypeVar
 
 from qdash.datamodel.task import ParameterModel
 
 logger = logging.getLogger(__name__)
+
+ParameterT = TypeVar("ParameterT", bound=ParameterModel)
 
 
 class TaskResultProcessingError(Exception):
@@ -95,7 +97,7 @@ class TaskResultProcessor:
 
     def validate_fidelity(
         self,
-        output_parameters: dict[str, ParameterModel],
+        output_parameters: Mapping[str, ParameterModel],
         task_name: str,
     ) -> bool:
         """Validate fidelity parameters (must be <= 1.0).
@@ -154,8 +156,8 @@ class TaskResultProcessor:
 
     def filter_output_parameters_on_r2_failure(
         self,
-        output_parameters: dict[str, ParameterModel],
-    ) -> dict[str, ParameterModel]:
+        output_parameters: dict[str, ParameterT],
+    ) -> dict[str, ParameterT]:
         """Filter out output parameters when R² validation fails.
 
         This is called when R² is too low - we don't want to save
@@ -226,11 +228,11 @@ class TaskResultProcessor:
 
     def process_output_parameters(
         self,
-        output_parameters: dict[str, ParameterModel],
+        output_parameters: dict[str, ParameterT],
         task_name: str,
         execution_id: str,
         task_id: str,
-    ) -> dict[str, ParameterModel]:
+    ) -> dict[str, ParameterT]:
         """Process output parameters, validating and attaching metadata.
 
         Parameters

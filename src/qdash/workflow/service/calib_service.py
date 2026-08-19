@@ -243,6 +243,7 @@ class CalibService:
         source_execution_id: str | None = None,
         parameter_overrides: dict[str, dict[str, Any]] | None = None,
         source_task_id: str | None = None,
+        snapshot_exempt_tasks: set[str] | None = None,
         force_update_params: bool = False,
         persist_output_parameters: bool = True,
         *,
@@ -311,6 +312,7 @@ class CalibService:
         self.source_execution_id = source_execution_id
         self._parameter_overrides = parameter_overrides
         self._source_task_id = source_task_id
+        self._snapshot_exempt_tasks = snapshot_exempt_tasks or set()
         self._force_update_params = force_update_params
         self._persist_output_parameters = persist_output_parameters
 
@@ -506,9 +508,11 @@ class CalibService:
                 persist_output_parameters=self._persist_output_parameters,
             )
 
-            # Create snapshot loader if re-executing from a previous execution
+            # Create a parameter loader for snapshot re-execution or standalone
+            # user overrides. Quick runs have no source snapshot, but still need
+            # input overrides to be re-applied after task preprocessing.
             snapshot_loader = None
-            if self.source_execution_id:
+            if self._source_task_id or self.source_execution_id or self._parameter_overrides:
                 from qdash.workflow.engine.task.snapshot_loader import (
                     SnapshotParameterLoader,
                 )
@@ -516,10 +520,13 @@ class CalibService:
                 snapshot_loader = SnapshotParameterLoader(
                     source_execution_id=self.source_execution_id,
                     project_id=self.project_id,
+                    source_task_id=self._source_task_id,
                     parameter_overrides=self._parameter_overrides,
+                    snapshot_exempt_tasks=self._snapshot_exempt_tasks,
                 )
                 logger.info(
-                    "Created SnapshotParameterLoader for source_execution_id=%s",
+                    "Created SnapshotParameterLoader for source_task_id=%s, source_execution_id=%s",
+                    self._source_task_id,
                     self.source_execution_id,
                 )
 

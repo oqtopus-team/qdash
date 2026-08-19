@@ -1,6 +1,6 @@
 """TaskStateManager class for managing task state and lifecycle."""
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 from pydantic import BaseModel
@@ -195,13 +195,13 @@ class TaskStateManager(BaseModel):
     def put_output_parameters(
         self,
         task_name: str,
-        output_parameters: dict[str, ParameterModel],
+        output_parameters: Mapping[str, ParameterModel],
         task_type: str,
         qid: str,
     ) -> None:
         """Store output parameters for a task and update calibration data."""
         task = self._ensure_task_exists(task_name, task_type, qid)
-        task.put_output_parameter(output_parameters)
+        task.put_output_parameter(dict(output_parameters))
 
         # Update calibration data
         if task_type == TaskTypes.QUBIT:

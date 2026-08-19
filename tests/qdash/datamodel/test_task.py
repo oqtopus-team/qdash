@@ -1,6 +1,76 @@
 """Tests for task datamodel, focusing on BaseTaskResultModel."""
 
-from qdash.datamodel.task import QubitTaskModel, RunParameterModel
+import pytest
+from pydantic import ValidationError
+
+from qdash.datamodel.task import (
+    InputParameterModel,
+    InputParameterSpec,
+    OutputParameterModel,
+    OutputParameterSpec,
+    QubitTaskModel,
+    RunParameterModel,
+    RunParameterSpec,
+)
+
+
+def test_calibration_input_resolution_rejects_contradictory_default() -> None:
+    with pytest.raises(ValidationError, match="database_required must not declare"):
+        InputParameterSpec(
+            resolution="database_required",
+            user_override="allowed",
+            default=1.0,
+        )
+
+
+def test_calibration_input_validates_effective_numeric_bounds_without_fallback() -> None:
+    declaration = InputParameterSpec(
+        resolution="database_or_default",
+        user_override="allowed",
+        default=0.1,
+        greater_than=0.0,
+        less_than=1.0,
+    )
+
+    declaration.validate_effective_value("amplitude", 0.5)
+
+    with pytest.raises(ValueError, match="must be greater than"):
+        declaration.validate_effective_value("amplitude", 0.0)
+    with pytest.raises(ValueError, match="must be less than"):
+        declaration.validate_effective_value("amplitude", 1.0)
+    with pytest.raises(ValueError, match="must be finite"):
+        declaration.validate_effective_value("amplitude", float("nan"))
+
+
+def test_calibration_input_rejects_inverted_numeric_bounds() -> None:
+    with pytest.raises(ValidationError, match="greater_than must be less than"):
+        InputParameterSpec(
+            resolution="database_or_default",
+            user_override="allowed",
+            default=0.1,
+            greater_than=1.0,
+            less_than=0.0,
+        )
+
+    with pytest.raises(ValidationError, match="database_or_default requires"):
+        InputParameterSpec(
+            resolution="database_or_default",
+            user_override="allowed",
+            default=None,
+        )
+
+
+def test_parameter_specs_create_matching_runtime_models() -> None:
+    input_model = InputParameterSpec.default_only(default=1.0, unit="GHz").create_model()
+    run_model = RunParameterSpec(default=1024, value_type="int").create_model()
+    output_model = OutputParameterSpec(default=0.5, unit="a.u.").create_model()
+
+    assert isinstance(input_model, InputParameterModel)
+    assert input_model.value == 1.0
+    assert isinstance(run_model, RunParameterModel)
+    assert run_model.value == 1024
+    assert isinstance(output_model, OutputParameterModel)
+    assert output_model.value == 0.5
 
 
 class TestBaseTaskResultModelRunParameters:

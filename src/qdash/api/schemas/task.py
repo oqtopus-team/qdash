@@ -35,6 +35,19 @@ class ListTaskResponse(BaseModel):
     tasks: list[TaskResponse]
 
 
+class QuickRunTaskRequest(BaseModel):
+    """Request to execute one task directly from the task catalog."""
+
+    chip_id: str
+    qid: str
+    backend_name: str | None = None
+    input_parameter_overrides: dict[str, Any] = Field(default_factory=dict)
+    run_parameter_overrides: dict[str, Any] = Field(default_factory=dict)
+    reconfigure: bool = False
+    persist_output_parameters: bool = False
+    update_params: bool = False
+
+
 class FailureModeResponse(BaseModel):
     """Response model for a structured failure mode."""
 

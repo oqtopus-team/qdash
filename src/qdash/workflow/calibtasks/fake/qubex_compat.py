@@ -1,6 +1,6 @@
 from typing import Any, cast
 
-from qdash.datamodel.task import ParameterModel
+from qdash.datamodel.task import InputParameterModel
 from qdash.workflow.calibtasks.base import PreProcessResult
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_fine_chevron import (
     CheckFineChevron,
@@ -51,7 +51,7 @@ class FakeCheckFineChevron(CheckFineChevron):
         for name, (value, unit, description) in defaults.items():
             param = self.input_parameters.get(name)
             if param is None:
-                self.input_parameters[name] = ParameterModel(
+                self.input_parameters[name] = InputParameterModel(
                     value=value,
                     unit=unit,
                     description=description,

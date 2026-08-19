@@ -5,7 +5,10 @@ from typing import Any, ClassVar, cast
 from qubex.contrib.experiment.simultaneous_qubit_spectroscopy import simultaneous_qubit_spectroscopy
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    ParameterModel,
+    RunParameterSpec,
+)
 from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import CheckQubitSpectroscopy
@@ -20,24 +23,24 @@ class CheckSimultaneousQubitSpectroscopy(CheckQubitSpectroscopy):
     name: str = "CheckSimultaneousQubitSpectroscopy"
     task_type: str = "qubit"
     timeout: int = 60 * 120
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        **CheckQubitSpectroscopy.run_parameters,
-        "power_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        **CheckQubitSpectroscopy.run_spec,
+        "power_range": RunParameterSpec(
             unit="dB",
             value_type="np.arange",
-            value=(-40.0, 0.0, 5.0),
+            default=(-40.0, 0.0, 5.0),
             description="Drive power sweep range for simultaneous qubit spectroscopy",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=1024,
+            default=1024,
             description="Number of shots for simultaneous qubit spectroscopy",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Measurement interval for simultaneous qubit spectroscopy",
         ),
     }

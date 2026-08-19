@@ -1,6 +1,11 @@
 name: ${ENV:-default}
 services:
   devcontainer:
+    security_opt:
+      - seccomp=unconfined
+      - apparmor=unconfined
+    cap_add:
+      - SYS_ADMIN
     build:
       context: .
       dockerfile: ./.devcontainer/Dockerfile

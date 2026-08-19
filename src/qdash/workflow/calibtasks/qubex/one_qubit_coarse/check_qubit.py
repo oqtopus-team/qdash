@@ -2,7 +2,11 @@ from typing import ClassVar
 
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -17,30 +21,32 @@ class CheckQubit(QubexTask):
 
     name: str = "CheckQubit"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "time_range": RunParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "time_range": RunParameterSpec(
             unit="ns",
             value_type="range",
-            value=(0, 201, 4),
+            default=(0, 201, 4),
             description="Time range for Rabi oscillation",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=DEFAULT_SHOTS,
+            default=DEFAULT_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval for Rabi oscillation",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "rabi_amplitude": ParameterModel(unit="a.u.", description="Rabi oscillation amplitude"),
-        "rabi_frequency": ParameterModel(unit="MHz", description="Rabi oscillation frequency"),
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "rabi_amplitude": OutputParameterSpec(
+            unit="a.u.", description="Rabi oscillation amplitude"
+        ),
+        "rabi_frequency": OutputParameterSpec(unit="MHz", description="Rabi oscillation frequency"),
     }
 
     def postprocess(

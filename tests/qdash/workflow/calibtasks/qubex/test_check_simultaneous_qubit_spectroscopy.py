@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from qdash.datamodel.task import ParameterModel
+from qdash.datamodel.task import InputParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.cw.check_simultaneous_qubit_spectroscopy import (
     CheckSimultaneousQubitSpectroscopy,
@@ -146,8 +146,8 @@ def test_batch_run_builds_readout_maps_from_calibration_data(
 
 def test_single_run_passes_loaded_readout_maps(monkeypatch: pytest.MonkeyPatch) -> None:
     task = CheckSimultaneousQubitSpectroscopy()
-    task.input_parameters["readout_amplitude"] = ParameterModel(value=0.017, unit="a.u.")
-    task.input_parameters["readout_frequency"] = ParameterModel(value=6.123, unit="GHz")
+    task.input_parameters["readout_amplitude"] = InputParameterModel(value=0.017, unit="a.u.")
+    task.input_parameters["readout_frequency"] = InputParameterModel(value=6.123, unit="GHz")
     calls: dict[str, Any] = {}
 
     def helper(

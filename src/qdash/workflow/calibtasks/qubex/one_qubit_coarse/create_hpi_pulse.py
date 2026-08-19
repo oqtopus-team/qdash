@@ -3,7 +3,11 @@ from typing import ClassVar
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, HPI_DURATION
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -18,35 +22,39 @@ class CreateHPIPulse(QubexTask):
 
     name: str = "CreateHPIPulse"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": None,  # Load from DB
-        "control_amplitude": None,  # Load from DB
-        "readout_amplitude": None,  # Load from DB
-        "readout_frequency": None,  # Load from DB
-        "readout_length": ParameterModel(
-            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.required_database(),
+        "control_amplitude": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_length": InputParameterSpec.database_or_default(
+            default=DEFAULT_READOUT_DURATION,
+            unit="ns",
+            description="Readout pulse length",
         ),
     }
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "hpi_duration": RunParameterModel(
-            unit="ns", value_type="int", value=HPI_DURATION, description="HPI pulse length"
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "hpi_duration": RunParameterSpec(
+            unit="ns", value_type="int", default=HPI_DURATION, description="HPI pulse length"
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="",
             value_type="int",
-            value=CALIBRATION_SHOTS,
+            default=CALIBRATION_SHOTS,
             description="Number of shots for calibration",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval for calibration",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "hpi_amplitude": ParameterModel(unit="", description="HPI pulse amplitude"),
-        "hpi_length": ParameterModel(value=HPI_DURATION, unit="ns", description="HPI pulse length"),
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "hpi_amplitude": OutputParameterSpec(unit="", description="HPI pulse amplitude"),
+        "hpi_length": OutputParameterSpec(
+            default=HPI_DURATION, unit="ns", description="HPI pulse length"
+        ),
     }
 
     def postprocess(

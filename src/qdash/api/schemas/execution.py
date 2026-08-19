@@ -26,6 +26,10 @@ class ExecutionLockStatusResponse(BaseModel):
     """Response model for the fetch_execution_lock_status endpoint."""
 
     lock: bool
+    execution_id: str | None = None
+    chip_id: str | None = None
+    name: str | None = None
+    status: str | None = None
 
 
 class Task(BaseModel):

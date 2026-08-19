@@ -8,6 +8,8 @@
 import type { TaskInfoTaskType } from './taskInfoTaskType';
 import type { TaskInfoDescription } from './taskInfoDescription';
 import type { TaskInfoCategory } from './taskInfoCategory';
+import type { TaskInfoInputParameters } from './taskInfoInputParameters';
+import type { TaskInfoRunParameters } from './taskInfoRunParameters';
 
 /**
  * Task information extracted from Python file.
@@ -20,4 +22,6 @@ export interface TaskInfo {
   file_path: string;
   category?: TaskInfoCategory;
   enabled?: boolean;
+  input_parameters?: TaskInfoInputParameters;
+  run_parameters?: TaskInfoRunParameters;
 }

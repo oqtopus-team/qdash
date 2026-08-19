@@ -3,10 +3,10 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, Self
 
 import numpy as np
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, format_iso, now, parse_elapsed_time
 from qdash.datamodel.system_info import SystemInfoModel
@@ -31,6 +31,14 @@ class TaskTypes:
     GLOBAL: Final[TaskType] = "global"
     SYSTEM: Final[TaskType] = "system"
     MUX: Final[TaskType] = "mux"
+
+
+class ParameterSpec(BaseModel):
+    """Common metadata declared for a task parameter."""
+
+    unit: str = ""
+    value_type: str = "float"
+    description: str = ""
 
 
 class RunParameterModel(BaseModel):
@@ -101,15 +109,135 @@ class RunParameterModel(BaseModel):
         return self.value
 
 
-class ParameterModel(BaseModel):
-    """Calibration parameter model.
+class RunParameterSpec(ParameterSpec):
+    """Class-level declaration for experiment run configuration."""
 
-    Used for both input_parameters (calibration dependencies) and
-    output_parameters (calibration outputs) in tasks.
+    default: tuple[int | float, ...] | list[int | float] | int | float | str | None = None
+
+    def create_model(self) -> RunParameterModel:
+        """Create an independent runtime model from this declaration."""
+        return RunParameterModel(
+            unit=self.unit,
+            value_type=self.value_type,
+            value=deepcopy(self.default),
+            description=self.description,
+        )
+
+
+class InputParameterSpec(ParameterSpec):
+    """Declaration describing how a task calibration input is resolved."""
+
+    resolution: Literal["database_required", "database_or_default", "default_only"]
+    user_override: Literal["allowed", "forbidden"]
+    default: float | int | None
+    parameter_name: str = ""
+    qid_role: Literal["self", "control", "target", "coupling"] = "self"
+    greater_than: float | None = None
+    less_than: float | None = None
+
+    @classmethod
+    def required_database(
+        cls,
+        *,
+        user_override: Literal["allowed", "forbidden"] = "allowed",
+        **metadata: Any,
+    ) -> Self:
+        """Declare a calibration input that must exist in the database."""
+        return cls(
+            resolution="database_required",
+            user_override=user_override,
+            default=None,
+            **metadata,
+        )
+
+    @classmethod
+    def database_or_default(
+        cls,
+        *,
+        default: float | int,
+        user_override: Literal["allowed", "forbidden"] = "allowed",
+        **metadata: Any,
+    ) -> Self:
+        """Declare a database input with an explicit missing-value fallback."""
+        return cls(
+            resolution="database_or_default",
+            user_override=user_override,
+            default=default,
+            **metadata,
+        )
+
+    @classmethod
+    def default_only(
+        cls,
+        *,
+        default: float | int,
+        user_override: Literal["allowed", "forbidden"] = "allowed",
+        **metadata: Any,
+    ) -> Self:
+        """Declare an input that never reads calibration state."""
+        return cls(
+            resolution="default_only",
+            user_override=user_override,
+            default=default,
+            **metadata,
+        )
+
+    @model_validator(mode="after")
+    def validate_resolution_default(self) -> "InputParameterSpec":
+        """Reject contradictory resolution and default declarations."""
+        if self.resolution == "database_required" and self.default is not None:
+            raise ValueError("database_required must not declare a default")
+        if self.resolution != "database_required" and self.default is None:
+            raise ValueError(f"{self.resolution} requires a default")
+        if (
+            self.greater_than is not None
+            and self.less_than is not None
+            and self.greater_than >= self.less_than
+        ):
+            raise ValueError("greater_than must be less than less_than")
+        return self
+
+    def validate_effective_value(self, name: str, value: Any) -> None:
+        """Validate a resolved value without changing it or applying a fallback."""
+        if value is None:
+            raise ValueError(f"Input parameter '{name}' was not resolved")
+        if self.greater_than is None and self.less_than is None:
+            return
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"Input parameter '{name}' must be numeric, got {value!r}")
+        numeric = float(value)
+        if not math.isfinite(numeric):
+            raise ValueError(f"Input parameter '{name}' must be finite, got {value!r}")
+        if self.greater_than is not None and numeric <= self.greater_than:
+            raise ValueError(
+                f"Input parameter '{name}' must be greater than {self.greater_than}, got {value!r}"
+            )
+        if self.less_than is not None and numeric >= self.less_than:
+            raise ValueError(
+                f"Input parameter '{name}' must be less than {self.less_than}, got {value!r}"
+            )
+
+    def create_model(self) -> "InputParameterModel":
+        """Create an independent runtime model from this declaration."""
+        return InputParameterModel(
+            parameter_name=self.parameter_name,
+            qid_role=self.qid_role,
+            value=self.default,
+            value_type=self.value_type,
+            unit=self.unit,
+            description=self.description,
+        )
+
+
+class ParameterModel(BaseModel):
+    """Common persisted metadata for resolved calibration parameters.
 
     Attributes
     ----------
         parameter_name: The actual DB parameter name. If empty, the dict key is used.
+        source: Explicit source for dependency resolution. ``"database"`` declares
+            that the value must be loaded from calibration state.
+        required: Whether resolution must fail when the declared source has no value.
         qid_role: The qid role for 2-qubit tasks. One of:
             - "" or "self": Use task's qid as-is (default, for 1-qubit tasks)
             - "control": Use control qubit's qid (for 2-qubit tasks)
@@ -128,7 +256,9 @@ class ParameterModel(BaseModel):
 
     parameter_name: str = ""
     qid_role: str = ""
-    value: float | int = 0
+    source: Literal["database"] | None = None
+    required: bool = False
+    value: float | int | None = 0
     value_type: str = "float"
     error: float = 0
     unit: str = ""
@@ -142,11 +272,36 @@ class ParameterModel(BaseModel):
 
     @field_validator("value", mode="before")
     @classmethod
-    def replace_nan_with_zero(cls, v: float) -> float:
+    def replace_nan_with_zero(cls, v: float | int | None) -> float | int | None:
         """Replace NaN values with zero."""
         if isinstance(v, float) and math.isnan(v):
             return 0
         return v
+
+
+class InputParameterModel(ParameterModel):
+    """Resolved input parameter used by one task instance."""
+
+
+class OutputParameterModel(ParameterModel):
+    """Output parameter produced by one task instance."""
+
+
+class OutputParameterSpec(ParameterSpec):
+    """Class-level declaration for a calibration output."""
+
+    default: float | int | None = 0
+    qid_role: str = ""
+
+    def create_model(self) -> OutputParameterModel:
+        """Create an independent runtime model from this declaration."""
+        return OutputParameterModel(
+            qid_role=self.qid_role,
+            value=self.default,
+            value_type=self.value_type,
+            unit=self.unit,
+            description=self.description,
+        )
 
 
 class TaskStatusModel(str, Enum):
