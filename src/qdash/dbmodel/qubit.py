@@ -82,15 +82,11 @@ class QubitDocument(Document):
         project_id: str | None,
     ) -> "QubitDocument":
         """Update the QubitDocument's calibration data with new values."""
-        query: dict[str, Any] = {"qid": qid, "chip_id": chip_id}
-        if project_id:
-            query["project_id"] = project_id
-            qubit_doc = cls.find_one(query).run()
+        if project_id is not None:
+            query = {"project_id": project_id, "qid": qid, "chip_id": chip_id}
         else:
-            qubit_doc = None
-
-        if qubit_doc is None:
-            qubit_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
+            query = {"username": username, "qid": qid, "chip_id": chip_id}
+        qubit_doc = cls.find_one(query).run()
 
         if qubit_doc is None:
             raise ValueError(f"Qubit {qid} not found in chip {chip_id}")

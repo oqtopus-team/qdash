@@ -82,17 +82,11 @@ class CouplingDocument(Document):
         project_id: str | None,
     ) -> "CouplingDocument":
         """Update the CouplingDocument's calibration data with new values."""
-        query: dict[str, Any] = {"qid": qid, "chip_id": chip_id}
-        if project_id:
-            query["project_id"] = project_id
-            coupling_doc = cls.find_one(query).run()
+        if project_id is not None:
+            query = {"project_id": project_id, "qid": qid, "chip_id": chip_id}
         else:
-            coupling_doc = None
-
-        if coupling_doc is None:
-            coupling_doc = cls.find_one(
-                {"username": username, "qid": qid, "chip_id": chip_id}
-            ).run()
+            query = {"username": username, "qid": qid, "chip_id": chip_id}
+        coupling_doc = cls.find_one(query).run()
 
         if coupling_doc is None:
             raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
