@@ -5,23 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MuxTaskOutputParametersAnyOfSource } from './muxTaskOutputParametersAnyOfSource';
-import type { MuxTaskOutputParametersAnyOfCalibratedAt } from './muxTaskOutputParametersAnyOfCalibratedAt';
+import type { MuxTaskOutputParametersAnyOfAnyOf } from './muxTaskOutputParametersAnyOfAnyOf';
 
-export type MuxTaskOutputParametersAnyOf = {[key: string]: {
-  parameter_name?: string;
-  qid_role?: string;
-  source?: MuxTaskOutputParametersAnyOfSource;
-  required?: boolean;
-  value?: unknown;
-  value_type?: string;
-  error?: number;
-  unit?: string;
-  description?: string;
-  calibrated_at?: MuxTaskOutputParametersAnyOfCalibratedAt;
-  execution_id?: string;
-  task_id?: string;
-  previous_database_value?: unknown;
-  database_updated?: boolean;
-  [key: string]: unknown;
- }};
+export type MuxTaskOutputParametersAnyOf = {[key: string]: MuxTaskOutputParametersAnyOfAnyOf | string | number | boolean | unknown[] | null};

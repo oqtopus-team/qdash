@@ -5,23 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskOutputParametersAnyOfSource } from './taskOutputParametersAnyOfSource';
-import type { TaskOutputParametersAnyOfCalibratedAt } from './taskOutputParametersAnyOfCalibratedAt';
+import type { TaskOutputParametersAnyOfAnyOf } from './taskOutputParametersAnyOfAnyOf';
 
-export type TaskOutputParametersAnyOf = {[key: string]: {
-  parameter_name?: string;
-  qid_role?: string;
-  source?: TaskOutputParametersAnyOfSource;
-  required?: boolean;
-  value?: unknown;
-  value_type?: string;
-  error?: number;
-  unit?: string;
-  description?: string;
-  calibrated_at?: TaskOutputParametersAnyOfCalibratedAt;
-  execution_id?: string;
-  task_id?: string;
-  previous_database_value?: unknown;
-  database_updated?: boolean;
-  [key: string]: unknown;
- }};
+export type TaskOutputParametersAnyOf = {[key: string]: TaskOutputParametersAnyOfAnyOf | string | number | boolean | unknown[] | null};

@@ -5,23 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MetricHistoryItemOutputParametersAnyOfSource } from './metricHistoryItemOutputParametersAnyOfSource';
-import type { MetricHistoryItemOutputParametersAnyOfCalibratedAt } from './metricHistoryItemOutputParametersAnyOfCalibratedAt';
+import type { MetricHistoryItemOutputParametersAnyOfAnyOf } from './metricHistoryItemOutputParametersAnyOfAnyOf';
 
-export type MetricHistoryItemOutputParametersAnyOf = {[key: string]: {
-  parameter_name?: string;
-  qid_role?: string;
-  source?: MetricHistoryItemOutputParametersAnyOfSource;
-  required?: boolean;
-  value?: unknown;
-  value_type?: string;
-  error?: number;
-  unit?: string;
-  description?: string;
-  calibrated_at?: MetricHistoryItemOutputParametersAnyOfCalibratedAt;
-  execution_id?: string;
-  task_id?: string;
-  previous_database_value?: unknown;
-  database_updated?: boolean;
-  [key: string]: unknown;
- }};
+export type MetricHistoryItemOutputParametersAnyOf = {[key: string]: MetricHistoryItemOutputParametersAnyOfAnyOf | string | number | boolean | unknown[] | null};

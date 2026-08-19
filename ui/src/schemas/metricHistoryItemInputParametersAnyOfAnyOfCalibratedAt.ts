@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type MetricHistoryItemOutputParametersAnyOfCalibratedAt = string | null;
+export type MetricHistoryItemInputParametersAnyOfAnyOfCalibratedAt = string | null;

@@ -156,6 +156,26 @@ class MongoQubitCalibrationRepository:
 
         return dict(doc.data)
 
+    def get_calibration_data_for_update(
+        self,
+        *,
+        username: str,
+        project_id: str | None,
+        chip_id: str,
+        qid: str,
+    ) -> dict[str, Any]:
+        """Get the data from the same document resolution path used by updates."""
+        doc = None
+        if project_id:
+            doc = QubitDocument.find_one(
+                {"project_id": project_id, "chip_id": chip_id, "qid": qid}
+            ).run()
+        if doc is None:
+            doc = QubitDocument.find_one(
+                {"username": username, "chip_id": chip_id, "qid": qid}
+            ).run()
+        return dict(doc.data) if doc is not None else {}
+
     def _to_model(self, doc: QubitDocument, project_id: str | None) -> QubitModel:
         """Convert a document to a domain model.
 

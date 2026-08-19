@@ -11,6 +11,7 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    TypeAdapter,
     WithJsonSchema,
     field_serializer,
     field_validator,
@@ -347,14 +348,49 @@ def _validate_task_result_output_parameter(value: Any) -> Any:
 TaskResultOutputParameter = Annotated[
     Any,
     BeforeValidator(_validate_task_result_output_parameter),
-    WithJsonSchema(TaskResultOutputParameterModel.model_json_schema()),
+    WithJsonSchema(
+        {
+            "anyOf": [
+                TaskResultOutputParameterModel.model_json_schema(),
+                {"type": "string"},
+                {"type": "number"},
+                {"type": "boolean"},
+                {"type": "array", "items": {}},
+                {"type": "null"},
+            ]
+        }
+    ),
 ]
 
 TaskResultInputParameter = Annotated[
     Any,
     BeforeValidator(_validate_task_result_input_parameter),
-    WithJsonSchema(TaskResultInputParameterModel.model_json_schema()),
+    WithJsonSchema(
+        {
+            "anyOf": [
+                TaskResultInputParameterModel.model_json_schema(),
+                {"type": "string"},
+                {"type": "number"},
+                {"type": "boolean"},
+                {"type": "array", "items": {}},
+                {"type": "null"},
+            ]
+        }
+    ),
 ]
+
+_TASK_RESULT_INPUT_PARAMETERS_ADAPTER = TypeAdapter(dict[str, TaskResultInputParameter])
+_TASK_RESULT_OUTPUT_PARAMETERS_ADAPTER = TypeAdapter(dict[str, TaskResultOutputParameter])
+
+
+def validate_task_result_input_parameters(parameters: dict[str, Any]) -> dict[str, Any]:
+    """Validate and normalize a complete task-result input parameter mapping."""
+    return _TASK_RESULT_INPUT_PARAMETERS_ADAPTER.validate_python(parameters)
+
+
+def validate_task_result_output_parameters(parameters: dict[str, Any]) -> dict[str, Any]:
+    """Validate and normalize a complete task-result output parameter mapping."""
+    return _TASK_RESULT_OUTPUT_PARAMETERS_ADAPTER.validate_python(parameters)
 
 
 class OutputParameterSpec(ParameterSpec):

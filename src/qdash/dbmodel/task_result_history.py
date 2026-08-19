@@ -13,6 +13,8 @@ from qdash.datamodel.task import (
     BaseTaskResultModel,
     TaskResultInputParameter,
     TaskResultOutputParameter,
+    validate_task_result_input_parameters,
+    validate_task_result_output_parameters,
 )
 from qdash.dbmodel.user import UserDocument
 
@@ -151,14 +153,6 @@ class TaskResultHistoryDocument(Document):
         td = parse_elapsed_time(v)
         return td.total_seconds() if td else None
 
-    @staticmethod
-    def _serialize_parameters(parameters: dict[str, Any]) -> dict[str, Any]:
-        """Normalize runtime parameter models to history dictionaries."""
-        return {
-            name: parameter.model_dump() if hasattr(parameter, "model_dump") else parameter
-            for name, parameter in parameters.items()
-        }
-
     class Settings:
         """Settings for the document."""
 
@@ -284,8 +278,8 @@ class TaskResultHistoryDocument(Document):
             status=task.status,
             message=task.message,
             stack_trace=task.stack_trace,
-            input_parameters=cls._serialize_parameters(task.input_parameters),
-            output_parameters=cls._serialize_parameters(task.output_parameters),
+            input_parameters=validate_task_result_input_parameters(task.input_parameters),
+            output_parameters=validate_task_result_output_parameters(task.output_parameters),
             output_parameter_names=task.output_parameter_names,
             run_parameters=task.run_parameters,
             quality_metrics=task.quality_metrics,
@@ -327,8 +321,8 @@ class TaskResultHistoryDocument(Document):
         doc.status = task.status
         doc.message = task.message
         doc.stack_trace = task.stack_trace
-        doc.input_parameters = cls._serialize_parameters(task.input_parameters)
-        doc.output_parameters = cls._serialize_parameters(task.output_parameters)
+        doc.input_parameters = validate_task_result_input_parameters(task.input_parameters)
+        doc.output_parameters = validate_task_result_output_parameters(task.output_parameters)
         doc.output_parameter_names = task.output_parameter_names
         doc.run_parameters = task.run_parameters
         doc.quality_metrics = task.quality_metrics

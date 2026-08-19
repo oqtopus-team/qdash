@@ -41,7 +41,7 @@ def test_save_mux_qid_syncs_backend_params_for_distributed_outputs() -> None:
         patch("qdash.repository.MongoQubitCalibrationRepository") as repo_cls,
         patch("qdash.workflow.engine.task.backend_saver.get_params_updater", return_value=updater),
     ):
-        repo_cls.return_value.get_calibration_data.return_value = {
+        repo_cls.return_value.get_calibration_data_for_update.return_value = {
             "readout_frequency": {"value": 5.987, "unit": "GHz"}
         }
         saver.save_mux_qid(task, execution_service, "1", backend)
@@ -144,7 +144,7 @@ def test_save_qubex_records_previous_database_value_for_persisted_output() -> No
         patch("qdash.repository.MongoCouplingCalibrationRepository"),
         patch("qdash.workflow.engine.task.backend_saver.get_params_updater", return_value=None),
     ):
-        qubit_repo_cls.return_value.get_calibration_data.return_value = {
+        qubit_repo_cls.return_value.get_calibration_data_for_update.return_value = {
             "drive_amplitude": {"value": 0.08, "unit": "a.u."}
         }
         saver.save(task, execution_service, "1", backend, success=True)
@@ -159,3 +159,37 @@ def test_save_qubex_records_previous_database_value_for_persisted_output() -> No
     assert task_model.output_parameters["drive_amplitude"]["value"] == 0.12
     assert task_model.output_parameters["drive_amplitude"]["previous_database_value"] == 0.08
     assert task_model.output_parameters["drive_amplitude"]["database_updated"] is True
+
+
+def test_save_qubex_records_previous_database_value_for_coupling() -> None:
+    output_parameters = {"coupling_strength": ParameterModel(value=0.03, unit="GHz")}
+    task_model = SimpleNamespace(output_parameters=output_parameters)
+    state_manager = MagicMock()
+    state_manager.get_task.return_value = task_model
+    execution_service = cast(
+        "ExecutionService",
+        SimpleNamespace(execution_id="exec-1", chip_id="chip-1", project_id="proj-1"),
+    )
+    task = MagicMock()
+    task.backend = "qubex"
+    task.get_name.return_value = "CheckCoupling"
+    task.get_task_type.return_value = "coupling"
+    task.is_qubit_task.return_value = False
+    task.is_coupling_task.return_value = True
+    backend = MagicMock()
+    backend.name = "qubex"
+    saver = BackendSaver(state_manager, "alice", "/tmp/calib", "tm-1")
+
+    with (
+        patch("qdash.repository.MongoQubitCalibrationRepository"),
+        patch("qdash.repository.MongoCouplingCalibrationRepository") as coupling_repo_cls,
+    ):
+        coupling_repo_cls.return_value.get_calibration_data_for_update.return_value = {
+            "coupling_strength": {"value": 0.02, "unit": "GHz"}
+        }
+        saver.save(task, execution_service, "0-1", backend, success=True)
+
+    assert task_model.output_parameters["coupling_strength"]["previous_database_value"] == 0.02
+    coupling_repo_cls.return_value.get_calibration_data_for_update.assert_called_once_with(
+        username="alice", project_id="proj-1", chip_id="chip-1", qid="0-1"
+    )

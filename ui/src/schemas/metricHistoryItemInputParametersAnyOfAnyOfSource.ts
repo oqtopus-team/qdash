@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type MuxTaskInputParametersAnyOfCalibratedAt = string | null;
+export type MetricHistoryItemInputParametersAnyOfAnyOfSource = 'database' | null;

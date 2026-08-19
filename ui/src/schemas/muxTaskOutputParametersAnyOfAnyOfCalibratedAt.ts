@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type TaskResultOutputParametersAnyOfCalibratedAt = string | null;
+export type MuxTaskOutputParametersAnyOfAnyOfCalibratedAt = string | null;

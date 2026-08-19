@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type MetricHistoryItemOutputParametersAnyOfSource = 'database' | null;
+export type MetricHistoryItemOutputParametersAnyOfAnyOfSource = 'database' | null;

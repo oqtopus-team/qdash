@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type TaskResultResponseInputParametersSource = 'database' | null;
+export type TaskResultResponseOutputParametersAnyOfSource = 'database' | null;

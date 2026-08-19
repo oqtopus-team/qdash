@@ -302,19 +302,12 @@ class BackendSaver:
         qid: str,
     ) -> dict[str, Any]:
         """Load pre-update calibration data for project-scoped and legacy executions."""
-        if execution_service.project_id is not None:
-            return cast(
-                "dict[str, Any]",
-                repository.get_calibration_data(
-                    project_id=execution_service.project_id,
-                    chip_id=execution_service.chip_id,
-                    qid=qid,
-                ),
-            )
-
-        calibration = repository.find_one(
-            username=self._username,
-            chip_id=execution_service.chip_id,
-            qid=qid,
+        return cast(
+            "dict[str, Any]",
+            repository.get_calibration_data_for_update(
+                username=self._username,
+                project_id=execution_service.project_id,
+                chip_id=execution_service.chip_id,
+                qid=qid,
+            ),
         )
-        return dict(calibration.data) if calibration is not None else {}

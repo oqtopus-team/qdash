@@ -181,10 +181,14 @@ class TestTaskResultOutputParameters:
         assert result.output_parameters["label"] == "legacy metadata"
 
     def test_comparison_fields_are_in_json_schema(self) -> None:
-        schema = str(TaskResult.model_json_schema())
+        model_schema = TaskResult.model_json_schema()
+        schema = str(model_schema)
 
         assert "previous_database_value" in schema
         assert "database_updated" in schema
+        output_schema = model_schema["properties"]["output_parameters"]
+        parameter_variants = output_schema["anyOf"][0]["additionalProperties"]["anyOf"]
+        assert {"type": "string"} in parameter_variants
 
 
 class TestTaskResultInputParameters:
