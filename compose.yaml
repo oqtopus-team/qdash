@@ -17,11 +17,12 @@ services:
       test:
         [
           "CMD-SHELL",
-          "mongosh --quiet --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 })'",
+          "mongosh --quiet --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 })'",
         ]
       interval: 5s
       timeout: 5s
       retries: 12
+      start_period: 30s
     networks:
       - custom_net
   calibration-migration:

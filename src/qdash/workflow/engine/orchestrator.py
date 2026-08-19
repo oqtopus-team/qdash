@@ -187,7 +187,7 @@ class CalibOrchestrator:
         """Create the calibration directory structure."""
         config = self.config
         Path(config.calib_data_path).mkdir(parents=True, exist_ok=True)
-        Path(config.classifier_dir).mkdir(exist_ok=True)
+        Path(config.classifier_dir).mkdir(parents=True, exist_ok=True)
         Path(f"{config.calib_data_path}/task").mkdir(exist_ok=True)
         Path(f"{config.calib_data_path}/fig").mkdir(exist_ok=True)
         Path(f"{config.calib_data_path}/calib").mkdir(exist_ok=True)

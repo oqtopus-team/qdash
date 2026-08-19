@@ -62,7 +62,7 @@ class ExecutionCounterDocument(Document):
         Args:
         ----
             date: The date to get the next index for
-            username: The username to get the next index for
+            username: The actor username recorded on the counter document
             chip_id: The chip_id to get the next index for
             project_id: The project_id to get the next index for
 

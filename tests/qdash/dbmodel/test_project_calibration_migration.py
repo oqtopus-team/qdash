@@ -17,6 +17,10 @@ def test_migration_archives_duplicates_and_installs_project_indexes(init_db) -> 
     qubits.drop_indexes()
     counters.drop_indexes()
     notes.drop_indexes()
+    legacy_qubit_index = qubits.create_index(
+        [("project_id", 1), ("chip_id", 1), ("qid", 1), ("username", 1)],
+        unique=True,
+    )
     older = datetime(2026, 1, 1, tzinfo=timezone.utc)
     newer = datetime(2026, 1, 2, tzinfo=timezone.utc)
     qubits.insert_many(
@@ -118,6 +122,7 @@ def test_migration_archives_duplicates_and_installs_project_indexes(init_db) -> 
     }
     assert init_db["migration_archive"].count_documents({"migration_id": MIGRATION_ID}) == 3
     assert "project_id_1_chip_id_1_qid_1" in qubits.index_information()
+    assert legacy_qubit_index not in qubits.index_information()
     assert "project_id_1_date_1_chip_id_1" in counters.index_information()
     ledger = init_db["migration_ledger"].find_one({"migration_id": MIGRATION_ID})
     assert ledger["status"] == "completed"

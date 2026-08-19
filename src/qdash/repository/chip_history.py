@@ -41,6 +41,9 @@ class MongoChipHistoryRepository:
         chip_id : str, optional
             The specific chip ID to create history for.
             If None, uses the current (most recently installed) chip.
+        project_id : str, optional
+            The owning project ID. When both project_id and chip_id are set,
+            the chip is resolved by project and chip instead of by username.
 
         """
         if project_id is not None and chip_id is not None:

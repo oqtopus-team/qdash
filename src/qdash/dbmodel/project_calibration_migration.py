@@ -382,9 +382,17 @@ def _migrate_execution_document_paths(
         if task_updates:
             updates.append(("task_result_history", task_document, task_updates))
 
-        for knowledge in database["issue_knowledge"].find(
-            {"project_id": execution["project_id"], "task_id": task_document.get("task_id")}
-        ):
+    task_ids = list(
+        dict.fromkeys(
+            task_id for task_document in task_documents if (task_id := task_document.get("task_id"))
+        )
+    )
+    if task_ids:
+        knowledge_query = {
+            "project_id": execution["project_id"],
+            "task_id": {"$in": task_ids},
+        }
+        for knowledge in database["issue_knowledge"].find(knowledge_query):
             old_paths = knowledge.get("figure_paths")
             if not isinstance(old_paths, list):
                 continue
@@ -481,8 +489,10 @@ def migrate_calibration_files(
         "missing": 0,
         "database_records_updated": 0,
     }
-    executions = database["execution_history"].find(
-        {"project_id": {"$exists": True}, "chip_id": {"$exists": True}}
+    executions = list(
+        database["execution_history"].find(
+            {"project_id": {"$exists": True}, "chip_id": {"$exists": True}}
+        )
     )
     for execution in executions:
         execution_id = execution.get("execution_id")

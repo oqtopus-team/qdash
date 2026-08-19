@@ -353,6 +353,7 @@ class GitHubIntegration:
             source_path=source_path,
             target_path=source_path,
             chip_id=self.chip_id,
+            project_id=self.project_id,
         )
 
         commit_message = (

@@ -159,6 +159,13 @@ class TestInMemoryExecutionCounterRepository:
         assert index2 == 1
         assert index3 == 2
 
+    def test_get_next_index_requires_project_id(self):
+        """Test in-memory behavior matches the production project requirement."""
+        repo = InMemoryExecutionCounterRepository()
+
+        with pytest.raises(ValueError, match="project_id is required"):
+            repo.get_next_index("20240101", "alice", "chip_1", None)
+
     def test_different_keys_have_separate_counters(self):
         """Test different key combinations have separate counters."""
         repo = InMemoryExecutionCounterRepository()

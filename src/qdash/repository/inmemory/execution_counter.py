@@ -52,6 +52,10 @@ class InMemoryExecutionCounterRepository:
             The next index (0 on first call, then 1, 2, 3...)
 
         """
+        if project_id is None:
+            msg = "project_id is required to generate an execution index"
+            raise ValueError(msg)
+
         counter_key = f"{date}:{chip_id}:{project_id}"
         current = self._counters.get(counter_key, -1)
         next_index = current + 1
