@@ -41,6 +41,7 @@ class CalibOrchestrator:
         ```python
         config = CalibConfig(
             username="alice",
+            project_id="proj-1",
             chip_id="64Qv3",
             qids=["0", "1"],
             execution_id="20240101-001",
