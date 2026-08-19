@@ -2,9 +2,10 @@
 
 import math
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, field_validator
+
+from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 
 
 class MetricValue(BaseModel):
@@ -46,8 +47,8 @@ class MetricHistoryItem(BaseModel):
     timestamp: datetime
     calibrated_at: datetime | None = None
     name: str | None = None
-    input_parameters: dict[str, Any] | None = None
-    output_parameters: dict[str, Any] | None = None
+    input_parameters: dict[str, TaskResultInputParameter] | None = None
+    output_parameters: dict[str, TaskResultOutputParameter] | None = None
     excluded: bool = False
     excluded_reason: str = ""
     excluded_by_user_id: str | None = None

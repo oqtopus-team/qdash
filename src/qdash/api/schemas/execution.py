@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
+from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 
 
 class ArtifactPreviewResponse(BaseModel):
@@ -43,8 +44,8 @@ class Task(BaseModel):
     upstream_id: str | None = None
     status: str = "pending"  # Default status
     message: str | None = None
-    input_parameters: dict[str, Any] | None = None
-    output_parameters: dict[str, Any] | None = None
+    input_parameters: dict[str, TaskResultInputParameter] | None = None
+    output_parameters: dict[str, TaskResultOutputParameter] | None = None
     output_parameter_names: list[str] | None = None
     run_parameters: dict[str, Any] | None = None
     note: dict[str, Any] | None = None

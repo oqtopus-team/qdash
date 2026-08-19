@@ -5,5 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { TaskResultOutputParametersAnyOfAnyOf } from './taskResultOutputParametersAnyOfAnyOf';
 
-export type TaskResultOutputParametersAnyOf = { [key: string]: unknown };
+export type TaskResultOutputParametersAnyOf = {[key: string]: TaskResultOutputParametersAnyOfAnyOf | string | number | boolean | unknown[] | null};

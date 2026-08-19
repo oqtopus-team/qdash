@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_valid
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.note import NoteModel
+from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 
 
 class InputParameterModel(BaseModel):
@@ -206,8 +207,8 @@ class TaskResultResponse(BaseModel):
     figure_path: list[str]
     json_figure_path: list[str]
     raw_data_path: list[str]
-    input_parameters: dict[str, Any]
-    output_parameters: dict[str, Any]
+    input_parameters: dict[str, TaskResultInputParameter]
+    output_parameters: dict[str, TaskResultOutputParameter]
     run_parameters: dict[str, Any] = {}
     tags: list[str] = []
     message: str = ""
