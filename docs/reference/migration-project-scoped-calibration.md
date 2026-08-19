@@ -13,10 +13,14 @@ calibration state.
 `docker compose up` starts the one-shot `calibration-migration` service after MongoDB becomes
 healthy. Other QDash services start only when the migration exits successfully. The migration is
 idempotent and records completion as `project-scoped-calibration-v1` in `migration_ledger`.
-Artifact migration is recorded separately as `project-scoped-calibration-artifacts-v1`, preventing
-legacy files from being reconsidered after shared classifier files receive newer updates.
+Artifact migration is recorded separately as
+`project-scoped-calibration-artifacts-date-layout-v2`, preventing legacy files from being
+reconsidered after shared classifier files receive newer updates.
 The migration lock has a 30-minute lease, so a deployment interrupted by a hard container stop can
 recover automatically on a later deployment.
+An idempotent compound index on migration ID, source collection, source document ID, and migration
+kind keeps archive lookups bounded as `migration_archive` grows. Deployments install this index
+even when the data migration ledger is already complete.
 
 To inspect an installation without changing it, run:
 
@@ -42,14 +46,16 @@ execution ID. The other counter documents are archived in the same way.
 The migration never deletes legacy calibration files. It copies execution artifacts to:
 
 ```text
-calib_data/projects/{project_id}/chips/{chip_id}/executions/{execution_id}/
+calib_data/projects/{project_id}/chips/{chip_id}/executions/{date}/{index}/
 ```
 
 After an execution directory is copied successfully, the migration rewrites its persisted artifact
 references in `execution_history`, `task_result_history`, and `issue_knowledge` to the new project
-path. Every affected document is copied verbatim to `migration_archive` before its paths are
-changed. This keeps historical figures, raw data downloads, and reanalysis available after the
-legacy directories are eventually removed.
+path. Installations that already copied artifacts to `executions/{execution_id}` atomically move
+that intermediate directory into the date layout when the destination does not exist, avoiding a
+second full artifact copy. Every affected database document is copied verbatim to
+`migration_archive` before its paths are changed. This keeps historical figures, raw data
+downloads, and reanalysis available after the legacy directories are eventually removed.
 
 Classifier files are copied to:
 
@@ -71,8 +77,20 @@ docker compose run --rm calibration-migration \
   --execute --allow-missing-artifacts
 ```
 
-Documents missing `project_id` or another required scope field also stop the migration and must be
-corrected before retrying; they are never grouped under an implicit null project.
+For legacy calibration documents missing `project_id`, the migration first resolves the actor by
+`user_id` or `username`. It uses the user's `default_project_id` when available, or a single
+active project membership when no default is stored. The original document is copied to
+`migration_archive` under `project-scoped-calibration-scope-backfill-v1` before the resolved
+project is written.
+
+For legacy calibration notes missing `chip_id`, the migration resolves the chip when
+`project_id + execution_id` identifies execution history for exactly one chip. The note remains
+unresolved if no matching execution exists or multiple chips match.
+
+Documents without a default and with multiple possible active projects, with no resolvable project,
+or with another missing scope field still stop the migration and must be corrected before retrying.
+They are never grouped under an implicit null project, and fields such as `qid`, `recorded_date`,
+and `execution_id` are not inferred.
 
 ## Verification and recovery
 

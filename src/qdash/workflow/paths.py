@@ -39,7 +39,7 @@ class PathResolver:
     PosixPath('/app/calib_data/alice')
 
     >>> resolver.execution_data_dir("proj-1", "chip-1", "20240101-001")
-    PosixPath('/app/calib_data/projects/proj-1/chips/chip-1/executions/20240101-001')
+    PosixPath('/app/calib_data/projects/proj-1/chips/chip-1/executions/20240101/001')
 
     """
 
@@ -79,7 +79,10 @@ class PathResolver:
 
     def execution_data_dir(self, project_id: str, chip_id: str, execution_id: str) -> Path:
         """Get the immutable artifact directory for an execution."""
-        return self.project_chip_dir(project_id, chip_id) / "executions" / execution_id
+        date_str, separator, index = execution_id.partition("-")
+        if not separator or not date_str or not index:
+            raise ValueError(f"Invalid execution_id: {execution_id!r}")
+        return self.project_chip_dir(project_id, chip_id) / "executions" / date_str / index
 
 
 # Default resolver instance
