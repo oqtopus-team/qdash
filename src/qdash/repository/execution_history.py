@@ -92,6 +92,18 @@ class MongoExecutionHistoryRepository:
         """
         return ExecutionHistoryDocument.find({"project_id": project_id, "chip_id": chip_id}).count()
 
+    def find_latest_by_project(self, project_id: str) -> ExecutionHistoryDocument | None:
+        """Find the most recently started execution for a project."""
+        results: list[ExecutionHistoryDocument] = (
+            ExecutionHistoryDocument.find(
+                {"project_id": project_id},
+                sort=[("start_at", SortDirection.DESCENDING)],
+            )
+            .limit(1)
+            .run()
+        )
+        return results[0] if results else None
+
     def find_by_id(
         self,
         project_id: str,
@@ -114,4 +126,14 @@ class MongoExecutionHistoryRepository:
         """
         return ExecutionHistoryDocument.find_one(
             {"project_id": project_id, "execution_id": execution_id}
+        ).run()
+
+    def find_by_flow_run_id(
+        self,
+        project_id: str,
+        flow_run_id: str,
+    ) -> ExecutionHistoryDocument | None:
+        """Find the QDash execution created by a Prefect flow run."""
+        return ExecutionHistoryDocument.find_one(
+            {"project_id": project_id, "note.flow_run_id": flow_run_id}
         ).run()

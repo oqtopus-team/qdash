@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type ParameterModelValue = number | number;
+export type ParameterModelValue = number | number | null;

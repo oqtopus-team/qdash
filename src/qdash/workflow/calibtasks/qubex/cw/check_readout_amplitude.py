@@ -4,7 +4,11 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -20,23 +24,23 @@ class CheckReadoutAmplitude(QubexTask):
 
     name: str = "CheckReadoutAmplitude"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "amplitude_range": RunParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "amplitude_range": RunParameterSpec(
             unit="a.u.",
             value_type="np.linspace",
-            value=(0.0, 0.2, 51),
+            default=(0.0, 0.2, 51),
             description="Amplitude range for readout",
         ),
-        "snr_threshold": RunParameterModel(
+        "snr_threshold": RunParameterSpec(
             unit="a.u.",
             value_type="float",
-            value=DEFAULT_SNR_THRESHOLD,
+            default=DEFAULT_SNR_THRESHOLD,
             description="SNR threshold for determining readout amplitude",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "readout_amplitude": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "readout_amplitude": OutputParameterSpec(
             unit="a.u.", description="Optimal readout amplitude from SNR threshold"
         ),
     }

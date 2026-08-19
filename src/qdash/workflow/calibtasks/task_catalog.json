@@ -1,0 +1,3436 @@
+{
+  "backends": {
+    "fake": [
+      {
+        "class_name": "FakeCheckFineChevron",
+        "description": "Fake-backend adapter for the production CheckFineChevron task.\n\nThe production task expects initial qubit/readout frequencies from calibration\nstorage. A fresh fake project has no stored calibration yet, so seed those\ninputs from FakeExperiment while keeping the production task implementation\nunchanged.",
+        "file_path": "qubex_compat.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": 0.0625,
+            "description": "Control pulse amplitude",
+            "greater_than": 0.0001,
+            "less_than": 1.0,
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckFineChevron",
+        "run_parameters": {
+          "readout_amplitude": {
+            "description": "Readout amplitude",
+            "unit": "a.u.",
+            "value": 0.2,
+            "value_type": "float"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "FakeCheckRabi",
+        "description": "Fake task to simulate Rabi oscillation measurement.\n\nThis task depends on qubit_frequency from CheckFineChevron.\nIt simulates measuring Rabi oscillations to determine control parameters.\n\nNote: Uses same name as qubex task for seamless backend switching.\n\nInputs:\n    qubit_frequency: From CheckFineChevron (loaded from DB)\n\nOutputs:\n    rabi_amplitude: Rabi oscillation amplitude\n    rabi_frequency: Rabi oscillation frequency (MHz)\n    rabi_phase: Rabi oscillation phase\n    rabi_offset: Rabi oscillation offset",
+        "file_path": "fake_check_rabi.py",
+        "input_parameters": {
+          "qubit_frequency": {
+            "default_value": 0,
+            "description": "Qubit frequency from CheckFineChevron",
+            "resolution": "default_only",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckRabi",
+        "run_parameters": {
+          "shots": {
+            "description": "Number of shots",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for Rabi oscillation",
+            "unit": "ns",
+            "value": [
+              0,
+              401,
+              8
+            ],
+            "value_type": "range"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "FakeCheckRamsey",
+        "description": "Fake task to simulate Ramsey fringe measurement.\n\nRamsey experiment measures T2* (dephasing time) and refines qubit frequency.\nThis task takes the initial qubit_frequency from CheckFineChevron and outputs\na more precise qubit_frequency along with t2_star.\n\nNote: Uses same name as qubex task for seamless backend switching.\n\nInputs:\n    qubit_frequency: Initial qubit frequency from CheckFineChevron (GHz)\n    hpi_amplitude: Half-pi pulse amplitude from CheckHPI\n\nOutputs:\n    qubit_frequency: Refined qubit frequency from Ramsey measurement (GHz)\n    t2_star: T2* dephasing time (μs)\n    ramsey_frequency: Detuning frequency observed in Ramsey fringes (MHz)",
+        "file_path": "fake_check_ramsey.py",
+        "input_parameters": {
+          "hpi_amplitude": {
+            "default_value": 0,
+            "description": "Half-pi pulse amplitude from CheckHPI",
+            "resolution": "default_only",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": 0,
+            "description": "Initial qubit frequency from CheckFineChevron",
+            "resolution": "default_only",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckRamsey",
+        "run_parameters": {
+          "artificial_detuning": {
+            "description": "Artificial detuning for Ramsey fringes",
+            "unit": "MHz",
+            "value": 1.0,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for Ramsey measurement",
+            "unit": "ns",
+            "value": [
+              0,
+              10000,
+              101
+            ],
+            "value_type": "np.linspace"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "FakeCheckT1",
+        "description": "Fake task to simulate T1 relaxation time measurement.\n\nThis task depends on qubit_frequency and hpi_amplitude.\nIt simulates measuring the T1 relaxation time.\n\nNote: Uses same name as qubex task for seamless backend switching.\n\nInputs:\n    qubit_frequency: From CheckFineChevron (loaded from DB)\n    hpi_amplitude: From CheckHPI (loaded from DB)\n\nOutputs:\n    t1: T1 relaxation time (μs)",
+        "file_path": "fake_check_t1.py",
+        "input_parameters": {
+          "hpi_amplitude": {
+            "default_value": 0,
+            "description": "Half-pi pulse amplitude from CheckHPI",
+            "resolution": "default_only",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": 0,
+            "description": "Qubit frequency from CheckFineChevron",
+            "resolution": "default_only",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckT1",
+        "run_parameters": {
+          "shots": {
+            "description": "Number of shots",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for T1 measurement (log scale)",
+            "unit": "ns",
+            "value": [
+              2,
+              5.7,
+              51
+            ],
+            "value_type": "np.logspace"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "FakeCheckT1Average",
+        "description": "Fake task to simulate repeated T1 relaxation time measurement.\n\nThis task depends on qubit_frequency and hpi_amplitude.\nIt simulates measuring T1 relaxation time n_runs times and computing statistics.\n\nNote: Uses same name as qubex task for seamless backend switching.\n\nInputs:\n    qubit_frequency: From CheckFineChevron (loaded from DB)\n    hpi_amplitude: From CheckHPI (loaded from DB)\n\nOutputs:\n    t1_average: Mean T1 relaxation time (μs)\n    t1_std: T1 standard deviation (μs)",
+        "file_path": "fake_check_t1_average.py",
+        "input_parameters": {
+          "hpi_amplitude": {
+            "default_value": 0,
+            "description": "Half-pi pulse amplitude from CheckHPI",
+            "resolution": "default_only",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": 0,
+            "description": "Qubit frequency from CheckFineChevron",
+            "resolution": "default_only",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckT1Average",
+        "run_parameters": {
+          "n_runs": {
+            "description": "Number of T1 measurement repetitions",
+            "unit": "",
+            "value": 10,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for T1 measurement (log scale)",
+            "unit": "ns",
+            "value": [
+              2,
+              5.7,
+              51
+            ],
+            "value_type": "np.logspace"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "FakeCheckT2Echo",
+        "description": "Fake task to simulate T2 echo (Hahn echo) measurement.\n\nThis task depends on qubit_frequency and hpi_amplitude.\nIt simulates measuring the T2 echo dephasing time.\n\nNote: Uses same name as qubex task for seamless backend switching.\n\nInputs:\n    qubit_frequency: From CheckFineChevron (loaded from DB)\n    hpi_amplitude: From CheckHPI (loaded from DB)\n\nOutputs:\n    t2_echo: T2 echo dephasing time (μs)",
+        "file_path": "fake_check_t2_echo.py",
+        "input_parameters": {
+          "hpi_amplitude": {
+            "default_value": 0,
+            "description": "Half-pi pulse amplitude from CheckHPI",
+            "resolution": "default_only",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": 0,
+            "description": "Qubit frequency from CheckFineChevron",
+            "resolution": "default_only",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckT2Echo",
+        "run_parameters": {
+          "shots": {
+            "description": "Number of shots",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for T2 echo measurement (log scale)",
+            "unit": "ns",
+            "value": [
+              2,
+              5.5,
+              51
+            ],
+            "value_type": "np.logspace"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "FakeCheckT2EchoAverage",
+        "description": "Fake task to simulate repeated T2 echo measurement.\n\nThis task depends on qubit_frequency and hpi_amplitude.\nIt simulates measuring T2 echo time n_runs times and computing statistics.\n\nNote: Uses same name as qubex task for seamless backend switching.\n\nInputs:\n    qubit_frequency: From CheckFineChevron (loaded from DB)\n    hpi_amplitude: From CheckHPI (loaded from DB)\n\nOutputs:\n    t2_echo_average: Mean T2 echo time (μs)\n    t2_echo_std: T2 echo standard deviation (μs)",
+        "file_path": "fake_check_t2_echo_average.py",
+        "input_parameters": {
+          "hpi_amplitude": {
+            "default_value": 0,
+            "description": "Half-pi pulse amplitude from CheckHPI",
+            "resolution": "default_only",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": 0,
+            "description": "Qubit frequency from CheckFineChevron",
+            "resolution": "default_only",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckT2EchoAverage",
+        "run_parameters": {
+          "n_runs": {
+            "description": "Number of T2 echo measurement repetitions",
+            "unit": "",
+            "value": 10,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for T2 echo measurement (log scale)",
+            "unit": "ns",
+            "value": [
+              2,
+              5.5,
+              51
+            ],
+            "value_type": "np.logspace"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "FakeChevronPattern",
+        "description": "Legacy alias for FakeCheckFineChevron — kept for UI filtering of historical results.",
+        "file_path": "legacy_fake_chevron_pattern.py",
+        "input_parameters": {},
+        "name": "ChevronPattern",
+        "run_parameters": {},
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "FakeCreateHPIPulse",
+        "description": "Fake task to simulate Half-Pi (HPI) pulse calibration.\n\nThis task depends on qubit_frequency from CheckFineChevron.\nIt simulates calibrating the half-pi pulse parameters.\n\nNote: Uses same name as qubex task for seamless backend switching.\n\nInputs:\n    qubit_frequency: From CheckFineChevron (loaded from DB)\n\nOutputs:\n    hpi_amplitude: Half-pi pulse amplitude\n    hpi_length: Half-pi pulse duration (ns)",
+        "file_path": "fake_create_hpi_pulse.py",
+        "input_parameters": {
+          "qubit_frequency": {
+            "default_value": 0,
+            "description": "Qubit frequency from CheckFineChevron",
+            "resolution": "default_only",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CreateHPIPulse",
+        "run_parameters": {
+          "amplitude_range": {
+            "description": "Amplitude range for HPI calibration",
+            "unit": "a.u.",
+            "value": [
+              0.1,
+              0.5,
+              21
+            ],
+            "value_type": "range"
+          },
+          "hpi_duration": {
+            "description": "HPI pulse duration",
+            "unit": "ns",
+            "value": 20,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "FakeRabi",
+        "description": "Task to check the Fake Rabi oscillation.",
+        "file_path": "fake_rabi.py",
+        "input_parameters": {},
+        "name": "FakeRabi",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval for Rabi oscillation",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for Rabi oscillation",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for Rabi oscillation",
+            "unit": "ns",
+            "value": [
+              0,
+              201,
+              4
+            ],
+            "value_type": "range"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "FakeRandomizedBenchmarking",
+        "description": "Fake task to simulate Randomized Benchmarking.\n\nThis task depends on multiple previous calibration parameters.\nIt simulates measuring gate fidelity through RB.\n\nNote: Uses same name as qubex task for seamless backend switching.\n\nInputs:\n    qubit_frequency: From CheckFineChevron\n    rabi_amplitude: From CheckRabi\n    t1: From CheckT1\n    t2_echo: From CheckT2Echo\n\nOutputs:\n    gate_fidelity: Average Clifford gate fidelity\n    error_per_gate: Error per Clifford gate",
+        "file_path": "fake_randomized_benchmarking.py",
+        "input_parameters": {
+          "qubit_frequency": {
+            "default_value": 0,
+            "description": "Qubit frequency from CheckFineChevron",
+            "resolution": "default_only",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "rabi_amplitude": {
+            "default_value": 0,
+            "description": "Rabi amplitude from CheckRabi",
+            "resolution": "default_only",
+            "unit": "",
+            "user_override": "allowed"
+          },
+          "t1": {
+            "default_value": 0,
+            "description": "T1 relaxation time from CheckT1",
+            "resolution": "default_only",
+            "unit": "μs",
+            "user_override": "allowed"
+          },
+          "t2_echo": {
+            "default_value": 0,
+            "description": "T2 echo dephasing time from CheckT2Echo",
+            "resolution": "default_only",
+            "unit": "μs",
+            "user_override": "allowed"
+          }
+        },
+        "name": "RandomizedBenchmarking",
+        "run_parameters": {
+          "num_cliffords": {
+            "description": "Number of Clifford gates per sequence",
+            "unit": "",
+            "value": [
+              1,
+              2,
+              4,
+              8,
+              16,
+              32,
+              64,
+              128,
+              256
+            ],
+            "value_type": "list"
+          },
+          "num_seeds": {
+            "description": "Number of random seeds per Clifford count",
+            "unit": "",
+            "value": 20,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots per circuit",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      }
+    ],
+    "qubex": [
+      {
+        "class_name": "Check1QGateCoherenceLimit",
+        "description": "Task to calculate 1Q gate coherence limit from T1, T2, and gate duration.",
+        "file_path": "benchmark/check_1q_gate_coherence_limit.py",
+        "input_parameters": {
+          "t1_average": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "t2_echo_average": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          }
+        },
+        "name": "Check1QGateCoherenceLimit",
+        "run_parameters": {
+          "drag_hpi_duration": {
+            "description": "DRAG half-pi pulse duration",
+            "unit": "ns",
+            "value": 16,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "Check2QGateCoherenceLimit",
+        "description": "Task to calculate 2Q gate coherence limit from T1, T2, and gate duration.",
+        "file_path": "benchmark/check_2q_gate_coherence_limit.py",
+        "input_parameters": {
+          "control_t1_average": {
+            "default_value": 0,
+            "parameter_name": "t1_average",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "μs",
+            "user_override": "allowed"
+          },
+          "control_t2_echo_average": {
+            "default_value": 0,
+            "parameter_name": "t2_echo_average",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "μs",
+            "user_override": "allowed"
+          },
+          "target_t1_average": {
+            "default_value": 0,
+            "parameter_name": "t1_average",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "μs",
+            "user_override": "allowed"
+          },
+          "target_t2_echo_average": {
+            "default_value": 0,
+            "parameter_name": "t2_echo_average",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "μs",
+            "user_override": "allowed"
+          },
+          "zx90_gate_time": {
+            "default_value": 0,
+            "parameter_name": "zx90_gate_time",
+            "qid_role": "coupling",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "Check2QGateCoherenceLimit",
+        "run_parameters": {},
+        "task_type": "coupling"
+      },
+      {
+        "class_name": "CheckBellState",
+        "description": "Task to check the bell state.",
+        "file_path": "two_qubit/check_bell_state.py",
+        "input_parameters": {
+          "cancel_amplitude": {
+            "default_value": 0,
+            "parameter_name": "cancel_amplitude",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cancel_beta": {
+            "default_value": 0,
+            "parameter_name": "cancel_beta",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cancel_phase": {
+            "default_value": 0,
+            "parameter_name": "cancel_phase",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_amplitude": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_beta": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_beta",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_length": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "control_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "cr_amplitude": {
+            "default_value": 0,
+            "parameter_name": "cr_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_phase": {
+            "default_value": 0,
+            "parameter_name": "cr_phase",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rotary_amplitude": {
+            "default_value": 0,
+            "parameter_name": "rotary_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "zx_rotation_rate": {
+            "default_value": 0,
+            "parameter_name": "zx_rotation_rate",
+            "qid_role": "coupling",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckBellState",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "coupling"
+      },
+      {
+        "class_name": "CheckBellStateTomography",
+        "description": "Task to check the bell state tomography.",
+        "file_path": "two_qubit/check_bell_state_tomography.py",
+        "input_parameters": {
+          "cancel_amplitude": {
+            "default_value": 0,
+            "parameter_name": "cancel_amplitude",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cancel_beta": {
+            "default_value": 0,
+            "parameter_name": "cancel_beta",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cancel_phase": {
+            "default_value": 0,
+            "parameter_name": "cancel_phase",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_amplitude": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_beta": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_beta",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_length": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "control_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "cr_amplitude": {
+            "default_value": 0,
+            "parameter_name": "cr_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_phase": {
+            "default_value": 0,
+            "parameter_name": "cr_phase",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rotary_amplitude": {
+            "default_value": 0,
+            "parameter_name": "rotary_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "zx_rotation_rate": {
+            "default_value": 0,
+            "parameter_name": "zx_rotation_rate",
+            "qid_role": "coupling",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckBellStateTomography",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "coupling"
+      },
+      {
+        "class_name": "CheckChevron",
+        "description": "Adaptive chevron task for coarse qubit-frequency estimation.",
+        "file_path": "one_qubit_coarse/check_chevron.py",
+        "input_parameters": {
+          "coarse_control_amplitude": {
+            "default_value": 0.0625,
+            "description": "Coarse control pulse amplitude",
+            "greater_than": 0.0001,
+            "less_than": 1.0,
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "coarse_qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckChevron",
+        "run_parameters": {},
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckCoarseChevron",
+        "description": "Coarse chevron pattern that locates the qubit resonance with a wide, sparse sweep.\n\nDesigned to bracket spectroscopy seeds that may be off by up to ~60 MHz, so the\ndownstream CheckFineChevron can use a narrow ±10 MHz window for the fine measurement.",
+        "file_path": "one_qubit_coarse/check_coarse_chevron.py",
+        "input_parameters": {
+          "coarse_qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "control_amplitude": {
+            "default_value": 0.0625,
+            "description": "Control pulse amplitude",
+            "greater_than": 0.0001,
+            "less_than": 1.0,
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckCoarseChevron",
+        "run_parameters": {
+          "readout_amplitude": {
+            "description": "Readout amplitude",
+            "unit": "a.u.",
+            "value": 0.2,
+            "value_type": "float"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckCoarseReadoutParams",
+        "description": "Task to check the Optimal Readout Frequency",
+        "file_path": "one_qubit_coarse/check_coarse_readout_params.py",
+        "input_parameters": {},
+        "name": "CheckCoarseReadoutParams",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval for Rabi oscillation",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for Rabi oscillation",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckControlAmplitude",
+        "description": "Task to estimate the control amplitude.\n\nSweeps the drive frequency around the calibrated qubit frequency\n(``qubit_frequency`` ± ``frequency_span``) and fits a sqrt-Lorentzian\nto scale the drive amplitude so that the resulting Rabi rate matches\n``target_rabi_rate``.",
+        "file_path": "cw/check_control_amplitude.py",
+        "input_parameters": {
+          "coarse_control_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "coarse_qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckControlAmplitude",
+        "run_parameters": {
+          "frequency_span": {
+            "description": "Half-span around qubit_frequency for the sweep (±span, default ±150 MHz)",
+            "unit": "GHz",
+            "value": 0.15,
+            "value_type": "float"
+          },
+          "frequency_step": {
+            "description": "Frequency step (default 2.5 MHz, ~120 points over ±150 MHz)",
+            "unit": "GHz",
+            "value": 0.0025,
+            "value_type": "float"
+          },
+          "interval": {
+            "description": "Shot interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "readout_amplitude": {
+            "description": "Readout amplitude used during the sweep. Matches the CheckQubitSpectroscopy default so the qubit response is probed under the same readout conditions.",
+            "unit": "a.u.",
+            "value": 0.04,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Number of shots per frequency point. Higher than the usual CALIBRATION_SHOTS (2048) because this is a 1D scan and the phase response can still be small near the spectroscopy-derived seed amplitude — extra averaging is needed to get the signal above the noise floor for a stable sqrt-Lorentzian fit.",
+            "unit": "a.u.",
+            "value": 8192,
+            "value_type": "int"
+          },
+          "target_rabi_rate": {
+            "description": "Target Rabi rate used to scale the estimated control amplitude",
+            "unit": "GHz",
+            "value": 0.0125,
+            "value_type": "float"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckCrossResonance",
+        "description": "Task to check the cross resonance pulse (obtain_cr_params).",
+        "file_path": "two_qubit/check_cross_resonance.py",
+        "input_parameters": {
+          "control_drag_hpi_amplitude": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_beta": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_beta",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_length": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "control_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "target_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckCrossResonance",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "coupling"
+      },
+      {
+        "class_name": "CheckDRAGHPIPulse",
+        "description": "Task to check the DRAG HPI pulse.",
+        "file_path": "one_qubit_fine/check_drag_hpi_pulse.py",
+        "input_parameters": {
+          "drag_hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "drag_hpi_beta": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "drag_hpi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckDRAGHPIPulse",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "repetitions": {
+            "description": "Number of repetitions for the PI pulse",
+            "unit": "a.u.",
+            "value": 20,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckDRAGPIPulse",
+        "description": "Task to check the DRAG PI pulse.",
+        "file_path": "one_qubit_fine/check_drag_pi_pulse.py",
+        "input_parameters": {
+          "drag_pi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "drag_pi_beta": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "drag_pi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckDRAGPIPulse",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "repetitions": {
+            "description": "Number of repetitions for the PI pulse",
+            "unit": "a.u.",
+            "value": 20,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckDispersiveShift",
+        "description": "Task to check the Dispersive Shift",
+        "file_path": "one_qubit_coarse/check_dispersive_shift.py",
+        "input_parameters": {},
+        "name": "CheckDispersiveShift",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval for Rabi oscillation",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for Rabi oscillation",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckElectricalDelay",
+        "description": "Task to check the electrical delay.",
+        "file_path": "cw/check_electrical_delay.py",
+        "input_parameters": {},
+        "name": "CheckElectricalDelay",
+        "run_parameters": {},
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckFineChevron",
+        "description": "Fine chevron pattern that refines qubit_frequency with a narrow ±10 MHz sweep.\n\nRuns after CheckCoarseChevron has located the qubit within ~MHz; this task\nfurther refines qubit_frequency and the chevron-derived control_amplitude.",
+        "file_path": "one_qubit_coarse/check_fine_chevron.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": 0.0625,
+            "description": "Control pulse amplitude",
+            "greater_than": 0.0001,
+            "less_than": 1.0,
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckFineChevron",
+        "run_parameters": {
+          "readout_amplitude": {
+            "description": "Readout amplitude",
+            "unit": "a.u.",
+            "value": 0.2,
+            "value_type": "float"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckHPIPulse",
+        "description": "Task to check the HPI pulse.",
+        "file_path": "one_qubit_coarse/check_hpi_pulse.py",
+        "input_parameters": {
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "hpi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckHPIPulse",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "repetitions": {
+            "description": "Number of repetitions for the HPI pulse",
+            "unit": "a.u.",
+            "value": 20,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckNoise",
+        "description": "Task to check the noise.",
+        "file_path": "box_setup/check_noise.py",
+        "input_parameters": {},
+        "name": "CheckNoise",
+        "run_parameters": {},
+        "task_type": "global"
+      },
+      {
+        "class_name": "CheckOptimalReadoutAmplitude",
+        "description": "Task to check the Optimal Readout Amplitude",
+        "file_path": "one_qubit_coarse/check_optimal_readout_amplitude.py",
+        "input_parameters": {},
+        "name": "CheckOptimalReadoutAmplitude",
+        "run_parameters": {
+          "amplitude_range": {
+            "description": "Readout amplitude range",
+            "unit": "a.u.",
+            "value": [
+              0.01,
+              0.25,
+              0.01
+            ],
+            "value_type": "np.arange"
+          },
+          "interval": {
+            "description": "Time interval for Rabi oscillation",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for Rabi oscillation",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckOptimalReadoutFrequency",
+        "description": "Task to check the Optimal Readout Frequency",
+        "file_path": "one_qubit_coarse/check_optimal_readout_frequency.py",
+        "input_parameters": {},
+        "name": "CheckOptimalReadoutFrequency",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval for Rabi oscillation",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for Rabi oscillation",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckPIPulse",
+        "description": "Task to check the PI pulse.",
+        "file_path": "one_qubit_coarse/check_pi_pulse.py",
+        "input_parameters": {
+          "pi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "pi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckPIPulse",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "repetitions": {
+            "description": "Number of repetitions for the PI pulse",
+            "unit": "a.u.",
+            "value": 20,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckQubit",
+        "description": "Task to check the Qubit Rabi oscillation breifly.",
+        "file_path": "one_qubit_coarse/check_qubit.py",
+        "input_parameters": {},
+        "name": "CheckQubit",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval for Rabi oscillation",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for Rabi oscillation",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for Rabi oscillation",
+            "unit": "ns",
+            "value": [
+              0,
+              201,
+              4
+            ],
+            "value_type": "range"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckQubitFrequencies",
+        "description": "Task to check the qubit frequencies.",
+        "file_path": "cw/check_qubit_frequencies.py",
+        "input_parameters": {},
+        "name": "CheckQubitFrequencies",
+        "run_parameters": {},
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckQubitFrequency",
+        "description": "Task to check the qubit frequency.",
+        "file_path": "one_qubit_coarse/check_qubit_frequency.py",
+        "input_parameters": {},
+        "name": "CheckQubitFrequency",
+        "run_parameters": {
+          "detuning_range": {
+            "description": "Detuning range",
+            "unit": "GHz",
+            "value": [
+              -0.01,
+              0.01,
+              21
+            ],
+            "value_type": "np.linspace"
+          },
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range",
+            "unit": "ns",
+            "value": [
+              0,
+              101,
+              4
+            ],
+            "value_type": "range"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckQubitSpectroscopy",
+        "description": "Task to check the qubit frequencies.\n\nThis task performs qubit spectroscopy and estimates the qubit frequency (f01)\nand optionally the f12 transition frequency from the spectroscopy data.",
+        "file_path": "cw/check_qubit_spectroscopy.py",
+        "input_parameters": {
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckQubitSpectroscopy",
+        "run_parameters": {
+          "binarize_threshold_sigma_minus": {
+            "description": "Negative threshold for binarization (in sigma units)",
+            "unit": "a.u.",
+            "value": -2.0,
+            "value_type": "float"
+          },
+          "binarize_threshold_sigma_plus": {
+            "description": "Positive threshold for binarization (in sigma units)",
+            "unit": "a.u.",
+            "value": 3.0,
+            "value_type": "float"
+          },
+          "f01_height_min": {
+            "description": "Minimum height for f01 peak detection (in dB)",
+            "unit": "dB",
+            "value": 14.9,
+            "value_type": "float"
+          },
+          "f12_distance_max": {
+            "description": "Maximum distance from f01 for f12 detection (in GHz)",
+            "unit": "GHz",
+            "value": 0.5,
+            "value_type": "float"
+          },
+          "f12_distance_min": {
+            "description": "Minimum distance from f01 for f12 detection (in GHz)",
+            "unit": "GHz",
+            "value": 0.125,
+            "value_type": "float"
+          },
+          "f12_height_min": {
+            "description": "Minimum height for f12 peak detection (in dB)",
+            "unit": "dB",
+            "value": 14.9,
+            "value_type": "float"
+          },
+          "frequency_range": {
+            "description": "Frequency range for qubit spectroscopy on the high band (64Q chips). Used when chip_id does not contain '144'.",
+            "unit": "GHz",
+            "value": [
+              6.5,
+              9.75,
+              0.005
+            ],
+            "value_type": "np.arange"
+          },
+          "frequency_range_low_band": {
+            "description": "Frequency range for qubit spectroscopy on the low band (144Q chips). Used when chip_id contains '144'.",
+            "unit": "GHz",
+            "value": [
+              3.0,
+              5.75,
+              0.005
+            ],
+            "value_type": "np.arange"
+          },
+          "max_coarse_control_amplitude": {
+            "description": "Upper bound for the uplifted coarse_control_amplitude so strong spectroscopy responses do not push the seed above a safe drive amplitude.",
+            "unit": "a.u.",
+            "value": 1.0,
+            "value_type": "float"
+          },
+          "readout_amplitude": {
+            "description": "Readout amplitude used during the qubit spectroscopy sweep",
+            "unit": "a.u.",
+            "value": 0.04,
+            "value_type": "float"
+          },
+          "retry_with_trim": {
+            "description": "If 'true', drop the highest-power row and retry when no f01 is detected on the first pass. If f01 is still not detected, drop one additional highest-power row and retry once more. Useful when the top rows are noisy.",
+            "unit": "",
+            "value": "false",
+            "value_type": "str"
+          },
+          "seed_amplitude_headroom_db": {
+            "description": "Headroom added on top of f01_repr_db before converting it to the coarse_control_amplitude seed used by downstream chevron/amplitude tasks.",
+            "unit": "dB",
+            "value": 10.0,
+            "value_type": "float"
+          },
+          "top_power": {
+            "description": "Reference power for height and moment calculation (should be > max(ys))",
+            "unit": "dB",
+            "value": 0.0,
+            "value_type": "float"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckRabi",
+        "description": "Task to check the Rabi oscillation.",
+        "file_path": "one_qubit_coarse/check_rabi.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": 0.0125,
+            "description": "Control pulse amplitude",
+            "greater_than": 0.0001,
+            "less_than": 1.0,
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": 0.2,
+            "description": "Readout amplitude",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckRabi",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval for Rabi oscillation",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for Rabi oscillation",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for Rabi oscillation",
+            "unit": "ns",
+            "value": [
+              0,
+              401,
+              8
+            ],
+            "value_type": "range"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckRamsey",
+        "description": "Task to check the Ramsey interference.",
+        "file_path": "one_qubit_coarse/check_ramsey.py",
+        "input_parameters": {
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "hpi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckRamsey",
+        "run_parameters": {
+          "detuning": {
+            "description": "Detuning for Ramsey oscillation",
+            "unit": "GHz",
+            "value": 0.001,
+            "value_type": "float"
+          },
+          "interval": {
+            "description": "Time interval for Rabi oscillation",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for Rabi oscillation",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for Rabi oscillation",
+            "unit": "ns",
+            "value": [
+              0,
+              10001,
+              100
+            ],
+            "value_type": "np.arange"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckReadoutAmplitude",
+        "description": "Task to check the readout amplitude.",
+        "file_path": "cw/check_readout_amplitude.py",
+        "input_parameters": {},
+        "name": "CheckReadoutAmplitude",
+        "run_parameters": {
+          "amplitude_range": {
+            "description": "Amplitude range for readout",
+            "unit": "a.u.",
+            "value": [
+              0.0,
+              0.2,
+              51
+            ],
+            "value_type": "np.linspace"
+          },
+          "snr_threshold": {
+            "description": "SNR threshold for determining readout amplitude",
+            "unit": "a.u.",
+            "value": 1.0,
+            "value_type": "float"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckReadoutFrequency",
+        "description": "Task to check the readout frequency.",
+        "file_path": "one_qubit_coarse/check_readout_frequency.py",
+        "input_parameters": {},
+        "name": "CheckReadoutFrequency",
+        "run_parameters": {
+          "detuning_range": {
+            "description": "Detuning range",
+            "unit": "GHz",
+            "value": [
+              -0.01,
+              0.01,
+              21
+            ],
+            "value_type": "np.linspace"
+          },
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range",
+            "unit": "ns",
+            "value": [
+              0,
+              101,
+              4
+            ],
+            "value_type": "range"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckReflectionCoefficient",
+        "description": "Task to check the reflection coefficient of a resonator.",
+        "file_path": "cw/check_reflection_coefficient.py",
+        "input_parameters": {},
+        "name": "CheckReflectionCoefficient",
+        "run_parameters": {},
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckResonatorFrequencies",
+        "description": "Task to check the resonator frequencies.",
+        "file_path": "cw/check_resonator_frequencies.py",
+        "input_parameters": {},
+        "name": "CheckResonatorFrequencies",
+        "run_parameters": {
+          "frequency_range": {
+            "description": "Frequency range for resonator frequencies",
+            "unit": "GHz",
+            "value": [
+              9.75,
+              10.75,
+              0.002
+            ],
+            "value_type": "np.arange"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckResonatorSpectroscopy",
+        "description": "Task to check the resonator spectroscopy.\n\nThis is a MUX-level task that performs spectroscopy on all resonators\nin a MUX simultaneously. The scheduler should execute this task once\nper MUX, and the result will be used by all qubits in that MUX.\n\nNote: task_type remains \"qubit\" for frontend compatibility, but\nis_mux_level=True indicates this task runs once per MUX.",
+        "file_path": "cw/check_resonator_spectroscopy.py",
+        "input_parameters": {},
+        "name": "CheckResonatorSpectroscopy",
+        "run_parameters": {
+          "bare_shift_estimator_type": {
+            "description": "How to pick the bare-shift boundary. 'config' uses high_power_min/max/low_power; 'high_frequency_strength' detects it from the FFT of each row.",
+            "unit": "",
+            "value": "high_frequency_strength",
+            "value_type": "str"
+          },
+          "bare_shift_strength_limit": {
+            "description": "Maximum high-frequency FFT strength accepted as the bare-shift boundary. Only used when bare_shift_estimator_type='high_frequency_strength'.",
+            "unit": "a.u.",
+            "value": 4.0,
+            "value_type": "float"
+          },
+          "frequency_range": {
+            "description": "Frequency range for resonator spectroscopy on the high band (64Q chips). Used when chip_id does not contain '144'.",
+            "unit": "GHz",
+            "value": [
+              9.75,
+              10.75,
+              0.002
+            ],
+            "value_type": "np.arange"
+          },
+          "frequency_range_low_band": {
+            "description": "Frequency range for resonator spectroscopy on the low band (144Q chips). Used when chip_id contains '144'.",
+            "unit": "GHz",
+            "value": [
+              5.75,
+              6.75,
+              0.002
+            ],
+            "value_type": "np.arange"
+          },
+          "high_power_max": {
+            "description": "Maximum power for high-power peak detection",
+            "unit": "dB",
+            "value": 0.0,
+            "value_type": "float"
+          },
+          "high_power_min": {
+            "description": "Minimum power for high-power peak detection",
+            "unit": "dB",
+            "value": -20.0,
+            "value_type": "float"
+          },
+          "low_power": {
+            "description": "Power level for low-power peak detection",
+            "unit": "dB",
+            "value": -30.0,
+            "value_type": "float"
+          },
+          "minimum_usable_power_correlation_coefficient_min": {
+            "description": "Minimum adjacent-row correlation used to estimate the minimum usable power for optimal_power calculation.",
+            "unit": "a.u.",
+            "value": 0.9,
+            "value_type": "float"
+          },
+          "num_resonators": {
+            "description": "Number of resonators to detect",
+            "unit": "a.u.",
+            "value": 4,
+            "value_type": "int"
+          },
+          "power_range": {
+            "description": "Power range for resonator spectroscopy",
+            "unit": "dB",
+            "value": [
+              -60,
+              5,
+              5
+            ],
+            "value_type": "np.arange"
+          },
+          "resonator_assignment_pattern": {
+            "description": "Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2].",
+            "unit": "",
+            "value": "default",
+            "value_type": "str"
+          },
+          "shots": {
+            "description": "Number of shots for resonator spectroscopy",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckSimultaneousQubitSpectroscopy",
+        "description": "Task to run qubit spectroscopy for multiple qubits simultaneously.",
+        "file_path": "cw/check_simultaneous_qubit_spectroscopy.py",
+        "input_parameters": {},
+        "name": "CheckSimultaneousQubitSpectroscopy",
+        "run_parameters": {
+          "interval": {
+            "description": "Measurement interval for simultaneous qubit spectroscopy",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "power_range": {
+            "description": "Drive power sweep range for simultaneous qubit spectroscopy",
+            "unit": "dB",
+            "value": [
+              -40.0,
+              0.0,
+              5.0
+            ],
+            "value_type": "np.arange"
+          },
+          "shots": {
+            "description": "Number of shots for simultaneous qubit spectroscopy",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckStatus",
+        "description": "Task to check the status of the experiment.",
+        "file_path": "box_setup/check_status.py",
+        "input_parameters": {},
+        "name": "CheckStatus",
+        "run_parameters": {},
+        "task_type": "global"
+      },
+      {
+        "class_name": "CheckT1",
+        "description": "Task to check the T1 time.",
+        "file_path": "one_qubit_coarse/check_t1.py",
+        "input_parameters": {
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "hpi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckT1",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval for T1 time",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for T1 time",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for T1 time",
+            "unit": "ns",
+            "value": [
+              2.0,
+              5.698970004336019,
+              51
+            ],
+            "value_type": "np.logspace"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckT1Average",
+        "description": "Task to measure T1 relaxation time multiple times and compute statistics.\n\nRuns T1 measurement n_runs times, computes mean, std, and CV%,\nand generates a 4-panel fluctuation analysis figure.",
+        "file_path": "one_qubit_coarse/check_t1_average.py",
+        "input_parameters": {
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "hpi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckT1Average",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval for T1 time",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "n_runs": {
+            "description": "Number of T1 measurement repetitions",
+            "unit": "",
+            "value": 10,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for T1 time",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for T1 time",
+            "unit": "ns",
+            "value": [
+              2.0,
+              5.698970004336019,
+              51
+            ],
+            "value_type": "np.logspace"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckT2Echo",
+        "description": "Task to check the T2 echo time.",
+        "file_path": "one_qubit_coarse/check_t2_echo.py",
+        "input_parameters": {
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "hpi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckT2Echo",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval for T2 echo time",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for T2 echo time",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for T2 echo time",
+            "unit": "ns",
+            "value": [
+              2.4771212547196626,
+              5.0,
+              51
+            ],
+            "value_type": "np.logspace"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckT2EchoAverage",
+        "description": "Task to measure T2 echo time multiple times and compute statistics.\n\nRuns T2 echo measurement n_runs times, computes mean and std,\nand generates a 4-panel fluctuation analysis figure.",
+        "file_path": "one_qubit_coarse/check_t2_echo_average.py",
+        "input_parameters": {
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "hpi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckT2EchoAverage",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval for T2 echo time",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "n_runs": {
+            "description": "Number of T2 echo measurement repetitions",
+            "unit": "",
+            "value": 10,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for T2 echo time",
+            "unit": "",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Time range for T2 echo time",
+            "unit": "ns",
+            "value": [
+              2.4771212547196626,
+              5.0,
+              51
+            ],
+            "value_type": "np.logspace"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckWaveform",
+        "description": "Task to check readout waveforms.",
+        "file_path": "cw/check_waveform.py",
+        "input_parameters": {},
+        "name": "CheckWaveform",
+        "run_parameters": {
+          "interval": {
+            "description": "Shot interval for waveform measurement",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "readout_amplitude": {
+            "description": "Readout pulse amplitude. Uses qubex default when unset.",
+            "unit": "a.u.",
+            "value": null,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses qubex default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
+          "readout_post_margin": {
+            "description": "Readout post-margin. Uses qubex default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
+          "readout_pre_margin": {
+            "description": "Readout pre-margin. Uses qubex default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Number of shots for waveform measurement",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CheckZX90",
+        "description": "Task to check ZX90 pulse.",
+        "file_path": "two_qubit/check_zx90.py",
+        "input_parameters": {
+          "cancel_amplitude": {
+            "default_value": 0,
+            "parameter_name": "cancel_amplitude",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cancel_beta": {
+            "default_value": 0,
+            "parameter_name": "cancel_beta",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cancel_phase": {
+            "default_value": 0,
+            "parameter_name": "cancel_phase",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_amplitude": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_beta": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_beta",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_length": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "control_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "cr_amplitude": {
+            "default_value": 0,
+            "parameter_name": "cr_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_phase": {
+            "default_value": 0,
+            "parameter_name": "cr_phase",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rotary_amplitude": {
+            "default_value": 0,
+            "parameter_name": "rotary_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "zx_rotation_rate": {
+            "default_value": 0,
+            "parameter_name": "zx_rotation_rate",
+            "qid_role": "coupling",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckZX90",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "repetitions": {
+            "description": "Number of repetitions for the PI pulse",
+            "unit": "a.u.",
+            "value": 20,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "coupling"
+      },
+      {
+        "class_name": "ChevronPattern",
+        "description": "Legacy alias for CheckFineChevron — kept for UI filtering of historical results.",
+        "file_path": "one_qubit_coarse/legacy_chevron_pattern.py",
+        "input_parameters": {},
+        "name": "ChevronPattern",
+        "run_parameters": {},
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "Configure",
+        "description": "Task to configure the box.",
+        "file_path": "box_setup/configure.py",
+        "input_parameters": {},
+        "name": "Configure",
+        "run_parameters": {},
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "ConfigureAll",
+        "description": "Task to configure all boxes for the selected MUXes.",
+        "file_path": "box_setup/configure_all.py",
+        "input_parameters": {},
+        "name": "ConfigureAll",
+        "run_parameters": {
+          "mux_ids": {
+            "description": "List of MUX IDs to configure",
+            "unit": "a.u.",
+            "value": [],
+            "value_type": "list"
+          }
+        },
+        "task_type": "system"
+      },
+      {
+        "class_name": "CreateDRAGHPIPulse",
+        "description": "Task to create the DRAG HPI pulse.",
+        "file_path": "one_qubit_fine/create_drag_hpi_pulse.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CreateDRAGHPIPulse",
+        "run_parameters": {
+          "drag_hpi_duration": {
+            "description": "HPI pulse length",
+            "unit": "ns",
+            "value": 16,
+            "value_type": "int"
+          },
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CreateDRAGPIPulse",
+        "description": "Task to create the DRAG pi pulse.",
+        "file_path": "one_qubit_fine/create_drag_pi_pulse.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CreateDRAGPIPulse",
+        "run_parameters": {
+          "drag_pi_duration": {
+            "description": "PI pulse length",
+            "unit": "ns",
+            "value": 24,
+            "value_type": "int"
+          },
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CreateHPIPulse",
+        "description": "Task to create the HPI pulse.",
+        "file_path": "one_qubit_coarse/create_hpi_pulse.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CreateHPIPulse",
+        "run_parameters": {
+          "hpi_duration": {
+            "description": "HPI pulse length",
+            "unit": "ns",
+            "value": 32,
+            "value_type": "int"
+          },
+          "interval": {
+            "description": "Time interval for calibration",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for calibration",
+            "unit": "",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CreatePIPulse",
+        "description": "Task to create the pi pulse.",
+        "file_path": "one_qubit_coarse/create_pi_pulse.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CreatePIPulse",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval for calibration",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "pi_duration": {
+            "description": "PI pulse length",
+            "unit": "ns",
+            "value": 32,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for calibration",
+            "unit": "",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CreateZX90",
+        "description": "Task to create ZX90 gate.",
+        "file_path": "two_qubit/create_zx90.py",
+        "input_parameters": {
+          "cancel_amplitude": {
+            "default_value": 0,
+            "parameter_name": "cancel_amplitude",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cancel_beta": {
+            "default_value": 0,
+            "parameter_name": "cancel_beta",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cancel_phase": {
+            "default_value": 0,
+            "parameter_name": "cancel_phase",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_amplitude": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_beta": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_beta",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_length": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "control_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "cr_amplitude": {
+            "default_value": 0,
+            "parameter_name": "cr_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_phase": {
+            "default_value": 0,
+            "parameter_name": "cr_phase",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rotary_amplitude": {
+            "default_value": 0,
+            "parameter_name": "rotary_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "zx_rotation_rate": {
+            "default_value": 0,
+            "parameter_name": "zx_rotation_rate",
+            "qid_role": "coupling",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CreateZX90",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "coupling"
+      },
+      {
+        "class_name": "DumpBox",
+        "description": "DumpBox class to dump the box information.",
+        "file_path": "box_setup/dump_box.py",
+        "input_parameters": {},
+        "name": "DumpBox",
+        "run_parameters": {},
+        "task_type": "global"
+      },
+      {
+        "class_name": "LinkUp",
+        "description": "Task to link up the box.",
+        "file_path": "box_setup/link_up.py",
+        "input_parameters": {},
+        "name": "LinkUp",
+        "run_parameters": {},
+        "task_type": "global"
+      },
+      {
+        "class_name": "RandomizedBenchmarking",
+        "description": "Task to perform randomized benchmarking.",
+        "file_path": "benchmark/randomized_benchmarking.py",
+        "input_parameters": {
+          "drag_hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "drag_hpi_beta": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "drag_hpi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "RandomizedBenchmarking",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "n_trials": {
+            "description": "Number of trials",
+            "unit": "a.u.",
+            "value": 10,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "ReadoutClassification",
+        "description": "Task to classify the readout.",
+        "file_path": "measurement/readout_classification.py",
+        "input_parameters": {
+          "drag_hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "drag_hpi_beta": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "drag_hpi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "ReadoutClassification",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "ReadoutConfigure",
+        "description": "Task to configure the box.",
+        "file_path": "box_setup/readout_configure.py",
+        "input_parameters": {},
+        "name": "ReadoutConfigure",
+        "run_parameters": {
+          "qubits": {
+            "description": "List of muxes to update readout settings",
+            "unit": "a.u.",
+            "value": [],
+            "value_type": "list"
+          }
+        },
+        "task_type": "global"
+      },
+      {
+        "class_name": "X180InterleavedRandomizedBenchmarking",
+        "description": "Task to perform X180 interleaved randomized benchmarking.",
+        "file_path": "benchmark/x180_interleaved_randoized_benchmarking.py",
+        "input_parameters": {},
+        "name": "X180InterleavedRandomizedBenchmarking",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "n_trials": {
+            "description": "Number of trials",
+            "unit": "a.u.",
+            "value": 10,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "X90InterleavedRandomizedBenchmarking",
+        "description": "Task to perform X90 interleaved randomized benchmarking.",
+        "file_path": "benchmark/x90_interleaved_randomized_benchmarking.py",
+        "input_parameters": {
+          "drag_hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "drag_hpi_beta": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "drag_hpi_length": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_length": {
+            "default_value": 384.0,
+            "description": "Readout pulse length",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          }
+        },
+        "name": "X90InterleavedRandomizedBenchmarking",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "n_trials": {
+            "description": "Number of trials",
+            "unit": "a.u.",
+            "value": 10,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "ZX90InterleavedRandomizedBenchmarking",
+        "description": "Task to perform ZX90 interleaved randomized benchmarking.",
+        "file_path": "benchmark/zx90_interleaved_randoized_benchmarking.py",
+        "input_parameters": {
+          "cancel_amplitude": {
+            "default_value": 0,
+            "parameter_name": "cancel_amplitude",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cancel_beta": {
+            "default_value": 0,
+            "parameter_name": "cancel_beta",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cancel_phase": {
+            "default_value": 0,
+            "parameter_name": "cancel_phase",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_amplitude": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_beta": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_beta",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_drag_hpi_length": {
+            "default_value": 0,
+            "parameter_name": "drag_hpi_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "control_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "cr_amplitude": {
+            "default_value": 0,
+            "parameter_name": "cr_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_phase": {
+            "default_value": 0,
+            "parameter_name": "cr_phase",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rotary_amplitude": {
+            "default_value": 0,
+            "parameter_name": "rotary_amplitude",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_qubit_frequency": {
+            "default_value": 0,
+            "parameter_name": "qubit_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_amplitude": {
+            "default_value": 0,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_readout_frequency": {
+            "default_value": 0,
+            "parameter_name": "readout_frequency",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_readout_length": {
+            "default_value": 0,
+            "parameter_name": "readout_length",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "zx_rotation_rate": {
+            "default_value": 0,
+            "parameter_name": "zx_rotation_rate",
+            "qid_role": "coupling",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          }
+        },
+        "name": "ZX90InterleavedRandomizedBenchmarking",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "n_trials": {
+            "description": "Number of trials",
+            "unit": "a.u.",
+            "value": 10,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "coupling"
+      }
+    ]
+  },
+  "version": 1
+}

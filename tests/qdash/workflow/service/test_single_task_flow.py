@@ -38,6 +38,7 @@ def test_single_task_executor_pulls_config_before_reexecute(monkeypatch):
     assert captured["kwargs"]["enable_github_pull"] is True
     assert captured["kwargs"]["enable_github"] is True
     assert captured["kwargs"]["persist_output_parameters"] is True
+    assert captured["kwargs"]["use_lock"] is True
     assert "execution_id" not in captured["kwargs"]
     assert captured["finished"] is True
 
@@ -53,3 +54,73 @@ def test_single_task_executor_pulls_config_before_reexecute(monkeypatch):
 
     assert captured["kwargs"]["enable_github"] is False
     assert captured["kwargs"]["persist_output_parameters"] is True
+
+
+def test_single_task_executor_exempts_reconfigure_from_snapshot(monkeypatch):
+    from qdash.workflow.service.single_task_flow import single_task_executor
+
+    captured: dict[str, Any] = {}
+    calls: list[str] = []
+
+    class FakeCalibService:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            captured.update(kwargs)
+
+        def execute_task(self, task_name: str, qid: str) -> dict[str, Any]:
+            calls.append(task_name)
+            return {"task_name": task_name, "qid": qid}
+
+        def finish_calibration(self) -> None:
+            pass
+
+    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", FakeCalibService)
+
+    single_task_executor(
+        username="alice",
+        chip_id="chip-1",
+        qid="0",
+        task_name="CheckRabi",
+        source_execution_id="exec-001",
+        source_task_id="task-001",
+        project_id="project-1",
+        reconfigure=True,
+    )
+
+    assert captured["snapshot_exempt_tasks"] == {"Configure"}
+    assert calls == ["Configure", "CheckRabi"]
+
+
+def test_single_task_executor_accepts_quick_run_parameters(monkeypatch):
+    from qdash.workflow.service.single_task_flow import single_task_executor
+
+    captured: dict[str, Any] = {}
+
+    class FakeCalibService:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            captured["kwargs"] = kwargs
+
+        def execute_task(self, task_name: str, qid: str) -> dict[str, Any]:
+            return {"task_name": task_name, "qid": qid}
+
+        def finish_calibration(self) -> None:
+            pass
+
+    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", FakeCalibService)
+
+    defaults = {"CheckRabi": {"shots": {"value": 100}}}
+    single_task_executor(
+        username="alice",
+        chip_id="chip-1",
+        qid="0",
+        task_name="CheckRabi",
+        project_id="project-1",
+        backend_name="fake",
+        default_run_parameters=defaults,
+        persist_output_parameters=False,
+        update_params=False,
+    )
+
+    assert captured["kwargs"]["source_execution_id"] is None
+    assert captured["kwargs"]["backend_name"] == "fake"
+    assert captured["kwargs"]["default_run_parameters"] == defaults
+    assert captured["kwargs"]["persist_output_parameters"] is False

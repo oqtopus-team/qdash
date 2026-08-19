@@ -6,7 +6,11 @@ import numpy as np
 from qubex.experiment.experiment_constants import DEFAULT_RABI_FREQUENCY
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -34,50 +38,50 @@ class CheckControlAmplitude(QubexTask):
     name: str = "CheckControlAmplitude"
     task_type: str = "qubit"
     timeout: int = 60 * 60
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # Coarse f01 from CheckQubitSpectroscopy (5 MHz grid). The sqrt-Lorentzian
         # fit refines this to sub-MHz precision and writes back coarse_qubit_frequency.
-        "coarse_qubit_frequency": None,
-        "readout_frequency": None,  # Load from DB
-        "readout_amplitude": None,  # Load from DB
+        "coarse_qubit_frequency": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.required_database(),
         # Seed drive amplitude. Comes from CheckQubitSpectroscopy and is the
         # threshold amplitude where f01 first appears in the spectroscopy heatmap
         # — NOT a Rabi-rate-derived control_amplitude.
-        "coarse_control_amplitude": None,
+        "coarse_control_amplitude": InputParameterSpec.required_database(),
     }
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "frequency_span": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "frequency_span": RunParameterSpec(
             unit="GHz",
             value_type="float",
-            value=0.15,
+            default=0.15,
             description="Half-span around qubit_frequency for the sweep (±span, default ±150 MHz)",
         ),
-        "frequency_step": RunParameterModel(
+        "frequency_step": RunParameterSpec(
             unit="GHz",
             value_type="float",
-            value=0.0025,
+            default=0.0025,
             description="Frequency step (default 2.5 MHz, ~120 points over ±150 MHz)",
         ),
-        "readout_amplitude": RunParameterModel(
+        "readout_amplitude": RunParameterSpec(
             unit="a.u.",
             value_type="float",
-            value=0.04,
+            default=0.04,
             description=(
                 "Readout amplitude used during the sweep. Matches the "
                 "CheckQubitSpectroscopy default so the qubit response is "
                 "probed under the same readout conditions."
             ),
         ),
-        "target_rabi_rate": RunParameterModel(
+        "target_rabi_rate": RunParameterSpec(
             unit="GHz",
             value_type="float",
-            value=DEFAULT_RABI_FREQUENCY,
+            default=DEFAULT_RABI_FREQUENCY,
             description="Target Rabi rate used to scale the estimated control amplitude",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=8192,
+            default=8192,
             description=(
                 "Number of shots per frequency point. Higher than the usual "
                 "CALIBRATION_SHOTS (2048) because this is a 1D scan and the "
@@ -86,15 +90,15 @@ class CheckControlAmplitude(QubexTask):
                 "above the noise floor for a stable sqrt-Lorentzian fit."
             ),
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Shot interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "coarse_control_amplitude": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "coarse_control_amplitude": OutputParameterSpec(
             unit="a.u.",
             description=(
                 "Refined coarse drive-amplitude seed for downstream chevron tasks. "
@@ -102,7 +106,7 @@ class CheckControlAmplitude(QubexTask):
                 "and capped at 1.0 a.u."
             ),
         ),
-        "coarse_qubit_frequency": ParameterModel(
+        "coarse_qubit_frequency": OutputParameterSpec(
             unit="GHz",
             description=(
                 "Refined f01 estimate from the bounded sqrt-Lorentzian fit "

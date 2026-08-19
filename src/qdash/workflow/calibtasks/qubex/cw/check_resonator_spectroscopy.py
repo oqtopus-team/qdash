@@ -23,7 +23,11 @@ from qdash.analysis.spectroscopy import (
     resolve_resonator_assignment_order,
 )
 from qdash.common.visualization.figure_metadata import set_figure_role
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -57,113 +61,113 @@ class CheckResonatorSpectroscopy(QubexTask):
     name: str = "CheckResonatorSpectroscopy"
     task_type: str = "qubit"
     is_mux_level: bool = True
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "frequency_range": RunParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "frequency_range": RunParameterSpec(
             unit="GHz",
             value_type="np.arange",
-            value=(9.75, 10.75, 0.002),
+            default=(9.75, 10.75, 0.002),
             description=(
                 "Frequency range for resonator spectroscopy on the high band "
                 "(64Q chips). Used when chip_id does not contain '144'."
             ),
         ),
-        "frequency_range_low_band": RunParameterModel(
+        "frequency_range_low_band": RunParameterSpec(
             unit="GHz",
             value_type="np.arange",
-            value=(5.75, 6.75, 0.002),
+            default=(5.75, 6.75, 0.002),
             description=(
                 "Frequency range for resonator spectroscopy on the low band "
                 "(144Q chips). Used when chip_id contains '144'."
             ),
         ),
-        "power_range": RunParameterModel(
+        "power_range": RunParameterSpec(
             unit="dB",
             value_type="np.arange",
-            value=(-60, 5, 5),
+            default=(-60, 5, 5),
             description="Power range for resonator spectroscopy",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=1024,
+            default=1024,
             description="Number of shots for resonator spectroscopy",
         ),
-        "num_resonators": RunParameterModel(
+        "num_resonators": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=NUM_RESONATORS,
+            default=NUM_RESONATORS,
             description="Number of resonators to detect",
         ),
-        "resonator_assignment_pattern": RunParameterModel(
+        "resonator_assignment_pattern": RunParameterSpec(
             unit="",
             value_type="str",
-            value="default",
+            default="default",
             description=(
                 "Named resonator assignment pattern: default or 16q. "
                 "Use 16q for mux[0], mux[3], mux[1], mux[2]."
             ),
         ),
-        "high_power_min": RunParameterModel(
+        "high_power_min": RunParameterSpec(
             unit="dB",
             value_type="float",
-            value=-20.0,
+            default=-20.0,
             description="Minimum power for high-power peak detection",
         ),
-        "high_power_max": RunParameterModel(
+        "high_power_max": RunParameterSpec(
             unit="dB",
             value_type="float",
-            value=0.0,
+            default=0.0,
             description="Maximum power for high-power peak detection",
         ),
-        "low_power": RunParameterModel(
+        "low_power": RunParameterSpec(
             unit="dB",
             value_type="float",
-            value=-30.0,
+            default=-30.0,
             description="Power level for low-power peak detection",
         ),
-        "bare_shift_estimator_type": RunParameterModel(
+        "bare_shift_estimator_type": RunParameterSpec(
             unit="",
             value_type="str",
-            value="high_frequency_strength",
+            default="high_frequency_strength",
             description=(
                 "How to pick the bare-shift boundary. "
                 "'config' uses high_power_min/max/low_power; "
                 "'high_frequency_strength' detects it from the FFT of each row."
             ),
         ),
-        "bare_shift_strength_limit": RunParameterModel(
+        "bare_shift_strength_limit": RunParameterSpec(
             unit="a.u.",
             value_type="float",
-            value=4.0,
+            default=4.0,
             description=(
                 "Maximum high-frequency FFT strength accepted as the bare-shift "
                 "boundary. Only used when bare_shift_estimator_type="
                 "'high_frequency_strength'."
             ),
         ),
-        "minimum_usable_power_correlation_coefficient_min": RunParameterModel(
+        "minimum_usable_power_correlation_coefficient_min": RunParameterSpec(
             unit="a.u.",
             value_type="float",
-            value=0.9,
+            default=0.9,
             description=(
                 "Minimum adjacent-row correlation used to estimate the minimum "
                 "usable power for optimal_power calculation."
             ),
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "readout_frequency": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "readout_frequency": OutputParameterSpec(
             unit="GHz", description="Estimated resonator frequency from spectroscopy"
         ),
-        "optimal_power": ParameterModel(
+        "optimal_power": OutputParameterSpec(
             unit="dB",
             description=(
                 "Estimated optimal readout power from the minimum usable power "
                 "and local bare-shift boundary."
             ),
         ),
-        "readout_amplitude": ParameterModel(
+        "readout_amplitude": OutputParameterSpec(
             unit="a.u.",
             description=(
                 "Readout amplitude converted from optimal_power "

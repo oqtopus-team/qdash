@@ -409,6 +409,10 @@ class ProvenanceRecorder:
                 error = 0.0
                 value_type = "float"
 
+            # Unresolved declarations are not parameter versions.
+            if value is None:
+                continue
+
             # Create parameter version
             entity = self.parameter_version_repo.create_version(
                 parameter_name=param_name,

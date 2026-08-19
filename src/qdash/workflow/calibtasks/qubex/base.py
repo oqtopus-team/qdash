@@ -2,7 +2,7 @@ from collections.abc import Generator, Mapping
 from contextlib import ExitStack, contextmanager
 from typing import TYPE_CHECKING, Any
 
-from qdash.datamodel.task import ParameterModel
+from qdash.datamodel.task import InputParameterModel, InputParameterSpec, ParameterModel
 from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.workflow.calibtasks.base import (
@@ -54,8 +54,9 @@ class QubexTask(BaseTask):
                 run_parameters=self.run_parameters,
             )
 
-        # Load declared input_parameters from DB
-        if self.input_parameters:
+        # Fresh executions resolve declarations from current calibration state.
+        # Re-executions arrive with a complete snapshot and must not read current DB values.
+        if self.input_parameters and not self.input_parameters_from_snapshot:
             self._load_parameters_from_db(backend, qid)
 
         return PreProcessResult(
@@ -77,7 +78,10 @@ class QubexTask(BaseTask):
         For qubit tasks, data is fetched from a single QubitDocument.
 
         Behavior for each parameter:
-        - If value is None: Create ParameterModel entirely from DB data
+        - If resolution="database_required": Load from DB or raise an error
+        - If resolution="database_or_default": Prefer DB, otherwise use default
+        - If resolution="default_only": Do not use a DB value
+        - If value is None: Deprecated compatibility behavior; create from DB data
         - If value is ParameterModel: Use DB value if available, else use as fallback
 
         Args:
@@ -149,17 +153,22 @@ class QubexTask(BaseTask):
                 to search (in priority order).
 
         """
-        for param_name, param in list(self.input_parameters.items()):
+        declarations = self.__class__.input_spec or self.input_parameters
+        for param_name, declaration in declarations.items():
+            param = self.input_parameters[param_name]
             # Determine the DB lookup key
-            if isinstance(param, ParameterModel) and param.parameter_name:
-                lookup_key = param.parameter_name
+            if (
+                isinstance(declaration, (InputParameterSpec, ParameterModel))
+                and declaration.parameter_name
+            ):
+                lookup_key = declaration.parameter_name
             else:
                 lookup_key = param_name
 
             # Determine the qid_role for source selection
             qid_role = ""
-            if isinstance(param, ParameterModel):
-                qid_role = param.qid_role
+            if isinstance(declaration, (InputParameterSpec, ParameterModel)):
+                qid_role = declaration.qid_role
 
             # Get the ordered list of data sources for this role
             sources = role_data_sources.get(qid_role, role_data_sources.get("", []))
@@ -173,7 +182,16 @@ class QubexTask(BaseTask):
 
             if db_value is not None:
                 if isinstance(db_value, dict):
-                    if param is None:
+                    if isinstance(declaration, InputParameterSpec):
+                        if declaration.resolution == "default_only":
+                            continue
+                        self.input_parameters[param_name] = InputParameterModel(
+                            value=db_value.get("value", declaration.default),
+                            value_type=declaration.value_type,
+                            unit=db_value.get("unit", declaration.unit),
+                            description=db_value.get("description", declaration.description),
+                        )
+                    elif declaration is None:
                         # Create ParameterModel entirely from DB
                         self.input_parameters[param_name] = ParameterModel(
                             value=db_value.get("value", 0),
@@ -184,8 +202,24 @@ class QubexTask(BaseTask):
                         # Update existing ParameterModel with DB value
                         if "value" in db_value:
                             param.value = db_value["value"]
-            elif param is None:
-                # Parameter not in any source and no fallback - create empty
+            elif isinstance(declaration, InputParameterSpec):
+                if declaration.resolution == "database_required":
+                    raise ValueError(
+                        f"Required input parameter '{lookup_key}' for role "
+                        f"'{qid_role or 'self'}' was not found in the calibration database"
+                    )
+                # The instance was initialized with the explicit default value.
+            elif (
+                isinstance(declaration, ParameterModel)
+                and declaration.source == "database"
+                and declaration.required
+            ):
+                raise ValueError(
+                    f"Required input parameter '{lookup_key}' for role "
+                    f"'{qid_role or 'self'}' was not found in the calibration database"
+                )
+            elif declaration is None:
+                # Deprecated compatibility behavior for legacy declarations.
                 self.input_parameters[param_name] = ParameterModel(
                     unit="",
                     description=f"Parameter {param_name} not found in DB",
@@ -378,7 +412,7 @@ class QubexTask(BaseTask):
 
         """
         param = self.input_parameters[param_name]
-        if param is None:
+        if param is None or param.value is None:
             raise ValueError(f"Parameter {param_name} not found or not loaded")
         # ParameterModel has .value, RunParameterModel has .get_value()
         if hasattr(param, "get_value"):

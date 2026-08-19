@@ -3,10 +3,34 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi import HTTPException
 
 from qdash.api.services import flow_service
 from qdash.api.services.flow_service import FlowService
 from qdash.common.config.path_resolver import resolve_workflow_path, to_container_user_flow_path
+
+
+@pytest.mark.asyncio
+async def test_execute_single_task_rejects_locked_project() -> None:
+    lock_repository = MagicMock()
+    lock_repository.is_locked.return_value = True
+    service = FlowService(
+        flow_repository=MagicMock(),
+        execution_lock_repository=lock_repository,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_single_task_from_snapshot(
+            task_name="CheckRabi",
+            qid="Q00",
+            chip_id="chip-1",
+            source_execution_id=None,
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert getattr(exc_info.value, "status_code", None) == 409
+    lock_repository.is_locked.assert_called_once_with("project-1")
 
 
 def test_resolve_workflow_path_uses_container_path_when_available(tmp_path: Path) -> None:
@@ -104,3 +128,50 @@ async def test_execute_single_task_uses_requested_execution_name(
 
     assert captured_parameters[0]["flow_name"] == expected_flow_name
     assert captured_parameters[0]["persist_output_parameters"] is True
+
+
+@pytest.mark.asyncio
+async def test_execute_single_task_supports_quick_run_without_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_parameters: list[dict[str, object]] = []
+
+    class FakeClient:
+        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
+            return SimpleNamespace(id="deployment-1")
+
+        async def create_flow_run_from_deployment(self, **kwargs: object) -> SimpleNamespace:
+            parameters = kwargs["parameters"]
+            assert isinstance(parameters, dict)
+            captured_parameters.append(parameters)
+            return SimpleNamespace(id="flow-run-1")
+
+    class FakeClientContext:
+        async def __aenter__(self) -> FakeClient:
+            return FakeClient()
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    monkeypatch.setattr(flow_service, "get_client", FakeClientContext)
+
+    defaults = {"CheckRabi": {"shots": {"value": 100}}}
+    await FlowService(flow_repository=MagicMock()).execute_single_task_from_snapshot(
+        task_name="CheckRabi",
+        qid="Q00",
+        chip_id="chip-1",
+        source_execution_id=None,
+        username="operator",
+        project_id="project-1",
+        execution_name="quick-run:CheckRabi",
+        backend_name="fake",
+        default_run_parameters=defaults,
+        persist_output_parameters=False,
+        update_params=False,
+    )
+
+    parameters = captured_parameters[0]
+    assert parameters["source_execution_id"] is None
+    assert parameters["backend_name"] == "fake"
+    assert parameters["default_run_parameters"] == defaults
+    assert parameters["persist_output_parameters"] is False

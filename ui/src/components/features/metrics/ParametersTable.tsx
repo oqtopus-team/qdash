@@ -37,6 +37,17 @@ export function ParametersTable({
   overrides,
 }: ParametersTableProps) {
   const entries = useMemo(() => Object.entries(parameters), [parameters]);
+  const showsDatabaseComparison = useMemo(
+    () =>
+      entries.some(
+        ([, value]) =>
+          typeof value === "object" &&
+          value !== null &&
+          "database_updated" in value &&
+          (value as Record<string, unknown>).database_updated === true,
+      ),
+    [entries],
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
 
@@ -128,7 +139,8 @@ export function ParametersTable({
         <thead>
           <tr>
             <th className="text-xs">Parameter</th>
-            <th className="text-xs">Value</th>
+            {showsDatabaseComparison && <th className="text-xs">Previous</th>}
+            <th className="text-xs">{showsDatabaseComparison ? "New" : "Value"}</th>
             <th className="text-xs">Unit</th>
           </tr>
         </thead>
@@ -156,7 +168,20 @@ export function ParametersTable({
                     </span>
                   )}
                 </td>
-                <td className="font-mono text-xs">
+                {showsDatabaseComparison && (
+                  <td className="font-mono text-xs bg-error/10 text-error">
+                    <span className="line-through">
+                      {paramValue.database_updated === true
+                        ? formatValue(paramValue.previous_database_value)
+                        : "-"}
+                    </span>
+                  </td>
+                )}
+                <td
+                  className={`font-mono text-xs ${
+                    showsDatabaseComparison ? "bg-success/10 text-success font-semibold" : ""
+                  }`}
+                >
                   {isEditing ? (
                     <input
                       type="text"

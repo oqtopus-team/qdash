@@ -8,7 +8,10 @@ import qubex as qx
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_SHOTS
 from qubex.simulator import Control, QuantumSimulator, QuantumSystem, SimulationResult, Transmon
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -88,27 +91,27 @@ class FakeRabi(FakeTask):
 
     name: str = "FakeRabi"
     task_type: str = "qubit"
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "time_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "time_range": RunParameterSpec(
             unit="ns",
             value_type="range",
-            value=(0, 201, 4),
+            default=(0, 201, 4),
             description="Time range for Rabi oscillation",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=DEFAULT_SHOTS,
+            default=DEFAULT_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval for Rabi oscillation",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {}
 
     def preprocess(self, backend: FakeBackend, qid: str) -> PreProcessResult:
         """Preprocess the task."""

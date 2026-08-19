@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import plotly.graph_objects as go
 
-from qdash.datamodel.task import ParameterModel
+from qdash.datamodel.task import InputParameterModel as ParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.cw.check_control_amplitude import CheckControlAmplitude
 

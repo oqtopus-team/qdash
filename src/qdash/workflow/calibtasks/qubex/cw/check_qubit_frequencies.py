@@ -1,6 +1,10 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -14,10 +18,12 @@ class CheckQubitFrequencies(QubexTask):
 
     name: str = "CheckQubitFrequencies"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "coarse_qubit_frequency": ParameterModel(unit="GHz", description="Coarse qubit frequency"),
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {}
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "coarse_qubit_frequency": OutputParameterSpec(
+            unit="GHz", description="Coarse qubit frequency"
+        ),
     }
 
     def postprocess(
