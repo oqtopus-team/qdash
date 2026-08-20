@@ -12,6 +12,10 @@ interface GridFullscreenButtonProps {
 export const gridControlButtonClass =
   "btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200";
 
+/** Overlay container for a grid panel expanded to fullscreen. */
+export const gridFullscreenPanelClass =
+  "fixed inset-0 z-[60] flex flex-col h-screen w-screen space-y-2 bg-base-100 p-4 overflow-hidden";
+
 export function GridFullscreenButton({ isFullscreen, onToggle }: GridFullscreenButtonProps) {
   const label = isFullscreen ? "Exit fullscreen" : "Fullscreen";
   return (
