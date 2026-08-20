@@ -13,9 +13,6 @@ from qdash.workflow.calibtasks.qubex.benchmark.randomized_benchmarking import (
 from qdash.workflow.calibtasks.qubex.benchmark.x90_interleaved_randomized_benchmarking import (
     X90InterleavedRandomizedBenchmarking,
 )
-from qdash.workflow.calibtasks.qubex.two_qubit.check_cross_resonance import (
-    CheckCrossResonance,
-)
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.qubex import QubexBackend
@@ -60,36 +57,3 @@ def test_single_qubit_rb_passes_restored_x90_explicitly(
     assert kwargs["x90"] == {"Q01": waveform}
     if method_name == "interleaved_randomized_benchmarking":
         assert kwargs["interleaved_waveform"] == {"Q01": waveform}
-
-
-def test_check_cross_resonance_passes_control_x90_explicitly(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    task = CheckCrossResonance()
-    waveform = object()
-    raw_result = MagicMock()
-    raw_result.data = {"figs_history": []}
-    raw_result.__getitem__.side_effect = {"coeffs_history": []}.__getitem__
-    obtain_cr_params = MagicMock(return_value=raw_result)
-    cr_param = {
-        "cr_amplitude": 0.2,
-        "cr_phase": 0.1,
-        "cancel_amplitude": 0.03,
-        "cancel_phase": -0.2,
-        "cancel_beta": 0.0,
-        "rotary_amplitude": 0.04,
-        "zx_rotation_rate": 0.005,
-        "ramptime": 16.0,
-    }
-    exp = SimpleNamespace(
-        drag_hpi_pulse={"Q00": waveform},
-        get_qubit_label=lambda qid: f"Q0{qid}",
-        obtain_cr_params=obtain_cr_params,
-        calib_note=SimpleNamespace(get_cr_param=lambda _label: cr_param),
-    )
-    monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
-    monkeypatch.setattr(task, "_restore_qubit_pulse_context", lambda _backend, _qid: None)
-
-    task.run(cast("QubexBackend", _backend_for(exp)), "0-1")
-
-    assert obtain_cr_params.call_args.kwargs["x90"] == {"Q00": waveform}

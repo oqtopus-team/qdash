@@ -138,13 +138,14 @@ class QubexTask(BaseTask):
         if not any(name.endswith(pulse_suffixes) for name in self.input_parameters):
             return
         exp = self.get_experiment(backend)
-        role_labels = {"": self.get_qubit_label(backend, qid)}
         if "-" in qid:
             control_qid, target_qid = qid.split("-", maxsplit=1)
             role_labels = {
                 "control_": self.get_qubit_label(backend, control_qid),
                 "target_": self.get_qubit_label(backend, target_qid),
             }
+        else:
+            role_labels = {"": self.get_qubit_label(backend, qid)}
 
         for prefix, label in role_labels.items():
             hpi = self._resolved_input_values((f"{prefix}hpi_amplitude", f"{prefix}hpi_length"))

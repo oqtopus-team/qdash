@@ -229,13 +229,10 @@ class CheckCrossResonance(QubexTask):
         control, target = (
             exp.get_qubit_label(int(q)) for q in qid.split("-")
         )  # e.g., "0-1" → "Q00","Q01"
-        self._restore_qubit_pulse_context(backend, qid)
-        x90 = {control: exp.drag_hpi_pulse[control]}
 
         raw_result = exp.obtain_cr_params(
             control,
             target,
-            x90=x90,
             n_shots=self.run_parameters["shots"].get_value(),
             shot_interval=self.run_parameters["interval"].get_value(),
         )

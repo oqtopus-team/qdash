@@ -245,8 +245,6 @@ class CreateZX90(QubexTask):
         label = "-".join(
             [exp.get_qubit_label(int(q)) for q in qid.split("-")]
         )  # e.g., "0-1" → "Q00-Q01"
-        self._restore_qubit_pulse_context(backend, qid)
-        self._restore_cr_context(backend, qid)
         raw_result = exp.calibrate_zx90(
             control,
             target,

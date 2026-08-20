@@ -1,7 +1,7 @@
 """Tests for QubexTask._load_parameters_from_db."""
 
 from typing import Any, ClassVar, cast
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -444,6 +444,29 @@ class TestRestoreCalibrationContext:
         assert label == "Q00"
         assert pulse["amplitude"] == 0.12
         assert pulse["duration"] == 32
+
+    def test_restores_two_qubit_pulses_using_each_qubit_id(self) -> None:
+        task = ConcreteQubexTask()
+        task.input_parameters = {
+            "control_hpi_amplitude": ParameterModel(value=0.12),
+            "control_hpi_length": ParameterModel(value=32),
+            "target_hpi_amplitude": ParameterModel(value=0.13),
+            "target_hpi_length": ParameterModel(value=36),
+        }
+        exp = MagicMock()
+        exp.get_qubit_label.side_effect = lambda qid: f"Q{qid:02d}"
+        backend = MagicMock()
+        backend.get_instance.return_value = exp
+
+        task._restore_qubit_pulse_context(backend, "72-73")
+
+        assert exp.get_qubit_label.call_args_list == [call(72), call(73)]
+        assert exp.calib_note.update_hpi_param.call_count == 2
+        control_call, target_call = exp.calib_note.update_hpi_param.call_args_list
+        assert control_call.args[0] == "Q72"
+        assert control_call.args[1]["amplitude"] == 0.12
+        assert target_call.args[0] == "Q73"
+        assert target_call.args[1]["amplitude"] == 0.13
 
     def test_restores_cr_context_from_resolved_inputs(self) -> None:
         task = ConcreteQubexTask()
