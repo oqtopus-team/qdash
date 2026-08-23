@@ -114,6 +114,21 @@ describe("selectTaskNeighborhood", () => {
     ]);
   });
 
+  it("falls back per task when only part of the group is linked", () => {
+    const partiallyLinked: Task[] = [
+      { ...task("CheckFineChevron", "0"), upstream_id: "" },
+      { ...task("CheckRabi", "0"), upstream_id: "CheckFineChevron-0" },
+      { ...task("CheckT1", "0"), upstream_id: "" },
+      { ...task("CheckT2Echo", "0"), upstream_id: "" },
+    ];
+
+    expect(selectTaskNeighborhood(partiallyLinked, "CheckT1").map((entry) => entry.name)).toEqual([
+      "CheckRabi",
+      "CheckT1",
+      "CheckT2Echo",
+    ]);
+  });
+
   it("returns the whole group when the task is missing or unset", () => {
     expect(selectTaskNeighborhood(linked, "CheckT2Echo")).toHaveLength(linked.length);
     expect(selectTaskNeighborhood(linked, "")).toHaveLength(linked.length);

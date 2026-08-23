@@ -64,7 +64,7 @@ export function filterTaskGroupsByName(groups: TaskGroups, taskName: string): Ta
  * Narrows one entity's tasks to the selected task plus the tasks directly linked
  * to it: its upstream task and every task declaring it as upstream.
  *
- * Executions recorded without `upstream_id` links fall back to the neighbours in
+ * A task with no link recorded on either side falls back to its neighbours in
  * execution order, so the selected task is never shown on its own.
  */
 export function selectTaskNeighborhood(entityTasks: Task[], taskName: string): Task[] {
@@ -80,25 +80,25 @@ export function selectTaskNeighborhood(entityTasks: Task[], taskName: string): T
   entityTasks.forEach((task, index) => {
     if (task.task_id) indexByTaskId.set(task.task_id, index);
   });
-  const hasUpstreamLinks = entityTasks.some(
-    (task) => task.upstream_id && indexByTaskId.has(task.upstream_id),
-  );
-
   const kept = new Set<number>(selectedIndexes);
   for (const selectedIndex of selectedIndexes) {
     const selected = entityTasks[selectedIndex];
-    if (hasUpstreamLinks) {
-      const upstreamIndex = selected.upstream_id
-        ? indexByTaskId.get(selected.upstream_id)
-        : undefined;
-      if (upstreamIndex !== undefined) kept.add(upstreamIndex);
-      entityTasks.forEach((task, index) => {
-        if (task.upstream_id && task.upstream_id === selected.task_id) kept.add(index);
-      });
-    } else {
+    const upstreamIndex = selected.upstream_id
+      ? indexByTaskId.get(selected.upstream_id)
+      : undefined;
+    const downstreamIndexes = entityTasks.reduce<number[]>((indexes, task, index) => {
+      if (selected.task_id && task.upstream_id === selected.task_id) indexes.push(index);
+      return indexes;
+    }, []);
+
+    if (upstreamIndex === undefined && downstreamIndexes.length === 0) {
       if (selectedIndex > 0) kept.add(selectedIndex - 1);
       if (selectedIndex < entityTasks.length - 1) kept.add(selectedIndex + 1);
+      continue;
     }
+
+    if (upstreamIndex !== undefined) kept.add(upstreamIndex);
+    for (const downstreamIndex of downstreamIndexes) kept.add(downstreamIndex);
   }
 
   return entityTasks.filter((_, index) => kept.has(index));
