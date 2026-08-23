@@ -239,6 +239,7 @@ const CouplingMarker = memo(function CouplingMarker({
   );
 });
 
+/** Chip topology grid showing the status of one execution's qubit or coupling tasks. */
 export function ExecutionTopologyView({
   chipId,
   executionId,

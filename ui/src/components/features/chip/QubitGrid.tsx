@@ -303,6 +303,7 @@ const GridCell = memo(function GridCell({
   );
 });
 
+/** Chip grid of per-qubit results for the selected task and time range. */
 export function QubitGrid({
   chipId,
   topologyId,

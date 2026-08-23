@@ -129,6 +129,7 @@ function taskRangeLabel(
   return selectedDate;
 }
 
+/** Chip grid of per-coupling results for the selected task and time range. */
 export function CouplingGrid({
   chipId,
   topologyId,

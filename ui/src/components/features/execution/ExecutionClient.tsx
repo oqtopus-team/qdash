@@ -44,6 +44,7 @@ function formatActorLabel(actor?: ActorFields | null) {
   return actor?.user_id || "Unknown";
 }
 
+/** Execution detail page: run summary, cancel control, and the task topology grid. */
 export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailClientProps) {
   const [topologyMode, setTopologyMode] = useState<TopologyMode>("1q");
   const [filterTaskName, setFilterTaskName] = useState<string>("");

@@ -14,6 +14,7 @@ interface UseFullscreenPanelResult {
 const openPanels: Array<() => void> = [];
 let previousOverflow = "";
 
+/** Exit the topmost open panel on Escape, unless a dialog is still open. */
 function handleKeyDown(event: KeyboardEvent) {
   if (event.key !== "Escape") return;
   if (document.querySelector('dialog[open], .modal-open, [role="dialog"][data-state="open"]'))
@@ -21,6 +22,7 @@ function handleKeyDown(event: KeyboardEvent) {
   openPanels[openPanels.length - 1]?.();
 }
 
+/** Register a panel as open and return a function that unregisters it. */
 function openPanel(exit: () => void) {
   if (openPanels.length === 0) {
     previousOverflow = document.body.style.overflow;
