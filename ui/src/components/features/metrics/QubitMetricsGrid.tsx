@@ -214,7 +214,6 @@ const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }
   return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
 });
 
-/** Chip grid coloring each qubit by the value of a single metric. */
 export function QubitMetricsGrid({
   metricData,
   title,
