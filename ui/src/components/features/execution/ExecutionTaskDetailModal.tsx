@@ -27,6 +27,7 @@ interface ExecutionTaskDetailModalProps {
   executionName?: string;
   qid: string;
   tasks: Task[];
+  initialTaskIndex?: number;
   onClose: () => void;
 }
 
@@ -60,9 +61,10 @@ export function ExecutionTaskDetailModal({
   executionName,
   qid,
   tasks,
+  initialTaskIndex = 0,
   onClose,
 }: ExecutionTaskDetailModalProps) {
-  const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
+  const [selectedTaskIndex, setSelectedTaskIndex] = useState(initialTaskIndex);
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("tasks");
   const { openMiniChat } = useAnalysisChatContext();
 
