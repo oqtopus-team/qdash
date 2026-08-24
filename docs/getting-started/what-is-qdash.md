@@ -70,7 +70,7 @@ Here are some screenshots of QDash in action:
 - **Quantum Library**: qubex
 
 Use [Operator Setup](../operator-guide/setup.md) to deploy QDash or
-[Developer Setup](../developer-guide/setup.md) to prepare a development environment. The
+[Developer Setup](../development/setup.md) to prepare a development environment. The
 [Application Tour](../user-guide/application-tour.md) maps the available features, while the
 [Architecture](./architecture.md) and [Database Structure](../reference/database-structure.md)
 describe the implementation.

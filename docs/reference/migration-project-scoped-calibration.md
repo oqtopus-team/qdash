@@ -1,4 +1,4 @@
-# Project-scoped calibration migration
+# Project-Scoped Calibration Migration
 
 QDash now shares current calibration state among all members of a project. The deployment process
 runs this migration automatically before the API, deployment service, and user-flow worker start.

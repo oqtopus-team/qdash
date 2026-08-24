@@ -45,7 +45,8 @@ Reviews** to filter runs by chip or task and drill into a run.
 
 AI output is supporting evidence, not an automatic calibration decision. Confirm findings against
 the task result, raw artifacts, task knowledge, and current calibration context before changing
-parameters or excluding data.
+parameters or excluding data. See [Copilot and AI Reviews](./copilot.md) for the chat and review
+workflows.
 
 ## Follow Notifications
 

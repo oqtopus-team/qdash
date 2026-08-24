@@ -124,6 +124,10 @@ export default withMermaid(
               link: "/user-guide/reviewing-results",
             },
             {
+              text: "Copilot and AI Reviews",
+              link: "/user-guide/copilot",
+            },
+            {
               text: "Task Parameters",
               link: "/user-guide/task-parameters",
             },
@@ -143,6 +147,10 @@ export default withMermaid(
               text: "Agent Calibration",
               link: "/user-guide/agent-calibration",
             },
+            {
+              text: "Calibration Data Sharing",
+              link: "/user-guide/calibration-data-sharing",
+            },
           ],
         },
         {
@@ -150,7 +158,7 @@ export default withMermaid(
           collapsed: false,
           items: [
             { text: "Overview", link: "/developer-guide/" },
-            { text: "Setup", link: "/developer-guide/setup" },
+            { text: "Setup", link: "/development/setup" },
             { text: "Codebase", link: "/developer-guide/codebase" },
             { text: "Commands", link: "/developer-guide/commands" },
             { text: "Testing", link: "/developer-guide/testing" },
@@ -161,7 +169,6 @@ export default withMermaid(
           collapsed: true,
           items: [
             { text: "Development Flow", link: "/development/development-flow" },
-            { text: "Full Setup Notes", link: "/development/setup" },
             {
               text: "API",
               collapsed: true,
@@ -194,6 +201,7 @@ export default withMermaid(
               text: "Copilot",
               collapsed: true,
               items: [
+                { text: "Agent Platform", link: "/development/agent-platform" },
                 { text: "Architecture", link: "/development/copilot/architecture" },
                 { text: "AI Review Evals", link: "/development/copilot/ai-review-evals" },
                 { text: "Sandbox", link: "/development/copilot/sandbox" },
@@ -227,6 +235,10 @@ export default withMermaid(
             },
             { text: "Database Indexes", link: "/reference/database-indexes" },
             { text: "Migration to v1.8.0", link: "/reference/migration-v1.8.0" },
+            {
+              text: "Project-Scoped Calibration Migration",
+              link: "/reference/migration-project-scoped-calibration",
+            },
             { text: "OpenAPI", link: "/reference/openapi" },
           ],
         },
