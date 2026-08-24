@@ -53,17 +53,17 @@ QDash uses a simplified three-role permission model:
 
 | Action                          | Viewer | Editor | Owner |
 | ------------------------------- | :----: | :----: | :---: |
-| View chips and calibration data |   ✅   |   ✅   |  ✅   |
-| View execution history          |   ✅   |   ✅   |  ✅   |
-| Download results                |   ✅   |   ✅   |  ✅   |
-| Create/modify chips             |   ❌   |   ✅   |  ✅   |
-| Run calibrations                |   ❌   |   ✅   |  ✅   |
-| Update parameters               |   ❌   |   ✅   |  ✅   |
-| Edit notes                      |   ❌   |   ✅   |  ✅   |
-| Manage forum categories         |   ❌   |   ❌   |  ✅   |
-| Invite or remove members        |   ❌   |   ❌   |  ✅   |
-| Delete project                  |   ❌   |   ❌   |  ✅   |
-| Transfer ownership              |   ❌   |   ❌   |  ✅   |
+| View chips and calibration data | Yes | Yes | Yes |
+| View execution history | Yes | Yes | Yes |
+| Download results | Yes | Yes | Yes |
+| Create or modify chips | No | Yes | Yes |
+| Run calibrations | No | Yes | Yes |
+| Update parameters | No | Yes | Yes |
+| Edit notes | No | Yes | Yes |
+| Manage forum categories | No | No | Yes |
+| Invite or remove members | No | No | Yes |
+| Delete project | No | No | Yes |
+| Transfer ownership | No | No | Yes |
 
 ## Inviting Team Members
 
