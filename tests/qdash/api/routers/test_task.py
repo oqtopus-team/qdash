@@ -67,6 +67,7 @@ async def test_quick_run_task_resolves_and_validates_default_backend(
     monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: True)
     response = ExecuteFlowResponse(
         execution_id="flow-run-1",
+        flow_run_id="flow-run-1",
         flow_run_url="http://prefect/runs/flow-run/flow-run-1",
         qdash_ui_url="http://qdash/execution/flow-run-1",
         message="started",

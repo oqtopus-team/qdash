@@ -41,6 +41,11 @@ def setup_logging(
             raise
         log_file = str(_REPO_ROOT / "logs" / f"{config_name}.log")
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    else:
+        log_dir = os.path.dirname(log_file)
+        if log_file.startswith("/app/logs/") and not os.access(log_dir, os.W_OK):
+            log_file = str(_REPO_ROOT / "logs" / f"{config_name}.log")
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
     raw = yaml_path.read_text()
     raw = raw.replace("${LOG_LEVEL}", log_level)
