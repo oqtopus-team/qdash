@@ -28,12 +28,6 @@ backends:
     tasks:
       One Qubit:
         - CheckChevron
-        - CheckCoarseChevron
-        - CheckFineChevron
-        - CheckQubit
-        - CheckQubitFrequency
-        - CheckReadoutFrequency
-        - CheckDispersiveShift
         - CheckOptimalReadoutAmplitude
         - RabiOscillation
         - CheckRabi
@@ -62,16 +56,10 @@ backends:
         - ZX90InterleavedRandomizedBenchmarking
 
       CW:
-        - CheckReflectionCoefficient
         - CheckResonatorSpectroscopy
-        - CheckResonatorFrequencies
         - CheckQubitSpectroscopy
-        - CheckSimultaneousQubitSpectroscopy
-        - CheckQubitFrequencies
         - CheckWaveform
         - CheckControlAmplitude
-        - CheckReadoutAmplitude
-        - CheckElectricalDelay
 
       Other:
         - Configure

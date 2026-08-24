@@ -173,7 +173,7 @@ Example workflow:
 - Step 1: get_parameter_lineage("x90_gate_fidelity", "0", chip_id) → find entity_id of the latest version
 - Step 2: get_provenance_lineage_graph(entity_id, chip_id) → get ancestor graph
 - Step 3: Inspect ancestor entities (e.g., qubit_frequency, pi_amplitude) for degradation
-- Step 4: Conclude "The qubit_frequency input to CreateX90 was degraded (v3, 4.85 GHz → expected ~5.0 GHz). Re-run CheckQubitFrequency first."
+- Step 4: Conclude "The qubit_frequency input to CreateX90 was degraded (v3, 4.85 GHz → expected ~5.0 GHz). Re-run CheckChevron first."
 
 ## Presenting analysis results
 

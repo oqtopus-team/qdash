@@ -38,14 +38,6 @@ BRINGUP_TASKS: list[str] = [
     "CheckChevron",
 ]
 
-EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS: list[str] = [
-    "CheckResonatorSpectroscopy",
-    "CheckSimultaneousQubitSpectroscopy",
-    "CheckControlAmplitude",
-    "CheckChevron",
-]
-
-
 # =============================================================================
 # 1-Qubit Task Lists
 # =============================================================================
