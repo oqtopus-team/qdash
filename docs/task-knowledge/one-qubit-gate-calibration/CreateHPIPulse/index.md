@@ -55,11 +55,11 @@ The π/2 amplitude should be approximately half of the π amplitude; fit quality
 ## Output parameters
 
 - hpi_amplitude: HPI pulse amplitude
-- hpi_length: HPI pulse length (ns)
+- hpi_duration: HPI pulse duration (ns)
 
 ## Run parameters
 
-- hpi_duration: HPI pulse length (ns)
+- hpi_duration: HPI pulse duration (ns)
 - shots: Number of shots for calibration
 - interval: Time interval for calibration (ns)
 

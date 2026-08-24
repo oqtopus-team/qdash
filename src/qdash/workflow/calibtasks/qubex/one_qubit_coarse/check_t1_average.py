@@ -37,7 +37,7 @@ class CheckT1Average(QubexTask):
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "qubit_frequency": InputParameterSpec.required_database(),
         "hpi_amplitude": InputParameterSpec.required_database(),
-        "hpi_length": InputParameterSpec.required_database(),
+        "hpi_duration": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
         "readout_length": InputParameterSpec.database_or_default(

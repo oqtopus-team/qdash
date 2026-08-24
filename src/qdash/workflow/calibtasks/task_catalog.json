@@ -317,7 +317,7 @@
       },
       {
         "class_name": "FakeCreateHPIPulse",
-        "description": "Fake task to simulate Half-Pi (HPI) pulse calibration.\n\nThis task depends on qubit_frequency from CheckFineChevron.\nIt simulates calibrating the half-pi pulse parameters.\n\nNote: Uses same name as qubex task for seamless backend switching.\n\nInputs:\n    qubit_frequency: From CheckFineChevron (loaded from DB)\n\nOutputs:\n    hpi_amplitude: Half-pi pulse amplitude\n    hpi_length: Half-pi pulse duration (ns)",
+        "description": "Fake task to simulate Half-Pi (HPI) pulse calibration.\n\nThis task depends on qubit_frequency from CheckFineChevron.\nIt simulates calibrating the half-pi pulse parameters.\n\nNote: Uses same name as qubex task for seamless backend switching.\n\nInputs:\n    qubit_frequency: From CheckFineChevron (loaded from DB)\n\nOutputs:\n    hpi_amplitude: Half-pi pulse amplitude\n    hpi_duration: Half-pi pulse duration (ns)",
         "file_path": "fake_create_hpi_pulse.py",
         "input_parameters": {
           "qubit_frequency": {
@@ -1429,7 +1429,7 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "hpi_length": {
+          "hpi_duration": {
             "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
@@ -1858,7 +1858,7 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "hpi_length": {
+          "hpi_duration": {
             "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
@@ -2161,7 +2161,7 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "hpi_length": {
+          "hpi_duration": {
             "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
@@ -2226,7 +2226,7 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "hpi_length": {
+          "hpi_duration": {
             "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
@@ -2297,7 +2297,7 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "hpi_length": {
+          "hpi_duration": {
             "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
@@ -2362,7 +2362,7 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "hpi_length": {
+          "hpi_duration": {
             "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
@@ -2991,7 +2991,7 @@
         "name": "CreateHPIPulse",
         "run_parameters": {
           "hpi_duration": {
-            "description": "HPI pulse length",
+            "description": "HPI pulse duration",
             "unit": "ns",
             "value": 32,
             "value_type": "int"

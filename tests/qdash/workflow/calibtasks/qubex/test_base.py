@@ -430,7 +430,7 @@ class TestRestoreCalibrationContext:
         task = ConcreteQubexTask()
         task.input_parameters = {
             "hpi_amplitude": ParameterModel(value=0.12),
-            "hpi_length": ParameterModel(value=32),
+            "hpi_duration": ParameterModel(value=32),
         }
         exp = MagicMock()
         exp.get_qubit_label.return_value = "Q00"
@@ -449,9 +449,9 @@ class TestRestoreCalibrationContext:
         task = ConcreteQubexTask()
         task.input_parameters = {
             "control_hpi_amplitude": ParameterModel(value=0.12),
-            "control_hpi_length": ParameterModel(value=32),
+            "control_hpi_duration": ParameterModel(value=32),
             "target_hpi_amplitude": ParameterModel(value=0.13),
-            "target_hpi_length": ParameterModel(value=36),
+            "target_hpi_duration": ParameterModel(value=36),
         }
         exp = MagicMock()
         exp.get_qubit_label.side_effect = lambda qid: f"Q{qid:02d}"
@@ -506,10 +506,10 @@ class TestRestoreCalibrationContext:
         task = ConcreteQubexTask()
         task.input_parameters = {
             "hpi_amplitude": ParameterModel(value=0.12),
-            "hpi_length": ParameterModel(value=None),
+            "hpi_duration": ParameterModel(value=None),
         }
 
-        with pytest.raises(ValueError, match="hpi_length"):
+        with pytest.raises(ValueError, match="hpi_duration"):
             task._restore_qubit_pulse_context(MagicMock(), "0")
 
     def test_replaces_existing_cr_context_with_qdash_values(self, caplog: Any) -> None:

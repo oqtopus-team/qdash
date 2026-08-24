@@ -51,7 +51,7 @@ Correct cycling pattern over many repetitions with minimal contrast decay.
 
 - qubit_frequency: Loaded from DB
 - hpi_amplitude: Loaded from DB
-- hpi_length: Loaded from DB
+- hpi_duration: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
 - readout_length: Readout pulse length (ns)

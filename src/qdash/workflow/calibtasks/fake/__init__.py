@@ -27,7 +27,7 @@ Dependency Graph:
         │
         ├──> CreateHPIPulse (calibrates half-pi pulse)
         │       ├── input: qubit_frequency
-        │       └── output: hpi_amplitude, hpi_length
+        │       └── output: hpi_amplitude, hpi_duration
         │
         ├──> CheckRabi
         │       ├── input: qubit_frequency
