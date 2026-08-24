@@ -539,50 +539,50 @@
         "file_path": "two_qubit/check_bell_state.py",
         "input_parameters": {
           "cancel_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_amplitude",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "cancel_beta": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_beta",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "cancel_phase": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_phase",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_beta": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_beta",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_length": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_length",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "ns",
             "user_override": "allowed"
           },
@@ -619,26 +619,50 @@
             "user_override": "allowed"
           },
           "cr_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cr_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_beta": {
+            "default_value": null,
+            "parameter_name": "cr_beta",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_duration": {
+            "default_value": null,
+            "parameter_name": "cr_duration",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_phase": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cr_phase",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "cr_ramptime": {
+            "default_value": null,
+            "parameter_name": "cr_ramptime",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "rotary_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "rotary_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
@@ -674,11 +698,19 @@
             "unit": "ns",
             "user_override": "allowed"
           },
+          "zx90_gate_time": {
+            "default_value": null,
+            "parameter_name": "zx90_gate_time",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "zx_rotation_rate": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "zx_rotation_rate",
             "qid_role": "coupling",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           }
@@ -706,50 +738,50 @@
         "file_path": "two_qubit/check_bell_state_tomography.py",
         "input_parameters": {
           "cancel_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_amplitude",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "cancel_beta": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_beta",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "cancel_phase": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_phase",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_beta": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_beta",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_length": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_length",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "ns",
             "user_override": "allowed"
           },
@@ -786,26 +818,50 @@
             "user_override": "allowed"
           },
           "cr_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cr_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_beta": {
+            "default_value": null,
+            "parameter_name": "cr_beta",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_duration": {
+            "default_value": null,
+            "parameter_name": "cr_duration",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_phase": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cr_phase",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "cr_ramptime": {
+            "default_value": null,
+            "parameter_name": "cr_ramptime",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "rotary_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "rotary_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
@@ -841,11 +897,19 @@
             "unit": "ns",
             "user_override": "allowed"
           },
+          "zx90_gate_time": {
+            "default_value": null,
+            "parameter_name": "zx90_gate_time",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "zx_rotation_rate": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "zx_rotation_rate",
             "qid_role": "coupling",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           }
@@ -1051,26 +1115,26 @@
         "file_path": "two_qubit/check_cross_resonance.py",
         "input_parameters": {
           "control_drag_hpi_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_beta": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_beta",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_length": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_length",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "ns",
             "user_override": "allowed"
           },
@@ -2411,50 +2475,50 @@
         "file_path": "two_qubit/check_zx90.py",
         "input_parameters": {
           "cancel_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_amplitude",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "cancel_beta": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_beta",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "cancel_phase": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_phase",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_beta": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_beta",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_length": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_length",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "ns",
             "user_override": "allowed"
           },
@@ -2491,26 +2555,50 @@
             "user_override": "allowed"
           },
           "cr_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cr_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_beta": {
+            "default_value": null,
+            "parameter_name": "cr_beta",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_duration": {
+            "default_value": null,
+            "parameter_name": "cr_duration",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_phase": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cr_phase",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "cr_ramptime": {
+            "default_value": null,
+            "parameter_name": "cr_ramptime",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "rotary_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "rotary_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
@@ -2546,11 +2634,19 @@
             "unit": "ns",
             "user_override": "allowed"
           },
+          "zx90_gate_time": {
+            "default_value": null,
+            "parameter_name": "zx90_gate_time",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "zx_rotation_rate": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "zx_rotation_rate",
             "qid_role": "coupling",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           }
@@ -2622,7 +2718,52 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "maximum_rabi_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_angle": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_distance": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_noise": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_offset": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_phase": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_r2": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_reference_phase": {
             "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
@@ -2678,7 +2819,52 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "maximum_rabi_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_angle": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_distance": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_noise": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_offset": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_phase": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_r2": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_reference_phase": {
             "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
@@ -2734,7 +2920,52 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "maximum_rabi_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_angle": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_distance": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_noise": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_offset": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_phase": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_r2": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_reference_phase": {
             "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
@@ -2790,7 +3021,52 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "maximum_rabi_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_angle": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_distance": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_noise": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_offset": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_phase": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_r2": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "rabi_reference_phase": {
             "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
@@ -2842,50 +3118,50 @@
         "file_path": "two_qubit/create_zx90.py",
         "input_parameters": {
           "cancel_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_amplitude",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "cancel_beta": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_beta",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "cancel_phase": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_phase",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_beta": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_beta",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_length": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_length",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "ns",
             "user_override": "allowed"
           },
@@ -2922,26 +3198,50 @@
             "user_override": "allowed"
           },
           "cr_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cr_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_beta": {
+            "default_value": null,
+            "parameter_name": "cr_beta",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_duration": {
+            "default_value": null,
+            "parameter_name": "cr_duration",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_phase": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cr_phase",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "cr_ramptime": {
+            "default_value": null,
+            "parameter_name": "cr_ramptime",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "rotary_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "rotary_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
@@ -2978,10 +3278,10 @@
             "user_override": "allowed"
           },
           "zx_rotation_rate": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "zx_rotation_rate",
             "qid_role": "coupling",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           }
@@ -3263,50 +3563,50 @@
         "file_path": "benchmark/zx90_interleaved_randoized_benchmarking.py",
         "input_parameters": {
           "cancel_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_amplitude",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "cancel_beta": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_beta",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "cancel_phase": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cancel_phase",
             "qid_role": "target",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_beta": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_beta",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
           "control_drag_hpi_length": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "drag_hpi_length",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "ns",
             "user_override": "allowed"
           },
@@ -3343,26 +3643,50 @@
             "user_override": "allowed"
           },
           "cr_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cr_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_beta": {
+            "default_value": null,
+            "parameter_name": "cr_beta",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_duration": {
+            "default_value": null,
+            "parameter_name": "cr_duration",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_phase": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "cr_phase",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "cr_ramptime": {
+            "default_value": null,
+            "parameter_name": "cr_ramptime",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "rotary_amplitude": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "rotary_amplitude",
             "qid_role": "control",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
@@ -3398,11 +3722,19 @@
             "unit": "ns",
             "user_override": "allowed"
           },
+          "zx90_gate_time": {
+            "default_value": null,
+            "parameter_name": "zx90_gate_time",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "zx_rotation_rate": {
-            "default_value": 0,
+            "default_value": null,
             "parameter_name": "zx_rotation_rate",
             "qid_role": "coupling",
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           }

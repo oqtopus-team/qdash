@@ -47,20 +47,17 @@ class CreateZX90(QubexTask):
             qid_role="control",
             unit="GHz",
         ),
-        "control_drag_hpi_amplitude": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_amplitude": InputParameterSpec.required_database(
             parameter_name="drag_hpi_amplitude",
             qid_role="control",
             unit="a.u.",
         ),
-        "control_drag_hpi_length": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_length": InputParameterSpec.required_database(
             parameter_name="drag_hpi_length",
             qid_role="control",
             unit="ns",
         ),
-        "control_drag_hpi_beta": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_beta": InputParameterSpec.required_database(
             parameter_name="drag_hpi_beta",
             qid_role="control",
             unit="a.u.",
@@ -109,57 +106,71 @@ class CreateZX90(QubexTask):
             unit="ns",
         ),
         # CR parameters (from CheckCrossResonance)
-        "cr_amplitude": InputParameterSpec.database_or_default(
-            default=0,
+        "cr_duration": InputParameterSpec.required_database(
+            parameter_name="cr_duration",
+            qid_role="coupling",
+            unit="ns",
+        ),
+        "cr_amplitude": InputParameterSpec.required_database(
             parameter_name="cr_amplitude",
             qid_role="control",
             unit="a.u.",
         ),
-        "cr_phase": InputParameterSpec.database_or_default(
-            default=0,
+        "cr_phase": InputParameterSpec.required_database(
             parameter_name="cr_phase",
             qid_role="control",
             unit="a.u.",
         ),
-        "cancel_amplitude": InputParameterSpec.database_or_default(
-            default=0,
+        "cr_beta": InputParameterSpec.required_database(
+            parameter_name="cr_beta",
+            qid_role="control",
+            unit="a.u.",
+        ),
+        "cancel_amplitude": InputParameterSpec.required_database(
             parameter_name="cancel_amplitude",
             qid_role="target",
             unit="a.u.",
         ),
-        "cancel_phase": InputParameterSpec.database_or_default(
-            default=0,
+        "cancel_phase": InputParameterSpec.required_database(
             parameter_name="cancel_phase",
             qid_role="target",
             unit="a.u.",
         ),
-        "cancel_beta": InputParameterSpec.database_or_default(
-            default=0,
+        "cancel_beta": InputParameterSpec.required_database(
             parameter_name="cancel_beta",
             qid_role="target",
             unit="a.u.",
         ),
-        "rotary_amplitude": InputParameterSpec.database_or_default(
-            default=0,
+        "rotary_amplitude": InputParameterSpec.required_database(
             parameter_name="rotary_amplitude",
             qid_role="control",
             unit="a.u.",
         ),
-        "zx_rotation_rate": InputParameterSpec.database_or_default(
-            default=0,
+        "zx_rotation_rate": InputParameterSpec.required_database(
             parameter_name="zx_rotation_rate",
             qid_role="coupling",
             unit="a.u.",
+        ),
+        "cr_ramptime": InputParameterSpec.required_database(
+            parameter_name="cr_ramptime",
+            qid_role="coupling",
+            unit="ns",
         ),
     }
 
     # Output parameters with qid_role specifying where each is stored
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "cr_duration": OutputParameterSpec(
+            qid_role="coupling", unit="ns", description="Duration of the CR pulse."
+        ),
         "cr_amplitude": OutputParameterSpec(
             qid_role="control", unit="a.u.", description="Amplitude of the CR pulse."
         ),
         "cr_phase": OutputParameterSpec(
             qid_role="control", unit="a.u.", description="Phase of the CR pulse."
+        ),
+        "cr_beta": OutputParameterSpec(
+            qid_role="control", unit="a.u.", description="Beta of the CR pulse."
         ),
         "cancel_amplitude": OutputParameterSpec(
             qid_role="target", unit="a.u.", description="Amplitude of the cancel pulse."
@@ -179,29 +190,43 @@ class CreateZX90(QubexTask):
         "zx90_gate_time": OutputParameterSpec(
             qid_role="coupling", unit="ns", description="Duration of the ZX90 pulse."
         ),
+        "cr_ramptime": OutputParameterSpec(
+            qid_role="coupling", unit="ns", description="CR pulse ramp time."
+        ),
     }
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         result = run_result.raw_result
+        self.output_parameters["cr_duration"].value = result["cr_duration"]
         self.output_parameters["cr_amplitude"].value = result["cr_amplitude"]
         self.output_parameters["cr_phase"].value = result["cr_phase"]
+        self.output_parameters["cr_beta"].value = result["cr_beta"]
         self.output_parameters["cancel_amplitude"].value = result["cancel_amplitude"]
         self.output_parameters["cancel_phase"].value = result["cancel_phase"]
         self.output_parameters["cancel_beta"].value = result["cancel_beta"]
         self.output_parameters["rotary_amplitude"].value = result["rotary_amplitude"]
         self.output_parameters["zx_rotation_rate"].value = result["zx_rotation_rate"]
         self.output_parameters["zx90_gate_time"].value = result["zx90_gate_time"]
+        self.output_parameters["cr_ramptime"].value = result["cr_ramptime"]
         output_parameters = self.attach_execution_id(execution_id)
         figures: list[Any] = [result["n1"], result["n3"], result["fig"]]
         raw_data: list[Any] = []
         validation_error = first_validation_error(
             finite_value_error(
+                self.output_parameters["cr_duration"].value,
+                f"CreateZX90 cr_duration for {qid}",
+                minimum=0.0,
+            ),
+            finite_value_error(
                 self.output_parameters["cr_amplitude"].value, f"CreateZX90 cr_amplitude for {qid}"
             ),
             finite_value_error(
                 self.output_parameters["cr_phase"].value, f"CreateZX90 cr_phase for {qid}"
+            ),
+            finite_value_error(
+                self.output_parameters["cr_beta"].value, f"CreateZX90 cr_beta for {qid}"
             ),
             finite_value_error(
                 self.output_parameters["cancel_amplitude"].value,
@@ -225,6 +250,10 @@ class CreateZX90(QubexTask):
                 self.output_parameters["zx90_gate_time"].value,
                 f"CreateZX90 zx90_gate_time for {qid}",
                 minimum=0.0,
+            ),
+            finite_value_error(
+                self.output_parameters["cr_ramptime"].value,
+                f"CreateZX90 cr_ramptime for {qid}",
             ),
         )
         return PostProcessResult(
@@ -253,13 +282,16 @@ class CreateZX90(QubexTask):
             err_msg = f"CR parameters for {label} not found."
             raise ValueError(err_msg)
         result = {
+            "cr_duration": fit_result["duration"],
             "cr_amplitude": fit_result["cr_amplitude"],
             "cr_phase": fit_result["cr_phase"],
+            "cr_beta": fit_result["cr_beta"],
             "cancel_amplitude": fit_result["cancel_amplitude"],
             "cancel_phase": fit_result["cancel_phase"],
             "cancel_beta": fit_result["cancel_beta"],
             "rotary_amplitude": fit_result["rotary_amplitude"],
             "zx_rotation_rate": fit_result["zx_rotation_rate"],
+            "cr_ramptime": fit_result["ramptime"],
             "n1": raw_result["n1"]["fig"],
             "n3": raw_result["n3"]["fig"],
             "fig": raw_result["fig"],

@@ -1,4 +1,4 @@
-# Agent calibration
+# Agent Calibration
 
 QDash agent calibration lets a user-operated AI agent run bounded calibration steps while QDash owns execution, deterministic gates, backend application, provenance, and audit records.
 

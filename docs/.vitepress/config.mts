@@ -22,7 +22,10 @@ export default withMermaid(
     base: "/qdash/",
     title: "QDash",
     description: "Qubit Calibration Management Platform",
-    ignoreDeadLinks: true,
+    ignoreDeadLinks: [
+      /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/.*)?$/,
+      /^\.\/(?:box-setup|cw-characterization|td-characterization|one-qubit-gate-calibration|two-qubit-gate-calibration|benchmarking|ChevronPattern)(?:\/|$)/,
+    ],
     head: [
       [
         "link",
@@ -82,7 +85,6 @@ export default withMermaid(
           text: "Getting Started",
           items: [
             { text: "What is QDash", link: "/getting-started/what-is-qdash" },
-            { text: "Quickstart", link: "/getting-started/quick-start" },
             { text: "Architecture", link: "/getting-started/architecture" },
           ],
         },
@@ -106,6 +108,26 @@ export default withMermaid(
               link: "/user-guide/dashboard",
             },
             {
+              text: "Application Tour",
+              link: "/user-guide/application-tour",
+            },
+            {
+              text: "Running Calibrations",
+              link: "/user-guide/running-calibrations",
+            },
+            {
+              text: "Data and Provenance",
+              link: "/user-guide/data-and-provenance",
+            },
+            {
+              text: "Reviewing Results",
+              link: "/user-guide/reviewing-results",
+            },
+            {
+              text: "Copilot and AI Reviews",
+              link: "/user-guide/copilot",
+            },
+            {
               text: "Task Parameters",
               link: "/user-guide/task-parameters",
             },
@@ -125,6 +147,10 @@ export default withMermaid(
               text: "Agent Calibration",
               link: "/user-guide/agent-calibration",
             },
+            {
+              text: "Calibration Data Sharing",
+              link: "/user-guide/calibration-data-sharing",
+            },
           ],
         },
         {
@@ -132,7 +158,7 @@ export default withMermaid(
           collapsed: false,
           items: [
             { text: "Overview", link: "/developer-guide/" },
-            { text: "Setup", link: "/developer-guide/setup" },
+            { text: "Setup", link: "/development/setup" },
             { text: "Codebase", link: "/developer-guide/codebase" },
             { text: "Commands", link: "/developer-guide/commands" },
             { text: "Testing", link: "/developer-guide/testing" },
@@ -143,7 +169,6 @@ export default withMermaid(
           collapsed: true,
           items: [
             { text: "Development Flow", link: "/development/development-flow" },
-            { text: "Full Setup Notes", link: "/development/setup" },
             {
               text: "API",
               collapsed: true,
@@ -176,6 +201,7 @@ export default withMermaid(
               text: "Copilot",
               collapsed: true,
               items: [
+                { text: "Agent Platform", link: "/development/agent-platform" },
                 { text: "Architecture", link: "/development/copilot/architecture" },
                 { text: "AI Review Evals", link: "/development/copilot/ai-review-evals" },
                 { text: "Sandbox", link: "/development/copilot/sandbox" },
@@ -209,6 +235,10 @@ export default withMermaid(
             },
             { text: "Database Indexes", link: "/reference/database-indexes" },
             { text: "Migration to v1.8.0", link: "/reference/migration-v1.8.0" },
+            {
+              text: "Project-Scoped Calibration Migration",
+              link: "/reference/migration-project-scoped-calibration",
+            },
             { text: "OpenAPI", link: "/reference/openapi" },
           ],
         },
@@ -237,6 +267,7 @@ export default withMermaid(
               link: "/architecture/square-lattice-topology",
             },
             { text: "Notes", link: "/architecture/notes" },
+            { text: "Provenance", link: "/architecture/provenance" },
           ],
         },
         {

@@ -1,8 +1,14 @@
 # Operator Setup
 
-QDash can run as a full Docker Compose stack or as a host-side API/UI connected to Docker-backed
-services. Operators normally use the Docker Compose stack; developers usually use the host-side
-stack.
+QDash operators configure the Qubex integration and run the full Docker Compose stack. Host-side
+API and UI processes are documented in [Development Environment Setup](../development/setup.md).
+
+## Clone the Repository
+
+```bash
+git clone https://github.com/oqtopus-team/qdash.git
+cd qdash
+```
 
 ## Qubex Setup
 
@@ -88,7 +94,7 @@ When workflow GitHub push is enabled, QDash can commit updated calibration files
 calibration run.
 
 Complete the Qubex config placement or repository setup before starting services with
-`task deploy-local` or `task dev-local`.
+`task deploy-local`.
 
 ## Full Stack
 
@@ -103,24 +109,6 @@ Open:
 - QDash UI: <http://localhost:5714/login>
 - API docs: <http://localhost:5715/docs>
 - Prefect: <http://localhost:4200>
-
-## Host-Side Stack
-
-For local iteration with API/UI running on the host:
-
-```bash
-task dev-local-setup
-task dev-local
-```
-
-This starts MongoDB, PostgreSQL, Prefect, deployment-service, and user-flow-worker in Docker,
-then runs the API and UI on the host.
-
-Stop the host API/UI processes and Docker Compose services:
-
-```bash
-task dev-local-down
-```
 
 ## Remote Access
 

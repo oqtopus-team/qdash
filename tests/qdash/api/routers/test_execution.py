@@ -1,5 +1,6 @@
 """Tests for execution router endpoints."""
 
+import re
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
@@ -474,7 +475,10 @@ class TestReExecuteFromSnapshot:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["execution_id"] == "new-exec-id"
+        assert data["flow_run_id"] == "new-exec-id"
+        assert data["flow_run_url"].endswith("new-exec-id")
+        assert re.fullmatch(r"\d{8}-\d{3}", data["execution_id"])
+        assert data["qdash_ui_url"].endswith(f"/execution/chip-1/{data['execution_id']}")
         assert "re-execution started" in data["message"]
 
     def test_re_execute_passes_source_execution_id(
@@ -612,6 +616,7 @@ class TestReExecuteFromSnapshot:
         execution.insert()
         mock_re_execute.return_value = {
             "execution_id": "exec-new",
+            "flow_run_id": "run-123",
             "flow_run_url": "http://prefect.local/runs/run-123",
             "qdash_ui_url": "http://qdash.local/executions/exec-new",
             "message": "Flow re-execution started",

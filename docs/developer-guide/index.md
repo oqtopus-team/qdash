@@ -7,7 +7,7 @@ design context or examples.
 
 ## Start Here
 
-- [Setup](./setup.md): get a working local stack.
+- [Setup](../development/setup.md): clone the repository and get a working local stack.
 - [Codebase](./codebase.md): understand where API, UI, workflow, and shared code live.
 - [Commands](./commands.md): use the common `task` commands.
 - [Testing](./testing.md): choose focused checks before opening a PR.

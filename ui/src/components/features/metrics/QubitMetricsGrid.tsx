@@ -7,7 +7,10 @@ import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import { GitBranch, Maximize2, Move } from "lucide-react";
 
-import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
+import {
+  GridFullscreenButton,
+  gridFullscreenPanelClass,
+} from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -644,7 +647,7 @@ export function QubitMetricsGrid({
     <div
       className={
         isFullscreen
-          ? "fixed inset-0 z-[60] flex flex-col h-screen w-screen space-y-2 bg-base-100 p-4 overflow-hidden"
+          ? gridFullscreenPanelClass
           : "flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8"
       }
     >

@@ -1,197 +1,63 @@
 # Projects and Data Sharing
 
-QDash uses a project-based system to organize calibration data and enable collaboration between team members. This guide explains how to create projects, manage team access, and share calibration results.
+A QDash project is the access and storage boundary for chips, calibration state, workflows,
+results, discussions, and files.
 
-## What is a Project?
+## Active Project
 
-A **Project** is a workspace that contains all your calibration data:
+Use the project selector to switch between projects. The active project determines which chips,
+workflows, executions, task results, notes, issues, and files QDash displays or changes. Confirm
+it before starting a calibration or editing shared state.
 
-- Chips and their configurations
-- Qubits and couplings
-- Calibration executions and results
-- Task definitions and parameters
-- Backend configurations
+Every new account receives a default project owned by that user. Users may also belong to other
+projects and switch between them without copying data.
 
-Each piece of data in QDash belongs to exactly one project. When you create a new chip or run a calibration, it is automatically associated with your currently selected project.
+## Project Roles
 
-## Getting Started
+| Role | Access |
+| --- | --- |
+| Viewer | Inspect project data and download available results. |
+| Editor | Viewer access plus operational changes such as running workflows and editing calibration data. |
+| Owner | Editor access plus project settings, membership, categories, ownership transfer, and deletion. |
 
-### Your Default Project
+Each project has one owner. Transfer ownership before the current owner leaves the project.
 
-When you first register for QDash, a default project is automatically created for you. This project is named `{username}'s project` and you are set as the owner.
+## Create and Configure Projects
 
-You can:
+A system administrator creates projects from **Admin** and assigns their owner. Give each project
+a name that identifies the experiment, device, or team; add a description when the boundary is
+not obvious.
 
-- Use this default project for all your work
-- Create additional projects for different experiments or teams
-- Invite collaborators to share your data
+Project owners manage an existing project from **Settings**. They can update its name and
+description, invite existing QDash users, change member roles, remove members, and transfer
+ownership. Assign viewer access for inspection and editor access only when the member needs to
+change shared operational state.
 
-### Switching Projects
+Deleting a project removes its project-scoped records and is not reversible through the UI.
+Review membership, chips, executions, and artifacts before confirming deletion.
 
-Use the project selector in the navigation bar to switch between projects you have access to. The currently active project determines which data you see and can modify.
+## Share Results
 
-## Creating a New Project
+Project members see calibration state and results produced in that project. A task result retains
+the user and execution that produced it, while accepted calibration state is shared by project and
+chip.
 
-1. Click the project selector dropdown in the navigation bar
-2. Select **"Create New Project"**
-3. Enter a project name and optional description
-4. Click **"Create"**
+Before sharing a QDash link, confirm that the recipient belongs to the project. Removing a member
+revokes access but does not delete records that member produced.
 
-You automatically become the owner of any project you create.
+See [Calibration Data Sharing](./calibration-data-sharing.md) for execution snapshots, current
+state, artifact paths, and migration behavior.
 
-## Team Roles and Permissions
+## Programmatic Access
 
-QDash uses a simplified three-role permission model:
-
-| Role       | Capabilities                                                                                       |
-| ---------- | -------------------------------------------------------------------------------------------------- |
-| **Viewer** | View all project data (chips, calibrations, results). Cannot modify anything.                      |
-| **Editor** | Operational write access: create/modify chips, run workflows, edit notes, and update calibration data. |
-| **Owner**  | Project administration plus editor access: manage members, project settings, categories, and deletion. |
-
-### Permission Summary
-
-| Action                          | Viewer | Editor | Owner |
-| ------------------------------- | :----: | :----: | :---: |
-| View chips and calibration data |   ✅   |   ✅   |  ✅   |
-| View execution history          |   ✅   |   ✅   |  ✅   |
-| Download results                |   ✅   |   ✅   |  ✅   |
-| Create/modify chips             |   ❌   |   ✅   |  ✅   |
-| Run calibrations                |   ❌   |   ✅   |  ✅   |
-| Update parameters               |   ❌   |   ✅   |  ✅   |
-| Edit notes                      |   ❌   |   ✅   |  ✅   |
-| Manage forum categories         |   ❌   |   ❌   |  ✅   |
-| Invite or remove members        |   ❌   |   ❌   |  ✅   |
-| Delete project                  |   ❌   |   ❌   |  ✅   |
-| Transfer ownership              |   ❌   |   ❌   |  ✅   |
-
-## Inviting Team Members
-
-As a project owner, you can invite other QDash users to collaborate:
-
-1. Open **Project Settings** from the project selector menu
-2. Go to the **Members** tab
-3. Click **"Invite Member"**
-4. Enter the username of the person you want to invite
-5. Click **"Send Invitation"**
-
-Choose **Viewer** for read-only access or **Editor** for operational work. The invited user sees the project in their project list immediately.
-
-### Managing Members
-
-From the Members tab, owners can:
-
-- **Assign roles**: Choose Viewer or Editor access for each member
-- **Remove members**: Revoke a user's access to the project
-- **Transfer ownership**: Make another member the owner. The previous owner remains an Editor.
-
-## Sharing Calibration Results
-
-Once you have team members in your project, sharing is automatic. Current calibration state is
-shared by project and chip, while each result remains associated with the user and execution that
-produced it. See [Calibration Data Sharing](./calibration-data-sharing.md) for the ownership model,
-execution behavior, and artifact layout.
-
-To share calibration results:
-
-1. **Run a calibration** in your project
-2. **All members can view** the results
-3. **Viewers** can see and download data
-4. **Editors and Owners** can modify and re-run calibrations
-
-### Best Practices for Sharing
-
-- Invite team members as **Viewers** when they only need to inspect results
-- Use **Editor** for users who need to run workflows or update calibration data
-- Keep **Owner** limited to users who should manage project membership and settings
-- Create **separate projects** for different experiments or teams
-- Use **descriptive project names** to keep things organized
-
-## API Access
-
-When accessing QDash programmatically, include the project context in your requests:
-
-### Required Headers
+Use the [QDash Client](./qdash-client.md) for scripts and agents. Select a saved profile and pass
+the project through its configuration or client API. Low-level API integrations must send both a
+bearer token and the project header:
 
 ```http
-Authorization: Bearer <your-access-token>
+Authorization: Bearer <access-token>
 X-Project-Id: <project-id>
 ```
 
-### Example: List Chips in a Project
-
-```bash
-curl -X GET "https://your-qdash-instance/chips" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "X-Project-Id: your-project-id"
-```
-
-## Workflow Integration
-
-When running calibration workflows, specify the project context:
-
-```python
-from prefect import flow
-from qdash.workflow.helpers import init_calibration, finish_calibration
-
-@flow
-def my_calibration(username, chip_id, qids, project_id):
-    session = init_calibration(
-        username=username,
-        chip_id=chip_id,
-        qids=qids,
-        project_id=project_id,  # Associate with project
-    )
-
-    # ... run calibration tasks ...
-
-    finish_calibration()
-```
-
-All results from this workflow will be stored in the specified project and visible to all project members.
-
-## Project Settings
-
-Access project settings from the project selector menu:
-
-### General Settings
-
-- **Project Name**: Display name for the project
-- **Description**: Optional description of the project's purpose
-
-### Danger Zone
-
-- **Delete Project**: Permanently delete the project and all its data
-  - Only the owner can delete a project
-  - This action cannot be undone
-  - All chips, calibrations, and results will be permanently removed
-
-## Frequently Asked Questions
-
-### Can I be a member of multiple projects?
-
-Yes! You can belong to as many projects as you need. Use the project selector to switch between them.
-
-### What happens to my data if I leave a project?
-
-Your access is revoked, but the data remains in the project. You will no longer be able to view or modify it.
-
-### Can I move data between projects?
-
-Currently, data cannot be moved between projects. You would need to re-create the chip and re-run calibrations in the new project.
-
-### What happens if the owner leaves?
-
-Before leaving, the owner must transfer ownership to another member. A project cannot exist without an owner.
-
-### Can I have multiple owners?
-
-No, each project has exactly one owner. If another user needs write access without project administration, assign them the Editor role.
-
-### How do I find my project ID?
-
-Your project ID is shown in:
-
-- Project Settings page
-- URL when viewing project details
-- API responses
+The project ID is available in **Settings** and project API responses. Data cannot be moved
+between projects as a normal UI operation; create or import it in the intended project instead.

@@ -1763,7 +1763,7 @@ if __name__ == "__main__":
     project_calibration_parser.add_argument(
         "--allow-missing-artifacts",
         action="store_true",
-        help="Complete migration despite reviewed legacy execution directories being missing",
+        help="Mark missing legacy execution artifacts as reviewed in the migration report",
     )
 
     args = parser.parse_args()

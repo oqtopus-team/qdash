@@ -17,26 +17,20 @@ hero:
       text: Developer Guide
       link: /developer-guide/
     - theme: alt
-      text: Quick Start
-      link: /getting-started/quick-start
+      text: Set Up QDash
+      link: /operator-guide/setup
 
 features:
-  - icon: ⚡
-    title: Workflow Management
-    details: Centrally manage and track calibration workflows from creation to completion with real-time progress monitoring.
-  - icon: 📊
-    title: Data Analysis
-    details: Access and analyze observational data with built-in visualization tools, time-series analysis, and CSV export.
-  - icon: ⚙️
-    title: Parameter Control
-    details: Configure calibration parameters and adjust workflow settings to meet specific experimental requirements.
-  - icon: 🔐
-    title: Secure Authentication
-    details: JWT-based authentication with admin-controlled signup and role-based access management.
-  - icon: 👥
-    title: Team Collaboration
-    details: Share projects and calibration data across team members with flexible permission controls.
-  - icon: 🔄
-    title: Remote Access
-    details: Access your calibration platform securely from anywhere via Cloudflare Tunnel integration.
+  - title: Run Calibrations
+    details: Create, schedule, and monitor project workflows or run an individual task from the workbench.
+    link: /user-guide/running-calibrations
+  - title: Inspect Calibration State
+    details: Compare chip metrics, task results, raw artifacts, parameter history, and provenance.
+    link: /user-guide/data-and-provenance
+  - title: Collaborate on Results
+    details: Connect notes, issues, forum discussions, knowledge cases, notifications, and AI reviews.
+    link: /user-guide/reviewing-results
+  - title: Share by Project
+    details: Keep workflows, calibration data, files, and membership within an explicit project boundary.
+    link: /user-guide/projects-and-sharing
 ---

@@ -29,7 +29,10 @@ import {
 } from "@/components/features/chip/DownloadConfirmModal";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CouplingTaskHistoryModal } from "@/components/features/chip/modals/CouplingTaskHistoryModal";
-import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
+import {
+  GridFullscreenButton,
+  gridFullscreenPanelClass,
+} from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
@@ -373,7 +376,7 @@ export function CouplingGrid({
   const errorDetail = requestErrorMessage(error);
 
   const containerClass = isFullscreen
-    ? "fixed inset-0 z-[60] flex flex-col h-screen w-screen space-y-2 bg-base-100 p-4 overflow-hidden"
+    ? gridFullscreenPanelClass
     : "flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8";
 
   if (isLoading)

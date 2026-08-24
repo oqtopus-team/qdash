@@ -4,11 +4,8 @@ layout: doc
 
 # What is QDash?
 
-QDash is a comprehensive web platform for managing and monitoring qubit calibration workflows. It provides a user-friendly interface to manage calibration processes, track observational data, and configure calibration parameters seamlessly.
-
-::: warning
-QDash is currently under development. Please check back later for updates.
-:::
+QDash is a web platform for operating qubit calibration workflows, inspecting calibration state,
+and sharing results within a project.
 
 ## Concept
 
@@ -16,7 +13,7 @@ To improve the accuracy of qubit calibration, it is essential to consolidate and
 
 ## Architecture
 
-QDash follows a microservices architecture with three major components:
+QDash has three main application components:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -34,25 +31,15 @@ QDash follows a microservices architecture with three major components:
 
 ## Key Features
 
-### Core Features
-
-- **⚡ Workflows**: Centrally manage and track the progress of calibration workflows, from creation to completion.
-
-- **📊 Observations**: Access and analyze the observational data utilized in calibration processes, ensuring transparency and insight.
-
-- **⚙️ Settings**: Configure calibration parameters and adjust workflow settings to meet specific requirements seamlessly.
-
-### Advanced Features
-
-- **🔐 Authentication**: Secure user authentication with admin-only signup and JWT-based session management.
-
-- **👥 Project Sharing**: Collaborate with team members by sharing projects and calibration data across users.
-
-- **🐍 Python Flow Editor**: High-level Python API for creating custom calibration workflows with parallel execution support.
-
-- **📈 Analysis Tools**: Time-series visualization, parameter correlation analysis, and CSV export functionality.
-
-- **🔄 Remote Access**: Secure remote access via Cloudflare Tunnel integration.
+- **Calibration operation**: Create, schedule, and monitor workflows, or run one task from the
+  task workbench.
+- **State inspection**: Review chip topology, configured metrics, task results, artifacts,
+  time-series data, and parameter provenance.
+- **Project collaboration**: Share calibration state and files through explicit project roles,
+  notes, issues, forum discussions, notifications, and knowledge cases.
+- **Assisted analysis**: Use project-aware chat and AI review runs as supporting evidence during
+  result analysis.
+- **Client access**: Integrate through the REST API or the generated Python and TypeScript clients.
 
 ## Screenshots
 
@@ -73,7 +60,7 @@ Here are some screenshots of QDash in action:
 ### Backend
 
 - **Framework**: FastAPI
-- **Language**: Python 3.11-3.12
+- **Language**: Python 3.10-3.12
 - **Database**: MongoDB (Bunnet ODM), PostgreSQL
 - **Authentication**: JWT
 
@@ -82,8 +69,8 @@ Here are some screenshots of QDash in action:
 - **Orchestration**: Prefect 3
 - **Quantum Library**: qubex
 
-## Learn More
-
-- [Quick Start](./quick-start.md) - Get started with QDash
-- [Architecture](./architecture.md) - Detailed architecture overview
-- [Database Structure](/reference/database-structure.md) - Database schema reference
+Use [Operator Setup](../operator-guide/setup.md) to deploy QDash or
+[Developer Setup](../development/setup.md) to prepare a development environment. The
+[Application Tour](../user-guide/application-tour.md) maps the available features, while the
+[Architecture](./architecture.md) and [Database Structure](../reference/database-structure.md)
+describe the implementation.

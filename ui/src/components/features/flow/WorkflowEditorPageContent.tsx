@@ -122,6 +122,7 @@ export function WorkflowEditorPageContent() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
   const [lastExecutionId, setLastExecutionId] = useState<string | null>(null);
+  const [lastFlowRunId, setLastFlowRunId] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
@@ -195,6 +196,7 @@ export function WorkflowEditorPageContent() {
       onSuccess: (response: AxiosResponse<ExecuteFlowResponse>) => {
         const execId = response.data.execution_id || null;
         setLastExecutionId(execId);
+        setLastFlowRunId(response.data.flow_run_id || null);
         toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`);
       },
     },
@@ -205,6 +207,7 @@ export function WorkflowEditorPageContent() {
       onSuccess: () => {
         toast.success("Cancellation requested successfully");
         setLastExecutionId(null);
+        setLastFlowRunId(null);
       },
       onError: (error: unknown) => {
         const detail =
@@ -215,7 +218,7 @@ export function WorkflowEditorPageContent() {
     },
   });
 
-  const canCancel = !!lastExecutionId && !!lockStatus?.data.lock;
+  const canCancel = !!lastFlowRunId && !!lockStatus?.data.lock;
   useEffect(() => {
     if (data?.data) {
       const flow = data.data;
@@ -768,9 +771,7 @@ export function WorkflowEditorPageContent() {
             </button>
             {canCancel && (
               <button
-                onClick={() =>
-                  lastExecutionId && cancelMutation.mutate({ flowRunId: lastExecutionId })
-                }
+                onClick={() => lastFlowRunId && cancelMutation.mutate({ flowRunId: lastFlowRunId })}
                 className="btn btn-sm btn-error btn-outline"
                 disabled={cancelMutation.isPending}
                 title="Cancel the running execution"
@@ -1451,9 +1452,7 @@ export function WorkflowEditorPageContent() {
                 Cancel
               </span>
               <button
-                onClick={() =>
-                  lastExecutionId && cancelMutation.mutate({ flowRunId: lastExecutionId })
-                }
+                onClick={() => lastFlowRunId && cancelMutation.mutate({ flowRunId: lastFlowRunId })}
                 className="btn btn-circle btn-error btn-outline shadow-lg"
                 disabled={cancelMutation.isPending}
               >

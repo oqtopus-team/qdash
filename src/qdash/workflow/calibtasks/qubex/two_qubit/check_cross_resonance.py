@@ -49,20 +49,17 @@ class CheckCrossResonance(QubexTask):
             qid_role="control",
             unit="GHz",
         ),
-        "control_drag_hpi_amplitude": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_amplitude": InputParameterSpec.required_database(
             parameter_name="drag_hpi_amplitude",
             qid_role="control",
             unit="a.u.",
         ),
-        "control_drag_hpi_length": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_length": InputParameterSpec.required_database(
             parameter_name="drag_hpi_length",
             qid_role="control",
             unit="ns",
         ),
-        "control_drag_hpi_beta": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_beta": InputParameterSpec.required_database(
             parameter_name="drag_hpi_beta",
             qid_role="control",
             unit="a.u.",
@@ -114,11 +111,17 @@ class CheckCrossResonance(QubexTask):
 
     # Output parameters with qid_role specifying where each is stored
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "cr_duration": OutputParameterSpec(
+            qid_role="coupling", unit="ns", description="Duration of the CR pulse."
+        ),
         "cr_amplitude": OutputParameterSpec(
             qid_role="control", unit="a.u.", description="Amplitude of the CR pulse."
         ),
         "cr_phase": OutputParameterSpec(
             qid_role="control", unit="a.u.", description="Phase of the CR pulse."
+        ),
+        "cr_beta": OutputParameterSpec(
+            qid_role="control", unit="a.u.", description="Beta of the CR pulse."
         ),
         "cancel_amplitude": OutputParameterSpec(
             qid_role="target", unit="a.u.", description="Amplitude of the cancel pulse."
@@ -134,6 +137,9 @@ class CheckCrossResonance(QubexTask):
         ),
         "zx_rotation_rate": OutputParameterSpec(
             qid_role="coupling", unit="a.u.", description="ZX rotation rate."
+        ),
+        "cr_ramptime": OutputParameterSpec(
+            qid_role="coupling", unit="ns", description="CR pulse ramp time."
         ),
     }
 
@@ -164,13 +170,16 @@ class CheckCrossResonance(QubexTask):
             [exp.get_qubit_label(int(q)) for q in qid.split("-")]
         )  # e.g., "0-1" → "Q00-Q01"
         result = run_result.raw_result
+        self.output_parameters["cr_duration"].value = result["cr_duration"]
         self.output_parameters["cr_amplitude"].value = result["cr_amplitude"]
         self.output_parameters["cr_phase"].value = result["cr_phase"]
+        self.output_parameters["cr_beta"].value = result["cr_beta"]
         self.output_parameters["cancel_amplitude"].value = result["cancel_amplitude"]
         self.output_parameters["cancel_phase"].value = result["cancel_phase"]
         self.output_parameters["cancel_beta"].value = result["cancel_beta"]
         self.output_parameters["rotary_amplitude"].value = result["rotary_amplitude"]
         self.output_parameters["zx_rotation_rate"].value = result["zx_rotation_rate"]
+        self.output_parameters["cr_ramptime"].value = result["cr_ramptime"]
 
         output_parameters = self.attach_execution_id(execution_id)
         fig = self._plot_coeffs_history(result["coeffs_history"], label=label)
@@ -181,12 +190,21 @@ class CheckCrossResonance(QubexTask):
         raw_data: list[Any] = []
         validation_error = first_validation_error(
             finite_value_error(
+                self.output_parameters["cr_duration"].value,
+                f"CheckCrossResonance cr_duration for {label}",
+                minimum=0.0,
+            ),
+            finite_value_error(
                 self.output_parameters["cr_amplitude"].value,
                 f"CheckCrossResonance cr_amplitude for {label}",
             ),
             finite_value_error(
                 self.output_parameters["cr_phase"].value,
                 f"CheckCrossResonance cr_phase for {label}",
+            ),
+            finite_value_error(
+                self.output_parameters["cr_beta"].value,
+                f"CheckCrossResonance cr_beta for {label}",
             ),
             finite_value_error(
                 self.output_parameters["cancel_amplitude"].value,
@@ -207,6 +225,10 @@ class CheckCrossResonance(QubexTask):
             finite_value_error(
                 self.output_parameters["zx_rotation_rate"].value,
                 f"CheckCrossResonance zx_rotation_rate for {label}",
+            ),
+            finite_value_error(
+                self.output_parameters["cr_ramptime"].value,
+                f"CheckCrossResonance cr_ramptime for {label}",
             ),
         )
         return PostProcessResult(
@@ -236,13 +258,16 @@ class CheckCrossResonance(QubexTask):
             error_message = "Fit result is None."
             raise ValueError(error_message)
         result = {
+            "cr_duration": fit_result["duration"],
             "cr_amplitude": fit_result["cr_amplitude"],
             "cr_phase": fit_result["cr_phase"],
+            "cr_beta": fit_result["cr_beta"],
             "cancel_amplitude": fit_result["cancel_amplitude"],
             "cancel_phase": fit_result["cancel_phase"],
             "cancel_beta": fit_result["cancel_beta"],
             "rotary_amplitude": fit_result["rotary_amplitude"],
             "zx_rotation_rate": fit_result["zx_rotation_rate"],
+            "cr_ramptime": fit_result["ramptime"],
             "coeffs_history": raw_result["coeffs_history"],
             "figs_history": raw_result.data["figs_history"],
         }
