@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 from prefect import get_run_logger
 
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
-from qdash.workflow.service.results import TwoQubitResult
+from qdash.workflow.service.results import TwoQubitResult, normalize_metric_value
 from qdash.workflow.service.steps.base import CalibrationStep, TransformStep
 from qdash.workflow.service.tasks import FULL_2Q_TASKS
 
@@ -529,24 +529,18 @@ class TwoQubitCalibration(CalibrationStep):
         zx_irb = raw.get("ZX90InterleavedRandomizedBenchmarking", {})
         if zx_irb:
             fidelity_param = zx_irb.get("zx90_gate_fidelity")
-            if fidelity_param is not None:
-                metrics["zx90_fidelity"] = (
-                    fidelity_param.value if hasattr(fidelity_param, "value") else fidelity_param
-                )
+            if (value := normalize_metric_value(fidelity_param)) is not None:
+                metrics["zx90_fidelity"] = value
         # Bell fidelity
         bell_result = raw.get("CheckBellState", {})
         if bell_result:
             fidelity_param = bell_result.get("bell_fidelity")
-            if fidelity_param is not None:
-                metrics["bell_fidelity"] = (
-                    fidelity_param.value if hasattr(fidelity_param, "value") else fidelity_param
-                )
+            if (value := normalize_metric_value(fidelity_param)) is not None:
+                metrics["bell_fidelity"] = value
         # 2Q gate coherence limit
         coh_result = raw.get("Check2QGateCoherenceLimit", {})
         if coh_result:
             coh_param = coh_result.get("two_qubit_gate_coherence_limit")
-            if coh_param is not None:
-                metrics["two_qubit_gate_coherence_limit"] = (
-                    coh_param.value if hasattr(coh_param, "value") else coh_param
-                )
+            if (value := normalize_metric_value(coh_param)) is not None:
+                metrics["two_qubit_gate_coherence_limit"] = value
         return metrics

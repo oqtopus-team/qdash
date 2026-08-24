@@ -16,8 +16,8 @@
 | Tool                                        | Version   | Description                          |
 | ------------------------------------------- | --------- | ------------------------------------ |
 | [Python](https://www.python.org/downloads/) | 3.11-3.12 | Backend development                  |
-| [Bun](https://bun.sh/)                      | 1.0+      | Frontend package manager and runtime |
-| [Node.js](https://nodejs.org/)              | 20+       | Alternative frontend runtime         |
+| [Bun](https://bun.sh/)                      | 1.4.0+    | Frontend package manager and runtime |
+| [Node.js](https://nodejs.org/)              | 24+       | Alternative frontend runtime         |
 
 ## Getting Started
 
@@ -91,7 +91,7 @@ Install [Nix](https://nixos.org/download/) with flakes enabled, then enter the d
 nix develop
 ```
 
-The shell provides Python 3.11, uv, Bun, Node.js 20, go-task, Docker CLI/Compose, jq, PostgreSQL
+The shell provides Python 3.11, uv, Bun, Node.js 24, go-task, Docker CLI/Compose, jq, PostgreSQL
 client tools, and the secret scanning tools used by the project. It also sets `UV_PYTHON` to the
 Nix-provided Python 3.11 so `uv sync` does not accidentally select Python 3.12 on macOS, where
 some workflow backend dependencies may fail to build. It does not start MongoDB, PostgreSQL,

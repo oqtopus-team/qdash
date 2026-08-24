@@ -47,6 +47,10 @@ class TaskProtocol(Protocol):
         """Run preprocessing."""
         ...
 
+    def prepare_run(self, backend: Any, qid: str) -> None:
+        """Apply resolved inputs immediately before task execution."""
+        ...
+
     def run(self, backend: Any, qid: str) -> RunResult | None:
         """Run the task."""
         ...

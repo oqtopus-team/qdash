@@ -19,11 +19,13 @@ REPO_QUBEX_CONFIG_BASE = Path("config/qubex-config")
 
 
 def _env_path(name: str) -> Path | None:
+    """Resolve the env var to an absolute Path, or None if it is unset."""
     value = os.getenv(name)
     return Path(value).expanduser().resolve() if value else None
 
 
 def _first_existing_env_path(*names: str) -> Path | None:
+    """Return the resolved path of the first env var whose path exists, or None."""
     for name in names:
         env_value = _env_path(name)
         if env_value is not None and env_value.exists():
@@ -119,3 +121,30 @@ def resolve_calib_data_path(path: str | Path) -> Path:
     local_base = Path(os.getenv("CALIB_DATA_PATH", "calib_data")).expanduser()
     mapped = local_base / relative_path
     return mapped if mapped.exists() else candidate
+
+
+def execution_calib_data_dir(username: str, execution_id: str) -> Path:
+    """Resolve the calibration data directory for a specific execution.
+
+    Equivalent to ``PathResolver.execution_data_dir`` in
+    ``qdash.workflow.paths``, but usable from modules that should not depend
+    on the workflow package.
+
+    Args:
+        username: Username the execution belongs to
+        execution_id: Execution ID in the format "YYYYMMDD-NNN"
+
+    Returns:
+        Path to the execution's calibration data directory
+        (``CALIB_DATA_BASE / username / date_str / index``).
+
+    Raises:
+        ValueError: If execution_id does not contain a "-" separator.
+
+    """
+    date_str, separator, index = execution_id.partition("-")
+    if not separator:
+        raise ValueError(
+            f"execution_id must be in the format 'YYYYMMDD-NNN', got: {execution_id!r}"
+        )
+    return CALIB_DATA_BASE / username / date_str / index

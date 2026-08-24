@@ -39,6 +39,14 @@ try:
 except ImportError:
     _DASK_AVAILABLE = False
     DaskTaskRunner = None
+except Exception as exc:
+    # psutil can observe a stale container PID while Dask determines CPU
+    # affinity during import. Treat that environment race like an unavailable
+    # optional runner, while allowing unrelated import failures to surface.
+    if type(exc).__name__ != "NoSuchProcess":
+        raise
+    _DASK_AVAILABLE = False
+    DaskTaskRunner = None
 
 if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService

@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
-from qdash.workflow.service.results import OneQubitResult
+from qdash.workflow.service.results import OneQubitResult, normalize_metric_value
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import BRINGUP_TASKS, EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS
 
@@ -214,15 +214,11 @@ class BringUp(CalibrationStep):
             freq_param = reso_result.get("readout_frequency") or reso_result.get(
                 "estimated_resonator_frequency"
             )
-            if freq_param is not None:
-                metrics["readout_frequency"] = (
-                    freq_param.value if hasattr(freq_param, "value") else freq_param
-                )
+            if (value := normalize_metric_value(freq_param)) is not None:
+                metrics["readout_frequency"] = value
             amp_param = reso_result.get("readout_amplitude")
-            if amp_param is not None:
-                metrics["readout_amplitude"] = (
-                    amp_param.value if hasattr(amp_param, "value") else amp_param
-                )
+            if (value := normalize_metric_value(amp_param)) is not None:
+                metrics["readout_amplitude"] = value
 
         # Coarse qubit frequency and anharmonicity from CheckQubitSpectroscopy
         qubit_result = raw.get("CheckQubitSpectroscopy", {}) or raw.get(
@@ -232,31 +228,21 @@ class BringUp(CalibrationStep):
             # Coarse qubit frequency (f01) — proper qubit_frequency comes from
             # CheckChevron's adaptive chevron fit.
             qubit_freq_param = qubit_result.get("coarse_qubit_frequency")
-            if qubit_freq_param is not None:
-                metrics["coarse_qubit_frequency"] = (
-                    qubit_freq_param.value
-                    if hasattr(qubit_freq_param, "value")
-                    else qubit_freq_param
-                )
+            if (value := normalize_metric_value(qubit_freq_param)) is not None:
+                metrics["coarse_qubit_frequency"] = value
 
             # Anharmonicity (α = f12 - f01)
             anharm_param = qubit_result.get("anharmonicity")
-            if anharm_param is not None:
-                value = anharm_param.value if hasattr(anharm_param, "value") else anharm_param
-                if value is not None:
-                    metrics["anharmonicity"] = value
+            if (value := normalize_metric_value(anharm_param)) is not None:
+                metrics["anharmonicity"] = value
 
         # Proper qubit frequency from CheckChevron. Keep CheckCoarseChevron as
         # a fallback so older persisted results still render metrics.
         chevron_result = raw.get("CheckChevron", {}) or raw.get("CheckCoarseChevron", {})
         if chevron_result and not chevron_result.get("skipped", False):
             qubit_freq_param = chevron_result.get("qubit_frequency")
-            if qubit_freq_param is not None:
-                metrics["qubit_frequency"] = (
-                    qubit_freq_param.value
-                    if hasattr(qubit_freq_param, "value")
-                    else qubit_freq_param
-                )
+            if (value := normalize_metric_value(qubit_freq_param)) is not None:
+                metrics["qubit_frequency"] = value
 
         return metrics
 

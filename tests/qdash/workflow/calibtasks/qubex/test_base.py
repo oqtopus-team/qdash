@@ -1,7 +1,7 @@
 """Tests for QubexTask._load_parameters_from_db."""
 
 from typing import Any, ClassVar, cast
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -421,3 +421,157 @@ class TestLoadParametersFromDbCouplingTask:
         p4 = task.input_parameters["cr_amplitude"]
         assert p4 is not None
         assert p4.value == 0.3
+
+
+class TestRestoreCalibrationContext:
+    """Test synchronization from resolved task inputs to Qubex context."""
+
+    def test_restores_hpi_pulse_from_resolved_inputs(self) -> None:
+        task = ConcreteQubexTask()
+        task.input_parameters = {
+            "hpi_amplitude": ParameterModel(value=0.12),
+            "hpi_length": ParameterModel(value=32),
+        }
+        exp = MagicMock()
+        exp.get_qubit_label.return_value = "Q00"
+        backend = MagicMock()
+        backend.get_instance.return_value = exp
+
+        task._restore_qubit_pulse_context(backend, "0")
+
+        exp.calib_note.update_hpi_param.assert_called_once()
+        label, pulse = exp.calib_note.update_hpi_param.call_args.args
+        assert label == "Q00"
+        assert pulse["amplitude"] == 0.12
+        assert pulse["duration"] == 32
+
+    def test_restores_two_qubit_pulses_using_each_qubit_id(self) -> None:
+        task = ConcreteQubexTask()
+        task.input_parameters = {
+            "control_hpi_amplitude": ParameterModel(value=0.12),
+            "control_hpi_length": ParameterModel(value=32),
+            "target_hpi_amplitude": ParameterModel(value=0.13),
+            "target_hpi_length": ParameterModel(value=36),
+        }
+        exp = MagicMock()
+        exp.get_qubit_label.side_effect = lambda qid: f"Q{qid:02d}"
+        backend = MagicMock()
+        backend.get_instance.return_value = exp
+
+        task._restore_qubit_pulse_context(backend, "72-73")
+
+        assert exp.get_qubit_label.call_args_list == [call(72), call(73)]
+        assert exp.calib_note.update_hpi_param.call_count == 2
+        control_call, target_call = exp.calib_note.update_hpi_param.call_args_list
+        assert control_call.args[0] == "Q72"
+        assert control_call.args[1]["amplitude"] == 0.12
+        assert target_call.args[0] == "Q73"
+        assert target_call.args[1]["amplitude"] == 0.13
+
+    def test_restores_cr_context_from_resolved_inputs(self) -> None:
+        task = ConcreteQubexTask()
+        task.input_parameters = {
+            name: ParameterModel(value=value)
+            for name, value in {
+                "cr_duration": 192.0,
+                "cr_amplitude": 0.2,
+                "cr_phase": 0.1,
+                "cr_beta": 0.25,
+                "cancel_amplitude": 0.03,
+                "cancel_phase": -0.2,
+                "cancel_beta": 0.0,
+                "rotary_amplitude": 0.04,
+                "zx_rotation_rate": 0.005,
+                "cr_ramptime": 16.0,
+            }.items()
+        }
+        exp = MagicMock()
+        exp.get_qubit_label.side_effect = lambda qid: f"Q0{qid}"
+        exp.calib_note.get_cr_param.return_value = None
+        backend = MagicMock()
+        backend.get_instance.return_value = exp
+
+        task._restore_cr_context(backend, "0-1")
+
+        exp.calib_note.update_cr_param.assert_called_once()
+        label, cr_param = exp.calib_note.update_cr_param.call_args.args
+        assert label == "Q00-Q01"
+        assert cr_param["cr_amplitude"] == 0.2
+        assert cr_param["duration"] == 192.0
+        assert cr_param["cr_beta"] == 0.25
+        assert cr_param["zx_rotation_rate"] == 0.005
+        assert cr_param["ramptime"] == 16.0
+
+    def test_partial_context_group_fails_explicitly(self) -> None:
+        task = ConcreteQubexTask()
+        task.input_parameters = {
+            "hpi_amplitude": ParameterModel(value=0.12),
+            "hpi_length": ParameterModel(value=None),
+        }
+
+        with pytest.raises(ValueError, match="hpi_length"):
+            task._restore_qubit_pulse_context(MagicMock(), "0")
+
+    def test_replaces_existing_cr_context_with_qdash_values(self, caplog: Any) -> None:
+        task = ConcreteQubexTask()
+        task.input_parameters = {
+            name: ParameterModel(value=value)
+            for name, value in {
+                "cr_duration": 192.0,
+                "cr_amplitude": 0.2,
+                "cr_phase": 0.1,
+                "cr_beta": 0.25,
+                "cancel_amplitude": 0.03,
+                "cancel_phase": -0.2,
+                "cancel_beta": 0.0,
+                "rotary_amplitude": 0.04,
+                "zx_rotation_rate": 0.005,
+                "cr_ramptime": 16.0,
+                "zx90_gate_time": 192.0,
+            }.items()
+        }
+        exp = MagicMock()
+        exp.get_qubit_label.side_effect = lambda qid: f"Q0{qid}"
+        existing_context = {"duration": 96.0, "cr_beta": 0.25}
+        exp.calib_note.get_cr_param.return_value = existing_context
+        backend = MagicMock()
+        backend.get_instance.return_value = exp
+
+        task._restore_cr_context(backend, "0-1")
+
+        exp.calib_note.get_cr_param.assert_called_once_with("Q00-Q01")
+        restored_context = exp.calib_note.update_cr_param.call_args.args[1]
+        assert restored_context["duration"] == 192.0
+        assert restored_context["cr_beta"] == 0.25
+        assert "Replacing Qubex CR context for Q00-Q01" in caplog.text
+
+    def test_restores_cr_context_when_qubex_context_is_missing(self) -> None:
+        task = ConcreteQubexTask()
+        task.input_parameters = {
+            name: ParameterModel(value=value)
+            for name, value in {
+                "cr_duration": 192.0,
+                "cr_amplitude": 0.2,
+                "cr_phase": 0.1,
+                "cr_beta": 0.25,
+                "cancel_amplitude": 0.03,
+                "cancel_phase": -0.2,
+                "cancel_beta": 0.0,
+                "rotary_amplitude": 0.04,
+                "zx_rotation_rate": 0.005,
+                "cr_ramptime": 16.0,
+                "zx90_gate_time": 192.0,
+            }.items()
+        }
+        exp = MagicMock()
+        exp.get_qubit_label.side_effect = lambda qid: f"Q0{qid}"
+        exp.calib_note.get_cr_param.return_value = None
+        backend = MagicMock()
+        backend.get_instance.return_value = exp
+
+        task._restore_cr_context(backend, "0-1")
+
+        restored_context = exp.calib_note.update_cr_param.call_args.args[1]
+        assert restored_context["duration"] == 192.0
+        assert restored_context["cr_beta"] == 0.25
+        assert restored_context["ramptime"] == 16.0

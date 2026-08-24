@@ -27,6 +27,15 @@ class CreatePIPulse(QubexTask):
         "control_amplitude": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
+        "rabi_amplitude": InputParameterSpec.required_database(),
+        "rabi_phase": InputParameterSpec.required_database(),
+        "rabi_offset": InputParameterSpec.required_database(),
+        "rabi_angle": InputParameterSpec.required_database(),
+        "rabi_noise": InputParameterSpec.required_database(),
+        "rabi_distance": InputParameterSpec.required_database(),
+        "rabi_reference_phase": InputParameterSpec.required_database(),
+        "rabi_r2": InputParameterSpec.required_database(),
+        "maximum_rabi_frequency": InputParameterSpec.required_database(),
         "readout_length": InputParameterSpec.database_or_default(
             default=DEFAULT_READOUT_DURATION,
             unit="ns",
@@ -87,6 +96,7 @@ class CreatePIPulse(QubexTask):
         control_amp_param = self.input_parameters["control_amplitude"]
         if control_amp_param is not None:
             exp.params.control_amplitude[labels[0]] = control_amp_param.value
+        self._restore_rabi_context(backend, qid)
         result = exp.calibrate_pi_pulse(
             targets=labels,
             n_rotations=1,

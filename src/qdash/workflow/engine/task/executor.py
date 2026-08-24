@@ -152,6 +152,15 @@ class TaskExecutor:
         """Run the main task logic."""
         return task.run(backend, qid)
 
+    def _prepare_run(
+        self,
+        task: TaskProtocol,
+        backend: BackendProtocol,
+        qid: str,
+    ) -> None:
+        """Apply resolved task inputs after overrides and validation."""
+        task.prepare_run(backend, qid)
+
     def _run_batch_task(
         self,
         task: TaskProtocol,
@@ -339,6 +348,10 @@ class TaskExecutor:
             # Validate once after database/snapshot resolution and user overrides.
             # Task-specific preprocess/run code must not repair effective inputs.
             self._validate_effective_inputs(task)
+
+            # Synchronize the final effective inputs only after user overrides
+            # have been applied and validated.
+            self._prepare_run(task, backend, qid)
 
             # 3. Run
             run_result = self._run_task(task, backend, qid)
