@@ -234,7 +234,8 @@ class BringUp(CalibrationStep):
             if (value := normalize_metric_value(anharm_param)) is not None:
                 metrics["anharmonicity"] = value
 
-        # Proper qubit frequency from CheckChevron.
+        # Proper qubit frequency from CheckChevron. Keep CheckCoarseChevron as
+        # a fallback so older persisted results still render metrics.
         chevron_result = raw.get("CheckChevron", {}) or raw.get("CheckCoarseChevron", {})
         if chevron_result and not chevron_result.get("skipped", False):
             qubit_freq_param = chevron_result.get("qubit_frequency")
