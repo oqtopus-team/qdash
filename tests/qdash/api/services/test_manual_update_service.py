@@ -1,12 +1,13 @@
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import plotly.graph_objects as go
 import plotly.io as pio
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from qdash.api.schemas.calibration import ManualParameterUpdateRequest
 from qdash.api.services.manual_update_service import ManualUpdateService
@@ -92,6 +93,59 @@ def test_validate_source_rejects_unknown_output_parameter() -> None:
             _request(parameters={"qubit_frequency": {"value": 5.0, "unit": "GHz"}}),
             "project",
         )
+
+
+def test_correction_point_requires_source_task() -> None:
+    with pytest.raises(ValidationError, match="source_task_id is required"):
+        _request(source_task_id=None, correction_point={"x": 9.95, "y": -25.0})
+
+
+def test_persistence_failure_does_not_update_calibration_and_removes_artifacts(
+    tmp_path: Path,
+    init_db: Any,
+) -> None:
+    png_path = tmp_path / "correction.png"
+    json_path = tmp_path / "correction.json"
+    png_path.touch()
+    json_path.touch()
+
+    qubit_repo = Mock()
+    activity = SimpleNamespace(activity_id="activity", status="running", ended_at=None, save=Mock())
+    activity_repo = Mock()
+    activity_repo.create_activity.return_value = activity
+    param_version_repo = Mock()
+    param_version_repo.create_version.return_value = SimpleNamespace(entity_id="entity")
+    param_version_repo.get_by_task.return_value = []
+    relation_repo = Mock()
+    service = ManualUpdateService(
+        qubit_repo=qubit_repo,
+        activity_repo=activity_repo,
+        param_version_repo=param_version_repo,
+        relation_repo=relation_repo,
+    )
+
+    with (
+        patch(
+            "qdash.api.services.manual_update_service.TaskResultHistoryDocument.find_one"
+        ) as find_one,
+        patch.object(
+            service,
+            "_save_correction_figure",
+            return_value=([str(png_path)], [str(json_path)]),
+        ),
+        patch(
+            "qdash.api.services.manual_update_service.TaskResultHistoryDocument.insert",
+            side_effect=RuntimeError("persistence failed"),
+        ),
+        pytest.raises(RuntimeError, match="persistence failed"),
+    ):
+        find_one.return_value.run.return_value = _source(status="completed")
+        service.update_parameters(_request(), "project", "tester")
+
+    qubit_repo.update_calib_data.assert_not_called()
+    assert activity.status == "failed"
+    assert not png_path.exists()
+    assert not json_path.exists()
 
 
 def test_save_correction_figure_persists_marker_artifacts(tmp_path) -> None:

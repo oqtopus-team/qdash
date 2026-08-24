@@ -51,6 +51,7 @@ export function SpectroscopyManualCorrection({
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [baselines, setBaselines] = useState<Record<string, number | null>>({});
   const [picking, setPicking] = useState(false);
   const [pendingPoint, setPendingPoint] = useState<PickedPoint | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<PickedPoint | null>(null);
@@ -66,21 +67,19 @@ export function SpectroscopyManualCorrection({
   const currentData = (qubitResponse?.data?.data ?? {}) as Record<string, unknown>;
 
   const beginEditing = () => {
-    setValues(
-      Object.fromEntries(
-        names.map((name) => {
-          const current = parameterValue(currentData[name]);
-          const measured = parameterValue(outputParameters[name]);
-          return [name, formatValue(current ?? measured)];
-        }),
-      ),
+    const nextBaselines = Object.fromEntries(
+      names.map((name) => [
+        name,
+        parameterValue(currentData[name]) ?? parameterValue(outputParameters[name]),
+      ]),
     );
+    setBaselines(nextBaselines);
+    setValues(Object.fromEntries(names.map((name) => [name, formatValue(nextBaselines[name])])));
     setEditing(true);
   };
 
   const changedNames = names.filter((name) => {
-    const baseline = parameterValue(currentData[name]) ?? parameterValue(outputParameters[name]);
-    return parseFinite(values[name]) !== baseline;
+    return parseFinite(values[name]) !== baselines[name];
   });
   const valid =
     changedNames.length > 0 && changedNames.every((name) => parseFinite(values[name]) !== null);
@@ -248,7 +247,7 @@ export function SpectroscopyManualCorrection({
               {names.map((name) => {
                 const measured = parameterValue(outputParameters[name]);
                 const current = parameterValue(currentData[name]);
-                const baseline = current ?? measured;
+                const baseline = baselines[name];
                 const changed = parseFinite(values[name]) !== baseline;
                 return (
                   <tr key={name} className={changed ? "bg-warning/10" : ""}>

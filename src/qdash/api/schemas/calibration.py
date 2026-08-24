@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CalibrationNoteResponse(BaseModel):
@@ -116,6 +116,13 @@ class ManualParameterUpdateRequest(BaseModel):
         default=None,
         description="Plotly point selected as the visual basis for this correction",
     )
+
+    @model_validator(mode="after")
+    def validate_correction_source(self) -> "ManualParameterUpdateRequest":
+        """Require a source result whenever a plotted correction point is recorded."""
+        if self.correction_point is not None and self.source_task_id is None:
+            raise ValueError("source_task_id is required when correction_point is provided")
+        return self
 
 
 class ManualParameterUpdateResponse(BaseModel):

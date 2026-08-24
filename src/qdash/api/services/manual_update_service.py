@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from pathlib import Path
 from typing import Any
 
 import plotly.graph_objects as go
@@ -95,29 +96,14 @@ class ManualUpdateService:
                 "description": param_data.get("description", f"Manually edited ({param_name})"),
             }
 
+        figure_paths: list[str] = []
+        json_figure_paths: list[str] = []
+        task_result: TaskResultHistoryDocument | None = None
         try:
             figure_paths, json_figure_paths = self._save_correction_figure(
                 source_doc=source_doc,
                 request=request,
             )
-
-            # Update DB
-            if is_coupling:
-                self._coupling_repo.update_calib_data(
-                    username=username,
-                    qid=request.qid,
-                    chip_id=request.chip_id,
-                    output_parameters=output_parameters,
-                    project_id=project_id,
-                )
-            else:
-                self._qubit_repo.update_calib_data(
-                    username=username,
-                    qid=request.qid,
-                    chip_id=request.chip_id,
-                    output_parameters=output_parameters,
-                    project_id=project_id,
-                )
 
             # Record provenance for each parameter
             for param_name, param_data in request.parameters.items():
@@ -207,10 +193,42 @@ class ManualUpdateService:
             activity.status = "completed"
             activity.ended_at = now()
             activity.save()
+
+            # Apply calibration values only after every audit record has been persisted. QDash's
+            # default standalone MongoDB deployment does not support multi-document transactions;
+            # keeping this as the final write prevents later persistence failures from leaving an
+            # untracked calibration change.
+            if is_coupling:
+                self._coupling_repo.update_calib_data(
+                    username=username,
+                    qid=request.qid,
+                    chip_id=request.chip_id,
+                    output_parameters=output_parameters,
+                    project_id=project_id,
+                )
+            else:
+                self._qubit_repo.update_calib_data(
+                    username=username,
+                    qid=request.qid,
+                    chip_id=request.chip_id,
+                    output_parameters=output_parameters,
+                    project_id=project_id,
+                )
         except Exception:
-            activity.status = "failed"
-            activity.ended_at = now()
-            activity.save()
+            try:
+                activity.status = "failed"
+                activity.ended_at = now()
+                activity.save()
+                if task_result is not None:
+                    task_result.status = "failed"
+                    task_result.message = f"Manual parameter edit failed for {username}"
+                    task_result.figure_path = []
+                    task_result.json_figure_path = []
+                    task_result.save()
+            except Exception:
+                logger.exception("Failed to persist manual correction failure state")
+            finally:
+                self._remove_correction_artifacts(figure_paths, json_figure_paths)
             raise
 
         logger.info(
@@ -319,6 +337,20 @@ class ManualUpdateService:
             request.qid,
             output_dir=str(source_path.parent),
         )
+
+    @staticmethod
+    def _remove_correction_artifacts(figure_paths: list[str], json_figure_paths: list[str]) -> None:
+        """Remove generated correction artifacts after a failed correction write."""
+        for artifact_path in [*figure_paths, *json_figure_paths]:
+            ManualUpdateService._remove_correction_artifact(artifact_path)
+
+    @staticmethod
+    def _remove_correction_artifact(artifact_path: str) -> None:
+        """Remove one generated correction artifact without masking the original failure."""
+        try:
+            Path(artifact_path).unlink(missing_ok=True)
+        except OSError:
+            logger.exception("Failed to remove correction artifact %s", artifact_path)
 
     def get_manual_edits(self, project_id: str, qid: str) -> ManualEditsResponse:
         """Get all manual edits for a qid (most recent per parameter)."""
