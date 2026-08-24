@@ -26392,17 +26392,20 @@
             "title": "Bare Shift Strength Limit",
             "description": "Strength cutoff for the high_frequency_strength estimator."
           },
-          "resonator_assignment_pattern": {
+          "resonator_assignment_order": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Resonator Assignment Pattern",
-            "description": "Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2]."
+            "title": "Resonator Assignment Order",
+            "description": "Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once."
           }
         },
         "type": "object",

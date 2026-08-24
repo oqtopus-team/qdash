@@ -44,19 +44,10 @@ class CheckQubitSpectroscopy(QubexTask):
         "frequency_range": RunParameterSpec(
             unit="GHz",
             value_type="np.arange",
-            default=(6.5, 9.75, 0.005),
+            default=None,
             description=(
-                "Frequency range for qubit spectroscopy on the high band "
-                "(64Q chips). Used when chip_id does not contain '144'."
-            ),
-        ),
-        "frequency_range_low_band": RunParameterSpec(
-            unit="GHz",
-            value_type="np.arange",
-            default=(3.0, 5.75, 0.005),
-            description=(
-                "Frequency range for qubit spectroscopy on the low band "
-                "(144Q chips). Used when chip_id contains '144'."
+                "Frequency range for qubit spectroscopy. When unset, qubex selects "
+                "the range from the connected control box type."
             ),
         ),
         "readout_amplitude": RunParameterSpec(
@@ -327,17 +318,10 @@ class CheckQubitSpectroscopy(QubexTask):
             figures=figures,
         )
 
-    def _select_frequency_range(self, backend: QubexBackend) -> Any:
-        """Pick the qubit-spectroscopy frequency range for the current chip.
-
-        144Q chips use ``frequency_range_low_band`` (~3.0-5.75 GHz); other
-        chips (64Q etc.) use ``frequency_range`` (~6.5-9.75 GHz). Same
-        ``"144" in chip_id`` convention as the resonator task and the
-        scheduler plugins.
-        """
-        chip_id = backend.config.get("chip_id") or ""
-        param_name = "frequency_range_low_band" if "144" in chip_id else "frequency_range"
-        return self.run_parameters[param_name].get_value()
+    def _frequency_range(self) -> Any:
+        """Return an explicit override, or let qubex select by control box type."""
+        parameter = self.run_parameters["frequency_range"]
+        return None if parameter.value is None else parameter.get_value()
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""
@@ -355,7 +339,7 @@ class CheckQubitSpectroscopy(QubexTask):
         ):
             result = exp.qubit_spectroscopy(
                 label,
-                frequency_range=self._select_frequency_range(backend),
+                frequency_range=self._frequency_range(),
                 readout_amplitude=self._get_readout_amplitude_value(),
                 readout_frequency=readout_freq_param.value,
             )
@@ -372,7 +356,7 @@ class CheckQubitSpectroscopy(QubexTask):
         """
         exp = self.get_experiment(backend)
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
-        frequency_range = self._select_frequency_range(backend)
+        frequency_range = self._frequency_range()
         readout_amplitude = self.run_parameters["readout_amplitude"].get_value()
         results = {}
         for label in labels:

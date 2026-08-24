@@ -20,7 +20,6 @@ from qdash.analysis.spectroscopy import (
     peak_positions_from_assignment_order,
     qid_for_sorted_slot,
     remove_false_spike_from_figure,
-    resolve_resonator_assignment_order,
 )
 from qdash.common.visualization.figure_metadata import set_figure_role
 from qdash.datamodel.task import (
@@ -44,7 +43,6 @@ logger = logging.getLogger(__name__)
 _guess_sorted_slots_for_partial_mux = guess_sorted_slots_for_partial_mux
 _qid_for_sorted_slot = qid_for_sorted_slot
 _peak_positions_from_assignment_order = peak_positions_from_assignment_order
-_resolve_resonator_assignment_order = resolve_resonator_assignment_order
 
 
 class CheckResonatorSpectroscopy(QubexTask):
@@ -66,19 +64,10 @@ class CheckResonatorSpectroscopy(QubexTask):
         "frequency_range": RunParameterSpec(
             unit="GHz",
             value_type="np.arange",
-            default=(9.75, 10.75, 0.002),
+            default=None,
             description=(
-                "Frequency range for resonator spectroscopy on the high band "
-                "(64Q chips). Used when chip_id does not contain '144'."
-            ),
-        ),
-        "frequency_range_low_band": RunParameterSpec(
-            unit="GHz",
-            value_type="np.arange",
-            default=(5.75, 6.75, 0.002),
-            description=(
-                "Frequency range for resonator spectroscopy on the low band "
-                "(144Q chips). Used when chip_id contains '144'."
+                "Frequency range for resonator spectroscopy. When unset, qubex selects "
+                "the range from the connected readout box type."
             ),
         ),
         "power_range": RunParameterSpec(
@@ -99,13 +88,13 @@ class CheckResonatorSpectroscopy(QubexTask):
             default=NUM_RESONATORS,
             description="Number of resonators to detect",
         ),
-        "resonator_assignment_pattern": RunParameterSpec(
+        "resonator_assignment_order": RunParameterSpec(
             unit="",
-            value_type="str",
-            default="default",
+            value_type="list",
+            default=[3, 0, 2, 1],
             description=(
-                "Named resonator assignment pattern: default or 16q. "
-                "Use 16q for mux[0], mux[3], mux[1], mux[2]."
+                "Qubit offsets in increasing resonator-frequency order. "
+                "Must contain each offset from 0 to 3 exactly once."
             ),
         ),
         "high_power_min": RunParameterSpec(
@@ -269,9 +258,7 @@ class CheckResonatorSpectroscopy(QubexTask):
             )
 
             id_in_mux = int(qid) % 4
-            assignment_order = resolve_resonator_assignment_order(
-                self.run_parameters["resonator_assignment_pattern"].get_value()
-            )
+            assignment_order = self.run_parameters["resonator_assignment_order"].get_value()
             peak_positions = peak_positions_from_assignment_order(assignment_order)
             sorted_slots, assignment_mode = guess_sorted_slots_for_partial_mux(
                 list(trace.x),
@@ -402,25 +389,25 @@ class CheckResonatorSpectroscopy(QubexTask):
                 RemoveFalseSpikeRange(10.498, 10.500),
             ]
         )
-        return remove_false_spike_from_figure(analysis_fig, spike_ranges)
+        rounded_xs = {f"{x:.3f}": index for index, x in enumerate(xs)}
+        applicable_ranges = []
+        for spike_range in spike_ranges:
+            idx_min = rounded_xs.get(f"{spike_range.x_min:.3f}")
+            idx_max = rounded_xs.get(f"{spike_range.x_max:.3f}")
+            if idx_min not in (None, 0) and idx_max not in (None, len(xs) - 1):
+                applicable_ranges.append(spike_range)
+        return remove_false_spike_from_figure(analysis_fig, applicable_ranges)
 
-    def _select_frequency_range(self, backend: QubexBackend) -> Any:
-        """Pick the resonator-spectroscopy frequency range for the current chip.
-
-        144Q chips (low band, ~5.75-6.75 GHz) use ``frequency_range_low_band``;
-        any other chip (64Q etc., high band ~9.75-10.75 GHz) uses
-        ``frequency_range``. Selection follows the same convention used by the
-        scheduler plugins (``"144" in chip_id``).
-        """
-        chip_id = backend.config.get("chip_id") or ""
-        param_name = "frequency_range_low_band" if "144" in chip_id else "frequency_range"
-        return self.run_parameters[param_name].get_value()
+    def _frequency_range(self) -> Any:
+        """Return an explicit override, or let qubex select by readout box type."""
+        parameter = self.run_parameters["frequency_range"]
+        return None if parameter.value is None else parameter.get_value()
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
-        frequency_range = self._select_frequency_range(backend)
+        frequency_range = self._frequency_range()
         result = exp.resonator_spectroscopy(
             target=label,
             frequency_range=frequency_range,
@@ -434,12 +421,12 @@ class CheckResonatorSpectroscopy(QubexTask):
         """Run the task for a batch of qubits."""
         exp = self.get_experiment(backend)
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
-        frequency_range = self._select_frequency_range(backend)
+        frequency_range = self._frequency_range()
         result = exp.resonator_spectroscopy(
             labels[0],
             frequency_range=frequency_range,
             power_range=self.run_parameters["power_range"].get_value(),
-            n_shots=1024,
+            n_shots=self.run_parameters["shots"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

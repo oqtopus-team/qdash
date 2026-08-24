@@ -343,12 +343,18 @@ class ReanalysisService:
         params: ReanalyzeResonatorSpectroscopyParams,
         stored_run_parameters: dict[str, Any],
     ) -> list[int]:
-        pattern = params.resonator_assignment_pattern
-        if pattern is None:
-            stored_pattern = stored_run_parameters.get("resonator_assignment_pattern")
-            if isinstance(stored_pattern, dict) and "value" in stored_pattern:
-                pattern = str(stored_pattern["value"])
+        if params.resonator_assignment_order is not None:
+            return params.resonator_assignment_order
 
+        stored_order = stored_run_parameters.get("resonator_assignment_order")
+        if isinstance(stored_order, dict) and isinstance(stored_order.get("value"), list):
+            return [int(offset) for offset in stored_order["value"]]
+
+        # Read task results created before assignment orders were stored directly.
+        pattern = None
+        stored_pattern = stored_run_parameters.get("resonator_assignment_pattern")
+        if isinstance(stored_pattern, dict) and "value" in stored_pattern:
+            pattern = str(stored_pattern["value"])
         return list(resolve_resonator_assignment_order(pattern))
 
     @staticmethod

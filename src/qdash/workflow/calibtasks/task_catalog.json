@@ -1508,23 +1508,9 @@
             "value_type": "float"
           },
           "frequency_range": {
-            "description": "Frequency range for qubit spectroscopy on the high band (64Q chips). Used when chip_id does not contain '144'.",
+            "description": "Frequency range for qubit spectroscopy. When unset, qubex selects the range from the connected control box type.",
             "unit": "GHz",
-            "value": [
-              6.5,
-              9.75,
-              0.005
-            ],
-            "value_type": "np.arange"
-          },
-          "frequency_range_low_band": {
-            "description": "Frequency range for qubit spectroscopy on the low band (144Q chips). Used when chip_id contains '144'.",
-            "unit": "GHz",
-            "value": [
-              3.0,
-              5.75,
-              0.005
-            ],
+            "value": null,
             "value_type": "np.arange"
           },
           "max_coarse_control_amplitude": {
@@ -1717,23 +1703,9 @@
             "value_type": "float"
           },
           "frequency_range": {
-            "description": "Frequency range for resonator spectroscopy on the high band (64Q chips). Used when chip_id does not contain '144'.",
+            "description": "Frequency range for resonator spectroscopy. When unset, qubex selects the range from the connected readout box type.",
             "unit": "GHz",
-            "value": [
-              9.75,
-              10.75,
-              0.002
-            ],
-            "value_type": "np.arange"
-          },
-          "frequency_range_low_band": {
-            "description": "Frequency range for resonator spectroscopy on the low band (144Q chips). Used when chip_id contains '144'.",
-            "unit": "GHz",
-            "value": [
-              5.75,
-              6.75,
-              0.002
-            ],
+            "value": null,
             "value_type": "np.arange"
           },
           "high_power_max": {
@@ -1776,11 +1748,16 @@
             ],
             "value_type": "np.arange"
           },
-          "resonator_assignment_pattern": {
-            "description": "Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2].",
+          "resonator_assignment_order": {
+            "description": "Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once.",
             "unit": "",
-            "value": "default",
-            "value_type": "str"
+            "value": [
+              3,
+              0,
+              2,
+              1
+            ],
+            "value_type": "list"
           },
           "shots": {
             "description": "Number of shots for resonator spectroscopy",

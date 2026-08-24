@@ -62,7 +62,7 @@ class BringUp(CalibrationStep):
 
     mode: str = "scheduled"
     tasks: list[str] = field(default_factory=lambda: list(BRINGUP_TASKS))
-    resonator_assignment_pattern: str | None = None
+    resonator_assignment_order: list[int] | None = None
 
     @property
     def name(self) -> str:
@@ -87,7 +87,7 @@ class BringUp(CalibrationStep):
         tasks = self.tasks
 
         logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(tasks)} tasks")
-        self._apply_resonator_assignment_pattern(service)
+        self._apply_resonator_assignment_order(service)
 
         from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
         from qdash.workflow.service.targets import MuxTargets
@@ -127,16 +127,16 @@ class BringUp(CalibrationStep):
         )
         return ctx
 
-    def _apply_resonator_assignment_pattern(self, service: CalibService) -> None:
-        """Inject step-level resonator assignment pattern as a task run parameter."""
-        if not self.resonator_assignment_pattern:
+    def _apply_resonator_assignment_order(self, service: CalibService) -> None:
+        """Inject step-level resonator assignment order as a task run parameter."""
+        if self.resonator_assignment_order is None:
             return
 
         default_run_parameters = copy.deepcopy(service.default_run_parameters)
         task_params = default_run_parameters.setdefault("CheckResonatorSpectroscopy", {})
-        task_params["resonator_assignment_pattern"] = {
-            "value": self.resonator_assignment_pattern,
-            "value_type": "str",
+        task_params["resonator_assignment_order"] = {
+            "value": self.resonator_assignment_order,
+            "value_type": "list",
         }
         service.default_run_parameters = default_run_parameters
 

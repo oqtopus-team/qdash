@@ -20,21 +20,21 @@ class FakeCalibService:
         return {"targets": targets, "steps": steps}
 
 
-def test_bringup_injects_resonator_assignment_pattern(monkeypatch) -> None:
+def test_bringup_injects_resonator_assignment_order(monkeypatch) -> None:
     monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
 
     bringup_module.bringup(
         username="alice",
         chip_id="16Q-test",
         mux_ids=[0],
-        resonator_assignment_pattern="16q",
+        resonator_assignment_order=[0, 3, 1, 2],
     )
 
     assert FakeCalibService.last_kwargs is not None
     assert FakeCalibService.last_kwargs["default_run_parameters"] == {
         "interval": {"value": 150 * 1024, "value_type": "int"},
         "CheckResonatorSpectroscopy": {
-            "resonator_assignment_pattern": {"value": "16q", "value_type": "str"}
+            "resonator_assignment_order": {"value": [0, 3, 1, 2], "value_type": "list"}
         },
     }
 
@@ -51,7 +51,7 @@ def test_bringup_starts_with_configure_all(monkeypatch) -> None:
     assert [step.name for step in result["steps"]] == ["configure_all", "bringup"]
 
 
-def test_bringup_step_accepts_resonator_assignment_pattern() -> None:
+def test_bringup_step_accepts_resonator_assignment_order() -> None:
     from qdash.workflow.service.steps import BringUp
 
     service = type(
@@ -59,14 +59,14 @@ def test_bringup_step_accepts_resonator_assignment_pattern() -> None:
         (),
         {"default_run_parameters": {"interval": {"value": 1, "value_type": "int"}}},
     )()
-    step = BringUp(mode="scheduled", resonator_assignment_pattern="16q")
+    step = BringUp(mode="scheduled", resonator_assignment_order=[0, 3, 1, 2])
 
-    step._apply_resonator_assignment_pattern(service)
+    step._apply_resonator_assignment_order(service)
 
     assert service.default_run_parameters == {
         "interval": {"value": 1, "value_type": "int"},
         "CheckResonatorSpectroscopy": {
-            "resonator_assignment_pattern": {"value": "16q", "value_type": "str"}
+            "resonator_assignment_order": {"value": [0, 3, 1, 2], "value_type": "list"}
         },
     }
 

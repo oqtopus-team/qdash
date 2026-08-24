@@ -2,6 +2,7 @@ import copy
 from unittest.mock import MagicMock, patch
 
 import plotly.graph_objs as go
+import pytest
 
 from qdash.analysis.spectroscopy.estimate_resonator_frequency import Peak, Resonance
 from qdash.workflow.calibtasks.base import RunResult
@@ -60,11 +61,11 @@ def test_postprocess_outputs_optimal_power_from_resonator_analysis() -> None:
     assert result.output_parameters["readout_amplitude"].execution_id == "exec-1"
 
 
-def test_postprocess_uses_named_16q_resonator_assignment_pattern() -> None:
+def test_postprocess_uses_custom_resonator_assignment_order() -> None:
     task = CheckResonatorSpectroscopy()
     task.run_parameters = copy.deepcopy(task.run_parameters)
     task.run_parameters["bare_shift_estimator_type"].value = "config"
-    task.run_parameters["resonator_assignment_pattern"].value = "16q"
+    task.run_parameters["resonator_assignment_order"].value = [0, 3, 1, 2]
     raw_fig = go.Figure(
         data=[
             go.Heatmap(
@@ -352,3 +353,47 @@ def test_postprocess_rejects_left_edge_missing_partial_mux_when_qid_slot_is_miss
 
     assert result.output_parameters == {}
     assert result.validation_error is not None
+
+
+def test_frequency_range_is_delegated_to_qubex_when_unset() -> None:
+    task = CheckResonatorSpectroscopy()
+
+    assert task._frequency_range() is None
+
+
+def test_frequency_range_can_be_overridden_per_task() -> None:
+    task = CheckResonatorSpectroscopy()
+    task.run_parameters = copy.deepcopy(task.run_parameters)
+    task.run_parameters["frequency_range"].value = (5.8, 6.15, 0.1)
+
+    assert list(task._frequency_range()) == pytest.approx([5.8, 5.9, 6.0, 6.1])
+
+
+def test_prepare_analysis_figure_ignores_spike_ranges_outside_custom_sweep() -> None:
+    task = CheckResonatorSpectroscopy()
+    raw_fig = go.Figure(
+        go.Heatmap(
+            x=[5.7, 5.8, 5.9],
+            y=[-30.0],
+            z=[[1.0, 2.0, 3.0]],
+        )
+    )
+
+    analysis_fig = task._prepare_analysis_figure(raw_fig)
+
+    assert list(analysis_fig.data[0].z[0]) == [1.0, 2.0, 3.0]
+
+
+def test_prepare_analysis_figure_ignores_spike_ranges_not_sampled_by_custom_step() -> None:
+    task = CheckResonatorSpectroscopy()
+    raw_fig = go.Figure(
+        go.Heatmap(
+            x=[5.95, 5.96, 5.97, 5.98, 5.99, 6.0, 6.01],
+            y=[-30.0],
+            z=[[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]],
+        )
+    )
+
+    analysis_fig = task._prepare_analysis_figure(raw_fig)
+
+    assert list(analysis_fig.data[0].z[0]) == [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]

@@ -1,3 +1,4 @@
+import copy
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
@@ -83,3 +84,17 @@ def test_check_qubit_spectroscopy_does_not_output_invalid_frequency(monkeypatch)
 
     assert result.output_parameters == {}
     assert result.validation_error is not None
+
+
+def test_frequency_range_is_delegated_to_qubex_when_unset() -> None:
+    task = CheckQubitSpectroscopy()
+
+    assert task._frequency_range() is None
+
+
+def test_frequency_range_can_be_overridden_per_task() -> None:
+    task = CheckQubitSpectroscopy()
+    task.run_parameters = copy.deepcopy(task.run_parameters)
+    task.run_parameters["frequency_range"].value = (3.0, 3.3, 0.1)
+
+    assert list(task._frequency_range()) == pytest.approx([3.0, 3.1, 3.2])

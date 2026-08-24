@@ -611,7 +611,7 @@ export * from './reanalyzeResonatorSpectroscopyParamsHighPowerMax';
 export * from './reanalyzeResonatorSpectroscopyParamsHighPowerMin';
 export * from './reanalyzeResonatorSpectroscopyParamsLowPower';
 export * from './reanalyzeResonatorSpectroscopyParamsNumResonators';
-export * from './reanalyzeResonatorSpectroscopyParamsResonatorAssignmentPattern';
+export * from './reanalyzeResonatorSpectroscopyParamsResonatorAssignmentOrder';
 export * from './reanalyzeResonatorSpectroscopyRequest';
 export * from './reanalyzeResonatorSpectroscopyRequestSourceTaskId';
 export * from './reanalyzeResponse';
