@@ -67,9 +67,14 @@ When two legacy classifier files have the same relative path and different conte
 the latest modification time is retained at the shared destination and the other file is copied
 below `.migration_conflicts/{username}`.
 
-Execution artifacts missing from their expected legacy directories stop an execute migration. After
-reviewing those records and confirming that the files cannot be recovered, an operator can accept
-the missing artifacts explicitly:
+Execution artifacts missing from their expected legacy directories are recorded in the artifact
+migration ledger and emitted as a warning. The report includes the execution ID, status, username,
+stored calibration path, and paths checked so operators can distinguish expected gaps from files
+that need recovery. Missing artifacts do not block the rest of QDash from starting because the
+migration has already moved every artifact it could locate.
+
+After reviewing the warning, an operator can rerun the migration with the following flag to mark
+the missing artifacts as reviewed in the report:
 
 ```bash
 docker compose run --rm calibration-migration \

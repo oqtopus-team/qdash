@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 from datetime import datetime, timedelta, timezone
@@ -10,6 +11,8 @@ from typing import TYPE_CHECKING, Any
 
 from pymongo import ASCENDING, MongoClient, ReturnDocument
 from pymongo.errors import DuplicateKeyError
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from pymongo.database import Database
@@ -636,15 +639,17 @@ def migrate_calibration_files(
     base_path: Path,
     dry_run: bool = True,
     allow_missing: bool = False,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """Copy legacy user artifacts to project-chip paths without deleting sources."""
     _ensure_migration_archive_index(database)
-    stats = {
+    stats: dict[str, Any] = {
         "copied": 0,
         "moved": 0,
         "identical": 0,
         "conflicts": 0,
         "missing": 0,
+        "missing_artifacts": [],
+        "missing_artifacts_reviewed": allow_missing,
         "database_records_updated": 0,
     }
     executions = list(
@@ -657,11 +662,31 @@ def migrate_calibration_files(
         username = execution.get("username")
         if not execution_id or not username:
             stats["missing"] += 1
+            stats["missing_artifacts"].append(
+                {
+                    "execution_id": execution_id,
+                    "username": username,
+                    "status": execution.get("status"),
+                    "calib_data_path": execution.get("calib_data_path"),
+                    "reason": "missing execution_id or username",
+                    "checked_paths": [],
+                }
+            )
             continue
         try:
             date_str, index = execution_id.split("-", 1)
         except ValueError:
             stats["missing"] += 1
+            stats["missing_artifacts"].append(
+                {
+                    "execution_id": execution_id,
+                    "username": username,
+                    "status": execution.get("status"),
+                    "calib_data_path": execution.get("calib_data_path"),
+                    "reason": "invalid execution_id format",
+                    "checked_paths": [],
+                }
+            )
             continue
         legacy_source = base_path / username / date_str / index
         project_chip_path = (
@@ -674,6 +699,16 @@ def migrate_calibration_files(
         source = flat_source if flat_source.is_dir() else legacy_source
         if not source.is_dir():
             stats["missing"] += 1
+            stats["missing_artifacts"].append(
+                {
+                    "execution_id": execution_id,
+                    "username": username,
+                    "status": execution.get("status"),
+                    "calib_data_path": execution.get("calib_data_path"),
+                    "reason": "legacy artifact directory not found",
+                    "checked_paths": [str(flat_source), str(legacy_source)],
+                }
+            )
             continue
         if dry_run:
             if source == flat_source and not target.exists():
@@ -734,11 +769,6 @@ def migrate_calibration_files(
         )
         for key, count in classifier_stats.items():
             stats[key] += count
-    if not dry_run and stats["missing"] and not allow_missing:
-        raise RuntimeError(
-            f"Could not locate legacy artifacts for {stats['missing']} execution(s); "
-            "rerun with --allow-missing-artifacts only after reviewing them"
-        )
     return stats
 
 
@@ -756,7 +786,26 @@ def run_from_environment(*, dry_run: bool, allow_missing_artifacts: bool = False
         database = client[os.getenv("MONGO_DB_NAME", "qdash")]
         stats = migrate_project_scoped_calibration(database, dry_run=dry_run)
         artifact_ledger = database["migration_ledger"]
-        if artifact_ledger.find_one({"migration_id": ARTIFACT_MIGRATION_ID, "status": "completed"}):
+        completed_artifact_migration = artifact_ledger.find_one(
+            {"migration_id": ARTIFACT_MIGRATION_ID, "status": "completed"}
+        )
+        if completed_artifact_migration:
+            recorded_stats = completed_artifact_migration.get("stats", {})
+            if (
+                not dry_run
+                and allow_missing_artifacts
+                and recorded_stats.get("missing")
+                and not recorded_stats.get("missing_artifacts_reviewed")
+            ):
+                artifact_ledger.update_one(
+                    {"migration_id": ARTIFACT_MIGRATION_ID},
+                    {
+                        "$set": {
+                            "stats.missing_artifacts_reviewed": True,
+                            "missing_artifacts_reviewed_at": datetime.now(timezone.utc),
+                        }
+                    },
+                )
             stats["files"] = {"already_completed": True}
             return stats
         stats["files"] = migrate_calibration_files(
@@ -765,6 +814,12 @@ def run_from_environment(*, dry_run: bool, allow_missing_artifacts: bool = False
             dry_run=dry_run,
             allow_missing=allow_missing_artifacts,
         )
+        if stats["files"]["missing"]:
+            logger.warning(
+                "Calibration artifact migration completed with %s missing execution(s): %s",
+                stats["files"]["missing"],
+                stats["files"]["missing_artifacts"],
+            )
         if not dry_run:
             artifact_ledger.update_one(
                 {"migration_id": ARTIFACT_MIGRATION_ID},

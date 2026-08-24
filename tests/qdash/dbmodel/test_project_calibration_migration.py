@@ -1,13 +1,17 @@
+import logging
 import os
 from datetime import datetime, timezone
 
 import pytest
 
+import qdash.dbmodel.project_calibration_migration as migration_module
 from qdash.dbmodel.project_calibration_migration import (
+    ARTIFACT_MIGRATION_ID,
     MIGRATION_ID,
     SCOPE_BACKFILL_MIGRATION_ID,
     migrate_calibration_files,
     migrate_project_scoped_calibration,
+    run_from_environment,
 )
 
 
@@ -505,7 +509,7 @@ def test_migration_rejects_ambiguous_calibration_note_chip(init_db) -> None:
         migrate_project_scoped_calibration(init_db, dry_run=False)
 
 
-def test_file_migration_rejects_missing_execution_artifacts(init_db, tmp_path) -> None:
+def test_file_migration_reports_missing_execution_artifacts(init_db, tmp_path) -> None:
     init_db["execution_history"].insert_one(
         {
             "project_id": "proj-1",
@@ -516,5 +520,68 @@ def test_file_migration_rejects_missing_execution_artifacts(init_db, tmp_path) -
         }
     )
 
-    with pytest.raises(RuntimeError, match="allow-missing-artifacts"):
-        migrate_calibration_files(init_db, base_path=tmp_path, dry_run=False)
+    stats = migrate_calibration_files(init_db, base_path=tmp_path, dry_run=False)
+
+    assert stats["missing"] == 1
+    assert stats["missing_artifacts"] == [
+        {
+            "execution_id": "20260102-001",
+            "username": "alice",
+            "status": None,
+            "calib_data_path": str(tmp_path / "alice" / "20260102" / "001"),
+            "reason": "legacy artifact directory not found",
+            "checked_paths": [
+                str(
+                    tmp_path
+                    / "projects"
+                    / "proj-1"
+                    / "chips"
+                    / "chip-1"
+                    / "executions"
+                    / "20260102-001"
+                ),
+                str(tmp_path / "alice" / "20260102" / "001"),
+            ],
+        }
+    ]
+    assert stats["missing_artifacts_reviewed"] is False
+
+
+def test_environment_migration_records_missing_artifacts_and_skips_rerun(
+    init_db, tmp_path, monkeypatch, caplog
+) -> None:
+    init_db["execution_history"].insert_one(
+        {
+            "project_id": "proj-1",
+            "chip_id": "chip-1",
+            "execution_id": "20260102-001",
+            "username": "alice",
+            "status": "failed",
+            "calib_data_path": str(tmp_path / "alice" / "20260102" / "001"),
+        }
+    )
+    monkeypatch.setenv("MONGO_DB_NAME", init_db.name)
+    monkeypatch.setenv("CALIB_DATA_PATH", str(tmp_path))
+    monkeypatch.setattr(migration_module, "MongoClient", lambda *args, **kwargs: init_db.client)
+
+    with caplog.at_level(logging.WARNING):
+        stats = run_from_environment(dry_run=False)
+
+    assert stats["files"]["missing"] == 1
+    assert "20260102-001" in caplog.text
+    ledger = init_db["migration_ledger"].find_one({"migration_id": ARTIFACT_MIGRATION_ID})
+    assert ledger is not None
+    assert ledger["status"] == "completed"
+    assert ledger["stats"]["missing_artifacts"][0]["execution_id"] == "20260102-001"
+
+    reviewed = run_from_environment(dry_run=False, allow_missing_artifacts=True)
+
+    assert reviewed["files"] == {"already_completed": True}
+    reviewed_ledger = init_db["migration_ledger"].find_one({"migration_id": ARTIFACT_MIGRATION_ID})
+    assert reviewed_ledger is not None
+    assert reviewed_ledger["stats"]["missing_artifacts_reviewed"] is True
+    assert "missing_artifacts_reviewed_at" in reviewed_ledger
+
+    repeated = run_from_environment(dry_run=False)
+
+    assert repeated["files"] == {"already_completed": True}
