@@ -81,9 +81,25 @@ def finalize_executions_by_flow_run_id(
             flow_run_id,
         )
 
-        ExecutionHistoryDocument.find(
-            {"project_id": project_id, "execution_id": execution_id}
-        ).update_many({"$set": {"status": status, "end_at": end_time, "message": message}}).run()
+        result = (
+            ExecutionHistoryDocument.find(
+                {
+                    "project_id": project_id,
+                    "execution_id": execution_id,
+                    "note.flow_run_id": flow_run_id,
+                    "status": {"$in": list(from_statuses)},
+                }
+            )
+            .update_many({"$set": {"status": status, "end_at": end_time, "message": message}})
+            .run()
+        )
+        if not result or result.modified_count == 0:
+            logger.info(
+                "%s: execution %s changed before finalization; leaving it untouched",
+                context,
+                execution_id,
+            )
+            continue
 
         if close_tasks:
             result = (
@@ -116,23 +132,27 @@ def finalize_executions_by_flow_run_id(
 
         closed_execution_ids.append(execution_id)
 
-    if release_lock:
+    if release_lock and closed_execution_ids:
         try:
-            lock_doc = ExecutionLockDocument.find_one({"project_id": project_id}).run()
-            if lock_doc and lock_doc.locked:
-                owner = lock_doc.execution_id
-                if owner is not None and owner not in closed_execution_ids:
-                    logger.info(
-                        "%s: execution lock for project %s is owned by %s, leaving it locked",
-                        context,
-                        project_id,
-                        owner,
-                    )
-                else:
-                    lock_doc.locked = False
-                    lock_doc.execution_id = None
-                    lock_doc.save()
-                    logger.info("Released execution lock for project %s", project_id)
+            result = (
+                ExecutionLockDocument.find(
+                    {
+                        "project_id": project_id,
+                        "locked": True,
+                        "execution_id": {"$in": [None, *closed_execution_ids]},
+                    }
+                )
+                .update_many({"$set": {"locked": False, "execution_id": None}})
+                .run()
+            )
+            if result and result.modified_count:
+                logger.info("Released execution lock for project %s", project_id)
+            else:
+                logger.info(
+                    "%s: execution lock for project %s is absent or owned by another execution",
+                    context,
+                    project_id,
+                )
         except Exception:
             logger.warning("Failed to release execution lock", exc_info=True)
 

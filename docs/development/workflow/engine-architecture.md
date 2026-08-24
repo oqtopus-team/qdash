@@ -290,7 +290,7 @@ Pre-creation is best effort. It is skipped when no `chip_id` can be resolved, an
 
 ### Reconciliation with Prefect
 
-Hooks only fire while the Prefect runner is alive. When the runner itself dies, nothing closes the execution and it stays `running` forever. `ExecutionService._reconcile_with_prefect()` (API) closes that gap: on every read of the execution list or detail, open executions holding a `note.flow_run_id` are looked up in Prefect in one batched query and finalized when their flow run has already reached a terminal state.
+Hooks only fire while the Prefect runner is alive. When the runner itself dies, nothing closes the execution and it stays `running` forever. `ExecutionService._reconcile_with_prefect()` (API) closes that gap when an execution detail is read: open executions holding a `note.flow_run_id` are looked up in Prefect and finalized when their flow run has already reached a terminal state. Execution-list reads do not call Prefect synchronously, so history remains available when Prefect is slow or unavailable.
 
 | Prefect flow run state | Execution status | Result |
 |------------------------|------------------|--------|

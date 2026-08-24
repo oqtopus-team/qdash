@@ -158,7 +158,6 @@ class ExecutionService:
             skip=skip,
             limit=limit,
         )
-        self._reconcile_with_prefect(executions)
         return [
             ExecutionResponseSummary(
                 name=f"{execution.name}-{execution.execution_id}",

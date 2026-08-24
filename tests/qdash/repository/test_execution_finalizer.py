@@ -173,6 +173,36 @@ def test_ignores_already_terminal_execution(init_db) -> None:
     assert execution.status == "completed"
 
 
+def test_does_not_overwrite_execution_that_becomes_terminal_before_update(init_db) -> None:
+    """A concurrent normal completion wins over a delayed finalizer."""
+    _make_execution(status="running")
+    original_find = ExecutionHistoryDocument.find
+    find_calls = 0
+
+    def racing_find(query):
+        nonlocal find_calls
+        find_calls += 1
+        if find_calls == 2:
+            ExecutionHistoryDocument.get_motor_collection().update_one(
+                {"project_id": PROJECT_ID, "execution_id": "exec-1"},
+                {"$set": {"status": "completed"}},
+            )
+        return original_find(query)
+
+    with patch.object(ExecutionHistoryDocument, "find", side_effect=racing_find):
+        closed = finalize_executions_by_flow_run_id(
+            project_id=PROJECT_ID,
+            flow_run_id=FLOW_RUN_ID,
+            status="failed",
+            message="boom",
+        )
+
+    assert closed == []
+    execution = _reload_execution()
+    assert execution is not None
+    assert execution.status == "completed"
+
+
 def test_from_statuses_restricts_which_executions_close(init_db) -> None:
     """from_statuses=("scheduled",) only closes the scheduled execution."""
     _make_execution(status="scheduled", execution_id="exec-scheduled")
@@ -285,6 +315,35 @@ def test_release_lock_owned_by_other_execution_stays_locked(init_db) -> None:
     assert lock.execution_id == "exec-other"
 
 
+def test_release_lock_does_not_clear_concurrently_reassigned_owner(init_db) -> None:
+    """The conditional unlock leaves a lock reassigned immediately before the update intact."""
+    _make_execution(status="running", execution_id="exec-1")
+    ExecutionLockDocument(project_id=PROJECT_ID, locked=True, execution_id="exec-1").save()
+    original_find = ExecutionLockDocument.find
+
+    def racing_find(query):
+        ExecutionLockDocument.get_motor_collection().update_one(
+            {"project_id": PROJECT_ID},
+            {"$set": {"locked": True, "execution_id": "exec-new"}},
+        )
+        return original_find(query)
+
+    with patch.object(ExecutionLockDocument, "find", side_effect=racing_find):
+        closed = finalize_executions_by_flow_run_id(
+            project_id=PROJECT_ID,
+            flow_run_id=FLOW_RUN_ID,
+            status="failed",
+            message="boom",
+            release_lock=True,
+        )
+
+    assert closed == ["exec-1"]
+    lock = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert lock is not None
+    assert lock.locked is True
+    assert lock.execution_id == "exec-new"
+
+
 def test_release_lock_false_leaves_lock_untouched(init_db) -> None:
     """release_lock=False leaves an existing lock in place."""
     _make_execution(status="running")
@@ -320,7 +379,7 @@ def test_release_lock_swallows_lookup_failure(init_db) -> None:
     _make_execution(status="running")
 
     with patch(
-        "qdash.repository.execution_finalizer.ExecutionLockDocument.find_one",
+        "qdash.repository.execution_finalizer.ExecutionLockDocument.find",
         side_effect=RuntimeError("boom"),
     ):
         closed = finalize_executions_by_flow_run_id(

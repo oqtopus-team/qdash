@@ -27,6 +27,16 @@ def _make_service() -> ExecutionService:
     )
 
 
+def _list_executions_after_reconciliation() -> list[Any]:
+    """Exercise reconciliation explicitly, then return the execution summaries."""
+    service = _make_service()
+    docs = service._history_repo.list_by_chip(
+        project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20
+    )
+    service._reconcile_with_prefect(docs)
+    return service.list_executions(project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20)
+
+
 def _make_execution(
     *,
     execution_id: str,
@@ -155,6 +165,24 @@ def _make_get_client(client: Any, calls: list[dict[str, Any]]) -> Any:
     return _get_client
 
 
+def test_list_executions_does_not_query_prefect(monkeypatch: Any, init_db: Any) -> None:
+    """Listing history stays available without making a synchronous Prefect request."""
+    flow_run_id = str(uuid4())
+    _make_execution(execution_id="exec-1", status="running", note={"flow_run_id": flow_run_id})
+
+    call_count: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        execution_service, "get_client", _make_get_client(_RaisingSyncClient(), call_count)
+    )
+
+    executions = _make_service().list_executions(
+        project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20
+    )
+
+    assert call_count == []
+    assert executions[0].status == "running"
+
+
 def test_list_executions_closes_running_execution_on_failed_flow_run(
     monkeypatch: Any, init_db: Any
 ) -> None:
@@ -167,9 +195,7 @@ def test_list_executions_closes_running_execution_on_failed_flow_run(
     client = _FakeSyncClient([_make_run(flow_run_id, "FAILED")])
     monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
 
-    executions = _make_service().list_executions(
-        project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20
-    )
+    executions = _list_executions_after_reconciliation()
 
     assert len(call_count) == 1
     assert call_count[0]["sync_client"] is True
@@ -201,9 +227,7 @@ def test_list_executions_closes_running_execution_on_crashed_flow_run(
     client = _FakeSyncClient([_make_run(flow_run_id, "CRASHED")])
     monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
 
-    executions = _make_service().list_executions(
-        project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20
-    )
+    executions = _list_executions_after_reconciliation()
 
     assert executions[0].status == "failed"
     reloaded = _reload_execution("exec-1")
@@ -227,9 +251,7 @@ def test_list_executions_closes_running_execution_on_cancelled_flow_run(
     client = _FakeSyncClient([_make_run(flow_run_id, "CANCELLED")])
     monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
 
-    executions = _make_service().list_executions(
-        project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20
-    )
+    executions = _list_executions_after_reconciliation()
 
     assert executions[0].status == "cancelled"
     reloaded = _reload_execution("exec-1")
@@ -253,9 +275,7 @@ def test_list_executions_completes_scheduled_execution_without_closing_its_tasks
     client = _FakeSyncClient([_make_run(flow_run_id, "COMPLETED")])
     monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
 
-    executions = _make_service().list_executions(
-        project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20
-    )
+    executions = _list_executions_after_reconciliation()
 
     assert executions[0].status == "completed"
     reloaded = _reload_execution("exec-1")
@@ -279,9 +299,7 @@ def test_list_executions_fails_running_execution_on_completed_flow_run(
     client = _FakeSyncClient([_make_run(flow_run_id, "COMPLETED")])
     monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
 
-    executions = _make_service().list_executions(
-        project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20
-    )
+    executions = _list_executions_after_reconciliation()
 
     assert executions[0].status == "failed"
     reloaded = _reload_execution("exec-1")
@@ -304,9 +322,7 @@ def test_list_executions_leaves_execution_untouched_when_flow_run_still_running(
     client = _FakeSyncClient([_make_run(flow_run_id, "RUNNING")])
     monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
 
-    executions = _make_service().list_executions(
-        project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20
-    )
+    executions = _list_executions_after_reconciliation()
 
     assert executions[0].status == "running"
     reloaded = _reload_execution("exec-1")
@@ -326,9 +342,7 @@ def test_list_executions_leaves_execution_untouched_when_prefect_omits_flow_run(
     client = _FakeSyncClient([])
     monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
 
-    executions = _make_service().list_executions(
-        project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20
-    )
+    executions = _list_executions_after_reconciliation()
 
     assert len(call_count) == 1
     assert executions[0].status == "running"
@@ -347,9 +361,7 @@ def test_list_executions_skips_prefect_when_no_open_executions(
     client = _FakeSyncClient([])
     monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
 
-    executions = _make_service().list_executions(
-        project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20
-    )
+    executions = _list_executions_after_reconciliation()
 
     assert call_count == []
     assert executions[0].status == "completed"
@@ -368,7 +380,7 @@ def test_list_executions_skips_executions_with_missing_or_invalid_flow_run_id(
     client = _FakeSyncClient([])
     monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
 
-    _make_service().list_executions(project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20)
+    _list_executions_after_reconciliation()
 
     assert call_count == []
     missing_note = _reload_execution("exec-missing-note")
@@ -391,9 +403,7 @@ def test_list_executions_returns_unreconciled_summaries_when_prefect_raises(
         execution_service, "get_client", _make_get_client(_RaisingSyncClient(), call_count)
     )
 
-    executions = _make_service().list_executions(
-        project_id=PROJECT_ID, chip_id=CHIP_ID, skip=0, limit=20
-    )
+    executions = _list_executions_after_reconciliation()
 
     assert len(call_count) == 1
     assert executions[0].status == "running"
