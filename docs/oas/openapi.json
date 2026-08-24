@@ -20392,6 +20392,11 @@
             "type": "string",
             "title": "Status"
           },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
           "flow_name": {
             "type": "string",
             "title": "Flow Name",
@@ -20498,6 +20503,11 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
           },
           "user_id": {
             "anyOf": [
@@ -26392,17 +26402,25 @@
             "title": "Bare Shift Strength Limit",
             "description": "Strength cutoff for the high_frequency_strength estimator."
           },
-          "resonator_assignment_pattern": {
+          "resonator_assignment_order": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "type": "integer",
+                  "maximum": 3.0,
+                  "minimum": 0.0
+                },
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Resonator Assignment Pattern",
-            "description": "Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2]."
+            "uniqueItems": true,
+            "title": "Resonator Assignment Order",
+            "description": "Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once."
           }
         },
         "type": "object",

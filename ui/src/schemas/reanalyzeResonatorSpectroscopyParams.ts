@@ -11,7 +11,7 @@ import type { ReanalyzeResonatorSpectroscopyParamsHighPowerMax } from './reanaly
 import type { ReanalyzeResonatorSpectroscopyParamsLowPower } from './reanalyzeResonatorSpectroscopyParamsLowPower';
 import type { ReanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType } from './reanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType';
 import type { ReanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit } from './reanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit';
-import type { ReanalyzeResonatorSpectroscopyParamsResonatorAssignmentPattern } from './reanalyzeResonatorSpectroscopyParamsResonatorAssignmentPattern';
+import type { ReanalyzeResonatorSpectroscopyParamsResonatorAssignmentOrder } from './reanalyzeResonatorSpectroscopyParamsResonatorAssignmentOrder';
 
 /**
  * Optional analysis-parameter overrides for resonator spectroscopy.
@@ -32,6 +32,6 @@ export interface ReanalyzeResonatorSpectroscopyParams {
   bare_shift_estimator_type?: ReanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType;
   /** Strength cutoff for the high_frequency_strength estimator. */
   bare_shift_strength_limit?: ReanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit;
-  /** Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2]. */
-  resonator_assignment_pattern?: ReanalyzeResonatorSpectroscopyParamsResonatorAssignmentPattern;
+  /** Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once. */
+  resonator_assignment_order?: ReanalyzeResonatorSpectroscopyParamsResonatorAssignmentOrder;
 }

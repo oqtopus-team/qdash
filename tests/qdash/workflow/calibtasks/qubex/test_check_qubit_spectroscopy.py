@@ -1,5 +1,7 @@
+import copy
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
+from unittest.mock import MagicMock, patch
 
 import plotly.graph_objects as go
 import pytest
@@ -83,3 +85,42 @@ def test_check_qubit_spectroscopy_does_not_output_invalid_frequency(monkeypatch)
 
     assert result.output_parameters == {}
     assert result.validation_error is not None
+
+
+def test_frequency_range_is_resolved_from_control_box_when_unset(monkeypatch) -> None:
+    task = CheckQubitSpectroscopy()
+    backend = cast("QubexBackend", object())
+    exp = MagicMock()
+    exp.ctx.experiment_system.get_control_box_for_qubit.return_value = SimpleNamespace(
+        traits=SimpleNamespace(default_control_frequency_range=(3.0, 5.75, 0.005))
+    )
+    monkeypatch.setattr(task, "get_experiment", lambda _backend: exp)
+    monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
+
+    task.resolve_run_parameters(backend, "0")
+
+    assert task.run_parameters["frequency_range"].value == (3.0, 5.75, 0.005)
+    exp.ctx.experiment_system.get_control_box_for_qubit.assert_called_once_with("Q00")
+
+
+def test_run_parameters_only_expose_measurement_settings() -> None:
+    assert set(CheckQubitSpectroscopy.run_spec) == {"frequency_range", "readout_amplitude"}
+
+
+def test_frequency_range_can_be_overridden_per_task() -> None:
+    task = CheckQubitSpectroscopy()
+    task.run_parameters = copy.deepcopy(task.run_parameters)
+    task.run_parameters["frequency_range"].value = (3.0, 3.3, 0.1)
+
+    assert list(task._frequency_range()) == pytest.approx([3.0, 3.1, 3.2])
+
+
+def test_explicit_frequency_range_is_not_resolved_from_control_box() -> None:
+    task = CheckQubitSpectroscopy()
+    task.run_parameters["frequency_range"].value = (3.0, 3.3, 0.1)
+    backend = cast("QubexBackend", MagicMock())
+
+    with patch.object(task, "get_experiment") as get_experiment:
+        task.resolve_run_parameters(backend, "0")
+
+    get_experiment.assert_not_called()

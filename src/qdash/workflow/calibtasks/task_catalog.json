@@ -1471,90 +1471,16 @@
         },
         "name": "CheckQubitSpectroscopy",
         "run_parameters": {
-          "binarize_threshold_sigma_minus": {
-            "description": "Negative threshold for binarization (in sigma units)",
-            "unit": "a.u.",
-            "value": -2.0,
-            "value_type": "float"
-          },
-          "binarize_threshold_sigma_plus": {
-            "description": "Positive threshold for binarization (in sigma units)",
-            "unit": "a.u.",
-            "value": 3.0,
-            "value_type": "float"
-          },
-          "f01_height_min": {
-            "description": "Minimum height for f01 peak detection (in dB)",
-            "unit": "dB",
-            "value": 14.9,
-            "value_type": "float"
-          },
-          "f12_distance_max": {
-            "description": "Maximum distance from f01 for f12 detection (in GHz)",
-            "unit": "GHz",
-            "value": 0.5,
-            "value_type": "float"
-          },
-          "f12_distance_min": {
-            "description": "Minimum distance from f01 for f12 detection (in GHz)",
-            "unit": "GHz",
-            "value": 0.125,
-            "value_type": "float"
-          },
-          "f12_height_min": {
-            "description": "Minimum height for f12 peak detection (in dB)",
-            "unit": "dB",
-            "value": 14.9,
-            "value_type": "float"
-          },
           "frequency_range": {
-            "description": "Frequency range for qubit spectroscopy on the high band (64Q chips). Used when chip_id does not contain '144'.",
+            "description": "Frequency range as [start, stop, step] in GHz. Leave blank to use the connected control box default. Examples: low band [3.0, 5.75, 0.005], high band [6.5, 9.75, 0.005].",
             "unit": "GHz",
-            "value": [
-              6.5,
-              9.75,
-              0.005
-            ],
+            "value": null,
             "value_type": "np.arange"
-          },
-          "frequency_range_low_band": {
-            "description": "Frequency range for qubit spectroscopy on the low band (144Q chips). Used when chip_id contains '144'.",
-            "unit": "GHz",
-            "value": [
-              3.0,
-              5.75,
-              0.005
-            ],
-            "value_type": "np.arange"
-          },
-          "max_coarse_control_amplitude": {
-            "description": "Upper bound for the uplifted coarse_control_amplitude so strong spectroscopy responses do not push the seed above a safe drive amplitude.",
-            "unit": "a.u.",
-            "value": 1.0,
-            "value_type": "float"
           },
           "readout_amplitude": {
             "description": "Readout amplitude used during the qubit spectroscopy sweep",
             "unit": "a.u.",
             "value": 0.04,
-            "value_type": "float"
-          },
-          "retry_with_trim": {
-            "description": "If 'true', drop the highest-power row and retry when no f01 is detected on the first pass. If f01 is still not detected, drop one additional highest-power row and retry once more. Useful when the top rows are noisy.",
-            "unit": "",
-            "value": "false",
-            "value_type": "str"
-          },
-          "seed_amplitude_headroom_db": {
-            "description": "Headroom added on top of f01_repr_db before converting it to the coarse_control_amplitude seed used by downstream chevron/amplitude tasks.",
-            "unit": "dB",
-            "value": 10.0,
-            "value_type": "float"
-          },
-          "top_power": {
-            "description": "Reference power for height and moment calculation (should be > max(ys))",
-            "unit": "dB",
-            "value": 0.0,
             "value_type": "float"
           }
         },
@@ -1704,67 +1630,11 @@
         "input_parameters": {},
         "name": "CheckResonatorSpectroscopy",
         "run_parameters": {
-          "bare_shift_estimator_type": {
-            "description": "How to pick the bare-shift boundary. 'config' uses high_power_min/max/low_power; 'high_frequency_strength' detects it from the FFT of each row.",
-            "unit": "",
-            "value": "high_frequency_strength",
-            "value_type": "str"
-          },
-          "bare_shift_strength_limit": {
-            "description": "Maximum high-frequency FFT strength accepted as the bare-shift boundary. Only used when bare_shift_estimator_type='high_frequency_strength'.",
-            "unit": "a.u.",
-            "value": 4.0,
-            "value_type": "float"
-          },
           "frequency_range": {
-            "description": "Frequency range for resonator spectroscopy on the high band (64Q chips). Used when chip_id does not contain '144'.",
+            "description": "Frequency range as [start, stop, step] in GHz. Leave blank to use the connected readout box default. Examples: low band [5.75, 6.75, 0.002], high band [9.75, 10.75, 0.002].",
             "unit": "GHz",
-            "value": [
-              9.75,
-              10.75,
-              0.002
-            ],
+            "value": null,
             "value_type": "np.arange"
-          },
-          "frequency_range_low_band": {
-            "description": "Frequency range for resonator spectroscopy on the low band (144Q chips). Used when chip_id contains '144'.",
-            "unit": "GHz",
-            "value": [
-              5.75,
-              6.75,
-              0.002
-            ],
-            "value_type": "np.arange"
-          },
-          "high_power_max": {
-            "description": "Maximum power for high-power peak detection",
-            "unit": "dB",
-            "value": 0.0,
-            "value_type": "float"
-          },
-          "high_power_min": {
-            "description": "Minimum power for high-power peak detection",
-            "unit": "dB",
-            "value": -20.0,
-            "value_type": "float"
-          },
-          "low_power": {
-            "description": "Power level for low-power peak detection",
-            "unit": "dB",
-            "value": -30.0,
-            "value_type": "float"
-          },
-          "minimum_usable_power_correlation_coefficient_min": {
-            "description": "Minimum adjacent-row correlation used to estimate the minimum usable power for optimal_power calculation.",
-            "unit": "a.u.",
-            "value": 0.9,
-            "value_type": "float"
-          },
-          "num_resonators": {
-            "description": "Number of resonators to detect",
-            "unit": "a.u.",
-            "value": 4,
-            "value_type": "int"
           },
           "power_range": {
             "description": "Power range for resonator spectroscopy",
@@ -1776,11 +1646,16 @@
             ],
             "value_type": "np.arange"
           },
-          "resonator_assignment_pattern": {
-            "description": "Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2].",
+          "resonator_assignment_order": {
+            "description": "Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once.",
             "unit": "",
-            "value": "default",
-            "value_type": "str"
+            "value": [
+              3,
+              0,
+              2,
+              1
+            ],
+            "value_type": "list"
           },
           "shots": {
             "description": "Number of shots for resonator spectroscopy",

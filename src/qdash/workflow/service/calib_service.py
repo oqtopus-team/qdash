@@ -145,7 +145,10 @@ def on_flow_cancellation(flow: Any, flow_run: Any, state: Any) -> None:
 def on_flow_failure(flow: Any, flow_run: Any, state: Any) -> None:
     """Prefect on_failure hook. Closes executions left open by an exception."""
     _run_terminal_hook(
-        "on_flow_failure", flow_run, "failed", "Flow run failed before the execution was closed"
+        "on_flow_failure",
+        flow_run,
+        "failed",
+        _terminal_state_message(state, "Flow run failed before the execution was closed"),
     )
 
 
@@ -154,6 +157,14 @@ def on_flow_crashed(flow: Any, flow_run: Any, state: Any) -> None:
     _run_terminal_hook(
         "on_flow_crashed", flow_run, "failed", "Flow run crashed before the execution was closed"
     )
+
+
+def _terminal_state_message(state: Any, fallback: str) -> str:
+    """Return Prefect's terminal reason without exposing an unbounded payload."""
+    message = getattr(state, "message", None)
+    if not isinstance(message, str) or not message.strip():
+        return fallback
+    return message.strip()[:2000]
 
 
 def on_flow_cancellation_keep_lock(flow: Any, flow_run: Any, state: Any) -> None:
@@ -183,7 +194,7 @@ def on_flow_failure_keep_lock(flow: Any, flow_run: Any, state: Any) -> None:
         "on_flow_failure_keep_lock",
         flow_run,
         "failed",
-        "Flow run failed before the execution was closed",
+        _terminal_state_message(state, "Flow run failed before the execution was closed"),
         release_lock=False,
     )
 

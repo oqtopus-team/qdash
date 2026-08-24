@@ -40,6 +40,7 @@ class MockTask:
         self.input_parameters: dict[str, Any] = {}
         self.input_parameters_from_snapshot = False
         self.run_parameters: dict[str, Any] = {}
+        self.resolve_run_parameters_callback: Any = None
 
     def get_name(self) -> str:
         return self.name
@@ -58,6 +59,10 @@ class MockTask:
 
     def prepare_run(self, session: Any, qid: str) -> None:
         pass
+
+    def resolve_run_parameters(self, session: Any, qid: str) -> None:
+        if self.resolve_run_parameters_callback is not None:
+            self.resolve_run_parameters_callback(session, qid)
 
     def run(self, session: Any, qid: str) -> RunResult:
         return RunResult(raw_result={"data": [1, 2, 3]}, r2={"0": 0.95})
@@ -588,6 +593,24 @@ class TestTaskExecutorExecuteTask:
         assert call_args[1]["shots"]["value"] == 1024
         assert call_args[2] == "qubit"  # task_type
         assert call_args[3] == "0"  # qid
+
+    def test_execute_task_resolves_run_parameters_before_recording(
+        self, executor: TaskExecutor, mock_state_manager: MagicMock
+    ) -> None:
+        task = MockTask()
+        task.run_parameters = {
+            "frequency_range": RunParameterModel(value=None, value_type="np.arange")
+        }
+
+        def resolve_run_parameters(_backend: Any, _qid: str) -> None:
+            task.run_parameters["frequency_range"].value = (5.75, 6.75, 0.002)
+
+        task.resolve_run_parameters_callback = resolve_run_parameters
+
+        executor.execute_task(task, MockSession(), "0")  # type: ignore[arg-type]
+
+        recorded = mock_state_manager.put_run_parameters.call_args.args[1]
+        assert recorded["frequency_range"]["value"] == (5.75, 6.75, 0.002)
 
     def test_execute_task_skips_empty_run_parameters(
         self, executor: TaskExecutor, mock_state_manager: MagicMock

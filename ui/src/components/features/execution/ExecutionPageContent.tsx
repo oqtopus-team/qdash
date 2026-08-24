@@ -457,6 +457,9 @@ export function ExecutionPageContent() {
                       <span className="truncate">{formatActorLabel(execution)}</span>
                     </span>
                   </div>
+                  {execution.status === "failed" && execution.message && (
+                    <p className="mt-2 line-clamp-2 text-xs text-error">{execution.message}</p>
+                  )}
                 </div>
               </div>
             );
@@ -528,6 +531,15 @@ export function ExecutionPageContent() {
               <h3 className="text-base sm:text-xl font-bold mb-3 sm:mb-4">Execution Details</h3>
               {isDetailLoading && <div>Loading details...</div>}
               {isDetailError && <div>Error loading details.</div>}
+              {executionDetailData?.data.status === "failed" &&
+                executionDetailData.data.message && (
+                  <div className="alert alert-error mb-4 items-start text-sm">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span className="break-words whitespace-pre-wrap">
+                      {executionDetailData.data.message}
+                    </span>
+                  </div>
+                )}
               {executionDetailData &&
                 executionDetailData.data.task &&
                 executionDetailData.data.task.map((detailTask, idx) => {

@@ -51,6 +51,10 @@ class TaskProtocol(Protocol):
         """Apply resolved inputs immediately before task execution."""
         ...
 
+    def resolve_run_parameters(self, backend: Any, qid: str) -> None:
+        """Resolve backend-dependent defaults before recording run parameters."""
+        ...
+
     def run(self, backend: Any, qid: str) -> RunResult | None:
         """Run the task."""
         ...

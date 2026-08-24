@@ -163,6 +163,7 @@ class ExecutionService:
                 name=f"{execution.name}-{execution.execution_id}",
                 execution_id=execution.execution_id,
                 status=execution.status,
+                message=execution.message,
                 user_id=execution.user_id,
                 username=execution.username,
                 start_at=execution.start_at,
@@ -236,6 +237,7 @@ class ExecutionService:
         return ExecutionResponseDetail(
             name=f"{execution.name}-{execution.execution_id}",
             status=execution.status,
+            message=execution.message,
             flow_name=execution.name,
             user_id=execution.user_id,
             username=execution.username,

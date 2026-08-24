@@ -92,6 +92,7 @@ class ExecutionResponseSummary(BaseModel):
     name: str
     execution_id: str
     status: str
+    message: str = ""
     user_id: str | None = None
     username: str = ""
     start_at: datetime | None = None
@@ -134,6 +135,7 @@ class ExecutionResponseDetail(BaseModel):
 
     name: str
     status: str
+    message: str = ""
     flow_name: str = ""
     user_id: str | None = None
     username: str = ""
