@@ -3,48 +3,36 @@
     "fake": [
       {
         "class_name": "FakeCheckFineChevron",
-        "description": "Fake-backend adapter for the production CheckFineChevron task.\n\nThe production task expects initial qubit/readout frequencies from calibration\nstorage. A fresh fake project has no stored calibration yet, so seed those\ninputs from FakeExperiment while keeping the production task implementation\nunchanged.",
-        "file_path": "qubex_compat.py",
-        "input_parameters": {
-          "control_amplitude": {
-            "default_value": 0.0625,
-            "description": "Control pulse amplitude",
-            "greater_than": 0.0001,
-            "less_than": 1.0,
-            "resolution": "database_or_default",
-            "unit": "a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_amplitude": {
-            "default_value": null,
-            "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
-          "readout_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
-            "user_override": "allowed"
-          }
-        },
+        "description": "Fake task to simulate chevron pattern calibration.\n\nThis is the entry point task that determines the qubit frequency.\nIt simulates finding the resonant frequency through a chevron pattern sweep.\n\nNote: Uses same name as qubex task for seamless backend switching.\n\nOutputs:\n    qubit_frequency: Simulated qubit bare frequency (GHz)\n    readout_frequency: Simulated readout resonator frequency (GHz)",
+        "file_path": "fake_check_fine_chevron.py",
+        "input_parameters": {},
         "name": "CheckFineChevron",
         "run_parameters": {
-          "readout_amplitude": {
-            "description": "Readout amplitude",
+          "control_amplitude": {
+            "description": "Control pulse amplitude",
             "unit": "a.u.",
-            "value": 0.2,
+            "value": 0.5,
             "value_type": "float"
+          },
+          "frequency_range": {
+            "description": "Drive frequency range for chevron pattern",
+            "unit": "GHz",
+            "value": [
+              7.82,
+              7.94,
+              101
+            ],
+            "value_type": "range"
+          },
+          "time_range": {
+            "description": "Time range for chevron pattern",
+            "unit": "ns",
+            "value": [
+              0,
+              200,
+              51
+            ],
+            "value_type": "range"
           }
         },
         "task_type": "qubit"
@@ -973,54 +961,6 @@
         "task_type": "qubit"
       },
       {
-        "class_name": "CheckCoarseChevron",
-        "description": "Coarse chevron pattern that locates the qubit resonance with a wide, sparse sweep.\n\nDesigned to bracket spectroscopy seeds that may be off by up to ~60 MHz, so the\ndownstream CheckFineChevron can use a narrow ±10 MHz window for the fine measurement.",
-        "file_path": "one_qubit_coarse/check_coarse_chevron.py",
-        "input_parameters": {
-          "coarse_qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "control_amplitude": {
-            "default_value": 0.0625,
-            "description": "Control pulse amplitude",
-            "greater_than": 0.0001,
-            "less_than": 1.0,
-            "resolution": "database_or_default",
-            "unit": "a.u.",
-            "user_override": "allowed"
-          },
-          "readout_amplitude": {
-            "default_value": null,
-            "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
-          "readout_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
-            "user_override": "allowed"
-          }
-        },
-        "name": "CheckCoarseChevron",
-        "run_parameters": {
-          "readout_amplitude": {
-            "description": "Readout amplitude",
-            "unit": "a.u.",
-            "value": 0.2,
-            "value_type": "float"
-          }
-        },
-        "task_type": "qubit"
-      },
-      {
         "class_name": "CheckCoarseReadoutParams",
         "description": "Task to check the Optimal Readout Frequency",
         "file_path": "one_qubit_coarse/check_coarse_readout_params.py",
@@ -1341,85 +1281,6 @@
         "task_type": "qubit"
       },
       {
-        "class_name": "CheckDispersiveShift",
-        "description": "Task to check the Dispersive Shift",
-        "file_path": "one_qubit_coarse/check_dispersive_shift.py",
-        "input_parameters": {},
-        "name": "CheckDispersiveShift",
-        "run_parameters": {
-          "interval": {
-            "description": "Time interval for Rabi oscillation",
-            "unit": "ns",
-            "value": 153600.0,
-            "value_type": "int"
-          },
-          "shots": {
-            "description": "Number of shots for Rabi oscillation",
-            "unit": "a.u.",
-            "value": 2048,
-            "value_type": "int"
-          }
-        },
-        "task_type": "qubit"
-      },
-      {
-        "class_name": "CheckElectricalDelay",
-        "description": "Task to check the electrical delay.",
-        "file_path": "cw/check_electrical_delay.py",
-        "input_parameters": {},
-        "name": "CheckElectricalDelay",
-        "run_parameters": {},
-        "task_type": "qubit"
-      },
-      {
-        "class_name": "CheckFineChevron",
-        "description": "Fine chevron pattern that refines qubit_frequency with a narrow ±10 MHz sweep.\n\nRuns after CheckCoarseChevron has located the qubit within ~MHz; this task\nfurther refines qubit_frequency and the chevron-derived control_amplitude.",
-        "file_path": "one_qubit_coarse/check_fine_chevron.py",
-        "input_parameters": {
-          "control_amplitude": {
-            "default_value": 0.0625,
-            "description": "Control pulse amplitude",
-            "greater_than": 0.0001,
-            "less_than": 1.0,
-            "resolution": "database_or_default",
-            "unit": "a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_amplitude": {
-            "default_value": null,
-            "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
-          "readout_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
-            "user_override": "allowed"
-          }
-        },
-        "name": "CheckFineChevron",
-        "run_parameters": {
-          "readout_amplitude": {
-            "description": "Readout amplitude",
-            "unit": "a.u.",
-            "value": 0.2,
-            "value_type": "float"
-          }
-        },
-        "task_type": "qubit"
-      },
-      {
         "class_name": "CheckHPIPulse",
         "description": "Task to check the HPI pulse.",
         "file_path": "one_qubit_coarse/check_hpi_pulse.py",
@@ -1588,89 +1449,6 @@
             "unit": "a.u.",
             "value": 20,
             "value_type": "int"
-          }
-        },
-        "task_type": "qubit"
-      },
-      {
-        "class_name": "CheckQubit",
-        "description": "Task to check the Qubit Rabi oscillation breifly.",
-        "file_path": "one_qubit_coarse/check_qubit.py",
-        "input_parameters": {},
-        "name": "CheckQubit",
-        "run_parameters": {
-          "interval": {
-            "description": "Time interval for Rabi oscillation",
-            "unit": "ns",
-            "value": 153600.0,
-            "value_type": "int"
-          },
-          "shots": {
-            "description": "Number of shots for Rabi oscillation",
-            "unit": "a.u.",
-            "value": 1024,
-            "value_type": "int"
-          },
-          "time_range": {
-            "description": "Time range for Rabi oscillation",
-            "unit": "ns",
-            "value": [
-              0,
-              201,
-              4
-            ],
-            "value_type": "range"
-          }
-        },
-        "task_type": "qubit"
-      },
-      {
-        "class_name": "CheckQubitFrequencies",
-        "description": "Task to check the qubit frequencies.",
-        "file_path": "cw/check_qubit_frequencies.py",
-        "input_parameters": {},
-        "name": "CheckQubitFrequencies",
-        "run_parameters": {},
-        "task_type": "qubit"
-      },
-      {
-        "class_name": "CheckQubitFrequency",
-        "description": "Task to check the qubit frequency.",
-        "file_path": "one_qubit_coarse/check_qubit_frequency.py",
-        "input_parameters": {},
-        "name": "CheckQubitFrequency",
-        "run_parameters": {
-          "detuning_range": {
-            "description": "Detuning range",
-            "unit": "GHz",
-            "value": [
-              -0.01,
-              0.01,
-              21
-            ],
-            "value_type": "np.linspace"
-          },
-          "interval": {
-            "description": "Time interval",
-            "unit": "ns",
-            "value": 153600.0,
-            "value_type": "int"
-          },
-          "shots": {
-            "description": "Number of shots",
-            "unit": "a.u.",
-            "value": 1024,
-            "value_type": "int"
-          },
-          "time_range": {
-            "description": "Time range",
-            "unit": "ns",
-            "value": [
-              0,
-              101,
-              4
-            ],
-            "value_type": "range"
           }
         },
         "task_type": "qubit"
@@ -1920,103 +1698,6 @@
         "task_type": "qubit"
       },
       {
-        "class_name": "CheckReadoutAmplitude",
-        "description": "Task to check the readout amplitude.",
-        "file_path": "cw/check_readout_amplitude.py",
-        "input_parameters": {},
-        "name": "CheckReadoutAmplitude",
-        "run_parameters": {
-          "amplitude_range": {
-            "description": "Amplitude range for readout",
-            "unit": "a.u.",
-            "value": [
-              0.0,
-              0.2,
-              51
-            ],
-            "value_type": "np.linspace"
-          },
-          "snr_threshold": {
-            "description": "SNR threshold for determining readout amplitude",
-            "unit": "a.u.",
-            "value": 1.0,
-            "value_type": "float"
-          }
-        },
-        "task_type": "qubit"
-      },
-      {
-        "class_name": "CheckReadoutFrequency",
-        "description": "Task to check the readout frequency.",
-        "file_path": "one_qubit_coarse/check_readout_frequency.py",
-        "input_parameters": {},
-        "name": "CheckReadoutFrequency",
-        "run_parameters": {
-          "detuning_range": {
-            "description": "Detuning range",
-            "unit": "GHz",
-            "value": [
-              -0.01,
-              0.01,
-              21
-            ],
-            "value_type": "np.linspace"
-          },
-          "interval": {
-            "description": "Time interval",
-            "unit": "ns",
-            "value": 153600.0,
-            "value_type": "int"
-          },
-          "shots": {
-            "description": "Number of shots",
-            "unit": "a.u.",
-            "value": 1024,
-            "value_type": "int"
-          },
-          "time_range": {
-            "description": "Time range",
-            "unit": "ns",
-            "value": [
-              0,
-              101,
-              4
-            ],
-            "value_type": "range"
-          }
-        },
-        "task_type": "qubit"
-      },
-      {
-        "class_name": "CheckReflectionCoefficient",
-        "description": "Task to check the reflection coefficient of a resonator.",
-        "file_path": "cw/check_reflection_coefficient.py",
-        "input_parameters": {},
-        "name": "CheckReflectionCoefficient",
-        "run_parameters": {},
-        "task_type": "qubit"
-      },
-      {
-        "class_name": "CheckResonatorFrequencies",
-        "description": "Task to check the resonator frequencies.",
-        "file_path": "cw/check_resonator_frequencies.py",
-        "input_parameters": {},
-        "name": "CheckResonatorFrequencies",
-        "run_parameters": {
-          "frequency_range": {
-            "description": "Frequency range for resonator frequencies",
-            "unit": "GHz",
-            "value": [
-              9.75,
-              10.75,
-              0.002
-            ],
-            "value_type": "np.arange"
-          }
-        },
-        "task_type": "qubit"
-      },
-      {
         "class_name": "CheckResonatorSpectroscopy",
         "description": "Task to check the resonator spectroscopy.\n\nThis is a MUX-level task that performs spectroscopy on all resonators\nin a MUX simultaneously. The scheduler should execute this task once\nper MUX, and the result will be used by all qubits in that MUX.\n\nNote: task_type remains \"qubit\" for frontend compatibility, but\nis_mux_level=True indicates this task runs once per MUX.",
         "file_path": "cw/check_resonator_spectroscopy.py",
@@ -2103,38 +1784,6 @@
           },
           "shots": {
             "description": "Number of shots for resonator spectroscopy",
-            "unit": "a.u.",
-            "value": 1024,
-            "value_type": "int"
-          }
-        },
-        "task_type": "qubit"
-      },
-      {
-        "class_name": "CheckSimultaneousQubitSpectroscopy",
-        "description": "Task to run qubit spectroscopy for multiple qubits simultaneously.",
-        "file_path": "cw/check_simultaneous_qubit_spectroscopy.py",
-        "input_parameters": {},
-        "name": "CheckSimultaneousQubitSpectroscopy",
-        "run_parameters": {
-          "interval": {
-            "description": "Measurement interval for simultaneous qubit spectroscopy",
-            "unit": "ns",
-            "value": 153600.0,
-            "value_type": "int"
-          },
-          "power_range": {
-            "description": "Drive power sweep range for simultaneous qubit spectroscopy",
-            "unit": "dB",
-            "value": [
-              -40.0,
-              0.0,
-              5.0
-            ],
-            "value_type": "np.arange"
-          },
-          "shots": {
-            "description": "Number of shots for simultaneous qubit spectroscopy",
             "unit": "a.u.",
             "value": 1024,
             "value_type": "int"
@@ -2673,15 +2322,6 @@
           }
         },
         "task_type": "coupling"
-      },
-      {
-        "class_name": "ChevronPattern",
-        "description": "Legacy alias for CheckFineChevron — kept for UI filtering of historical results.",
-        "file_path": "one_qubit_coarse/legacy_chevron_pattern.py",
-        "input_parameters": {},
-        "name": "ChevronPattern",
-        "run_parameters": {},
-        "task_type": "qubit"
       },
       {
         "class_name": "Configure",

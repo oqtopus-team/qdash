@@ -24,32 +24,16 @@ from qdash.workflow.calibtasks.qubex.box_setup.dump_box import DumpBox
 from qdash.workflow.calibtasks.qubex.box_setup.link_up import LinkUp
 from qdash.workflow.calibtasks.qubex.box_setup.readout_configure import ReadoutConfigure
 from qdash.workflow.calibtasks.qubex.cw.check_control_amplitude import CheckControlAmplitude
-from qdash.workflow.calibtasks.qubex.cw.check_qubit_frequencies import CheckQubitFrequencies
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import CheckQubitSpectroscopy
-from qdash.workflow.calibtasks.qubex.cw.check_readout_amplitude import CheckReadoutAmplitude
-from qdash.workflow.calibtasks.qubex.cw.check_reflection_coefficient import (
-    CheckReflectionCoefficient,
-)
-from qdash.workflow.calibtasks.qubex.cw.check_resonator_frequencies import CheckResonatorFrequencies
 from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
     CheckResonatorSpectroscopy,
-)
-from qdash.workflow.calibtasks.qubex.cw.check_simultaneous_qubit_spectroscopy import (
-    CheckSimultaneousQubitSpectroscopy,
 )
 from qdash.workflow.calibtasks.qubex.cw.check_waveform import CheckWaveform
 from qdash.workflow.calibtasks.qubex.measurement.readout_classification import ReadoutClassification
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_chevron import CheckChevron
-from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_coarse_chevron import (
-    CheckCoarseChevron,
-)
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_coarse_readout_params import (
     CheckCoarseReadoutParams,
 )
-from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_dispersive_shift import (
-    CheckDispersiveShift,
-)
-from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_fine_chevron import CheckFineChevron
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_hpi_pulse import CheckHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_optimal_readout_amplitude import (
     CheckOptimalReadoutAmplitude,
@@ -58,15 +42,8 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_optimal_readout_freq
     CheckOptimalReadoutFrequency,
 )
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_pi_pulse import CheckPIPulse
-from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_qubit import CheckQubit
-from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_qubit_frequency import (
-    CheckQubitFrequency,
-)
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_rabi import CheckRabi
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_ramsey import CheckRamsey
-from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_readout_frequency import (
-    CheckReadoutFrequency,
-)
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t1 import CheckT1
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t1_average import CheckT1Average
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t2_echo import CheckT2Echo
@@ -75,9 +52,6 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t2_echo_average impo
 )
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_hpi_pulse import CreateHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_pi_pulse import CreatePIPulse
-from qdash.workflow.calibtasks.qubex.one_qubit_coarse.legacy_chevron_pattern import (
-    ChevronPattern,
-)
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_hpi_pulse import CheckDRAGHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_pi_pulse import CheckDRAGPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_hpi_pulse import CreateDRAGHPIPulse
@@ -96,31 +70,20 @@ __all__ = [
     "CheckBellState",
     "CheckBellStateTomography",
     "CheckChevron",
-    "CheckCoarseChevron",
     "CheckCoarseReadoutParams",
     "CheckControlAmplitude",
     "CheckCrossResonance",
     "CheckDRAGHPIPulse",
     "CheckDRAGPIPulse",
-    "CheckDispersiveShift",
-    "CheckFineChevron",
     "CheckHPIPulse",
     "CheckNoise",
     "CheckOptimalReadoutAmplitude",
     "CheckOptimalReadoutFrequency",
     "CheckPIPulse",
-    "CheckQubit",
-    "CheckQubitFrequencies",
-    "CheckQubitFrequency",
     "CheckQubitSpectroscopy",
     "CheckRabi",
     "CheckRamsey",
-    "CheckReadoutAmplitude",
-    "CheckReadoutFrequency",
-    "CheckReflectionCoefficient",
-    "CheckResonatorFrequencies",
     "CheckResonatorSpectroscopy",
-    "CheckSimultaneousQubitSpectroscopy",
     "CheckStatus",
     "CheckT1",
     "CheckT1Average",
@@ -128,7 +91,6 @@ __all__ = [
     "CheckT2EchoAverage",
     "CheckWaveform",
     "CheckZX90",
-    "ChevronPattern",  # legacy alias of CheckFineChevron — UI selector only
     "Configure",
     "ConfigureAll",
     "CreateDRAGHPIPulse",

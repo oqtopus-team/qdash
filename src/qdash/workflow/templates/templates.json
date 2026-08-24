@@ -8,14 +8,6 @@
     "function_name": "bringup"
   },
   {
-    "id": "experimental_simultaneous_bringup",
-    "name": "Experimental Simultaneous Bring-up",
-    "description": "Experimental single-execution bring-up with resonator spectroscopy, all-qubit simultaneous spectroscopy, and regular bring-up follow-up tasks. Requires explicit mux_ids or qids.",
-    "category": "advanced",
-    "filename": "experimental_simultaneous_bringup.py",
-    "function_name": "experimental_simultaneous_bringup"
-  },
-  {
     "id": "check_waveform",
     "name": "Check Waveform",
     "description": "Readout waveform inspection using qubex CheckWaveform for explicitly selected MUXes or qubits.",
