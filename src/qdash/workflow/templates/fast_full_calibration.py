@@ -26,7 +26,11 @@ from typing import Any
 from prefect import flow
 
 from qdash.workflow.service import CalibService
-from qdash.workflow.service.calib_service import on_flow_cancellation
+from qdash.workflow.service.calib_service import (
+    on_flow_cancellation,
+    on_flow_crashed,
+    on_flow_failure,
+)
 from qdash.workflow.service.steps import (
     ConfigureAll,
     FilterByMetric,
@@ -60,7 +64,11 @@ FAST_1Q_FINE_TUNE_TASKS: list[str] = [
 ]
 
 
-@flow(on_cancellation=[on_flow_cancellation])
+@flow(
+    on_cancellation=[on_flow_cancellation],
+    on_failure=[on_flow_failure],
+    on_crashed=[on_flow_crashed],
+)
 def fast_full_calibration(
     username: str,
     chip_id: str,

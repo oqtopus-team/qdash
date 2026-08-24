@@ -13,7 +13,9 @@ from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.cryostat import MongoCryostatRepository
 from qdash.repository.execution import MongoExecutionRepository
 from qdash.repository.execution_counter import MongoExecutionCounterRepository
+from qdash.repository.execution_finalizer import finalize_executions_by_flow_run_id
 from qdash.repository.execution_history import MongoExecutionHistoryRepository
+from qdash.repository.execution_id import generate_execution_id
 from qdash.repository.execution_lock import MongoExecutionLockRepository
 
 # Filesystem implementations
@@ -92,4 +94,7 @@ __all__ = [
     "TaskRepository",
     "TaskResultHistoryRepository",
     "UserRepository",
+    # Module-level functions
+    "finalize_executions_by_flow_run_id",
+    "generate_execution_id",
 ]
