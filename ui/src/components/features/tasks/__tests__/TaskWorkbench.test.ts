@@ -1,0 +1,26 @@
+import { describe, expect, it } from "vitest";
+
+import { parseTaskParameter } from "../TaskWorkbench";
+
+describe("parseTaskParameter", () => {
+  it("parses complete numeric values", () => {
+    expect(parseTaskParameter("42", "int")).toBe(42);
+    expect(parseTaskParameter(" 1.25 ", "float")).toBe(1.25);
+  });
+
+  it("rejects partial or non-finite numeric values", () => {
+    expect(() => parseTaskParameter("1.5", "int")).toThrow("Expected an integer");
+    expect(() => parseTaskParameter("10oops", "float")).toThrow("Expected a finite number");
+    expect(() => parseTaskParameter("Infinity", "float")).toThrow("Expected a finite number");
+  });
+
+  it("accepts only explicit boolean values", () => {
+    expect(parseTaskParameter("TRUE", "bool")).toBe(true);
+    expect(parseTaskParameter(" false ", "bool")).toBe(false);
+    expect(() => parseTaskParameter("yes", "bool")).toThrow("Expected true or false");
+  });
+
+  it("parses array-shaped run parameter JSON", () => {
+    expect(parseTaskParameter("[0, 1, 2]", "np.linspace")).toEqual([0, 1, 2]);
+  });
+});

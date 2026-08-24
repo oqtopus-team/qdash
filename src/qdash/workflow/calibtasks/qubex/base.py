@@ -1,8 +1,13 @@
+import logging
+import math
 from collections.abc import Generator, Mapping
 from contextlib import ExitStack, contextmanager
 from typing import TYPE_CHECKING, Any
 
-from qdash.datamodel.task import ParameterModel
+from qubex.experiment.experiment_constants import HPI_RAMPTIME, PI_RAMPTIME
+from qubex.experiment.models.rabi_param import RabiParam
+
+from qdash.datamodel.task import InputParameterModel, InputParameterSpec, ParameterModel
 from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.workflow.calibtasks.base import (
@@ -15,6 +20,8 @@ from qdash.workflow.engine.task.provenance_recorder import resolve_qid
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.qubex import QubexBackend
+
+logger = logging.getLogger(__name__)
 
 
 class QubexTask(BaseTask):
@@ -54,14 +61,201 @@ class QubexTask(BaseTask):
                 run_parameters=self.run_parameters,
             )
 
-        # Load declared input_parameters from DB
-        if self.input_parameters:
+        # Fresh executions resolve declarations from current calibration state.
+        # Re-executions arrive with a complete snapshot and must not read current DB values.
+        if self.input_parameters and not self.input_parameters_from_snapshot:
             self._load_parameters_from_db(backend, qid)
 
         return PreProcessResult(
             input_parameters=self.input_parameters,
             run_parameters=self.run_parameters,
         )
+
+    def prepare_run(self, backend: "QubexBackend", qid: str) -> None:
+        """Synchronize final effective QDash inputs into the Qubex context."""
+        self._restore_calibration_context(backend, qid)
+
+    def _resolved_input_values(self, names: tuple[str, ...]) -> dict[str, float] | None:
+        """Return a complete group of numeric inputs, or None when it is undeclared."""
+        if not all(name in self.input_parameters for name in names):
+            return None
+        values: dict[str, float] = {}
+        missing: list[str] = []
+        for name in names:
+            value = self.input_parameters[name].value
+            if value is None:
+                missing.append(name)
+            else:
+                values[name] = float(value)
+        if missing:
+            raise ValueError(
+                f"{self.name} requires resolved calibration inputs: " + ", ".join(missing)
+            )
+        return values
+
+    def _restore_rabi_context(self, backend: "QubexBackend", qid: str) -> None:
+        """Restore Qubex Rabi context from successful QDash calibration inputs."""
+        names = (
+            "control_amplitude",
+            "rabi_amplitude",
+            "rabi_phase",
+            "rabi_offset",
+            "rabi_angle",
+            "rabi_noise",
+            "rabi_distance",
+            "rabi_reference_phase",
+            "rabi_r2",
+            "maximum_rabi_frequency",
+        )
+        values = self._resolved_input_values(names)
+        if values is None:
+            return
+        rabi_r2 = values["rabi_r2"]
+        if not math.isfinite(rabi_r2) or rabi_r2 < 0.6:
+            raise ValueError(
+                f"{self.name} requires finite rabi_r2 greater than or equal to 0.6; got {rabi_r2}"
+            )
+        exp = self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
+        rabi_param = RabiParam(
+            target=label,
+            amplitude=values["rabi_amplitude"],
+            frequency=(values["maximum_rabi_frequency"] * values["control_amplitude"] / 1000),
+            phase=values["rabi_phase"],
+            offset=values["rabi_offset"],
+            noise=values["rabi_noise"],
+            angle=values["rabi_angle"],
+            distance=values["rabi_distance"],
+            r2=rabi_r2,
+            reference_phase=values["rabi_reference_phase"],
+        )
+        exp.store_rabi_params({label: rabi_param})
+
+    def _restore_qubit_pulse_context(self, backend: "QubexBackend", qid: str) -> None:
+        """Restore pulse parameters consumed implicitly by Qubex experiment methods."""
+        pulse_suffixes = (
+            "hpi_amplitude",
+            "pi_amplitude",
+            "drag_hpi_amplitude",
+            "drag_pi_amplitude",
+        )
+        if not any(name.endswith(pulse_suffixes) for name in self.input_parameters):
+            return
+        exp = self.get_experiment(backend)
+        if "-" in qid:
+            control_qid, target_qid = qid.split("-", maxsplit=1)
+            role_labels = {
+                "control_": self.get_qubit_label(backend, control_qid),
+                "target_": self.get_qubit_label(backend, target_qid),
+            }
+        else:
+            role_labels = {"": self.get_qubit_label(backend, qid)}
+
+        for prefix, label in role_labels.items():
+            hpi = self._resolved_input_values((f"{prefix}hpi_amplitude", f"{prefix}hpi_length"))
+            if hpi is not None:
+                exp.calib_note.update_hpi_param(
+                    label,
+                    {
+                        "target": label,
+                        "duration": hpi[f"{prefix}hpi_length"],
+                        "amplitude": hpi[f"{prefix}hpi_amplitude"],
+                        "tau": HPI_RAMPTIME,
+                    },
+                )
+
+            pi = self._resolved_input_values((f"{prefix}pi_amplitude", f"{prefix}pi_length"))
+            if pi is not None:
+                exp.calib_note.update_pi_param(
+                    label,
+                    {
+                        "target": label,
+                        "duration": pi[f"{prefix}pi_length"],
+                        "amplitude": pi[f"{prefix}pi_amplitude"],
+                        "tau": PI_RAMPTIME,
+                    },
+                )
+
+            for pulse_type in ("drag_hpi", "drag_pi"):
+                drag = self._resolved_input_values(
+                    (
+                        f"{prefix}{pulse_type}_amplitude",
+                        f"{prefix}{pulse_type}_length",
+                        f"{prefix}{pulse_type}_beta",
+                    )
+                )
+                if drag is None:
+                    continue
+                getattr(exp.calib_note, f"update_{pulse_type}_param")(
+                    label,
+                    {
+                        "target": label,
+                        "duration": drag[f"{prefix}{pulse_type}_length"],
+                        "amplitude": drag[f"{prefix}{pulse_type}_amplitude"],
+                        "beta": drag[f"{prefix}{pulse_type}_beta"],
+                    },
+                )
+
+    def _restore_cr_context(self, backend: "QubexBackend", qid: str) -> None:
+        """Restore CR parameters consumed implicitly by Qubex two-qubit methods."""
+        if "-" not in qid:
+            return
+        names = (
+            "cr_duration",
+            "cr_amplitude",
+            "cr_phase",
+            "cr_beta",
+            "cancel_amplitude",
+            "cancel_phase",
+            "cancel_beta",
+            "rotary_amplitude",
+            "zx_rotation_rate",
+            "cr_ramptime",
+        )
+        values = self._resolved_input_values(names)
+        if values is None:
+            return
+        exp = self.get_experiment(backend)
+        control_qid, target_qid = qid.split("-", maxsplit=1)
+        label = "-".join(
+            (
+                self.get_qubit_label(backend, control_qid),
+                self.get_qubit_label(backend, target_qid),
+            )
+        )
+        restored = {
+            "target": label,
+            "duration": values["cr_duration"],
+            "ramptime": values["cr_ramptime"],
+            "cr_amplitude": values["cr_amplitude"],
+            "cr_phase": values["cr_phase"],
+            "cr_beta": values["cr_beta"],
+            "cancel_amplitude": values["cancel_amplitude"],
+            "cancel_phase": values["cancel_phase"],
+            "cancel_beta": values["cancel_beta"],
+            "rotary_amplitude": values["rotary_amplitude"],
+            "zx_rotation_rate": values["zx_rotation_rate"],
+        }
+        existing = exp.calib_note.get_cr_param(label)
+        if existing is not None:
+            differences = {
+                name: {"qubex": existing.get(name), "qdash": value}
+                for name, value in restored.items()
+                if existing.get(name) != value
+            }
+            if differences:
+                logger.warning(
+                    "Replacing Qubex CR context for %s with QDash inputs: %s",
+                    label,
+                    differences,
+                )
+        exp.calib_note.update_cr_param(label, restored)
+
+    def _restore_calibration_context(self, backend: "QubexBackend", qid: str) -> None:
+        """Synchronize resolved task inputs into the Qubex in-memory context."""
+        self._restore_rabi_context(backend, qid)
+        self._restore_qubit_pulse_context(backend, qid)
+        self._restore_cr_context(backend, qid)
 
     def _load_parameters_from_db(self, backend: "QubexBackend", qid: str) -> None:
         """Load declared parameter values from QDash database.
@@ -77,7 +271,10 @@ class QubexTask(BaseTask):
         For qubit tasks, data is fetched from a single QubitDocument.
 
         Behavior for each parameter:
-        - If value is None: Create ParameterModel entirely from DB data
+        - If resolution="database_required": Load from DB or raise an error
+        - If resolution="database_or_default": Prefer DB, otherwise use default
+        - If resolution="default_only": Do not use a DB value
+        - If value is None: Deprecated compatibility behavior; create from DB data
         - If value is ParameterModel: Use DB value if available, else use as fallback
 
         Args:
@@ -149,17 +346,22 @@ class QubexTask(BaseTask):
                 to search (in priority order).
 
         """
-        for param_name, param in list(self.input_parameters.items()):
+        declarations = self.__class__.input_spec or self.input_parameters
+        for param_name, declaration in declarations.items():
+            param = self.input_parameters[param_name]
             # Determine the DB lookup key
-            if isinstance(param, ParameterModel) and param.parameter_name:
-                lookup_key = param.parameter_name
+            if (
+                isinstance(declaration, (InputParameterSpec, ParameterModel))
+                and declaration.parameter_name
+            ):
+                lookup_key = declaration.parameter_name
             else:
                 lookup_key = param_name
 
             # Determine the qid_role for source selection
             qid_role = ""
-            if isinstance(param, ParameterModel):
-                qid_role = param.qid_role
+            if isinstance(declaration, (InputParameterSpec, ParameterModel)):
+                qid_role = declaration.qid_role
 
             # Get the ordered list of data sources for this role
             sources = role_data_sources.get(qid_role, role_data_sources.get("", []))
@@ -173,7 +375,16 @@ class QubexTask(BaseTask):
 
             if db_value is not None:
                 if isinstance(db_value, dict):
-                    if param is None:
+                    if isinstance(declaration, InputParameterSpec):
+                        if declaration.resolution == "default_only":
+                            continue
+                        self.input_parameters[param_name] = InputParameterModel(
+                            value=db_value.get("value", declaration.default),
+                            value_type=declaration.value_type,
+                            unit=db_value.get("unit", declaration.unit),
+                            description=db_value.get("description", declaration.description),
+                        )
+                    elif declaration is None:
                         # Create ParameterModel entirely from DB
                         self.input_parameters[param_name] = ParameterModel(
                             value=db_value.get("value", 0),
@@ -184,8 +395,24 @@ class QubexTask(BaseTask):
                         # Update existing ParameterModel with DB value
                         if "value" in db_value:
                             param.value = db_value["value"]
-            elif param is None:
-                # Parameter not in any source and no fallback - create empty
+            elif isinstance(declaration, InputParameterSpec):
+                if declaration.resolution == "database_required":
+                    raise ValueError(
+                        f"Required input parameter '{lookup_key}' for role "
+                        f"'{qid_role or 'self'}' was not found in the calibration database"
+                    )
+                # The instance was initialized with the explicit default value.
+            elif (
+                isinstance(declaration, ParameterModel)
+                and declaration.source == "database"
+                and declaration.required
+            ):
+                raise ValueError(
+                    f"Required input parameter '{lookup_key}' for role "
+                    f"'{qid_role or 'self'}' was not found in the calibration database"
+                )
+            elif declaration is None:
+                # Deprecated compatibility behavior for legacy declarations.
                 self.input_parameters[param_name] = ParameterModel(
                     unit="",
                     description=f"Parameter {param_name} not found in DB",
@@ -378,7 +605,7 @@ class QubexTask(BaseTask):
 
         """
         param = self.input_parameters[param_name]
-        if param is None:
+        if param is None or param.value is None:
             raise ValueError(f"Parameter {param_name} not found or not loaded")
         # ParameterModel has .value, RunParameterModel has .get_value()
         if hasattr(param, "get_value"):

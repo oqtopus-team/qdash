@@ -5,7 +5,11 @@ from typing import ClassVar
 import numpy as np
 import plotly.graph_objects as go
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -35,40 +39,41 @@ class FakeCreateHPIPulse(FakeTask):
     task_type: str = "qubit"
     timeout: int = 60
 
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": ParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.default_only(
+            default=0,
             unit="GHz",
             description="Qubit frequency from CheckFineChevron",
         ),
     }
 
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "amplitude_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "amplitude_range": RunParameterSpec(
             unit="a.u.",
             value_type="range",
-            value=(0.1, 0.5, 21),
+            default=(0.1, 0.5, 21),
             description="Amplitude range for HPI calibration",
         ),
-        "hpi_duration": RunParameterModel(
+        "hpi_duration": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=20,
+            default=20,
             description="HPI pulse duration",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="",
             value_type="int",
-            value=1024,
+            default=1024,
             description="Number of shots",
         ),
     }
 
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "hpi_amplitude": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "hpi_amplitude": OutputParameterSpec(
             unit="a.u.",
             description="Half-pi pulse amplitude",
         ),
-        "hpi_length": ParameterModel(
+        "hpi_length": OutputParameterSpec(
             unit="ns",
             description="Half-pi pulse duration",
         ),

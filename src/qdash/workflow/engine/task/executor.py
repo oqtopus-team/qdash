@@ -152,6 +152,15 @@ class TaskExecutor:
         """Run the main task logic."""
         return task.run(backend, qid)
 
+    def _prepare_run(
+        self,
+        task: TaskProtocol,
+        backend: BackendProtocol,
+        qid: str,
+    ) -> None:
+        """Apply resolved task inputs after overrides and validation."""
+        task.prepare_run(backend, qid)
+
     def _run_batch_task(
         self,
         task: TaskProtocol,
@@ -336,6 +345,14 @@ class TaskExecutor:
             if self._snapshot_loader is not None:
                 self._apply_user_overrides_only(task, task_name, task_type, qid)
 
+            # Validate once after database/snapshot resolution and user overrides.
+            # Task-specific preprocess/run code must not repair effective inputs.
+            self._validate_effective_inputs(task)
+
+            # Synchronize the final effective inputs only after user overrides
+            # have been applied and validated.
+            self._prepare_run(task, backend, qid)
+
             # 3. Run
             run_result = self._run_task(task, backend, qid)
             result.r2 = run_result.r2 if run_result else None
@@ -429,7 +446,7 @@ class TaskExecutor:
                                     task_name, task_type, qid
                                 )
                             backend_success = False
-                            r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f}"
+                            r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f} (threshold = {task.r2_threshold})"
 
                     if not backend_success and postprocess_result.output_parameters:
                         self.state_manager.clear_output_parameters(task_name, task_type, qid)
@@ -496,7 +513,11 @@ class TaskExecutor:
                 self.history_recorder.record_task_result(
                     executed_task, execution_service.to_datamodel()
                 )
-                self.history_recorder.create_chip_history_snapshot(self.username)
+                self.history_recorder.create_chip_history_snapshot(
+                    self.username,
+                    chip_id=execution_service.chip_id,
+                    project_id=execution_service.project_id,
+                )
                 execution_service = self._update_execution(execution_service)
 
         result.calib_data_delta = self.state_manager.calib_data
@@ -641,7 +662,7 @@ class TaskExecutor:
                                         task_name, task_type, qid
                                     )
                                 backend_success = False
-                                r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f}"
+                                r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f} (threshold = {task.r2_threshold})"
 
                         if not backend_success and postprocess_result.output_parameters:
                             self.state_manager.clear_output_parameters(task_name, task_type, qid)
@@ -692,7 +713,11 @@ class TaskExecutor:
                         executed_task, execution_service.to_datamodel()
                     )
             if execution_service is not None:
-                self.history_recorder.create_chip_history_snapshot(self.username)
+                self.history_recorder.create_chip_history_snapshot(
+                    self.username,
+                    chip_id=execution_service.chip_id,
+                    project_id=execution_service.project_id,
+                )
                 execution_service = self._update_execution(execution_service)
 
         for result in results.values():
@@ -730,11 +755,15 @@ class TaskExecutor:
         Replaces the task's input_parameters and run_parameters with values
         from the snapshot, and updates state_manager accordingly.
         """
-        from qdash.datamodel.task import ParameterModel, RunParameterModel
+        from qdash.datamodel.task import InputParameterModel, RunParameterModel
 
         assert self._snapshot_loader is not None
         snapshot = self._snapshot_loader.get_snapshot(task_name, qid)
         if snapshot is None:
+            if self._snapshot_loader.requires_snapshot(task_name):
+                raise ValueError(
+                    f"Snapshot inputs for task '{task_name}' and qid '{qid}' were not found"
+                )
             logger.warning(
                 "No snapshot found for task=%s, qid=%s - continuing with default parameters",
                 task_name,
@@ -743,6 +772,15 @@ class TaskExecutor:
             return
 
         snap_input, snap_run = snapshot
+        if self._snapshot_loader.requires_snapshot(task_name):
+            declarations = getattr(task.__class__, "input_spec", {})
+            missing_inputs = set(declarations) - set(snap_input)
+            if missing_inputs:
+                missing = ", ".join(sorted(missing_inputs))
+                raise ValueError(
+                    f"Snapshot inputs for task '{task_name}' and qid '{qid}' "
+                    f"are incomplete; missing: {missing}"
+                )
         logger.info(
             "Applying snapshot overrides for task=%s, qid=%s (input_params=%d, run_params=%d)",
             task_name,
@@ -756,11 +794,14 @@ class TaskExecutor:
             reconstructed_input = {
                 k: m
                 for k, v in snap_input.items()
-                if (m := self._reconstruct_param(ParameterModel, k, v)) is not None
+                if (m := self._reconstruct_param(InputParameterModel, k, v)) is not None
             }
             task.input_parameters = reconstructed_input
             # Re-record in state_manager
             self.state_manager.put_input_parameters(task_name, reconstructed_input, task_type, qid)
+
+        if self._snapshot_loader.requires_snapshot(task_name):
+            task.input_parameters_from_snapshot = True
 
         # Override run_parameters on the task instance
         if snap_run:
@@ -788,7 +829,11 @@ class TaskExecutor:
         explicitly overrode. This preserves values computed by preprocess
         (e.g. readout_amplitude from SNR sweep).
         """
-        from qdash.datamodel.task import ParameterModel, RunParameterModel
+        from qdash.datamodel.task import (
+            InputParameterSpec,
+            ParameterModel,
+            RunParameterModel,
+        )
 
         assert self._snapshot_loader is not None
         overrides = self._snapshot_loader._parameter_overrides
@@ -800,9 +845,28 @@ class TaskExecutor:
 
         if input_overrides:
             for key, new_value in input_overrides.items():
+                declarations = getattr(task.__class__, "input_spec", {})
+                declaration = declarations.get(key)
+                if (
+                    isinstance(declaration, InputParameterSpec)
+                    and declaration.user_override == "forbidden"
+                ):
+                    raise ValueError(f"Input parameter '{key}' does not allow user overrides")
                 param = task.input_parameters.get(key)
                 if isinstance(param, ParameterModel):
-                    param.value = new_value
+                    converted_value = new_value
+                    if isinstance(declaration, InputParameterSpec):
+                        try:
+                            if declaration.value_type == "float":
+                                converted_value = float(new_value)
+                            elif declaration.value_type == "int":
+                                converted_value = int(new_value)
+                        except (TypeError, ValueError) as exc:
+                            raise ValueError(
+                                f"Input parameter {key!r} must be a valid "
+                                f"{declaration.value_type}, got {new_value!r}"
+                            ) from exc
+                    param.value = converted_value
                     logger.info("User override applied: input.%s = %s", key, new_value)
             self.state_manager.put_input_parameters(
                 task_name,
@@ -819,6 +883,15 @@ class TaskExecutor:
                     logger.info("User override applied: run.%s = %s", key, new_value)
             run_params_dict = {k: v.model_dump() for k, v in task.run_parameters.items()}
             self.state_manager.put_run_parameters(task_name, run_params_dict, task_type, qid)
+
+    @staticmethod
+    def _validate_effective_inputs(task: TaskProtocol) -> None:
+        """Validate declared effective inputs without mutating task parameters."""
+        declarations = getattr(task.__class__, "input_spec", {})
+        for name, declaration in declarations.items():
+            parameter = task.input_parameters.get(name)
+            value = parameter.value if parameter is not None else None
+            declaration.validate_effective_value(name, value)
 
     def _update_execution(self, execution_service: "ExecutionService") -> "ExecutionService":
         """Update execution service with current calibration data."""

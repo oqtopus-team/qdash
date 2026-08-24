@@ -1,6 +1,10 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -22,17 +26,17 @@ class CheckResonatorFrequencies(QubexTask):
 
     name: str = "CheckResonatorFrequencies"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "frequency_range": RunParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "frequency_range": RunParameterSpec(
             unit="GHz",
             value_type="np.arange",
-            value=(9.75, 10.75, 0.002),
+            default=(9.75, 10.75, 0.002),
             description="Frequency range for resonator frequencies",
         )
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "coarse_resonator_frequency": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "coarse_resonator_frequency": OutputParameterSpec(
             unit="GHz", description="Coarse resonator frequency"
         ),
     }

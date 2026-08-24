@@ -5,7 +5,11 @@ from typing import ClassVar
 import numpy as np
 import plotly.graph_objects as go
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -32,35 +36,35 @@ class FakeCheckFineChevron(FakeTask):
     task_type: str = "qubit"
     timeout: int = 60
 
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
 
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "frequency_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "frequency_range": RunParameterSpec(
             unit="GHz",
             value_type="range",
-            value=(7.82, 7.94, 101),
+            default=(7.82, 7.94, 101),
             description="Drive frequency range for chevron pattern",
         ),
-        "time_range": RunParameterModel(
+        "time_range": RunParameterSpec(
             unit="ns",
             value_type="range",
-            value=(0, 200, 51),
+            default=(0, 200, 51),
             description="Time range for chevron pattern",
         ),
-        "control_amplitude": RunParameterModel(
+        "control_amplitude": RunParameterSpec(
             unit="a.u.",
             value_type="float",
-            value=0.5,
+            default=0.5,
             description="Control pulse amplitude",
         ),
     }
 
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "qubit_frequency": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "qubit_frequency": OutputParameterSpec(
             unit="GHz",
             description="Qubit bare frequency determined from chevron pattern",
         ),
-        "readout_frequency": ParameterModel(
+        "readout_frequency": OutputParameterSpec(
             unit="GHz",
             description="Readout resonator frequency",
         ),

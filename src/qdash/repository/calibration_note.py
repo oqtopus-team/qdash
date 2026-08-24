@@ -183,7 +183,6 @@ class MongoCalibrationNoteRepository:
             "project_id": note.project_id,
             "execution_id": note.execution_id,
             "task_id": note.task_id,
-            "username": note.username,
             "chip_id": note.chip_id,
         }
 
@@ -195,6 +194,7 @@ class MongoCalibrationNoteRepository:
         update = {
             "$set": {
                 "user_id": user_id,
+                "username": note.username,
                 "note": note.note,
                 "timestamp": timestamp,
             },
@@ -203,7 +203,6 @@ class MongoCalibrationNoteRepository:
                 "project_id": note.project_id,
                 "execution_id": note.execution_id,
                 "task_id": note.task_id,
-                "username": note.username,
                 "chip_id": note.chip_id,
             },
         }
@@ -257,7 +256,6 @@ class MongoCalibrationNoteRepository:
             "project_id": note.project_id,
             "execution_id": note.execution_id,
             "task_id": note.task_id,
-            "username": note.username,
             "chip_id": note.chip_id,
         }
 
@@ -265,6 +263,7 @@ class MongoCalibrationNoteRepository:
         update = {
             "$set": {
                 "user_id": user_id,
+                "username": note.username,
                 "timestamp": timestamp,
             },
             "$inc": {"version": 1},
@@ -272,7 +271,6 @@ class MongoCalibrationNoteRepository:
                 "project_id": note.project_id,
                 "execution_id": note.execution_id,
                 "task_id": note.task_id,
-                "username": note.username,
                 "chip_id": note.chip_id,
                 "note": note.note,
             },

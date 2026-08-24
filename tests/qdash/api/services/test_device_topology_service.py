@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Literal, cast
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -91,3 +92,30 @@ def test_device_topology_request_accepts_condition_cr_direction() -> None:
     )
 
     assert request.condition.cr_direction == "forward"
+
+
+def test_build_device_topology_resolves_chip_with_project_scope() -> None:
+    chip_repo = MagicMock()
+    chip_repo.find_by_id.return_value = SimpleNamespace(chip_id="chip-1", topology_id="test")
+    chip_repo.get_all_qubit_models.return_value = {}
+    chip_repo.get_all_coupling_models.return_value = {}
+    note_repo = MagicMock()
+    note_repo.find_latest_master_by_project.return_value = SimpleNamespace(
+        chip_id="chip-1",
+        username="alice",
+        note={"cr_params": {}, "drag_hpi_params": {}, "drag_pi_params": {}},
+        timestamp=None,
+    )
+    service = DeviceTopologyService(chip_repo, note_repo)
+    request = DeviceTopologyRequest(qubits=[])
+
+    with (
+        patch("qdash.api.services.device_topology_service.load_topology", return_value=_topology()),
+        patch.object(service, "_build_qubits", return_value=[]),
+        patch.object(service, "_build_couplings", return_value=[]),
+        patch.object(service, "_apply_filters", return_value=([], [])),
+    ):
+        service.build_device_topology("proj-1", request)
+
+    chip_repo.find_by_id.assert_called_once_with(project_id="proj-1", chip_id="chip-1")
+    chip_repo.get_current_chip.assert_not_called()

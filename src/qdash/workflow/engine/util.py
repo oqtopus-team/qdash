@@ -3,13 +3,10 @@
 from datetime import datetime
 from typing import Any
 
-from prefect import task
 from pydantic import BaseModel, Field
 
 from qdash.common.domain.qubit import qid_to_label, qid_to_label_from_chip
 from qdash.common.utils.datetime import now
-from qdash.datamodel.task import TaskModel
-from qdash.workflow.calibtasks.base import BaseTask
 
 __all__ = ["qid_to_label", "qid_to_label_from_chip"]
 
@@ -38,33 +35,6 @@ def pydantic_serializer(obj: BaseModel) -> dict[str, Any]:
     if isinstance(obj, BaseModel):
         return obj.model_dump()
     raise TypeError(f"Type {type(obj)} not serializable")
-
-
-@task
-def update_active_tasks(username: str, backend: str) -> list[TaskModel]:
-    """Update the active tasks in the registry and return a list of TaskModel instances."""
-    task_cls = BaseTask.registry.get(backend)
-    if task_cls is None:
-        return []
-    return [
-        TaskModel(
-            project_id=None,
-            username=username,
-            backend=backend,
-            name=cls.name,
-            description=cls.__doc__ or "",
-            task_type=cls.task_type,
-            input_parameters={
-                name: param.model_dump()
-                for name, param in cls.input_parameters.items()
-                if param is not None
-            },
-            output_parameters={
-                name: param.model_dump() for name, param in cls.output_parameters.items()
-            },
-        )
-        for cls in task_cls.values()
-    ]
 
 
 class SystemInfo(BaseModel):

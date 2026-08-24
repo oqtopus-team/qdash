@@ -5,7 +5,11 @@ if TYPE_CHECKING:
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, DRAG_PI_DURATION
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -20,40 +24,51 @@ class CreateDRAGPIPulse(QubexTask):
 
     name: str = "CreateDRAGPIPulse"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": None,  # Load from DB
-        "control_amplitude": None,  # Load from DB
-        "readout_amplitude": None,  # Load from DB
-        "readout_frequency": None,  # Load from DB
-        "readout_length": ParameterModel(
-            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.required_database(),
+        "control_amplitude": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(),
+        "rabi_amplitude": InputParameterSpec.required_database(),
+        "rabi_phase": InputParameterSpec.required_database(),
+        "rabi_offset": InputParameterSpec.required_database(),
+        "rabi_angle": InputParameterSpec.required_database(),
+        "rabi_noise": InputParameterSpec.required_database(),
+        "rabi_distance": InputParameterSpec.required_database(),
+        "rabi_reference_phase": InputParameterSpec.required_database(),
+        "rabi_r2": InputParameterSpec.required_database(),
+        "maximum_rabi_frequency": InputParameterSpec.required_database(),
+        "readout_length": InputParameterSpec.database_or_default(
+            default=DEFAULT_READOUT_DURATION,
+            unit="ns",
+            description="Readout pulse length",
         ),
     }
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "drag_pi_duration": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "drag_pi_duration": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DRAG_PI_DURATION,
+            default=DRAG_PI_DURATION,
             description="PI pulse length",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=CALIBRATION_SHOTS,
+            default=CALIBRATION_SHOTS,
             description="Number of shots",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "drag_pi_beta": ParameterModel(unit="", description="DRAG PI pulse beta"),
-        "drag_pi_amplitude": ParameterModel(unit="", description="DRAG PI pulse amplitude"),
-        "drag_pi_length": ParameterModel(
-            value=DRAG_PI_DURATION, unit="ns", description="DRAG PI pulse length"
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "drag_pi_beta": OutputParameterSpec(unit="", description="DRAG PI pulse beta"),
+        "drag_pi_amplitude": OutputParameterSpec(unit="", description="DRAG PI pulse amplitude"),
+        "drag_pi_length": OutputParameterSpec(
+            default=DRAG_PI_DURATION, unit="ns", description="DRAG PI pulse length"
         ),
     }
 
@@ -94,6 +109,7 @@ class CreateDRAGPIPulse(QubexTask):
         control_amp_param = self.input_parameters["control_amplitude"]
         if control_amp_param is not None:
             exp.params.control_amplitude[labels[0]] = control_amp_param.value
+        self._restore_rabi_context(backend, qid)
         result = exp.calibrate_drag_pi_pulse(
             targets=labels,
             n_rotations=4,

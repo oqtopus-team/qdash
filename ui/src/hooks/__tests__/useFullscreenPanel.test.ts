@@ -83,6 +83,32 @@ describe("useFullscreenPanel", () => {
     unmount();
   });
 
+  it("keeps the panel open when Escape closes a Radix dialog", () => {
+    const { result, unmount } = renderHook(() => useFullscreenPanel());
+    act(() => result.current.toggleFullscreen());
+
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("data-state", "open");
+    document.body.appendChild(dialog);
+
+    const dismiss = () => dialog.remove();
+    document.addEventListener("keydown", dismiss, { capture: true });
+
+    act(() => {
+      dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    document.removeEventListener("keydown", dismiss, { capture: true });
+
+    expect(dialog.isConnected).toBe(false);
+    expect(result.current.isFullscreen).toBe(true);
+
+    act(() => pressEscape());
+    expect(result.current.isFullscreen).toBe(false);
+
+    unmount();
+  });
+
   it("releases the scroll lock when a fullscreen panel unmounts", () => {
     const { result, unmount } = renderHook(() => useFullscreenPanel());
 

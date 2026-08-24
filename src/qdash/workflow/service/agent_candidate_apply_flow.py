@@ -87,6 +87,7 @@ def agent_candidate_apply(
                 commit.committed_by,
                 commit.chip_id,
                 commit.execution_id,
+                project_id=project_id,
             )
             base_git_commit = github_integration.pull_config()
             if not base_git_commit:

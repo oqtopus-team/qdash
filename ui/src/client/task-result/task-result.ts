@@ -1503,8 +1503,8 @@ export const useSetTaskResultExcluded = <TError = HTTPValidationError,
     /**
  * Download multiple calibration figures as a ZIP file.
 
-Creates a ZIP archive containing all requested figure files and returns it
-as a streaming response.
+Creates a ZIP archive on temporary storage and serves it without retaining
+the completed archive in API worker memory.
 
 Parameters
 ----------
@@ -1515,8 +1515,8 @@ body.filename : str
 
 Returns
 -------
-StreamingResponse
-    ZIP archive containing all requested files
+FileResponse
+    ZIP archive streamed from a temporary file
 
 Raises
 ------

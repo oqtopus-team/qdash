@@ -6,37 +6,27 @@
  * OpenAPI spec version: 0.0.1
  */
 import {
-  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
-  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
-  UseMutationOptions,
-  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
   BackendConfigResponse,
-  GetTaskFileContent200,
-  GetTaskFileContentParams,
-  GetTaskFileTreeParams,
   HTTPValidationError,
   ListTaskFileBackendsResponse,
   ListTaskInfoParams,
   ListTaskInfoResponse,
-  SaveTaskFileContent200,
-  SaveTaskFileRequest,
-  TaskFileSettings,
-  TaskFileTreeNode
+  TaskFileSettings
 } from '../../schemas';
 
 import { customInstance } from '../../lib/custom-instance';
@@ -239,280 +229,6 @@ export function useListTaskFileBackends<TData = Awaited<ReturnType<typeof listTa
 
 
 /**
- * Get file tree structure for a specific backend directory.
-
-Args:
-----
-    backend: Backend name (e.g., "qubex", "fake")
-
-Returns:
--------
-    File tree structure for the backend
- * @summary Get file tree for a specific backend
- */
-export const getTaskFileTree = (
-    params: GetTaskFileTreeParams,
- options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
-) => {
-      
-      
-      return customInstance<TaskFileTreeNode[]>(
-      {url: `/task-files/tree`, method: 'GET',
-        params, signal
-    },
-      options);
-    }
-  
-
-
-
-export const getGetTaskFileTreeQueryKey = (params?: GetTaskFileTreeParams,) => {
-    return [
-    `/task-files/tree`, ...(params ? [params]: [])
-    ] as const;
-    }
-
-    
-export const getGetTaskFileTreeQueryOptions = <TData = Awaited<ReturnType<typeof getTaskFileTree>>, TError = HTTPValidationError>(params: GetTaskFileTreeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileTree>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTaskFileTreeQueryKey(params);
-
-  
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTaskFileTree>>> = ({ signal }) => getTaskFileTree(params, requestOptions, signal);
-
-      
-
-      
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskFileTree>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetTaskFileTreeQueryResult = NonNullable<Awaited<ReturnType<typeof getTaskFileTree>>>
-export type GetTaskFileTreeQueryError = HTTPValidationError
-
-
-export function useGetTaskFileTree<TData = Awaited<ReturnType<typeof getTaskFileTree>>, TError = HTTPValidationError>(
- params: GetTaskFileTreeParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileTree>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTaskFileTree>>,
-          TError,
-          Awaited<ReturnType<typeof getTaskFileTree>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTaskFileTree<TData = Awaited<ReturnType<typeof getTaskFileTree>>, TError = HTTPValidationError>(
- params: GetTaskFileTreeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileTree>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTaskFileTree>>,
-          TError,
-          Awaited<ReturnType<typeof getTaskFileTree>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTaskFileTree<TData = Awaited<ReturnType<typeof getTaskFileTree>>, TError = HTTPValidationError>(
- params: GetTaskFileTreeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileTree>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get file tree for a specific backend
- */
-
-export function useGetTaskFileTree<TData = Awaited<ReturnType<typeof getTaskFileTree>>, TError = HTTPValidationError>(
- params: GetTaskFileTreeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileTree>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetTaskFileTreeQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey ;
-
-  return query;
-}
-
-
-
-/**
- * Get task file content for viewing/editing.
-
-Args:
-----
-    path: Relative path from CALIBTASKS_BASE_PATH
-
-Returns:
--------
-    File content and metadata
- * @summary Get task file content for viewing/editing
- */
-export const getTaskFileContent = (
-    params: GetTaskFileContentParams,
- options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
-) => {
-      
-      
-      return customInstance<GetTaskFileContent200>(
-      {url: `/task-files/content`, method: 'GET',
-        params, signal
-    },
-      options);
-    }
-  
-
-
-
-export const getGetTaskFileContentQueryKey = (params?: GetTaskFileContentParams,) => {
-    return [
-    `/task-files/content`, ...(params ? [params]: [])
-    ] as const;
-    }
-
-    
-export const getGetTaskFileContentQueryOptions = <TData = Awaited<ReturnType<typeof getTaskFileContent>>, TError = HTTPValidationError>(params: GetTaskFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTaskFileContentQueryKey(params);
-
-  
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTaskFileContent>>> = ({ signal }) => getTaskFileContent(params, requestOptions, signal);
-
-      
-
-      
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskFileContent>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetTaskFileContentQueryResult = NonNullable<Awaited<ReturnType<typeof getTaskFileContent>>>
-export type GetTaskFileContentQueryError = HTTPValidationError
-
-
-export function useGetTaskFileContent<TData = Awaited<ReturnType<typeof getTaskFileContent>>, TError = HTTPValidationError>(
- params: GetTaskFileContentParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileContent>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTaskFileContent>>,
-          TError,
-          Awaited<ReturnType<typeof getTaskFileContent>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTaskFileContent<TData = Awaited<ReturnType<typeof getTaskFileContent>>, TError = HTTPValidationError>(
- params: GetTaskFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileContent>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTaskFileContent>>,
-          TError,
-          Awaited<ReturnType<typeof getTaskFileContent>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTaskFileContent<TData = Awaited<ReturnType<typeof getTaskFileContent>>, TError = HTTPValidationError>(
- params: GetTaskFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get task file content for viewing/editing
- */
-
-export function useGetTaskFileContent<TData = Awaited<ReturnType<typeof getTaskFileContent>>, TError = HTTPValidationError>(
- params: GetTaskFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient 
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetTaskFileContentQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = queryOptions.queryKey ;
-
-  return query;
-}
-
-
-
-/**
- * Save task file content.
-
-Args:
-----
-    request: Save file request with path and content
-
-Returns:
--------
-    Success message
- * @summary Save task file content
- */
-export const saveTaskFileContent = (
-    saveTaskFileRequest: SaveTaskFileRequest,
- options?: SecondParameter<typeof customInstance>,) => {
-      
-      
-      return customInstance<SaveTaskFileContent200>(
-      {url: `/task-files/content`, method: 'PUT',
-      headers: {'Content-Type': 'application/json', },
-      data: saveTaskFileRequest
-    },
-      options);
-    }
-  
-
-
-export const getSaveTaskFileContentMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveTaskFileContent>>, TError,{data: SaveTaskFileRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof saveTaskFileContent>>, TError,{data: SaveTaskFileRequest}, TContext> => {
-
-const mutationKey = ['saveTaskFileContent'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-      
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveTaskFileContent>>, {data: SaveTaskFileRequest}> = (props) => {
-          const {data} = props ?? {};
-
-          return  saveTaskFileContent(data,requestOptions)
-        }
-
-        
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type SaveTaskFileContentMutationResult = NonNullable<Awaited<ReturnType<typeof saveTaskFileContent>>>
-    export type SaveTaskFileContentMutationBody = SaveTaskFileRequest
-    export type SaveTaskFileContentMutationError = HTTPValidationError
-
-    /**
- * @summary Save task file content
- */
-export const useSaveTaskFileContent = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveTaskFileContent>>, TError,{data: SaveTaskFileRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof saveTaskFileContent>>,
-        TError,
-        {data: SaveTaskFileRequest},
-        TContext
-      > => {
-
-      const mutationOptions = getSaveTaskFileContentMutationOptions(options);
-
-      return useMutation(mutationOptions, queryClient);
-    }
-    /**
  * Get backend configuration from config/app/backend.yaml.
 
 Returns

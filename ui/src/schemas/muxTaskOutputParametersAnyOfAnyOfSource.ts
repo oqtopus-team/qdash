@@ -6,6 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type GetTaskFileTreeParams = {
-backend: string;
-};
+export type MuxTaskOutputParametersAnyOfAnyOfSource = 'database' | null;

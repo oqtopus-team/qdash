@@ -7,7 +7,11 @@ import numpy.typing as npt
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -38,41 +42,43 @@ class FakeCheckT1Average(FakeTask):
     task_type: str = "qubit"
     timeout: int = 120
 
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": ParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.default_only(
+            default=0,
             unit="GHz",
             description="Qubit frequency from CheckFineChevron",
         ),
-        "hpi_amplitude": ParameterModel(
+        "hpi_amplitude": InputParameterSpec.default_only(
+            default=0,
             unit="a.u.",
             description="Half-pi pulse amplitude from CheckHPI",
         ),
     }
 
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "time_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "time_range": RunParameterSpec(
             unit="ns",
             value_type="np.logspace",
-            value=(2, 5.7, 51),  # 100 ns to 500 μs
+            default=(2, 5.7, 51),  # 100 ns to 500 μs
             description="Time range for T1 measurement (log scale)",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="",
             value_type="int",
-            value=1024,
+            default=1024,
             description="Number of shots",
         ),
-        "n_runs": RunParameterModel(
+        "n_runs": RunParameterSpec(
             unit="",
             value_type="int",
-            value=10,
+            default=10,
             description="Number of T1 measurement repetitions",
         ),
     }
 
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "t1_average": ParameterModel(unit="μs", description="Mean T1 relaxation time"),
-        "t1_std": ParameterModel(unit="μs", description="T1 standard deviation"),
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "t1_average": OutputParameterSpec(unit="μs", description="Mean T1 relaxation time"),
+        "t1_std": OutputParameterSpec(unit="μs", description="T1 standard deviation"),
     }
 
     def preprocess(self, backend: FakeBackend, qid: str) -> PreProcessResult:

@@ -87,7 +87,12 @@ From the Members tab, owners can:
 
 ## Sharing Calibration Results
 
-Once you have team members in your project, sharing is automatic:
+Once you have team members in your project, sharing is automatic. Current calibration state is
+shared by project and chip, while each result remains associated with the user and execution that
+produced it. See [Calibration Data Sharing](./calibration-data-sharing.md) for the ownership model,
+execution behavior, and artifact layout.
+
+To share calibration results:
 
 1. **Run a calibration** in your project
 2. **All members can view** the results

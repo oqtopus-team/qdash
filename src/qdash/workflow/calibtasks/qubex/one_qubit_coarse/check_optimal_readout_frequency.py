@@ -3,7 +3,11 @@ from typing import ClassVar
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -17,23 +21,25 @@ class CheckOptimalReadoutFrequency(QubexTask):
 
     name: str = "CheckOptimalReadoutFrequency"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "shots": RunParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=CALIBRATION_SHOTS,
+            default=CALIBRATION_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval for Rabi oscillation",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "readout_frequency": ParameterModel(unit="GHz", description="Optimal Readout Frequency"),
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "readout_frequency": OutputParameterSpec(
+            unit="GHz", description="Optimal Readout Frequency"
+        ),
     }
 
     def postprocess(

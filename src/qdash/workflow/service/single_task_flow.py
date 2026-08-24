@@ -39,7 +39,7 @@ def single_task_executor(
     chip_id: str,
     qid: str,
     task_name: str,
-    source_execution_id: str,
+    source_execution_id: str | None = None,
     project_id: str | None = None,
     flow_name: str | None = None,
     tags: list[str] | None = None,
@@ -48,6 +48,8 @@ def single_task_executor(
     update_params: bool = True,
     persist_output_parameters: bool = True,
     reconfigure: bool = False,
+    backend_name: str | None = None,
+    default_run_parameters: dict[str, Any] | None = None,
 ) -> Any:
     """Execute a single calibration task.
 
@@ -83,11 +85,14 @@ def single_task_executor(
         flow_name=flow_name or f"re-execute:{task_name}",
         tags=tags,
         project_id=project_id,
+        backend_name=backend_name,
+        default_run_parameters=default_run_parameters,
         enable_github_pull=True,
         enable_github=update_params,
-        use_lock=False,
+        use_lock=True,
         parameter_overrides=parameter_overrides,
         source_task_id=source_task_id,
+        snapshot_exempt_tasks={"Configure"} if reconfigure else None,
         force_update_params=update_params,
         persist_output_parameters=persist_output_parameters,
     )

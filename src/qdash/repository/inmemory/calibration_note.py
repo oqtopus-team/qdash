@@ -46,7 +46,8 @@ class InMemoryCalibrationNoteRepository:
         task_id: str,
     ) -> str:
         """Create a unique key for storage."""
-        return f"{project_id}:{username}:{chip_id}:{execution_id}:{task_id}"
+        _ = username
+        return f"{project_id}:{chip_id}:{execution_id}:{task_id}"
 
     def find_one(
         self,

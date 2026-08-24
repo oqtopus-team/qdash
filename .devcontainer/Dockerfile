@@ -6,7 +6,7 @@ ARG TRUFFLEHOG_VERSION=3.95.3
 ARG BETTERLEAKS_VERSION=v1.3.1
 ARG LEFTHOOK_VERSION=2.1.6
 ARG UV_VERSION=0.11.11
-ARG BUN_VERSION=1.3.14
+ARG BUN_VERSION=1.4.0
 ARG CODEX_VERSION=0.130.0
 
 FROM ghcr.io/betterleaks/betterleaks:${BETTERLEAKS_VERSION} AS betterleaks-bin
@@ -113,7 +113,7 @@ WORKDIR /workspace/qdash
 # ========================================
 FROM toolchain AS node-env
 
-ARG NODE_VERSION=20
+ARG NODE_VERSION=24
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
     apt-get install -y nodejs && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \

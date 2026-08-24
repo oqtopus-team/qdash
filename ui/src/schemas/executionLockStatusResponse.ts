@@ -5,10 +5,18 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecutionLockStatusResponseExecutionId } from './executionLockStatusResponseExecutionId';
+import type { ExecutionLockStatusResponseChipId } from './executionLockStatusResponseChipId';
+import type { ExecutionLockStatusResponseName } from './executionLockStatusResponseName';
+import type { ExecutionLockStatusResponseStatus } from './executionLockStatusResponseStatus';
 
 /**
  * Response model for the fetch_execution_lock_status endpoint.
  */
 export interface ExecutionLockStatusResponse {
   lock: boolean;
+  execution_id?: ExecutionLockStatusResponseExecutionId;
+  chip_id?: ExecutionLockStatusResponseChipId;
+  name?: ExecutionLockStatusResponseName;
+  status?: ExecutionLockStatusResponseStatus;
 }

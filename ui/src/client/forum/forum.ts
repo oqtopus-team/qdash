@@ -57,15 +57,15 @@ export const listForumCategories = (
     params?: ListForumCategoriesParams,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-
-
+      
+      
       return customInstance<ListForumCategoriesResponse>(
       {url: `/forum/categories`, method: 'GET',
         params, signal
     },
       options);
     }
-
+  
 
 
 
@@ -75,7 +75,7 @@ export const getListForumCategoriesQueryKey = (params?: ListForumCategoriesParam
     ] as const;
     }
 
-
+    
 export const getListForumCategoriesQueryOptions = <TData = Awaited<ReturnType<typeof listForumCategories>>, TError = HTTPValidationError>(params?: ListForumCategoriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -83,13 +83,13 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getListForumCategoriesQueryKey(params);
 
-
+  
 
     const queryFn: QueryFunction<Awaited<ReturnType<typeof listForumCategories>>> = ({ signal }) => listForumCategories(params, requestOptions, signal);
 
+      
 
-
-
+      
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
@@ -128,7 +128,7 @@ export function useListForumCategories<TData = Awaited<ReturnType<typeof listFor
 
 export function useListForumCategories<TData = Awaited<ReturnType<typeof listForumCategories>>, TError = HTTPValidationError>(
  params?: ListForumCategoriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
+ , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListForumCategoriesQueryOptions(params,options)
@@ -150,8 +150,8 @@ export const createForumCategory = (
     forumCategoryCreate: ForumCategoryCreate,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-
-
+      
+      
       return customInstance<ForumCategoryResponse>(
       {url: `/forum/categories`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
@@ -159,7 +159,7 @@ export const createForumCategory = (
     },
       options);
     }
-
+  
 
 
 export const getCreateForumCategoryMutationOptions = <TError = HTTPValidationError,
@@ -173,7 +173,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
-
+      
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof createForumCategory>>, {data: ForumCategoryCreate}> = (props) => {
@@ -182,7 +182,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
           return  createForumCategory(data,requestOptions)
         }
 
-
+        
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -215,8 +215,8 @@ export const updateForumCategory = (
     categoryKey: string,
     forumCategoryUpdate: ForumCategoryUpdate,
  options?: SecondParameter<typeof customInstance>,) => {
-
-
+      
+      
       return customInstance<ForumCategoryResponse>(
       {url: `/forum/categories/${categoryKey}`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
@@ -224,7 +224,7 @@ export const updateForumCategory = (
     },
       options);
     }
-
+  
 
 
 export const getUpdateForumCategoryMutationOptions = <TError = HTTPValidationError,
@@ -238,7 +238,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
-
+      
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateForumCategory>>, {categoryKey: string;data: ForumCategoryUpdate}> = (props) => {
@@ -247,7 +247,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
           return  updateForumCategory(categoryKey,data,requestOptions)
         }
 
-
+        
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -279,14 +279,14 @@ export const useUpdateForumCategory = <TError = HTTPValidationError,
 export const deleteForumCategory = (
     categoryKey: string,
  options?: SecondParameter<typeof customInstance>,) => {
-
-
+      
+      
       return customInstance<SuccessResponse>(
       {url: `/forum/categories/${categoryKey}`, method: 'DELETE'
     },
       options);
     }
-
+  
 
 
 export const getDeleteForumCategoryMutationOptions = <TError = HTTPValidationError,
@@ -300,7 +300,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
-
+      
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteForumCategory>>, {categoryKey: string}> = (props) => {
@@ -309,13 +309,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
           return  deleteForumCategory(categoryKey,requestOptions)
         }
 
-
+        
 
 
   return  { mutationFn, ...mutationOptions }}
 
     export type DeleteForumCategoryMutationResult = NonNullable<Awaited<ReturnType<typeof deleteForumCategory>>>
-
+    
     export type DeleteForumCategoryMutationError = HTTPValidationError
 
     /**
@@ -342,15 +342,15 @@ export const listForumPosts = (
     params?: ListForumPostsParams,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-
-
+      
+      
       return customInstance<ListForumPostsResponse>(
       {url: `/forum/posts`, method: 'GET',
         params, signal
     },
       options);
     }
-
+  
 
 
 
@@ -360,7 +360,7 @@ export const getListForumPostsQueryKey = (params?: ListForumPostsParams,) => {
     ] as const;
     }
 
-
+    
 export const getListForumPostsQueryOptions = <TData = Awaited<ReturnType<typeof listForumPosts>>, TError = HTTPValidationError>(params?: ListForumPostsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -368,13 +368,13 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getListForumPostsQueryKey(params);
 
-
+  
 
     const queryFn: QueryFunction<Awaited<ReturnType<typeof listForumPosts>>> = ({ signal }) => listForumPosts(params, requestOptions, signal);
 
+      
 
-
-
+      
 
    return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
@@ -413,7 +413,7 @@ export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPos
 
 export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPosts>>, TError = HTTPValidationError>(
  params?: ListForumPostsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
+ , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListForumPostsQueryOptions(params,options)
@@ -435,8 +435,8 @@ export const createForumPost = (
     forumPostCreate: ForumPostCreate,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-
-
+      
+      
       return customInstance<ForumPostResponse>(
       {url: `/forum/posts`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
@@ -444,7 +444,7 @@ export const createForumPost = (
     },
       options);
     }
-
+  
 
 
 export const getCreateForumPostMutationOptions = <TError = HTTPValidationError,
@@ -458,7 +458,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
-
+      
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof createForumPost>>, {data: ForumPostCreate}> = (props) => {
@@ -467,7 +467,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
           return  createForumPost(data,requestOptions)
         }
 
-
+        
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -500,14 +500,14 @@ export const getForumPost = (
     postId: string,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-
-
+      
+      
       return customInstance<ForumPostResponse>(
       {url: `/forum/posts/${postId}`, method: 'GET', signal
     },
       options);
     }
-
+  
 
 
 
@@ -517,7 +517,7 @@ export const getGetForumPostQueryKey = (postId?: string,) => {
     ] as const;
     }
 
-
+    
 export const getGetForumPostQueryOptions = <TData = Awaited<ReturnType<typeof getForumPost>>, TError = HTTPValidationError>(postId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -525,13 +525,13 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetForumPostQueryKey(postId);
 
-
+  
 
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getForumPost>>> = ({ signal }) => getForumPost(postId, requestOptions, signal);
 
+      
 
-
-
+      
 
    return  { queryKey, queryFn, enabled: !!(postId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
@@ -570,7 +570,7 @@ export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>
 
 export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>, TError = HTTPValidationError>(
  postId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
+ , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetForumPostQueryOptions(postId,options)
@@ -592,8 +592,8 @@ export const updateForumPost = (
     postId: string,
     forumPostUpdate: ForumPostUpdate,
  options?: SecondParameter<typeof customInstance>,) => {
-
-
+      
+      
       return customInstance<ForumPostResponse>(
       {url: `/forum/posts/${postId}`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
@@ -601,7 +601,7 @@ export const updateForumPost = (
     },
       options);
     }
-
+  
 
 
 export const getUpdateForumPostMutationOptions = <TError = HTTPValidationError,
@@ -615,7 +615,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
-
+      
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateForumPost>>, {postId: string;data: ForumPostUpdate}> = (props) => {
@@ -624,7 +624,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
           return  updateForumPost(postId,data,requestOptions)
         }
 
-
+        
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -656,14 +656,14 @@ export const useUpdateForumPost = <TError = HTTPValidationError,
 export const deleteForumPost = (
     postId: string,
  options?: SecondParameter<typeof customInstance>,) => {
-
-
+      
+      
       return customInstance<SuccessResponse>(
       {url: `/forum/posts/${postId}`, method: 'DELETE'
     },
       options);
     }
-
+  
 
 
 export const getDeleteForumPostMutationOptions = <TError = HTTPValidationError,
@@ -677,7 +677,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
-
+      
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteForumPost>>, {postId: string}> = (props) => {
@@ -686,13 +686,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
           return  deleteForumPost(postId,requestOptions)
         }
 
-
+        
 
 
   return  { mutationFn, ...mutationOptions }}
 
     export type DeleteForumPostMutationResult = NonNullable<Awaited<ReturnType<typeof deleteForumPost>>>
-
+    
     export type DeleteForumPostMutationError = HTTPValidationError
 
     /**
@@ -720,15 +720,15 @@ export const getForumPostReplies = (
     params?: GetForumPostRepliesParams,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-
-
+      
+      
       return customInstance<ForumPostResponse[]>(
       {url: `/forum/posts/${postId}/replies`, method: 'GET',
         params, signal
     },
       options);
     }
-
+  
 
 
 
@@ -739,7 +739,7 @@ export const getGetForumPostRepliesQueryKey = (postId?: string,
     ] as const;
     }
 
-
+    
 export const getGetForumPostRepliesQueryOptions = <TData = Awaited<ReturnType<typeof getForumPostReplies>>, TError = HTTPValidationError>(postId: string,
     params?: GetForumPostRepliesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
@@ -748,13 +748,13 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetForumPostRepliesQueryKey(postId,params);
 
-
+  
 
     const queryFn: QueryFunction<Awaited<ReturnType<typeof getForumPostReplies>>> = ({ signal }) => getForumPostReplies(postId,params, requestOptions, signal);
 
+      
 
-
-
+      
 
    return  { queryKey, queryFn, enabled: !!(postId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
@@ -797,7 +797,7 @@ export function useGetForumPostReplies<TData = Awaited<ReturnType<typeof getForu
 export function useGetForumPostReplies<TData = Awaited<ReturnType<typeof getForumPostReplies>>, TError = HTTPValidationError>(
  postId: string,
     params?: GetForumPostRepliesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
+ , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetForumPostRepliesQueryOptions(postId,params,options)
@@ -819,7 +819,7 @@ export const uploadForumImage = (
     bodyUploadForumImage: BodyUploadForumImage,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-
+      
       const formData = new FormData();
 formData.append(`file`, bodyUploadForumImage.file)
 
@@ -830,7 +830,7 @@ formData.append(`file`, bodyUploadForumImage.file)
     },
       options);
     }
-
+  
 
 
 export const getUploadForumImageMutationOptions = <TError = void | HTTPValidationError,
@@ -844,7 +844,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
-
+      
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadForumImage>>, {data: BodyUploadForumImage}> = (props) => {
@@ -853,7 +853,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
           return  uploadForumImage(data,requestOptions)
         }
 
-
+        
 
 
   return  { mutationFn, ...mutationOptions }}
@@ -885,14 +885,14 @@ export const useUploadForumImage = <TError = void | HTTPValidationError,
 export const closeForumPost = (
     postId: string,
  options?: SecondParameter<typeof customInstance>,) => {
-
-
+      
+      
       return customInstance<SuccessResponse>(
       {url: `/forum/posts/${postId}/close`, method: 'PATCH'
     },
       options);
     }
-
+  
 
 
 export const getCloseForumPostMutationOptions = <TError = HTTPValidationError,
@@ -906,7 +906,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
-
+      
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof closeForumPost>>, {postId: string}> = (props) => {
@@ -915,13 +915,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
           return  closeForumPost(postId,requestOptions)
         }
 
-
+        
 
 
   return  { mutationFn, ...mutationOptions }}
 
     export type CloseForumPostMutationResult = NonNullable<Awaited<ReturnType<typeof closeForumPost>>>
-
+    
     export type CloseForumPostMutationError = HTTPValidationError
 
     /**
@@ -947,14 +947,14 @@ export const useCloseForumPost = <TError = HTTPValidationError,
 export const reopenForumPost = (
     postId: string,
  options?: SecondParameter<typeof customInstance>,) => {
-
-
+      
+      
       return customInstance<SuccessResponse>(
       {url: `/forum/posts/${postId}/reopen`, method: 'PATCH'
     },
       options);
     }
-
+  
 
 
 export const getReopenForumPostMutationOptions = <TError = HTTPValidationError,
@@ -968,7 +968,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       : {...options, mutation: {...options.mutation, mutationKey}}
       : {mutation: { mutationKey, }, request: undefined};
 
-
+      
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof reopenForumPost>>, {postId: string}> = (props) => {
@@ -977,13 +977,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
           return  reopenForumPost(postId,requestOptions)
         }
 
-
+        
 
 
   return  { mutationFn, ...mutationOptions }}
 
     export type ReopenForumPostMutationResult = NonNullable<Awaited<ReturnType<typeof reopenForumPost>>>
-
+    
     export type ReopenForumPostMutationError = HTTPValidationError
 
     /**
@@ -1002,3 +1002,4 @@ export const useReopenForumPost = <TError = HTTPValidationError,
 
       return useMutation(mutationOptions, queryClient);
     }
+    

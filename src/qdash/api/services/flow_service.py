@@ -41,7 +41,7 @@ from qdash.repository.execution_id import generate_execution_id
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from qdash.repository import MongoFlowRepository
+    from qdash.repository import MongoExecutionLockRepository, MongoFlowRepository
 
 logger = logging.getLogger("uvicorn.app")
 
@@ -65,9 +65,11 @@ class FlowService:
     def __init__(
         self,
         flow_repository: MongoFlowRepository,
+        execution_lock_repository: MongoExecutionLockRepository | None = None,
     ) -> None:
         """Initialize the service with a flow repository."""
         self._flow_repo = flow_repository
+        self._execution_lock_repo = execution_lock_repository
         self._project_flows_base_dir = USER_FLOWS_DIR
 
     async def save_flow(
@@ -543,7 +545,7 @@ class FlowService:
         task_name: str,
         qid: str,
         chip_id: str,
-        source_execution_id: str,
+        source_execution_id: str | None,
         username: str,
         project_id: str,
         tags: list[str] | None = None,
@@ -553,6 +555,8 @@ class FlowService:
         persist_output_parameters: bool = True,
         reconfigure: bool = False,
         execution_name: str | None = None,
+        backend_name: str | None = None,
+        default_run_parameters: dict[str, Any] | None = None,
     ) -> ExecuteFlowResponse:
         """Execute a single task via the system single-task-executor deployment.
 
@@ -589,6 +593,14 @@ class FlowService:
         settings = get_settings()
         deployment_name = "single-task-executor/system-single-task"
 
+        if self._execution_lock_repo is not None and self._execution_lock_repo.is_locked(
+            project_id
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Another calibration execution is already running for this project",
+            )
+
         try:
             async with get_client() as client:
                 deployment = await client.read_deployment_by_name(deployment_name)
@@ -614,6 +626,8 @@ class FlowService:
             "persist_output_parameters": persist_output_parameters,
             "update_params": update_params,
             "reconfigure": reconfigure,
+            "backend_name": backend_name,
+            "default_run_parameters": default_run_parameters,
         }
 
         logger.info(

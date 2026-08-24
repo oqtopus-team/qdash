@@ -1,31 +1,6 @@
 """Schema definitions for task file router."""
 
-from enum import Enum
-
-from pydantic import BaseModel
-
-
-class FileNodeType(str, Enum):
-    """File node type enum."""
-
-    FILE = "file"
-    DIRECTORY = "directory"
-
-
-class TaskFileTreeNode(BaseModel):
-    """Task file tree node model."""
-
-    name: str
-    path: str
-    type: FileNodeType
-    children: list["TaskFileTreeNode"] | None = None
-
-
-class SaveTaskFileRequest(BaseModel):
-    """Request model for saving task file content."""
-
-    path: str  # Relative path from CALIBTASKS_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
-    content: str
+from pydantic import BaseModel, Field
 
 
 class TaskFileBackend(BaseModel):
@@ -46,7 +21,7 @@ class TaskFileSettings(BaseModel):
 
     default_backend: str | None = None
     default_view_mode: str | None = None  # "tasks" or "files"
-    sort_order: str | None = None  # "type_then_name", "name_only", "file_path"
+    sort_order: str | None = None  # "category", "type_then_name", "name_only", "file_path"
 
 
 class TaskInfo(BaseModel):
@@ -59,6 +34,8 @@ class TaskInfo(BaseModel):
     file_path: str
     category: str | None = None  # From backend.yaml categories
     enabled: bool = True  # Whether task is in enabled_tasks list
+    input_parameters: dict[str, dict[str, object]] = Field(default_factory=dict)
+    run_parameters: dict[str, dict[str, object]] = Field(default_factory=dict)
 
 
 class ListTaskInfoResponse(BaseModel):

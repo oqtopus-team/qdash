@@ -1,11 +1,19 @@
 """Tests for TaskExecutor."""
 
-from typing import Any, ClassVar
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
-from qdash.datamodel.task import ParameterModel, QubitTaskModel, RunParameterModel, TaskStatusModel
+from qdash.datamodel.task import (
+    InputParameterModel,
+    InputParameterSpec,
+    OutputParameterModel,
+    ParameterModel,
+    QubitTaskModel,
+    RunParameterModel,
+    TaskStatusModel,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.task.executor import TaskExecutor
 from qdash.workflow.engine.task.result_processor import (
@@ -18,9 +26,6 @@ from qdash.workflow.engine.task.types import TaskExecutionError, TaskProtocol
 class MockTask:
     """Mock task for testing."""
 
-    input_parameters: ClassVar[dict[str, Any]] = {}
-    run_parameters: ClassVar[dict[str, Any]] = {}
-
     def __init__(
         self,
         name: str = "CheckRabi",
@@ -32,6 +37,9 @@ class MockTask:
         self._task_type = task_type
         self.r2_threshold = r2_threshold
         self.backend = backend
+        self.input_parameters: dict[str, Any] = {}
+        self.input_parameters_from_snapshot = False
+        self.run_parameters: dict[str, Any] = {}
 
     def get_name(self) -> str:
         return self.name
@@ -46,7 +54,10 @@ class MockTask:
         return self._task_type == "coupling"
 
     def preprocess(self, session: Any, qid: str) -> PreProcessResult:
-        return PreProcessResult(input_parameters={"param1": ParameterModel(value=1.0)})
+        return PreProcessResult(input_parameters={"param1": InputParameterModel(value=1.0)})
+
+    def prepare_run(self, session: Any, qid: str) -> None:
+        pass
 
     def run(self, session: Any, qid: str) -> RunResult:
         return RunResult(raw_result={"data": [1, 2, 3]}, r2={"0": 0.95})
@@ -66,12 +77,12 @@ class MockTask:
         self, session: Any, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         return PostProcessResult(
-            output_parameters={"qubit_frequency": ParameterModel(value=5.0)},
+            output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)},
             figures=[],
             raw_data=[],
         )
 
-    def attach_task_id(self, task_id: str) -> dict[str, ParameterModel]:
+    def attach_task_id(self, task_id: str) -> dict[str, OutputParameterModel]:
         return {}
 
 
@@ -107,6 +118,26 @@ class TestTaskExecutorInit:
         assert executor.data_saver == data_saver
         assert executor.execution_id == "exec-001"
         assert executor.task_manager_id == "tm-001"
+
+    def test_effective_input_validation_fails_without_mutating_value(self) -> None:
+        class DeclaredTask(MockTask):
+            input_spec = {
+                "amplitude": InputParameterSpec(
+                    resolution="database_or_default",
+                    user_override="allowed",
+                    default=0.1,
+                    greater_than=0.0,
+                    less_than=1.0,
+                )
+            }
+
+        task = DeclaredTask()
+        task.input_parameters["amplitude"] = ParameterModel(value=2.0)
+
+        with pytest.raises(ValueError, match="must be less than"):
+            TaskExecutor._validate_effective_inputs(task)
+
+        assert task.input_parameters["amplitude"].value == 2.0
 
     def test_init_creates_default_dependencies(self) -> None:
         """Test initialization creates default dependencies if not provided."""
@@ -219,6 +250,23 @@ class TestTaskExecutorExecuteTask:
         assert result["message"] == "Completed without run result"
         mock_state_manager.update_task_status_to_completed.assert_called_once()
 
+    def test_execute_records_chip_history_in_execution_project(
+        self, executor: TaskExecutor
+    ) -> None:
+        """Test single-task history uses the execution's project and chip scope."""
+        task = MockTask()
+        task.run = MagicMock(return_value=None)  # type: ignore[method-assign]
+        session: Any = MockSession()
+        execution_service = MagicMock(project_id="proj-1", chip_id="chip-1")
+        execution_service.merge_calib_data.return_value = execution_service
+        executor.history_recorder = MagicMock()
+
+        executor.execute(task, session, "0", execution_service)
+
+        executor.history_recorder.create_chip_history_snapshot.assert_called_once_with(
+            "admin", chip_id="chip-1", project_id="proj-1"
+        )
+
     def test_execute_batch_calls_batch_run_once(
         self, executor: TaskExecutor, mock_state_manager: MagicMock
     ) -> None:
@@ -230,7 +278,7 @@ class TestTaskExecutorExecuteTask:
         )
         task.postprocess = MagicMock(  # type: ignore[method-assign]
             return_value=PostProcessResult(
-                output_parameters={"qubit_frequency": ParameterModel(value=5.0)},
+                output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)},
                 figures=[],
                 raw_data=[],
             )
@@ -246,6 +294,23 @@ class TestTaskExecutorExecuteTask:
         assert mock_state_manager.start_task.call_count == 2
         assert mock_state_manager.end_task.call_count == 2
 
+    def test_execute_batch_records_chip_history_in_execution_project(
+        self, executor: TaskExecutor
+    ) -> None:
+        """Test batch history uses the execution's project and chip scope."""
+        task = MockTask()
+        task.batch_run = MagicMock(return_value=None)  # type: ignore[method-assign]
+        session: Any = MockSession()
+        execution_service = MagicMock(project_id="proj-1", chip_id="chip-1")
+        execution_service.merge_calib_data.return_value = execution_service
+        executor.history_recorder = MagicMock()
+
+        executor.execute_batch(task, session, ["0", "4"], execution_service)
+
+        executor.history_recorder.create_chip_history_snapshot.assert_called_once_with(
+            "admin", chip_id="chip-1", project_id="proj-1"
+        )
+
     def test_execute_batch_continues_after_qid_validation_error(
         self, executor: TaskExecutor, mock_state_manager: MagicMock
     ) -> None:
@@ -260,13 +325,13 @@ class TestTaskExecutorExecuteTask:
         ) -> PostProcessResult:
             if qid == "0":
                 return PostProcessResult(
-                    output_parameters={"qubit_frequency": ParameterModel(value=0.0)},
+                    output_parameters={"qubit_frequency": OutputParameterModel(value=0.0)},
                     figures=[],
                     raw_data=[],
                     validation_error="Qubit frequency too low for qid=0",
                 )
             return PostProcessResult(
-                output_parameters={"qubit_frequency": ParameterModel(value=5.0)},
+                output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)},
                 figures=[],
                 raw_data=[],
             )
@@ -507,16 +572,13 @@ class TestTaskExecutorExecuteTask:
     ) -> None:
         """Test execute_task records run_parameters when present."""
         task = MockTask()
-        MockTask.run_parameters = {
+        task.run_parameters = {
             "shots": RunParameterModel(value=1024, value_type="int", description="Number of shots"),
             "interval": RunParameterModel(value=150, value_type="int", unit="us"),
         }
         session: Any = MockSession()
 
         executor.execute_task(task, session, "0")
-
-        # Reset class variable
-        MockTask.run_parameters = {}
 
         mock_state_manager.put_run_parameters.assert_called_once()
         call_args = mock_state_manager.put_run_parameters.call_args[0]
@@ -716,7 +778,10 @@ class TestSnapshotOverrides:
 
     @pytest.fixture
     def mock_snapshot_loader(self) -> MagicMock:
-        return MagicMock()
+        loader = MagicMock()
+        loader.has_snapshot_source = False
+        loader.requires_snapshot.side_effect = lambda task_name: loader.has_snapshot_source
+        return loader
 
     @pytest.fixture
     def executor_with_snapshot(
@@ -774,6 +839,67 @@ class TestSnapshotOverrides:
         assert task.run_parameters == original_run_params
         mock_state_manager.put_input_parameters.assert_not_called()
         mock_state_manager.put_run_parameters.assert_not_called()
+
+    def test_reexecution_fails_when_snapshot_is_missing(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        mock_snapshot_loader.has_snapshot_source = True
+        mock_snapshot_loader.get_snapshot.return_value = None
+
+        with pytest.raises(ValueError, match=r"Snapshot inputs.*were not found"):
+            executor_with_snapshot._apply_snapshot_overrides(MockTask(), "CheckRabi", "qubit", "0")
+
+    def test_snapshot_exempt_task_allows_fresh_resolution(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        mock_snapshot_loader.has_snapshot_source = True
+        mock_snapshot_loader.requires_snapshot.side_effect = lambda task_name: (
+            task_name != "Configure"
+        )
+        mock_snapshot_loader.get_snapshot.return_value = None
+
+        executor_with_snapshot._apply_snapshot_overrides(MockTask(), "Configure", "qubit", "0")
+
+        mock_state_manager.put_input_parameters.assert_not_called()
+        mock_state_manager.put_run_parameters.assert_not_called()
+
+    def test_user_input_override_is_coerced_to_declared_float(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        class DeclaredTask(MockTask):
+            input_spec = {
+                "control_amplitude": InputParameterSpec.required_database(
+                    greater_than=0.0,
+                )
+            }
+
+            def prepare_run(self, session: Any, qid: str) -> None:
+                session.applied_value = self.input_parameters["control_amplitude"].value
+
+        task = DeclaredTask()
+        task.input_parameters["control_amplitude"] = ParameterModel(value=0.1)
+        mock_snapshot_loader._parameter_overrides = {
+            "input": {"control_amplitude": "0.002479649788714785"}
+        }
+
+        executor_with_snapshot._apply_user_overrides_only(
+            task, "CheckControlAmplitude", "qubit", "0"
+        )
+        executor_with_snapshot._validate_effective_inputs(task)
+        session = MagicMock()
+        executor_with_snapshot._prepare_run(task, session, "0")
+
+        value = task.input_parameters["control_amplitude"].value
+        assert value == pytest.approx(0.002479649788714785)
+        assert isinstance(value, float)
+        assert session.applied_value == pytest.approx(value)
 
     def test_apply_snapshot_overrides_empty_params(
         self,

@@ -26,11 +26,11 @@ if TYPE_CHECKING:
 
 
 class PathResolver:
-    """Resolves paths for workflow infrastructure.
+    """Resolve project-scoped paths for workflow infrastructure.
 
-    This class provides methods to generate paths for user-specific
-    calibration data, execution directories, and other workflow-related
-    locations.
+    This class provides methods to generate shared project-chip calibration
+    paths and immutable execution artifact directories. ``user_data_dir`` is
+    retained only for legacy migration support.
 
     Examples
     --------
@@ -38,8 +38,8 @@ class PathResolver:
     >>> resolver.user_data_dir("alice")
     PosixPath('/app/calib_data/alice')
 
-    >>> resolver.execution_data_dir("alice", "20240101", "001")
-    PosixPath('/app/calib_data/alice/20240101/001')
+    >>> resolver.execution_data_dir("proj-1", "chip-1", "20240101-001")
+    PosixPath('/app/calib_data/projects/proj-1/chips/chip-1/executions/20240101/001')
 
     """
 
@@ -62,20 +62,27 @@ class PathResolver:
         return self._workflow_dir
 
     # -------------------------------------------------------------------------
-    # User-specific paths
+    # Legacy user-specific paths
     # -------------------------------------------------------------------------
 
     def user_data_dir(self, username: str) -> Path:
         """Get the base directory for a user's calibration data."""
         return self._calib_data_base / username
 
-    def classifier_dir(self, username: str) -> Path:
-        """Get the classifier directory for a user."""
-        return self.user_data_dir(username) / ".classifier"
+    def project_chip_dir(self, project_id: str, chip_id: str) -> Path:
+        """Get the shared calibration directory for a project chip."""
+        return self._calib_data_base / "projects" / project_id / "chips" / chip_id
 
-    def execution_data_dir(self, username: str, date_str: str, index: str) -> Path:
-        """Get the directory for a specific execution's data."""
-        return self.user_data_dir(username) / date_str / index
+    def classifier_dir(self, project_id: str, chip_id: str) -> Path:
+        """Get the shared classifier directory for a project chip."""
+        return self.project_chip_dir(project_id, chip_id) / "shared" / "classifier"
+
+    def execution_data_dir(self, project_id: str, chip_id: str, execution_id: str) -> Path:
+        """Get the immutable artifact directory for an execution."""
+        date_str, separator, index = execution_id.partition("-")
+        if not separator or not date_str or not index:
+            raise ValueError(f"Invalid execution_id: {execution_id!r}")
+        return self.project_chip_dir(project_id, chip_id) / "executions" / date_str / index
 
 
 # Default resolver instance
