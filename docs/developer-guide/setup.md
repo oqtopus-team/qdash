@@ -1,12 +1,13 @@
 # Developer Setup
 
-Use DevContainer when you want the most isolated environment. Use Nix when you want a lightweight
-host shell with the project toolchain.
+Use DevContainer for an isolated environment or Nix for a lightweight host shell. The detailed
+[Development Environment Setup](../development/setup.md) is the canonical reference for tool
+versions, service composition, environment variables, and individual commands.
 
 ## DevContainer
 
 ```bash
-docker compose -f compose.devcontainer.yaml up -d --build
+docker compose -f compose.devcontainer.yaml up -d
 docker compose -f compose.devcontainer.yaml exec --user vscode devcontainer zsh
 ```
 
@@ -25,25 +26,14 @@ task dev-local-setup
 task dev-local
 ```
 
-`task dev-local` starts Docker-backed services and runs the API/UI on the host.
-
-## Full Docker Stack
-
-Create and review `.env` before starting the stack:
+Install dependencies and start the Docker-backed services with host API and UI processes:
 
 ```bash
-cp .env.example.qubex .env
+task dev-local-setup
+task dev-local
 ```
 
-Edit `.env` if you need custom ports, data paths, admin credentials, Qubex config repository
-settings, remote access settings, or Copilot provider credentials. For Qubex workflows, make sure
-`CONFIG_PATH` contains the chip configuration tree described in the
-[Operator Setup](../operator-guide/setup.md#qubex-configuration-files).
+Stop them with `task dev-local-down`.
 
-Then start the full stack:
-
-```bash
-task deploy-local
-```
-
-Use the full stack when you want behavior closest to a Compose deployment.
+Use the [Operator Setup](../operator-guide/setup.md) when you need the full Compose stack or must
+configure Qubex files, persistent storage, authentication, Copilot providers, or remote access.

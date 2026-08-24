@@ -15,30 +15,15 @@
 
 | Tool                                        | Version   | Description                          |
 | ------------------------------------------- | --------- | ------------------------------------ |
-| [Python](https://www.python.org/downloads/) | 3.11-3.12 | Backend development                  |
+| [Python](https://www.python.org/downloads/) | 3.10-3.12 | Backend development                  |
 | [Bun](https://bun.sh/)                      | 1.4.0+    | Frontend package manager and runtime |
 | [Node.js](https://nodejs.org/)              | 24+       | Alternative frontend runtime         |
 
-## Getting Started
+## Development Environment
 
-### Clone the Repository
-
-```shell
-git clone https://github.com/oqtopus-team/qdash.git
-cd qdash
-```
-
-### Qubex Setup
-
-Create the environment file from the Qubex example:
-
-```shell
-cp .env.example.qubex .env
-```
-
-Edit `.env` before starting services if you need custom ports, data paths, admin credentials,
-Qubex config repository settings, remote access settings, or Copilot provider credentials. Data
-directories are created by Docker Compose and `task dev-local-setup` as needed.
+Clone `https://github.com/oqtopus-team/qdash.git` and enter the repository directory. A
+DevContainer can start without `.env`. Before running Qubex-backed calibration tasks, follow
+[Operator Setup](../operator-guide/setup.md) for `.env` and `CONFIG_PATH` configuration.
 
 ### Using DevContainer (Recommended)
 

@@ -22,7 +22,10 @@ export default withMermaid(
     base: "/qdash/",
     title: "QDash",
     description: "Qubit Calibration Management Platform",
-    ignoreDeadLinks: true,
+    ignoreDeadLinks: [
+      /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/.*)?$/,
+      /^\.\/(?:box-setup|cw-characterization|td-characterization|one-qubit-gate-calibration|two-qubit-gate-calibration|benchmarking|ChevronPattern)(?:\/|$)/,
+    ],
     head: [
       [
         "link",
@@ -82,7 +85,6 @@ export default withMermaid(
           text: "Getting Started",
           items: [
             { text: "What is QDash", link: "/getting-started/what-is-qdash" },
-            { text: "Quickstart", link: "/getting-started/quick-start" },
             { text: "Architecture", link: "/getting-started/architecture" },
           ],
         },
@@ -104,6 +106,22 @@ export default withMermaid(
             {
               text: "Dashboard",
               link: "/user-guide/dashboard",
+            },
+            {
+              text: "Application Tour",
+              link: "/user-guide/application-tour",
+            },
+            {
+              text: "Running Calibrations",
+              link: "/user-guide/running-calibrations",
+            },
+            {
+              text: "Data and Provenance",
+              link: "/user-guide/data-and-provenance",
+            },
+            {
+              text: "Reviewing Results",
+              link: "/user-guide/reviewing-results",
             },
             {
               text: "Task Parameters",
@@ -237,6 +255,7 @@ export default withMermaid(
               link: "/architecture/square-lattice-topology",
             },
             { text: "Notes", link: "/architecture/notes" },
+            { text: "Provenance", link: "/architecture/provenance" },
           ],
         },
         {
