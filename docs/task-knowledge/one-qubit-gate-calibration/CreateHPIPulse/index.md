@@ -50,7 +50,7 @@ The π/2 amplitude should be approximately half of the π amplitude; fit quality
 - control_amplitude: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_length: Readout pulse length (ns)
+- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 

@@ -38,10 +38,10 @@ class CreateDRAGHPIPulse(QubexTask):
         "rabi_reference_phase": InputParameterSpec.required_database(),
         "rabi_r2": InputParameterSpec.required_database(),
         "maximum_rabi_frequency": InputParameterSpec.required_database(),
-        "readout_length": InputParameterSpec.database_or_default(
+        "readout_duration": InputParameterSpec.database_or_default(
             default=DEFAULT_READOUT_DURATION,
             unit="ns",
-            description="Readout pulse length",
+            description="Readout pulse duration",
         ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
