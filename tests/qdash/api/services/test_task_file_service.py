@@ -240,7 +240,7 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
     assert set(task.input_parameters) == {
         "qubit_frequency",
         "hpi_amplitude",
-        "hpi_length",
+        "hpi_duration",
         "readout_amplitude",
         "readout_frequency",
         "readout_length",

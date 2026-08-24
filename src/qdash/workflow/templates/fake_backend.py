@@ -10,7 +10,7 @@ Backend Switching:
 
 Available Fake Tasks (same names as qubex for seamless switching):
     - CheckFineChevron: Entry point, outputs qubit_frequency, readout_frequency
-    - CreateHPIPulse: Depends on qubit_frequency, outputs hpi_amplitude, hpi_length
+    - CreateHPIPulse: Depends on qubit_frequency, outputs hpi_amplitude, hpi_duration
     - CheckRabi: Depends on qubit_frequency
     - CheckRamsey: Depends on qubit_frequency, hpi_amplitude
     - CheckT1: Depends on qubit_frequency, hpi_amplitude

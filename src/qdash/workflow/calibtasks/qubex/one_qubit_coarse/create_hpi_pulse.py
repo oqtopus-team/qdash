@@ -45,7 +45,7 @@ class CreateHPIPulse(QubexTask):
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "hpi_duration": RunParameterSpec(
-            unit="ns", value_type="int", default=HPI_DURATION, description="HPI pulse length"
+            unit="ns", value_type="int", default=HPI_DURATION, description="HPI pulse duration"
         ),
         "shots": RunParameterSpec(
             unit="",
@@ -62,8 +62,8 @@ class CreateHPIPulse(QubexTask):
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "hpi_amplitude": OutputParameterSpec(unit="", description="HPI pulse amplitude"),
-        "hpi_length": OutputParameterSpec(
-            default=HPI_DURATION, unit="ns", description="HPI pulse length"
+        "hpi_duration": OutputParameterSpec(
+            default=HPI_DURATION, unit="ns", description="HPI pulse duration"
         ),
     }
 
