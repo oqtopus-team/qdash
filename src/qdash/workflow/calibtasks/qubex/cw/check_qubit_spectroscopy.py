@@ -143,7 +143,7 @@ class CheckQubitSpectroscopy(QubexTask):
             description=(
                 "Coarse f01 estimate from spectroscopy (5 MHz grid). NOT a calibrated "
                 "qubit_frequency (those come from a Rabi-detuning fit such as "
-                "CheckCoarseChevron); this is intended as a seed for downstream "
+                "CheckChevron); this is intended as a seed for downstream "
                 "frequency-refinement tasks."
             ),
         ),

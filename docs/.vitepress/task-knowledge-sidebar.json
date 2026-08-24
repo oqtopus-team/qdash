@@ -34,28 +34,8 @@
     "collapsed": true,
     "items": [
       {
-        "text": "CheckResonatorFrequencies",
-        "link": "/task-knowledge/cw-characterization/CheckResonatorFrequencies"
-      },
-      {
         "text": "CheckResonatorSpectroscopy",
         "link": "/task-knowledge/cw-characterization/CheckResonatorSpectroscopy"
-      },
-      {
-        "text": "CheckReflectionCoefficient",
-        "link": "/task-knowledge/cw-characterization/CheckReflectionCoefficient"
-      },
-      {
-        "text": "CheckElectricalDelay",
-        "link": "/task-knowledge/cw-characterization/CheckElectricalDelay"
-      },
-      {
-        "text": "CheckReadoutAmplitude",
-        "link": "/task-knowledge/cw-characterization/CheckReadoutAmplitude"
-      },
-      {
-        "text": "CheckQubitFrequencies",
-        "link": "/task-knowledge/cw-characterization/CheckQubitFrequencies"
       },
       {
         "text": "CheckQubitSpectroscopy",
@@ -67,18 +47,6 @@
     "text": "TD Characterization",
     "collapsed": true,
     "items": [
-      {
-        "text": "CheckQubit",
-        "link": "/task-knowledge/td-characterization/CheckQubit"
-      },
-      {
-        "text": "CheckQubitFrequency",
-        "link": "/task-knowledge/td-characterization/CheckQubitFrequency"
-      },
-      {
-        "text": "CheckReadoutFrequency",
-        "link": "/task-knowledge/td-characterization/CheckReadoutFrequency"
-      },
       {
         "text": "CheckRabi",
         "link": "/task-knowledge/td-characterization/CheckRabi"
@@ -94,10 +62,6 @@
       {
         "text": "CheckRamsey",
         "link": "/task-knowledge/td-characterization/CheckRamsey"
-      },
-      {
-        "text": "CheckDispersiveShift",
-        "link": "/task-knowledge/td-characterization/CheckDispersiveShift"
       },
       {
         "text": "CheckOptimalReadoutAmplitude",
