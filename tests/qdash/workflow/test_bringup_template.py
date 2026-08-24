@@ -20,25 +20,6 @@ class FakeCalibService:
         return {"targets": targets, "steps": steps}
 
 
-def test_bringup_injects_resonator_assignment_order(monkeypatch) -> None:
-    monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
-
-    bringup_module.bringup(
-        username="alice",
-        chip_id="16Q-test",
-        mux_ids=[0],
-        resonator_assignment_order=[0, 3, 1, 2],
-    )
-
-    assert FakeCalibService.last_kwargs is not None
-    assert FakeCalibService.last_kwargs["default_run_parameters"] == {
-        "interval": {"value": 150 * 1024, "value_type": "int"},
-        "CheckResonatorSpectroscopy": {
-            "resonator_assignment_order": {"value": [0, 3, 1, 2], "value_type": "list"}
-        },
-    }
-
-
 def test_bringup_starts_with_configure_all(monkeypatch) -> None:
     monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
 

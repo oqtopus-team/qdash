@@ -70,10 +70,12 @@ class ReanalysisService:
 
         config = self._build_resonator_config(params, doc.run_parameters)
 
-        # Resolve bare-shift estimator: form override → original task's run_parameters
-        # → "config". This way, leaving the form blank reproduces the original run.
+        # Older results stored analysis settings as run parameters. Newer results use
+        # the task's internal analysis default when no explicit reanalysis override exists.
         estimator_type = params.bare_shift_estimator_type or self._stored_value(
-            doc.run_parameters, "bare_shift_estimator_type", default="config"
+            doc.run_parameters,
+            "bare_shift_estimator_type",
+            default="high_frequency_strength",
         )
         if estimator_type and estimator_type != "config":
             strength_limit = params.bare_shift_strength_limit

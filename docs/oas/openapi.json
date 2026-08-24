@@ -20392,6 +20392,11 @@
             "type": "string",
             "title": "Status"
           },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
           "flow_name": {
             "type": "string",
             "title": "Flow Name",
@@ -20498,6 +20503,11 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
           },
           "user_id": {
             "anyOf": [

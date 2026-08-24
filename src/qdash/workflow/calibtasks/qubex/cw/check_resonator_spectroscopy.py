@@ -66,8 +66,9 @@ class CheckResonatorSpectroscopy(QubexTask):
             value_type="np.arange",
             default=None,
             description=(
-                "Frequency range for resonator spectroscopy. When unset, qubex selects "
-                "the range from the connected readout box type."
+                "Frequency range as [start, stop, step] in GHz. Leave blank to use "
+                "the connected readout box default. Examples: low band "
+                "[5.75, 6.75, 0.002], high band [9.75, 10.75, 0.002]."
             ),
         ),
         "power_range": RunParameterSpec(
@@ -82,12 +83,6 @@ class CheckResonatorSpectroscopy(QubexTask):
             default=1024,
             description="Number of shots for resonator spectroscopy",
         ),
-        "num_resonators": RunParameterSpec(
-            unit="a.u.",
-            value_type="int",
-            default=NUM_RESONATORS,
-            description="Number of resonators to detect",
-        ),
         "resonator_assignment_order": RunParameterSpec(
             unit="",
             value_type="list",
@@ -97,54 +92,12 @@ class CheckResonatorSpectroscopy(QubexTask):
                 "Must contain each offset from 0 to 3 exactly once."
             ),
         ),
-        "high_power_min": RunParameterSpec(
-            unit="dB",
-            value_type="float",
-            default=-20.0,
-            description="Minimum power for high-power peak detection",
-        ),
-        "high_power_max": RunParameterSpec(
-            unit="dB",
-            value_type="float",
-            default=0.0,
-            description="Maximum power for high-power peak detection",
-        ),
-        "low_power": RunParameterSpec(
-            unit="dB",
-            value_type="float",
-            default=-30.0,
-            description="Power level for low-power peak detection",
-        ),
-        "bare_shift_estimator_type": RunParameterSpec(
-            unit="",
-            value_type="str",
-            default="high_frequency_strength",
-            description=(
-                "How to pick the bare-shift boundary. "
-                "'config' uses high_power_min/max/low_power; "
-                "'high_frequency_strength' detects it from the FFT of each row."
-            ),
-        ),
-        "bare_shift_strength_limit": RunParameterSpec(
-            unit="a.u.",
-            value_type="float",
-            default=4.0,
-            description=(
-                "Maximum high-frequency FFT strength accepted as the bare-shift "
-                "boundary. Only used when bare_shift_estimator_type="
-                "'high_frequency_strength'."
-            ),
-        ),
-        "minimum_usable_power_correlation_coefficient_min": RunParameterSpec(
-            unit="a.u.",
-            value_type="float",
-            default=0.9,
-            description=(
-                "Minimum adjacent-row correlation used to estimate the minimum "
-                "usable power for optimal_power calculation."
-            ),
-        ),
     }
+    _analysis_config: ClassVar[EstimateResonatorFrequencyConfig] = (
+        EstimateResonatorFrequencyConfig()
+    )
+    _bare_shift_estimator_type: ClassVar[str] = "high_frequency_strength"
+    _bare_shift_strength_limit: ClassVar[float] = 4.0
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "readout_frequency": OutputParameterSpec(
             unit="GHz", description="Estimated resonator frequency from spectroscopy"
@@ -189,32 +142,22 @@ class CheckResonatorSpectroscopy(QubexTask):
         local_boundaries: list[BareShiftBoundary] | None = None
         optimal_powers: list[float] | None = None
         marked_fig = None
+        analysis_error: str | None = None
+        assignment_error: str | None = None
         try:
-            config = EstimateResonatorFrequencyConfig(
-                num_resonators=self.run_parameters["num_resonators"].get_value(),
-                high_power_min=self.run_parameters["high_power_min"].get_value(),
-                high_power_max=self.run_parameters["high_power_max"].get_value(),
-                low_power=self.run_parameters["low_power"].get_value(),
-                minimum_usable_power_correlation_coefficient_min=self.run_parameters[
-                    "minimum_usable_power_correlation_coefficient_min"
-                ].get_value(),
-            )
+            config = self._analysis_config
             boundary = BareShiftBoundary(
                 low_power=config.low_power,
                 high_power_min=config.high_power_min,
                 high_power_max=config.high_power_max,
             )
 
-            estimator_type = self.run_parameters["bare_shift_estimator_type"].get_value()
+            estimator_type = self._bare_shift_estimator_type
             if estimator_type and estimator_type != "config":
                 trace = analysis_fig.data[0]
                 estimator = create_bare_shift_boundary_estimator(
                     type=estimator_type,
-                    args={
-                        "strength_limit": self.run_parameters[
-                            "bare_shift_strength_limit"
-                        ].get_value(),
-                    },
+                    args={"strength_limit": self._bare_shift_strength_limit},
                 )
                 boundary = estimator.estimate_bare_shift_boundary(
                     list(trace.x), list(trace.y), list(trace.z)
@@ -310,12 +253,20 @@ class CheckResonatorSpectroscopy(QubexTask):
                     f"all={[f'{f:.6f}' for f in frequencies]})"
                 )
             else:
-                print(
-                    f"[WARNING] Failed to detect resonator frequency for qid={qid}: "
-                    f"assigned slot {assigned_slot} unavailable "
-                    f"(mode={assignment_mode}, found {len(frequencies)}/{NUM_RESONATORS} peaks)"
+                assignment_error = (
+                    f"Resonator assignment failed for qid={qid}: "
+                    f"assignment_order={list(assignment_order)}, "
+                    f"assigned_slot={assigned_slot}, detected_slots={sorted_slots}, "
+                    f"mode={assignment_mode}, "
+                    f"detected_frequencies={[float(frequency) for frequency in frequencies]}"
                 )
-        except Exception:
+                print(f"[WARNING] {assignment_error}")
+        except Exception as exc:
+            analysis_error = (
+                f"Resonator analysis failed for qid={qid}: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            print(f"[ERROR] {analysis_error}")
             logger.warning(
                 "Failed to estimate resonator frequency for qid=%s",
                 qid,
@@ -343,7 +294,11 @@ class CheckResonatorSpectroscopy(QubexTask):
             value.execution_id = execution_id
 
         error_msg: str | None = None
-        if not math.isfinite(estimated_frequency) or estimated_frequency <= 0.0:
+        if analysis_error is not None:
+            error_msg = analysis_error
+        elif assignment_error is not None:
+            error_msg = assignment_error
+        elif not math.isfinite(estimated_frequency) or estimated_frequency <= 0.0:
             error_msg = f"Invalid resonator frequency for qid={qid}: {estimated_frequency:.6f} GHz"
         elif optimal_power is None or not math.isfinite(optimal_power):
             error_msg = f"Invalid optimal_power for qid={qid}: {optimal_power}"
@@ -402,6 +357,17 @@ class CheckResonatorSpectroscopy(QubexTask):
         """Return an explicit override, or let qubex select by readout box type."""
         parameter = self.run_parameters["frequency_range"]
         return None if parameter.value is None else parameter.get_value()
+
+    def resolve_run_parameters(self, backend: QubexBackend, qid: str) -> None:
+        """Populate the effective device-specific sweep before it is recorded."""
+        parameter = self.run_parameters["frequency_range"]
+        if parameter.value is not None:
+            return
+
+        exp = self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
+        box = exp.ctx.experiment_system.get_readout_box_for_qubit(label)
+        parameter.value = tuple(box.traits.default_readout_frequency_range)
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""

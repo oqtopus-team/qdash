@@ -6,9 +6,8 @@ resonator spectroscopy. Bring-up tasks are executed once per MUX, not per qubit.
 Example:
     bringup(
         username="alice",
-        chip_id="64Qv3",
+        chip_id="16Q",
         mux_ids=[0, 1, 2, 3],
-        resonator_assignment_order=[3, 0, 2, 1],
     )
 """
 
@@ -48,7 +47,6 @@ def bringup(
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
-    resonator_assignment_order: list[int] | None = None,
 ) -> Any:
     """Bring-up calibration for MUX-level characterization.
 
@@ -69,9 +67,6 @@ def bringup(
             - "synchronized": Step-based synchronized execution
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
-        resonator_assignment_order: Qubit offsets in increasing resonator-frequency
-            order. For example, use [0, 3, 1, 2] for mux[0], mux[3], mux[1], mux[2].
-
     Returns:
         Pipeline results with bring-up step outputs
     """
@@ -84,33 +79,24 @@ def bringup(
 
     default_run_parameters: dict[str, Any] = {
         "interval": {"value": 150 * 1024, "value_type": "int"},
+        # For a 16Q chip, use the following frequency-sorted resonator assignment:
+        # "CheckResonatorSpectroscopy": {
+        #     "resonator_assignment_order": {
+        #         "value": [0, 3, 1, 2],
+        #         "value_type": "list",
+        #     },
+        #     "frequency_range": {
+        #         "value": [5.75, 6.75, 0.002],
+        #         "value_type": "np.arange",
+        #     },
+        # },
+        # "CheckQubitSpectroscopy": {
+        #     "frequency_range": {
+        #         "value": [3.0, 5.75, 0.005],
+        #         "value_type": "np.arange",
+        #     },
+        # },
     }
-
-    resonator_run_parameters: dict[str, Any] = {}
-    if resonator_assignment_order is not None:
-        resonator_run_parameters["resonator_assignment_order"] = {
-            "value": resonator_assignment_order,
-            "value_type": "list",
-        }
-
-    # Optionally add a custom sweep to the same task parameters. When omitted,
-    # qubex selects the frequency range from the connected readout box type.
-    # resonator_run_parameters["frequency_range"] = {
-    #     "value": [5.75, 6.75, 0.002],
-    #     "value_type": "np.arange",
-    # }
-
-    if resonator_run_parameters:
-        default_run_parameters["CheckResonatorSpectroscopy"] = resonator_run_parameters
-
-    # CheckQubitSpectroscopy uses a separate control-frequency sweep. When omitted,
-    # qubex selects the frequency range from the connected control box type.
-    # default_run_parameters["CheckQubitSpectroscopy"] = {
-    #     "frequency_range": {
-    #         "value": [3.0, 5.0, 0.005],
-    #         "value_type": "np.arange",
-    #     },
-    # }
 
     steps = [
         ConfigureAll(),

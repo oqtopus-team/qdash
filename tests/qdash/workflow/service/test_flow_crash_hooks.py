@@ -239,6 +239,22 @@ def test_on_flow_failure_closes_execution_as_failed(init_db) -> None:
     assert execution.status == "failed"
 
 
+def test_on_flow_failure_preserves_prefect_failure_message(init_db) -> None:
+    _make_execution(status="running")
+    state = SimpleNamespace(
+        message=(
+            "Flow run encountered an exception: ValueError: "
+            "mux_ids is required; select MUX targets before running this flow"
+        )
+    )
+
+    on_flow_failure(None, _fake_flow_run(), state)
+
+    execution = _reload_execution()
+    assert execution is not None
+    assert execution.message == state.message
+
+
 def test_hook_without_project_id_is_noop(init_db) -> None:
     """A flow_run whose parameters lack project_id leaves executions untouched."""
     _make_execution(status="running")

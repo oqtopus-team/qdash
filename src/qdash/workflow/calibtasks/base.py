@@ -104,6 +104,9 @@ class BaseTask(ABC):
     def prepare_run(self, backend: BaseBackend, qid: str) -> None:
         """Apply resolved and validated inputs immediately before execution."""
 
+    def resolve_run_parameters(self, backend: BaseBackend, qid: str) -> None:
+        """Resolve backend-dependent defaults before run parameters are recorded."""
+
     def extract_batch_raw_data(
         self, backend: BaseBackend, run_result: RunResult, qids: list[str]
     ) -> dict[str, list[Any]]:

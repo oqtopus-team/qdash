@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { SaveFlowRequest, ExecuteFlowResponse } from "@/schemas";
+import type { ExecutionResponseDetail, SaveFlowRequest, ExecuteFlowResponse } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
 import { useToast } from "@/components/ui/Toast";
@@ -22,7 +22,11 @@ import {
 
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
-import { useGetExecutionLockStatus, useCancelExecution } from "@/client/execution/execution";
+import {
+  useCancelExecution,
+  useGetExecution,
+  useGetExecutionLockStatus,
+} from "@/client/execution/execution";
 import {
   getFlow,
   saveFlow,
@@ -136,6 +140,7 @@ export function WorkflowEditorPageContent() {
   const [selection, setSelection] = useState({ lines: 0, chars: 0 });
   const [isBottomPanelOpen, setIsBottomPanelOpen] = useState(false);
   const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
+  const reportedTerminalExecution = useRef<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRef = useRef<any>(null);
 
@@ -151,6 +156,29 @@ export function WorkflowEditorPageContent() {
       refetchInterval: 5000,
     },
   });
+
+  const { data: executionResponse } = useGetExecution(lastExecutionId ?? "", {
+    query: {
+      enabled: Boolean(lastExecutionId),
+      refetchInterval: (query) => {
+        const status = (query.state.data?.data as ExecutionResponseDetail | undefined)?.status;
+        return status && ["completed", "failed", "cancelled"].includes(status) ? false : 2000;
+      },
+      refetchIntervalInBackground: true,
+    },
+  });
+  const latestExecution = executionResponse?.data as ExecutionResponseDetail | undefined;
+
+  useEffect(() => {
+    if (!lastExecutionId || !latestExecution) return;
+    if (!["failed", "cancelled"].includes(latestExecution.status)) return;
+    if (reportedTerminalExecution.current === lastExecutionId) return;
+
+    reportedTerminalExecution.current = lastExecutionId;
+    const message = latestExecution.message || `Flow execution ${latestExecution.status}`;
+    toast.error(message);
+    setIsBottomPanelOpen(true);
+  }, [lastExecutionId, latestExecution, toast]);
 
   // Fetch all flows for sidebar
   const { data: flowsData } = useListFlows();
@@ -1243,13 +1271,27 @@ export function WorkflowEditorPageContent() {
                   <div className="text-base-content/40">
                     <span className="text-info">[info]</span> Chip: {chipId} | User: {username}
                   </div>
-                  {lockStatus?.data.lock ? (
+                  {latestExecution?.status === "failed" ? (
+                    <div className="space-y-1 text-error">
+                      <div>[failed] Execution failed.</div>
+                      {latestExecution.message && <div>{latestExecution.message}</div>}
+                    </div>
+                  ) : latestExecution?.status === "cancelled" ? (
+                    <div className="space-y-1 text-warning">
+                      <div>[cancelled] Execution was cancelled.</div>
+                      {latestExecution.message && <div>{latestExecution.message}</div>}
+                    </div>
+                  ) : latestExecution?.status === "completed" ? (
+                    <div>
+                      <span className="text-success">[done]</span> Execution completed.
+                    </div>
+                  ) : lockStatus?.data.lock ? (
                     <div>
                       <span className="text-warning">[running]</span> Execution in progress...
                     </div>
                   ) : (
                     <div>
-                      <span className="text-success">[done]</span> Execution completed.
+                      <span className="text-info">[pending]</span> Waiting for execution status...
                     </div>
                   )}
                 </div>
