@@ -45,7 +45,7 @@
             jq
             lefthook
             lsof
-            nodejs_20
+            nodejs_24
             pkg-config
             postgresql_14
             python311
