@@ -121,6 +121,14 @@ def _rabi_validation_error(result: Any, label: str) -> str | None:
         )
         if error is not None:
             return error
+
+    r2 = getattr(rabi_param, "r2", None)
+    error = _finite_rabi_validation_error(r2, "r2", label)
+    if error is not None:
+        return error
+    assert r2 is not None
+    if float(r2) < 0.6:
+        return f"CheckRabi produced rabi_r2 below 0.6 for {label}: {r2}"
     return None
 
 
@@ -184,6 +192,7 @@ class CheckRabi(QubexTask):
         "rabi_reference_phase": OutputParameterSpec(
             unit="a.u.", description="Rabi reference phase"
         ),
+        "rabi_r2": OutputParameterSpec(unit="", description="Rabi fit R²"),
         "control_amplitude": OutputParameterSpec(
             unit="a.u.", description="Control pulse amplitude"
         ),
@@ -216,6 +225,7 @@ class CheckRabi(QubexTask):
         self.output_parameters["rabi_reference_phase"].value = result.rabi_params[
             label
         ].reference_phase
+        self.output_parameters["rabi_r2"].value = result.rabi_params[label].r2
         control_amplitude_param = self.input_parameters["control_amplitude"]
         assert control_amplitude_param is not None
         default_amp = control_amplitude_param.value
@@ -273,8 +283,9 @@ class CheckRabi(QubexTask):
             store_params=False,
         )
 
-        _store_rabi_params(exp, result)
-        self.save_calibration(backend)
+        if _rabi_validation_error(result, label) is None:
+            _store_rabi_params(exp, result)
+            self.save_calibration(backend)
         r2_candidates = _extract_rabi_r2_candidates(result, label)
         r2 = _extract_rabi_r2(result, label)
         logger.warning(

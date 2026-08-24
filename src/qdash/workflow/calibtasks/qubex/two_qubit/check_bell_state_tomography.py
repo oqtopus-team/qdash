@@ -48,20 +48,17 @@ class CheckBellStateTomography(QubexTask):
             qid_role="control",
             unit="GHz",
         ),
-        "control_drag_hpi_amplitude": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_amplitude": InputParameterSpec.required_database(
             parameter_name="drag_hpi_amplitude",
             qid_role="control",
             unit="a.u.",
         ),
-        "control_drag_hpi_length": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_length": InputParameterSpec.required_database(
             parameter_name="drag_hpi_length",
             qid_role="control",
             unit="ns",
         ),
-        "control_drag_hpi_beta": InputParameterSpec.database_or_default(
-            default=0,
+        "control_drag_hpi_beta": InputParameterSpec.required_database(
             parameter_name="drag_hpi_beta",
             qid_role="control",
             unit="a.u.",
@@ -110,47 +107,52 @@ class CheckBellStateTomography(QubexTask):
             unit="ns",
         ),
         # CR parameters (from previous calibration)
-        "cr_amplitude": InputParameterSpec.database_or_default(
-            default=0,
+        "cr_duration": InputParameterSpec.required_database(
+            parameter_name="cr_duration", qid_role="coupling", unit="ns"
+        ),
+        "cr_amplitude": InputParameterSpec.required_database(
             parameter_name="cr_amplitude",
             qid_role="control",
             unit="a.u.",
         ),
-        "cr_phase": InputParameterSpec.database_or_default(
-            default=0,
+        "cr_phase": InputParameterSpec.required_database(
             parameter_name="cr_phase",
             qid_role="control",
             unit="a.u.",
         ),
-        "cancel_amplitude": InputParameterSpec.database_or_default(
-            default=0,
+        "cr_beta": InputParameterSpec.required_database(
+            parameter_name="cr_beta", qid_role="control", unit="a.u."
+        ),
+        "cancel_amplitude": InputParameterSpec.required_database(
             parameter_name="cancel_amplitude",
             qid_role="target",
             unit="a.u.",
         ),
-        "cancel_phase": InputParameterSpec.database_or_default(
-            default=0,
+        "cancel_phase": InputParameterSpec.required_database(
             parameter_name="cancel_phase",
             qid_role="target",
             unit="a.u.",
         ),
-        "cancel_beta": InputParameterSpec.database_or_default(
-            default=0,
+        "cancel_beta": InputParameterSpec.required_database(
             parameter_name="cancel_beta",
             qid_role="target",
             unit="a.u.",
         ),
-        "rotary_amplitude": InputParameterSpec.database_or_default(
-            default=0,
+        "rotary_amplitude": InputParameterSpec.required_database(
             parameter_name="rotary_amplitude",
             qid_role="control",
             unit="a.u.",
         ),
-        "zx_rotation_rate": InputParameterSpec.database_or_default(
-            default=0,
+        "zx_rotation_rate": InputParameterSpec.required_database(
             parameter_name="zx_rotation_rate",
             qid_role="coupling",
             unit="a.u.",
+        ),
+        "cr_ramptime": InputParameterSpec.required_database(
+            parameter_name="cr_ramptime", qid_role="coupling", unit="ns"
+        ),
+        "zx90_gate_time": InputParameterSpec.required_database(
+            parameter_name="zx90_gate_time", qid_role="coupling", unit="ns"
         ),
     }
 

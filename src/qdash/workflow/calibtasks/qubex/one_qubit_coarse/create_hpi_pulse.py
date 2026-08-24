@@ -10,6 +10,7 @@ from qdash.datamodel.task import (
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
+    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
@@ -27,6 +28,15 @@ class CreateHPIPulse(QubexTask):
         "control_amplitude": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
+        "rabi_amplitude": InputParameterSpec.required_database(),
+        "rabi_phase": InputParameterSpec.required_database(),
+        "rabi_offset": InputParameterSpec.required_database(),
+        "rabi_angle": InputParameterSpec.required_database(),
+        "rabi_noise": InputParameterSpec.required_database(),
+        "rabi_distance": InputParameterSpec.required_database(),
+        "rabi_reference_phase": InputParameterSpec.required_database(),
+        "rabi_r2": InputParameterSpec.required_database(),
+        "maximum_rabi_frequency": InputParameterSpec.required_database(),
         "readout_length": InputParameterSpec.database_or_default(
             default=DEFAULT_READOUT_DURATION,
             unit="ns",
@@ -57,6 +67,18 @@ class CreateHPIPulse(QubexTask):
         ),
     }
 
+    def preprocess(self, backend: QubexBackend, qid: str) -> PreProcessResult:
+        """Load and explicitly validate every input needed to restore Rabi context."""
+        result = super().preprocess(backend, qid)
+        missing = [
+            name for name, parameter in self.input_parameters.items() if parameter.value is None
+        ]
+        if missing:
+            raise ValueError(
+                "CreateHPIPulse requires resolved calibration inputs: " + ", ".join(missing)
+            )
+        return result
+
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
@@ -81,12 +103,15 @@ class CreateHPIPulse(QubexTask):
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
         labels = [exp.get_qubit_label(int(qid))]
+        label = labels[0]
         readout_amp_param = self.input_parameters["readout_amplitude"]
         if readout_amp_param is not None:
             exp.params.readout_amplitude[labels[0]] = readout_amp_param.value
         control_amp_param = self.input_parameters["control_amplitude"]
         if control_amp_param is not None:
-            exp.params.control_amplitude[labels[0]] = control_amp_param.value
+            exp.params.control_amplitude[label] = control_amp_param.value
+
+        self._restore_rabi_context(backend, qid)
         result = exp.calibrate_hpi_pulse(
             targets=labels,
             n_rotations=1,

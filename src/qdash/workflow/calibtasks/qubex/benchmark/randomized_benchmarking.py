@@ -86,8 +86,10 @@ class RandomizedBenchmarking(QubexTask):
         readout_amp_param = self.input_parameters["readout_amplitude"]
         if readout_amp_param is not None:
             exp.params.readout_amplitude[label] = readout_amp_param.value
+        x90 = {label: exp.drag_hpi_pulse[label]}
         result = exp.randomized_benchmarking(
             targets=label,
+            x90=x90,
             n_trials=self.run_parameters["n_trials"].get_value(),
             save_image=False,
             n_shots=self.run_parameters["shots"].get_value(),

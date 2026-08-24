@@ -32,6 +32,27 @@ from typing import Any, Literal
 # =============================================================================
 
 
+def normalize_metric_value(parameter: Any) -> float | None:
+    """Normalize a task output parameter into a numeric workflow metric.
+
+    Task outputs can cross a Prefect process boundary as serialized dictionaries,
+    while in-process execution returns ``ParameterModel``-like objects. Raw numeric
+    values are also accepted for backwards compatibility.
+    """
+    if parameter is None:
+        return None
+    if isinstance(parameter, dict):
+        parameter = parameter.get("value")
+    elif hasattr(parameter, "value"):
+        parameter = parameter.value
+    if parameter is None:
+        return None
+    try:
+        return float(parameter)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Metric value must be numeric, got {parameter!r}") from exc
+
+
 @dataclass
 class QubitCalibData:
     """Calibration data for a single qubit.
@@ -127,8 +148,7 @@ class OneQubitResult:
         return sorted(
             qid
             for qid, data in self.qubits.items()
-            if data.get_metric(metric_name) is not None
-            and data.get_metric(metric_name) >= threshold  # type: ignore[operator]
+            if (value := data.get_metric(metric_name)) is not None and value >= threshold
         )
 
     def all_qids(self) -> list[str]:
@@ -175,8 +195,7 @@ class TwoQubitResult:
         return sorted(
             cid
             for cid, data in self.couplings.items()
-            if data.get_metric(metric_name) is not None
-            and data.get_metric(metric_name) >= threshold  # type: ignore[operator]
+            if (value := data.get_metric(metric_name)) is not None and value >= threshold
         )
 
     def all_couplings(self) -> list[str]:
