@@ -49,7 +49,7 @@ Clear fringe visibility with identifiable chevron vertex; vertex position should
 - qubit_frequency: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_length: Readout pulse length (ns)
+- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 

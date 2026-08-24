@@ -33,7 +33,7 @@ def _task_info() -> TaskInfo:
         file_path="fake/fake_check_rabi.py",
         input_parameters={
             "qubit_frequency": {"user_override": "allowed", "value_type": "float"},
-            "readout_length": {"user_override": "forbidden", "value_type": "float"},
+            "readout_duration": {"user_override": "forbidden", "value_type": "float"},
         },
         run_parameters={"shots": {"value_type": "int"}},
     )
@@ -115,9 +115,9 @@ async def test_quick_run_task_resolves_and_validates_default_backend(
                 chip_id="chip-1",
                 qid="0",
                 backend_name="fake",
-                input_parameter_overrides={"readout_length": 1024},
+                input_parameter_overrides={"readout_duration": 1024},
             ),
-            "input parameters do not allow overrides: readout_length",
+            "input parameters do not allow overrides: readout_duration",
         ),
         (
             QuickRunTaskRequest(

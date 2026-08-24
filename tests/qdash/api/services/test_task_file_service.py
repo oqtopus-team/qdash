@@ -184,7 +184,7 @@ def test_list_task_info_resolves_local_and_qubex_constants() -> None:
     )
 
     assert task.input_parameters["control_amplitude"]["default_value"] == 0.0125
-    assert task.input_parameters["readout_length"]["default_value"] == DEFAULT_READOUT_DURATION
+    assert task.input_parameters["readout_duration"]["default_value"] == DEFAULT_READOUT_DURATION
     assert task.run_parameters["shots"]["value"] == CALIBRATION_SHOTS
     assert task.run_parameters["interval"]["value"] == 150 * 1024
 
@@ -215,7 +215,7 @@ def test_list_task_info_prefers_generated_catalog(tmp_path: Path) -> None:
                             "class_name": "CatalogTask",
                             "task_type": "qubit",
                             "file_path": "catalog_task.py",
-                            "input_parameters": {"readout_length": {"default_value": 384.0}},
+                            "input_parameters": {"readout_duration": {"default_value": 384.0}},
                         }
                     ]
                 },
@@ -227,7 +227,7 @@ def test_list_task_info_prefers_generated_catalog(tmp_path: Path) -> None:
     task = TaskFileService(calibtasks_base_path=tmp_path).list_task_info("qubex").tasks[0]
 
     assert task.name == "FromCatalog"
-    assert task.input_parameters["readout_length"]["default_value"] == 384.0
+    assert task.input_parameters["readout_duration"]["default_value"] == 384.0
 
 
 def test_list_task_info_includes_database_input_parameter_dependencies() -> None:
@@ -243,14 +243,14 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
         "hpi_duration",
         "readout_amplitude",
         "readout_frequency",
-        "readout_length",
+        "readout_duration",
     }
     assert task.input_parameters["qubit_frequency"] == {
         "resolution": "database_required",
         "user_override": "allowed",
         "default_value": None,
     }
-    assert task.input_parameters["readout_length"]["unit"] == "ns"
+    assert task.input_parameters["readout_duration"]["unit"] == "ns"
 
 
 def test_extract_parameter_metadata_understands_named_spec_constructors() -> None:

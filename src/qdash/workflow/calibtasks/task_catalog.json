@@ -25,16 +25,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -602,20 +602,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "control_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_amplitude": {
@@ -682,20 +682,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "target_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "target_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "zx90_gate_time": {
@@ -801,20 +801,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "control_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_amplitude": {
@@ -881,20 +881,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "target_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "target_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "zx90_gate_time": {
@@ -955,16 +955,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -996,16 +996,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -1154,20 +1154,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "control_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "target_qubit_frequency": {
@@ -1186,20 +1186,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "target_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "target_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -1250,16 +1250,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -1310,16 +1310,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -1395,16 +1395,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -1444,16 +1444,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -1562,16 +1562,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -1808,16 +1808,16 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -1873,16 +1873,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -2176,16 +2176,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -2241,16 +2241,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -2312,16 +2312,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -2377,16 +2377,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -2538,20 +2538,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "control_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_amplitude": {
@@ -2618,20 +2618,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "target_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "target_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "zx90_gate_time": {
@@ -2773,16 +2773,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -2874,16 +2874,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -2975,16 +2975,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -3076,16 +3076,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -3181,20 +3181,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "control_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_amplitude": {
@@ -3261,20 +3261,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "target_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "target_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "zx_rotation_rate": {
@@ -3351,16 +3351,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -3417,16 +3417,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -3521,16 +3521,16 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "readout_length": {
-            "default_value": 384.0,
-            "description": "Readout pulse length",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           }
         },
@@ -3626,20 +3626,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "control",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "control_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_amplitude": {
@@ -3706,20 +3706,20 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "target_readout_duration": {
+            "default_value": 0,
+            "parameter_name": "readout_duration",
+            "qid_role": "target",
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "target_readout_length": {
-            "default_value": 0,
-            "parameter_name": "readout_length",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "zx90_gate_time": {
