@@ -4,7 +4,7 @@ ARG NEXT_PUBLIC_PREFECT_URL
 ARG INTERNAL_API_URL
 ARG NEXT_PUBLIC_COPILOT_ENABLED
 
-FROM oven/bun:1 AS base
+FROM oven/bun:1.4.0 AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -31,7 +31,7 @@ RUN --mount=type=cache,target=/app/.next/cache \
     bun run next build --turbo
 
 # Standalone output - no need for bun install in runner
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_ENV
 ARG NEXT_PUBLIC_PREFECT_URL
