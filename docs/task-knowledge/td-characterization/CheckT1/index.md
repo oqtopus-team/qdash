@@ -50,10 +50,10 @@ Exponential fit should have high R²; T1 should be stable across repeated measur
 
 - qubit_frequency: Loaded from DB
 - hpi_amplitude: Loaded from DB
-- hpi_length: Loaded from DB
+- hpi_duration: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_length: Readout pulse length (ns)
+- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 

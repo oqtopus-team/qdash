@@ -98,6 +98,12 @@ def test_preprocess_fails_explicitly_when_rabi_inputs_are_missing() -> None:
         task.preprocess(cast("QubexBackend", backend), "1")
 
 
+def test_hpi_duration_is_used_consistently_for_run_and_output_parameters() -> None:
+    assert "hpi_duration" in CreateHPIPulse.run_spec
+    assert "hpi_duration" in CreateHPIPulse.output_spec
+    assert "hpi_length" not in CreateHPIPulse.run_spec
+
+
 def test_restore_rabi_context_rejects_low_quality_database_value() -> None:
     task = _configured_task()
     task.input_parameters["rabi_r2"] = InputParameterModel(value=0.59)

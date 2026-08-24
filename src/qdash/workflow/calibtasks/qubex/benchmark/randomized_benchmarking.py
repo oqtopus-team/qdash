@@ -28,10 +28,10 @@ class RandomizedBenchmarking(QubexTask):
         "drag_hpi_beta": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
-        "readout_length": InputParameterSpec.database_or_default(
+        "readout_duration": InputParameterSpec.database_or_default(
             default=DEFAULT_READOUT_DURATION,
             unit="ns",
-            description="Readout pulse length",
+            description="Readout pulse duration",
         ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {

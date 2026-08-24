@@ -53,7 +53,7 @@ Average readout fidelity should be high with low asymmetry between |0‚ü© and |1‚
 - drag_hpi_beta: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_length: Readout pulse length (ns)
+- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 

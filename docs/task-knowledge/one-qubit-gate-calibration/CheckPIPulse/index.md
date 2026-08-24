@@ -54,7 +54,7 @@ Contrast should remain high over many repetitions; per-gate error rate extracted
 - pi_length: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_length: Readout pulse length (ns)
+- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 

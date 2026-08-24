@@ -74,9 +74,9 @@ class CreateZX90(QubexTask):
             qid_role="control",
             unit="a.u.",
         ),
-        "control_readout_length": InputParameterSpec.database_or_default(
+        "control_readout_duration": InputParameterSpec.database_or_default(
             default=0,
-            parameter_name="readout_length",
+            parameter_name="readout_duration",
             qid_role="control",
             unit="ns",
         ),
@@ -99,9 +99,9 @@ class CreateZX90(QubexTask):
             qid_role="target",
             unit="a.u.",
         ),
-        "target_readout_length": InputParameterSpec.database_or_default(
+        "target_readout_duration": InputParameterSpec.database_or_default(
             default=0,
-            parameter_name="readout_length",
+            parameter_name="readout_duration",
             qid_role="target",
             unit="ns",
         ),

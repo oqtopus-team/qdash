@@ -202,8 +202,8 @@ qubit_metrics:
     evaluation:
       mode: none
 
-  hpi_length:
-    title: HPI Length
+  hpi_duration:
+    title: HPI Duration
     unit: ns
     scale: 1
     description: Half-pi pulse duration

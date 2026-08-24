@@ -152,13 +152,13 @@ class QubexTask(BaseTask):
             role_labels = {"": self.get_qubit_label(backend, qid)}
 
         for prefix, label in role_labels.items():
-            hpi = self._resolved_input_values((f"{prefix}hpi_amplitude", f"{prefix}hpi_length"))
+            hpi = self._resolved_input_values((f"{prefix}hpi_amplitude", f"{prefix}hpi_duration"))
             if hpi is not None:
                 exp.calib_note.update_hpi_param(
                     label,
                     {
                         "target": label,
-                        "duration": hpi[f"{prefix}hpi_length"],
+                        "duration": hpi[f"{prefix}hpi_duration"],
                         "amplitude": hpi[f"{prefix}hpi_amplitude"],
                         "tau": HPI_RAMPTIME,
                     },
