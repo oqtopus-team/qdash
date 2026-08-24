@@ -7,7 +7,7 @@ health, or understand how users interact with projects and workflows.
 
 ## Start Here
 
-- [Setup](./setup.md): create `.env`, choose Docker Compose or host-side development, and sign in.
+- [Setup](./setup.md): clone QDash, configure `.env` and Qubex, start Compose, and sign in.
 - [Operations](./operations.md): start, stop, inspect logs, and handle common local failures.
 - [Workflows](./workflows.md): understand Prefect, deployment-service, and user-flow-worker roles.
 

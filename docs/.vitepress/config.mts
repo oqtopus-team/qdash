@@ -150,7 +150,7 @@ export default withMermaid(
           collapsed: false,
           items: [
             { text: "Overview", link: "/developer-guide/" },
-            { text: "Setup", link: "/developer-guide/setup" },
+            { text: "Setup", link: "/development/setup" },
             { text: "Codebase", link: "/developer-guide/codebase" },
             { text: "Commands", link: "/developer-guide/commands" },
             { text: "Testing", link: "/developer-guide/testing" },
@@ -161,7 +161,6 @@ export default withMermaid(
           collapsed: true,
           items: [
             { text: "Development Flow", link: "/development/development-flow" },
-            { text: "Full Setup Notes", link: "/development/setup" },
             {
               text: "API",
               collapsed: true,

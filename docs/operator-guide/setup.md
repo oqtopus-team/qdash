@@ -1,7 +1,14 @@
 # Operator Setup
 
 QDash operators configure the Qubex integration and run the full Docker Compose stack. Host-side
-API and UI processes are documented in [Developer Setup](../developer-guide/setup.md).
+API and UI processes are documented in [Development Environment Setup](../development/setup.md).
+
+## Clone the Repository
+
+```bash
+git clone https://github.com/oqtopus-team/qdash.git
+cd qdash
+```
 
 ## Qubex Setup
 
