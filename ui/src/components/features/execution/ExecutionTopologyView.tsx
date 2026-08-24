@@ -8,6 +8,12 @@ import type { Task } from "@/schemas";
 import { useGetChip } from "@/client/chip/chip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskDetailModal } from "@/components/features/execution/ExecutionTaskDetailModal";
+import {
+  filterTaskGroupsByName,
+  groupTasksByEntity,
+  resolveInitialTaskIndex,
+  selectTaskNeighborhood,
+} from "@/components/features/execution/executionTopologyTasks";
 import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -43,20 +49,6 @@ function aggregateStatus(tasks: Task[]): string {
   if (tasks.some((t) => t.status === "running")) return "running";
   if (tasks.every((t) => t.status === "completed")) return "completed";
   return "pending";
-}
-
-function normalizeQid(qid: string): string {
-  const numericQid = Number.parseInt(qid.replace(/\D/g, ""), 10);
-  return Number.isNaN(numericQid) ? qid : String(numericQid);
-}
-
-function compareQid(first: string, second: string): number {
-  const firstNumber = Number(first);
-  const secondNumber = Number(second);
-  if (!Number.isNaN(firstNumber) && !Number.isNaN(secondNumber)) {
-    return firstNumber - secondNumber;
-  }
-  return first.localeCompare(second);
 }
 
 const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }) {
@@ -302,33 +294,17 @@ export function ExecutionTopologyView({
     [hasMux, muxSize, gridSize, layoutType],
   );
 
-  // Group one-qubit tasks by qid. If filterTaskName is set, only include matching tasks.
-  const oneQTasksByQid = useMemo(() => {
-    const map: Record<string, Task[]> = {};
-    for (const task of tasks) {
-      if (!task.qid) continue;
-      if (task.qid.includes("-")) continue;
-      if (!filterTaskName || task.name !== filterTaskName) continue;
-      const qid = normalizeQid(task.qid);
-      if (!map[qid]) map[qid] = [];
-      map[qid].push(task);
-    }
-    return map;
-  }, [tasks, filterTaskName]);
+  const allTasksByEntity = useMemo(() => groupTasksByEntity(tasks), [tasks]);
 
-  const couplingTasksByQid = useMemo(() => {
-    const map: Record<string, Task[]> = {};
-    for (const task of tasks) {
-      if (!task.qid || !task.qid.includes("-")) continue;
-      if (!filterTaskName || task.name !== filterTaskName) continue;
-      const [first, second] = task.qid.split("-");
-      if (!first || !second) continue;
-      const normalizedQid = [normalizeQid(first), normalizeQid(second)].sort(compareQid).join("-");
-      if (!map[normalizedQid]) map[normalizedQid] = [];
-      map[normalizedQid].push(task);
-    }
-    return map;
-  }, [tasks, filterTaskName]);
+  const oneQTasksByQid = useMemo(
+    () => filterTaskGroupsByName(allTasksByEntity.oneQubit, filterTaskName),
+    [allTasksByEntity, filterTaskName],
+  );
+
+  const couplingTasksByQid = useMemo(
+    () => filterTaskGroupsByName(allTasksByEntity.coupling, filterTaskName),
+    [allTasksByEntity, filterTaskName],
+  );
 
   // Build grid positions for all qids
   const gridPositions = useMemo(() => {
@@ -388,10 +364,16 @@ export function ExecutionTopologyView({
     if (!selectedEntityId) return null;
     const entityTasks =
       topologyMode === "2q"
-        ? couplingTasksByQid[selectedEntityId]
-        : oneQTasksByQid[selectedEntityId];
-    return entityTasks ?? [];
-  }, [couplingTasksByQid, oneQTasksByQid, selectedEntityId, topologyMode]);
+        ? allTasksByEntity.coupling[selectedEntityId]
+        : allTasksByEntity.oneQubit[selectedEntityId];
+    if (!entityTasks) return [];
+    return selectTaskNeighborhood(entityTasks, filterTaskName);
+  }, [allTasksByEntity, selectedEntityId, topologyMode, filterTaskName]);
+
+  const initialTaskIndex = useMemo(
+    () => (selectedTasks ? resolveInitialTaskIndex(selectedTasks, filterTaskName) : 0),
+    [selectedTasks, filterTaskName],
+  );
 
   const visibleTaskGroups = topologyMode === "2q" ? couplingTasksByQid : oneQTasksByQid;
   const hasVisibleTasks = Object.keys(visibleTaskGroups).length > 0;
@@ -601,8 +583,10 @@ export function ExecutionTopologyView({
 
       {selectedEntityId && selectedTasks && (
         <ExecutionTaskDetailModal
+          key={selectedEntityId}
           isOpen={!!selectedEntityId}
           tasks={selectedTasks}
+          initialTaskIndex={initialTaskIndex}
           qid={selectedEntityId}
           chipId={chipId}
           executionId={executionId}
