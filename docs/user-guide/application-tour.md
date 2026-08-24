@@ -24,7 +24,7 @@ See [Projects and Sharing](./projects-and-sharing.md) for membership and role de
 | **Metrics** | Inspect one metric across qubits or couplings and compare its history. |
 | **Chip** | Browse calibration tasks and the latest results on the chip topology. |
 | **Analysis** | Plot and compare chip parameters over a selected time range. |
-| **AI Chat** | Ask questions using the project-aware Copilot interface. |
+| **AI Chat** | Ask questions using the [project-aware Copilot interface](./copilot.md). |
 
 Use **Dashboard** for broad health checks, **Metrics** for a parameter-focused investigation, and
 **Chip** when the calibration task or physical target is the starting point.
