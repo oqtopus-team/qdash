@@ -138,6 +138,7 @@ const TopologyCell = memo(function TopologyCell({
             jsonFigurePath={jsonFigurePath || undefined}
             qid={qid}
             className="w-full h-full object-contain"
+            hideExpandButton
           />
         </div>
       )}
@@ -223,6 +224,7 @@ const CouplingMarker = memo(function CouplingMarker({
             jsonFigurePath={jsonFigurePath || undefined}
             qid={couplingId}
             className="w-full h-full object-contain"
+            hideExpandButton
           />
         </div>
       )}

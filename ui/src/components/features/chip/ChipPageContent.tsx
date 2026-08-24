@@ -711,6 +711,7 @@ export function ChipPageContent() {
                                                 path={task.figure_path}
                                                 qid={qid}
                                                 className="w-full h-48 object-contain"
+                                                hideExpandButton
                                               />
                                             </div>
                                           )}
