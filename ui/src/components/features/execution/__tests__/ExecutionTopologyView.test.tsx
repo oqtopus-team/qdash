@@ -64,6 +64,7 @@ describe("ExecutionTopologyView grid figures", () => {
       tasks,
       topologyMode: "1q",
       filterTaskName: "CheckT1",
+      onToggleFullscreen: vi.fn(),
     });
 
     expect(screen.getByAltText("Result for QID 0")).toBeTruthy();
@@ -88,6 +89,7 @@ describe("ExecutionTopologyView grid figures", () => {
       tasks,
       topologyMode: "2q",
       filterTaskName: "CheckCoupling",
+      onToggleFullscreen: vi.fn(),
     });
 
     expect(screen.getByAltText("Result for QID 0-1")).toBeTruthy();
