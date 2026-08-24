@@ -473,8 +473,10 @@ class TestRestoreCalibrationContext:
         task.input_parameters = {
             name: ParameterModel(value=value)
             for name, value in {
+                "cr_duration": 192.0,
                 "cr_amplitude": 0.2,
                 "cr_phase": 0.1,
+                "cr_beta": 0.25,
                 "cancel_amplitude": 0.03,
                 "cancel_phase": -0.2,
                 "cancel_beta": 0.0,
@@ -485,6 +487,7 @@ class TestRestoreCalibrationContext:
         }
         exp = MagicMock()
         exp.get_qubit_label.side_effect = lambda qid: f"Q0{qid}"
+        exp.calib_note.get_cr_param.return_value = None
         backend = MagicMock()
         backend.get_instance.return_value = exp
 
@@ -494,6 +497,8 @@ class TestRestoreCalibrationContext:
         label, cr_param = exp.calib_note.update_cr_param.call_args.args
         assert label == "Q00-Q01"
         assert cr_param["cr_amplitude"] == 0.2
+        assert cr_param["duration"] == 192.0
+        assert cr_param["cr_beta"] == 0.25
         assert cr_param["zx_rotation_rate"] == 0.005
         assert cr_param["ramptime"] == 16.0
 
@@ -507,13 +512,15 @@ class TestRestoreCalibrationContext:
         with pytest.raises(ValueError, match="hpi_length"):
             task._restore_qubit_pulse_context(MagicMock(), "0")
 
-    def test_same_and_split_sessions_restore_identical_cr_context(self) -> None:
+    def test_replaces_existing_cr_context_with_qdash_values(self, caplog: Any) -> None:
         task = ConcreteQubexTask()
         task.input_parameters = {
             name: ParameterModel(value=value)
             for name, value in {
+                "cr_duration": 192.0,
                 "cr_amplitude": 0.2,
                 "cr_phase": 0.1,
+                "cr_beta": 0.25,
                 "cancel_amplitude": 0.03,
                 "cancel_phase": -0.2,
                 "cancel_beta": 0.0,
@@ -523,18 +530,48 @@ class TestRestoreCalibrationContext:
                 "zx90_gate_time": 192.0,
             }.items()
         }
-        restored_contexts = []
+        exp = MagicMock()
+        exp.get_qubit_label.side_effect = lambda qid: f"Q0{qid}"
+        existing_context = {"duration": 96.0, "cr_beta": 0.25}
+        exp.calib_note.get_cr_param.return_value = existing_context
+        backend = MagicMock()
+        backend.get_instance.return_value = exp
 
-        for previous_note in ({"duration": 96.0}, {}):
-            exp = MagicMock()
-            exp.get_qubit_label.side_effect = lambda qid: f"Q0{qid}"
-            exp.calib_note.get_cr_param.return_value = previous_note
-            backend = MagicMock()
-            backend.get_instance.return_value = exp
+        task._restore_cr_context(backend, "0-1")
 
-            task._restore_cr_context(backend, "0-1")
-            restored_contexts.append(exp.calib_note.update_cr_param.call_args.args[1])
+        exp.calib_note.get_cr_param.assert_called_once_with("Q00-Q01")
+        restored_context = exp.calib_note.update_cr_param.call_args.args[1]
+        assert restored_context["duration"] == 192.0
+        assert restored_context["cr_beta"] == 0.25
+        assert "Replacing Qubex CR context for Q00-Q01" in caplog.text
 
-        assert restored_contexts[0] == restored_contexts[1]
-        assert restored_contexts[0]["duration"] == 192.0
-        assert restored_contexts[0]["ramptime"] == 16.0
+    def test_restores_cr_context_when_qubex_context_is_missing(self) -> None:
+        task = ConcreteQubexTask()
+        task.input_parameters = {
+            name: ParameterModel(value=value)
+            for name, value in {
+                "cr_duration": 192.0,
+                "cr_amplitude": 0.2,
+                "cr_phase": 0.1,
+                "cr_beta": 0.25,
+                "cancel_amplitude": 0.03,
+                "cancel_phase": -0.2,
+                "cancel_beta": 0.0,
+                "rotary_amplitude": 0.04,
+                "zx_rotation_rate": 0.005,
+                "cr_ramptime": 16.0,
+                "zx90_gate_time": 192.0,
+            }.items()
+        }
+        exp = MagicMock()
+        exp.get_qubit_label.side_effect = lambda qid: f"Q0{qid}"
+        exp.calib_note.get_cr_param.return_value = None
+        backend = MagicMock()
+        backend.get_instance.return_value = exp
+
+        task._restore_cr_context(backend, "0-1")
+
+        restored_context = exp.calib_note.update_cr_param.call_args.args[1]
+        assert restored_context["duration"] == 192.0
+        assert restored_context["cr_beta"] == 0.25
+        assert restored_context["ramptime"] == 16.0

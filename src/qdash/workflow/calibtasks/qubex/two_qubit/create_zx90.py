@@ -106,6 +106,11 @@ class CreateZX90(QubexTask):
             unit="ns",
         ),
         # CR parameters (from CheckCrossResonance)
+        "cr_duration": InputParameterSpec.required_database(
+            parameter_name="cr_duration",
+            qid_role="coupling",
+            unit="ns",
+        ),
         "cr_amplitude": InputParameterSpec.required_database(
             parameter_name="cr_amplitude",
             qid_role="control",
@@ -113,6 +118,11 @@ class CreateZX90(QubexTask):
         ),
         "cr_phase": InputParameterSpec.required_database(
             parameter_name="cr_phase",
+            qid_role="control",
+            unit="a.u.",
+        ),
+        "cr_beta": InputParameterSpec.required_database(
+            parameter_name="cr_beta",
             qid_role="control",
             unit="a.u.",
         ),
@@ -150,11 +160,17 @@ class CreateZX90(QubexTask):
 
     # Output parameters with qid_role specifying where each is stored
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "cr_duration": OutputParameterSpec(
+            qid_role="coupling", unit="ns", description="Duration of the CR pulse."
+        ),
         "cr_amplitude": OutputParameterSpec(
             qid_role="control", unit="a.u.", description="Amplitude of the CR pulse."
         ),
         "cr_phase": OutputParameterSpec(
             qid_role="control", unit="a.u.", description="Phase of the CR pulse."
+        ),
+        "cr_beta": OutputParameterSpec(
+            qid_role="control", unit="a.u.", description="Beta of the CR pulse."
         ),
         "cancel_amplitude": OutputParameterSpec(
             qid_role="target", unit="a.u.", description="Amplitude of the cancel pulse."
@@ -183,8 +199,10 @@ class CreateZX90(QubexTask):
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         result = run_result.raw_result
+        self.output_parameters["cr_duration"].value = result["cr_duration"]
         self.output_parameters["cr_amplitude"].value = result["cr_amplitude"]
         self.output_parameters["cr_phase"].value = result["cr_phase"]
+        self.output_parameters["cr_beta"].value = result["cr_beta"]
         self.output_parameters["cancel_amplitude"].value = result["cancel_amplitude"]
         self.output_parameters["cancel_phase"].value = result["cancel_phase"]
         self.output_parameters["cancel_beta"].value = result["cancel_beta"]
@@ -197,10 +215,18 @@ class CreateZX90(QubexTask):
         raw_data: list[Any] = []
         validation_error = first_validation_error(
             finite_value_error(
+                self.output_parameters["cr_duration"].value,
+                f"CreateZX90 cr_duration for {qid}",
+                minimum=0.0,
+            ),
+            finite_value_error(
                 self.output_parameters["cr_amplitude"].value, f"CreateZX90 cr_amplitude for {qid}"
             ),
             finite_value_error(
                 self.output_parameters["cr_phase"].value, f"CreateZX90 cr_phase for {qid}"
+            ),
+            finite_value_error(
+                self.output_parameters["cr_beta"].value, f"CreateZX90 cr_beta for {qid}"
             ),
             finite_value_error(
                 self.output_parameters["cancel_amplitude"].value,
@@ -256,8 +282,10 @@ class CreateZX90(QubexTask):
             err_msg = f"CR parameters for {label} not found."
             raise ValueError(err_msg)
         result = {
+            "cr_duration": fit_result["duration"],
             "cr_amplitude": fit_result["cr_amplitude"],
             "cr_phase": fit_result["cr_phase"],
+            "cr_beta": fit_result["cr_beta"],
             "cancel_amplitude": fit_result["cancel_amplitude"],
             "cancel_phase": fit_result["cancel_phase"],
             "cancel_beta": fit_result["cancel_beta"],

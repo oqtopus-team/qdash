@@ -626,6 +626,22 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "cr_beta": {
+            "default_value": null,
+            "parameter_name": "cr_beta",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_duration": {
+            "default_value": null,
+            "parameter_name": "cr_duration",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "cr_phase": {
             "default_value": null,
             "parameter_name": "cr_phase",
@@ -807,6 +823,22 @@
             "qid_role": "control",
             "resolution": "database_required",
             "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_beta": {
+            "default_value": null,
+            "parameter_name": "cr_beta",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_duration": {
+            "default_value": null,
+            "parameter_name": "cr_duration",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_phase": {
@@ -2530,6 +2562,22 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "cr_beta": {
+            "default_value": null,
+            "parameter_name": "cr_beta",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_duration": {
+            "default_value": null,
+            "parameter_name": "cr_duration",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "cr_phase": {
             "default_value": null,
             "parameter_name": "cr_phase",
@@ -3157,6 +3205,22 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "cr_beta": {
+            "default_value": null,
+            "parameter_name": "cr_beta",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_duration": {
+            "default_value": null,
+            "parameter_name": "cr_duration",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "cr_phase": {
             "default_value": null,
             "parameter_name": "cr_phase",
@@ -3584,6 +3648,22 @@
             "qid_role": "control",
             "resolution": "database_required",
             "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_beta": {
+            "default_value": null,
+            "parameter_name": "cr_beta",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "cr_duration": {
+            "default_value": null,
+            "parameter_name": "cr_duration",
+            "qid_role": "coupling",
+            "resolution": "database_required",
+            "unit": "ns",
             "user_override": "allowed"
           },
           "cr_phase": {

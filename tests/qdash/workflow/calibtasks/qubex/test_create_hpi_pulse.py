@@ -124,8 +124,10 @@ def test_rabi_dependent_create_tasks_require_complete_database_context(
 
 def test_create_zx90_requires_complete_cr_database_context() -> None:
     cr_dependencies = {
+        "cr_duration",
         "cr_amplitude",
         "cr_phase",
+        "cr_beta",
         "cancel_amplitude",
         "cancel_phase",
         "cancel_beta",

@@ -105,6 +105,9 @@ class CheckBellState(QubexTask):
             unit="ns",
         ),
         # CR parameters (from previous calibration)
+        "cr_duration": InputParameterSpec.required_database(
+            parameter_name="cr_duration", qid_role="coupling", unit="ns"
+        ),
         "cr_amplitude": InputParameterSpec.required_database(
             parameter_name="cr_amplitude",
             qid_role="control",
@@ -114,6 +117,9 @@ class CheckBellState(QubexTask):
             parameter_name="cr_phase",
             qid_role="control",
             unit="a.u.",
+        ),
+        "cr_beta": InputParameterSpec.required_database(
+            parameter_name="cr_beta", qid_role="control", unit="a.u."
         ),
         "cancel_amplitude": InputParameterSpec.required_database(
             parameter_name="cancel_amplitude",

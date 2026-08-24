@@ -102,9 +102,7 @@ def test_check_rabi_run_does_not_store_rejected_rabi_params(
         obtain_rabi_params=lambda **_kwargs: result,
     )
 
-    run_result = task.run(
-        cast("QubexBackend", SimpleNamespace(get_instance=lambda: exp)), "1"
-    )
+    run_result = task.run(cast("QubexBackend", SimpleNamespace(get_instance=lambda: exp)), "1")
 
     assert run_result.raw_result is result
     store_rabi_params.assert_not_called()

@@ -1,3 +1,4 @@
+import logging
 import math
 from collections.abc import Generator, Mapping
 from contextlib import ExitStack, contextmanager
@@ -19,6 +20,8 @@ from qdash.workflow.engine.task.provenance_recorder import resolve_qid
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.qubex import QubexBackend
+
+logger = logging.getLogger(__name__)
 
 
 class QubexTask(BaseTask):
@@ -63,12 +66,14 @@ class QubexTask(BaseTask):
         if self.input_parameters and not self.input_parameters_from_snapshot:
             self._load_parameters_from_db(backend, qid)
 
-        self._restore_calibration_context(backend, qid)
-
         return PreProcessResult(
             input_parameters=self.input_parameters,
             run_parameters=self.run_parameters,
         )
+
+    def prepare_run(self, backend: "QubexBackend", qid: str) -> None:
+        """Synchronize final effective QDash inputs into the Qubex context."""
+        self._restore_calibration_context(backend, qid)
 
     def _resolved_input_values(self, names: tuple[str, ...]) -> dict[str, float] | None:
         """Return a complete group of numeric inputs, or None when it is undeclared."""
@@ -108,8 +113,7 @@ class QubexTask(BaseTask):
         rabi_r2 = values["rabi_r2"]
         if not math.isfinite(rabi_r2) or rabi_r2 < 0.6:
             raise ValueError(
-                f"{self.name} requires finite rabi_r2 greater than or equal to 0.6; "
-                f"got {rabi_r2}"
+                f"{self.name} requires finite rabi_r2 greater than or equal to 0.6; got {rabi_r2}"
             )
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
@@ -197,8 +201,10 @@ class QubexTask(BaseTask):
         if "-" not in qid:
             return
         names = (
+            "cr_duration",
             "cr_amplitude",
             "cr_phase",
+            "cr_beta",
             "cancel_amplitude",
             "cancel_phase",
             "cancel_beta",
@@ -217,26 +223,33 @@ class QubexTask(BaseTask):
                 self.get_qubit_label(backend, target_qid),
             )
         )
-        duration = 0.0
-        zx90_gate_time = self.input_parameters.get("zx90_gate_time")
-        if zx90_gate_time is not None and zx90_gate_time.value is not None:
-            duration = float(zx90_gate_time.value)
-        exp.calib_note.update_cr_param(
-            label,
-            {
-                "target": label,
-                "duration": duration,
-                "ramptime": values["cr_ramptime"],
-                "cr_amplitude": values["cr_amplitude"],
-                "cr_phase": values["cr_phase"],
-                "cr_beta": 0.0,
-                "cancel_amplitude": values["cancel_amplitude"],
-                "cancel_phase": values["cancel_phase"],
-                "cancel_beta": values["cancel_beta"],
-                "rotary_amplitude": values["rotary_amplitude"],
-                "zx_rotation_rate": values["zx_rotation_rate"],
-            },
-        )
+        restored = {
+            "target": label,
+            "duration": values["cr_duration"],
+            "ramptime": values["cr_ramptime"],
+            "cr_amplitude": values["cr_amplitude"],
+            "cr_phase": values["cr_phase"],
+            "cr_beta": values["cr_beta"],
+            "cancel_amplitude": values["cancel_amplitude"],
+            "cancel_phase": values["cancel_phase"],
+            "cancel_beta": values["cancel_beta"],
+            "rotary_amplitude": values["rotary_amplitude"],
+            "zx_rotation_rate": values["zx_rotation_rate"],
+        }
+        existing = exp.calib_note.get_cr_param(label)
+        if existing is not None:
+            differences = {
+                name: {"qubex": existing.get(name), "qdash": value}
+                for name, value in restored.items()
+                if existing.get(name) != value
+            }
+            if differences:
+                logger.warning(
+                    "Replacing Qubex CR context for %s with QDash inputs: %s",
+                    label,
+                    differences,
+                )
+        exp.calib_note.update_cr_param(label, restored)
 
     def _restore_calibration_context(self, backend: "QubexBackend", qid: str) -> None:
         """Synchronize resolved task inputs into the Qubex in-memory context."""

@@ -56,6 +56,9 @@ class MockTask:
     def preprocess(self, session: Any, qid: str) -> PreProcessResult:
         return PreProcessResult(input_parameters={"param1": InputParameterModel(value=1.0)})
 
+    def prepare_run(self, session: Any, qid: str) -> None:
+        pass
+
     def run(self, session: Any, qid: str) -> RunResult:
         return RunResult(raw_result={"data": [1, 2, 3]}, r2={"0": 0.95})
 
@@ -877,6 +880,9 @@ class TestSnapshotOverrides:
                 )
             }
 
+            def prepare_run(self, session: Any, qid: str) -> None:
+                session.applied_value = self.input_parameters["control_amplitude"].value
+
         task = DeclaredTask()
         task.input_parameters["control_amplitude"] = ParameterModel(value=0.1)
         mock_snapshot_loader._parameter_overrides = {
@@ -887,10 +893,13 @@ class TestSnapshotOverrides:
             task, "CheckControlAmplitude", "qubit", "0"
         )
         executor_with_snapshot._validate_effective_inputs(task)
+        session = MagicMock()
+        executor_with_snapshot._prepare_run(task, session, "0")
 
         value = task.input_parameters["control_amplitude"].value
         assert value == pytest.approx(0.002479649788714785)
         assert isinstance(value, float)
+        assert session.applied_value == pytest.approx(value)
 
     def test_apply_snapshot_overrides_empty_params(
         self,
