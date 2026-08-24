@@ -26406,14 +26406,19 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "integer"
+                  "type": "integer",
+                  "maximum": 3.0,
+                  "minimum": 0.0
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
               },
               {
                 "type": "null"
               }
             ],
+            "uniqueItems": true,
             "title": "Resonator Assignment Order",
             "description": "Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once."
           }

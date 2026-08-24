@@ -201,7 +201,7 @@ class CheckResonatorSpectroscopy(QubexTask):
             )
 
             id_in_mux = int(qid) % 4
-            assignment_order = self.run_parameters["resonator_assignment_order"].get_value()
+            assignment_order = self._resonator_assignment_order()
             peak_positions = peak_positions_from_assignment_order(assignment_order)
             sorted_slots, assignment_mode = guess_sorted_slots_for_partial_mux(
                 list(trace.x),
@@ -262,10 +262,7 @@ class CheckResonatorSpectroscopy(QubexTask):
                 )
                 print(f"[WARNING] {assignment_error}")
         except Exception as exc:
-            analysis_error = (
-                f"Resonator analysis failed for qid={qid}: "
-                f"{type(exc).__name__}: {exc}"
-            )
+            analysis_error = f"Resonator analysis failed for qid={qid}: {type(exc).__name__}: {exc}"
             print(f"[ERROR] {analysis_error}")
             logger.warning(
                 "Failed to estimate resonator frequency for qid=%s",
@@ -358,6 +355,12 @@ class CheckResonatorSpectroscopy(QubexTask):
         parameter = self.run_parameters["frequency_range"]
         return None if parameter.value is None else parameter.get_value()
 
+    def _resonator_assignment_order(self) -> list[int]:
+        """Return a validated frequency-sorted permutation of MUX offsets."""
+        value = self.run_parameters["resonator_assignment_order"].get_value()
+        peak_positions_from_assignment_order(value)
+        return [int(offset) for offset in value]
+
     def resolve_run_parameters(self, backend: QubexBackend, qid: str) -> None:
         """Populate the effective device-specific sweep before it is recorded."""
         parameter = self.run_parameters["frequency_range"]
@@ -371,6 +374,7 @@ class CheckResonatorSpectroscopy(QubexTask):
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""
+        self._resonator_assignment_order()
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         frequency_range = self._frequency_range()
@@ -385,6 +389,7 @@ class CheckResonatorSpectroscopy(QubexTask):
 
     def batch_run(self, backend: QubexBackend, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits."""
+        self._resonator_assignment_order()
         exp = self.get_experiment(backend)
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
         frequency_range = self._frequency_range()

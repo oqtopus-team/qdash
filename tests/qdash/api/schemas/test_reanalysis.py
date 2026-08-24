@@ -16,6 +16,17 @@ def test_resonator_assignment_order_rejects_duplicate_offsets() -> None:
         ReanalyzeResonatorSpectroscopyParams(resonator_assignment_order=[0, 0, 1, 2])
 
 
+def test_resonator_assignment_order_openapi_constraints() -> None:
+    schema = ReanalyzeResonatorSpectroscopyParams.model_json_schema()
+    assignment_schema = schema["properties"]["resonator_assignment_order"]["anyOf"][0]
+
+    assert assignment_schema["minItems"] == 4
+    assert assignment_schema["maxItems"] == 4
+    assert schema["properties"]["resonator_assignment_order"]["uniqueItems"] is True
+    assert assignment_schema["items"]["minimum"] == 0
+    assert assignment_schema["items"]["maximum"] == 3
+
+
 def test_reanalysis_reads_legacy_named_assignment_pattern() -> None:
     params = ReanalyzeResonatorSpectroscopyParams()
 

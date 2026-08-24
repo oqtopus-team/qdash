@@ -79,7 +79,9 @@ def bringup(
 
     default_run_parameters: dict[str, Any] = {
         "interval": {"value": 150 * 1024, "value_type": "int"},
-        # For a 16Q chip, use the following frequency-sorted resonator assignment:
+        # resonator_assignment_order lists the four qid offsets within each MUX
+        # in increasing resonator-frequency order. For 16Q, the order is
+        # mux[0] < mux[3] < mux[1] < mux[2], so use [0, 3, 1, 2].
         # "CheckResonatorSpectroscopy": {
         #     "resonator_assignment_order": {
         #         "value": [0, 3, 1, 2],

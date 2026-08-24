@@ -411,6 +411,25 @@ def test_run_parameters_only_expose_measurement_and_assignment_settings() -> Non
     }
 
 
+@pytest.mark.parametrize("assignment_order", [[0, 0, 1, 2], [0, 1, 2]])
+@pytest.mark.parametrize("batch", [False, True])
+def test_invalid_assignment_order_is_rejected_before_hardware(
+    assignment_order: list[int], batch: bool
+) -> None:
+    task = CheckResonatorSpectroscopy()
+    task.run_parameters["resonator_assignment_order"].value = tuple(assignment_order)
+    get_experiment = MagicMock()
+    task.get_experiment = get_experiment  # type: ignore[method-assign]
+
+    with pytest.raises(ValueError, match="must contain each qubit offset"):
+        if batch:
+            task.batch_run(MagicMock(), ["0", "1"])
+        else:
+            task.run(MagicMock(), "0")
+
+    get_experiment.assert_not_called()
+
+
 def test_frequency_range_can_be_overridden_per_task() -> None:
     task = CheckResonatorSpectroscopy()
     task.run_parameters = copy.deepcopy(task.run_parameters)

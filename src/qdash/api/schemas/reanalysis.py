@@ -7,7 +7,7 @@ without re-running the experiment on hardware.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -44,8 +44,11 @@ class ReanalyzeResonatorSpectroscopyParams(BaseModel):
         default=None,
         description="Strength cutoff for the high_frequency_strength estimator.",
     )
-    resonator_assignment_order: list[int] | None = Field(
+    resonator_assignment_order: list[Annotated[int, Field(ge=0, le=3)]] | None = Field(
         default=None,
+        min_length=4,
+        max_length=4,
+        json_schema_extra={"uniqueItems": True},
         description=(
             "Qubit offsets in increasing resonator-frequency order. "
             "Must contain each offset from 0 to 3 exactly once."

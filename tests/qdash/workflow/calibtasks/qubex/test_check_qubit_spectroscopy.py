@@ -1,7 +1,7 @@
 import copy
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import plotly.graph_objects as go
 import pytest
@@ -120,6 +120,7 @@ def test_explicit_frequency_range_is_not_resolved_from_control_box() -> None:
     task.run_parameters["frequency_range"].value = (3.0, 3.3, 0.1)
     backend = cast("QubexBackend", MagicMock())
 
-    task.resolve_run_parameters(backend, "0")
+    with patch.object(task, "get_experiment") as get_experiment:
+        task.resolve_run_parameters(backend, "0")
 
-    backend.get_experiment.assert_not_called()
+    get_experiment.assert_not_called()
