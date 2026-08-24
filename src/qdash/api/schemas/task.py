@@ -209,6 +209,7 @@ class TaskResultResponse(BaseModel):
     raw_data_path: list[str]
     input_parameters: dict[str, TaskResultInputParameter]
     output_parameters: dict[str, TaskResultOutputParameter]
+    output_parameter_names: list[str] = Field(default_factory=list)
     run_parameters: dict[str, Any] = {}
     tags: list[str] = []
     message: str = ""

@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ManualParameterUpdateRequestParameters } from './manualParameterUpdateRequestParameters';
+import type { ManualParameterUpdateRequestSourceTaskId } from './manualParameterUpdateRequestSourceTaskId';
+import type { ManualParameterUpdateRequestCorrectionPoint } from './manualParameterUpdateRequestCorrectionPoint';
 
 /**
  * Request to manually update calibration parameters.
@@ -20,4 +22,8 @@ export interface ManualParameterUpdateRequest {
   qid: string;
   /** Parameters to update. Format: {"param_name": {"value": 4.85, "unit": "GHz"}} */
   parameters: ManualParameterUpdateRequestParameters;
+  /** Task result whose output values are being manually corrected */
+  source_task_id?: ManualParameterUpdateRequestSourceTaskId;
+  /** Plotly point selected as the visual basis for this correction */
+  correction_point?: ManualParameterUpdateRequestCorrectionPoint;
 }

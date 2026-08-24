@@ -88,6 +88,13 @@ class SeedImportResponse(BaseModel):
     )
 
 
+class ManualCorrectionPoint(BaseModel):
+    """A point selected from the source spectroscopy figure."""
+
+    x: float = Field(..., allow_inf_nan=False, description="Selected frequency coordinate")
+    y: float = Field(..., allow_inf_nan=False, description="Selected power coordinate")
+
+
 class ManualParameterUpdateRequest(BaseModel):
     """Request to manually update calibration parameters.
 
@@ -101,12 +108,22 @@ class ManualParameterUpdateRequest(BaseModel):
         ...,
         description='Parameters to update. Format: {"param_name": {"value": 4.85, "unit": "GHz"}}',
     )
+    source_task_id: str | None = Field(
+        default=None,
+        description="Task result whose output values are being manually corrected",
+    )
+    correction_point: ManualCorrectionPoint | None = Field(
+        default=None,
+        description="Plotly point selected as the visual basis for this correction",
+    )
 
 
 class ManualParameterUpdateResponse(BaseModel):
     """Response from manual parameter update."""
 
     updated_count: int
+    task_id: str = Field(..., description="Created ManualParameterEdit task result ID")
+    execution_id: str = Field(..., description="Created manual edit execution ID")
     provenance_activity_id: str | None = None
 
 
