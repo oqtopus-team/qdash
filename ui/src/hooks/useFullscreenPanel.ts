@@ -16,7 +16,8 @@ let previousOverflow = "";
 
 function handleKeyDown(event: KeyboardEvent) {
   if (event.key !== "Escape") return;
-  if (document.querySelector("dialog[open], .modal-open")) return;
+  if (document.querySelector('dialog[open], .modal-open, [role="dialog"][data-state="open"]'))
+    return;
   openPanels[openPanels.length - 1]?.();
 }
 
@@ -24,7 +25,7 @@ function openPanel(exit: () => void) {
   if (openPanels.length === 0) {
     previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
   }
   openPanels.push(exit);
 
@@ -35,7 +36,7 @@ function openPanel(exit: () => void) {
     if (openPanels.length === 0) {
       document.body.style.overflow = previousOverflow;
       previousOverflow = "";
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
     }
   };
 }
