@@ -87,6 +87,30 @@ def test_check_qubit_spectroscopy_does_not_output_invalid_frequency(monkeypatch)
     assert result.validation_error is not None
 
 
+def test_check_qubit_spectroscopy_enables_trim_retry(monkeypatch) -> None:
+    task = CheckQubitSpectroscopy()
+    raw_fig = go.Figure(go.Heatmap(x=[4.0, 4.1], y=[-20.0, -10.0], z=[[0.0, 1.0], [1.0, 0.0]]))
+    marked_fig = go.Figure(raw_fig)
+    freq_result = SimpleNamespace(f01=None, f12=None, anharmonicity=None)
+    estimate = MagicMock(return_value=(marked_fig, freq_result))
+
+    monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy."
+        "estimate_and_mark_qubit_figure",
+        estimate,
+    )
+
+    task.postprocess(
+        backend=cast("QubexBackend", object()),
+        execution_id="exec-1",
+        run_result=RunResult(raw_result={"Q00": {"fig": raw_fig}}),
+        qid="0",
+    )
+
+    estimate.assert_called_once_with(raw_fig, task._analysis_config, retry_with_trim=True)
+
+
 def test_frequency_range_is_resolved_from_control_box_when_unset(monkeypatch) -> None:
     task = CheckQubitSpectroscopy()
     backend = cast("QubexBackend", object())

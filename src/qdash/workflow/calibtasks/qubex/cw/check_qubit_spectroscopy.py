@@ -59,7 +59,7 @@ class CheckQubitSpectroscopy(QubexTask):
         ),
     }
     _analysis_config: ClassVar[EstimateQubitFrequencyConfig] = EstimateQubitFrequencyConfig()
-    _retry_with_trim: ClassVar[bool] = False
+    _retry_with_trim: ClassVar[bool] = True
     _seed_amplitude_headroom_db: ClassVar[float] = 10.0
     _max_coarse_control_amplitude: ClassVar[float] = 1.0
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
