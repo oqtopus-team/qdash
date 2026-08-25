@@ -67,7 +67,7 @@ class CheckResonatorSpectroscopy(QubexTask):
             default=None,
             description=(
                 "Frequency range as [start, stop, step] in GHz. Leave blank to use "
-                "the connected readout box default. Examples: low band "
+                "the connected readout box's qubex default: low band "
                 "[5.75, 6.75, 0.002], high band [9.75, 10.75, 0.002]."
             ),
         ),
@@ -89,7 +89,8 @@ class CheckResonatorSpectroscopy(QubexTask):
             default=[3, 0, 2, 1],
             description=(
                 "Qubit offsets in increasing resonator-frequency order. "
-                "Must contain each offset from 0 to 3 exactly once."
+                "The default is [3, 0, 2, 1]. Must contain each offset from 0 to 3 "
+                "exactly once."
             ),
         ),
     }
