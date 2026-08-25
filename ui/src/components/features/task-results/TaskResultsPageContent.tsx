@@ -347,6 +347,8 @@ function TaskResultPreviewSidebar({
   const figures = taskResult && Array.isArray(taskResult.figure_path) ? taskResult.figure_path : [];
   const jsonFigures =
     taskResult && Array.isArray(taskResult.json_figure_path) ? taskResult.json_figure_path : [];
+  const message = taskResult?.message?.trim();
+  const isFailure = isFailureStatus(taskResult?.status ?? "");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -478,23 +480,41 @@ function TaskResultPreviewSidebar({
                 </dl>
               </div>
 
-              {taskResult.message ? (
-                <div className="overflow-hidden rounded-lg border border-error/40">
-                  <div className="flex items-center gap-2 bg-error/10 px-3 py-2 text-sm font-semibold text-error">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    Error Log
+              {message && (
+                <div
+                  className={`overflow-hidden rounded-lg border ${
+                    isFailure ? "border-error/40" : "border-base-300"
+                  }`}
+                >
+                  <div
+                    className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold ${
+                      isFailure ? "bg-error/10 text-error" : "bg-base-200/60 text-base-content/70"
+                    }`}
+                  >
+                    {isFailure ? (
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    ) : (
+                      <MessageSquareText className="h-3.5 w-3.5 shrink-0" />
+                    )}
+                    {isFailure ? "Error Log" : "Message"}
                   </div>
-                  <pre className="whitespace-pre-wrap break-all bg-error/5 px-3 py-3 font-mono text-xs text-error/80">
-                    {taskResult.message}
+                  <pre
+                    className={`whitespace-pre-wrap break-all px-3 py-3 font-mono text-xs ${
+                      isFailure ? "bg-error/5 text-error/80" : "text-base-content/70"
+                    }`}
+                  >
+                    {message}
                   </pre>
                 </div>
-              ) : (
+              )}
+
+              {isFailure && !message && (
                 <div className="rounded-lg border border-base-300 p-3 text-sm text-base-content/60">
                   No error message recorded.
                 </div>
               )}
 
-              {taskResult.stack_trace && (
+              {isFailure && taskResult.stack_trace && (
                 <div className="overflow-hidden rounded-lg border border-error/30">
                   <div className="bg-error/5 px-3 py-2 text-xs font-semibold text-error/70">
                     Stack Trace
