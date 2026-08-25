@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CalibrationNoteResponse(BaseModel):
@@ -88,6 +88,13 @@ class SeedImportResponse(BaseModel):
     )
 
 
+class ManualCorrectionPoint(BaseModel):
+    """A point selected from the source spectroscopy figure."""
+
+    x: float = Field(..., allow_inf_nan=False, description="Selected frequency coordinate")
+    y: float = Field(..., allow_inf_nan=False, description="Selected power coordinate")
+
+
 class ManualParameterUpdateRequest(BaseModel):
     """Request to manually update calibration parameters.
 
@@ -101,12 +108,29 @@ class ManualParameterUpdateRequest(BaseModel):
         ...,
         description='Parameters to update. Format: {"param_name": {"value": 4.85, "unit": "GHz"}}',
     )
+    source_task_id: str | None = Field(
+        default=None,
+        description="Task result whose output values are being manually corrected",
+    )
+    correction_point: ManualCorrectionPoint | None = Field(
+        default=None,
+        description="Plotly point selected as the visual basis for this correction",
+    )
+
+    @model_validator(mode="after")
+    def validate_correction_source(self) -> "ManualParameterUpdateRequest":
+        """Require a source result whenever a plotted correction point is recorded."""
+        if self.correction_point is not None and self.source_task_id is None:
+            raise ValueError("source_task_id is required when correction_point is provided")
+        return self
 
 
 class ManualParameterUpdateResponse(BaseModel):
     """Response from manual parameter update."""
 
     updated_count: int
+    task_id: str = Field(..., description="Created ManualParameterEdit task result ID")
+    execution_id: str = Field(..., description="Created manual edit execution ID")
     provenance_activity_id: str | None = None
 
 

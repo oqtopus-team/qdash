@@ -307,6 +307,8 @@ class TaskExecutor:
             if self._snapshot_loader is not None:
                 self._apply_snapshot_overrides(task, task_name, task_type, qid)
 
+            task.resolve_run_parameters(backend, qid)
+
             # Record run_parameters (experiment configuration used)
             run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
             if run_params:
@@ -553,6 +555,8 @@ class TaskExecutor:
 
                 if self._snapshot_loader is not None:
                     self._apply_snapshot_overrides(task, task_name, task_type, qid)
+
+                task.resolve_run_parameters(backend, qid)
 
                 run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
                 if run_params:

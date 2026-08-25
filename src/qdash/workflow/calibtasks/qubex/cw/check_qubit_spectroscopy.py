@@ -44,19 +44,11 @@ class CheckQubitSpectroscopy(QubexTask):
         "frequency_range": RunParameterSpec(
             unit="GHz",
             value_type="np.arange",
-            default=(6.5, 9.75, 0.005),
+            default=None,
             description=(
-                "Frequency range for qubit spectroscopy on the high band "
-                "(64Q chips). Used when chip_id does not contain '144'."
-            ),
-        ),
-        "frequency_range_low_band": RunParameterSpec(
-            unit="GHz",
-            value_type="np.arange",
-            default=(3.0, 5.75, 0.005),
-            description=(
-                "Frequency range for qubit spectroscopy on the low band "
-                "(144Q chips). Used when chip_id contains '144'."
+                "Frequency range as [start, stop, step] in GHz. Leave blank to use "
+                "the connected control box default. Examples: low band "
+                "[3.0, 5.75, 0.005], high band [6.5, 9.75, 0.005]."
             ),
         ),
         "readout_amplitude": RunParameterSpec(
@@ -65,78 +57,11 @@ class CheckQubitSpectroscopy(QubexTask):
             default=0.04,
             description="Readout amplitude used during the qubit spectroscopy sweep",
         ),
-        "binarize_threshold_sigma_plus": RunParameterSpec(
-            unit="a.u.",
-            value_type="float",
-            default=3.0,
-            description="Positive threshold for binarization (in sigma units)",
-        ),
-        "binarize_threshold_sigma_minus": RunParameterSpec(
-            unit="a.u.",
-            value_type="float",
-            default=-2.0,
-            description="Negative threshold for binarization (in sigma units)",
-        ),
-        "top_power": RunParameterSpec(
-            unit="dB",
-            value_type="float",
-            default=0.0,
-            description="Reference power for height and moment calculation (should be > max(ys))",
-        ),
-        "f01_height_min": RunParameterSpec(
-            unit="dB",
-            value_type="float",
-            default=14.9,
-            description="Minimum height for f01 peak detection (in dB)",
-        ),
-        "f12_distance_min": RunParameterSpec(
-            unit="GHz",
-            value_type="float",
-            default=0.125,
-            description="Minimum distance from f01 for f12 detection (in GHz)",
-        ),
-        "f12_distance_max": RunParameterSpec(
-            unit="GHz",
-            value_type="float",
-            default=0.5,
-            description="Maximum distance from f01 for f12 detection (in GHz)",
-        ),
-        "f12_height_min": RunParameterSpec(
-            unit="dB",
-            value_type="float",
-            default=14.9,
-            description="Minimum height for f12 peak detection (in dB)",
-        ),
-        "retry_with_trim": RunParameterSpec(
-            unit="",
-            value_type="str",
-            default="false",
-            description=(
-                "If 'true', drop the highest-power row and retry when no f01 is "
-                "detected on the first pass. If f01 is still not detected, drop "
-                "one additional highest-power row and retry once more. Useful "
-                "when the top rows are noisy."
-            ),
-        ),
-        "seed_amplitude_headroom_db": RunParameterSpec(
-            unit="dB",
-            value_type="float",
-            default=10.0,
-            description=(
-                "Headroom added on top of f01_repr_db before converting it to the "
-                "coarse_control_amplitude seed used by downstream chevron/amplitude tasks."
-            ),
-        ),
-        "max_coarse_control_amplitude": RunParameterSpec(
-            unit="a.u.",
-            value_type="float",
-            default=1.0,
-            description=(
-                "Upper bound for the uplifted coarse_control_amplitude so strong "
-                "spectroscopy responses do not push the seed above a safe drive amplitude."
-            ),
-        ),
     }
+    _analysis_config: ClassVar[EstimateQubitFrequencyConfig] = EstimateQubitFrequencyConfig()
+    _retry_with_trim: ClassVar[bool] = True
+    _seed_amplitude_headroom_db: ClassVar[float] = 10.0
+    _max_coarse_control_amplitude: ClassVar[float] = 1.0
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "coarse_qubit_frequency": OutputParameterSpec(
             unit="GHz",
@@ -179,8 +104,8 @@ class CheckQubitSpectroscopy(QubexTask):
 
     def _compute_coarse_control_amplitude(self, repr_db: float) -> tuple[float, float]:
         raw_amplitude = float(10 ** (repr_db / 20))
-        headroom_db = float(self.run_parameters["seed_amplitude_headroom_db"].get_value())
-        max_amplitude = float(self.run_parameters["max_coarse_control_amplitude"].get_value())
+        headroom_db = self._seed_amplitude_headroom_db
+        max_amplitude = self._max_coarse_control_amplitude
         uplifted_amplitude = raw_amplitude * (10 ** (headroom_db / 20))
         coarse_control_amplitude = min(uplifted_amplitude, max_amplitude)
         marker_db = float(20 * math.log10(coarse_control_amplitude))
@@ -206,24 +131,8 @@ class CheckQubitSpectroscopy(QubexTask):
         estimated_quality_level: int | None = None
         marked_fig = None
         try:
-            config = EstimateQubitFrequencyConfig(
-                binarize_threshold_sigma_plus=self.run_parameters[
-                    "binarize_threshold_sigma_plus"
-                ].get_value(),
-                binarize_threshold_sigma_minus=self.run_parameters[
-                    "binarize_threshold_sigma_minus"
-                ].get_value(),
-                top_power=self.run_parameters["top_power"].get_value(),
-                f01_height_min=self.run_parameters["f01_height_min"].get_value(),
-                f12_distance_min=self.run_parameters["f12_distance_min"].get_value(),
-                f12_distance_max=self.run_parameters["f12_distance_max"].get_value(),
-                f12_height_min=self.run_parameters["f12_height_min"].get_value(),
-            )
-            retry_flag = (
-                str(self.run_parameters["retry_with_trim"].get_value()).strip().lower() == "true"
-            )
             marked_fig, freq_result = estimate_and_mark_qubit_figure(
-                raw_fig, config, retry_with_trim=retry_flag
+                raw_fig, self._analysis_config, retry_with_trim=self._retry_with_trim
             )
 
             if freq_result.f01 is not None:
@@ -327,17 +236,21 @@ class CheckQubitSpectroscopy(QubexTask):
             figures=figures,
         )
 
-    def _select_frequency_range(self, backend: QubexBackend) -> Any:
-        """Pick the qubit-spectroscopy frequency range for the current chip.
+    def _frequency_range(self) -> Any:
+        """Return an explicit override, or let qubex select by control box type."""
+        parameter = self.run_parameters["frequency_range"]
+        return None if parameter.value is None else parameter.get_value()
 
-        144Q chips use ``frequency_range_low_band`` (~3.0-5.75 GHz); other
-        chips (64Q etc.) use ``frequency_range`` (~6.5-9.75 GHz). Same
-        ``"144" in chip_id`` convention as the resonator task and the
-        scheduler plugins.
-        """
-        chip_id = backend.config.get("chip_id") or ""
-        param_name = "frequency_range_low_band" if "144" in chip_id else "frequency_range"
-        return self.run_parameters[param_name].get_value()
+    def resolve_run_parameters(self, backend: QubexBackend, qid: str) -> None:
+        """Populate the effective device-specific sweep before it is recorded."""
+        parameter = self.run_parameters["frequency_range"]
+        if parameter.value is not None:
+            return
+
+        exp = self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
+        box = exp.ctx.experiment_system.get_control_box_for_qubit(label)
+        parameter.value = tuple(box.traits.default_control_frequency_range)
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""
@@ -355,7 +268,7 @@ class CheckQubitSpectroscopy(QubexTask):
         ):
             result = exp.qubit_spectroscopy(
                 label,
-                frequency_range=self._select_frequency_range(backend),
+                frequency_range=self._frequency_range(),
                 readout_amplitude=self._get_readout_amplitude_value(),
                 readout_frequency=readout_freq_param.value,
             )
@@ -372,7 +285,7 @@ class CheckQubitSpectroscopy(QubexTask):
         """
         exp = self.get_experiment(backend)
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
-        frequency_range = self._select_frequency_range(backend)
+        frequency_range = self._frequency_range()
         readout_amplitude = self.run_parameters["readout_amplitude"].get_value()
         results = {}
         for label in labels:

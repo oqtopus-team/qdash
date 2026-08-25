@@ -70,10 +70,12 @@ class ReanalysisService:
 
         config = self._build_resonator_config(params, doc.run_parameters)
 
-        # Resolve bare-shift estimator: form override → original task's run_parameters
-        # → "config". This way, leaving the form blank reproduces the original run.
+        # Older results stored analysis settings as run parameters. Newer results use
+        # the task's internal analysis default when no explicit reanalysis override exists.
         estimator_type = params.bare_shift_estimator_type or self._stored_value(
-            doc.run_parameters, "bare_shift_estimator_type", default="config"
+            doc.run_parameters,
+            "bare_shift_estimator_type",
+            default="high_frequency_strength",
         )
         if estimator_type and estimator_type != "config":
             strength_limit = params.bare_shift_strength_limit
@@ -343,12 +345,18 @@ class ReanalysisService:
         params: ReanalyzeResonatorSpectroscopyParams,
         stored_run_parameters: dict[str, Any],
     ) -> list[int]:
-        pattern = params.resonator_assignment_pattern
-        if pattern is None:
-            stored_pattern = stored_run_parameters.get("resonator_assignment_pattern")
-            if isinstance(stored_pattern, dict) and "value" in stored_pattern:
-                pattern = str(stored_pattern["value"])
+        if params.resonator_assignment_order is not None:
+            return params.resonator_assignment_order
 
+        stored_order = stored_run_parameters.get("resonator_assignment_order")
+        if isinstance(stored_order, dict) and isinstance(stored_order.get("value"), list):
+            return [int(offset) for offset in stored_order["value"]]
+
+        # Read task results created before assignment orders were stored directly.
+        pattern = None
+        stored_pattern = stored_run_parameters.get("resonator_assignment_pattern")
+        if isinstance(stored_pattern, dict) and "value" in stored_pattern:
+            pattern = str(stored_pattern["value"])
         return list(resolve_resonator_assignment_order(pattern))
 
     @staticmethod

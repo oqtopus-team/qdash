@@ -31,6 +31,7 @@ export interface ExecutionResponseSummary {
   name: string;
   execution_id: string;
   status: string;
+  message?: string;
   user_id?: ExecutionResponseSummaryUserId;
   username?: string;
   start_at?: ExecutionResponseSummaryStartAt;

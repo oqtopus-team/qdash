@@ -267,6 +267,11 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               <span className="truncate">{formatActorLabel(execution)}</span>
             </div>
           </div>
+          {execution.status === "failed" && execution.message && (
+            <div className="alert alert-error items-start">
+              <span className="break-words whitespace-pre-wrap">{execution.message}</span>
+            </div>
+          )}
         </div>
 
         <div className="bg-base-100 rounded-lg shadow-md p-6">

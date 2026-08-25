@@ -20392,6 +20392,11 @@
             "type": "string",
             "title": "Status"
           },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
           "flow_name": {
             "type": "string",
             "title": "Flow Name",
@@ -20498,6 +20503,11 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
           },
           "user_id": {
             "anyOf": [
@@ -23437,6 +23447,27 @@
         "title": "ListTaskResponse",
         "description": "Response model for a list of tasks."
       },
+      "ManualCorrectionPoint": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X",
+            "description": "Selected frequency coordinate"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y",
+            "description": "Selected power coordinate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y"
+        ],
+        "title": "ManualCorrectionPoint",
+        "description": "A point selected from the source spectroscopy figure."
+      },
       "ManualEditItem": {
         "properties": {
           "parameter_name": {
@@ -23524,6 +23555,29 @@
             "type": "object",
             "title": "Parameters",
             "description": "Parameters to update. Format: {\"param_name\": {\"value\": 4.85, \"unit\": \"GHz\"}}"
+          },
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id",
+            "description": "Task result whose output values are being manually corrected"
+          },
+          "correction_point": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ManualCorrectionPoint"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plotly point selected as the visual basis for this correction"
           }
         },
         "type": "object",
@@ -23541,6 +23595,16 @@
             "type": "integer",
             "title": "Updated Count"
           },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "Created ManualParameterEdit task result ID"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "description": "Created manual edit execution ID"
+          },
           "provenance_activity_id": {
             "anyOf": [
               {
@@ -23555,7 +23619,9 @@
         },
         "type": "object",
         "required": [
-          "updated_count"
+          "updated_count",
+          "task_id",
+          "execution_id"
         ],
         "title": "ManualParameterUpdateResponse",
         "description": "Response from manual parameter update."
@@ -26392,17 +26458,25 @@
             "title": "Bare Shift Strength Limit",
             "description": "Strength cutoff for the high_frequency_strength estimator."
           },
-          "resonator_assignment_pattern": {
+          "resonator_assignment_order": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "type": "integer",
+                  "maximum": 3.0,
+                  "minimum": 0.0
+                },
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Resonator Assignment Pattern",
-            "description": "Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2]."
+            "uniqueItems": true,
+            "title": "Resonator Assignment Order",
+            "description": "Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once."
           }
         },
         "type": "object",
@@ -29113,6 +29187,13 @@
             },
             "type": "object",
             "title": "Output Parameters"
+          },
+          "output_parameter_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Parameter Names"
           },
           "run_parameters": {
             "additionalProperties": true,
