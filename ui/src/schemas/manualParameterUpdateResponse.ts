@@ -12,5 +12,9 @@ import type { ManualParameterUpdateResponseProvenanceActivityId } from './manual
  */
 export interface ManualParameterUpdateResponse {
   updated_count: number;
+  /** Created ManualParameterEdit task result ID */
+  task_id: string;
+  /** Created manual edit execution ID */
+  execution_id: string;
   provenance_activity_id?: ManualParameterUpdateResponseProvenanceActivityId;
 }

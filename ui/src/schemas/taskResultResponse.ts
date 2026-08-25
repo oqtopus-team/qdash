@@ -54,6 +54,7 @@ export interface TaskResultResponse {
   raw_data_path: string[];
   input_parameters: TaskResultResponseInputParameters;
   output_parameters: TaskResultResponseOutputParameters;
+  output_parameter_names?: string[];
   run_parameters?: TaskResultResponseRunParameters;
   tags?: string[];
   message?: string;

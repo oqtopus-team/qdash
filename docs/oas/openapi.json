@@ -23447,6 +23447,27 @@
         "title": "ListTaskResponse",
         "description": "Response model for a list of tasks."
       },
+      "ManualCorrectionPoint": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X",
+            "description": "Selected frequency coordinate"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y",
+            "description": "Selected power coordinate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y"
+        ],
+        "title": "ManualCorrectionPoint",
+        "description": "A point selected from the source spectroscopy figure."
+      },
       "ManualEditItem": {
         "properties": {
           "parameter_name": {
@@ -23534,6 +23555,29 @@
             "type": "object",
             "title": "Parameters",
             "description": "Parameters to update. Format: {\"param_name\": {\"value\": 4.85, \"unit\": \"GHz\"}}"
+          },
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id",
+            "description": "Task result whose output values are being manually corrected"
+          },
+          "correction_point": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ManualCorrectionPoint"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plotly point selected as the visual basis for this correction"
           }
         },
         "type": "object",
@@ -23551,6 +23595,16 @@
             "type": "integer",
             "title": "Updated Count"
           },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "Created ManualParameterEdit task result ID"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "description": "Created manual edit execution ID"
+          },
           "provenance_activity_id": {
             "anyOf": [
               {
@@ -23565,7 +23619,9 @@
         },
         "type": "object",
         "required": [
-          "updated_count"
+          "updated_count",
+          "task_id",
+          "execution_id"
         ],
         "title": "ManualParameterUpdateResponse",
         "description": "Response from manual parameter update."
@@ -29131,6 +29187,13 @@
             },
             "type": "object",
             "title": "Output Parameters"
+          },
+          "output_parameter_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Parameter Names"
           },
           "run_parameters": {
             "additionalProperties": true,

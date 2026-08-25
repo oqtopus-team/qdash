@@ -182,6 +182,7 @@ class TaskService:
             raw_data_path=task_result.raw_data_path,
             input_parameters=task_result.input_parameters,
             output_parameters=task_result.output_parameters,
+            output_parameter_names=task_result.output_parameter_names,
             run_parameters=task_result.run_parameters,
             tags=task_result.tags,
             message=task_result.message,
