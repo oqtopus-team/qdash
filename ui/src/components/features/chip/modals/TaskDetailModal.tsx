@@ -813,12 +813,13 @@ export function TaskDetailModal({
                     </div>
                   )}
 
-                  {/* Message */}
-                  {task.message && (
+                  {/* Error Log */}
+                  {task.status === "failed" && task.message && (
                     <div>
-                      <h4 className="text-lg font-semibold mb-3">Message</h4>
-                      <div className="alert">
-                        <span>{task.message}</span>
+                      <h4 className="text-lg font-semibold mb-3">Error Log</h4>
+                      <div className="alert alert-error items-start">
+                        <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                        <span className="whitespace-pre-wrap break-all">{task.message}</span>
                       </div>
                     </div>
                   )}

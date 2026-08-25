@@ -272,6 +272,8 @@ export function TaskHistoryViewer({
                 const meta = statusMeta(task.status);
                 const StatusIcon = meta.Icon;
                 const isSelected = selectedTaskId === task.taskId;
+                const messageClass =
+                  task.status === "failed" ? "font-medium text-error" : "opacity-70";
                 return (
                   <button
                     key={task.taskId}
@@ -300,7 +302,11 @@ export function TaskHistoryViewer({
                           {task.elapsed_time && <span>{task.elapsed_time}</span>}
                         </div>
                         {task.message && (
-                          <div className="mt-1 truncate text-xs opacity-70">{task.message}</div>
+                          <div
+                            className={`mt-1 truncate text-xs ${isSelected ? "" : messageClass}`}
+                          >
+                            {task.message}
+                          </div>
                         )}
                         {index === 0 && (
                           <span
@@ -422,12 +428,19 @@ export function TaskHistoryViewer({
                         {selectedTask.task_id || selectedTask.taskId}
                       </Link>
                     </div>
-                    {selectedTask.message && (
-                      <div className="mt-2 border-t border-base-300 pt-2 text-base-content/70">
-                        {selectedTask.message}
-                      </div>
-                    )}
                   </div>
+
+                  {selectedTask.status === "failed" && selectedTask.message && (
+                    <div className="overflow-hidden rounded-lg border border-error/40">
+                      <div className="flex items-center gap-2 bg-error/10 px-3 py-2 text-sm font-semibold text-error">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        Error Log
+                      </div>
+                      <pre className="whitespace-pre-wrap break-all bg-error/5 px-3 py-3 font-mono text-xs text-error/80">
+                        {selectedTask.message}
+                      </pre>
+                    </div>
+                  )}
                 </div>
 
                 <div className="min-w-0 space-y-4">
