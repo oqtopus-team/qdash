@@ -47,7 +47,7 @@ class CheckQubitSpectroscopy(QubexTask):
             default=None,
             description=(
                 "Frequency range as [start, stop, step] in GHz. Leave blank to use "
-                "the connected control box default. Examples: low band "
+                "the connected control box's qubex default: low band "
                 "[3.0, 5.75, 0.005], high band [6.5, 9.75, 0.005]."
             ),
         ),

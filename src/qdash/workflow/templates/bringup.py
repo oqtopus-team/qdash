@@ -80,8 +80,13 @@ def bringup(
     default_run_parameters: dict[str, Any] = {
         "interval": {"value": 150 * 1024, "value_type": "int"},
         # resonator_assignment_order lists the four qid offsets within each MUX
-        # in increasing resonator-frequency order. For 16Q, the order is
-        # mux[0] < mux[3] < mux[1] < mux[2], so use [0, 3, 1, 2].
+        # in increasing resonator-frequency order. The default is [3, 0, 2, 1].
+        # For 16Q, override it with [0, 3, 1, 2] because the order is
+        # mux[0] < mux[3] < mux[1] < mux[2].
+        #
+        # CheckResonatorSpectroscopy uses the connected readout box's qubex default:
+        # low band [5.75, 6.75, 0.002] GHz or high band [9.75, 10.75, 0.002] GHz.
+        # Leave frequency_range unset to use that default, or uncomment to override it.
         # "CheckResonatorSpectroscopy": {
         #     "resonator_assignment_order": {
         #         "value": [0, 3, 1, 2],
@@ -92,6 +97,9 @@ def bringup(
         #         "value_type": "np.arange",
         #     },
         # },
+        # CheckQubitSpectroscopy uses the connected control box's qubex default:
+        # low band [3.0, 5.75, 0.005] GHz or high band [6.5, 9.75, 0.005] GHz.
+        # Leave frequency_range unset to use that default, or uncomment to override it.
         # "CheckQubitSpectroscopy": {
         #     "frequency_range": {
         #         "value": [3.0, 5.75, 0.005],
