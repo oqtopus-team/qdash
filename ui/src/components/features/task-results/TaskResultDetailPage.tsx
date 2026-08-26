@@ -15,7 +15,6 @@ import {
   ChevronDown,
   ChevronRight,
   RotateCcw,
-  AlertCircle,
   UserRound,
   Pencil,
 } from "lucide-react";
@@ -30,6 +29,7 @@ import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResult
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
@@ -41,7 +41,6 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
-import { useToast } from "@/components/ui/Toast";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
@@ -279,7 +278,6 @@ function IssueCard({
 export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const toast = useToast();
   const { username: currentUser } = useAuth();
   const { isOwner } = useProject();
   const [showEditor, setShowEditor] = useState(false);
@@ -724,40 +722,11 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           />
         )}
 
-        {taskResult.status === "failed" && taskResult.message && (
-          <div className="border border-error/40 rounded-lg overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 bg-error/10 text-error text-sm font-semibold">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              Error Log
-            </div>
-            <pre className="px-3 py-3 text-xs font-mono text-error/80 whitespace-pre-wrap break-all bg-error/5">
-              {taskResult.message}
-            </pre>
-            {taskResult.stack_trace && (
-              <>
-                <div className="px-3 py-1 text-xs font-semibold text-error/60 bg-error/5 border-t border-error/20 flex justify-between items-center">
-                  Stack Trace
-                  <button
-                    className="btn btn-ghost btn-xs"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(taskResult.stack_trace ?? "");
-                        toast.success("Copied to clipboard");
-                      } catch {
-                        toast.error("Failed to copy to clipboard");
-                      }
-                    }}
-                  >
-                    Copy
-                  </button>
-                </div>
-                <pre className="px-3 py-3 text-xs font-mono text-error/60 whitespace-pre-wrap break-all bg-error/5">
-                  {taskResult.stack_trace}
-                </pre>
-              </>
-            )}
-          </div>
-        )}
+        <TaskMessagePanel
+          status={taskResult.status}
+          message={taskResult.message}
+          stackTrace={taskResult.stack_trace}
+        />
       </div>
 
       <TaskResultAiReviewNote note={taskResult.ai_review_note} hideWhenEmpty />

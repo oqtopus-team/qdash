@@ -19,6 +19,7 @@ import type { Task } from "@/schemas";
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
@@ -430,17 +431,7 @@ export function TaskHistoryViewer({
                     </div>
                   </div>
 
-                  {selectedTask.status === "failed" && selectedTask.message && (
-                    <div className="overflow-hidden rounded-lg border border-error/40">
-                      <div className="flex items-center gap-2 bg-error/10 px-3 py-2 text-sm font-semibold text-error">
-                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                        Error Log
-                      </div>
-                      <pre className="whitespace-pre-wrap break-all bg-error/5 px-3 py-3 font-mono text-xs text-error/80">
-                        {selectedTask.message}
-                      </pre>
-                    </div>
-                  )}
+                  <TaskMessagePanel status={selectedTask.status} message={selectedTask.message} />
                 </div>
 
                 <div className="min-w-0 space-y-4">
