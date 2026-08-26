@@ -127,6 +127,12 @@ function taskResultHref(task: TaskHistoryItem): string {
   return `/task-results/${task.task_id || task.taskId}`;
 }
 
+/**
+ * Execution history for one qubit and task name over the given time range.
+ *
+ * The left column lists every run so the user can pick one; the right column shows the
+ * selected run's figure, output parameters, and message. The newest run is selected by default.
+ */
 export function TaskHistoryViewer({
   chipId,
   qubitId,

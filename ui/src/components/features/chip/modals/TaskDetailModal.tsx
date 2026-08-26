@@ -48,6 +48,12 @@ interface TaskDetailModalProps {
   variant?: "simple" | "detailed";
 }
 
+/**
+ * Modal for a single task result on the Chip page, opened from a MUX View task card.
+ *
+ * Shows figures in either a static or an interactive view, plus artifacts, parameters, and
+ * the task message. Callers use the `detailed` variant; `simple` is a smaller card layout.
+ */
 export function TaskDetailModal({
   isOpen,
   task: taskProp,
@@ -463,12 +469,6 @@ export function TaskDetailModal({
                             </div>
                           </details>
                         )}
-                        {task.message && (
-                          <div className="card bg-base-200 p-4 rounded-xl">
-                            <h4 className="font-medium mb-2">Message</h4>
-                            <p className="text-sm">{task.message}</p>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
@@ -813,10 +813,10 @@ export function TaskDetailModal({
                       </div>
                     </div>
                   )}
-
-                  <TaskMessagePanel status={task.status} message={task.message} />
                 </>
               )}
+
+              <TaskMessagePanel status={task.status} message={task.message} />
             </>
           )}
 

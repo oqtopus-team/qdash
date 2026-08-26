@@ -24,6 +24,7 @@ interface MessageTone {
   stackBodyClass: string;
 }
 
+/** Map a task status to the frame, header, and body classes the panel renders with. */
 function toneFor(status: string | null | undefined): MessageTone {
   if (status === "failed") {
     return {

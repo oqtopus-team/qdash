@@ -275,6 +275,12 @@ function IssueCard({
   );
 }
 
+/**
+ * Full page view of a single task result.
+ *
+ * Shows figures, artifacts, and parameters, and lets the user re-execute the task with
+ * overridden parameters. Also hosts the AI review note, the memo editor, and linked issues.
+ */
 export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();

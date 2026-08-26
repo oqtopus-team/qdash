@@ -329,6 +329,12 @@ function ParameterPreview({
   );
 }
 
+/**
+ * Slide-over preview of the selected row on the Task Results list page.
+ *
+ * Fetches the full result for `taskId` and shows its figures, metadata, message, and a
+ * trimmed set of parameters. Pass `taskId` as null to keep it closed.
+ */
 function TaskResultPreviewSidebar({
   taskId,
   onClose,
