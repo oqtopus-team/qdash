@@ -14,6 +14,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useToast } from "@/components/ui/Toast";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
+import { formatTaskParameter, parseTaskParameter } from "@/lib/utils/task-parameters";
 
 interface TaskWorkbenchProps {
   task: TaskInfo;
@@ -26,29 +27,6 @@ function badgeClass(status?: string | null) {
   if (status === "cancelled") return "badge-neutral";
   if (status === "running") return "badge-info";
   return "badge-warning";
-}
-
-export function parseTaskParameter(raw: string, valueType: unknown) {
-  const normalized = raw.trim();
-  if (valueType === "int") {
-    const value = Number(normalized);
-    if (!Number.isInteger(value)) throw new Error(`Expected an integer, got "${raw}"`);
-    return value;
-  }
-  if (valueType === "float") {
-    const value = Number(normalized);
-    if (!Number.isFinite(value)) throw new Error(`Expected a finite number, got "${raw}"`);
-    return value;
-  }
-  if (["np.linspace", "np.logspace", "np.arange", "range"].includes(String(valueType))) {
-    return JSON.parse(normalized);
-  }
-  if (valueType === "bool") {
-    if (normalized.toLowerCase() === "true") return true;
-    if (normalized.toLowerCase() === "false") return false;
-    throw new Error(`Expected true or false, got "${raw}"`);
-  }
-  return raw;
 }
 
 export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
@@ -97,11 +75,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
       Object.fromEntries(
         Object.entries(task.run_parameters ?? {}).map(([name, parameter]) => [
           name,
-          parameter.value === null || parameter.value === undefined
-            ? ""
-            : Array.isArray(parameter.value)
-              ? JSON.stringify(parameter.value)
-              : String(parameter.value),
+          formatTaskParameter(parameter.value),
         ]),
       ),
     );

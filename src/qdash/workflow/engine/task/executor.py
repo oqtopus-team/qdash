@@ -883,8 +883,27 @@ class TaskExecutor:
             for key, new_value in run_overrides.items():
                 param = task.run_parameters.get(key)
                 if isinstance(param, RunParameterModel):
-                    param.value = new_value
-                    logger.info("User override applied: run.%s = %s", key, new_value)
+                    converted_value = new_value
+                    if param.value_type == "list":
+                        if not isinstance(new_value, (list, tuple)):
+                            raise ValueError(
+                                f"Run parameter {key!r} must be a JSON array, got {new_value!r}"
+                            )
+                        converted_value = list(new_value)
+                    elif param.value_type in {
+                        "np.linspace",
+                        "np.logspace",
+                        "np.arange",
+                        "range",
+                    }:
+                        if not isinstance(new_value, (list, tuple)) or len(new_value) != 3:
+                            raise ValueError(
+                                f"Run parameter {key!r} must be a 3-value JSON array, "
+                                f"got {new_value!r}"
+                            )
+                        converted_value = tuple(new_value)
+                    logger.info("User override applied: run.%s = %s", key, converted_value)
+                    param.value = converted_value
             run_params_dict = {k: v.model_dump() for k, v in task.run_parameters.items()}
             self.state_manager.put_run_parameters(task_name, run_params_dict, task_type, qid)
 
