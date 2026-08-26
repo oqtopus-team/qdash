@@ -1,16 +1,17 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import React, { useState, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
-import { Bot } from "lucide-react";
+import { Bot, Plus } from "lucide-react";
 
 import { dateToDateTimeLocal, formatDateTime, toIsoSeconds } from "@/lib/utils/datetime";
 
 import { CouplingGrid } from "./CouplingGrid";
 import { QubitGrid } from "./QubitGrid";
 import { ChipManageModal } from "./ChipManageModal";
+import { ChipCreationTour } from "./ChipCreationTour";
 import { getAiReviewBadgeState, type AiReviewBadgeState } from "./aiReviewBadge";
 import { CreateChipModal } from "./modals/CreateChipModal";
 
@@ -51,7 +52,9 @@ function dateKeyToRange(dateKey: string): { start: string; end: string } {
 
 export function ChipPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { canEdit } = useProject();
+  const tutorialActive = canEdit && searchParams.get("tutorial") === "create-chip";
   // URL state management
   const {
     selectedChip,
@@ -131,6 +134,36 @@ export function ChipPageContent() {
   const [selectedTaskInfo, setSelectedTaskInfo] = useState<SelectedTaskInfo | null>(null);
   const [isCreateChipModalOpen, setIsCreateChipModalOpen] = useState(false);
   const [isManageChipModalOpen, setIsManageChipModalOpen] = useState(false);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
+  const [tutorialRestartKey, setTutorialRestartKey] = useState(0);
+  const tutorialJustCompleted = useRef(false);
+
+  useEffect(() => {
+    if (tutorialActive) {
+      setTutorialCompleted(false);
+      setTutorialRestartKey(0);
+    }
+  }, [tutorialActive]);
+
+  const finishTutorial = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("tutorial");
+    const query = params.toString();
+    router.replace(query ? `/chip?${query}` : "/chip", { scroll: false });
+  }, [router, searchParams]);
+
+  const openCreateChipModal = () => {
+    setIsCreateChipModalOpen(true);
+  };
+
+  const closeCreateChipModal = () => {
+    setIsCreateChipModalOpen(false);
+    if (tutorialJustCompleted.current) {
+      tutorialJustCompleted.current = false;
+    } else if (tutorialActive) {
+      setTutorialRestartKey((current) => current + 1);
+    }
+  };
 
   // Track previous date to distinguish modal navigation from external navigation
   const [previousDate, setPreviousDate] = useState(selectedDate);
@@ -417,22 +450,10 @@ export function ChipPageContent() {
                   )}
                   <button
                     className="btn btn-primary btn-sm w-fit"
-                    onClick={() => setIsCreateChipModalOpen(true)}
+                    onClick={openCreateChipModal}
+                    data-tour="create-chip"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
+                    <Plus size={20} />
                     Create Chip
                   </button>
                 </div>
@@ -766,12 +787,25 @@ export function ChipPageContent() {
       {/* Create Chip Modal */}
       <CreateChipModal
         isOpen={isCreateChipModalOpen}
-        onClose={() => setIsCreateChipModalOpen(false)}
+        onClose={closeCreateChipModal}
         onSuccess={(chipId) => {
           // Automatically select the newly created chip
           setSelectedChip(chipId);
+          if (tutorialActive) {
+            tutorialJustCompleted.current = true;
+            setTutorialCompleted(true);
+          }
         }}
       />
+
+      {tutorialActive && (
+        <ChipCreationTour
+          active
+          completed={tutorialCompleted}
+          restartKey={tutorialRestartKey}
+          onDismiss={finishTutorial}
+        />
+      )}
 
       {/* Manage Chip Modal */}
       {isManageChipModalOpen && selectedChip && (

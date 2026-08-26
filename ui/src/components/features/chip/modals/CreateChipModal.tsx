@@ -245,6 +245,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
               type="submit"
               className="btn btn-primary"
               disabled={createChipMutation.isPending}
+              data-tour="submit-chip"
             >
               {createChipMutation.isPending ? (
                 <>
