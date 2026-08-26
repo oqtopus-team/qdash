@@ -75,7 +75,10 @@ class CheckResonatorSpectroscopy(QubexTask):
             unit="dB",
             value_type="np.arange",
             default=(-60, 5, 5),
-            description="Power range for resonator spectroscopy",
+            description=(
+                "Power range as [start, stop, step] in dB. The qubex default is "
+                "[-60, 5, 5] dB. The stop value is exclusive."
+            ),
         ),
         "shots": RunParameterSpec(
             unit="a.u.",
