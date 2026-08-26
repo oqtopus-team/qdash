@@ -2,7 +2,7 @@
   "name": "ui",
   "version": "0.0.0",
   "private": true,
-  "homepage": "/inbox",
+  "homepage": "/home",
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build --turbo",
