@@ -7,6 +7,7 @@ import "@blocknote/mantine/style.css";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 
+import { DARK_THEMES, type ThemeName } from "@/constants/themes";
 import { uploadInlineFile } from "@/lib/blocknote/inlineFileUpload";
 
 // Reuse the cryo BlockNote theme (scoped to the `.wiring-blocknote` wrapper).
@@ -17,8 +18,7 @@ function useThemeScheme(): "light" | "dark" {
   useEffect(() => {
     const compute = () => {
       const t = document.documentElement.getAttribute("data-theme")?.toLowerCase() ?? "";
-      const dark = ["dark", "night", "dracula", "dim", "abyss", "dev-dark"];
-      setScheme(dark.includes(t) ? "dark" : "light");
+      setScheme(DARK_THEMES.includes(t as ThemeName) ? "dark" : "light");
     };
     compute();
     const obs = new MutationObserver(compute);
