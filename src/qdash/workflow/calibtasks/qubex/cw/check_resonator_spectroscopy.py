@@ -88,9 +88,10 @@ class CheckResonatorSpectroscopy(QubexTask):
             value_type="list",
             default=[3, 0, 2, 1],
             description=(
-                "Qubit offsets in increasing resonator-frequency order. "
-                "The default is [3, 0, 2, 1]. Must contain each offset from 0 to 3 "
-                "exactly once."
+                "Qubit offsets within each MUX in increasing resonator-frequency order. "
+                "Enter a JSON array containing each offset from 0 to 3 exactly once. "
+                "The default is [3, 0, 2, 1]. For 16Q, use [0, 3, 1, 2] when the "
+                "frequency order is mux[0] < mux[3] < mux[1] < mux[2]."
             ),
         ),
     }

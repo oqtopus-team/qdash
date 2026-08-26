@@ -41,6 +41,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
+import { formatTaskParameter, parseTaskParameter } from "@/lib/utils/task-parameters";
 import { useToast } from "@/components/ui/Toast";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
@@ -59,9 +60,16 @@ function formatActorLabel(actor?: ActorFields | null) {
 /** Extract the display value from a parameter entry (may be a dict with `value` key or a plain value). */
 function extractParamValue(entry: unknown): string {
   if (entry != null && typeof entry === "object" && "value" in (entry as Record<string, unknown>)) {
-    return String((entry as Record<string, unknown>).value ?? "");
+    return formatTaskParameter((entry as Record<string, unknown>).value);
   }
-  return String(entry ?? "");
+  return formatTaskParameter(entry);
+}
+
+function extractParamValueType(entry: unknown): unknown {
+  if (entry != null && typeof entry === "object" && "value_type" in entry) {
+    return (entry as Record<string, unknown>).value_type;
+  }
+  return undefined;
 }
 
 /** Extract the unit from a parameter entry. */
@@ -82,24 +90,16 @@ function buildFormValues(params: Record<string, unknown> | undefined): Record<st
   return result;
 }
 
-/** Parse a string back to a number if possible, otherwise keep as string. */
-function parseValue(val: string): string | number | boolean {
-  if (val === "true") return true;
-  if (val === "false") return false;
-  const num = Number(val);
-  if (val.trim() !== "" && !isNaN(num)) return num;
-  return val;
-}
-
 /** Compute changed overrides by comparing current form values to originals. */
 function computeOverrides(
+  parameters: Record<string, unknown>,
   original: Record<string, string>,
   current: Record<string, string>,
-): Record<string, string | number | boolean> {
-  const overrides: Record<string, string | number | boolean> = {};
+): Record<string, unknown> {
+  const overrides: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(current)) {
     if (val !== original[key]) {
-      overrides[key] = parseValue(val);
+      overrides[key] = parseTaskParameter(val, extractParamValueType(parameters[key]));
     }
   }
   return overrides;
@@ -395,8 +395,14 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
     setReExecCountBefore(taskResult.re_executions?.length ?? 0);
     try {
       // Build parameter_overrides only with changed values
-      const runOverrides = computeOverrides(originalRunValues, runParamValues);
-      const inputOverrides = computeOverrides(originalInputValues, inputParamValues);
+      const runParameters = taskResult.run_parameters as Record<string, unknown> | undefined;
+      const inputParameters = taskResult.input_parameters as Record<string, unknown> | undefined;
+      const runOverrides = computeOverrides(runParameters ?? {}, originalRunValues, runParamValues);
+      const inputOverrides = computeOverrides(
+        inputParameters ?? {},
+        originalInputValues,
+        inputParamValues,
+      );
       const hasOverrides =
         Object.keys(runOverrides).length > 0 || Object.keys(inputOverrides).length > 0;
 
