@@ -8,7 +8,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CalendarDays,
-  Check,
   MessageSquare,
   Pencil,
   Crosshair,
@@ -25,7 +24,6 @@ import {
   getGetForumPostQueryKey,
   getGetForumPostRepliesQueryKey,
   getListForumPostsQueryKey,
-  useCloseForumPost,
   useCreateForumPost,
   useDeleteForumPost,
   useGetForumPost,
@@ -135,7 +133,6 @@ function PostBody({
   canEdit: canEditOverride,
   onEdit,
   onDelete,
-  postAction = "delete",
   editing,
   editContent,
   editInitialBlocks,
@@ -153,7 +150,6 @@ function PostBody({
   canEdit?: boolean;
   onEdit: () => void;
   onDelete?: () => void;
-  postAction?: "delete" | "close";
   editing: boolean;
   /** Current markdown projection — used only to gate the Save button. */
   editContent: string;
@@ -169,8 +165,6 @@ function PostBody({
 }) {
   const canEdit = canEditOverride ?? currentUsername === post.username;
   const isAi = post.is_ai_reply || post.username === "qdash";
-  const ActionIcon = postAction === "close" ? Check : Trash2;
-  const actionTitle = postAction === "close" ? "Close thread" : "Delete";
 
   return (
     <div
@@ -195,7 +189,7 @@ function PostBody({
             <span className="text-xs italic text-base-content/30">(edited)</span>
           )}
         </div>
-        {canEdit && !editing && !isAi && onDelete && (
+        {canEdit && !editing && !isAi && (
           <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -210,21 +204,21 @@ function PostBody({
               </TooltipTrigger>
               <TooltipContent>Edit</TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={`btn btn-ghost btn-sm btn-square text-base-content/40 ${
-                    postAction === "close" ? "hover:text-primary" : "hover:text-error"
-                  }`}
-                  onClick={onDelete}
-                  aria-label={actionTitle}
-                >
-                  <ActionIcon className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{actionTitle}</TooltipContent>
-            </Tooltip>
+            {onDelete && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-error"
+                    onClick={onDelete}
+                    aria-label="Delete"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Delete</TooltipContent>
+              </Tooltip>
+            )}
           </div>
         )}
       </div>
@@ -378,7 +372,6 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const createMutation = useCreateForumPost();
   const updateMutation = useUpdateForumPost();
   const deleteMutation = useDeleteForumPost();
-  const closeMutation = useCloseForumPost();
   const {
     isGenerating,
     statusMessage: aiStatus,
@@ -739,12 +732,6 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             currentUsername={currentUsername}
             canEdit={canManage}
             onEdit={handleStartEditRoot}
-            onDelete={
-              isTerminal
-                ? undefined
-                : () => closeMutation.mutate({ postId }, { onSuccess: invalidateThread })
-            }
-            postAction="close"
             editing={editingRoot}
             editContent={editRootContent}
             editInitialBlocks={editRootBlocks}
