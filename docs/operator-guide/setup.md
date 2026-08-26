@@ -26,6 +26,7 @@ Review or fill in these values before starting services:
 | `DEFAULT_BACKEND` | Backend selected by default; keep `qubex` for the Qubex-backed stack |
 | `QDASH_ADMIN_USERNAME` / `QDASH_ADMIN_PASSWORD` | Initial admin login |
 | `API_PORT` / `UI_PORT` / `PREFECT_PORT` | Host ports for API, UI, and Prefect |
+| `NEXT_PUBLIC_DEFAULT_THEME` | Initial UI color theme for browsers without a saved preference; defaults to `light` |
 | `MONGO_DATA_PATH` / `POSTGRES_DATA_PATH` | Persistent database storage |
 | `CALIB_DATA_PATH` | Calibration figures and run artifacts |
 | `CALIB_TASKS_PATH` | Calibration task definitions used by the workflow worker |
@@ -42,6 +43,27 @@ Review or fill in these values before starting services:
 
 QDash application settings are committed under `config/app`, `config/domain`, and
 `config/copilot`; `CONFIG_PATH` is only for the Qubex backend configuration tree.
+
+### Default Color Theme
+
+Set `NEXT_PUBLIC_DEFAULT_THEME` in `.env` to choose the initial UI theme:
+
+```dotenv
+NEXT_PUBLIC_DEFAULT_THEME=light
+```
+
+Supported values are `light`, `dark`, `cupcake`, `emerald`, `corporate`, `synthwave`, `nord`,
+`night`, `dracula`, `dim`, `abyss`, `business`, `coffee`, and `sunset`. An unset or unsupported
+value falls back to `light`.
+
+A theme selected from **Settings** is saved in the browser and takes precedence over the deployment
+default. `NEXT_PUBLIC_DEFAULT_THEME` is embedded in the Next.js application at build time, so rebuild
+the UI image after changing it:
+
+```bash
+docker compose build ui
+docker compose up -d ui
+```
 
 ### Qubex Configuration Files
 

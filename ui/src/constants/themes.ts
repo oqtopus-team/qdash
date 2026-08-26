@@ -1,9 +1,14 @@
 // Theme definitions - single source of truth
-// Keep synchronized with @import statements in globals.css (lines 546-547, 686-692)
+// Keep synchronized with the DaisyUI theme imports and custom themes in globals.css.
 
 export const AVAILABLE_THEMES = [
   "light",
   "dark",
+  "cupcake",
+  "emerald",
+  "corporate",
+  "synthwave",
+  "nord",
   "night",
   "dracula",
   "dim",
@@ -15,10 +20,9 @@ export const AVAILABLE_THEMES = [
 
 export type ThemeName = (typeof AVAILABLE_THEMES)[number];
 
-export const DEV_THEMES: ThemeName[] = ["light", "dark"];
-
 export const DARK_THEMES: ThemeName[] = [
   "dark",
+  "synthwave",
   "night",
   "dracula",
   "business",

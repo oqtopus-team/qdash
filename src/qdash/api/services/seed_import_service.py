@@ -187,14 +187,18 @@ class SeedImportService:
                 unit = meta.get("unit", "")
 
                 for qid, value in data.items():
+                    yaml_qid = str(qid)
+                    normalized_qid = self._normalize_qid(qid)
                     # Skip coupling-format qids (e.g. "Q024-Q025")
                     # Seed import only handles qubit parameters
-                    if "-" in qid:
+                    if "-" in yaml_qid:
                         skipped_count += 1
                         continue
 
                     # Filter by qids if specified
-                    if request.qids and qid not in request.qids:
+                    if request.qids and normalized_qid not in {
+                        self._normalize_qid(request_qid) for request_qid in request.qids
+                    }:
                         continue
 
                     # Skip null values
@@ -208,7 +212,7 @@ class SeedImportService:
                             project_id=project_id,
                             username=username,
                             chip_id=request.chip_id,
-                            qid=qid,
+                            qid=normalized_qid,
                             param_name=param_name,
                             value=value,
                             unit=unit,
@@ -219,7 +223,7 @@ class SeedImportService:
                             project_id=project_id,
                             chip_id=request.chip_id,
                             param_name=param_name,
-                            qid=qid,
+                            qid=normalized_qid,
                             value=value,
                             unit=unit,
                             execution_id=execution_id,
@@ -230,7 +234,7 @@ class SeedImportService:
                         results.append(
                             SeedImportResultItem(
                                 parameter_name=param_name,
-                                qid=qid,
+                                qid=yaml_qid,
                                 value=value,
                                 unit=unit,
                                 status="imported",
@@ -238,11 +242,11 @@ class SeedImportService:
                         )
                         imported_count += 1
                     except Exception as e:
-                        logger.error(f"Failed to import {param_name} for {qid}: {e}")
+                        logger.error(f"Failed to import {param_name} for {yaml_qid}: {e}")
                         results.append(
                             SeedImportResultItem(
                                 parameter_name=param_name,
-                                qid=qid,
+                                qid=yaml_qid,
                                 value=value,
                                 unit=unit,
                                 status="error",
@@ -321,13 +325,16 @@ class SeedImportService:
 
         for param_name, qid_values in request.manual_data.items():
             for qid, value_data in qid_values.items():
+                normalized_qid = self._normalize_qid(qid)
                 # Skip coupling-format qids (e.g. "Q024-Q025")
                 if "-" in qid:
                     skipped_count += 1
                     continue
 
                 # Filter by qids if specified
-                if request.qids and qid not in request.qids:
+                if request.qids and normalized_qid not in {
+                    self._normalize_qid(request_qid) for request_qid in request.qids
+                }:
                     continue
 
                 # Handle both simple values and dict with value/unit
@@ -349,7 +356,7 @@ class SeedImportService:
                         project_id=project_id,
                         username=username,
                         chip_id=request.chip_id,
-                        qid=qid,
+                        qid=normalized_qid,
                         param_name=param_name,
                         value=value,
                         unit=unit,
@@ -360,7 +367,7 @@ class SeedImportService:
                         project_id=project_id,
                         chip_id=request.chip_id,
                         param_name=param_name,
-                        qid=qid,
+                        qid=normalized_qid,
                         value=value,
                         unit=unit,
                         execution_id=execution_id,
@@ -459,14 +466,12 @@ class SeedImportService:
         """
         # Normalize qid: remove 'Q' prefix and leading zeros to match
         # chip_initializer format (e.g. "Q024" -> "24", "Q000" -> "0")
-        normalized_qid = qid.lstrip("Q") if qid.startswith("Q") else qid
-        normalized_qid = str(int(normalized_qid)) if normalized_qid.isdigit() else normalized_qid
+        normalized_qid = self._normalize_qid(qid)
 
         # Find existing document
         qubit_doc = QubitDocument.find_one(
             {
                 "project_id": project_id,
-                "username": username,
                 "chip_id": chip_id,
                 "qid": normalized_qid,
             }
@@ -659,7 +664,6 @@ class SeedImportService:
             QubitDocument.find(
                 {
                     "project_id": project_id,
-                    "username": username,
                     "chip_id": chip_id,
                 }
             ).run()
@@ -702,8 +706,7 @@ class SeedImportService:
                         continue
 
                     # Normalize qid to match DB format (e.g. "Q024" -> "24")
-                    stripped = qid.lstrip("Q") if qid.startswith("Q") else qid
-                    normalized_qid = str(int(stripped)) if stripped.isdigit() else stripped
+                    normalized_qid = self._normalize_qid(qid)
                     qdash_value = qdash_values.get(normalized_qid, {}).get(param_name)
 
                     # Determine status
@@ -714,7 +717,8 @@ class SeedImportService:
                     else:
                         status = "different"
 
-                    param_comparison["qubits"][qid] = {
+                    param_comparison["qubits"][normalized_qid] = {
+                        "yaml_qid": str(qid),
                         "yaml_value": yaml_value,
                         "qdash_value": qdash_value,
                         "status": status,
@@ -753,3 +757,10 @@ class SeedImportService:
                 return abs(v1 - v2) < tolerance
             return abs(v1 - v2) / max(abs(v1), abs(v2)) < tolerance
         return bool(v1 == v2)
+
+    @staticmethod
+    def _normalize_qid(qid: str | int) -> str:
+        """Convert a Qubex numeric key or concrete label to QDash's numeric qid."""
+        text = str(qid)
+        stripped = text[1:] if text.startswith("Q") else text
+        return str(int(stripped)) if stripped.isdigit() else stripped

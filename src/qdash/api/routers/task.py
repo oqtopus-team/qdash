@@ -48,8 +48,10 @@ def _matches_parameter_type(value: object, value_type: object) -> bool:
         )
     if value_type == "bool":
         return isinstance(value, bool)
-    if value_type in {"np.linspace", "np.logspace", "np.arange", "range"}:
+    if value_type == "list":
         return isinstance(value, list)
+    if value_type in {"np.linspace", "np.logspace", "np.arange", "range"}:
+        return isinstance(value, list) and len(value) == 3
     if value_type in {"str", "string"}:
         return isinstance(value, str)
     return True

@@ -924,6 +924,39 @@ class TestSnapshotOverrides:
         assert isinstance(value, float)
         assert session.applied_value == pytest.approx(value)
 
+    def test_user_run_override_preserves_list_value(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        task = MockTask()
+        task.run_parameters["resonator_assignment_order"] = RunParameterModel(
+            value=[3, 0, 2, 1], value_type="list"
+        )
+        mock_snapshot_loader._parameter_overrides = {
+            "run": {"resonator_assignment_order": [0, 3, 1, 2]}
+        }
+
+        executor_with_snapshot._apply_user_overrides_only(task, "Task", "qubit", "0")
+
+        assert task.run_parameters["resonator_assignment_order"].value == [0, 3, 1, 2]
+
+    def test_user_run_override_rejects_string_for_array_type(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        task = MockTask()
+        task.run_parameters["frequency_range"] = RunParameterModel(
+            value=(5.75, 6.75, 0.002), value_type="np.arange"
+        )
+        mock_snapshot_loader._parameter_overrides = {
+            "run": {"frequency_range": "[5.75, 6.75, 0.002]"}
+        }
+
+        with pytest.raises(ValueError, match="must be a 3-value JSON array"):
+            executor_with_snapshot._apply_user_overrides_only(task, "Task", "qubit", "0")
+
     def test_apply_snapshot_overrides_empty_params(
         self,
         executor_with_snapshot: TaskExecutor,

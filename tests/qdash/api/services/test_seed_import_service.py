@@ -485,3 +485,64 @@ class TestSeedImportServiceValueComparison:
         assert service._values_equal("value1", "value2") is False
         assert service._values_equal([1, 2], [1, 2]) is True
         assert service._values_equal([1, 2], [1, 3]) is False
+
+
+def test_upsert_qubit_parameter_finds_project_scoped_document_from_another_user():
+    """Calibration values belong to a project and can be updated by another editor."""
+    service = SeedImportService.__new__(SeedImportService)
+    service._user_repository = MagicMock()
+    service._user_repository.find_by_username.return_value = None
+    existing = MagicMock(
+        data={"qubit_frequency": {"value": 4.9, "unit": "GHz"}},
+        system_info=MagicMock(),
+    )
+
+    with patch("qdash.api.services.seed_import_service.QubitDocument") as qubit_document:
+        qubit_document.find_one.return_value.run.return_value = existing
+        qubit_document.merge_calib_data.return_value = {
+            "qubit_frequency": {"value": 5.0, "unit": "GHz"}
+        }
+        service._upsert_qubit_parameter(
+            project_id="project-001",
+            username="editor",
+            chip_id="chip001",
+            qid="Q03",
+            param_name="qubit_frequency",
+            value=5.0,
+            unit="GHz",
+        )
+
+    qubit_document.find_one.assert_called_once_with(
+        {"project_id": "project-001", "chip_id": "chip001", "qid": "3"}
+    )
+    existing.save.assert_called_once_with()
+
+
+@pytest.mark.parametrize(("yaml_key", "yaml_qid"), [(24, "24"), ("24", "24"), ("Q024", "Q024")])
+def test_compare_seed_values_normalizes_supported_qubex_keys(tmp_path, yaml_key, yaml_qid):
+    """Integer, numeric-string, and concrete-label keys merge with a QDash qid."""
+    service = SeedImportService.__new__(SeedImportService)
+    service._config_base = tmp_path
+    params_dir = tmp_path / "chip001" / "params"
+    params_dir.mkdir(parents=True)
+    yaml.safe_dump(
+        {"meta": {"unit": "GHz"}, "data": {yaml_key: 5.0}},
+        (params_dir / "qubit_frequency.yaml").open("w", encoding="utf-8"),
+    )
+    qubit = MagicMock(qid="24", data={"qubit_frequency": {"value": 4.9}})
+
+    with patch("qdash.api.services.seed_import_service.QubitDocument") as qubit_document:
+        qubit_document.find.return_value.run.return_value = [qubit]
+        result = service.compare_seed_values("chip001", "project-001", "user001")
+
+    qubit_document.find.assert_called_once_with({"project_id": "project-001", "chip_id": "chip001"})
+
+    rows = result["parameters"]["qubit_frequency"]["qubits"]
+    assert rows == {
+        "24": {
+            "yaml_qid": yaml_qid,
+            "yaml_value": 5.0,
+            "qdash_value": 4.9,
+            "status": "different",
+        }
+    }

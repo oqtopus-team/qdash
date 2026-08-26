@@ -35,7 +35,11 @@ def _task_info() -> TaskInfo:
             "qubit_frequency": {"user_override": "allowed", "value_type": "float"},
             "readout_duration": {"user_override": "forbidden", "value_type": "float"},
         },
-        run_parameters={"shots": {"value_type": "int"}},
+        run_parameters={
+            "shots": {"value_type": "int"},
+            "frequency_range": {"value_type": "np.arange"},
+            "resonator_assignment_order": {"value_type": "list"},
+        },
     )
 
 
@@ -128,6 +132,24 @@ async def test_quick_run_task_resolves_and_validates_default_backend(
                 run_parameter_overrides={"shots": 100.5},
             ),
             "invalid parameter types: input.qubit_frequency must be float, run.shots must be int",
+        ),
+        (
+            QuickRunTaskRequest(
+                chip_id="chip-1",
+                qid="0",
+                backend_name="fake",
+                run_parameter_overrides={"resonator_assignment_order": "[3, 0, 2, 1]"},
+            ),
+            "invalid parameter types: run.resonator_assignment_order must be list",
+        ),
+        (
+            QuickRunTaskRequest(
+                chip_id="chip-1",
+                qid="0",
+                backend_name="fake",
+                run_parameter_overrides={"frequency_range": [5.75, 6.75]},
+            ),
+            "invalid parameter types: run.frequency_range must be np.arange",
         ),
     ],
 )
