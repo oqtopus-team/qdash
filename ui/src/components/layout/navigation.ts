@@ -8,7 +8,7 @@ import {
   ClipboardList,
   Code,
   Cpu,
-  Download,
+  Database,
   Files,
   Inbox,
   LayoutDashboard,
@@ -74,7 +74,7 @@ export function getNavigationSections({
         { href: "/task-results", label: "Task Results", icon: ClipboardList, match: "prefix" },
         { href: "/tasks", label: "Tasks", icon: ListTodo, visible: canEdit },
         { href: "/cryo", label: "Cryo", icon: Snowflake },
-        { href: "/import", label: "Import", icon: Download },
+        { href: "/import", label: "Calibration DB", icon: Database },
       ],
     },
     {
