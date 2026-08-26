@@ -4,11 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HomePageContent } from "@/components/features/home/HomePageContent";
 
 const mockExecutionLock = vi.hoisted(() => vi.fn());
+const mockChips = vi.hoisted(() => vi.fn());
 const mockTaskResults = vi.hoisted(() => vi.fn());
 const mockNotifications = vi.hoisted(() => vi.fn());
 
 vi.mock("@/client/execution/execution", () => ({
   useGetExecutionLockStatus: mockExecutionLock,
+}));
+
+vi.mock("@/client/chip/chip", () => ({
+  useListChips: mockChips,
 }));
 
 vi.mock("@/client/task-result/task-result", () => ({
@@ -26,6 +31,11 @@ vi.mock("@/hooks/useNotifications", () => ({
 
 describe("HomePageContent", () => {
   beforeEach(() => {
+    mockChips.mockReturnValue({
+      data: { data: { chips: [{ chip_id: "chip-1" }] } },
+      isLoading: false,
+      error: null,
+    });
     mockExecutionLock.mockReturnValue({
       data: {
         data: {
@@ -93,6 +103,9 @@ describe("HomePageContent", () => {
     expect(screen.getByText("A new reply")).toBeTruthy();
     expect(screen.getByRole("link", { name: /Run a task/ }).getAttribute("href")).toBe("/tasks");
     expect(screen.getByRole("link", { name: /View inbox/ }).getAttribute("href")).toBe("/inbox");
+    expect(screen.getByRole("link", { name: "Setup tour" }).getAttribute("href")).toBe(
+      "/chip?tutorial=create-chip",
+    );
   });
 
   it("shows calm empty states when no work is waiting", () => {
@@ -116,5 +129,21 @@ describe("HomePageContent", () => {
     expect(screen.getByText("No calibration is running")).toBeTruthy();
     expect(screen.getByText("No failed task results")).toBeTruthy();
     expect(screen.getByText("You are all caught up")).toBeTruthy();
+  });
+
+  it("prominently offers setup when the project has no chips", () => {
+    mockChips.mockReturnValue({
+      data: { data: { chips: [] } },
+      isLoading: false,
+      error: null,
+    });
+
+    render(<HomePageContent />);
+
+    expect(screen.getByRole("heading", { name: "Create your first chip" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Start setup tour" }).getAttribute("href")).toBe(
+      "/chip?tutorial=create-chip",
+    );
+    expect(screen.queryByRole("link", { name: "Setup tour" })).toBeNull();
   });
 });

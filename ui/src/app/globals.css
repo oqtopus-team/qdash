@@ -1549,3 +1549,47 @@ html[data-theme="dark"],
 .animate-fade-in-up {
   animation: fadeInUp 0.3s ease-out;
 }
+
+/* Driver.js product tours, themed to match DaisyUI. */
+.driver-popover.qdash-tour-popover {
+  max-width: 22rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: 1rem;
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  box-shadow: 0 20px 25px -5px color-mix(in oklch, var(--color-base-content) 14%, transparent);
+}
+
+.driver-popover.qdash-tour-popover .driver-popover-title {
+  color: var(--color-base-content);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.driver-popover.qdash-tour-popover .driver-popover-description,
+.driver-popover.qdash-tour-popover .driver-popover-progress-text {
+  color: color-mix(in oklch, var(--color-base-content) 65%, transparent);
+  font-family: inherit;
+}
+
+.driver-popover.qdash-tour-popover button {
+  border: 1px solid var(--color-base-300);
+  border-radius: 0.5rem;
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+  font-family: inherit;
+  text-shadow: none;
+}
+
+.driver-popover.qdash-tour-popover .driver-popover-next-btn {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+}
+
+.driver-popover.qdash-tour-popover .driver-popover-close-btn {
+  border: 0;
+  background: transparent;
+  color: var(--color-base-content);
+}

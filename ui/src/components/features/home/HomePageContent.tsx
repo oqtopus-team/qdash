@@ -6,7 +6,9 @@ import {
   ArrowRight,
   CheckCircle2,
   ClipboardList,
+  Cpu,
   Gauge,
+  GraduationCap,
   MessageSquare,
   Play,
   Workflow,
@@ -14,6 +16,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import { useGetExecutionLockStatus } from "@/client/execution/execution";
+import { useListChips } from "@/client/chip/chip";
 import { useListTaskResults } from "@/client/task-result/task-result";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -196,6 +199,11 @@ function RecentNotifications() {
 
 export function HomePageContent() {
   const { canEdit } = useProject();
+  const {
+    data: chipsResponse,
+    isLoading: chipsLoading,
+    error: chipsError,
+  } = useListChips({ query: { staleTime: 30_000 } });
   const { data: lockResponse, isLoading: lockLoading } = useGetExecutionLockStatus({
     query: { refetchInterval: 5000, refetchIntervalInBackground: true },
   });
@@ -215,12 +223,49 @@ export function HomePageContent() {
       ? `/execution/${encodeURIComponent(lock.chip_id)}/${encodeURIComponent(lock.execution_id)}`
       : "/execution";
   const failedResults = failedResponse?.data.items ?? [];
+  const hasChips = (chipsResponse?.data.chips.length ?? 0) > 0;
+  const showGettingStarted = canEdit && !chipsLoading && !chipsError && !hasChips;
+  const showHeaderTour = canEdit && !chipsLoading && (hasChips || Boolean(chipsError));
 
   return (
     <PageContainer maxWidth>
-      <PageHeader title="Home" description="Start work and review what needs your attention" />
+      <PageHeader
+        title="Home"
+        description="Start work and review what needs your attention"
+        actions={
+          showHeaderTour && (
+            <Link href="/chip?tutorial=create-chip" className="btn btn-ghost btn-sm gap-2">
+              <GraduationCap size={18} />
+              Setup tour
+            </Link>
+          )
+        }
+      />
 
       <div className="space-y-6">
+        {showGettingStarted && (
+          <section className="flex flex-col gap-4 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Cpu size={20} />
+              </span>
+              <div>
+                <h2 className="font-semibold">Create your first chip</h2>
+                <p className="mt-1 text-sm text-base-content/60">
+                  Set up the device QDash will use for calibration tasks and results.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/chip?tutorial=create-chip"
+              className="btn btn-primary btn-sm shrink-0 gap-2 sm:self-center"
+            >
+              <GraduationCap size={18} />
+              Start setup tour
+            </Link>
+          </section>
+        )}
+
         <QuickActions canEdit={canEdit} />
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
