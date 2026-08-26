@@ -1,13 +1,13 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useState, type MutableRefObject, type ReactNode } from "react";
+import { useEffect, useState, type MutableRefObject } from "react";
 
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 
+import { DARK_THEMES, type ThemeName } from "@/constants/themes";
 import { uploadInlineFile } from "@/lib/blocknote/inlineFileUpload";
 
 // Reuse the cryo BlockNote theme (scoped to the `.wiring-blocknote` wrapper).
@@ -18,8 +18,7 @@ function useThemeScheme(): "light" | "dark" {
   useEffect(() => {
     const compute = () => {
       const t = document.documentElement.getAttribute("data-theme")?.toLowerCase() ?? "";
-      const dark = ["dark", "night", "dracula", "dim", "abyss", "dev-dark"];
-      setScheme(dark.includes(t) ? "dark" : "light");
+      setScheme(DARK_THEMES.includes(t as ThemeName) ? "dark" : "light");
     };
     compute();
     const obs = new MutationObserver(compute);
@@ -60,141 +59,21 @@ interface ForumBlockEditorProps {
   editable?: boolean;
 }
 
-type ForumBlock = Record<string, unknown> & {
-  type?: string;
-  props?: Record<string, unknown>;
-  content?: unknown;
-  children?: ForumBlock[];
-};
-
-type ForumInlineContent = {
-  type?: string;
-  text?: unknown;
-  href?: unknown;
-  content?: unknown;
-};
-
-function safeLinkHref(href: unknown): string | null {
-  if (typeof href !== "string") return null;
-  const value = href.trim();
-  if (value.startsWith("/") || value.startsWith("#") || /^(https?:|mailto:)/i.test(value)) {
-    return value;
-  }
-  return null;
-}
-
-function renderInlineContent(content: unknown): ReactNode {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .map((item, index) => {
-      if (typeof item === "string") return item;
-      if (!item || typeof item !== "object") return "";
-
-      const inline = item as ForumInlineContent;
-      if (inline.type === "link") {
-        const children = renderInlineContent(inline.content);
-        const href = safeLinkHref(inline.href);
-        if (!href) return children;
-        return (
-          <a
-            key={index}
-            href={href}
-            className="break-words text-primary underline underline-offset-2 hover:text-primary/80"
-          >
-            {children}
-          </a>
-        );
-      }
-
-      return typeof inline.text === "string" ? inline.text : "";
-    })
-    .filter((item) => item !== "");
-}
-
-function renderViewerBlock(block: ForumBlock, index: number) {
-  const props = block.props ?? {};
-  const content = renderInlineContent(block.content);
-  const children = Array.isArray(block.children) ? block.children : [];
-
-  if (block.type === "image") {
-    const url = typeof props.url === "string" ? props.url : "";
-    const caption = typeof props.caption === "string" ? props.caption : "";
-    const width = typeof props.previewWidth === "number" ? props.previewWidth : undefined;
-    if (!url) return null;
-    return (
-      <figure key={String(block.id ?? index)} className="my-3">
-        <Image
-          src={url}
-          alt={typeof props.name === "string" ? props.name : caption}
-          width={width ?? 800}
-          height={450}
-          unoptimized
-          style={
-            width
-              ? { width, maxWidth: "100%", height: "auto" }
-              : { maxWidth: "100%", height: "auto" }
-          }
-          className="rounded border border-base-300"
-        />
-        {caption && (
-          <figcaption className="mt-1 text-xs text-base-content/50">{caption}</figcaption>
-        )}
-      </figure>
-    );
-  }
-
-  const key = String(block.id ?? index);
-  if (block.type === "heading") {
-    const level = props.level === 1 || props.level === 2 || props.level === 3 ? props.level : 3;
-    const className = level === 1 ? "text-xl" : level === 2 ? "text-lg" : "text-base";
-    return (
-      <h3 key={key} className={`my-2 font-semibold ${className}`}>
-        {content}
-      </h3>
-    );
-  }
-  if (block.type === "bulletListItem") {
-    return (
-      <li key={key} className="ml-5 list-disc">
-        {content}
-      </li>
-    );
-  }
-  if (block.type === "numberedListItem") {
-    return (
-      <li key={key} className="ml-5 list-decimal">
-        {content}
-      </li>
-    );
-  }
-  if (block.type === "quote") {
-    return (
-      <blockquote key={key} className="my-2 border-l-2 border-base-300 pl-3 text-base-content/70">
-        {content}
-      </blockquote>
-    );
-  }
-  if (block.type === "codeBlock") {
-    return (
-      <pre key={key} className="my-2 overflow-x-auto rounded bg-base-200 p-3 text-xs">
-        <code>{content}</code>
-      </pre>
-    );
-  }
-
-  return (
-    <div key={key} className="my-1">
-      {content && <p>{content}</p>}
-      {children.length > 0 && <div className="ml-4">{children.map(renderViewerBlock)}</div>}
-    </div>
-  );
-}
-
 export function ForumBlockViewer({ blocks }: { blocks: Record<string, unknown>[] }) {
+  const colorScheme = useThemeScheme();
+  const editor = useCreateBlockNote(
+    {
+      // Use the same full schema as the editor so tables and other rich blocks
+      // render consistently in forum previews.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      initialContent: blocks.length > 0 ? (blocks as any) : undefined,
+    },
+    [blocks],
+  );
+
   return (
-    <div className="text-sm leading-6 text-base-content/80">
-      {(blocks as ForumBlock[]).map(renderViewerBlock)}
+    <div className="forum-blocknote wiring-blocknote">
+      <BlockNoteView editor={editor} editable={false} theme={colorScheme} />
     </div>
   );
 }

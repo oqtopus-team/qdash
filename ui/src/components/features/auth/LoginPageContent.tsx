@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, BookOpen, Eye, EyeOff, GitBranch, Loader2, Moon, Sun } from "lucide-react";
 
 import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
+import { DARK_THEMES } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -17,7 +18,7 @@ export function LoginPageContent() {
   const { login: authLogin, loading } = useAuth();
   const { theme, setTheme } = useTheme();
 
-  const isDarkTheme = theme === "dark";
+  const isDarkTheme = DARK_THEMES.includes(theme);
 
   const toggleTheme = useCallback(() => {
     setTheme(isDarkTheme ? "light" : "dark");

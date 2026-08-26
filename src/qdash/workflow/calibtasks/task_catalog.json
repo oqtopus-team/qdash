@@ -1477,6 +1477,12 @@
             "value": null,
             "value_type": "np.arange"
           },
+          "power_range": {
+            "description": "Power range as [start, stop, step] in dB. Leave blank to use qubex's default [-60, 0, 5] dB. The stop value is exclusive.",
+            "unit": "dB",
+            "value": null,
+            "value_type": "np.arange"
+          },
           "readout_amplitude": {
             "description": "Readout amplitude used during the qubit spectroscopy sweep",
             "unit": "a.u.",
@@ -1637,7 +1643,7 @@
             "value_type": "np.arange"
           },
           "power_range": {
-            "description": "Power range for resonator spectroscopy",
+            "description": "Power range as [start, stop, step] in dB. The qubex default is [-60, 5, 5] dB. The stop value is exclusive.",
             "unit": "dB",
             "value": [
               -60,
@@ -1647,7 +1653,7 @@
             "value_type": "np.arange"
           },
           "resonator_assignment_order": {
-            "description": "Qubit offsets in increasing resonator-frequency order. The default is [3, 0, 2, 1]. Must contain each offset from 0 to 3 exactly once.",
+            "description": "Qubit offsets within each MUX in increasing resonator-frequency order. Enter a JSON array containing each offset from 0 to 3 exactly once. The default is [3, 0, 2, 1]. For 16Q, use [0, 3, 1, 2] when the frequency order is mux[0] < mux[3] < mux[1] < mux[2].",
             "unit": "",
             "value": [
               3,

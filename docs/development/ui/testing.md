@@ -236,7 +236,7 @@ task dev-local
 
 Verify the following per page during manual testing:
 
-- **Authentication** — login, redirect to `/inbox`, protected routes redirect to `/login`, logout clears session
+- **Authentication** — login, redirect to `/home`, protected routes redirect to `/login`, logout clears session
 - **Metrics** (`/metrics`) — page loads, chip selector, visualizations, time range
 - **Chip** (`/chip`) — list loads, details page, qubit grid, task results
 - **Execution** (`/execution`) — list loads, details, real-time updates

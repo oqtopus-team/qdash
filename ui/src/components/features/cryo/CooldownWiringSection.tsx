@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 
 import { useUpdateCooldown } from "@/client/cooldown/cooldown";
+import { DARK_THEMES, type ThemeName } from "@/constants/themes";
 
 import { CooldownWiringHistory } from "./CooldownWiringHistory";
 import { SaveStatus, useDebouncedAutosave } from "./SaveStatus";
@@ -28,8 +29,7 @@ function useThemeScheme(): "light" | "dark" {
   useEffect(() => {
     const compute = () => {
       const t = document.documentElement.getAttribute("data-theme")?.toLowerCase() ?? "";
-      const dark = ["dark", "night", "dracula", "dim", "abyss", "dev-dark"];
-      setScheme(dark.includes(t) ? "dark" : "light");
+      setScheme(DARK_THEMES.includes(t as ThemeName) ? "dark" : "light");
     };
     compute();
     const obs = new MutationObserver(compute);

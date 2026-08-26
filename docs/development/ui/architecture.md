@@ -31,7 +31,8 @@ src/app/
 │   │   ├── page.tsx            # /forum
 │   │   └── [postId]/page.tsx   # /forum/:postId
 │   ├── import/page.tsx         # /import
-│   ├── inbox/page.tsx          # /inbox (default landing page)
+│   ├── home/page.tsx           # /home (default landing page)
+│   ├── inbox/page.tsx          # /inbox
 │   ├── issue-knowledge/
 │   │   ├── page.tsx            # /issue-knowledge
 │   │   └── [knowledgeId]/page.tsx # /issue-knowledge/:knowledgeId
@@ -58,7 +59,7 @@ src/app/
 ├── api/                        # Next.js route handlers and proxy endpoints
 ├── globals.css                 # Global styles
 ├── layout.tsx                  # Root layout
-├── page.tsx                    # / (redirects to /inbox)
+├── page.tsx                    # / (redirects to /home)
 └── providers.tsx               # Provider composition
 ```
 
@@ -68,8 +69,8 @@ Route groups (parenthesized folders) organize routes without affecting URLs:
 
 ```tsx
 // (auth) group - requires authentication
-// File: src/app/(auth)/inbox/page.tsx
-// URL: /inbox (not /auth/inbox)
+// File: src/app/(auth)/home/page.tsx
+// URL: /home (not /auth/home)
 
 // (public) group - no authentication required
 // File: src/app/(public)/login/page.tsx

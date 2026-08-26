@@ -86,7 +86,8 @@ def bringup(
         #
         # CheckResonatorSpectroscopy uses the connected readout box's qubex default:
         # low band [5.75, 6.75, 0.002] GHz or high band [9.75, 10.75, 0.002] GHz.
-        # Leave frequency_range unset to use that default, or uncomment to override it.
+        # Its qubex default power range is [-60, 5, 5] dB (stop is exclusive).
+        # Leave each range unset to use its default, or uncomment to override it.
         # "CheckResonatorSpectroscopy": {
         #     "resonator_assignment_order": {
         #         "value": [0, 3, 1, 2],
@@ -99,15 +100,19 @@ def bringup(
         # },
         # CheckQubitSpectroscopy uses the connected control box's qubex default:
         # low band [3.0, 5.75, 0.005] GHz or high band [6.5, 9.75, 0.005] GHz.
+        # Its qubex default power range is [-60, 0, 5] dB (stop is exclusive).
         # Leave frequency_range unset to use that default, or uncomment to override it.
         # "CheckQubitSpectroscopy": {
         #     "frequency_range": {
         #         "value": [3.0, 5.75, 0.005],
         #         "value_type": "np.arange",
         #     },
+        #     "power_range": {
+        #         "value": [-60, 0, 10],
+        #         "value_type": "np.arange",
+        #     },
         # },
     }
-
     steps = [
         ConfigureAll(),
         BringUp(mode=mode, tasks=BRINGUP_TASKS),

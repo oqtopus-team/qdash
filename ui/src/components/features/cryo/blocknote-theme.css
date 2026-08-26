@@ -1,7 +1,7 @@
 /*
  * BlockNote theme overrides — bridge BlockNote's --bn-colors-* variables to
  * the QDash DaisyUI palette so the editor blends with the rest of the app
- * across all themes (light, dark, dev-light, dev-dark, etc.).
+ * across all light and dark DaisyUI themes.
  *
  * Layout principle: do NOT touch BlockNote's internal padding/positioning.
  * The side menu (drag handle, +) lives in the left padding of .bn-editor,

@@ -19,7 +19,7 @@ See [Projects and Sharing](./projects-and-sharing.md) for membership and role de
 
 | Page | Purpose |
 | --- | --- |
-| **Inbox** | Review mentions, replies, and system notifications. |
+| **Home** | Start common work and review active executions, failed tasks, and recent notifications. |
 | **Dashboard** | Scan all configured chip metrics, coverage, distributions, and scoped notes. |
 | **Metrics** | Inspect one metric across qubits or couplings and compare its history. |
 | **Chip** | Browse calibration tasks and the latest results on the chip topology. |
@@ -28,6 +28,11 @@ See [Projects and Sharing](./projects-and-sharing.md) for membership and role de
 
 Use **Dashboard** for broad health checks, **Metrics** for a parameter-focused investigation, and
 **Chip** when the calibration task or physical target is the starting point.
+
+When a project has no chips, Home highlights the **Setup tour** for project editors. After a chip
+exists, the tour remains available as a compact Home action for replay. It opens the Chip page,
+points to the creation action, and explains the chip ID and topology fields without creating data
+until the form is submitted.
 
 ## Operate
 
@@ -47,6 +52,7 @@ permission. See [Running Calibrations](./running-calibrations.md) for the end-to
 
 | Page | Purpose |
 | --- | --- |
+| **Inbox** | Review mentions, replies, and system notifications. |
 | **Issues** | Track and discuss a problem attached to a task result. |
 | **Forum** | Hold project-wide discussions that are not tied to one result. |
 | **Knowledge** | Reuse curated cases derived from resolved issues. |

@@ -37,6 +37,12 @@ if "prefect" not in sys.modules:
     sys.modules["prefect.deployments"] = MagicMock()
     sys.modules["prefect.exceptions"] = MagicMock()
     sys.modules["prefect.states"] = MagicMock()
+    sys.modules["prefect.client.schemas.objects"] = MagicMock()
+    sys.modules["prefect.events"] = MagicMock()
+    sys.modules["prefect.events.actions"] = MagicMock()
+    sys.modules["prefect.events.schemas"] = MagicMock()
+    sys.modules["prefect.events.schemas.automations"] = MagicMock()
+    sys.modules["prefect.events.schemas.events"] = MagicMock()
 
 import mongomock
 import pytest
