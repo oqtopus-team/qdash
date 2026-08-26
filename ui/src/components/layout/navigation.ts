@@ -10,6 +10,7 @@ import {
   Cpu,
   Database,
   Files,
+  House,
   Inbox,
   LayoutDashboard,
   LayoutGrid,
@@ -52,7 +53,7 @@ export function getNavigationSections({
     {
       label: "Overview",
       items: [
-        { href: "/inbox", label: "Inbox", icon: Inbox, badge: unreadNotifications },
+        { href: "/home", label: "Home", icon: House },
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/metrics", label: "Metrics", icon: LayoutGrid },
         { href: "/chip", label: "Chip", icon: Cpu },
@@ -71,7 +72,12 @@ export function getNavigationSections({
           visible: canEdit,
         },
         { href: "/execution", label: "Execution", icon: Zap },
-        { href: "/task-results", label: "Task Results", icon: ClipboardList, match: "prefix" },
+        {
+          href: "/task-results",
+          label: "Task Results",
+          icon: ClipboardList,
+          match: "prefix",
+        },
         { href: "/tasks", label: "Tasks", icon: ListTodo, visible: canEdit },
         { href: "/cryo", label: "Cryo", icon: Snowflake },
         { href: "/import", label: "Calibration DB", icon: Database },
@@ -80,17 +86,49 @@ export function getNavigationSections({
     {
       label: "Collaborate",
       items: [
+        {
+          href: "/inbox",
+          label: "Inbox",
+          icon: Inbox,
+          badge: unreadNotifications,
+        },
         { href: "/issues", label: "Issues", icon: CircleDot, match: "prefix" },
-        { href: "/forum", label: "Forum", icon: MessagesSquare, match: "prefix" },
-        { href: "/issue-knowledge", label: "Knowledge", icon: Brain, match: "prefix" },
-        { href: "/ai-reviews", label: "AI Reviews", icon: ClipboardCheck, match: "prefix" },
-        { href: "/task-knowledge", label: "Task Knowledge", icon: BookMarked, match: "prefix" },
+        {
+          href: "/forum",
+          label: "Forum",
+          icon: MessagesSquare,
+          match: "prefix",
+        },
+        {
+          href: "/issue-knowledge",
+          label: "Knowledge",
+          icon: Brain,
+          match: "prefix",
+        },
+        {
+          href: "/ai-reviews",
+          label: "AI Reviews",
+          icon: ClipboardCheck,
+          match: "prefix",
+        },
+        {
+          href: "/task-knowledge",
+          label: "Task Knowledge",
+          icon: BookMarked,
+          match: "prefix",
+        },
       ],
     },
     {
       label: "Manage",
       items: [
-        { href: "/files", label: "Files", icon: Files, match: "prefix", visible: canEdit },
+        {
+          href: "/files",
+          label: "Files",
+          icon: Files,
+          match: "prefix",
+          visible: canEdit,
+        },
         { href: "/settings", label: "Settings", icon: Settings },
         { href: "/admin", label: "Admin", icon: ShieldCheck, visible: isAdmin },
       ],

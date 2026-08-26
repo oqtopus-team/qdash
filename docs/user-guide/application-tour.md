@@ -19,7 +19,7 @@ See [Projects and Sharing](./projects-and-sharing.md) for membership and role de
 
 | Page | Purpose |
 | --- | --- |
-| **Inbox** | Review mentions, replies, and system notifications. |
+| **Home** | Start common work and review active executions, failed tasks, and recent notifications. |
 | **Dashboard** | Scan all configured chip metrics, coverage, distributions, and scoped notes. |
 | **Metrics** | Inspect one metric across qubits or couplings and compare its history. |
 | **Chip** | Browse calibration tasks and the latest results on the chip topology. |
@@ -47,6 +47,7 @@ permission. See [Running Calibrations](./running-calibrations.md) for the end-to
 
 | Page | Purpose |
 | --- | --- |
+| **Inbox** | Review mentions, replies, and system notifications. |
 | **Issues** | Track and discuss a problem attached to a task result. |
 | **Forum** | Hold project-wide discussions that are not tied to one result. |
 | **Knowledge** | Reuse curated cases derived from resolved issues. |
