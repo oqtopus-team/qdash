@@ -1,4 +1,5 @@
 import copy
+from contextlib import nullcontext
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import MagicMock, patch
@@ -128,7 +129,32 @@ def test_frequency_range_is_resolved_from_control_box_when_unset(monkeypatch) ->
 
 
 def test_run_parameters_only_expose_measurement_settings() -> None:
-    assert set(CheckQubitSpectroscopy.run_spec) == {"frequency_range", "readout_amplitude"}
+    assert set(CheckQubitSpectroscopy.run_spec) == {
+        "frequency_range",
+        "power_range",
+        "readout_amplitude",
+    }
+
+
+def test_power_range_is_forwarded_to_qubex(monkeypatch) -> None:
+    task = CheckQubitSpectroscopy()
+    task.run_parameters = copy.deepcopy(task.run_parameters)
+    task.run_parameters["power_range"].value = (-40.0, -19.0, 10.0)
+    task.input_parameters["readout_frequency"].value = 6.0
+    backend = cast("QubexBackend", object())
+    exp = MagicMock()
+    monkeypatch.setattr(task, "get_experiment", lambda _backend: exp)
+    monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
+    monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
+    monkeypatch.setattr(
+        task, "_modified_qubit_readout_frequencies", lambda *args, **kwargs: nullcontext()
+    )
+
+    task.run(backend, "0")
+
+    assert list(exp.qubit_spectroscopy.call_args.kwargs["power_range"]) == pytest.approx(
+        [-40.0, -30.0, -20.0]
+    )
 
 
 def test_frequency_range_can_be_overridden_per_task() -> None:

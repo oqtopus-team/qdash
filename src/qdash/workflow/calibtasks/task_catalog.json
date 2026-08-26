@@ -1477,6 +1477,12 @@
             "value": null,
             "value_type": "np.arange"
           },
+          "power_range": {
+            "description": "Power range as [start, stop, step] in dB. Leave blank to use qubex's default [-60, 0, 5] dB. The stop value is exclusive.",
+            "unit": "dB",
+            "value": null,
+            "value_type": "np.arange"
+          },
           "readout_amplitude": {
             "description": "Readout amplitude used during the qubit spectroscopy sweep",
             "unit": "a.u.",
@@ -1637,7 +1643,7 @@
             "value_type": "np.arange"
           },
           "power_range": {
-            "description": "Power range for resonator spectroscopy",
+            "description": "Power range as [start, stop, step] in dB. The qubex default is [-60, 5, 5] dB. The stop value is exclusive.",
             "unit": "dB",
             "value": [
               -60,
