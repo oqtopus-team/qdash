@@ -54,4 +54,55 @@ describe("ForumBlockViewer", () => {
     expect(screen.getByText("unsafe link")).toBeTruthy();
     expect(screen.queryByRole("link")).toBeNull();
   });
+
+  it("renders BlockNote tables in read-only previews", () => {
+    render(
+      <ForumBlockViewer
+        blocks={[
+          {
+            id: "table-1",
+            type: "table",
+            props: { textColor: "default" },
+            content: {
+              type: "tableContent",
+              columnWidths: [120, 120],
+              rows: [
+                {
+                  cells: [
+                    {
+                      type: "tableCell",
+                      props: {
+                        backgroundColor: "default",
+                        textColor: "default",
+                        textAlignment: "left",
+                        colspan: 1,
+                        rowspan: 1,
+                      },
+                      content: [{ type: "text", text: "Qubit", styles: {} }],
+                    },
+                    {
+                      type: "tableCell",
+                      props: {
+                        backgroundColor: "default",
+                        textColor: "default",
+                        textAlignment: "left",
+                        colspan: 1,
+                        rowspan: 1,
+                      },
+                      content: [{ type: "text", text: "Frequency", styles: {} }],
+                    },
+                  ],
+                },
+              ],
+            },
+            children: [],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("table")).toBeTruthy();
+    expect(screen.getByText("Qubit")).toBeTruthy();
+    expect(screen.getByText("Frequency")).toBeTruthy();
+  });
 });
