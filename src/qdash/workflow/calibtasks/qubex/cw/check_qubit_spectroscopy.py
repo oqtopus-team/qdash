@@ -51,6 +51,15 @@ class CheckQubitSpectroscopy(QubexTask):
                 "[3.0, 5.75, 0.005], high band [6.5, 9.75, 0.005]."
             ),
         ),
+        "power_range": RunParameterSpec(
+            unit="dB",
+            value_type="np.arange",
+            default=None,
+            description=(
+                "Power range as [start, stop, step] in dB. Leave blank to use "
+                "qubex's default [-60, 0, 5] dB. The stop value is exclusive."
+            ),
+        ),
         "readout_amplitude": RunParameterSpec(
             unit="a.u.",
             value_type="float",
@@ -269,6 +278,7 @@ class CheckQubitSpectroscopy(QubexTask):
             result = exp.qubit_spectroscopy(
                 label,
                 frequency_range=self._frequency_range(),
+                power_range=self.run_parameters["power_range"].get_value(),
                 readout_amplitude=self._get_readout_amplitude_value(),
                 readout_frequency=readout_freq_param.value,
             )
@@ -292,6 +302,7 @@ class CheckQubitSpectroscopy(QubexTask):
             result = exp.qubit_spectroscopy(
                 label,
                 frequency_range=frequency_range,
+                power_range=self.run_parameters["power_range"].get_value(),
                 readout_amplitude=readout_amplitude,
             )
             results[label] = result
