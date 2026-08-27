@@ -156,11 +156,12 @@ def test_power_range_is_forwarded_to_qubex(monkeypatch) -> None:
         task, "_modified_qubit_readout_frequencies", lambda *args, **kwargs: nullcontext()
     )
 
-    task.run(backend, "0")
+    task.batch_run(backend, ["0"])
 
     assert list(exp.qubit_spectroscopy.call_args.kwargs["power_range"]) == pytest.approx(
         [-40.0, -30.0, -20.0]
     )
+    assert exp.qubit_spectroscopy.call_args.kwargs["readout_amplitude"] == 0.04
 
 
 def test_frequency_range_can_be_overridden_per_task() -> None:
