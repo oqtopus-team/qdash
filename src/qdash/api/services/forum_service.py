@@ -936,9 +936,7 @@ class ForumService:
         content_blocks_changed = content_blocks is not None and content_blocks != doc.content_blocks
         content_changed = content != doc.content
         if not can_edit_content and not (
-            can_edit_metadata
-            and not content_changed
-            and not content_blocks_changed
+            can_edit_metadata and not content_changed and not content_blocks_changed
         ):
             raise HTTPException(
                 status_code=403,
