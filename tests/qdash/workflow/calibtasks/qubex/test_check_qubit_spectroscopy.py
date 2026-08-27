@@ -19,6 +19,7 @@ else:
 def test_check_qubit_spectroscopy_outputs_uplifted_coarse_control_amplitude_and_marks_it(
     monkeypatch,
 ) -> None:
+    """Verify spectroscopy outputs and marks the uplifted coarse control amplitude."""
     task = CheckQubitSpectroscopy()
     raw_fig = go.Figure(go.Heatmap(x=[4.0, 4.1], y=[-20.0, -10.0], z=[[0.0, 1.0], [1.0, 0.0]]))
     marked_fig = go.Figure(raw_fig)
@@ -57,6 +58,7 @@ def test_check_qubit_spectroscopy_outputs_uplifted_coarse_control_amplitude_and_
 
 
 def test_check_qubit_spectroscopy_does_not_output_invalid_frequency(monkeypatch) -> None:
+    """Verify spectroscopy omits invalid frequency estimates from its outputs."""
     task = CheckQubitSpectroscopy()
     raw_fig = go.Figure(go.Heatmap(x=[4.0, 4.1], y=[-20.0, -10.0], z=[[0.0, 1.0], [1.0, 0.0]]))
     marked_fig = go.Figure(raw_fig)
@@ -89,6 +91,7 @@ def test_check_qubit_spectroscopy_does_not_output_invalid_frequency(monkeypatch)
 
 
 def test_check_qubit_spectroscopy_enables_trim_retry(monkeypatch) -> None:
+    """Verify spectroscopy enables the configured trimmed-data retry."""
     task = CheckQubitSpectroscopy()
     raw_fig = go.Figure(go.Heatmap(x=[4.0, 4.1], y=[-20.0, -10.0], z=[[0.0, 1.0], [1.0, 0.0]]))
     marked_fig = go.Figure(raw_fig)
@@ -113,6 +116,7 @@ def test_check_qubit_spectroscopy_enables_trim_retry(monkeypatch) -> None:
 
 
 def test_frequency_range_is_resolved_from_control_box_when_unset(monkeypatch) -> None:
+    """Verify an unset frequency range is resolved from the connected control box."""
     task = CheckQubitSpectroscopy()
     backend = cast("QubexBackend", object())
     exp = MagicMock()
@@ -129,6 +133,7 @@ def test_frequency_range_is_resolved_from_control_box_when_unset(monkeypatch) ->
 
 
 def test_run_parameters_only_expose_measurement_settings() -> None:
+    """Verify the task exposes only non-calibration measurement settings for a run."""
     assert set(CheckQubitSpectroscopy.run_spec) == {
         "frequency_range",
         "power_range",
@@ -136,6 +141,7 @@ def test_run_parameters_only_expose_measurement_settings() -> None:
 
 
 def test_power_range_is_forwarded_to_qubex(monkeypatch) -> None:
+    """Verify the resolved power range is forwarded to the qubex experiment."""
     task = CheckQubitSpectroscopy()
     task.run_parameters = copy.deepcopy(task.run_parameters)
     task.run_parameters["power_range"].value = (-40.0, -19.0, 10.0)
@@ -158,6 +164,7 @@ def test_power_range_is_forwarded_to_qubex(monkeypatch) -> None:
 
 
 def test_frequency_range_can_be_overridden_per_task() -> None:
+    """Verify a task-level frequency range override is honored."""
     task = CheckQubitSpectroscopy()
     task.run_parameters = copy.deepcopy(task.run_parameters)
     task.run_parameters["frequency_range"].value = (3.0, 3.3, 0.1)
@@ -166,6 +173,7 @@ def test_frequency_range_can_be_overridden_per_task() -> None:
 
 
 def test_explicit_frequency_range_is_not_resolved_from_control_box() -> None:
+    """Verify an explicit frequency range does not query the control box default."""
     task = CheckQubitSpectroscopy()
     task.run_parameters["frequency_range"].value = (3.0, 3.3, 0.1)
     backend = cast("QubexBackend", MagicMock())

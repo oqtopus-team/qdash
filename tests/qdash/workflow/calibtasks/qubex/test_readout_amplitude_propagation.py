@@ -8,6 +8,7 @@ from qdash.workflow.service.tasks import BRINGUP_TASKS
 
 
 def test_bringup_tasks_prefer_loaded_readout_amplitude() -> None:
+    """Verify bring-up tasks use the resolved readout-amplitude calibration input."""
     for task_cls in (
         CheckQubitSpectroscopy,
         CheckControlAmplitude,
@@ -20,6 +21,7 @@ def test_bringup_tasks_prefer_loaded_readout_amplitude() -> None:
 
 
 def test_readout_amplitude_requires_resolved_calibration_input() -> None:
+    """Verify a missing readout-amplitude calibration input fails explicitly."""
     task = CheckQubitSpectroscopy()
 
     with pytest.raises(ValueError, match="readout_amplitude input parameter is required"):
@@ -27,6 +29,7 @@ def test_readout_amplitude_requires_resolved_calibration_input() -> None:
 
 
 def test_bringup_tasks_declare_readout_amplitude_as_calibration_input() -> None:
+    """Verify bring-up tasks declare readout amplitude as a calibration input."""
     for task_cls in (
         CheckQubitSpectroscopy,
         CheckControlAmplitude,
@@ -36,11 +39,13 @@ def test_bringup_tasks_declare_readout_amplitude_as_calibration_input() -> None:
 
 
 def test_cw_tasks_do_not_declare_readout_amplitude_as_run_parameter() -> None:
+    """Verify CW tasks do not duplicate readout amplitude in their run parameters."""
     for task_cls in (CheckQubitSpectroscopy, CheckControlAmplitude):
         assert "readout_amplitude" not in task_cls.run_spec
 
 
 def test_bringup_uses_adaptive_check_chevron_before_fine_refinement() -> None:
+    """Verify bring-up orders adaptive chevron after CW calibration tasks."""
     assert "CheckChevron" in BRINGUP_TASKS
     assert "CheckCoarseChevron" not in BRINGUP_TASKS
     assert "Configure" not in BRINGUP_TASKS
