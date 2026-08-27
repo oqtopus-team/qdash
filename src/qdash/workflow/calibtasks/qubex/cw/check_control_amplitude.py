@@ -62,16 +62,6 @@ class CheckControlAmplitude(QubexTask):
             default=0.0025,
             description="Frequency step (default 2.5 MHz, ~120 points over ±150 MHz)",
         ),
-        "readout_amplitude": RunParameterSpec(
-            unit="a.u.",
-            value_type="float",
-            default=0.04,
-            description=(
-                "Readout amplitude used during the sweep. Matches the "
-                "CheckQubitSpectroscopy default so the qubit response is "
-                "probed under the same readout conditions."
-            ),
-        ),
         "target_rabi_rate": RunParameterSpec(
             unit="GHz",
             value_type="float",
