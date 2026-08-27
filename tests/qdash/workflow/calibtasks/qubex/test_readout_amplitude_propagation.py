@@ -1,3 +1,5 @@
+import pytest
+
 from qdash.datamodel.task import InputParameterModel
 from qdash.workflow.calibtasks.qubex.cw.check_control_amplitude import CheckControlAmplitude
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import CheckQubitSpectroscopy
@@ -17,10 +19,11 @@ def test_bringup_tasks_prefer_loaded_readout_amplitude() -> None:
         assert task._get_readout_amplitude_value() == 0.017
 
 
-def test_readout_amplitude_falls_back_to_run_parameter_default() -> None:
+def test_readout_amplitude_requires_resolved_calibration_input() -> None:
     task = CheckQubitSpectroscopy()
 
-    assert task._get_readout_amplitude_value() == 0.04
+    with pytest.raises(ValueError, match="readout_amplitude input parameter is required"):
+        task._get_readout_amplitude_value()
 
 
 def test_bringup_tasks_declare_readout_amplitude_as_calibration_input() -> None:
@@ -30,6 +33,11 @@ def test_bringup_tasks_declare_readout_amplitude_as_calibration_input() -> None:
         CheckChevron,
     ):
         assert "readout_amplitude" in task_cls.input_spec
+
+
+def test_cw_tasks_do_not_declare_readout_amplitude_as_run_parameter() -> None:
+    for task_cls in (CheckQubitSpectroscopy, CheckControlAmplitude):
+        assert "readout_amplitude" not in task_cls.run_spec
 
 
 def test_bringup_uses_adaptive_check_chevron_before_fine_refinement() -> None:

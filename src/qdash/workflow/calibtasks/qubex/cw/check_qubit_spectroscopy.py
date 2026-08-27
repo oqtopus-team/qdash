@@ -60,12 +60,6 @@ class CheckQubitSpectroscopy(QubexTask):
                 "qubex's default [-60, 0, 5] dB. The stop value is exclusive."
             ),
         ),
-        "readout_amplitude": RunParameterSpec(
-            unit="a.u.",
-            value_type="float",
-            default=0.04,
-            description="Readout amplitude used during the qubit spectroscopy sweep",
-        ),
     }
     _analysis_config: ClassVar[EstimateQubitFrequencyConfig] = EstimateQubitFrequencyConfig()
     _retry_with_trim: ClassVar[bool] = True
@@ -296,7 +290,7 @@ class CheckQubitSpectroscopy(QubexTask):
         exp = self.get_experiment(backend)
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
         frequency_range = self._frequency_range()
-        readout_amplitude = self.run_parameters["readout_amplitude"].get_value()
+        readout_amplitude = self._get_readout_amplitude_value()
         results = {}
         for label in labels:
             result = exp.qubit_spectroscopy(

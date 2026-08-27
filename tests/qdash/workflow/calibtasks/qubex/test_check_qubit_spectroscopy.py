@@ -132,7 +132,6 @@ def test_run_parameters_only_expose_measurement_settings() -> None:
     assert set(CheckQubitSpectroscopy.run_spec) == {
         "frequency_range",
         "power_range",
-        "readout_amplitude",
     }
 
 
@@ -141,6 +140,7 @@ def test_power_range_is_forwarded_to_qubex(monkeypatch) -> None:
     task.run_parameters = copy.deepcopy(task.run_parameters)
     task.run_parameters["power_range"].value = (-40.0, -19.0, 10.0)
     task.input_parameters["readout_frequency"].value = 6.0
+    task.input_parameters["readout_amplitude"].value = 0.04
     backend = cast("QubexBackend", object())
     exp = MagicMock()
     monkeypatch.setattr(task, "get_experiment", lambda _backend: exp)
