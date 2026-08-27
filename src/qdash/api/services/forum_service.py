@@ -935,12 +935,8 @@ class ForumService:
         can_edit_metadata = doc.parent_id is None and role == ProjectRole.EDITOR
         content_blocks_changed = content_blocks is not None and content_blocks != doc.content_blocks
         content_changed = content != doc.content
-        title_changed = title is not None and title != doc.title
         if not can_edit_content and not (
-            can_edit_metadata
-            and not content_changed
-            and not content_blocks_changed
-            and not title_changed
+            can_edit_metadata and not content_changed and not content_blocks_changed
         ):
             raise HTTPException(
                 status_code=403,

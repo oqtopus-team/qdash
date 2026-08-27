@@ -565,6 +565,24 @@ def test_editor_can_update_forum_thread_metadata(test_client, init_db):
     assert response.json()["status"] == "investigating"
 
 
+def test_editor_can_update_another_users_forum_thread_title(test_client, init_db):
+    """Project editors can update the title without permission to rewrite the content."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_user("editor", "editor_token", ProjectRole.EDITOR)
+    _create_project()
+
+    root = _create_post(test_client, _headers("owner_token"))
+    response = test_client.patch(
+        f"/forum/posts/{root.json()['id']}",
+        headers=_headers("editor_token"),
+        json={"title": "Clarified title", "content": root.json()["content"]},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["title"] == "Clarified title"
+    assert response.json()["content"] == root.json()["content"]
+
+
 def test_editor_cannot_update_another_users_forum_content(test_client, init_db):
     """Metadata moderation does not grant editors permission to rewrite post content."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
