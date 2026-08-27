@@ -699,7 +699,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 {post.title || "Untitled topic"}
               </h1>
             )}
-            {canManageContent && !editingTitle && (
+            {canManageMetadata && !editingTitle && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
