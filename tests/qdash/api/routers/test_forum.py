@@ -540,6 +540,47 @@ def test_author_can_update_forum_thread_category(test_client, init_db):
     assert fetched.json()["category"] == "coupling"
 
 
+def test_editor_can_update_forum_thread_metadata(test_client, init_db):
+    """Project editors can manage metadata on a thread created by another user."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_user("editor", "editor_token", ProjectRole.EDITOR)
+    _create_project()
+
+    root = _create_post(test_client, _headers("owner_token"))
+    root_id = root.json()["id"]
+    response = test_client.patch(
+        f"/forum/posts/{root_id}",
+        headers=_headers("editor_token"),
+        json={
+            "category": "coupling",
+            "content": root.json()["content"],
+            "labels": ["anomaly"],
+            "status": "investigating",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["category"] == "coupling"
+    assert response.json()["labels"] == ["anomaly"]
+    assert response.json()["status"] == "investigating"
+
+
+def test_editor_cannot_update_another_users_forum_content(test_client, init_db):
+    """Metadata moderation does not grant editors permission to rewrite post content."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_user("editor", "editor_token", ProjectRole.EDITOR)
+    _create_project()
+
+    root = _create_post(test_client, _headers("owner_token"))
+    response = test_client.patch(
+        f"/forum/posts/{root.json()['id']}",
+        headers=_headers("editor_token"),
+        json={"content": "Rewritten by editor", "status": "investigating"},
+    )
+
+    assert response.status_code == 403
+
+
 def test_update_forum_thread_rejects_unknown_category(test_client, init_db):
     """Updating to a non-existent category is rejected and leaves the thread unchanged."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)

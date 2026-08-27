@@ -19,6 +19,7 @@ import type { Task } from "@/schemas";
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
@@ -126,6 +127,12 @@ function taskResultHref(task: TaskHistoryItem): string {
   return `/task-results/${task.task_id || task.taskId}`;
 }
 
+/**
+ * Execution history for one qubit and task name over the given time range.
+ *
+ * The left column lists every run so the user can pick one; the right column shows the
+ * selected run's figure, output parameters, and message. The newest run is selected by default.
+ */
 export function TaskHistoryViewer({
   chipId,
   qubitId,
@@ -272,6 +279,8 @@ export function TaskHistoryViewer({
                 const meta = statusMeta(task.status);
                 const StatusIcon = meta.Icon;
                 const isSelected = selectedTaskId === task.taskId;
+                const messageClass =
+                  task.status === "failed" ? "font-medium text-error" : "opacity-70";
                 return (
                   <button
                     key={task.taskId}
@@ -300,7 +309,11 @@ export function TaskHistoryViewer({
                           {task.elapsed_time && <span>{task.elapsed_time}</span>}
                         </div>
                         {task.message && (
-                          <div className="mt-1 truncate text-xs opacity-70">{task.message}</div>
+                          <div
+                            className={`mt-1 truncate text-xs ${isSelected ? "" : messageClass}`}
+                          >
+                            {task.message}
+                          </div>
                         )}
                         {index === 0 && (
                           <span
@@ -422,12 +435,9 @@ export function TaskHistoryViewer({
                         {selectedTask.task_id || selectedTask.taskId}
                       </Link>
                     </div>
-                    {selectedTask.message && (
-                      <div className="mt-2 border-t border-base-300 pt-2 text-base-content/70">
-                        {selectedTask.message}
-                      </div>
-                    )}
                   </div>
+
+                  <TaskMessagePanel status={selectedTask.status} message={selectedTask.message} />
                 </div>
 
                 <div className="min-w-0 space-y-4">

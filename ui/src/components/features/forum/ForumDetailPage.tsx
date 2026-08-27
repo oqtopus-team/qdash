@@ -264,7 +264,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { isOwner, projectId } = useProject();
+  const { canEdit, isOwner, projectId } = useProject();
   const { uploadImage } = useImageUpload("forum");
   const currentUsername = user?.username;
   const [replyText, setReplyText] = useState("");
@@ -544,7 +544,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     assigneeUsername?: string | null;
     status?: ForumPostResponse["status"];
   }) => {
-    if (!post || !canManage) return;
+    if (!post || !canManageMetadata) return;
     const response = await updateMutation.mutateAsync({
       postId: post.id,
       data: {
@@ -641,7 +641,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const category = getForumCategory(post.category, categories);
   const CategoryIcon = category.icon;
   const targetContext = linkedTargetContext;
-  const canManage = isOwner || currentUsername === post.username;
+  const canManageContent = isOwner || currentUsername === post.username;
+  const canManageMetadata = canEdit || currentUsername === post.username;
   const statusDef = getForumStatus(post.status);
   const StatusIcon = statusDef.icon;
   const isTerminal = isForumTerminalStatus(post.status);
@@ -698,7 +699,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 {post.title || "Untitled topic"}
               </h1>
             )}
-            {canManage && !editingTitle && (
+            {canManageContent && !editingTitle && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -730,7 +731,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           <PostBody
             post={post}
             currentUsername={currentUsername}
-            canEdit={canManage}
+            canEdit={canManageContent}
             onEdit={handleStartEditRoot}
             editing={editingRoot}
             editContent={editRootContent}
@@ -853,7 +854,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <CategoryIcon className="h-3.5 w-3.5" />
               Category
             </div>
-            {canManage ? (
+            {canManageMetadata ? (
               <select
                 className="select select-bordered select-sm w-full"
                 value={post.category}
@@ -888,7 +889,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 </span>
               </Link>
             )}
-            {canManage ? (
+            {canManageMetadata ? (
               <div className="space-y-2">
                 <select
                   className="select select-bordered select-xs w-full"
@@ -1016,7 +1017,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <CalendarDays className="h-3.5 w-3.5" />
               Cooldown
             </div>
-            {canManage ? (
+            {canManageMetadata ? (
               <div className="space-y-2">
                 <select
                   className="select select-bordered select-xs w-full"
@@ -1057,7 +1058,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <UserRound className="h-3.5 w-3.5" />
               Assignee
             </div>
-            {canManage ? (
+            {canManageMetadata ? (
               <select
                 className="select select-bordered select-xs w-full"
                 value={post.assignee_username ?? ""}
@@ -1088,7 +1089,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <Tag className="h-3.5 w-3.5" />
               Labels
             </div>
-            {canManage ? (
+            {canManageMetadata ? (
               <ForumLabelPicker
                 selectedLabels={post.labels ?? []}
                 onToggle={togglePostLabel}
@@ -1117,7 +1118,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <StatusIcon className="h-3.5 w-3.5" />
               Status
             </div>
-            {canManage ? (
+            {canManageMetadata ? (
               <select
                 className="select select-bordered select-xs w-full"
                 value={post.status ?? "open"}
