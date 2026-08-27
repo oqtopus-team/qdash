@@ -931,9 +931,23 @@ class ForumService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
         user_id = self._user_id_for_username(username)
-        if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
+        can_edit_content = self._is_author(doc, user_id=user_id) or role == ProjectRole.OWNER
+        can_edit_metadata = doc.parent_id is None and role == ProjectRole.EDITOR
+        content_blocks_changed = content_blocks is not None and content_blocks != doc.content_blocks
+        content_changed = content != doc.content
+        title_changed = title is not None and title != doc.title
+        if not can_edit_content and not (
+            can_edit_metadata
+            and not content_changed
+            and not content_blocks_changed
+            and not title_changed
+        ):
             raise HTTPException(
-                status_code=403, detail="Only the author or project owner can edit this post"
+                status_code=403,
+                detail=(
+                    "Only the author or project owner can edit post content; "
+                    "project editors can edit thread metadata"
+                ),
             )
 
         status_changed = False
