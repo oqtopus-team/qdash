@@ -140,6 +140,15 @@ def test_run_parameters_only_expose_measurement_settings() -> None:
     }
 
 
+def test_power_range_has_qdash_default() -> None:
+    """Verify QDash provides a usable default power sweep."""
+    task = CheckQubitSpectroscopy()
+
+    assert list(task.run_parameters["power_range"].get_value()) == pytest.approx(
+        [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0, -20.0, -15.0, -10.0, -5.0]
+    )
+
+
 def test_power_range_is_forwarded_to_qubex(monkeypatch) -> None:
     """Verify the resolved power range is forwarded to the qubex experiment."""
     task = CheckQubitSpectroscopy()

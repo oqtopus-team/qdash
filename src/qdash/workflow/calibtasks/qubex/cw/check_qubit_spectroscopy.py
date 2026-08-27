@@ -54,10 +54,10 @@ class CheckQubitSpectroscopy(QubexTask):
         "power_range": RunParameterSpec(
             unit="dB",
             value_type="np.arange",
-            default=None,
+            default=(-60, 0, 5),
             description=(
-                "Power range as [start, stop, step] in dB. Leave blank to use "
-                "qubex's default [-60, 0, 5] dB. The stop value is exclusive."
+                "Power range as [start, stop, step] in dB. The QDash default is "
+                "[-60, 0, 5] dB. The stop value is exclusive."
             ),
         ),
     }

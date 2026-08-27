@@ -1472,9 +1472,13 @@
             "value_type": "np.arange"
           },
           "power_range": {
-            "description": "Power range as [start, stop, step] in dB. Leave blank to use qubex's default [-60, 0, 5] dB. The stop value is exclusive.",
+            "description": "Power range as [start, stop, step] in dB. The QDash default is [-60, 0, 5] dB. The stop value is exclusive.",
             "unit": "dB",
-            "value": null,
+            "value": [
+              -60,
+              0,
+              5
+            ],
             "value_type": "np.arange"
           }
         },
