@@ -32,7 +32,6 @@ import {
   useListForumPosts,
   useUpdateForumPost,
 } from "@/client/forum/forum";
-import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
@@ -53,7 +52,8 @@ import {
   toForumCategoryDefinition,
 } from "./categories";
 import { ForumLabelPicker } from "./ForumLabelSelector";
-import { ForumBlockViewer, type ForumBlockSnapshotGetter } from "./ForumBlockEditor";
+import { type ForumBlockSnapshotGetter } from "./ForumBlockEditor";
+import { ForumPostContent } from "./ForumPostContent";
 
 const ForumBlockEditor = dynamic(
   () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
@@ -246,14 +246,11 @@ function PostBody({
           </div>
         </div>
       ) : (
-        (() => {
-          const displayBlocks = (post.content_blocks ?? []) as Record<string, unknown>[];
-          return displayBlocks.length > 0 ? (
-            <ForumBlockViewer blocks={displayBlocks} />
-          ) : (
-            <MarkdownContent content={post.content} className="text-sm text-base-content/80" />
-          );
-        })()
+        <ForumPostContent
+          content={post.content}
+          contentBlocks={post.content_blocks}
+          markdownClassName="text-sm text-base-content/80"
+        />
       )}
     </div>
   );

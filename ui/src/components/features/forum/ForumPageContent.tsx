@@ -61,7 +61,7 @@ import {
   type ForumCategoryDefinition,
 } from "./categories";
 import { ForumLabelPicker } from "./ForumLabelSelector";
-import { ForumBlockViewer } from "./ForumBlockEditor";
+import { ForumPostContent } from "./ForumPostContent";
 
 const PAGE_SIZE = 30;
 
@@ -706,16 +706,11 @@ function ForumThreadPreviewSidebar({
               <section>
                 <h3 className="mb-2 text-sm font-semibold">Root thread</h3>
                 <div className="rounded-lg border border-base-300 bg-base-100 p-4">
-                  {(post.content_blocks ?? []).length > 0 ? (
-                    <ForumBlockViewer
-                      blocks={(post.content_blocks ?? []) as Record<string, unknown>[]}
-                    />
-                  ) : (
-                    <MarkdownContent
-                      content={post.content}
-                      className="text-sm text-base-content/80"
-                    />
-                  )}
+                  <ForumPostContent
+                    content={post.content}
+                    contentBlocks={post.content_blocks}
+                    markdownClassName="text-sm text-base-content/80"
+                  />
                 </div>
               </section>
 
@@ -738,17 +733,12 @@ function ForumThreadPreviewSidebar({
                           <span>{reply.username}</span>
                           <span>{formatRelativeTime(reply.created_at)}</span>
                         </div>
-                        {(reply.content_blocks ?? []).length > 0 ? (
-                          <ForumBlockViewer
-                            blocks={(reply.content_blocks ?? []) as Record<string, unknown>[]}
-                          />
-                        ) : (
-                          <MarkdownContent
-                            content={reply.content}
-                            preview
-                            className="line-clamp-3 text-sm text-base-content/70"
-                          />
-                        )}
+                        <ForumPostContent
+                          content={reply.content}
+                          contentBlocks={reply.content_blocks}
+                          markdownPreview
+                          markdownClassName="line-clamp-3 text-sm text-base-content/70"
+                        />
                       </div>
                     ))}
                   </div>
