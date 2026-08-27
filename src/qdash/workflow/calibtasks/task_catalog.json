@@ -1028,12 +1028,6 @@
             "value": 153600.0,
             "value_type": "int"
           },
-          "readout_amplitude": {
-            "description": "Readout amplitude used during the sweep. Matches the CheckQubitSpectroscopy default so the qubit response is probed under the same readout conditions.",
-            "unit": "a.u.",
-            "value": 0.04,
-            "value_type": "float"
-          },
           "shots": {
             "description": "Number of shots per frequency point. Higher than the usual CALIBRATION_SHOTS (2048) because this is a 1D scan and the phase response can still be small near the spectroscopy-derived seed amplitude — extra averaging is needed to get the signal above the noise floor for a stable sqrt-Lorentzian fit.",
             "unit": "a.u.",
@@ -1482,12 +1476,6 @@
             "unit": "dB",
             "value": null,
             "value_type": "np.arange"
-          },
-          "readout_amplitude": {
-            "description": "Readout amplitude used during the qubit spectroscopy sweep",
-            "unit": "a.u.",
-            "value": 0.04,
-            "value_type": "float"
           }
         },
         "task_type": "qubit"
