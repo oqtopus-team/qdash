@@ -17,6 +17,7 @@ from qdash.copilot.agent_runtime.rendering import build_llm_summary, legacy_to_b
 from qdash.copilot.contracts import AnalysisResponse
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.copilot.tooling.schemas import AGENT_TOOLS
+from tests._sandbox import requires_sandbox
 
 if TYPE_CHECKING:
     from qdash.api.schemas.provenance import LineageResponse
@@ -336,6 +337,7 @@ class TestDataStoreWrapper:
         assert "chip_summary" in data_store
         assert result["data_key"] == "chip_summary"
 
+    @requires_sandbox
     @pytest.mark.asyncio
     async def test_python_analysis_receives_data_store(self):
         data_store = {"t1": {"timeseries": [{"v": 45.2}]}}

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from tests._sandbox import requires_sandbox
 
 from qdash.copilot.agent_runtime.execution import execute_tool_executor, wrap_tool_executors
 from qdash.copilot.tooling import sandbox
@@ -23,25 +24,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 MAX_STARTUP_OVERHEAD_SECONDS = 1.5
-
-
-def _sandbox_available() -> bool:
-    """Whether the OS sandbox can actually run in this environment.
-
-    The sandbox is fail-closed and needs bubblewrap plus user/network namespaces. Some CI
-    runners allow the namespaces but deny configuring loopback, so probe by executing a
-    trivial analysis rather than only checking for the bwrap binary.
-    """
-    if sandbox._bwrap_path() is None:
-        return False
-    result = asyncio.run(execute_python_analysis('result = {"output": "ok"}'))
-    return result.get("output") == "ok"
-
-
-requires_sandbox = pytest.mark.skipif(
-    not _sandbox_available(),
-    reason="OS sandbox (bubblewrap + user/network namespaces) is unavailable here",
-)
 
 
 @requires_sandbox
