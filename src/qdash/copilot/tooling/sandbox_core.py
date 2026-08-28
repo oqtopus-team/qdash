@@ -304,7 +304,7 @@ def execute_python_analysis_in_process(
             output = stdout_capture.getvalue()
             chart = None
 
-        output_str = str(output) if output else ""
+        output_str = "" if output is None else str(output)
         if len(output_str.encode("utf-8")) > MAX_OUTPUT_BYTES:
             output_bytes = output_str.encode("utf-8")[:MAX_OUTPUT_BYTES]
             output_str = output_bytes.decode("utf-8", errors="ignore") + "\n... (output truncated)"
