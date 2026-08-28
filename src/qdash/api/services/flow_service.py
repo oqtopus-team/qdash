@@ -42,10 +42,14 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from qdash.repository import MongoExecutionLockRepository, MongoFlowRepository
+    from qdash.repository.execution_history import MongoExecutionHistoryRepository
 
 logger = logging.getLogger("uvicorn.app")
 
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
+EXECUTION_IN_PROGRESS_DETAIL = (
+    "Another calibration execution is already in progress for this project"
+)
 
 
 def _to_deployment_service_path(file_path: Path) -> Path:
@@ -66,10 +70,12 @@ class FlowService:
         self,
         flow_repository: MongoFlowRepository,
         execution_lock_repository: MongoExecutionLockRepository | None = None,
+        execution_history_repository: MongoExecutionHistoryRepository | None = None,
     ) -> None:
         """Initialize the service with a flow repository."""
         self._flow_repo = flow_repository
         self._execution_lock_repo = execution_lock_repository
+        self._execution_history_repo = execution_history_repository
         self._project_flows_base_dir = USER_FLOWS_DIR
 
     async def save_flow(
@@ -381,6 +387,8 @@ class FlowService:
                 ),
             )
 
+        self._reject_when_execution_in_progress(project_id)
+
         parameters: dict[str, Any] = {
             **flow.default_parameters,
             **request.parameters,
@@ -483,6 +491,8 @@ class FlowService:
                     " Please re-save the flow to register a deployment."
                 ),
             )
+
+        self._reject_when_execution_in_progress(project_id)
 
         parameters: dict[str, Any] = {
             **flow.default_parameters,
@@ -593,13 +603,7 @@ class FlowService:
         settings = get_settings()
         deployment_name = "single-task-executor/system-single-task"
 
-        if self._execution_lock_repo is not None and self._execution_lock_repo.is_locked(
-            project_id
-        ):
-            raise HTTPException(
-                status_code=409,
-                detail="Another calibration execution is already running for this project",
-            )
+        self._reject_when_execution_in_progress(project_id)
 
         try:
             async with get_client() as client:
@@ -858,6 +862,41 @@ class FlowService:
             raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
 
     # --- Private helpers ---
+
+    def _reject_when_execution_in_progress(self, project_id: str) -> None:
+        """Reject a new run while the project already has one in flight.
+
+        The ``ExecutionLockDocument`` is only taken once the flow process
+        starts, so it alone leaves the seconds between the trigger and the
+        flow start unguarded. The ``scheduled`` execution the API records at
+        trigger time covers that window, which is what keeps a repeated press
+        from dispatching a second flow run. This reads the same execution as
+        ``ExecutionService.get_lock_status()``, so a rejection here always
+        matches the locked state the UI is showing.
+
+        Parameters
+        ----------
+        project_id : str
+            The project whose calibration runs are mutually exclusive.
+
+        Raises
+        ------
+        HTTPException
+            409 when the project is locked or already has a dispatched run
+            waiting to start.
+
+        """
+        if self._execution_lock_repo is not None and self._execution_lock_repo.is_locked(
+            project_id
+        ):
+            raise HTTPException(status_code=409, detail=EXECUTION_IN_PROGRESS_DETAIL)
+
+        if self._execution_history_repo is None:
+            return
+
+        latest = self._execution_history_repo.find_latest_by_project(project_id)
+        if latest is not None and latest.status == ExecutionStatusModel.SCHEDULED:
+            raise HTTPException(status_code=409, detail=EXECUTION_IN_PROGRESS_DETAIL)
 
     def _create_scheduled_execution(
         self,

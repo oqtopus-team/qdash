@@ -495,3 +495,83 @@ def test_get_lock_status_without_execution_returns_lock_only() -> None:
 
     assert result.lock is False
     assert result.execution_id is None
+
+
+def test_get_lock_status_locks_on_scheduled_execution_before_the_flow_starts() -> None:
+    """A scheduled execution locks the project even before the flow takes the lock."""
+    history_repository = MagicMock()
+    history_repository.find_latest_by_project.return_value = SimpleNamespace(
+        execution_id="exec-scheduled",
+        chip_id="chip-1",
+        name="full-calibration",
+        status="scheduled",
+        note={},
+        project_id="project-1",
+    )
+    lock_repository = MagicMock()
+    lock_repository.get_lock_status.return_value = False
+    service = ExecutionService(history_repository, lock_repository)
+
+    result = service.get_lock_status("project-1")
+
+    assert result.lock is True
+    assert result.status == "scheduled"
+
+
+def test_get_lock_status_leaves_a_started_execution_to_the_lock_document() -> None:
+    """Once the flow has started, the lock document alone decides."""
+    history_repository = MagicMock()
+    history_repository.find_latest_by_project.return_value = SimpleNamespace(
+        execution_id="exec-running",
+        chip_id="chip-1",
+        name="full-calibration",
+        status="running",
+        note={},
+        project_id="project-1",
+    )
+    lock_repository = MagicMock()
+    lock_repository.get_lock_status.return_value = False
+    service = ExecutionService(history_repository, lock_repository)
+
+    result = service.get_lock_status("project-1")
+
+    assert result.lock is False
+
+
+def test_get_lock_status_unlocks_after_reconciling_a_dead_scheduled_execution(
+    monkeypatch: Any, init_db: Any
+) -> None:
+    """A scheduled execution whose flow run crashed stops locking the project."""
+    flow_run_id = str(uuid4())
+    _make_execution(execution_id="exec-1", status="scheduled", note={"flow_run_id": flow_run_id})
+
+    calls: list[dict[str, Any]] = []
+    client = _FakeSyncClient([_make_run(flow_run_id, "CRASHED")])
+    monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, calls))
+
+    result = _make_service().get_lock_status(PROJECT_ID)
+
+    assert len(calls) == 1
+    assert result.lock is False
+    assert result.status == "failed"
+
+    reloaded = _reload_execution("exec-1")
+    assert reloaded is not None
+    assert reloaded.status == "failed"
+
+
+def test_get_lock_status_does_not_query_prefect_for_terminal_executions(
+    monkeypatch: Any, init_db: Any
+) -> None:
+    """A finished execution needs no reconciliation, so the poll stays Prefect-free."""
+    _make_execution(execution_id="exec-1", status="completed", note={"flow_run_id": str(uuid4())})
+
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        execution_service, "get_client", _make_get_client(_RaisingSyncClient(), calls)
+    )
+
+    result = _make_service().get_lock_status(PROJECT_ID)
+
+    assert calls == []
+    assert result.lock is False

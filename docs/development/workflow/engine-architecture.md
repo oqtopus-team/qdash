@@ -288,6 +288,15 @@ Runs that do not go through the API — cron schedules, where the Prefect schedu
 
 Pre-creation is best effort. It is skipped when no `chip_id` can be resolved, and any failure is logged and swallowed: the Prefect flow run already exists at that point, and a bookkeeping failure is not a reason to cancel a healthy calibration. Such a run simply falls back to the cron-schedule path above — `CalibService` allocates its own `execution_id` at flow start — and the API response reports the Prefect flow run ID as `execution_id` until then.
 
+### Mutual Exclusion
+
+`ExecutionLockDocument` is taken by `CalibService._initialize()` when the flow process starts and released when the execution is closed, so it says nothing during the seconds between the button press and the flow start. The pre-created `scheduled` row covers exactly that window: the row only becomes `running` inside `CalibOrchestrator.initialize()`, which runs after the lock has been acquired, so the two signals overlap rather than leaving a gap.
+
+- `GET /executions/lock-status` reports `lock=true` when the lock document is held **or** the project's latest execution is still `scheduled`, so the UI locks as soon as a run is dispatched.
+- `FlowService._reject_when_execution_in_progress()` reads the same execution and applies the same rule to `execute_flow`, `re_execute_from_snapshot` and `execute_single_task_from_snapshot`, which answer `409` instead of dispatching a second flow run. A rejection therefore always matches the locked state the UI is showing.
+
+A `scheduled` execution is reconciled against Prefect before the lock status is reported, so a run that dies before its flow process starts does not keep the project locked. Started executions are deliberately left to the lock document, which the finalizer releases together with the execution record.
+
 ### Reconciliation with Prefect
 
 Hooks only fire while the Prefect runner is alive. When the runner itself dies, nothing closes the execution and it stays `running` forever. `ExecutionService._reconcile_with_prefect()` (API) closes that gap when an execution detail is read: open executions holding a `note.flow_run_id` are looked up in Prefect and finalized when their flow run has already reached a terminal state. Execution-list reads do not call Prefect synchronously, so history remains available when Prefect is slow or unavailable.

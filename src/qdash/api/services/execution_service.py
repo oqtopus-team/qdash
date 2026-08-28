@@ -25,6 +25,7 @@ from qdash.api.schemas.execution import (
     Task,
 )
 from qdash.common.utils.datetime import now, parse_elapsed_time
+from qdash.datamodel.execution import ExecutionStatusModel
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.repository.execution_finalizer import finalize_executions_by_flow_run_id
 
@@ -283,6 +284,16 @@ class ExecutionService:
     def get_lock_status(self, project_id: str) -> ExecutionLockStatusResponse:
         """Get the execution lock status.
 
+        The ``ExecutionLockDocument`` is only taken once the flow process
+        starts, which leaves a window of several seconds after the user
+        presses execute where nothing looks locked. The ``scheduled``
+        execution the API records at trigger time covers that window, so the
+        status flips the moment a run is dispatched.
+
+        Such an execution is reconciled against Prefect first, so a run that
+        died before its flow process started does not keep the project locked
+        forever.
+
         Parameters
         ----------
         project_id : str
@@ -298,8 +309,10 @@ class ExecutionService:
         latest = self._history_repo.find_latest_by_project(project_id)
         if latest is None:
             return ExecutionLockStatusResponse(lock=bool(status))
+        if latest.status == ExecutionStatusModel.SCHEDULED:
+            self._reconcile_with_prefect([latest])
         return ExecutionLockStatusResponse(
-            lock=bool(status),
+            lock=bool(status) or latest.status == ExecutionStatusModel.SCHEDULED,
             execution_id=latest.execution_id,
             chip_id=latest.chip_id,
             name=latest.name,

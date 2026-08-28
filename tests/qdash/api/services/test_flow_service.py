@@ -517,3 +517,145 @@ async def test_execute_single_task_supports_quick_run_without_snapshot(
     assert parameters["backend_name"] == "fake"
     assert parameters["default_run_parameters"] == defaults
     assert parameters["persist_output_parameters"] is False
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_rejects_locked_project() -> None:
+    """execute_flow refuses to dispatch while the project lock is held."""
+    lock_repository = MagicMock()
+    lock_repository.is_locked.return_value = True
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow()
+
+    service = FlowService(
+        flow_repository=flow_repo,
+        execution_lock_repository=lock_repository,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_flow(
+            name="my-flow",
+            request=ExecuteFlowRequest(parameters={}),
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_rejects_project_with_a_dispatched_run() -> None:
+    """A run recorded at the previous press blocks the next one before the lock is taken."""
+    lock_repository = MagicMock()
+    lock_repository.is_locked.return_value = False
+    history_repository = MagicMock()
+    history_repository.find_latest_by_project.return_value = SimpleNamespace(
+        execution_id="exec-scheduled", status="scheduled"
+    )
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow()
+
+    service = FlowService(
+        flow_repository=flow_repo,
+        execution_lock_repository=lock_repository,
+        execution_history_repository=history_repository,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_flow(
+            name="my-flow",
+            request=ExecuteFlowRequest(parameters={}),
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 409
+    history_repository.find_latest_by_project.assert_called_once_with("project-1")
+
+
+@pytest.mark.asyncio
+async def test_re_execute_from_snapshot_rejects_project_with_a_dispatched_run() -> None:
+    """Snapshot re-execution is blocked while the project already has a run in flight."""
+    history_repository = MagicMock()
+    history_repository.find_latest_by_project.return_value = SimpleNamespace(
+        execution_id="exec-scheduled", status="scheduled"
+    )
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow()
+
+    service = FlowService(
+        flow_repository=flow_repo,
+        execution_history_repository=history_repository,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.re_execute_from_snapshot(
+            flow_name="my-flow",
+            source_execution_id="exec-1",
+            parameter_overrides={},
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_execute_single_task_rejects_project_with_a_dispatched_run() -> None:
+    """Single-task execution is blocked while the project already has a run in flight."""
+    history_repository = MagicMock()
+    history_repository.find_latest_by_project.return_value = SimpleNamespace(
+        execution_id="exec-scheduled", status="scheduled"
+    )
+
+    service = FlowService(
+        flow_repository=MagicMock(),
+        execution_history_repository=history_repository,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_single_task_from_snapshot(
+            task_name="CheckRabi",
+            qid="Q00",
+            chip_id="chip-1",
+            source_execution_id=None,
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_dispatches_when_the_last_run_has_finished(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A finished run leaves the project idle, and both guards are consulted."""
+    monkeypatch.setattr(FlowService, "_create_scheduled_execution", lambda self, **_: "exec-1")
+    monkeypatch.setattr(
+        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-3")
+    )
+
+    lock_repository = MagicMock()
+    lock_repository.is_locked.return_value = False
+    history_repository = MagicMock()
+    history_repository.find_latest_by_project.return_value = SimpleNamespace(
+        execution_id="exec-done", status="completed"
+    )
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow()
+
+    response = await FlowService(
+        flow_repository=flow_repo,
+        execution_lock_repository=lock_repository,
+        execution_history_repository=history_repository,
+    ).execute_flow(
+        name="my-flow",
+        request=ExecuteFlowRequest(parameters={}),
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert response.flow_run_id == "flow-run-3"
+    lock_repository.is_locked.assert_called_once_with("project-1")
+    history_repository.find_latest_by_project.assert_called_once_with("project-1")

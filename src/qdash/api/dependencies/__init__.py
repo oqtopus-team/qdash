@@ -515,6 +515,7 @@ def get_flow_service() -> "FlowService":
     return FlowService(
         flow_repository=get_flow_repository(),
         execution_lock_repository=get_execution_lock_repository(),
+        execution_history_repository=get_execution_history_repository(),
     )
 
 
