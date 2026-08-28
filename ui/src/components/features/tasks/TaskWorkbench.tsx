@@ -194,7 +194,6 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
         ?.detail;
       toast.error(detail ?? (error instanceof Error ? error.message : "Failed to start task"));
     } finally {
-      // Awaited, so the button stays busy until the refreshed lock status arrives.
       await queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() });
       setIsStarting(false);
     }
