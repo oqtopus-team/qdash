@@ -277,7 +277,7 @@
           "auth"
         ],
         "summary": "Reset user password (admin only)",
-        "description": "Reset a user's password (admin only).\n\nParameters\n----------\npassword_data : PasswordReset\n    Contains username and new_password\ncurrent_user : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\ndict[str, str]\n    Success message confirming password reset\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin",
+        "description": "Reset a user's password (admin only).\n\nParameters\n----------\npassword_data : PasswordReset\n    Contains the target username\ncurrent_user : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\nPasswordResetResponse\n    Generated temporary password, returned only in this response\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin",
         "operationId": "resetPassword",
         "requestBody": {
           "content": {
@@ -295,11 +295,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Resetpassword"
+                  "$ref": "#/components/schemas/PasswordResetResponse"
                 }
               }
             }
@@ -8422,7 +8418,7 @@
           "forum"
         ],
         "summary": "Update a forum post",
-        "description": "Update a forum post. Only the author or project owner can edit.",
+        "description": "Update a forum post, or update root-thread metadata as a project editor.",
         "operationId": "updateForumPost",
         "security": [
           {
@@ -25656,19 +25652,33 @@
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$",
             "title": "Username"
-          },
-          "new_password": {
-            "type": "string",
-            "title": "New Password"
           }
         },
         "type": "object",
         "required": [
-          "username",
-          "new_password"
+          "username"
         ],
         "title": "PasswordReset",
         "description": "Password reset request model (admin only)."
+      },
+      "PasswordResetResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "initial_password": {
+            "type": "string",
+            "title": "Initial Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "initial_password"
+        ],
+        "title": "PasswordResetResponse",
+        "description": "One-time response containing a generated temporary password."
       },
       "Position": {
         "properties": {

@@ -80,4 +80,10 @@ class PasswordReset(BaseModel):
     """Password reset request model (admin only)."""
 
     username: Username
-    new_password: str
+
+
+class PasswordResetResponse(BaseModel):
+    """One-time response containing a generated temporary password."""
+
+    message: str
+    initial_password: str

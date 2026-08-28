@@ -31,7 +31,8 @@ export function EditUserModal({
   const [systemRole, setSystemRole] = useState<SystemRole>(user.system_role ?? "user");
   const isSelf = user.username === currentUsername;
   const [showPasswordReset, setShowPasswordReset] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
@@ -50,31 +51,22 @@ export function EditUserModal({
     setPasswordError(null);
     setPasswordSuccess(false);
 
-    if (!newPassword.trim()) {
-      setPasswordError("Password is required");
-      return;
-    }
-    if (newPassword.length < 4) {
-      setPasswordError("Password must be at least 4 characters");
-      return;
-    }
-
     try {
-      await resetPasswordMutation.mutateAsync({
-        data: {
-          username: user.username,
-          new_password: newPassword,
-        },
+      const response = await resetPasswordMutation.mutateAsync({
+        data: { username: user.username },
       });
+      setTemporaryPassword(response.data.initial_password);
       setPasswordSuccess(true);
-      setNewPassword("");
-      setTimeout(() => {
-        setShowPasswordReset(false);
-        setPasswordSuccess(false);
-      }, 2000);
     } catch {
       setPasswordError("Failed to reset password");
     }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!temporaryPassword) return;
+    await navigator.clipboard.writeText(temporaryPassword);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -158,7 +150,7 @@ export function EditUserModal({
             </button>
           ) : (
             <div className="space-y-3 rounded-lg bg-base-300 p-4">
-              <h4 className="text-sm font-medium">Reset Password</h4>
+              <h4 className="text-sm font-medium">Generate Temporary Password</h4>
 
               {passwordError && (
                 <div className="alert alert-error py-2">
@@ -168,20 +160,41 @@ export function EditUserModal({
 
               {passwordSuccess && (
                 <div className="alert alert-success py-2">
-                  <span className="text-sm">Password reset successfully!</span>
+                  <span className="text-sm">
+                    Password reset. Share this temporary password securely.
+                  </span>
                 </div>
               )}
 
-              <div className="form-control">
-                <input
-                  type="password"
-                  className="input input-bordered input-sm w-full"
-                  value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  placeholder="Enter new password"
-                  disabled={passwordSuccess}
-                />
-              </div>
+              {temporaryPassword && (
+                <div className="space-y-1">
+                  <div className="join w-full">
+                    <input
+                      className="input input-bordered input-sm join-item w-full font-mono"
+                      value={temporaryPassword}
+                      readOnly
+                      aria-label="Temporary password"
+                    />
+                    <button
+                      type="button"
+                      className={`btn btn-sm join-item ${copied ? "btn-success" : "btn-primary"}`}
+                      onClick={handleCopyPassword}
+                    >
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <p className="text-xs text-base-content/60">
+                    This password is shown only once. The user must change it after signing in.
+                  </p>
+                </div>
+              )}
+
+              {!passwordSuccess && (
+                <p className="text-sm text-base-content/70">
+                  This invalidates the current password. The generated password is shown only once,
+                  and the user must change it after signing in.
+                </p>
+              )}
 
               <div className="flex gap-2">
                 <button
@@ -192,15 +205,17 @@ export function EditUserModal({
                   {resetPasswordMutation.isPending ? (
                     <span className="loading loading-spinner loading-xs" />
                   ) : (
-                    "Confirm Reset"
+                    "Generate and Reset"
                   )}
                 </button>
                 <button
                   className="btn btn-ghost btn-sm"
                   onClick={() => {
                     setShowPasswordReset(false);
-                    setNewPassword("");
+                    setTemporaryPassword(null);
+                    setCopied(false);
                     setPasswordError(null);
+                    setPasswordSuccess(false);
                   }}
                   disabled={resetPasswordMutation.isPending}
                 >
