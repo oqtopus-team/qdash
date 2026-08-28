@@ -17,6 +17,7 @@ from qdash.copilot.tooling.sandbox_core import (
     EXECUTION_TIMEOUT_SECONDS,
     MAX_OUTPUT_BYTES,
     MEMORY_LIMIT_BYTES,
+    SafeModule,
 )
 
 if TYPE_CHECKING:
@@ -59,6 +60,101 @@ async def test_execute_python_analysis_rejects_unapproved_import() -> None:
     assert result["output"] is None
     assert result["chart"] is None
     assert result["error"] == "Import of 'os' is not allowed"
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_rejects_transitive_module_attribute() -> None:
+    """``numpy.f2py.os`` resolves to the real ``os`` module and must not be reachable."""
+    result = await execute_python_analysis(
+        'import numpy as np\nresult = {"output": np.f2py.os.system("id")}'
+    )
+
+    assert result["output"] is None
+    assert result["chart"] is None
+    assert result["error"] == "Access to 'system' is not allowed"
+
+    # The ``os`` hop itself is rejected too, not just the call at the end of the chain.
+    result = await execute_python_analysis(
+        'import numpy as np\nresult = {"output": np.f2py.os.getcwd()}'
+    )
+
+    assert result["output"] is None
+    assert result["error"] == "Access to 'os' is not allowed"
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_rejects_sys_modules_of_allowed_module() -> None:
+    result = await execute_python_analysis(
+        'import datetime\nresult = {"output": datetime.sys.modules["os"].getcwd()}'
+    )
+
+    assert result["output"] is None
+    assert result["error"] == "Access to 'sys' is not allowed"
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_rejects_module_dict_access() -> None:
+    """``__dict__`` would hand back the unwrapped module and bypass SafeModule."""
+    result = await execute_python_analysis(
+        'import numpy as np\nresult = {"output": str(np.__dict__["f2py"])}'
+    )
+
+    assert result["output"] is None
+    assert result["error"] == "Access to '__dict__' is not allowed"
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_rejects_access_to_wrapped_module() -> None:
+    result = await execute_python_analysis(
+        'import numpy as np\nresult = {"output": str(np._module)}'
+    )
+
+    assert result["output"] is None
+    assert result["error"] == "AttributeError: Access to '_module' is not allowed in the sandbox"
+
+
+@pytest.mark.asyncio
+async def test_execute_python_analysis_allows_submodules_of_allowed_packages() -> None:
+    """The module boundary must not break the whitelisted APIs the analysis code relies on."""
+    result = await execute_python_analysis(
+        "import numpy as np\n"
+        "import plotly.express as px\n"
+        "from plotly.subplots import make_subplots\n"
+        "value = np.linalg.norm([3.0, 4.0])\n"
+        "palette = len(px.colors.qualitative.Plotly)\n"
+        "fig = make_subplots(rows=1, cols=1)\n"
+        'result = {"output": f"{value}|{palette}", "chart": fig}'
+    )
+
+    assert result["error"] is None
+    assert result["output"] == "5.0|10"
+    assert result["chart"] is not None
+
+
+def test_safe_module_blocks_modules_outside_the_whitelist() -> None:
+    """Covers the runtime boundary for attribute names that the AST denylist does not know."""
+    import os
+    import types
+
+    stub = types.ModuleType("numpy.stub")
+    stub.helper = os  # type: ignore[attr-defined]
+
+    with pytest.raises(ImportError, match="Access to module 'os' is not allowed"):
+        SafeModule(stub).helper  # noqa: B018
+
+
+def test_safe_module_rewraps_allowed_submodules() -> None:
+    import types
+
+    child = types.ModuleType("numpy.stub.child")
+    child.answer = 42  # type: ignore[attr-defined]
+    parent = types.ModuleType("numpy.stub")
+    parent.child = child  # type: ignore[attr-defined]
+
+    wrapped = SafeModule(parent).child
+
+    assert isinstance(wrapped, SafeModule)
+    assert wrapped.answer == 42
 
 
 @pytest.mark.asyncio
