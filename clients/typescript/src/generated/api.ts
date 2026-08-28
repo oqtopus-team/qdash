@@ -2976,7 +2976,7 @@ const getForumPost = (
     }
 
 /**
- * Update a forum post. Only the author or project owner can edit.
+ * Update a forum post, or update root-thread metadata as a project editor.
  * @summary Update a forum post
  */
 const updateForumPost = (

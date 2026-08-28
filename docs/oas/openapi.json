@@ -8422,7 +8422,7 @@
           "forum"
         ],
         "summary": "Update a forum post",
-        "description": "Update a forum post. Only the author or project owner can edit.",
+        "description": "Update a forum post, or update root-thread metadata as a project editor.",
         "operationId": "updateForumPost",
         "security": [
           {
@@ -29199,6 +29199,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Run Parameters",
+            "default": {}
+          },
+          "note": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Note",
             "default": {}
           },
           "tags": {

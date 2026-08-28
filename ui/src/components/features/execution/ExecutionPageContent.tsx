@@ -28,6 +28,7 @@ import {
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
+import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { getCancelErrorMessage } from "@/components/features/execution/getCancelErrorMessage";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
@@ -606,6 +607,7 @@ export function ExecutionPageContent() {
                           {formatActorLabel(detailTask)}
                         </span>
                       </div>
+                      <ExecutionTaskProgress status={detailTask.status} note={detailTask.note} />
                       {expandedTaskIndex === idx && (
                         <div className="mt-2 sm:mt-3 space-y-2 sm:space-y-3">
                           {Array.isArray(detailTask.figure_path) &&

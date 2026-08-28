@@ -38,6 +38,12 @@ class TaskResultHistoryRepository(Protocol):
         """
         ...
 
+    def update_progress(
+        self, *, project_id: str | None, task_id: str, progress: dict[str, object]
+    ) -> None:
+        """Update a live task progress snapshot."""
+        ...
+
     def find_latest_by_chip_and_qids(
         self,
         *,

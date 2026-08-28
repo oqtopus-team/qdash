@@ -1,5 +1,6 @@
 import json
 import logging
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -7,6 +8,7 @@ from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.datamodel.task import TaskTypes
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.workflow.engine.progress import ProgressReporter
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,16 @@ class QubexBackend(BaseBackend):
     """Backend management for Qubex experiments."""
 
     name: str = "qubex"
+
+    def capture_progress(
+        self, reporter: ProgressReporter, *, task_name: str
+    ) -> AbstractContextManager[None]:
+        """Capture qubex tqdm sweeps for the current task."""
+        from qdash.workflow.engine.backend.plugins.qubex_progress import (
+            capture_qubex_progress,
+        )
+
+        return capture_qubex_progress(reporter, task_name=task_name)
 
     from qubex import Experiment
 
