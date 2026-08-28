@@ -119,7 +119,7 @@ _SIGNAL_HINTS = {
 
 
 def _exit_status_text(returncode: int | None) -> str:
-    """Describe how the worker terminated. """
+    """Describe how the worker terminated."""
     if returncode is None:
         return "did not report an exit status"
     if returncode >= 0:
