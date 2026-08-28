@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useState, type MutableRefObject } from "react";
 
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
-import { useCreateBlockNote } from "@blocknote/react";
+import {
+  SuggestionMenuController,
+  useCreateBlockNote,
+  type DefaultReactSuggestionItem,
+} from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 
 import { DARK_THEMES, type ThemeName } from "@/constants/themes";
@@ -45,6 +49,25 @@ export type ForumBlockSnapshot = {
 
 export type ForumBlockSnapshotGetter = () => Promise<ForumBlockSnapshot>;
 
+export type ForumMentionCandidate = {
+  id: string;
+  label: string;
+  secondaryLabel?: string;
+};
+
+export function filterForumMentionCandidates(
+  candidates: ForumMentionCandidate[],
+  query: string,
+): ForumMentionCandidate[] {
+  const normalizedQuery = query.toLowerCase();
+  return candidates.filter(
+    (candidate) =>
+      candidate.id.toLowerCase().includes(normalizedQuery) ||
+      candidate.label.toLowerCase().includes(normalizedQuery) ||
+      candidate.secondaryLabel?.toLowerCase().includes(normalizedQuery),
+  );
+}
+
 interface ForumBlockEditorProps {
   /** Current document, as opaque BlockNote JSON objects. */
   initialBlocks?: Record<string, unknown>[];
@@ -56,6 +79,7 @@ interface ForumBlockEditorProps {
   onChange: (blocks: Record<string, unknown>[], markdown: string) => void;
   /** Imperative snapshot used by external Save buttons to avoid stale React state. */
   snapshotRef?: MutableRefObject<ForumBlockSnapshotGetter | null>;
+  mentionCandidates?: ForumMentionCandidate[];
   editable?: boolean;
 }
 
@@ -94,6 +118,7 @@ export function ForumBlockEditor({
   onImageUpload,
   onChange,
   snapshotRef,
+  mentionCandidates = [],
   editable = true,
 }: ForumBlockEditorProps) {
   const colorScheme = useThemeScheme();
@@ -110,6 +135,25 @@ export function ForumBlockEditor({
     uploadFile: (file: File) =>
       file.type.startsWith("image/") ? onImageUpload(file) : uploadInlineFile(file),
   });
+  const getMentionItems = useCallback(
+    async (query: string): Promise<DefaultReactSuggestionItem[]> =>
+      filterForumMentionCandidates(mentionCandidates, query).map((candidate) => ({
+        title: candidate.label,
+        subtext: candidate.secondaryLabel
+          ? `@${candidate.id} · ${candidate.secondaryLabel}`
+          : `@${candidate.id}`,
+        onItemClick: () =>
+          editor.insertInlineContent([
+            {
+              type: "text",
+              text: `@${candidate.id}`,
+              styles: { bold: true, textColor: "blue", backgroundColor: "blue" },
+            },
+            { type: "text", text: " ", styles: {} },
+          ]),
+      })),
+    [editor, mentionCandidates],
+  );
 
   useEffect(() => {
     if (!snapshotRef) return;
@@ -152,7 +196,11 @@ export function ForumBlockEditor({
             onChange(blocks, md),
           );
         }}
-      />
+      >
+        {editable && mentionCandidates.length > 0 && (
+          <SuggestionMenuController triggerCharacter="@" getItems={getMentionItems} />
+        )}
+      </BlockNoteView>
     </div>
   );
 }

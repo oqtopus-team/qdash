@@ -32,7 +32,6 @@ import {
   useListForumPosts,
   useUpdateForumPost,
 } from "@/client/forum/forum";
-import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
@@ -53,7 +52,8 @@ import {
   toForumCategoryDefinition,
 } from "./categories";
 import { ForumLabelPicker } from "./ForumLabelSelector";
-import { ForumBlockViewer, type ForumBlockSnapshotGetter } from "./ForumBlockEditor";
+import { type ForumBlockSnapshotGetter, type ForumMentionCandidate } from "./ForumBlockEditor";
+import { ForumPostContent } from "./ForumPostContent";
 
 const ForumBlockEditor = dynamic(
   () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
@@ -144,6 +144,7 @@ function PostBody({
   saving,
   onImageUpload,
   editorSnapshotRef,
+  mentionCandidates,
 }: {
   post: ForumPostResponse;
   currentUsername?: string;
@@ -162,6 +163,7 @@ function PostBody({
   saving: boolean;
   onImageUpload: (file: File) => Promise<string>;
   editorSnapshotRef?: MutableRefObject<ForumBlockSnapshotGetter | null>;
+  mentionCandidates?: ForumMentionCandidate[];
 }) {
   const canEdit = canEditOverride ?? currentUsername === post.username;
   const isAi = post.is_ai_reply || post.username === "qdash";
@@ -231,6 +233,7 @@ function PostBody({
             onChange={onEditChange}
             onImageUpload={onImageUpload}
             snapshotRef={editorSnapshotRef}
+            mentionCandidates={mentionCandidates}
           />
           <div className="flex justify-end gap-2">
             <button className="btn btn-ghost btn-sm" onClick={onCancel}>
@@ -246,14 +249,11 @@ function PostBody({
           </div>
         </div>
       ) : (
-        (() => {
-          const displayBlocks = (post.content_blocks ?? []) as Record<string, unknown>[];
-          return displayBlocks.length > 0 ? (
-            <ForumBlockViewer blocks={displayBlocks} />
-          ) : (
-            <MarkdownContent content={post.content} className="text-sm text-base-content/80" />
-          );
-        })()
+        <ForumPostContent
+          content={post.content}
+          contentBlocks={post.content_blocks}
+          markdownClassName="text-sm text-base-content/80"
+        />
       )}
     </div>
   );
@@ -313,6 +313,20 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const members = useMemo(
     () => (membersResponse?.data.members ?? []).filter((member) => member.status === "active"),
     [membersResponse?.data.members],
+  );
+  const mentionCandidates: ForumMentionCandidate[] = useMemo(
+    () => [
+      { id: "qdash", label: "QDash" },
+      { id: "project", label: "Project", secondaryLabel: "Notify all project members" },
+      ...members
+        .filter((member) => member.username !== currentUsername)
+        .map((member) => ({
+          id: member.username,
+          label: member.display_name || member.username,
+          secondaryLabel: member.organization ?? undefined,
+        })),
+    ],
+    [currentUsername, members],
   );
   const { data: chipsResponse } = useListChips({ query: { staleTime: 60_000 } });
   const chips = useMemo(
@@ -699,7 +713,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 {post.title || "Untitled topic"}
               </h1>
             )}
-            {canManageContent && !editingTitle && (
+            {canManageMetadata && !editingTitle && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -746,6 +760,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             saving={updateMutation.isPending}
             onImageUpload={uploadImage}
             editorSnapshotRef={editRootSnapshotRef}
+            mentionCandidates={mentionCandidates}
           />
 
           <div className="divider text-xs text-base-content/40">
@@ -780,6 +795,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                     saving={updateMutation.isPending}
                     onImageUpload={uploadImage}
                     editorSnapshotRef={editReplySnapshotRef}
+                    mentionCandidates={mentionCandidates}
                   />
                 ))}
                 {replies.length >= replyLimit && (
@@ -824,6 +840,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                   }}
                   onImageUpload={uploadImage}
                   snapshotRef={replyComposerSnapshotRef}
+                  mentionCandidates={mentionCandidates}
                 />
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-base-content/50">

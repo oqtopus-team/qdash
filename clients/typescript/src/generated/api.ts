@@ -207,6 +207,7 @@ import type {
   ParameterVersionResponse,
   PasswordChange,
   PasswordReset,
+  PasswordResetResponse,
   PreviewArtifactByPathParams,
   ProjectCreate,
   ProjectResponse,
@@ -227,7 +228,6 @@ import type {
   RecentChangesResponse,
   RecentExecutionsResponse,
   RemoveProjectMemberAdmin200,
-  ResetPassword200,
   SaveFileContent200,
   SaveFileRequest,
   SaveFlowRequest,
@@ -438,7 +438,7 @@ const changePassword = (
 Parameters
 ----------
 password_data : PasswordReset
-    Contains username and new_password
+    Contains the target username
 current_user : User
     Current authenticated admin user
 auth_service : AuthService
@@ -446,8 +446,8 @@ auth_service : AuthService
 
 Returns
 -------
-dict[str, str]
-    Success message confirming password reset
+PasswordResetResponse
+    Generated temporary password, returned only in this response
 
 Raises
 ------
@@ -457,8 +457,8 @@ HTTPException
  */
 const resetPassword = (
     passwordReset: PasswordReset,
- options?: SecondParameter<typeof qdashRequest<ResetPassword200>>,) => {
-      return qdashRequest<ResetPassword200>(
+ options?: SecondParameter<typeof qdashRequest<PasswordResetResponse>>,) => {
+      return qdashRequest<PasswordResetResponse>(
       {url: `/auth/reset-password`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: passwordReset
@@ -2976,7 +2976,7 @@ const getForumPost = (
     }
 
 /**
- * Update a forum post. Only the author or project owner can edit.
+ * Update a forum post, or update root-thread metadata as a project editor.
  * @summary Update a forum post
  */
 const updateForumPost = (

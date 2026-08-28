@@ -6,10 +6,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Form, HTTPException, status
 
 from qdash.api.dependencies import get_auth_service
-from qdash.api.lib.auth import authenticate_user, get_current_active_user
+from qdash.api.lib.auth import authenticate_user, get_admin_user, get_current_active_user
 from qdash.api.schemas.auth import (
     PasswordChange,
     PasswordReset,
+    PasswordResetResponse,
     TokenResponse,
     User,
     UserCreate,
@@ -222,41 +223,30 @@ def change_password(
 
 @router.post(
     "/reset-password",
-    response_model=dict[str, str],
+    response_model=PasswordResetResponse,
     summary="Reset user password (admin only)",
     operation_id="resetPassword",
 )
 def reset_password(
     password_data: PasswordReset,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    admin: Annotated[User, Depends(get_admin_user)],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
-) -> dict[str, str]:
+) -> PasswordResetResponse:
     """Reset a user's password (admin only).
 
     Parameters
     ----------
     password_data : PasswordReset
-        Contains username and new_password
-    current_user : User
+        Contains the target username
+    admin : User
         Current authenticated admin user
     auth_service : AuthService
         The auth service instance
 
     Returns
     -------
-    dict[str, str]
-        Success message confirming password reset
-
-    Raises
-    ------
-    HTTPException
-        403 if the current user is not an admin
+    PasswordResetResponse
+        Generated temporary password, returned only in this response
 
     """
-    if current_user.system_role != SystemRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can reset user passwords",
-        )
-
-    return auth_service.reset_password(current_user.username, password_data)
+    return auth_service.reset_password(admin.username, password_data)

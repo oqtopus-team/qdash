@@ -54,17 +54,11 @@ class CheckQubitSpectroscopy(QubexTask):
         "power_range": RunParameterSpec(
             unit="dB",
             value_type="np.arange",
-            default=None,
+            default=(-60, 0, 5),
             description=(
-                "Power range as [start, stop, step] in dB. Leave blank to use "
-                "qubex's default [-60, 0, 5] dB. The stop value is exclusive."
+                "Power range as [start, stop, step] in dB. The QDash default is "
+                "[-60, 0, 5] dB. The stop value is exclusive."
             ),
-        ),
-        "readout_amplitude": RunParameterSpec(
-            unit="a.u.",
-            value_type="float",
-            default=0.04,
-            description="Readout amplitude used during the qubit spectroscopy sweep",
         ),
     }
     _analysis_config: ClassVar[EstimateQubitFrequencyConfig] = EstimateQubitFrequencyConfig()
@@ -296,7 +290,7 @@ class CheckQubitSpectroscopy(QubexTask):
         exp = self.get_experiment(backend)
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
         frequency_range = self._frequency_range()
-        readout_amplitude = self.run_parameters["readout_amplitude"].get_value()
+        readout_amplitude = self._get_readout_amplitude_value()
         results = {}
         for label in labels:
             result = exp.qubit_spectroscopy(
