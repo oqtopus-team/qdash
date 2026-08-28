@@ -467,10 +467,13 @@ async def _wait_until(condition: Callable[[set[str]], bool], timeout: float = 5.
 
 @pytest.mark.asyncio
 async def test_execute_python_analysis_reaps_worker_process() -> None:
+    before = await _worker_pids()
+
     result = await execute_python_analysis('result = {"output": "done"}')
 
     assert result["error"] is None
-    assert await _worker_pids() == set()
+    remaining = await _wait_until(lambda pids: not (pids - before))
+    assert not (remaining - before)
 
 
 @pytest.mark.asyncio
