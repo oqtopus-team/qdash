@@ -25,6 +25,26 @@ if TYPE_CHECKING:
 MAX_STARTUP_OVERHEAD_SECONDS = 1.5
 
 
+def _sandbox_available() -> bool:
+    """Whether the OS sandbox can actually run in this environment.
+
+    The sandbox is fail-closed and needs bubblewrap plus user/network namespaces. Some CI
+    runners allow the namespaces but deny configuring loopback, so probe by executing a
+    trivial analysis rather than only checking for the bwrap binary.
+    """
+    if sandbox._bwrap_path() is None:
+        return False
+    result = asyncio.run(execute_python_analysis('result = {"output": "ok"}'))
+    return result.get("output") == "ok"
+
+
+requires_sandbox = pytest.mark.skipif(
+    not _sandbox_available(),
+    reason="OS sandbox (bubblewrap + user/network namespaces) is unavailable here",
+)
+
+
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_execute_python_analysis_runs_python_code() -> None:
     result = await execute_python_analysis('print("hello")')
@@ -32,6 +52,7 @@ async def test_execute_python_analysis_runs_python_code() -> None:
     assert result == {"output": "hello\n", "chart": None, "error": None}
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_execute_python_analysis_exposes_context_data_as_data() -> None:
     result = await execute_python_analysis(
@@ -61,6 +82,7 @@ async def test_execute_python_analysis_rejects_unapproved_import() -> None:
     assert result["error"] == "Import of 'os' is not allowed"
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_execute_python_analysis_allows_submodules_of_allowed_packages() -> None:
     """The module boundary must not break the whitelisted APIs the analysis code relies on."""
@@ -79,6 +101,7 @@ async def test_execute_python_analysis_allows_submodules_of_allowed_packages() -
     assert result["chart"] is not None
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_execute_python_analysis_accepts_multi_megabyte_context_data() -> None:
     """The data store accumulates per stored tool call; a few MB must not break analysis."""
@@ -161,6 +184,7 @@ async def test_worker_revalidates_code_independently() -> None:
     assert json.loads(stdout)["error"] == "Import of 'os' is not allowed"
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_execute_python_analysis_kills_worker_on_timeout() -> None:
     result = await execute_python_analysis("while True:\n    pass")
@@ -217,6 +241,7 @@ async def test_execute_python_analysis_returns_error_for_invalid_worker_json(mon
     assert result["error"].startswith("Invalid sandbox JSON response")
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_execute_python_analysis_applies_output_size_limit() -> None:
     result = await execute_python_analysis(f'result = {{"output": "x" * {MAX_OUTPUT_BYTES + 1}}}')
@@ -229,6 +254,7 @@ async def test_execute_python_analysis_applies_output_size_limit() -> None:
     assert result["error"] is None
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_execute_python_analysis_returns_plotly_chart() -> None:
     result = await execute_python_analysis(
@@ -242,6 +268,7 @@ async def test_execute_python_analysis_returns_plotly_chart() -> None:
     assert result["error"] is None
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_execute_python_analysis_does_not_block_event_loop() -> None:
     ticker_ran = asyncio.Event()
@@ -295,6 +322,7 @@ def test_worker_env_pins_blas_thread_counts() -> None:
 
 
 @pytest.mark.skipif(not Path("/proc/self/environ").exists(), reason="requires procfs")
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_worker_does_not_leak_parent_environment(monkeypatch) -> None:
     """Allowed libraries can read /proc/self/environ, so the worker must not inherit secrets."""
@@ -313,6 +341,7 @@ async def test_worker_does_not_leak_parent_environment(monkeypatch) -> None:
     assert "OPENBLAS_NUM_THREADS=1" in result["output"]
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_worker_cannot_write_files() -> None:
     result = await execute_python_analysis(
@@ -342,7 +371,7 @@ _TRACEBACK_ESCAPE_PREAMBLE = (
 )
 
 
-@pytest.mark.skipif(sandbox._bwrap_path() is None, reason="requires bubblewrap")
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_traceback_escape_cannot_read_host_files(tmp_path: Path) -> None:
     """A traceback-recovered ``os`` cannot read a file outside the OS sandbox."""
@@ -381,6 +410,7 @@ async def test_sandbox_is_fail_closed_without_bubblewrap(monkeypatch) -> None:
 
 
 @pytest.mark.skipif(not Path("/proc/self/status").exists(), reason="requires procfs")
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_worker_analysis_with_scipy_stays_single_threaded() -> None:
     """scipy analysis must run, and stay well inside RLIMIT_AS, whatever the host core count.
@@ -410,6 +440,7 @@ async def test_worker_analysis_with_scipy_stays_single_threaded() -> None:
     assert vm_peak_bytes < MEMORY_LIMIT_BYTES * 0.6, result["output"]
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_execute_python_analysis_starts_worker_without_qdash_imports() -> None:
     started = time.perf_counter()
@@ -441,6 +472,7 @@ async def _wait_until(condition: Callable[[set[str]], bool], timeout: float = 5.
     return pids
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_execute_python_analysis_reaps_worker_process() -> None:
     before = await _worker_pids()
@@ -452,6 +484,7 @@ async def test_execute_python_analysis_reaps_worker_process() -> None:
     assert not (remaining - before)
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_execute_python_analysis_kills_worker_on_cancellation() -> None:
     """A disconnected caller must not leave the worker spinning until its own alarm fires."""
@@ -477,6 +510,7 @@ async def test_execute_tool_executor_awaits_awaitable_result() -> None:
     assert result == {"value": 42}
 
 
+@requires_sandbox
 @pytest.mark.asyncio
 async def test_wrap_tool_executors_collects_chart_from_async_python_executor() -> None:
     wrapped, charts = wrap_tool_executors({}, {"values": [1, 2]})
