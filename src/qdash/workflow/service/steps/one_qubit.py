@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
-from qdash.workflow.service.results import OneQubitResult
+from qdash.workflow.service.results import OneQubitResult, normalize_metric_value
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_1Q_TASKS_AFTER_CHECK
 
@@ -367,17 +367,15 @@ class OneQubitCheck(CalibrationStep):
         t1_result = raw.get("CheckT1Average", {})
         if t1_result:
             t1_param = t1_result.get("t1_average")
-            if t1_param is not None:
-                metrics["t1_average"] = t1_param.value if hasattr(t1_param, "value") else t1_param
+            if (value := normalize_metric_value(t1_param)) is not None:
+                metrics["t1_average"] = value
 
         # T2 Echo Average
         t2_result = raw.get("CheckT2EchoAverage", {})
         if t2_result:
             t2_param = t2_result.get("t2_echo_average")
-            if t2_param is not None:
-                metrics["t2_echo_average"] = (
-                    t2_param.value if hasattr(t2_param, "value") else t2_param
-                )
+            if (value := normalize_metric_value(t2_param)) is not None:
+                metrics["t2_echo_average"] = value
         return metrics
 
 
@@ -506,38 +504,30 @@ class OneQubitFineTune(CalibrationStep):
         irb = raw.get("X90InterleavedRandomizedBenchmarking", {})
         if irb:
             fidelity_param = irb.get("x90_gate_fidelity")
-            if fidelity_param is not None:
-                metrics["x90_fidelity"] = (
-                    fidelity_param.value if hasattr(fidelity_param, "value") else fidelity_param
-                )
+            if (value := normalize_metric_value(fidelity_param)) is not None:
+                metrics["x90_fidelity"] = value
         # RB fidelity
         rb = raw.get("RandomizedBenchmarking", {})
         if rb:
             fidelity_param = rb.get("fidelity")
-            if fidelity_param is not None:
-                metrics["rb_fidelity"] = (
-                    fidelity_param.value if hasattr(fidelity_param, "value") else fidelity_param
-                )
+            if (value := normalize_metric_value(fidelity_param)) is not None:
+                metrics["rb_fidelity"] = value
         # T1 Average
         t1_result = raw.get("CheckT1Average", {})
         if t1_result:
             t1_param = t1_result.get("t1_average")
-            if t1_param is not None:
-                metrics["t1_average"] = t1_param.value if hasattr(t1_param, "value") else t1_param
+            if (value := normalize_metric_value(t1_param)) is not None:
+                metrics["t1_average"] = value
         # T2 Echo Average
         t2_result = raw.get("CheckT2EchoAverage", {})
         if t2_result:
             t2_param = t2_result.get("t2_echo_average")
-            if t2_param is not None:
-                metrics["t2_echo_average"] = (
-                    t2_param.value if hasattr(t2_param, "value") else t2_param
-                )
+            if (value := normalize_metric_value(t2_param)) is not None:
+                metrics["t2_echo_average"] = value
         # 1Q gate coherence limit
         coh_result = raw.get("Check1QGateCoherenceLimit", {})
         if coh_result:
             coh_param = coh_result.get("one_qubit_gate_coherence_limit")
-            if coh_param is not None:
-                metrics["one_qubit_gate_coherence_limit"] = (
-                    coh_param.value if hasattr(coh_param, "value") else coh_param
-                )
+            if (value := normalize_metric_value(coh_param)) is not None:
+                metrics["one_qubit_gate_coherence_limit"] = value
         return metrics

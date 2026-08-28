@@ -28,7 +28,7 @@ AGENT_TOOLS: list[dict[str, Any]] = [
             "properties": {
                 "task_name": {
                     "type": "string",
-                    "description": "Task class name (e.g. CheckT1, CheckT2Echo, CheckRabi, CheckQubitFrequency)",
+                    "description": "Task class name (e.g. CheckT1, CheckT2Echo, CheckRabi, CheckChevron)",
                 },
                 "chip_id": {"type": "string", "description": "Chip ID"},
                 "qid": {"type": "string", "description": "Qubit ID"},

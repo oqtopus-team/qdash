@@ -10,8 +10,10 @@
  * Response after executing a flow.
  */
 export interface ExecuteFlowResponse {
-  /** Execution ID */
+  /** QDash execution ID (falls back to the Prefect flow run ID when no execution row could be pre-created) */
   execution_id: string;
+  /** Prefect flow run ID */
+  flow_run_id: string;
   /** Prefect flow run URL */
   flow_run_url: string;
   /** QDash UI URL for execution */

@@ -1,6 +1,6 @@
 # Codebase Map
 
-QDash has four main code areas.
+QDash keeps application code and generated clients in the following areas.
 
 | Area | Path | Notes |
 | --- | --- | --- |
@@ -8,6 +8,8 @@ QDash has four main code areas.
 | API | `src/qdash/api/` | FastAPI routers, services, schemas, middleware |
 | Workflow | `src/qdash/workflow/` | Prefect flows, deployment service, user flow worker, scheduler, task execution |
 | Shared model/repository code | `src/qdash/common/`, `src/qdash/datamodel/`, `src/qdash/dbmodel/`, `src/qdash/repository/` | Shared config, document models, repositories |
+| Python client | `clients/python/` | Typed client package and service wrappers |
+| TypeScript client | `clients/typescript/` | Standalone generated TypeScript client |
 
 ## Generated Files
 
@@ -15,6 +17,7 @@ Do not manually edit:
 
 - `ui/src/client/`
 - `ui/src/schemas/`
+- `clients/typescript/src/generated/`
 - `docs/oas/openapi.json`
 
 When API schemas or routes change, run:

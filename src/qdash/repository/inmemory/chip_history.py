@@ -23,7 +23,12 @@ class InMemoryChipHistoryRepository:
         """Initialize with empty storage."""
         self._history: list[dict[str, str | None]] = []
 
-    def create_history(self, username: str, chip_id: str | None = None) -> None:
+    def create_history(
+        self,
+        username: str,
+        chip_id: str | None = None,
+        project_id: str | None = None,
+    ) -> None:
         """Create a chip history snapshot.
 
         Parameters
@@ -35,7 +40,7 @@ class InMemoryChipHistoryRepository:
             If None, uses the current (most recently installed) chip.
 
         """
-        self._history.append({"username": username, "chip_id": chip_id})
+        self._history.append({"username": username, "chip_id": chip_id, "project_id": project_id})
 
     def get_all(self) -> list[dict[str, str | None]]:
         """Get all stored history snapshots (test helper).

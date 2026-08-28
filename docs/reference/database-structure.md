@@ -586,6 +586,13 @@ class ExecutionHistoryDocument(Document):
     system_info: SystemInfoModel
 ```
 
+**Note fields used by the runtime:**
+
+| Key | Written by | Purpose |
+|-----|-----------|---------|
+| `flow_run_id` | API on trigger, `CalibService._initialize()` on creation | Links the record to its Prefect flow run (cancel, terminal hooks, reconciliation) |
+| `claimed_at` | `MongoExecutionRepository.claim_scheduled_execution()` | Marks a pre-created `scheduled` record as adopted by a flow process |
+
 **Related Collections:**
 
 - Task results → `task_result_history` (query by `execution_id`)

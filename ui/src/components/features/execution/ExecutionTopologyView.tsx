@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, memo, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo, type KeyboardEvent } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
@@ -8,6 +8,13 @@ import type { Task } from "@/schemas";
 import { useGetChip } from "@/client/chip/chip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskDetailModal } from "@/components/features/execution/ExecutionTaskDetailModal";
+import {
+  filterTaskGroupsByName,
+  groupTasksByEntity,
+  resolveInitialTaskIndex,
+  selectTaskNeighborhood,
+} from "@/components/features/execution/executionTopologyTasks";
+import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
@@ -21,6 +28,8 @@ interface ExecutionTopologyViewProps {
   tasks: Task[];
   topologyMode: "1q" | "2q";
   filterTaskName: string;
+  isFullscreen?: boolean;
+  onToggleFullscreen: () => void;
 }
 
 function getStatusColor(status: string | undefined): string {
@@ -40,20 +49,6 @@ function aggregateStatus(tasks: Task[]): string {
   if (tasks.some((t) => t.status === "running")) return "running";
   if (tasks.every((t) => t.status === "completed")) return "completed";
   return "pending";
-}
-
-function normalizeQid(qid: string): string {
-  const numericQid = Number.parseInt(qid.replace(/\D/g, ""), 10);
-  return Number.isNaN(numericQid) ? qid : String(numericQid);
-}
-
-function compareQid(first: string, second: string): number {
-  const firstNumber = Number(first);
-  const secondNumber = Number(second);
-  if (!Number.isNaN(firstNumber) && !Number.isNaN(secondNumber)) {
-    return firstNumber - secondNumber;
-  }
-  return first.localeCompare(second);
 }
 
 const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }) {
@@ -135,6 +130,7 @@ const TopologyCell = memo(function TopologyCell({
             jsonFigurePath={jsonFigurePath || undefined}
             qid={qid}
             className="w-full h-full object-contain"
+            hideExpandButton
           />
         </div>
       )}
@@ -220,6 +216,7 @@ const CouplingMarker = memo(function CouplingMarker({
             jsonFigurePath={jsonFigurePath || undefined}
             qid={couplingId}
             className="w-full h-full object-contain"
+            hideExpandButton
           />
         </div>
       )}
@@ -243,8 +240,12 @@ export function ExecutionTopologyView({
   tasks,
   topologyMode,
   filterTaskName,
+  isFullscreen,
+  onToggleFullscreen,
 }: ExecutionTopologyViewProps) {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [currentScale, setCurrentScale] = useState(1);
+  const lodTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get chip data to derive topology_id
   const { data: chipData } = useGetChip(chipId, {
@@ -293,33 +294,17 @@ export function ExecutionTopologyView({
     [hasMux, muxSize, gridSize, layoutType],
   );
 
-  // Group one-qubit tasks by qid. If filterTaskName is set, only include matching tasks.
-  const oneQTasksByQid = useMemo(() => {
-    const map: Record<string, Task[]> = {};
-    for (const task of tasks) {
-      if (!task.qid) continue;
-      if (task.qid.includes("-")) continue;
-      if (!filterTaskName || task.name !== filterTaskName) continue;
-      const qid = normalizeQid(task.qid);
-      if (!map[qid]) map[qid] = [];
-      map[qid].push(task);
-    }
-    return map;
-  }, [tasks, filterTaskName]);
+  const allTasksByEntity = useMemo(() => groupTasksByEntity(tasks), [tasks]);
 
-  const couplingTasksByQid = useMemo(() => {
-    const map: Record<string, Task[]> = {};
-    for (const task of tasks) {
-      if (!task.qid || !task.qid.includes("-")) continue;
-      if (!filterTaskName || task.name !== filterTaskName) continue;
-      const [first, second] = task.qid.split("-");
-      if (!first || !second) continue;
-      const normalizedQid = [normalizeQid(first), normalizeQid(second)].sort(compareQid).join("-");
-      if (!map[normalizedQid]) map[normalizedQid] = [];
-      map[normalizedQid].push(task);
-    }
-    return map;
-  }, [tasks, filterTaskName]);
+  const oneQTasksByQid = useMemo(
+    () => filterTaskGroupsByName(allTasksByEntity.oneQubit, filterTaskName),
+    [allTasksByEntity, filterTaskName],
+  );
+
+  const couplingTasksByQid = useMemo(
+    () => filterTaskGroupsByName(allTasksByEntity.coupling, filterTaskName),
+    [allTasksByEntity, filterTaskName],
+  );
 
   // Build grid positions for all qids
   const gridPositions = useMemo(() => {
@@ -349,37 +334,49 @@ export function ExecutionTopologyView({
   const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
     cols: gridCols,
     rows: gridRows,
-    reservedHeight: { mobile: 300, desktop: 350 },
-    deps: [oneQTasksByQid, couplingTasksByQid, topologyMode, topologyQubits],
+    reservedHeight: isFullscreen ? { mobile: 200, desktop: 220 } : { mobile: 300, desktop: 350 },
+    deps: [oneQTasksByQid, couplingTasksByQid, topologyMode, topologyQubits, isFullscreen],
   });
 
   const MIN_FIGURE_CELL_SIZE = 60;
   const baseCellSize = Math.max(cellSize, MIN_FIGURE_CELL_SIZE);
 
-  // Fixed LOD thresholds (pan-zoom handles the rest)
-  const showLabels = baseCellSize >= 20;
-  const showFigures = baseCellSize >= 50;
+  const handleTransform = useCallback((_: unknown, state: { scale: number }) => {
+    if (lodTimeoutRef.current) {
+      clearTimeout(lodTimeoutRef.current);
+    }
+    lodTimeoutRef.current = setTimeout(() => {
+      setCurrentScale((prev) => (Math.abs(prev - state.scale) > 0.05 ? state.scale : prev));
+    }, 100);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (lodTimeoutRef.current) clearTimeout(lodTimeoutRef.current);
+    };
+  }, []);
+
+  const effectiveCellSize = baseCellSize * currentScale;
+  const showLabels = effectiveCellSize >= 20;
+  const showFigures = effectiveCellSize >= 50;
 
   const selectedTasks = useMemo(() => {
     if (!selectedEntityId) return null;
     const entityTasks =
       topologyMode === "2q"
-        ? couplingTasksByQid[selectedEntityId]
-        : oneQTasksByQid[selectedEntityId];
-    return entityTasks ?? [];
-  }, [couplingTasksByQid, oneQTasksByQid, selectedEntityId, topologyMode]);
+        ? allTasksByEntity.coupling[selectedEntityId]
+        : allTasksByEntity.oneQubit[selectedEntityId];
+    if (!entityTasks) return [];
+    return selectTaskNeighborhood(entityTasks, filterTaskName);
+  }, [allTasksByEntity, selectedEntityId, topologyMode, filterTaskName]);
+
+  const initialTaskIndex = useMemo(
+    () => (selectedTasks ? resolveInitialTaskIndex(selectedTasks, filterTaskName) : 0),
+    [selectedTasks, filterTaskName],
+  );
 
   const visibleTaskGroups = topologyMode === "2q" ? couplingTasksByQid : oneQTasksByQid;
-
-  if (Object.keys(visibleTaskGroups).length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-base-content/50">
-        <p className="text-sm">
-          No {topologyMode === "2q" ? "coupling" : "one-qubit"} tasks to display in topology view
-        </p>
-      </div>
-    );
-  }
+  const hasVisibleTasks = Object.keys(visibleTaskGroups).length > 0;
 
   const gridContent = (
     <div
@@ -532,41 +529,64 @@ export function ExecutionTopologyView({
   );
 
   return (
-    <div className="flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full">
+    <div
+      className={`flex flex-col h-full space-y-2 w-full ${
+        isFullscreen ? "flex-1 min-h-0" : "max-w-4xl mx-auto"
+      }`}
+    >
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden flex justify-center bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
       >
-        <TransformWrapper
-          initialScale={1}
-          minScale={0.3}
-          maxScale={5}
-          wheel={{ step: 0.08 }}
-          pinch={{ step: 5 }}
-          doubleClick={{ mode: "zoomIn", step: 0.7 }}
-          panning={{ velocityDisabled: false }}
-          smooth={false}
-          centerOnInit
-        >
-          <GridZoomControls />
-          <TransformComponent
-            wrapperStyle={{ width: "100%", minHeight: "520px", overflow: "hidden" }}
-            contentStyle={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
+        <GridFullscreenButton isFullscreen={isFullscreen} onToggle={onToggleFullscreen} />
+        {hasVisibleTasks ? (
+          <TransformWrapper
+            initialScale={1}
+            minScale={0.3}
+            maxScale={4}
+            wheel={{ step: 0.08 }}
+            pinch={{ step: 5 }}
+            doubleClick={{ mode: "zoomIn", step: 0.7 }}
+            panning={{ velocityDisabled: true }}
+            smooth={false}
+            limitToBounds={false}
+            centerOnInit
+            onTransform={handleTransform}
           >
-            {gridContent}
-          </TransformComponent>
-        </TransformWrapper>
+            <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
+            <TransformComponent
+              wrapperStyle={{
+                width: "100%",
+                height: isFullscreen ? "100%" : undefined,
+                minHeight: isFullscreen ? undefined : "520px",
+                overflow: "hidden",
+              }}
+              contentStyle={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              {gridContent}
+            </TransformComponent>
+          </TransformWrapper>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-12 text-base-content/50">
+            <p className="text-sm">
+              No {topologyMode === "2q" ? "coupling" : "one-qubit"} tasks to display in topology
+              view
+            </p>
+          </div>
+        )}
       </div>
 
       {selectedEntityId && selectedTasks && (
         <ExecutionTaskDetailModal
+          key={selectedEntityId}
           isOpen={!!selectedEntityId}
           tasks={selectedTasks}
+          initialTaskIndex={initialTaskIndex}
           qid={selectedEntityId}
           chipId={chipId}
           executionId={executionId}

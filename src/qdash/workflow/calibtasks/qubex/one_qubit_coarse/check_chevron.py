@@ -1,4 +1,3 @@
-import math
 from collections.abc import Mapping
 from typing import Any, ClassVar
 
@@ -6,10 +5,12 @@ import plotly.graph_objects as go
 from qubex.contrib.experiment import estimate_qubit_frequency_from_chevron_adaptive
 from qubex.measurement.measurement_defaults import DEFAULT_READOUT_DURATION
 
-from qdash.datamodel.task import ParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
-    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
@@ -26,56 +27,32 @@ class CheckChevron(QubexTask):
     name: str = "CheckChevron"
     task_type: str = "qubit"
     timeout: int = 60 * 240
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "coarse_qubit_frequency": None,
-        "readout_frequency": None,
-        "readout_amplitude": None,
-        "coarse_control_amplitude": ParameterModel(
-            value=DEFAULT_COARSE_CONTROL_AMPLITUDE,
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "coarse_qubit_frequency": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.required_database(),
+        "coarse_control_amplitude": InputParameterSpec.database_or_default(
+            default=DEFAULT_COARSE_CONTROL_AMPLITUDE,
+            greater_than=CONTROL_AMPLITUDE_MIN,
+            less_than=CONTROL_AMPLITUDE_MAX,
             unit="a.u.",
             description="Coarse control pulse amplitude",
         ),
-        "readout_length": ParameterModel(
-            value=DEFAULT_READOUT_DURATION,
+        "readout_duration": InputParameterSpec.database_or_default(
+            default=DEFAULT_READOUT_DURATION,
             unit="ns",
-            description="Readout pulse length",
+            description="Readout pulse duration",
         ),
     }
-    run_parameters: ClassVar[dict[str, Any]] = {}
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "qubit_frequency": ParameterModel(unit="GHz", description="Qubit bare frequency (coarse)"),
-        "control_amplitude": ParameterModel(
+    run_spec: ClassVar[dict[str, Any]] = {}
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "qubit_frequency": OutputParameterSpec(
+            unit="GHz", description="Qubit bare frequency (coarse)"
+        ),
+        "control_amplitude": OutputParameterSpec(
             unit="a.u.", description="Control pulse amplitude estimated by adaptive chevron"
         ),
     }
-
-    def preprocess(self, backend: QubexBackend, qid: str) -> PreProcessResult:
-        result = super().preprocess(backend, qid)
-
-        param = self.input_parameters.get("coarse_control_amplitude")
-        value = param.value if param is not None else None
-        if (
-            value is None
-            or not isinstance(value, (int, float))
-            or math.isnan(value)
-            or value <= CONTROL_AMPLITUDE_MIN
-            or value >= CONTROL_AMPLITUDE_MAX
-        ):
-            print(
-                f"coarse_control_amplitude={value} is out of range "
-                f"({CONTROL_AMPLITUDE_MIN}, {CONTROL_AMPLITUDE_MAX}), "
-                f"using default={DEFAULT_COARSE_CONTROL_AMPLITUDE}"
-            )
-            if param is None:
-                self.input_parameters["coarse_control_amplitude"] = ParameterModel(
-                    value=DEFAULT_COARSE_CONTROL_AMPLITUDE,
-                    unit="a.u.",
-                    description="Coarse control pulse amplitude (default)",
-                )
-            else:
-                param.value = DEFAULT_COARSE_CONTROL_AMPLITUDE
-
-        return result
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -122,22 +99,10 @@ class CheckChevron(QubexTask):
         readout_freq = float(readout_frequency.value)
         readout_amp = float(readout_amplitude.value)
 
-        ca_param = self.input_parameters.get("coarse_control_amplitude")
-        ctrl_amp_value = (
-            ca_param.value if ca_param is not None else DEFAULT_COARSE_CONTROL_AMPLITUDE
-        )
-        if (
-            ctrl_amp_value is None
-            or not isinstance(ctrl_amp_value, (int, float))
-            or math.isnan(ctrl_amp_value)
-            or ctrl_amp_value <= CONTROL_AMPLITUDE_MIN
-            or ctrl_amp_value >= CONTROL_AMPLITUDE_MAX
-        ):
-            print(
-                f"[run] coarse_control_amplitude={ctrl_amp_value} is invalid for {label}, "
-                f"using default={DEFAULT_COARSE_CONTROL_AMPLITUDE}"
-            )
-            ctrl_amp_value = DEFAULT_COARSE_CONTROL_AMPLITUDE
+        control_amplitude = self.input_parameters["coarse_control_amplitude"].value
+        if control_amplitude is None:
+            raise ValueError("coarse_control_amplitude input parameter is required")
+        ctrl_amp_value = float(control_amplitude)
 
         print(
             f"[run] CheckChevron params for {label}: "

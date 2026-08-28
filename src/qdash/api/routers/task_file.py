@@ -3,20 +3,16 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
 from qdash.api.dependencies import get_task_file_service
-from qdash.api.lib.auth import get_current_active_user
-from qdash.api.schemas.auth import User
 from qdash.api.schemas.task_file import (
     BackendConfigResponse,
     ListTaskFileBackendsResponse,
     ListTaskInfoResponse,
-    SaveTaskFileRequest,
     TaskFileSettings,
-    TaskFileTreeNode,
 )
 from qdash.api.services.task_file_service import TaskFileService
 
@@ -61,77 +57,6 @@ def list_task_file_backends(
 
     """
     return service.list_backends()
-
-
-@router.get(
-    "/task-files/tree",
-    summary="Get file tree for a specific backend",
-    operation_id="getTaskFileTree",
-    response_model=list[TaskFileTreeNode],
-)
-def get_task_file_tree(
-    backend: str,
-    service: Annotated[TaskFileService, Depends(get_task_file_service)],
-) -> list[TaskFileTreeNode]:
-    """Get file tree structure for a specific backend directory.
-
-    Args:
-    ----
-        backend: Backend name (e.g., "qubex", "fake")
-
-    Returns:
-    -------
-        File tree structure for the backend
-
-    """
-    return service.get_file_tree(backend)
-
-
-@router.get(
-    "/task-files/content",
-    summary="Get task file content for viewing/editing",
-    operation_id="getTaskFileContent",
-)
-def get_task_file_content(
-    path: str,
-    service: Annotated[TaskFileService, Depends(get_task_file_service)],
-) -> dict[str, Any]:
-    """Get task file content for viewing/editing.
-
-    Args:
-    ----
-        path: Relative path from CALIBTASKS_BASE_PATH
-
-    Returns:
-    -------
-        File content and metadata
-
-    """
-    return service.get_file_content(path)
-
-
-@router.put(
-    "/task-files/content",
-    summary="Save task file content",
-    operation_id="saveTaskFileContent",
-)
-def save_task_file_content(
-    request: SaveTaskFileRequest,
-    _current_user: Annotated[User, Depends(get_current_active_user)],
-    service: Annotated[TaskFileService, Depends(get_task_file_service)],
-) -> dict[str, str]:
-    """Save task file content.
-
-    Args:
-    ----
-        request: Save file request with path and content
-
-    Returns:
-    -------
-        Success message
-
-    """
-    return service.save_file_content(request)
 
 
 @router.get(

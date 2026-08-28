@@ -107,7 +107,14 @@ class ExecuteFlowRequest(BaseModel):
 class ExecuteFlowResponse(BaseModel):
     """Response after executing a flow."""
 
-    execution_id: str = Field(..., description="Execution ID")
+    execution_id: str = Field(
+        ...,
+        description=(
+            "QDash execution ID (falls back to the Prefect flow run ID"
+            " when no execution row could be pre-created)"
+        ),
+    )
+    flow_run_id: str = Field(..., description="Prefect flow run ID")
     flow_run_url: str = Field(..., description="Prefect flow run URL")
     qdash_ui_url: str = Field(..., description="QDash UI URL for execution")
     message: str = Field(..., description="Success message")

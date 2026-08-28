@@ -5,7 +5,11 @@ from typing import ClassVar
 import numpy as np
 import plotly.graph_objects as go
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -38,48 +42,50 @@ class FakeCheckRamsey(FakeTask):
     task_type: str = "qubit"
     timeout: int = 120
 
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": ParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.default_only(
+            default=0,
             unit="GHz",
             description="Initial qubit frequency from CheckFineChevron",
         ),
-        "hpi_amplitude": ParameterModel(
+        "hpi_amplitude": InputParameterSpec.default_only(
+            default=0,
             unit="a.u.",
             description="Half-pi pulse amplitude from CheckHPI",
         ),
     }
 
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "time_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "time_range": RunParameterSpec(
             unit="ns",
             value_type="np.linspace",
-            value=(0, 10000, 101),  # 0 to 10 μs
+            default=(0, 10000, 101),  # 0 to 10 μs
             description="Time range for Ramsey measurement",
         ),
-        "artificial_detuning": RunParameterModel(
+        "artificial_detuning": RunParameterSpec(
             unit="MHz",
             value_type="float",
-            value=1.0,
+            default=1.0,
             description="Artificial detuning for Ramsey fringes",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="",
             value_type="int",
-            value=1024,
+            default=1024,
             description="Number of shots",
         ),
     }
 
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "qubit_frequency": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "qubit_frequency": OutputParameterSpec(
             unit="GHz",
             description="Refined qubit frequency from Ramsey measurement",
         ),
-        "t2_star": ParameterModel(
+        "t2_star": OutputParameterSpec(
             unit="μs",
             description="T2* dephasing time (without echo)",
         ),
-        "ramsey_frequency": ParameterModel(
+        "ramsey_frequency": OutputParameterSpec(
             unit="MHz",
             description="Observed detuning frequency in Ramsey fringes",
         ),

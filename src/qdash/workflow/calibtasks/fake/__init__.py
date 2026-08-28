@@ -27,7 +27,7 @@ Dependency Graph:
         │
         ├──> CreateHPIPulse (calibrates half-pi pulse)
         │       ├── input: qubit_frequency
-        │       └── output: hpi_amplitude, hpi_length
+        │       └── output: hpi_amplitude, hpi_duration
         │
         ├──> CheckRabi
         │       ├── input: qubit_frequency
@@ -105,11 +105,9 @@ def _use_qubex_tasks_with_fake_backend() -> None:
     """
     import qdash.workflow.calibtasks.qubex  # noqa: F401
     from qdash.workflow.calibtasks.base import BaseTask
-    from qdash.workflow.calibtasks.fake.qubex_compat import FakeCheckFineChevron
 
     qubex_registry = BaseTask.registry.get("qubex", {})
     fake_registry = BaseTask.registry.setdefault("fake", {})
-    fake_registry["CheckFineChevron"] = FakeCheckFineChevron
     for task_name in (
         "CheckRabi",
         "CreateHPIPulse",

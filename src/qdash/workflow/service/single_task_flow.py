@@ -5,6 +5,12 @@ and allows re-executing a single calibration task from the task detail page.
 
 Unlike user flows, this flow does not require a FlowDocument to exist.
 It is always available as a system deployment.
+
+This flow always runs with ``use_lock=False`` (see ``single_task_executor``
+below), so it never owns the project execution lock. It therefore registers
+the ``*_keep_lock`` terminal hooks, which close its own executions on
+cancellation/failure/crash without releasing a lock that belongs to an
+unrelated, concurrently running calibration.
 """
 
 from __future__ import annotations
@@ -14,16 +20,26 @@ from typing import Any
 
 from prefect import flow, get_run_logger
 
-from qdash.workflow.service.calib_service import CalibService, on_flow_cancellation
+from qdash.workflow.service.calib_service import (
+    CalibService,
+    on_flow_cancellation_keep_lock,
+    on_flow_crashed_keep_lock,
+    on_flow_failure_keep_lock,
+)
 
 
-@flow(name="single-task-executor", on_cancellation=[on_flow_cancellation])
+@flow(
+    name="single-task-executor",
+    on_cancellation=[on_flow_cancellation_keep_lock],
+    on_failure=[on_flow_failure_keep_lock],
+    on_crashed=[on_flow_crashed_keep_lock],
+)
 def single_task_executor(
     username: str,
     chip_id: str,
     qid: str,
     task_name: str,
-    source_execution_id: str,
+    source_execution_id: str | None = None,
     project_id: str | None = None,
     flow_name: str | None = None,
     tags: list[str] | None = None,
@@ -32,6 +48,8 @@ def single_task_executor(
     update_params: bool = True,
     persist_output_parameters: bool = True,
     reconfigure: bool = False,
+    backend_name: str | None = None,
+    default_run_parameters: dict[str, Any] | None = None,
 ) -> Any:
     """Execute a single calibration task.
 
@@ -67,11 +85,14 @@ def single_task_executor(
         flow_name=flow_name or f"re-execute:{task_name}",
         tags=tags,
         project_id=project_id,
+        backend_name=backend_name,
+        default_run_parameters=default_run_parameters,
         enable_github_pull=True,
         enable_github=update_params,
-        use_lock=False,
+        use_lock=True,
         parameter_overrides=parameter_overrides,
         source_task_id=source_task_id,
+        snapshot_exempt_tasks={"Configure"} if reconfigure else None,
         force_update_params=update_params,
         persist_output_parameters=persist_output_parameters,
     )

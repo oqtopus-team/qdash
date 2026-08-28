@@ -58,7 +58,6 @@ class CouplingHistoryDocument(Document):
                     ("project_id", ASCENDING),
                     ("chip_id", ASCENDING),
                     ("qid", ASCENDING),
-                    ("username", ASCENDING),
                     ("recorded_date", ASCENDING),
                 ],
                 unique=True,
@@ -105,13 +104,13 @@ class CouplingHistoryDocument(Document):
                 "project_id": coupling.project_id,
                 "chip_id": coupling.chip_id,
                 "qid": coupling.qid,
-                "username": username,
                 "recorded_date": today,
             }
         ).run()
         if existing_history:
             history = existing_history
             history.user_id = user_id
+            history.username = username
             history.data = coupling.data
             history.status = coupling.status
             history.cooldown_id = cooldown_id

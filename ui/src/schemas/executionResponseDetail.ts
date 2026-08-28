@@ -32,6 +32,7 @@ Attributes
 export interface ExecutionResponseDetail {
   name: string;
   status: string;
+  message?: string;
   flow_name?: string;
   user_id?: ExecutionResponseDetailUserId;
   username?: string;

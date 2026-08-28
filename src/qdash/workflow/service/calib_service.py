@@ -70,18 +70,26 @@ def _is_cancellation(exc: BaseException) -> bool:
     return any(cls.__name__ in ("CancelledRun", "CancelledError") for cls in type(exc).__mro__)
 
 
-def on_flow_cancellation(flow: Any, flow_run: Any, state: Any) -> None:
-    """Prefect on_cancellation hook for flow runs.
+def _run_terminal_hook(
+    hook_name: str,
+    flow_run: Any,
+    status: str,
+    message: str,
+    *,
+    release_lock: bool = True,
+) -> None:
+    """Close executions belonging to a finished flow run.
 
-    Called by Prefect after the flow process is killed (SIGTERM).
-    This runs in a *separate* process, so it cannot access in-memory state.
-    Instead, it reads the flow_run parameters and updates MongoDB directly.
-
-    Usage::
-
-        @flow(on_cancellation=[on_flow_cancellation])
-        def my_flow(username, chip_id, ...):
-            ...
+    Args:
+        hook_name: Name of the calling hook, used as the finalizer's log context.
+        flow_run: The Prefect flow run whose parameters identify the project
+            and whose id identifies the executions to close.
+        status: Terminal status to set on any executions left open.
+        message: Message to record on the closed executions.
+        release_lock: Whether the finalizer should also release the project's
+            execution lock. Must be ``False`` for flows built with
+            ``use_lock=False``, since they never acquired the lock and must
+            not clear one held by an unrelated running calibration.
 
     """
     _logger = logging.getLogger(__name__)
@@ -91,94 +99,120 @@ def on_flow_cancellation(flow: Any, flow_run: Any, state: Any) -> None:
         flow_run_id = str(flow_run.id)
 
         if not project_id:
-            _logger.warning("on_flow_cancellation: no project_id in parameters, skipping")
+            _logger.warning("%s: no project_id in parameters, skipping", hook_name)
             return
 
         from qdash.dbmodel.initialize import initialize
 
         initialize()
 
-        _cancel_executions_by_flow_run_id(flow_run_id, project_id, _logger)
+        from qdash.repository.execution_finalizer import finalize_executions_by_flow_run_id
+
+        finalize_executions_by_flow_run_id(
+            project_id=project_id,
+            flow_run_id=flow_run_id,
+            status=status,
+            message=message,
+            context=hook_name,
+            logger=_logger,
+            release_lock=release_lock,
+        )
     except Exception:
-        _logger.error("on_flow_cancellation failed", exc_info=True)
+        _logger.error("%s failed", hook_name, exc_info=True)
 
 
-def _cancel_executions_by_flow_run_id(
-    flow_run_id: str,
-    project_id: str,
-    _logger: Any,
-) -> None:
-    """Find executions with the given flow_run_id in note and mark as cancelled."""
-    from qdash.common.utils.datetime import now
-    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
-    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+def on_flow_cancellation(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_cancellation hook for flow runs.
 
-    end_time = now()
+    Called by Prefect after the flow process is killed (SIGTERM).
+    This runs in a *separate* process, so it cannot access in-memory state.
+    Instead, it reads the flow_run parameters and updates MongoDB directly.
 
-    # Find executions that have this flow_run_id in their note
-    executions = ExecutionHistoryDocument.find(
-        {
-            "project_id": project_id,
-            "note.flow_run_id": flow_run_id,
-            "status": {"$in": ["running", "scheduled"]},
-        }
-    ).run()
+    Usage::
 
-    if not executions:
-        _logger.info(
-            "on_flow_cancellation: no active executions found for flow_run_id=%s",
-            flow_run_id,
+        @flow(
+            on_cancellation=[on_flow_cancellation],
+            on_failure=[on_flow_failure],
+            on_crashed=[on_flow_crashed],
         )
-        return
+        def my_flow(username, chip_id, ...):
+            ...
 
-    for execution in executions:
-        execution_id = execution.execution_id
-        _logger.info("Cancelling execution %s (flow_run_id=%s)", execution_id, flow_run_id)
+    """
+    _run_terminal_hook("on_flow_cancellation", flow_run, "cancelled", "Execution was cancelled")
 
-        # Update execution status to cancelled
-        ExecutionHistoryDocument.find(
-            {"project_id": project_id, "execution_id": execution_id}
-        ).update_many({"$set": {"status": "cancelled", "end_at": end_time}}).run()
 
-        # Update non-terminal tasks to cancelled
-        result = (
-            TaskResultHistoryDocument.find(
-                {
-                    "project_id": project_id,
-                    "execution_id": execution_id,
-                    "status": {"$in": ["running", "scheduled", "pending"]},
-                }
-            )
-            .update_many(
-                {
-                    "$set": {
-                        "status": "cancelled",
-                        "message": "Execution was cancelled",
-                        "end_at": end_time,
-                    }
-                }
-            )
-            .run()
-        )
+def on_flow_failure(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_failure hook. Closes executions left open by an exception."""
+    _run_terminal_hook(
+        "on_flow_failure",
+        flow_run,
+        "failed",
+        _terminal_state_message(state, "Flow run failed before the execution was closed"),
+    )
 
-        task_count = result.modified_count if result else 0
-        _logger.info(
-            "Cancelled execution %s: %d task(s) updated",
-            execution_id,
-            task_count,
-        )
 
-    # Also release execution lock
-    try:
-        from qdash.dbmodel.execution_lock import ExecutionLockDocument
+def on_flow_crashed(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_crashed hook. Closes executions left open by an infrastructure crash."""
+    _run_terminal_hook(
+        "on_flow_crashed", flow_run, "failed", "Flow run crashed before the execution was closed"
+    )
 
-        lock_doc = ExecutionLockDocument.find_one({"project_id": project_id}).run()
-        if lock_doc and lock_doc.locked:
-            lock_doc.locked = False
-            lock_doc.save()
-            _logger.info("Released execution lock for project %s", project_id)
-    except Exception:
-        _logger.warning("Failed to release execution lock", exc_info=True)
+
+def _terminal_state_message(state: Any, fallback: str) -> str:
+    """Return Prefect's terminal reason without exposing an unbounded payload."""
+    message = getattr(state, "message", None)
+    if not isinstance(message, str) or not message.strip():
+        return fallback
+    return message.strip()[:2000]
+
+
+def on_flow_cancellation_keep_lock(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_cancellation hook for flows that do not acquire the project execution lock.
+
+    Behaves like ``on_flow_cancellation`` but never releases the project
+    execution lock, for use by flows built with ``use_lock=False`` that
+    never acquired it in the first place.
+    """
+    _run_terminal_hook(
+        "on_flow_cancellation_keep_lock",
+        flow_run,
+        "cancelled",
+        "Execution was cancelled",
+        release_lock=False,
+    )
+
+
+def on_flow_failure_keep_lock(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_failure hook for flows that do not acquire the project execution lock.
+
+    Behaves like ``on_flow_failure`` but never releases the project
+    execution lock, for use by flows built with ``use_lock=False`` that
+    never acquired it in the first place.
+    """
+    _run_terminal_hook(
+        "on_flow_failure_keep_lock",
+        flow_run,
+        "failed",
+        _terminal_state_message(state, "Flow run failed before the execution was closed"),
+        release_lock=False,
+    )
+
+
+def on_flow_crashed_keep_lock(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_crashed hook for flows that do not acquire the project execution lock.
+
+    Behaves like ``on_flow_crashed`` but never releases the project
+    execution lock, for use by flows built with ``use_lock=False`` that
+    never acquired it in the first place.
+    """
+    _run_terminal_hook(
+        "on_flow_crashed_keep_lock",
+        flow_run,
+        "failed",
+        "Flow run crashed before the execution was closed",
+        release_lock=False,
+    )
 
 
 __all__ = [
@@ -189,6 +223,11 @@ __all__ = [
     "get_session",
     "init_calibration",
     "on_flow_cancellation",
+    "on_flow_cancellation_keep_lock",
+    "on_flow_crashed",
+    "on_flow_crashed_keep_lock",
+    "on_flow_failure",
+    "on_flow_failure_keep_lock",
 ]
 
 
@@ -243,6 +282,7 @@ class CalibService:
         source_execution_id: str | None = None,
         parameter_overrides: dict[str, dict[str, Any]] | None = None,
         source_task_id: str | None = None,
+        snapshot_exempt_tasks: set[str] | None = None,
         force_update_params: bool = False,
         persist_output_parameters: bool = True,
         *,
@@ -311,6 +351,7 @@ class CalibService:
         self.source_execution_id = source_execution_id
         self._parameter_overrides = parameter_overrides
         self._source_task_id = source_task_id
+        self._snapshot_exempt_tasks = snapshot_exempt_tasks or set()
         self._force_update_params = force_update_params
         self._persist_output_parameters = persist_output_parameters
 
@@ -386,23 +427,19 @@ class CalibService:
             logger.debug("No Prefect run context available for source_execution_id")
         return None
 
-    def _store_flow_run_id(self) -> None:
-        """Store Prefect flow_run_id in execution note for cancel support."""
-        if self.skip_execution:
-            return
+    @staticmethod
+    def _read_flow_run_id_from_context() -> str | None:
+        """Try to read the Prefect flow run id from the run context."""
         try:
             from prefect.context import get_run_context
 
             ctx = get_run_context()
             flow_run = getattr(ctx, "flow_run", None)
             if flow_run:
-                flow_run_id = str(flow_run.id)
-                es = self.execution_service
-                if es is not None:
-                    es.update_note("flow_run_id", flow_run_id)
-                    logger.info("Stored flow_run_id=%s in execution note", flow_run_id)
+                return str(flow_run.id)
         except Exception:
-            logger.debug("Could not store flow_run_id in execution note", exc_info=True)
+            logger.debug("No Prefect run context available for flow_run_id")
+        return None
 
     def _load_default_run_parameters(self) -> None:
         """Load default_run_parameters from the flow document in MongoDB."""
@@ -444,9 +481,24 @@ class CalibService:
 
         self.qids = qids
 
-        # Auto-generate execution_id if not provided
+        flow_run_id = self._read_flow_run_id_from_context()
+
         if self.execution_id is None:
-            self.execution_id = generate_execution_id(
+            claimed_execution_id: str | None = None
+            if not self.skip_execution and flow_run_id is not None:
+                from qdash.repository import MongoExecutionRepository
+
+                claimed_execution_id = MongoExecutionRepository().claim_scheduled_execution(
+                    project_id=self.project_id, flow_run_id=flow_run_id
+                )
+                if claimed_execution_id is not None:
+                    logger.info(
+                        "Adopted pre-created execution_id=%s for flow_run_id=%s",
+                        claimed_execution_id,
+                        flow_run_id,
+                    )
+
+            self.execution_id = claimed_execution_id or generate_execution_id(
                 self.username,
                 self.chip_id,
                 project_id=self.project_id,
@@ -458,6 +510,7 @@ class CalibService:
             username=self.username,
             chip_id=self.chip_id,
             execution_id=self.execution_id,
+            project_id=self.project_id,
         )
 
         # Setup github_push_config if not provided
@@ -481,11 +534,15 @@ class CalibService:
             if self._lock_repo.is_locked(project_id=self.project_id):
                 msg = "Calibration is already running. Cannot start a new session."
                 raise RuntimeError(msg)
-            self._lock_repo.lock(project_id=self.project_id)
+            self._lock_repo.lock(project_id=self.project_id, execution_id=self.execution_id)
             self._lock_acquired = True
 
         # Wrap all initialization in try/except to ensure lock is released on failure
         try:
+            if flow_run_id:
+                note = {**(note or {}), "flow_run_id": flow_run_id}
+                self.note = note
+
             # Create CalibConfig
             logger.debug("CalibConfig default_run_parameters=%s", self.default_run_parameters)
             config = CalibConfig(
@@ -506,9 +563,11 @@ class CalibService:
                 persist_output_parameters=self._persist_output_parameters,
             )
 
-            # Create snapshot loader if re-executing from a previous execution
+            # Create a parameter loader for snapshot re-execution or standalone
+            # user overrides. Quick runs have no source snapshot, but still need
+            # input overrides to be re-applied after task preprocessing.
             snapshot_loader = None
-            if self.source_execution_id:
+            if self._source_task_id or self.source_execution_id or self._parameter_overrides:
                 from qdash.workflow.engine.task.snapshot_loader import (
                     SnapshotParameterLoader,
                 )
@@ -516,10 +575,13 @@ class CalibService:
                 snapshot_loader = SnapshotParameterLoader(
                     source_execution_id=self.source_execution_id,
                     project_id=self.project_id,
+                    source_task_id=self._source_task_id,
                     parameter_overrides=self._parameter_overrides,
+                    snapshot_exempt_tasks=self._snapshot_exempt_tasks,
                 )
                 logger.info(
-                    "Created SnapshotParameterLoader for source_execution_id=%s",
+                    "Created SnapshotParameterLoader for source_task_id=%s, source_execution_id=%s",
+                    self._source_task_id,
                     self.source_execution_id,
                 )
 
@@ -531,9 +593,6 @@ class CalibService:
             )
             self._orchestrator._source_task_id = self._source_task_id
             self._orchestrator.initialize()
-
-            # Store Prefect flow_run_id in execution note for cancel support
-            self._store_flow_run_id()
 
             self._initialized = True
         except Exception:
@@ -1035,13 +1094,17 @@ class CalibService:
             )
 
             chip_repo = MongoChipRepository()
-            chip = chip_repo.get_chip_by_id(username=self.username, chip_id=self.chip_id)
+            chip = chip_repo.find_by_id(project_id=self.project_id, chip_id=self.chip_id)
             if chip is not None:
                 history_repo = MongoChipHistoryRepository()
-                history_repo.create_history(username=self.username, chip_id=self.chip_id)
+                history_repo.create_history(
+                    username=self.username,
+                    chip_id=self.chip_id,
+                    project_id=self.project_id,
+                )
             else:
                 logger.warning(
-                    f"Chip '{self.chip_id}' not found for user '{self.username}', "
+                    f"Chip '{self.chip_id}' not found in project '{self.project_id}', "
                     "skipping history update"
                 )
         except Exception as e:
@@ -1267,6 +1330,13 @@ class CalibService:
             # Distinguish cancellation from failure.
             # Prefect 3 raises CancelledRun (subclass of BaseException) on cancel.
             with contextlib.suppress(Exception):
+                logger.error(
+                    "Pipeline aborted by %s (cause=%s, context=%s, group=%s)",
+                    type(exc).__name__,
+                    type(exc.__cause__).__name__ if exc.__cause__ else None,
+                    type(exc.__context__).__name__ if exc.__context__ else None,
+                    [type(sub).__name__ for sub in getattr(exc, "exceptions", [])] or None,
+                )
                 if _is_cancellation(exc):
                     logger.info("Execution was cancelled")
                     self.cancel_calibration()

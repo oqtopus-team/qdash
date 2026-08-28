@@ -25,17 +25,23 @@ from qdash.api.schemas.flow import (
     SaveFlowResponse,
 )
 from qdash.common.config.path_resolver import (
+    execution_calib_data_dir,
     resolve_user_flows_dir,
     resolve_workflow_service_dir,
     resolve_workflow_templates_dir,
     to_container_user_flow_path,
 )
+from qdash.common.utils.datetime import now
 from qdash.config import get_settings
+from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
+from qdash.datamodel.system_info import SystemInfoModel
+from qdash.repository import MongoExecutionRepository
+from qdash.repository.execution_id import generate_execution_id
 
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from qdash.repository import MongoFlowRepository
+    from qdash.repository import MongoExecutionLockRepository, MongoFlowRepository
 
 logger = logging.getLogger("uvicorn.app")
 
@@ -59,9 +65,11 @@ class FlowService:
     def __init__(
         self,
         flow_repository: MongoFlowRepository,
+        execution_lock_repository: MongoExecutionLockRepository | None = None,
     ) -> None:
         """Initialize the service with a flow repository."""
         self._flow_repo = flow_repository
+        self._execution_lock_repo = execution_lock_repository
         self._project_flows_base_dir = USER_FLOWS_DIR
 
     async def save_flow(
@@ -397,16 +405,29 @@ class FlowService:
                     parameters=parameters,
                 )
 
-                execution_id = str(flow_run.id)
+                chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
+                flow_run_id = str(flow_run.id)
                 flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{execution_id}"
+                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
                 )
-                qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
-                logger.info(f"Flow run created: {execution_id}")
+                logger.info(f"Flow run created: {flow_run_id}")
+
+                qdash_execution_id = self._create_scheduled_execution(
+                    project_id=project_id,
+                    username=username,
+                    chip_id=chip_id,
+                    name=name,
+                    flow_run_id=flow_run_id,
+                    tags=parameters.get("tags") or flow.tags,
+                )
+                qdash_ui_url = self._build_qdash_ui_url(
+                    settings.ui_port, chip_id, qdash_execution_id
+                )
 
                 return ExecuteFlowResponse(
-                    execution_id=execution_id,
+                    execution_id=qdash_execution_id or flow_run_id,
+                    flow_run_id=flow_run_id,
                     flow_run_url=flow_run_url,
                     qdash_ui_url=qdash_ui_url,
                     message=f"Flow '{name}' execution started successfully",
@@ -487,16 +508,29 @@ class FlowService:
                     parameters=parameters,
                 )
 
-                execution_id = str(flow_run.id)
+                chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
+                flow_run_id = str(flow_run.id)
                 flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{execution_id}"
+                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
                 )
-                qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
-                logger.info(f"Re-execution flow run created: {execution_id}")
+                logger.info(f"Re-execution flow run created: {flow_run_id}")
+
+                qdash_execution_id = self._create_scheduled_execution(
+                    project_id=project_id,
+                    username=username,
+                    chip_id=chip_id,
+                    name=flow_name,
+                    flow_run_id=flow_run_id,
+                    tags=parameters.get("tags") or flow.tags,
+                )
+                qdash_ui_url = self._build_qdash_ui_url(
+                    settings.ui_port, chip_id, qdash_execution_id
+                )
 
                 return ExecuteFlowResponse(
-                    execution_id=execution_id,
+                    execution_id=qdash_execution_id or flow_run_id,
+                    flow_run_id=flow_run_id,
                     flow_run_url=flow_run_url,
                     qdash_ui_url=qdash_ui_url,
                     message=f"Flow '{flow_name}' re-execution started from snapshot {source_execution_id}",
@@ -511,7 +545,7 @@ class FlowService:
         task_name: str,
         qid: str,
         chip_id: str,
-        source_execution_id: str,
+        source_execution_id: str | None,
         username: str,
         project_id: str,
         tags: list[str] | None = None,
@@ -521,6 +555,8 @@ class FlowService:
         persist_output_parameters: bool = True,
         reconfigure: bool = False,
         execution_name: str | None = None,
+        backend_name: str | None = None,
+        default_run_parameters: dict[str, Any] | None = None,
     ) -> ExecuteFlowResponse:
         """Execute a single task via the system single-task-executor deployment.
 
@@ -557,6 +593,14 @@ class FlowService:
         settings = get_settings()
         deployment_name = "single-task-executor/system-single-task"
 
+        if self._execution_lock_repo is not None and self._execution_lock_repo.is_locked(
+            project_id
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Another calibration execution is already running for this project",
+            )
+
         try:
             async with get_client() as client:
                 deployment = await client.read_deployment_by_name(deployment_name)
@@ -582,6 +626,8 @@ class FlowService:
             "persist_output_parameters": persist_output_parameters,
             "update_params": update_params,
             "reconfigure": reconfigure,
+            "backend_name": backend_name,
+            "default_run_parameters": default_run_parameters,
         }
 
         logger.info(
@@ -596,16 +642,28 @@ class FlowService:
                     parameters=parameters,
                 )
 
-                execution_id = str(flow_run.id)
+                flow_run_id = str(flow_run.id)
                 flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{execution_id}"
+                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
                 )
-                qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
-                logger.info(f"Single-task flow run created: {execution_id}")
+                logger.info(f"Single-task flow run created: {flow_run_id}")
+
+                qdash_execution_id = self._create_scheduled_execution(
+                    project_id=project_id,
+                    username=username,
+                    chip_id=chip_id,
+                    name=flow_name,
+                    flow_run_id=flow_run_id,
+                    tags=tags,
+                )
+                qdash_ui_url = self._build_qdash_ui_url(
+                    settings.ui_port, chip_id, qdash_execution_id
+                )
 
                 return ExecuteFlowResponse(
-                    execution_id=execution_id,
+                    execution_id=qdash_execution_id or flow_run_id,
+                    flow_run_id=flow_run_id,
                     flow_run_url=flow_run_url,
                     qdash_ui_url=qdash_ui_url,
                     message=(
@@ -664,6 +722,7 @@ class FlowService:
         operation_id = str(flow_run.id)
         return ExecuteFlowResponse(
             execution_id=operation_id,
+            flow_run_id=operation_id,
             flow_run_url=f"http://localhost:{settings.prefect_port}/runs/flow-run/{operation_id}",
             qdash_ui_url=f"http://localhost:{settings.ui_port}/",
             message=f"Agent candidate commit '{commit_id}' queued for backend application",
@@ -799,6 +858,119 @@ class FlowService:
             raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
 
     # --- Private helpers ---
+
+    def _create_scheduled_execution(
+        self,
+        *,
+        project_id: str,
+        username: str,
+        chip_id: str | None,
+        name: str,
+        flow_run_id: str,
+        tags: list[str] | None = None,
+    ) -> str | None:
+        """Pre-create a scheduled execution row for a freshly created flow run.
+
+        This makes the run visible in execution history immediately, before the
+        flow process itself has had a chance to create its own execution record,
+        so that a run which fails or is orphaned before reaching that point can
+        still be found and closed (by the flow's own hooks or by reconciliation).
+
+        Pre-creation is deliberately best effort: the Prefect flow run has
+        already been created by the time this runs, and a bookkeeping failure
+        here is not a reason to cancel a healthy calibration. On failure the
+        run is left going and ``CalibService._initialize()`` allocates an
+        execution ID of its own at flow start, exactly as it does for runs that
+        never went through the API (cron schedules). Callers fall back to the
+        flow run ID for the response, so the only thing lost is the
+        ``scheduled`` row that would have been visible before the flow started.
+
+        Parameters
+        ----------
+        project_id : str
+            The project ID.
+        username : str
+            The username who triggered the run.
+        chip_id : str | None
+            The chip ID targeted by the run. When it cannot be resolved,
+            no row is created.
+        name : str
+            Execution/flow name to record.
+        flow_run_id : str
+            The Prefect flow run ID, stored in ``note.flow_run_id``.
+        tags : list[str] | None
+            Tags to record on the execution.
+
+        Returns
+        -------
+        str | None
+            The generated execution ID, or None if the row could not be created.
+
+        """
+        if not chip_id:
+            logger.warning(
+                f"Skipping scheduled execution pre-creation for flow run "
+                f"{flow_run_id}: no chip_id could be resolved"
+            )
+            return None
+
+        try:
+            execution_id = generate_execution_id(username, chip_id, project_id=project_id)
+            calib_data_path = str(execution_calib_data_dir(username, execution_id))
+
+            model = ExecutionModel(
+                project_id=project_id,
+                username=username,
+                name=name,
+                execution_id=execution_id,
+                calib_data_path=calib_data_path,
+                note={"flow_run_id": flow_run_id},
+                status=ExecutionStatusModel.SCHEDULED,
+                tags=tags or [],
+                chip_id=chip_id,
+                start_at=now(),
+                end_at=None,
+                elapsed_time=None,
+                message="",
+                system_info=SystemInfoModel(),
+            )
+            MongoExecutionRepository().save(model)
+            return execution_id
+        except Exception:
+            logger.warning(
+                "Failed to pre-create scheduled execution for flow_run_id=%s",
+                flow_run_id,
+                exc_info=True,
+            )
+            return None
+
+    @staticmethod
+    def _build_qdash_ui_url(ui_port: int, chip_id: str | None, execution_id: str | None) -> str:
+        """Build the QDash UI URL for an execution.
+
+        Parameters
+        ----------
+        ui_port : int
+            The port the QDash UI is served on.
+        chip_id : str | None
+            The chip ID targeted by the execution, if known.
+        execution_id : str | None
+            The QDash execution ID, if known.
+
+        Returns
+        -------
+        str
+            ``http://localhost:{ui_port}/execution/{chip_id}/{execution_id}`` when both
+            ``chip_id`` and ``execution_id`` are known, ``http://localhost:{ui_port}/execution/{chip_id}``
+            when only ``chip_id`` is known, and ``http://localhost:{ui_port}/execution`` otherwise.
+
+        """
+        base = f"http://localhost:{ui_port}/execution"
+        if not chip_id:
+            return base
+        if not execution_id:
+            return f"{base}/{chip_id}"
+        return f"{base}/{chip_id}/{execution_id}"
 
     def _get_project_flows_dir(self, project_id: str) -> Path:
         """Get a project's flows directory, create if not exists."""

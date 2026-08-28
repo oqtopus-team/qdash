@@ -61,7 +61,7 @@ import {
   type ForumCategoryDefinition,
 } from "./categories";
 import { ForumLabelPicker } from "./ForumLabelSelector";
-import { ForumBlockViewer } from "./ForumBlockEditor";
+import { ForumPostContent } from "./ForumPostContent";
 
 const PAGE_SIZE = 30;
 
@@ -257,7 +257,7 @@ function ForumThreadPreviewSidebar({
   postId,
   categories,
   currentUsername,
-  isOwner,
+  canEditMetadata,
   projectId,
   returnQuery,
   onClose,
@@ -265,7 +265,7 @@ function ForumThreadPreviewSidebar({
   postId: string | null;
   categories: ForumCategoryDefinition[];
   currentUsername?: string;
-  isOwner: boolean;
+  canEditMetadata: boolean;
   projectId?: string | null;
   returnQuery: string;
   onClose: () => void;
@@ -305,7 +305,7 @@ function ForumThreadPreviewSidebar({
   const statusDef = getForumStatus(post?.status);
   const StatusIcon = statusDef.icon;
   const targetContext = post ? postTargetContext(post) : null;
-  const canManage = !!post && (isOwner || currentUsername === post.username);
+  const canManageMetadata = !!post && (canEditMetadata || currentUsername === post.username);
   const updateMutation = useUpdateForumPost();
   const members = useMemo(
     () => (membersResponse?.data.members ?? []).filter((member) => member.status === "active"),
@@ -377,7 +377,7 @@ function ForumThreadPreviewSidebar({
     cooldownId?: string | null;
     assigneeUsername?: string | null;
   }) => {
-    if (!post || !canManage) return;
+    if (!post || !canManageMetadata) return;
     const response = await updateMutation.mutateAsync({
       postId: post.id,
       data: {
@@ -505,7 +505,7 @@ function ForumThreadPreviewSidebar({
                     <ExternalLink className="h-3.5 w-3.5" />
                     Open full page
                   </Link>
-                  {canManage && (
+                  {canManageMetadata && (
                     <button
                       type="button"
                       className={`btn btn-sm gap-1 ${editingMetadata ? "btn-neutral" : "btn-outline"}`}
@@ -546,7 +546,7 @@ function ForumThreadPreviewSidebar({
                 </div>
               )}
 
-              {editingMetadata && canManage && (
+              {editingMetadata && canManageMetadata && (
                 <section className="rounded-lg border border-base-300 bg-base-200/40 p-3">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <h3 className="text-sm font-semibold">Metadata</h3>
@@ -706,16 +706,11 @@ function ForumThreadPreviewSidebar({
               <section>
                 <h3 className="mb-2 text-sm font-semibold">Root thread</h3>
                 <div className="rounded-lg border border-base-300 bg-base-100 p-4">
-                  {(post.content_blocks ?? []).length > 0 ? (
-                    <ForumBlockViewer
-                      blocks={(post.content_blocks ?? []) as Record<string, unknown>[]}
-                    />
-                  ) : (
-                    <MarkdownContent
-                      content={post.content}
-                      className="text-sm text-base-content/80"
-                    />
-                  )}
+                  <ForumPostContent
+                    content={post.content}
+                    contentBlocks={post.content_blocks}
+                    markdownClassName="text-sm text-base-content/80"
+                  />
                 </div>
               </section>
 
@@ -738,17 +733,12 @@ function ForumThreadPreviewSidebar({
                           <span>{reply.username}</span>
                           <span>{formatRelativeTime(reply.created_at)}</span>
                         </div>
-                        {(reply.content_blocks ?? []).length > 0 ? (
-                          <ForumBlockViewer
-                            blocks={(reply.content_blocks ?? []) as Record<string, unknown>[]}
-                          />
-                        ) : (
-                          <MarkdownContent
-                            content={reply.content}
-                            preview
-                            className="line-clamp-3 text-sm text-base-content/70"
-                          />
-                        )}
+                        <ForumPostContent
+                          content={reply.content}
+                          contentBlocks={reply.content_blocks}
+                          markdownPreview
+                          markdownClassName="line-clamp-3 text-sm text-base-content/70"
+                        />
                       </div>
                     ))}
                   </div>
@@ -771,7 +761,7 @@ export function ForumPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { isOwner, projectId } = useProject();
+  const { canEdit, isOwner, projectId } = useProject();
   const [category, setCategory] = useState<CategoryFilter>(
     () => (searchParams.get("forum_category") as CategoryFilter | null) ?? "all",
   );
@@ -1329,7 +1319,7 @@ export function ForumPageContent() {
         postId={selectedPostId}
         categories={categories}
         currentUsername={user?.username}
-        isOwner={isOwner}
+        canEditMetadata={canEdit}
         projectId={projectId}
         returnQuery={listReturnQuery}
         onClose={() => setSelectedPostId(null)}

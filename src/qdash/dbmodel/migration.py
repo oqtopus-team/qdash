@@ -1751,6 +1751,21 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    project_calibration_parser = subparsers.add_parser(
+        "project-scoped-calibration",
+        help="Consolidate user-owned calibration data into project-shared state",
+    )
+    project_calibration_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+    project_calibration_parser.add_argument(
+        "--allow-missing-artifacts",
+        action="store_true",
+        help="Mark missing legacy execution artifacts as reviewed in the migration report",
+    )
+
     args = parser.parse_args()
 
     if args.command == "fix-invalid-fidelity":
@@ -1828,6 +1843,14 @@ if __name__ == "__main__":
 
         initialize()
         stats = migrate_forum_status(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "project-scoped-calibration":
+        from qdash.dbmodel.project_calibration_migration import run_from_environment
+
+        stats = run_from_environment(
+            dry_run=not args.execute,
+            allow_missing_artifacts=args.allow_missing_artifacts,
+        )
         logger.info(f"Migration complete: {stats}")
     else:
         parser.print_help()

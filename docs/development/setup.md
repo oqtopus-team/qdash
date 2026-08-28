@@ -1,4 +1,7 @@
-# Development Environment Setup
+# Developer Setup
+
+QDash development starts from a local repository checkout and uses either DevContainer or Nix for
+the project toolchain.
 
 ## Prerequisites
 
@@ -15,32 +18,21 @@
 
 | Tool                                        | Version   | Description                          |
 | ------------------------------------------- | --------- | ------------------------------------ |
-| [Python](https://www.python.org/downloads/) | 3.11-3.12 | Backend development                  |
-| [Bun](https://bun.sh/)                      | 1.0+      | Frontend package manager and runtime |
-| [Node.js](https://nodejs.org/)              | 20+       | Alternative frontend runtime         |
+| [Python](https://www.python.org/downloads/) | 3.10-3.12 | Backend development                  |
+| [Bun](https://bun.sh/)                      | 1.4.0+    | Frontend package manager and runtime |
+| [Node.js](https://nodejs.org/)              | 24+       | Alternative frontend runtime         |
 
-## Getting Started
+## Clone the Repository
 
-### Clone the Repository
-
-```shell
+```bash
 git clone https://github.com/oqtopus-team/qdash.git
 cd qdash
 ```
 
-### Qubex Setup
+A DevContainer can start without `.env`. Before running Qubex-backed calibration tasks, follow
+[Operator Setup](../operator-guide/setup.md) for `.env` and `CONFIG_PATH` configuration.
 
-Create the environment file from the Qubex example:
-
-```shell
-cp .env.example.qubex .env
-```
-
-Edit `.env` before starting services if you need custom ports, data paths, admin credentials,
-Qubex config repository settings, remote access settings, or Copilot provider credentials. Data
-directories are created by Docker Compose and `task dev-local-setup` as needed.
-
-### Using DevContainer (Recommended)
+## DevContainer
 
 The recommended way to develop is using the DevContainer:
 
@@ -79,7 +71,7 @@ git config --global user.email
 
 Set them in the container if either command is empty.
 
-### Using Nix (Lightweight Host Shell)
+## Nix Host Shell
 
 Nix can provide the local CLI toolchain without starting the DevContainer. This is useful when
 you want to run Python tests, UI checks, or Docker Compose tasks from the host shell while keeping
@@ -91,7 +83,7 @@ Install [Nix](https://nixos.org/download/) with flakes enabled, then enter the d
 nix develop
 ```
 
-The shell provides Python 3.11, uv, Bun, Node.js 20, go-task, Docker CLI/Compose, jq, PostgreSQL
+The shell provides Python 3.11, uv, Bun, Node.js 24, go-task, Docker CLI/Compose, jq, PostgreSQL
 client tools, and the secret scanning tools used by the project. It also sets `UV_PYTHON` to the
 Nix-provided Python 3.11 so `uv sync` does not accidentally select Python 3.12 on macOS, where
 some workflow backend dependencies may fail to build. It does not start MongoDB, PostgreSQL,
@@ -119,7 +111,7 @@ Stop the host API/UI processes and Docker Compose services:
 task dev-local-down
 ```
 
-### Install Dependencies
+## Refresh Dependencies
 
 The DevContainer installs Python, frontend, and Lefthook dependencies automatically during
 creation. To refresh dependencies manually, run:
@@ -128,26 +120,7 @@ creation. To refresh dependencies manually, run:
 task dev-local-setup
 ```
 
-## Running Services
-
-### Full Docker Compose Stack
-
-```shell
-task deploy-local
-```
-
-This starts the following services:
-
-- **mongo**: MongoDB database (port 27017)
-- **mongo-express**: MongoDB admin UI (port 8081)
-- **postgres**: PostgreSQL database (port 5432)
-- **prefect-server**: Prefect workflow server (port 4200)
-- **deployment-service**: Prefect deployment management
-- **user-flow-worker**: User flow execution worker
-- **api**: FastAPI backend (port 5715)
-- **ui**: Next.js frontend (port 5714)
-
-### Lightweight Host Stack
+## Run the Development Stack
 
 ```shell
 task dev-local
@@ -171,102 +144,9 @@ The component tasks are:
 | Prefect Dashboard | http://localhost:4200      |
 | MongoDB Admin     | http://localhost:8081      |
 
-## Development Commands
-
-### Using go-task
-
-```shell
-# Show all available tasks
-task
-
-# Start the full Docker Compose stack
-task deploy-local
-
-# Start supporting services with host API/UI
-task dev-local
-
-# Stop host API/UI and local Docker Compose services
-task dev-local-down
-
-# Deploy with Cloudflare Tunnel
-task deploy
-
-# Restart API service
-task restart-api
-```
-
-### Code Quality
-
-```shell
-# Auto-fix Python and UI lint/format issues
-task lint
-
-# Auto-fix Python only
-task lint-python
-
-# Auto-fix UI only
-task lint-ui
-
-# Check Python linting and formatting without modifying files
-task ci-lint
-
-# Run mypy type checking
-task ci-typecheck
-```
-
-### Testing
-
-```shell
-# Run all tests
-task test
-
-# Run API tests only
-task test-api
-
-# Run workflow tests only
-task test-workflow
-
-# Run UI tests only
-task test-ui
-
-# Run tests with coverage
-task test-coverage
-
-# Run tests, stop on first failure
-task test-fast
-```
-
-### Build & Generate
-
-```shell
-# Generate TypeScript API client
-task generate
-
-# Build UI
-task build
-
-# Build API Docker image
-task build-api
-
-# Build workflow Docker image
-task build-workflow
-
-# Check dependency locks
-task check-locks
-```
-
-### Documentation
-
-```shell
-# Start docs dev server
-task docs
-
-# Build docs
-task build-docs
-
-# Generate DB schema docs
-task tbls-docs
-```
+Use [Developer Commands](../developer-guide/commands.md) for linting, tests, builds, generation,
+and documentation tasks. Use [Operator Setup](../operator-guide/setup.md) when you need the full
+Compose deployment rather than the host-side development stack.
 
 ## Secret Scanning Tools
 
@@ -293,30 +173,3 @@ lefthook install
 ```
 
 > The pre-commit hook requires Betterleaks. Install it before enabling Lefthook; otherwise commits fail closed instead of bypassing the staged leak scan.
-
-## Environment Variables
-
-Key environment variables are configured in `.env`. See `.env.example.qubex` for the Qubex-backed
-defaults and `.env.example` for the fake backend defaults:
-
-| Variable                  | Default | Description                 |
-| ------------------------- | ------- | --------------------------- |
-| `API_PORT`                | 5715    | Backend API port            |
-| `UI_PORT`                 | 5714    | Frontend UI port            |
-| `MONGO_PORT`              | 27017   | MongoDB port                |
-| `POSTGRES_PORT`           | 5432    | PostgreSQL port             |
-| `PREFECT_PORT`            | 4200    | Prefect dashboard port      |
-| `DEPLOYMENT_SERVICE_PORT` | 4006    | Deployment service port     |
-| `CALIB_DATA_PATH`         | -       | Calibration data mount path |
-| `CALIB_TASKS_PATH`        | -       | Calibration tasks path      |
-| `CONFIG_PATH`             | -       | Qubex backend config root |
-| `NEXT_PUBLIC_API_URL`     | -       | Public API URL for frontend |
-| `NEXT_PUBLIC_PREFECT_URL` | -       | Prefect dashboard URL       |
-| `NEXT_ALLOWED_DEV_ORIGINS` | -       | Additional hostnames allowed to access the Next.js dev server |
-| `SLACK_FORUM_NOTIFICATION` | `false` | Set to `true` to enable Slack notifications for forum activity (optional) |
-| `SLACK_BOT_TOKEN`         | -       | Slack Bot Token (`xoxb-…`) with `chat:write` scope (optional) |
-| `SLACK_FORUM_CHANNEL_ID`  | -       | Slack channel ID for forum notifications (optional) |
-
-For Qubex-backed runs, `CONFIG_PATH` must contain chip-specific Qubex configuration directories.
-QDash reads `<CONFIG_PATH>/<chip_id>/config` and `<CONFIG_PATH>/<chip_id>/params`; see
-[Operator Setup](../operator-guide/setup.md#qubex-configuration-files) for the expected layout.

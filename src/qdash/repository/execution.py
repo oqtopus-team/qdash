@@ -14,6 +14,7 @@ from typing import Any
 from pymongo import MongoClient, ReturnDocument
 from pymongo.collection import Collection
 
+from qdash.common.utils.datetime import now
 from qdash.datamodel.execution import (
     ExecutionModel,
     ExecutionStatusModel,
@@ -129,6 +130,47 @@ class MongoExecutionRepository:
         if doc is None:
             return None
         return self._doc_to_model(doc.model_dump())
+
+    def claim_scheduled_execution(self, *, project_id: str, flow_run_id: str) -> str | None:
+        """Atomically claim a pre-created scheduled execution for a flow run.
+
+        The API pre-creates an execution row with ``status="scheduled"`` and
+        ``note.flow_run_id`` set when the user triggers an execution. When the
+        flow process later starts, it claims that row instead of allocating a
+        new execution_id.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        flow_run_id : str
+            The Prefect flow run ID stored in ``note.flow_run_id``
+
+        Returns
+        -------
+        str | None
+            The claimed execution_id, or None if no matching row was found
+
+        """
+        try:
+            client = self._get_client()
+            collection = self._get_collection(client)
+            doc = collection.find_one_and_update(
+                {
+                    "project_id": project_id,
+                    "note.flow_run_id": flow_run_id,
+                    "status": "scheduled",
+                    "note.claimed_at": {"$exists": False},
+                },
+                {"$set": {"note.claimed_at": now()}},
+                return_document=ReturnDocument.AFTER,
+            )
+            if doc is None:
+                return None
+            return str(doc["execution_id"])
+        except Exception as e:
+            logger.warning(f"Failed to claim scheduled execution: {e}")
+            return None
 
     def update_with_optimistic_lock(
         self,

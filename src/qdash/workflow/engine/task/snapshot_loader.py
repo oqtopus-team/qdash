@@ -21,9 +21,9 @@ DEFAULT_SNAPSHOT_LIMIT = 10_000
 class SnapshotParameterLoader:
     """Loads parameters from a previous execution's task results.
 
-    Lazily loads all TaskResultHistoryDocument records for the source execution
-    and caches them by (task_name, qid) key. Provides a get_snapshot() method
-    that returns input_parameters and run_parameters for a given task+qid.
+    Loads the exact source task when ``source_task_id`` is available. Full
+    workflow re-execution may instead load all records for a source execution
+    and index them by (task_name, qid).
 
     Parameters
     ----------
@@ -31,6 +31,8 @@ class SnapshotParameterLoader:
         The execution ID to load snapshot parameters from.
     project_id : str
         The project identifier.
+    source_task_id : str | None
+        Exact task result ID to load for single-task re-execution.
     parameter_overrides : dict[str, dict[str, Any]] | None
         Optional user overrides. Shape: ``{"run": {...}, "input": {...}}``.
         Values are merged on top of snapshot parameters.
@@ -42,24 +44,55 @@ class SnapshotParameterLoader:
 
     def __init__(
         self,
-        source_execution_id: str,
+        source_execution_id: str | None,
         project_id: str,
+        source_task_id: str | None = None,
         parameter_overrides: dict[str, dict[str, Any]] | None = None,
+        snapshot_exempt_tasks: set[str] | None = None,
         limit: int = DEFAULT_SNAPSHOT_LIMIT,
     ) -> None:
         self._source_execution_id = source_execution_id
         self._project_id = project_id
+        self._source_task_id = source_task_id
         self._parameter_overrides = parameter_overrides
+        self._snapshot_exempt_tasks = snapshot_exempt_tasks or set()
         self._limit = limit
         self._cache: dict[tuple[str, str], tuple[dict[str, Any], dict[str, Any]]] | None = None
+
+    @property
+    def has_snapshot_source(self) -> bool:
+        """Whether this loader represents a re-execution snapshot."""
+        return self._source_task_id is not None or self._source_execution_id is not None
+
+    def requires_snapshot(self, task_name: str) -> bool:
+        """Whether a task must be resolved from the configured snapshot source."""
+        return self.has_snapshot_source and task_name not in self._snapshot_exempt_tasks
 
     def _load(self) -> None:
         """Lazily load all task results for the source execution."""
         if self._cache is not None:
             return
+        if self._source_task_id is None and self._source_execution_id is None:
+            self._cache = {}
+            return
 
         self._cache = {}
         try:
+            if self._source_task_id is not None:
+                doc = TaskResultHistoryDocument.find_one(
+                    {
+                        "project_id": self._project_id,
+                        "task_id": self._source_task_id,
+                    }
+                ).run()
+                if doc is not None:
+                    self._cache[(doc.name, doc.qid)] = (
+                        doc.input_parameters or {},
+                        doc.run_parameters or {},
+                    )
+                return
+
+            assert self._source_execution_id is not None
             docs: list[TaskResultHistoryDocument] = (
                 TaskResultHistoryDocument.find(
                     {

@@ -7,7 +7,7 @@ without re-running the experiment on hardware.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -44,21 +44,26 @@ class ReanalyzeResonatorSpectroscopyParams(BaseModel):
         default=None,
         description="Strength cutoff for the high_frequency_strength estimator.",
     )
-    resonator_assignment_pattern: str | None = Field(
+    resonator_assignment_order: list[Annotated[int, Field(ge=0, le=3)]] | None = Field(
         default=None,
+        min_length=4,
+        max_length=4,
+        json_schema_extra={"uniqueItems": True},
         description=(
-            "Named resonator assignment pattern: default or 16q. "
-            "Use 16q for mux[0], mux[3], mux[1], mux[2]."
+            "Qubit offsets in increasing resonator-frequency order. "
+            "Must contain each offset from 0 to 3 exactly once."
         ),
     )
 
-    @field_validator("resonator_assignment_pattern")
+    @field_validator("resonator_assignment_order")
     @classmethod
-    def validate_resonator_assignment_pattern(cls, value: str | None) -> str | None:
+    def validate_resonator_assignment_order(cls, value: list[int] | None) -> list[int] | None:
         if value is None:
             return value
-        if value not in {"default", "16q"}:
-            raise ValueError("resonator_assignment_pattern must be 'default' or '16q'")
+        if len(value) != 4 or set(value) != set(range(4)):
+            raise ValueError(
+                "resonator_assignment_order must contain each qubit offset 0..3 exactly once"
+            )
         return value
 
 

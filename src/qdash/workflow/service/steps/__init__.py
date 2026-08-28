@@ -45,7 +45,6 @@ from qdash.workflow.service.steps.box_setup import (
 # MUX-level bring-up steps
 from qdash.workflow.service.steps.bringup import (
     BringUp,
-    ExperimentalSimultaneousBringUp,
 )
 
 # Filter steps
@@ -85,7 +84,6 @@ __all__ = [
     "CustomOneQubit",
     # 2-Qubit steps
     "CustomTwoQubit",
-    "ExperimentalSimultaneousBringUp",
     # Filter steps
     "FilterByMetric",
     "FilterByStatus",

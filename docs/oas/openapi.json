@@ -277,7 +277,7 @@
           "auth"
         ],
         "summary": "Reset user password (admin only)",
-        "description": "Reset a user's password (admin only).\n\nParameters\n----------\npassword_data : PasswordReset\n    Contains username and new_password\ncurrent_user : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\ndict[str, str]\n    Success message confirming password reset\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin",
+        "description": "Reset a user's password (admin only).\n\nParameters\n----------\npassword_data : PasswordReset\n    Contains the target username\ncurrent_user : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\nPasswordResetResponse\n    Generated temporary password, returned only in this response\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin",
         "operationId": "resetPassword",
         "requestBody": {
           "content": {
@@ -295,11 +295,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Resetpassword"
+                  "$ref": "#/components/schemas/PasswordResetResponse"
                 }
               }
             }
@@ -5761,6 +5757,80 @@
         }
       }
     },
+    "/tasks/{task_name}/execute": {
+      "post": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Execute a single task from the task catalog",
+        "description": "Execute one task without requiring a previous execution snapshot.",
+        "operationId": "quickRunTask",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuickRunTaskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{task_id}/result": {
       "get": {
         "tags": [
@@ -6005,157 +6075,6 @@
             "HTTPBearer": []
           }
         ]
-      }
-    },
-    "/task-files/tree": {
-      "get": {
-        "tags": [
-          "task-file"
-        ],
-        "summary": "Get file tree for a specific backend",
-        "description": "Get file tree structure for a specific backend directory.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n\nReturns:\n-------\n    File tree structure for the backend",
-        "operationId": "getTaskFileTree",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "backend",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Backend"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TaskFileTreeNode"
-                  },
-                  "title": "Response Gettaskfiletree"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/task-files/content": {
-      "get": {
-        "tags": [
-          "task-file"
-        ],
-        "summary": "Get task file content for viewing/editing",
-        "description": "Get task file content for viewing/editing.\n\nArgs:\n----\n    path: Relative path from CALIBTASKS_BASE_PATH\n\nReturns:\n-------\n    File content and metadata",
-        "operationId": "getTaskFileContent",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Gettaskfilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "task-file"
-        ],
-        "summary": "Save task file content",
-        "description": "Save task file content.\n\nArgs:\n----\n    request: Save file request with path and content\n\nReturns:\n-------\n    Success message",
-        "operationId": "saveTaskFileContent",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaveTaskFileRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Savetaskfilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
       }
     },
     "/task-files/backend-config": {
@@ -8499,7 +8418,7 @@
           "forum"
         ],
         "summary": "Update a forum post",
-        "description": "Update a forum post. Only the author or project owner can edit.",
+        "description": "Update a forum post, or update root-thread metadata as a project editor.",
         "operationId": "updateForumPost",
         "security": [
           {
@@ -20291,7 +20210,12 @@
           "execution_id": {
             "type": "string",
             "title": "Execution Id",
-            "description": "Execution ID"
+            "description": "QDash execution ID (falls back to the Prefect flow run ID when no execution row could be pre-created)"
+          },
+          "flow_run_id": {
+            "type": "string",
+            "title": "Flow Run Id",
+            "description": "Prefect flow run ID"
           },
           "flow_run_url": {
             "type": "string",
@@ -20312,6 +20236,7 @@
         "type": "object",
         "required": [
           "execution_id",
+          "flow_run_id",
           "flow_run_url",
           "qdash_ui_url",
           "message"
@@ -20400,6 +20325,50 @@
           "lock": {
             "type": "boolean",
             "title": "Lock"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
           }
         },
         "type": "object",
@@ -20418,6 +20387,11 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
           },
           "flow_name": {
             "type": "string",
@@ -20525,6 +20499,11 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
           },
           "user_id": {
             "anyOf": [
@@ -20719,15 +20698,6 @@
         ],
         "title": "FidelityCondition",
         "description": "Condition for fidelity filtering."
-      },
-      "FileNodeType": {
-        "type": "string",
-        "enum": [
-          "file",
-          "directory"
-        ],
-        "title": "FileNodeType",
-        "description": "File node type enum."
       },
       "FileTreeNode": {
         "properties": {
@@ -23473,6 +23443,27 @@
         "title": "ListTaskResponse",
         "description": "Response model for a list of tasks."
       },
+      "ManualCorrectionPoint": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X",
+            "description": "Selected frequency coordinate"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y",
+            "description": "Selected power coordinate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y"
+        ],
+        "title": "ManualCorrectionPoint",
+        "description": "A point selected from the source spectroscopy figure."
+      },
       "ManualEditItem": {
         "properties": {
           "parameter_name": {
@@ -23560,6 +23551,29 @@
             "type": "object",
             "title": "Parameters",
             "description": "Parameters to update. Format: {\"param_name\": {\"value\": 4.85, \"unit\": \"GHz\"}}"
+          },
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id",
+            "description": "Task result whose output values are being manually corrected"
+          },
+          "correction_point": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ManualCorrectionPoint"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plotly point selected as the visual basis for this correction"
           }
         },
         "type": "object",
@@ -23577,6 +23591,16 @@
             "type": "integer",
             "title": "Updated Count"
           },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "Created ManualParameterEdit task result ID"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "description": "Created manual edit execution ID"
+          },
           "provenance_activity_id": {
             "anyOf": [
               {
@@ -23591,7 +23615,9 @@
         },
         "type": "object",
         "required": [
-          "updated_count"
+          "updated_count",
+          "task_id",
+          "execution_id"
         ],
         "title": "ManualParameterUpdateResponse",
         "description": "Response from manual parameter update."
@@ -23922,7 +23948,106 @@
           "input_parameters": {
             "anyOf": [
               {
-                "additionalProperties": true,
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "parameter_name": {
+                          "type": "string",
+                          "title": "Parameter Name",
+                          "default": ""
+                        },
+                        "qid_role": {
+                          "type": "string",
+                          "title": "Qid Role",
+                          "default": ""
+                        },
+                        "source": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "database"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Source"
+                        },
+                        "required": {
+                          "type": "boolean",
+                          "title": "Required",
+                          "default": false
+                        },
+                        "value": {
+                          "title": "Value"
+                        },
+                        "value_type": {
+                          "type": "string",
+                          "title": "Value Type",
+                          "default": ""
+                        },
+                        "error": {
+                          "type": "number",
+                          "title": "Error",
+                          "default": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "title": "Unit",
+                          "default": ""
+                        },
+                        "description": {
+                          "type": "string",
+                          "title": "Description",
+                          "default": ""
+                        },
+                        "calibrated_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Calibrated At"
+                        },
+                        "execution_id": {
+                          "type": "string",
+                          "title": "Execution Id",
+                          "default": ""
+                        },
+                        "task_id": {
+                          "type": "string",
+                          "title": "Task Id",
+                          "default": ""
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "title": "TaskResultInputParameterModel",
+                      "description": "Input parameter persisted in task-result history."
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "items": {},
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "type": "object"
               },
               {
@@ -23934,7 +24059,114 @@
           "output_parameters": {
             "anyOf": [
               {
-                "additionalProperties": true,
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "parameter_name": {
+                          "type": "string",
+                          "title": "Parameter Name",
+                          "default": ""
+                        },
+                        "qid_role": {
+                          "type": "string",
+                          "title": "Qid Role",
+                          "default": ""
+                        },
+                        "source": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "database"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Source"
+                        },
+                        "required": {
+                          "type": "boolean",
+                          "title": "Required",
+                          "default": false
+                        },
+                        "value": {
+                          "title": "Value"
+                        },
+                        "value_type": {
+                          "type": "string",
+                          "title": "Value Type",
+                          "default": ""
+                        },
+                        "error": {
+                          "type": "number",
+                          "title": "Error",
+                          "default": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "title": "Unit",
+                          "default": ""
+                        },
+                        "description": {
+                          "type": "string",
+                          "title": "Description",
+                          "default": ""
+                        },
+                        "calibrated_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Calibrated At"
+                        },
+                        "execution_id": {
+                          "type": "string",
+                          "title": "Execution Id",
+                          "default": ""
+                        },
+                        "task_id": {
+                          "type": "string",
+                          "title": "Task Id",
+                          "default": ""
+                        },
+                        "previous_database_value": {
+                          "title": "Previous Database Value"
+                        },
+                        "database_updated": {
+                          "type": "boolean",
+                          "title": "Database Updated",
+                          "default": false
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "title": "TaskResultOutputParameterModel",
+                      "description": "Output parameter persisted in task-result history with DB comparison metadata."
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "items": {},
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "type": "object"
               },
               {
@@ -24287,7 +24519,106 @@
           "input_parameters": {
             "anyOf": [
               {
-                "additionalProperties": true,
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "parameter_name": {
+                          "type": "string",
+                          "title": "Parameter Name",
+                          "default": ""
+                        },
+                        "qid_role": {
+                          "type": "string",
+                          "title": "Qid Role",
+                          "default": ""
+                        },
+                        "source": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "database"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Source"
+                        },
+                        "required": {
+                          "type": "boolean",
+                          "title": "Required",
+                          "default": false
+                        },
+                        "value": {
+                          "title": "Value"
+                        },
+                        "value_type": {
+                          "type": "string",
+                          "title": "Value Type",
+                          "default": ""
+                        },
+                        "error": {
+                          "type": "number",
+                          "title": "Error",
+                          "default": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "title": "Unit",
+                          "default": ""
+                        },
+                        "description": {
+                          "type": "string",
+                          "title": "Description",
+                          "default": ""
+                        },
+                        "calibrated_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Calibrated At"
+                        },
+                        "execution_id": {
+                          "type": "string",
+                          "title": "Execution Id",
+                          "default": ""
+                        },
+                        "task_id": {
+                          "type": "string",
+                          "title": "Task Id",
+                          "default": ""
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "title": "TaskResultInputParameterModel",
+                      "description": "Input parameter persisted in task-result history."
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "items": {},
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "type": "object"
               },
               {
@@ -24299,7 +24630,114 @@
           "output_parameters": {
             "anyOf": [
               {
-                "additionalProperties": true,
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "parameter_name": {
+                          "type": "string",
+                          "title": "Parameter Name",
+                          "default": ""
+                        },
+                        "qid_role": {
+                          "type": "string",
+                          "title": "Qid Role",
+                          "default": ""
+                        },
+                        "source": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "database"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Source"
+                        },
+                        "required": {
+                          "type": "boolean",
+                          "title": "Required",
+                          "default": false
+                        },
+                        "value": {
+                          "title": "Value"
+                        },
+                        "value_type": {
+                          "type": "string",
+                          "title": "Value Type",
+                          "default": ""
+                        },
+                        "error": {
+                          "type": "number",
+                          "title": "Error",
+                          "default": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "title": "Unit",
+                          "default": ""
+                        },
+                        "description": {
+                          "type": "string",
+                          "title": "Description",
+                          "default": ""
+                        },
+                        "calibrated_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Calibrated At"
+                        },
+                        "execution_id": {
+                          "type": "string",
+                          "title": "Execution Id",
+                          "default": ""
+                        },
+                        "task_id": {
+                          "type": "string",
+                          "title": "Task Id",
+                          "default": ""
+                        },
+                        "previous_database_value": {
+                          "title": "Previous Database Value"
+                        },
+                        "database_updated": {
+                          "type": "boolean",
+                          "title": "Database Updated",
+                          "default": false
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "title": "TaskResultOutputParameterModel",
+                      "description": "Output parameter persisted in task-result history with DB comparison metadata."
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "items": {},
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "type": "object"
               },
               {
@@ -25008,6 +25446,23 @@
             "title": "Qid Role",
             "default": ""
           },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "database"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": false
+          },
           "value": {
             "anyOf": [
               {
@@ -25015,6 +25470,9 @@
               },
               {
                 "type": "integer"
+              },
+              {
+                "type": "null"
               }
             ],
             "title": "Value",
@@ -25059,7 +25517,7 @@
         },
         "type": "object",
         "title": "ParameterModel",
-        "description": "Calibration parameter model.\n\nUsed for both input_parameters (calibration dependencies) and\noutput_parameters (calibration outputs) in tasks.\n\nAttributes\n----------\n    parameter_name: The actual DB parameter name. If empty, the dict key is used.\n    qid_role: The qid role for 2-qubit tasks. One of:\n        - \"\" or \"self\": Use task's qid as-is (default, for 1-qubit tasks)\n        - \"control\": Use control qubit's qid (for 2-qubit tasks)\n        - \"target\": Use target qubit's qid (for 2-qubit tasks)\n        - \"coupling\": Use coupling qid as-is (for 2-qubit tasks)\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
+        "description": "Common persisted metadata for resolved calibration parameters.\n\nAttributes\n----------\n    parameter_name: The actual DB parameter name. If empty, the dict key is used.\n    source: Explicit source for dependency resolution. ``\"database\"`` declares\n        that the value must be loaded from calibration state.\n    required: Whether resolution must fail when the declared source has no value.\n    qid_role: The qid role for 2-qubit tasks. One of:\n        - \"\" or \"self\": Use task's qid as-is (default, for 1-qubit tasks)\n        - \"control\": Use control qubit's qid (for 2-qubit tasks)\n        - \"target\": Use target qubit's qid (for 2-qubit tasks)\n        - \"coupling\": Use coupling qid as-is (for 2-qubit tasks)\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
       },
       "ParameterVersionResponse": {
         "properties": {
@@ -25194,19 +25652,33 @@
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$",
             "title": "Username"
-          },
-          "new_password": {
-            "type": "string",
-            "title": "New Password"
           }
         },
         "type": "object",
         "required": [
-          "username",
-          "new_password"
+          "username"
         ],
         "title": "PasswordReset",
         "description": "Password reset request model (admin only)."
+      },
+      "PasswordResetResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "initial_password": {
+            "type": "string",
+            "title": "Initial Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "initial_password"
+        ],
+        "title": "PasswordResetResponse",
+        "description": "One-time response containing a generated temporary password."
       },
       "Position": {
         "properties": {
@@ -25660,6 +26132,61 @@
         "title": "QubitResponse",
         "description": "Response model for a single qubit."
       },
+      "QuickRunTaskRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "backend_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Name"
+          },
+          "input_parameter_overrides": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input Parameter Overrides"
+          },
+          "run_parameter_overrides": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Run Parameter Overrides"
+          },
+          "reconfigure": {
+            "type": "boolean",
+            "title": "Reconfigure",
+            "default": false
+          },
+          "persist_output_parameters": {
+            "type": "boolean",
+            "title": "Persist Output Parameters",
+            "default": false
+          },
+          "update_params": {
+            "type": "boolean",
+            "title": "Update Params",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "qid"
+        ],
+        "title": "QuickRunTaskRequest",
+        "description": "Request to execute one task directly from the task catalog."
+      },
       "ReExecuteRequest": {
         "properties": {
           "flow_name": {
@@ -25941,17 +26468,25 @@
             "title": "Bare Shift Strength Limit",
             "description": "Strength cutoff for the high_frequency_strength estimator."
           },
-          "resonator_assignment_pattern": {
+          "resonator_assignment_order": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "type": "integer",
+                  "maximum": 3.0,
+                  "minimum": 0.0
+                },
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Resonator Assignment Pattern",
-            "description": "Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2]."
+            "uniqueItems": true,
+            "title": "Resonator Assignment Order",
+            "description": "Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once."
           }
         },
         "type": "object",
@@ -26281,25 +26816,6 @@
         ],
         "title": "SaveFlowResponse",
         "description": "Response after saving a flow."
-      },
-      "SaveTaskFileRequest": {
-        "properties": {
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "content": {
-            "type": "string",
-            "title": "Content"
-          }
-        },
-        "type": "object",
-        "required": [
-          "path",
-          "content"
-        ],
-        "title": "SaveTaskFileRequest",
-        "description": "Request model for saving task file content."
       },
       "ScheduleFlowRequest": {
         "properties": {
@@ -26937,7 +27453,106 @@
           "input_parameters": {
             "anyOf": [
               {
-                "additionalProperties": true,
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "parameter_name": {
+                          "type": "string",
+                          "title": "Parameter Name",
+                          "default": ""
+                        },
+                        "qid_role": {
+                          "type": "string",
+                          "title": "Qid Role",
+                          "default": ""
+                        },
+                        "source": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "database"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Source"
+                        },
+                        "required": {
+                          "type": "boolean",
+                          "title": "Required",
+                          "default": false
+                        },
+                        "value": {
+                          "title": "Value"
+                        },
+                        "value_type": {
+                          "type": "string",
+                          "title": "Value Type",
+                          "default": ""
+                        },
+                        "error": {
+                          "type": "number",
+                          "title": "Error",
+                          "default": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "title": "Unit",
+                          "default": ""
+                        },
+                        "description": {
+                          "type": "string",
+                          "title": "Description",
+                          "default": ""
+                        },
+                        "calibrated_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Calibrated At"
+                        },
+                        "execution_id": {
+                          "type": "string",
+                          "title": "Execution Id",
+                          "default": ""
+                        },
+                        "task_id": {
+                          "type": "string",
+                          "title": "Task Id",
+                          "default": ""
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "title": "TaskResultInputParameterModel",
+                      "description": "Input parameter persisted in task-result history."
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "items": {},
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "type": "object"
               },
               {
@@ -26949,7 +27564,114 @@
           "output_parameters": {
             "anyOf": [
               {
-                "additionalProperties": true,
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "parameter_name": {
+                          "type": "string",
+                          "title": "Parameter Name",
+                          "default": ""
+                        },
+                        "qid_role": {
+                          "type": "string",
+                          "title": "Qid Role",
+                          "default": ""
+                        },
+                        "source": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "database"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Source"
+                        },
+                        "required": {
+                          "type": "boolean",
+                          "title": "Required",
+                          "default": false
+                        },
+                        "value": {
+                          "title": "Value"
+                        },
+                        "value_type": {
+                          "type": "string",
+                          "title": "Value Type",
+                          "default": ""
+                        },
+                        "error": {
+                          "type": "number",
+                          "title": "Error",
+                          "default": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "title": "Unit",
+                          "default": ""
+                        },
+                        "description": {
+                          "type": "string",
+                          "title": "Description",
+                          "default": ""
+                        },
+                        "calibrated_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Calibrated At"
+                        },
+                        "execution_id": {
+                          "type": "string",
+                          "title": "Execution Id",
+                          "default": ""
+                        },
+                        "task_id": {
+                          "type": "string",
+                          "title": "Task Id",
+                          "default": ""
+                        },
+                        "previous_database_value": {
+                          "title": "Previous Database Value"
+                        },
+                        "database_updated": {
+                          "type": "boolean",
+                          "title": "Database Updated",
+                          "default": false
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "title": "TaskResultOutputParameterModel",
+                      "description": "Output parameter persisted in task-result history with DB comparison metadata."
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "items": {},
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "type": "object"
               },
               {
@@ -27154,43 +27876,6 @@
         "title": "TaskFileSettings",
         "description": "Task file settings model."
       },
-      "TaskFileTreeNode": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "type": {
-            "$ref": "#/components/schemas/FileNodeType"
-          },
-          "children": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/TaskFileTreeNode"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Children"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "path",
-          "type"
-        ],
-        "title": "TaskFileTreeNode",
-        "description": "Task file tree node model."
-      },
       "TaskHistoryResponse": {
         "properties": {
           "name": {
@@ -27264,6 +27949,22 @@
             "type": "boolean",
             "title": "Enabled",
             "default": true
+          },
+          "input_parameters": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Input Parameters"
+          },
+          "run_parameters": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Run Parameters"
           }
         },
         "type": "object",
@@ -27602,7 +28303,106 @@
           "input_parameters": {
             "anyOf": [
               {
-                "additionalProperties": true,
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "parameter_name": {
+                          "type": "string",
+                          "title": "Parameter Name",
+                          "default": ""
+                        },
+                        "qid_role": {
+                          "type": "string",
+                          "title": "Qid Role",
+                          "default": ""
+                        },
+                        "source": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "database"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Source"
+                        },
+                        "required": {
+                          "type": "boolean",
+                          "title": "Required",
+                          "default": false
+                        },
+                        "value": {
+                          "title": "Value"
+                        },
+                        "value_type": {
+                          "type": "string",
+                          "title": "Value Type",
+                          "default": ""
+                        },
+                        "error": {
+                          "type": "number",
+                          "title": "Error",
+                          "default": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "title": "Unit",
+                          "default": ""
+                        },
+                        "description": {
+                          "type": "string",
+                          "title": "Description",
+                          "default": ""
+                        },
+                        "calibrated_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Calibrated At"
+                        },
+                        "execution_id": {
+                          "type": "string",
+                          "title": "Execution Id",
+                          "default": ""
+                        },
+                        "task_id": {
+                          "type": "string",
+                          "title": "Task Id",
+                          "default": ""
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "title": "TaskResultInputParameterModel",
+                      "description": "Input parameter persisted in task-result history."
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "items": {},
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "type": "object"
               },
               {
@@ -27614,7 +28414,114 @@
           "output_parameters": {
             "anyOf": [
               {
-                "additionalProperties": true,
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "parameter_name": {
+                          "type": "string",
+                          "title": "Parameter Name",
+                          "default": ""
+                        },
+                        "qid_role": {
+                          "type": "string",
+                          "title": "Qid Role",
+                          "default": ""
+                        },
+                        "source": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "database"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Source"
+                        },
+                        "required": {
+                          "type": "boolean",
+                          "title": "Required",
+                          "default": false
+                        },
+                        "value": {
+                          "title": "Value"
+                        },
+                        "value_type": {
+                          "type": "string",
+                          "title": "Value Type",
+                          "default": ""
+                        },
+                        "error": {
+                          "type": "number",
+                          "title": "Error",
+                          "default": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "title": "Unit",
+                          "default": ""
+                        },
+                        "description": {
+                          "type": "string",
+                          "title": "Description",
+                          "default": ""
+                        },
+                        "calibrated_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Calibrated At"
+                        },
+                        "execution_id": {
+                          "type": "string",
+                          "title": "Execution Id",
+                          "default": ""
+                        },
+                        "task_id": {
+                          "type": "string",
+                          "title": "Task Id",
+                          "default": ""
+                        },
+                        "previous_database_value": {
+                          "title": "Previous Database Value"
+                        },
+                        "database_updated": {
+                          "type": "boolean",
+                          "title": "Database Updated",
+                          "default": false
+                        }
+                      },
+                      "additionalProperties": true,
+                      "type": "object",
+                      "title": "TaskResultOutputParameterModel",
+                      "description": "Output parameter persisted in task-result history with DB comparison metadata."
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "items": {},
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "type": "object"
               },
               {
@@ -28076,14 +28983,227 @@
             "title": "Raw Data Path"
           },
           "input_parameters": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "parameter_name": {
+                      "type": "string",
+                      "title": "Parameter Name",
+                      "default": ""
+                    },
+                    "qid_role": {
+                      "type": "string",
+                      "title": "Qid Role",
+                      "default": ""
+                    },
+                    "source": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "database"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Source"
+                    },
+                    "required": {
+                      "type": "boolean",
+                      "title": "Required",
+                      "default": false
+                    },
+                    "value": {
+                      "title": "Value"
+                    },
+                    "value_type": {
+                      "type": "string",
+                      "title": "Value Type",
+                      "default": ""
+                    },
+                    "error": {
+                      "type": "number",
+                      "title": "Error",
+                      "default": 0
+                    },
+                    "unit": {
+                      "type": "string",
+                      "title": "Unit",
+                      "default": ""
+                    },
+                    "description": {
+                      "type": "string",
+                      "title": "Description",
+                      "default": ""
+                    },
+                    "calibrated_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Calibrated At"
+                    },
+                    "execution_id": {
+                      "type": "string",
+                      "title": "Execution Id",
+                      "default": ""
+                    },
+                    "task_id": {
+                      "type": "string",
+                      "title": "Task Id",
+                      "default": ""
+                    }
+                  },
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "TaskResultInputParameterModel",
+                  "description": "Input parameter persisted in task-result history."
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {},
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "type": "object",
             "title": "Input Parameters"
           },
           "output_parameters": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "parameter_name": {
+                      "type": "string",
+                      "title": "Parameter Name",
+                      "default": ""
+                    },
+                    "qid_role": {
+                      "type": "string",
+                      "title": "Qid Role",
+                      "default": ""
+                    },
+                    "source": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "const": "database"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Source"
+                    },
+                    "required": {
+                      "type": "boolean",
+                      "title": "Required",
+                      "default": false
+                    },
+                    "value": {
+                      "title": "Value"
+                    },
+                    "value_type": {
+                      "type": "string",
+                      "title": "Value Type",
+                      "default": ""
+                    },
+                    "error": {
+                      "type": "number",
+                      "title": "Error",
+                      "default": 0
+                    },
+                    "unit": {
+                      "type": "string",
+                      "title": "Unit",
+                      "default": ""
+                    },
+                    "description": {
+                      "type": "string",
+                      "title": "Description",
+                      "default": ""
+                    },
+                    "calibrated_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "title": "Calibrated At"
+                    },
+                    "execution_id": {
+                      "type": "string",
+                      "title": "Execution Id",
+                      "default": ""
+                    },
+                    "task_id": {
+                      "type": "string",
+                      "title": "Task Id",
+                      "default": ""
+                    },
+                    "previous_database_value": {
+                      "title": "Previous Database Value"
+                    },
+                    "database_updated": {
+                      "type": "boolean",
+                      "title": "Database Updated",
+                      "default": false
+                    }
+                  },
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "TaskResultOutputParameterModel",
+                  "description": "Output parameter persisted in task-result history with DB comparison metadata."
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {},
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "type": "object",
             "title": "Output Parameters"
+          },
+          "output_parameter_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Parameter Names"
           },
           "run_parameters": {
             "additionalProperties": true,

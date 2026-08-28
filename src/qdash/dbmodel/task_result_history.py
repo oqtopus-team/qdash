@@ -9,7 +9,13 @@ from qdash.common.utils.datetime import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.note import AiReviewModel, NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.datamodel.task import BaseTaskResultModel
+from qdash.datamodel.task import (
+    BaseTaskResultModel,
+    TaskResultInputParameter,
+    TaskResultOutputParameter,
+    validate_task_result_input_parameters,
+    validate_task_result_output_parameters,
+)
 from qdash.dbmodel.user import UserDocument
 
 
@@ -43,8 +49,12 @@ class TaskResultHistoryDocument(Document):
     status: str = Field(..., description="The status of the execution")
     message: str = Field(..., description="The message")
     stack_trace: str = Field("", description="The stack trace")
-    input_parameters: dict[str, Any] = Field(..., description="The input parameters")
-    output_parameters: dict[str, Any] = Field(..., description="The output parameters")
+    input_parameters: dict[str, TaskResultInputParameter] = Field(
+        ..., description="Validated input parameter snapshots"
+    )
+    output_parameters: dict[str, TaskResultOutputParameter] = Field(
+        ..., description="Output parameters, including database update comparison metadata"
+    )
     output_parameter_names: list[str] = Field(..., description="The output parameter names")
     run_parameters: dict[str, Any] = Field(default_factory=dict, description="The run parameters")
     quality_metrics: dict[str, float] = Field(
@@ -268,8 +278,8 @@ class TaskResultHistoryDocument(Document):
             status=task.status,
             message=task.message,
             stack_trace=task.stack_trace,
-            input_parameters=task.input_parameters,
-            output_parameters=task.output_parameters,
+            input_parameters=validate_task_result_input_parameters(task.input_parameters),
+            output_parameters=validate_task_result_output_parameters(task.output_parameters),
             output_parameter_names=task.output_parameter_names,
             run_parameters=task.run_parameters,
             quality_metrics=task.quality_metrics,
@@ -311,8 +321,8 @@ class TaskResultHistoryDocument(Document):
         doc.status = task.status
         doc.message = task.message
         doc.stack_trace = task.stack_trace
-        doc.input_parameters = task.input_parameters
-        doc.output_parameters = task.output_parameters
+        doc.input_parameters = validate_task_result_input_parameters(task.input_parameters)
+        doc.output_parameters = validate_task_result_output_parameters(task.output_parameters)
         doc.output_parameter_names = task.output_parameter_names
         doc.run_parameters = task.run_parameters
         doc.quality_metrics = task.quality_metrics

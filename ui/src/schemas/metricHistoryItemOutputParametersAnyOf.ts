@@ -5,5 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { MetricHistoryItemOutputParametersAnyOfAnyOf } from './metricHistoryItemOutputParametersAnyOfAnyOf';
 
-export type MetricHistoryItemOutputParametersAnyOf = { [key: string]: unknown };
+export type MetricHistoryItemOutputParametersAnyOf = {[key: string]: MetricHistoryItemOutputParametersAnyOfAnyOf | string | number | boolean | unknown[] | null};

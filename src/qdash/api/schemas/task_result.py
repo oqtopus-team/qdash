@@ -8,7 +8,11 @@ from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.copilot.config import ModelConfig
 from qdash.datamodel.note import AiReviewModel
-from qdash.datamodel.task import ParameterModel
+from qdash.datamodel.task import (
+    ParameterModel,
+    TaskResultInputParameter,
+    TaskResultOutputParameter,
+)
 
 
 class TaskResult(BaseModel):
@@ -21,8 +25,8 @@ class TaskResult(BaseModel):
     upstream_id: str | None = None
     status: str = "pending"  # Default status
     message: str | None = None
-    input_parameters: dict[str, Any] | None = None
-    output_parameters: dict[str, Any] | None = None
+    input_parameters: dict[str, TaskResultInputParameter] | None = None
+    output_parameters: dict[str, TaskResultOutputParameter] | None = None
     output_parameter_names: list[str] | None = None
     run_parameters: dict[str, Any] | None = None
     note: dict[str, Any] | None = None
@@ -109,7 +113,7 @@ class TimeSeriesProjection(BaseModel):
     """Projection model for time series data query."""
 
     qid: str
-    output_parameters: dict[str, Any]
+    output_parameters: dict[str, TaskResultOutputParameter]
     start_at: datetime
 
 

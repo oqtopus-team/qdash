@@ -3,7 +3,11 @@ from typing import ClassVar
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -18,43 +22,45 @@ class X90InterleavedRandomizedBenchmarking(QubexTask):
     name: str = "X90InterleavedRandomizedBenchmarking"
     task_type: str = "qubit"
     timeout: int = 60 * 30
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": None,  # Load from DB
-        "drag_hpi_amplitude": None,  # Load from DB
-        "drag_hpi_length": None,  # Load from DB
-        "drag_hpi_beta": None,  # Load from DB
-        "readout_amplitude": None,  # Load from DB
-        "readout_frequency": None,  # Load from DB
-        "readout_length": ParameterModel(
-            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.required_database(),
+        "drag_hpi_amplitude": InputParameterSpec.required_database(),
+        "drag_hpi_length": InputParameterSpec.required_database(),
+        "drag_hpi_beta": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_duration": InputParameterSpec.database_or_default(
+            default=DEFAULT_READOUT_DURATION,
+            unit="ns",
+            description="Readout pulse duration",
         ),
     }
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "n_trials": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "n_trials": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=10,
+            default=10,
             description="Number of trials",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=CALIBRATION_SHOTS,
+            default=CALIBRATION_SHOTS,
             description="Number of shots",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "x90_gate_fidelity": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "x90_gate_fidelity": OutputParameterSpec(
             unit="a.u.",
             description="X90 gate fidelity",
         ),
-        "x90_depolarizing_rate": ParameterModel(
+        "x90_depolarizing_rate": OutputParameterSpec(
             unit="a.u.",
             description="Depolarization error of the X90 gate",
         ),
@@ -82,9 +88,12 @@ class X90InterleavedRandomizedBenchmarking(QubexTask):
         readout_amp_param = self.input_parameters["readout_amplitude"]
         if readout_amp_param is not None:
             exp.params.readout_amplitude[label] = readout_amp_param.value
+        x90 = {label: exp.drag_hpi_pulse[label]}
         result = exp.interleaved_randomized_benchmarking(
             targets=label,
             interleaved_clifford="X90",
+            interleaved_waveform=x90,
+            x90=x90,
             n_trials=self.run_parameters["n_trials"].get_value(),
             save_image=False,
             n_shots=self.run_parameters["shots"].get_value(),

@@ -1,6 +1,10 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -15,16 +19,16 @@ class ConfigureAll(QubexTask):
 
     name: str = "ConfigureAll"
     task_type: str = "system"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "mux_ids": RunParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "mux_ids": RunParameterSpec(
             unit="a.u.",
             value_type="list",
-            value=[],
+            default=[],
             description="List of MUX IDs to configure",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {}
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str

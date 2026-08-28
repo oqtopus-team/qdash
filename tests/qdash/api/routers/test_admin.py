@@ -81,6 +81,39 @@ class TestAdminUsersEndpoints:
         response = test_client.get("/admin/users")
         assert response.status_code == 401
 
+    def test_admin_generates_temporary_password_for_user(
+        self, test_client, admin_user, regular_user, admin_headers
+    ):
+        """Admin reset returns a one-time password and requires changing it."""
+        response = test_client.post(
+            "/auth/reset-password",
+            headers=admin_headers,
+            json={"username": regular_user.username},
+        )
+
+        assert response.status_code == 200
+        temporary_password = response.json()["initial_password"]
+        assert len(temporary_password) == 18
+
+        login_response = test_client.post(
+            "/auth/login",
+            data={"username": regular_user.username, "password": temporary_password},
+        )
+        assert login_response.status_code == 200
+        assert login_response.json()["must_change_password"] is True
+
+    def test_password_reset_requires_admin(
+        self, test_client, admin_user, regular_user, user_headers
+    ):
+        """Regular users cannot generate passwords for other users."""
+        response = test_client.post(
+            "/auth/reset-password",
+            headers=user_headers,
+            json={"username": admin_user.username},
+        )
+
+        assert response.status_code == 403
+
     def test_reload_config_caches_as_admin(self, test_client, admin_user, admin_headers):
         """Admin can reload cached configuration."""
         response = test_client.post("/admin/config/reload", headers=admin_headers)

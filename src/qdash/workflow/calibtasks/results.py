@@ -7,9 +7,14 @@ execution, and postprocessing phases.
 from typing import Any
 
 import plotly.graph_objs as go
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterModel,
+    OutputParameterModel,
+    ParameterModel,
+    RunParameterModel,
+)
 
 
 class PreProcessResult(BaseModel):
@@ -17,14 +22,25 @@ class PreProcessResult(BaseModel):
 
     Attributes
     ----------
-    input_parameters : dict[str, ParameterModel]
+    input_parameters : dict[str, InputParameterModel]
         Calibration parameters loaded from backend (for provenance tracking).
     run_parameters : dict[str, RunParameterModel]
         Experiment configuration parameters (shots, ranges, etc.).
     """
 
-    input_parameters: dict[str, ParameterModel | None] = {}
+    input_parameters: dict[str, InputParameterModel] = {}
     run_parameters: dict[str, RunParameterModel] = {}
+
+    @field_validator("input_parameters", mode="before")
+    @classmethod
+    def convert_input_models(cls, values: Any) -> Any:
+        """Accept persisted base models while normalizing to the input role."""
+        if isinstance(values, dict):
+            return {
+                name: value.model_dump() if isinstance(value, ParameterModel) else value
+                for name, value in values.items()
+            }
+        return values
 
 
 class PostProcessResult(BaseModel):
@@ -41,10 +57,21 @@ class PostProcessResult(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    output_parameters: dict[str, ParameterModel]
+    output_parameters: dict[str, OutputParameterModel]
     figures: list[go.Figure | go.FigureWidget] = []
     raw_data: list[Any] = []
     validation_error: str | None = None
+
+    @field_validator("output_parameters", mode="before")
+    @classmethod
+    def convert_output_models(cls, values: Any) -> Any:
+        """Accept persisted base models while normalizing to the output role."""
+        if isinstance(values, dict):
+            return {
+                name: value.model_dump() if isinstance(value, ParameterModel) else value
+                for name, value in values.items()
+            }
+        return values
 
 
 class RunResult(BaseModel):

@@ -21,14 +21,18 @@ task ci-typecheck        # mypy
 task test                # all Python tests
 task test-api            # API tests
 task test-workflow       # workflow tests
+task test-client         # Python client tests
+task test-client-ts      # TypeScript client checks
 task test-ui             # UI tests
-task check               # broad local check
+task ci                  # Python lint, type checking, and tests
+task check-all           # full local checks including UI and secret scan
 ```
 
 ## Build and Generation
 
 ```bash
 task generate            # OpenAPI + generated UI client
+task generate-task-catalog # workflow task metadata catalog
 task build               # UI production build
 task build-docs          # documentation build
 ```

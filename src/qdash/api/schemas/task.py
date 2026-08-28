@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_valid
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.note import NoteModel
+from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 
 
 class InputParameterModel(BaseModel):
@@ -33,6 +34,19 @@ class ListTaskResponse(BaseModel):
     """Response model for a list of tasks."""
 
     tasks: list[TaskResponse]
+
+
+class QuickRunTaskRequest(BaseModel):
+    """Request to execute one task directly from the task catalog."""
+
+    chip_id: str
+    qid: str
+    backend_name: str | None = None
+    input_parameter_overrides: dict[str, Any] = Field(default_factory=dict)
+    run_parameter_overrides: dict[str, Any] = Field(default_factory=dict)
+    reconfigure: bool = False
+    persist_output_parameters: bool = False
+    update_params: bool = False
 
 
 class FailureModeResponse(BaseModel):
@@ -193,8 +207,9 @@ class TaskResultResponse(BaseModel):
     figure_path: list[str]
     json_figure_path: list[str]
     raw_data_path: list[str]
-    input_parameters: dict[str, Any]
-    output_parameters: dict[str, Any]
+    input_parameters: dict[str, TaskResultInputParameter]
+    output_parameters: dict[str, TaskResultOutputParameter]
+    output_parameter_names: list[str] = Field(default_factory=list)
     run_parameters: dict[str, Any] = {}
     tags: list[str] = []
     message: str = ""

@@ -10,8 +10,8 @@ export function ImportPageContent() {
     <PageContainer maxWidth>
       <div className="space-y-4 sm:space-y-6">
         <PageHeader
-          title="Import"
-          description="Compare and import initial calibration parameters from qubex YAML files"
+          title="Calibration Database"
+          description="View the latest calibration values for each qubit and apply updates from YAML"
         />
         <SeedParametersPanel />
       </div>

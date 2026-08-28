@@ -24,21 +24,21 @@ db.project_membership.create_index([("username", 1), ("status", 1)])
 ### ChipDocument
 
 ```python
-db.chip.create_index([("project_id", 1), ("chip_id", 1), ("username", 1)], unique=True)
+db.chip.create_index([("project_id", 1), ("chip_id", 1)], unique=True)
 db.chip.create_index([("project_id", 1), ("username", 1), ("installed_at", -1)])
 ```
 
 ### QubitDocument
 
 ```python
-db.qubit.create_index([("project_id", 1), ("chip_id", 1), ("qid", 1), ("username", 1)], unique=True)
+db.qubit.create_index([("project_id", 1), ("chip_id", 1), ("qid", 1)], unique=True)
 db.qubit.create_index([("project_id", 1), ("chip_id", 1)])
 ```
 
 ### CouplingDocument
 
 ```python
-db.coupling.create_index([("project_id", 1), ("chip_id", 1), ("qid", 1), ("username", 1)], unique=True)
+db.coupling.create_index([("project_id", 1), ("chip_id", 1), ("qid", 1)], unique=True)
 db.coupling.create_index([("project_id", 1), ("chip_id", 1)])
 ```
 
@@ -102,28 +102,38 @@ db.execution_lock.create_index([("project_id", 1)], unique=True)
 ### ExecutionCounterDocument
 
 ```python
-db.execution_counter.create_index([("project_id", 1), ("date", 1), ("username", 1), ("chip_id", 1)], unique=True)
+db.execution_counter.create_index([("project_id", 1), ("date", 1), ("chip_id", 1)], unique=True)
 ```
 
 ### ChipHistoryDocument
 
 ```python
-db.chip_history.create_index([("project_id", 1), ("chip_id", 1), ("username", 1), ("recorded_date", 1)], unique=True)
+db.chip_history.create_index([("project_id", 1), ("chip_id", 1), ("recorded_date", 1)], unique=True)
 db.chip_history.create_index([("project_id", 1), ("chip_id", 1), ("recorded_date", -1)])
 ```
 
 ### QubitHistoryDocument
 
 ```python
-db.qubit_history.create_index([("project_id", 1), ("chip_id", 1), ("qid", 1), ("username", 1), ("recorded_date", 1)], unique=True)
+db.qubit_history.create_index([("project_id", 1), ("chip_id", 1), ("qid", 1), ("recorded_date", 1)], unique=True)
 db.qubit_history.create_index([("project_id", 1), ("chip_id", 1), ("recorded_date", -1)])
 ```
 
 ### CouplingHistoryDocument
 
 ```python
-db.coupling_history.create_index([("project_id", 1), ("chip_id", 1), ("qid", 1), ("username", 1), ("recorded_date", 1)], unique=True)
+db.coupling_history.create_index([("project_id", 1), ("chip_id", 1), ("qid", 1), ("recorded_date", 1)], unique=True)
 db.coupling_history.create_index([("project_id", 1), ("chip_id", 1), ("recorded_date", -1)])
+```
+
+### CalibrationNoteDocument
+
+```python
+db.calibration_note.create_index(
+    [("project_id", 1), ("execution_id", 1), ("task_id", 1), ("chip_id", 1)],
+    unique=True,
+)
+db.calibration_note.create_index([("project_id", 1), ("chip_id", 1), ("timestamp", 1)])
 ```
 
 ### TaskResultHistoryDocument

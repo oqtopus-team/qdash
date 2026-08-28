@@ -15,20 +15,21 @@ import {
   ChevronDown,
   ChevronRight,
   RotateCcw,
-  AlertCircle,
   UserRound,
+  Pencil,
 } from "lucide-react";
 import { useGetTaskResult, getGetTaskResultQueryKey } from "@/client/task/task";
 import { useCreateIssue, getGetTaskResultIssuesQueryKey } from "@/client/issue/issue";
 import { useQueryClient } from "@tanstack/react-query";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
+import { SpectroscopyManualCorrection } from "@/components/features/task-results/SpectroscopyManualCorrection";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
-import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
@@ -40,7 +41,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
-import { useToast } from "@/components/ui/Toast";
+import { formatTaskParameter, parseTaskParameter } from "@/lib/utils/task-parameters";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
@@ -58,9 +59,16 @@ function formatActorLabel(actor?: ActorFields | null) {
 /** Extract the display value from a parameter entry (may be a dict with `value` key or a plain value). */
 function extractParamValue(entry: unknown): string {
   if (entry != null && typeof entry === "object" && "value" in (entry as Record<string, unknown>)) {
-    return String((entry as Record<string, unknown>).value ?? "");
+    return formatTaskParameter((entry as Record<string, unknown>).value);
   }
-  return String(entry ?? "");
+  return formatTaskParameter(entry);
+}
+
+function extractParamValueType(entry: unknown): unknown {
+  if (entry != null && typeof entry === "object" && "value_type" in entry) {
+    return (entry as Record<string, unknown>).value_type;
+  }
+  return undefined;
 }
 
 /** Extract the unit from a parameter entry. */
@@ -81,24 +89,16 @@ function buildFormValues(params: Record<string, unknown> | undefined): Record<st
   return result;
 }
 
-/** Parse a string back to a number if possible, otherwise keep as string. */
-function parseValue(val: string): string | number | boolean {
-  if (val === "true") return true;
-  if (val === "false") return false;
-  const num = Number(val);
-  if (val.trim() !== "" && !isNaN(num)) return num;
-  return val;
-}
-
 /** Compute changed overrides by comparing current form values to originals. */
 function computeOverrides(
+  parameters: Record<string, unknown>,
   original: Record<string, string>,
   current: Record<string, string>,
-): Record<string, string | number | boolean> {
-  const overrides: Record<string, string | number | boolean> = {};
+): Record<string, unknown> {
+  const overrides: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(current)) {
     if (val !== original[key]) {
-      overrides[key] = parseValue(val);
+      overrides[key] = parseTaskParameter(val, extractParamValueType(parameters[key]));
     }
   }
   return overrides;
@@ -275,10 +275,15 @@ function IssueCard({
   );
 }
 
+/**
+ * Full page view of a single task result.
+ *
+ * Shows figures, artifacts, and parameters, and lets the user re-execute the task with
+ * overridden parameters. Also hosts the AI review note, the memo editor, and linked issues.
+ */
 export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const toast = useToast();
   const { username: currentUser } = useAuth();
   const { isOwner } = useProject();
   const [showEditor, setShowEditor] = useState(false);
@@ -394,8 +399,14 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
     setReExecCountBefore(taskResult.re_executions?.length ?? 0);
     try {
       // Build parameter_overrides only with changed values
-      const runOverrides = computeOverrides(originalRunValues, runParamValues);
-      const inputOverrides = computeOverrides(originalInputValues, inputParamValues);
+      const runParameters = taskResult.run_parameters as Record<string, unknown> | undefined;
+      const inputParameters = taskResult.input_parameters as Record<string, unknown> | undefined;
+      const runOverrides = computeOverrides(runParameters ?? {}, originalRunValues, runParamValues);
+      const inputOverrides = computeOverrides(
+        inputParameters ?? {},
+        originalInputValues,
+        inputParamValues,
+      );
       const hasOverrides =
         Object.keys(runOverrides).length > 0 || Object.keys(inputOverrides).length > 0;
 
@@ -456,6 +467,13 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
     );
   }
 
+  const manualCorrections = (taskResult.re_executions ?? []).filter(
+    (result) => result.task_name === "ManualParameterEdit",
+  );
+  const relatedExecutions = (taskResult.re_executions ?? []).filter(
+    (result) => result.task_name !== "ManualParameterEdit",
+  );
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
@@ -480,6 +498,40 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       </div>
 
       {/* Task Info Box */}
+      {taskResult.task_name === "ManualParameterEdit" && (
+        <div className="mb-4 overflow-hidden rounded-xl border border-success/30 bg-success/5">
+          <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-success/15 p-2 text-success">
+                <CheckCircle size={18} />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-sm font-semibold">Manual correction applied</h2>
+                  <span className="badge badge-sm badge-success">Calibration DB updated</span>
+                </div>
+                <p className="mt-1 text-xs text-base-content/60">
+                  {Object.keys(taskResult.output_parameters ?? {}).length} calibration
+                  {Object.keys(taskResult.output_parameters ?? {}).length === 1
+                    ? " value was"
+                    : " values were"}{" "}
+                  manually corrected. The source measurement remains unchanged.
+                </p>
+              </div>
+            </div>
+            {taskResult.source_task_id && (
+              <a
+                href={`/task-results/${taskResult.source_task_id}`}
+                className="btn btn-sm btn-outline shrink-0 gap-2"
+              >
+                View source result
+                <ExternalLink size={14} />
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="bg-base-200/50 rounded-lg p-4 mb-4">
         <h2 className="text-sm font-semibold mb-2">{taskResult.task_name}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
@@ -549,7 +601,11 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           {/* Parent: re-executed from */}
           {taskResult.source_task_id && (
             <div className="flex items-center gap-2 text-xs">
-              <span className="text-base-content/50">Re-executed from:</span>
+              <span className="text-base-content/50">
+                {taskResult.task_name === "ManualParameterEdit"
+                  ? "Corrected from:"
+                  : "Created from:"}
+              </span>
               <a
                 href={`/task-results/${taskResult.source_task_id}`}
                 className="font-mono text-primary hover:underline"
@@ -559,26 +615,55 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
               </a>
             </div>
           )}
-          {/* Children: re-executions from this task */}
-          {taskResult.re_executions && taskResult.re_executions.length > 0 && (
+          {manualCorrections.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-base-content/50 mb-2 flex items-center gap-1.5">
-                <RefreshCw className="h-3 w-3" />
-                Re-executions ({taskResult.re_executions.length})
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-base-content/60">
+                <Pencil className="h-3 w-3" />
+                Manual corrections ({manualCorrections.length})
               </h3>
               <div className="space-y-1">
-                {taskResult.re_executions.map((re) => (
+                {manualCorrections.map((correction) => (
                   <a
-                    key={re.task_id}
-                    href={`/task-results/${re.task_id}`}
-                    className="flex items-center gap-2 text-xs p-2 rounded hover:bg-base-200 transition-colors"
+                    key={correction.task_id}
+                    href={`/task-results/${correction.task_id}`}
+                    className="flex items-center gap-2 rounded-lg border border-success/20 bg-success/5 p-2.5 text-xs transition-colors hover:bg-success/10"
                   >
-                    <span className="font-mono text-primary">{re.task_id.slice(0, 8)}...</span>
-                    <StatusBadge status={re.status} />
+                    <span className="font-medium">Manual correction</span>
+                    <span className="font-mono text-primary">
+                      {correction.task_id.slice(0, 8)}...
+                    </span>
+                    <StatusBadge status={correction.status} />
                     <span className="text-base-content/40">
-                      {re.start_at ? formatRelativeTime(re.start_at as string) : ""}
+                      {correction.start_at ? formatRelativeTime(correction.start_at as string) : ""}
                     </span>
                     <ExternalLink className="h-3 w-3 text-base-content/30 ml-auto" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          {relatedExecutions.length > 0 && (
+            <div>
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-base-content/50">
+                <RefreshCw className="h-3 w-3" />
+                Related executions ({relatedExecutions.length})
+              </h3>
+              <div className="space-y-1">
+                {relatedExecutions.map((execution) => (
+                  <a
+                    key={execution.task_id}
+                    href={`/task-results/${execution.task_id}`}
+                    className="flex items-center gap-2 rounded p-2 text-xs transition-colors hover:bg-base-200"
+                  >
+                    <span className="font-mono text-primary">
+                      {execution.task_id.slice(0, 8)}...
+                    </span>
+                    <span className="badge badge-sm badge-outline">{execution.task_name}</span>
+                    <StatusBadge status={execution.status} />
+                    <span className="text-base-content/40">
+                      {execution.start_at ? formatRelativeTime(execution.start_at as string) : ""}
+                    </span>
+                    <ExternalLink className="ml-auto h-3 w-3 text-base-content/30" />
                   </a>
                 ))}
               </div>
@@ -614,18 +699,6 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         </div>
       )}
 
-      {/* Re-analysis (preview-only re-run for spectroscopy tasks) */}
-      {taskResult.chip_id && REANALYZABLE_TASKS.has(taskResult.task_name) && (
-        <div className="mb-6">
-          <ReanalysisPanel
-            chipId={taskResult.chip_id}
-            qubitId={taskResult.qid}
-            taskName={taskResult.task_name}
-            sourceTaskId={taskResult.task_id}
-          />
-        </div>
-      )}
-
       {/* Parameters */}
       <div className="space-y-4 mb-6">
         {taskResult.input_parameters && Object.keys(taskResult.input_parameters).length > 0 && (
@@ -642,6 +715,18 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           />
         )}
 
+        {taskResult.chip_id && REANALYZABLE_TASKS.has(taskResult.task_name) && (
+          <SpectroscopyManualCorrection
+            chipId={taskResult.chip_id}
+            qid={taskResult.qid}
+            taskId={taskResult.task_id}
+            taskName={taskResult.task_name}
+            outputParameters={(taskResult.output_parameters ?? {}) as Record<string, unknown>}
+            outputParameterNames={taskResult.output_parameter_names ?? []}
+            jsonFigurePaths={taskResult.json_figure_path ?? []}
+          />
+        )}
+
         {taskResult.run_parameters && Object.keys(taskResult.run_parameters).length > 0 && (
           <ParametersTable
             title="Run Parameters"
@@ -649,40 +734,11 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           />
         )}
 
-        {taskResult.status === "failed" && taskResult.message && (
-          <div className="border border-error/40 rounded-lg overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 bg-error/10 text-error text-sm font-semibold">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              Error Log
-            </div>
-            <pre className="px-3 py-3 text-xs font-mono text-error/80 whitespace-pre-wrap break-all bg-error/5">
-              {taskResult.message}
-            </pre>
-            {taskResult.stack_trace && (
-              <>
-                <div className="px-3 py-1 text-xs font-semibold text-error/60 bg-error/5 border-t border-error/20 flex justify-between items-center">
-                  Stack Trace
-                  <button
-                    className="btn btn-ghost btn-xs"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(taskResult.stack_trace ?? "");
-                        toast.success("Copied to clipboard");
-                      } catch {
-                        toast.error("Failed to copy to clipboard");
-                      }
-                    }}
-                  >
-                    Copy
-                  </button>
-                </div>
-                <pre className="px-3 py-3 text-xs font-mono text-error/60 whitespace-pre-wrap break-all bg-error/5">
-                  {taskResult.stack_trace}
-                </pre>
-              </>
-            )}
-          </div>
-        )}
+        <TaskMessagePanel
+          status={taskResult.status}
+          message={taskResult.message}
+          stackTrace={taskResult.stack_trace}
+        />
       </div>
 
       <TaskResultAiReviewNote note={taskResult.ai_review_note} hideWhenEmpty />

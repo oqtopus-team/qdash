@@ -57,7 +57,6 @@ class ChipHistoryDocument(Document):
                 [
                     ("project_id", ASCENDING),
                     ("chip_id", ASCENDING),
-                    ("username", ASCENDING),
                     ("recorded_date", ASCENDING),
                 ],
                 unique=True,
@@ -96,7 +95,6 @@ class ChipHistoryDocument(Document):
             {
                 "project_id": project_id,
                 "chip_id": chip_id,
-                "username": username,
                 "recorded_date": yesterday,
             }
         ).run()
@@ -145,7 +143,6 @@ class ChipHistoryDocument(Document):
                 {
                     "project_id": chip_doc.project_id,
                     "chip_id": chip_doc.chip_id,
-                    "username": chip_doc.username,
                     "recorded_date": today,
                 }
             ).run()

@@ -8,11 +8,11 @@ Centralising these definitions avoids circular imports between modules
 that need to reference TaskProtocol or TaskExecutionResult.
 """
 
-from typing import Any, ClassVar, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
-from qdash.datamodel.task import CalibDataModel, ParameterModel
+from qdash.datamodel.task import CalibDataModel, OutputParameterModel
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 
 
@@ -23,8 +23,9 @@ class TaskProtocol(Protocol):
     name: str
     r2_threshold: float
     backend: str
-    input_parameters: ClassVar[dict[str, Any]]
-    run_parameters: ClassVar[dict[str, Any]]
+    input_parameters: dict[str, Any]
+    input_parameters_from_snapshot: bool
+    run_parameters: dict[str, Any]
 
     def get_name(self) -> str:
         """Get task name."""
@@ -44,6 +45,14 @@ class TaskProtocol(Protocol):
 
     def preprocess(self, backend: Any, qid: str) -> PreProcessResult | None:
         """Run preprocessing."""
+        ...
+
+    def prepare_run(self, backend: Any, qid: str) -> None:
+        """Apply resolved inputs immediately before task execution."""
+        ...
+
+    def resolve_run_parameters(self, backend: Any, qid: str) -> None:
+        """Resolve backend-dependent defaults before recording run parameters."""
         ...
 
     def run(self, backend: Any, qid: str) -> RunResult | None:
@@ -70,7 +79,7 @@ class TaskProtocol(Protocol):
         """Run postprocessing."""
         ...
 
-    def attach_task_id(self, task_id: str) -> dict[str, ParameterModel]:
+    def attach_task_id(self, task_id: str) -> dict[str, OutputParameterModel]:
         """Attach task ID to output parameters."""
         ...
 

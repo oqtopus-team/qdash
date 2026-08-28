@@ -157,6 +157,7 @@ class CRScheduler:
         chip_id: str,
         wiring_config_path: str | Path | None = None,
         *,
+        project_id: str | None = None,
         chip_repo: ChipRepository | None = None,
     ) -> None:
         """Initialize CR scheduler.
@@ -172,6 +173,7 @@ class CRScheduler:
         """
         self.username = username
         self.chip_id = chip_id
+        self.project_id = project_id
         self.wiring_config_path = wiring_config_path
         self._chip_repo = chip_repo
         self._chip: ChipModel | None = None
@@ -193,9 +195,13 @@ class CRScheduler:
         """Load chip data from database."""
         if self._chip is None:
             chip_repo = self._ensure_chip_repo()
-            chip = chip_repo.get_current_chip(self.username)
+            if self.project_id:
+                chip = chip_repo.find_by_id(self.project_id, self.chip_id)
+            else:
+                chip = chip_repo.get_current_chip(self.username)
             if chip is None:
-                raise ValueError(f"Chip not found for user {self.username}")
+                scope = f"project {self.project_id}" if self.project_id else f"user {self.username}"
+                raise ValueError(f"Chip {self.chip_id} not found for {scope}")
             self._chip = chip
         return self._chip
 

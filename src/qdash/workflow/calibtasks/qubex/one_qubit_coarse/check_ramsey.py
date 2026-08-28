@@ -7,7 +7,11 @@ from qubex.measurement.measurement_defaults import (
     DEFAULT_SHOTS,
 )
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -21,46 +25,50 @@ class CheckRamsey(QubexTask):
 
     name: str = "CheckRamsey"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": None,  # Load from DB
-        "hpi_amplitude": None,  # Load from DB
-        "hpi_length": None,  # Load from DB
-        "readout_amplitude": None,  # Load from DB
-        "readout_frequency": None,  # Load from DB
-        "readout_length": ParameterModel(
-            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.required_database(),
+        "hpi_amplitude": InputParameterSpec.required_database(),
+        "hpi_duration": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_duration": InputParameterSpec.database_or_default(
+            default=DEFAULT_READOUT_DURATION,
+            unit="ns",
+            description="Readout pulse duration",
         ),
     }
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "detuning": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "detuning": RunParameterSpec(
             unit="GHz",
             value_type="float",
-            value=0.001,
+            default=0.001,
             description="Detuning for Ramsey oscillation",
         ),
-        "time_range": RunParameterModel(
+        "time_range": RunParameterSpec(
             unit="ns",
             value_type="np.arange",
-            value=(0, 10001, 100),
+            default=(0, 10001, 100),
             description="Time range for Rabi oscillation",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=DEFAULT_SHOTS,
+            default=DEFAULT_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval for Rabi oscillation",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "ramsey_frequency": ParameterModel(unit="MHz", description="Ramsey oscillation frequency"),
-        "qubit_frequency": ParameterModel(unit="GHz", description="Qubit bare frequency"),
-        "t2_star": ParameterModel(unit="μs", description="T2* time"),
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "ramsey_frequency": OutputParameterSpec(
+            unit="MHz", description="Ramsey oscillation frequency"
+        ),
+        "qubit_frequency": OutputParameterSpec(unit="GHz", description="Qubit bare frequency"),
+        "t2_star": OutputParameterSpec(unit="μs", description="T2* time"),
     }
 
     def make_figure(self, result_x: Any, result_y: Any, label: str) -> go.Figure:

@@ -56,7 +56,6 @@ class CouplingDocument(Document):
                     ("project_id", ASCENDING),
                     ("chip_id", ASCENDING),
                     ("qid", ASCENDING),
-                    ("username", ASCENDING),
                 ],
                 unique=True,
             ),
@@ -83,27 +82,22 @@ class CouplingDocument(Document):
         project_id: str | None,
     ) -> "CouplingDocument":
         """Update the CouplingDocument's calibration data with new values."""
-        query: dict[str, Any] = {"qid": qid, "chip_id": chip_id}
-        if project_id:
-            query["project_id"] = project_id
-            coupling_doc = cls.find_one(query).run()
+        if project_id is not None:
+            query = {"project_id": project_id, "qid": qid, "chip_id": chip_id}
         else:
-            coupling_doc = None
-
-        if coupling_doc is None:
-            coupling_doc = cls.find_one(
-                {"username": username, "qid": qid, "chip_id": chip_id}
-            ).run()
+            query = {"username": username, "qid": qid, "chip_id": chip_id}
+        coupling_doc = cls.find_one(query).run()
 
         if coupling_doc is None:
             raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
         coupling_doc.user_id = cls._user_id_for_username(username)
+        coupling_doc.username = username
         coupling_doc.data = CouplingDocument.merge_calib_data(coupling_doc.data, output_parameters)
         coupling_doc.system_info.update_time()
         coupling_doc.save()
         # Create history entry for the updated coupling
         coupling_model = CouplingModel(
-            project_id=project_id,
+            project_id=coupling_doc.project_id,
             user_id=coupling_doc.user_id,
             qid=qid,
             chip_id=chip_id,

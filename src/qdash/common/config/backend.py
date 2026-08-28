@@ -14,7 +14,7 @@ class BackendDefinition(BaseModel):
     """Definition of a single backend."""
 
     description: str = ""
-    tasks: list[str] = Field(default_factory=list)
+    tasks: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class BackendConfig(BaseModel):
@@ -22,7 +22,6 @@ class BackendConfig(BaseModel):
 
     default_backend: str = "qubex"
     backends: dict[str, BackendDefinition] = Field(default_factory=dict)
-    categories: dict[str, list[str]] = Field(default_factory=dict)
 
 
 @lru_cache(maxsize=1)
@@ -41,7 +40,13 @@ def get_tasks(backend: str) -> list[str]:
     backend_def = config.backends.get(backend)
     if backend_def is None:
         return []
-    return backend_def.tasks
+    return [task for tasks in backend_def.tasks.values() for task in tasks]
+
+
+def get_task_groups(backend: str) -> dict[str, list[str]]:
+    """Get task groups for a backend in configured display order."""
+    backend_def = load_backend_config().backends.get(backend)
+    return backend_def.tasks if backend_def is not None else {}
 
 
 def get_available_backends() -> list[str]:
@@ -62,10 +67,9 @@ def is_task_available(task_name: str, backend: str) -> bool:
     return task_name in get_tasks(backend)
 
 
-def get_task_category(task_name: str) -> str | None:
+def get_task_category(task_name: str, backend: str) -> str | None:
     """Get the category for a task."""
-    config = load_backend_config()
-    for category, tasks in config.categories.items():
+    for category, tasks in get_task_groups(backend).items():
         if task_name in tasks:
             return category
     return None

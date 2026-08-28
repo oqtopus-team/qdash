@@ -16,9 +16,11 @@ import { useGetExecution, useCancelExecution } from "@/client/execution/executio
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { getCancelErrorMessage } from "@/components/features/execution/getCancelErrorMessage";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
+import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
+import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 
 type FilterOption = {
   value: string;
@@ -46,6 +48,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
   const [topologyMode, setTopologyMode] = useState<TopologyMode>("1q");
   const [filterTaskName, setFilterTaskName] = useState<string>("");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
 
   const calculateDetailedDuration = (
     start: string | null | undefined,
@@ -162,7 +165,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
       }),
       menu: (provided) => ({
         ...provided,
-        zIndex: 20,
+        zIndex: 40,
       }),
     }),
     [],
@@ -264,6 +267,11 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               <span className="truncate">{formatActorLabel(execution)}</span>
             </div>
           </div>
+          {execution.status === "failed" && execution.message && (
+            <div className="alert alert-error items-start">
+              <span className="break-words whitespace-pre-wrap">{execution.message}</span>
+            </div>
+          )}
         </div>
 
         <div className="bg-base-100 rounded-lg shadow-md p-6">
@@ -311,8 +319,16 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
             </div>
           )}
 
-        <div className="bg-base-100 rounded-lg shadow-md p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
+        <div
+          className={
+            isFullscreen ? gridFullscreenPanelClass : "bg-base-100 rounded-lg shadow-md p-4 sm:p-6"
+          }
+        >
+          <div
+            className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 ${
+              isFullscreen ? "shrink-0" : "mb-4"
+            }`}
+          >
             <div>
               <h2 className="text-lg sm:text-xl font-bold">Task Topology</h2>
               <p className="mt-1 text-xs text-base-content/60">
@@ -345,7 +361,9 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           </div>
 
           {/* Filter Controls */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
+          <div
+            className={`flex flex-col sm:flex-row gap-2 sm:gap-4 ${isFullscreen ? "shrink-0" : "mb-4"}`}
+          >
             <div className="form-control flex-1 min-w-0">
               <label className="label py-1">
                 <span className="label-text text-xs font-semibold">Task Name</span>
@@ -372,6 +390,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
             tasks={execution.task || []}
             topologyMode={topologyMode}
             filterTaskName={filterTaskName}
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={toggleFullscreen}
           />
         </div>
       </div>

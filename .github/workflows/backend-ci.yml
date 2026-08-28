@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
     paths:
       - "src/qdash/**"
+      - "scripts/generate_task_catalog.py"
       - "tests/**"
       - "pyproject.toml"
       - "uv.lock"
@@ -14,6 +15,7 @@ on:
     branches: [main, develop]
     paths:
       - "src/qdash/**"
+      - "scripts/generate_task_catalog.py"
       - "tests/**"
       - "pyproject.toml"
       - "uv.lock"

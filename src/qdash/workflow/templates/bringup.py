@@ -6,7 +6,7 @@ resonator spectroscopy. Bring-up tasks are executed once per MUX, not per qubit.
 Example:
     bringup(
         username="alice",
-        chip_id="64Qv3",
+        chip_id="16Q",
         mux_ids=[0, 1, 2, 3],
     )
 """
@@ -16,7 +16,11 @@ from typing import Any
 from prefect import flow
 
 from qdash.workflow.service import CalibService
-from qdash.workflow.service.calib_service import on_flow_cancellation
+from qdash.workflow.service.calib_service import (
+    on_flow_cancellation,
+    on_flow_crashed,
+    on_flow_failure,
+)
 from qdash.workflow.service.steps import BringUp, ConfigureAll
 from qdash.workflow.service.targets import MuxTargets
 
@@ -28,7 +32,11 @@ BRINGUP_TASKS: list[str] = [
 ]
 
 
-@flow(on_cancellation=[on_flow_cancellation])
+@flow(
+    on_cancellation=[on_flow_cancellation],
+    on_failure=[on_flow_failure],
+    on_crashed=[on_flow_crashed],
+)
 def bringup(
     username: str,
     chip_id: str,
@@ -39,7 +47,6 @@ def bringup(
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
-    resonator_assignment_pattern: str | None = None,
 ) -> Any:
     """Bring-up calibration for MUX-level characterization.
 
@@ -60,9 +67,6 @@ def bringup(
             - "synchronized": Step-based synchronized execution
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
-        resonator_assignment_pattern: Named resonator assignment pattern for
-            CheckResonatorSpectroscopy. Use "16q" for mux[0], mux[3], mux[1], mux[2].
-
     Returns:
         Pipeline results with bring-up step outputs
     """
@@ -75,15 +79,40 @@ def bringup(
 
     default_run_parameters: dict[str, Any] = {
         "interval": {"value": 150 * 1024, "value_type": "int"},
+        # resonator_assignment_order lists the four qid offsets within each MUX
+        # in increasing resonator-frequency order. The default is [3, 0, 2, 1].
+        # For 16Q, override it with [0, 3, 1, 2] because the order is
+        # mux[0] < mux[3] < mux[1] < mux[2].
+        #
+        # CheckResonatorSpectroscopy uses the connected readout box's qubex default:
+        # low band [5.75, 6.75, 0.002] GHz or high band [9.75, 10.75, 0.002] GHz.
+        # Its qubex default power range is [-60, 5, 5] dB (stop is exclusive).
+        # Leave each range unset to use its default, or uncomment to override it.
+        # "CheckResonatorSpectroscopy": {
+        #     "resonator_assignment_order": {
+        #         "value": [0, 3, 1, 2],
+        #         "value_type": "list",
+        #     },
+        #     "frequency_range": {
+        #         "value": [5.75, 6.75, 0.002],
+        #         "value_type": "np.arange",
+        #     },
+        # },
+        # CheckQubitSpectroscopy uses the connected control box's qubex default:
+        # low band [3.0, 5.75, 0.005] GHz or high band [6.5, 9.75, 0.005] GHz.
+        # Its qubex default power range is [-60, 0, 5] dB (stop is exclusive).
+        # Leave frequency_range unset to use that default, or uncomment to override it.
+        # "CheckQubitSpectroscopy": {
+        #     "frequency_range": {
+        #         "value": [3.0, 5.75, 0.005],
+        #         "value_type": "np.arange",
+        #     },
+        #     "power_range": {
+        #         "value": [-60, 0, 10],
+        #         "value_type": "np.arange",
+        #     },
+        # },
     }
-    if resonator_assignment_pattern:
-        default_run_parameters["CheckResonatorSpectroscopy"] = {
-            "resonator_assignment_pattern": {
-                "value": resonator_assignment_pattern,
-                "value_type": "str",
-            },
-        }
-
     steps = [
         ConfigureAll(),
         BringUp(mode=mode, tasks=BRINGUP_TASKS),

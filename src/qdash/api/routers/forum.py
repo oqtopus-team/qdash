@@ -429,7 +429,7 @@ def update_forum_post(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> ForumPostResponse:
-    """Update a forum post. Only the author or project owner can edit."""
+    """Update a forum post, or update root-thread metadata as a project editor."""
     # Distinguish "content_blocks omitted" (leave unchanged) from "explicitly []"
     # (clear); the default_factory makes both look like [] on the model otherwise.
     content_blocks = body.content_blocks if "content_blocks" in body.model_fields_set else None

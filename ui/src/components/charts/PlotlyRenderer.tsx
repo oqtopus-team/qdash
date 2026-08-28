@@ -1,15 +1,20 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import type { PlotMouseEvent } from "plotly.js";
 
 import Plot from "@/components/charts/Plot";
 
 export function PlotlyRenderer({
   fullPath,
   className = "",
+  onClick,
+  highlightPoint,
 }: {
   fullPath: string;
   className?: string;
+  onClick?: (event: PlotMouseEvent) => void;
+  highlightPoint?: { x: number; y: number; label?: string } | null;
 }) {
   const { data: figure, error } = useQuery({
     queryKey: ["plotly-figure", fullPath],
@@ -26,7 +31,29 @@ export function PlotlyRenderer({
   return (
     <div className={className}>
       <Plot
-        data={figure.data}
+        data={[
+          ...figure.data,
+          ...(highlightPoint
+            ? [
+                {
+                  x: [highlightPoint.x],
+                  y: [highlightPoint.y],
+                  type: "scatter" as const,
+                  mode: "markers+text" as const,
+                  name: highlightPoint.label ?? "Manual correction",
+                  text: [highlightPoint.label ?? "Selected"],
+                  textposition: "top center" as const,
+                  marker: {
+                    color: "var(--color-error)",
+                    size: 12,
+                    symbol: "x",
+                    line: { width: 2 },
+                  },
+                  hovertemplate: "x=%{x}<br>y=%{y}<extra>Manual correction</extra>",
+                },
+              ]
+            : []),
+        ]}
         layout={{
           ...figure.layout,
           autosize: false,
@@ -34,6 +61,7 @@ export function PlotlyRenderer({
         }}
         config={{ displayModeBar: true, responsive: false }}
         useResizeHandler={false}
+        onClick={onClick}
         style={{ width: "auto", height: "auto" }}
       />
     </div>

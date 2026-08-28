@@ -27,7 +27,7 @@ import {
   toForumCategoryDefinition,
 } from "./categories";
 import { ForumLabelPicker } from "./ForumLabelSelector";
-import type { ForumBlockSnapshotGetter } from "./ForumBlockEditor";
+import type { ForumBlockSnapshotGetter, ForumMentionCandidate } from "./ForumBlockEditor";
 
 const ForumBlockEditor = dynamic(
   () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
@@ -128,6 +128,20 @@ export function ForumNewPage() {
     () => (membersResponse?.data.members ?? []).filter((member) => member.status === "active"),
     [membersResponse?.data.members],
   );
+  const mentionCandidates: ForumMentionCandidate[] = useMemo(
+    () => [
+      { id: "qdash", label: "QDash" },
+      { id: "project", label: "Project", secondaryLabel: "Notify all project members" },
+      ...members
+        .filter((member) => member.username !== user?.username)
+        .map((member) => ({
+          id: member.username,
+          label: member.display_name || member.username,
+          secondaryLabel: member.organization ?? undefined,
+        })),
+    ],
+    [members, user?.username],
+  );
 
   const createMutation = useCreateForumPost();
 
@@ -217,6 +231,7 @@ export function ForumNewPage() {
               }}
               onImageUpload={uploadImage}
               snapshotRef={editorSnapshotRef}
+              mentionCandidates={mentionCandidates}
             />
             <div className="mt-2 flex items-center justify-between gap-2">
               <span className="text-xs text-base-content/50">

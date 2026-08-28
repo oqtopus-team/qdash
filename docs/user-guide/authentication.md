@@ -1,176 +1,59 @@
-# Authentication and User Management
+# Authentication and Users
 
-QDash uses JWT-based authentication with a two-tier role system: system roles (admin/user) and project roles (owner/editor/viewer). Only administrators can create new user accounts.
+QDash combines system-wide user accounts with project-specific roles.
 
-## System Roles
+## Sign In
 
-System roles control platform-wide permissions:
-
-| Role      | Capabilities                                      |
-| --------- | ------------------------------------------------- |
-| **Admin** | Create new users, reset any user's password       |
-| **User**  | Standard access, can only change own password     |
-
-### How Admin Role is Assigned
-
-The admin role is assigned based on the `QDASH_ADMIN_USERNAME` environment variable. When a user is created with a username matching this variable, they are automatically assigned the admin role.
-
-```bash
-# Example: Set admin username in environment
-export QDASH_ADMIN_USERNAME=admin
-```
-
-## User Registration
-
-Only administrators can register new users. When a new user is created:
-
-1. Admin calls the registration endpoint with username and password
-2. A default project is automatically created for the new user
-3. The new user receives an access token for immediate use
-
-### API Example
-
-```bash
-curl -X POST "https://your-qdash-instance/auth/register" \
-  -H "Authorization: Bearer ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "newuser",
-    "password": "secure_password",
-    "full_name": "New User"
-  }'
-```
-
-## Password Management
-
-QDash provides two methods for password management:
-
-### 1. Self-Service Password Change
-
-Any authenticated user can change their own password by providing the current password.
-
-| Endpoint | Method | Auth Required |
-| -------- | ------ | ------------- |
-| `/auth/change-password` | POST | Yes (any user) |
-
-**Request Body:**
-
-```json
-{
-  "current_password": "old_password",
-  "new_password": "new_secure_password"
-}
-```
-
-**Example:**
-
-```bash
-curl -X POST "https://your-qdash-instance/auth/change-password" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "current_password": "old_password",
-    "new_password": "new_secure_password"
-  }'
-```
-
-### 2. Admin Password Reset
-
-Administrators can reset any user's password without knowing the current password. This is useful for password recovery scenarios.
-
-| Endpoint | Method | Auth Required |
-| -------- | ------ | ------------- |
-| `/auth/reset-password` | POST | Yes (admin only) |
-
-**Request Body:**
-
-```json
-{
-  "username": "target_user",
-  "new_password": "new_secure_password"
-}
-```
-
-**Example:**
-
-```bash
-curl -X POST "https://your-qdash-instance/auth/reset-password" \
-  -H "Authorization: Bearer ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "target_user",
-    "new_password": "new_secure_password"
-  }'
-```
-
-## Login and Logout
-
-### Login
-
-Sign in from the `/login` page with your user ID and password. On success QDash takes you to the Execution page for your default project.
+Open `/login` and enter your username and password. After authentication, QDash opens the
+Execution page in your default project.
 
 ![Signing in to QDash](/images/guides/login.gif)
 
-For programmatic access, authenticate against the API to receive an access token.
+Use the profile menu at the bottom of the sidebar to sign out. The same menu provides access to
+personal settings and password changes.
 
-```bash
-curl -X POST "https://your-qdash-instance/auth/login" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=your_username&password=your_password"
-```
+## System Roles
 
-**Response:**
+| Role | Platform access |
+| --- | --- |
+| User | Sign in, update the own account, and access assigned projects. |
+| Admin | Create users, reset passwords, and open the Admin page. |
 
-```json
-{
-  "access_token": "your_access_token",
-  "token_type": "bearer",
-  "username": "your_username",
-  "default_project_id": "project_id"
-}
-```
+The initial administrator is configured with `QDASH_ADMIN_USERNAME`. System administrators do
+not automatically own every project; project membership still controls access to project data.
 
-### Logout
+## Create Users
 
-The logout endpoint confirms the logout action. Since tokens are managed client-side, the client is responsible for removing stored credentials.
+Only a system administrator can create an account. Open **Admin**, create the user, and provide
+the credentials through an appropriate secret-sharing channel. QDash creates a default project
+for the new account and makes that user its owner.
 
-```bash
-curl -X POST "https://your-qdash-instance/auth/logout"
-```
+Administrators can also reset a user's password from **Admin**. A reset replaces the current
+password and should be followed by a user-initiated password change.
+
+## Change a Password
+
+An authenticated user can change their own password from **Settings** by supplying the current
+password and a new password. A user who cannot authenticate must ask an administrator for a
+reset.
 
 ## API Authentication
 
-Include the access token in the `Authorization` header for all authenticated requests:
+Automation should use a saved [QDash Client](./qdash-client.md) profile or its documented
+`QDASH_*` environment variables. The client handles authentication and project headers without
+placing tokens directly in shell history.
 
-```http
-Authorization: Bearer <your-access-token>
-```
+Raw API consumers authenticate through `/auth/login`, send the returned bearer token in the
+`Authorization` header, and select project-scoped data with `X-Project-Id`. Use the interactive
+OpenAPI page linked from QDash or the [OpenAPI reference](../reference/openapi.md) for current
+request and response schemas.
 
-### Getting Current User Info
+## Authorization Layers
 
-```bash
-curl -X GET "https://your-qdash-instance/auth/me" \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
+System and project roles answer different questions:
 
-**Response:**
+- The system role controls account administration.
+- The project role controls access to a project's calibration data and operations.
 
-```json
-{
-  "username": "your_username",
-  "full_name": "Your Name",
-  "disabled": false,
-  "default_project_id": "project_id",
-  "system_role": "user"
-}
-```
-
-## Permission Summary
-
-| Action | User | Admin |
-| ------ | :--: | :---: |
-| Login/Logout | Yes | Yes |
-| View own profile | Yes | Yes |
-| Change own password | Yes | Yes |
-| Register new users | No | Yes |
-| Reset any user's password | No | Yes |
+See [Projects and Data Sharing](./projects-and-sharing.md) for owner, editor, and viewer
+permissions.

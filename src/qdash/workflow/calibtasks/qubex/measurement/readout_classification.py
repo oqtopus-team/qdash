@@ -6,7 +6,11 @@ import plotly.graph_objs as go
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -24,41 +28,43 @@ class ReadoutClassification(QubexTask):
 
     # High resolution for accurate threshold detection
     GRID_RESOLUTION: int = 2001
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": None,  # Load from DB
-        "drag_hpi_amplitude": None,  # Load from DB
-        "drag_hpi_length": None,  # Load from DB
-        "drag_hpi_beta": None,  # Load from DB
-        "readout_amplitude": None,  # Load from DB
-        "readout_frequency": None,  # Load from DB
-        "readout_length": ParameterModel(
-            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.required_database(),
+        "drag_hpi_amplitude": InputParameterSpec.required_database(),
+        "drag_hpi_length": InputParameterSpec.required_database(),
+        "drag_hpi_beta": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_duration": InputParameterSpec.database_or_default(
+            default=DEFAULT_READOUT_DURATION,
+            unit="ns",
+            description="Readout pulse duration",
         ),
     }
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "shots": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            value=CALIBRATION_SHOTS,
+            default=CALIBRATION_SHOTS,
             description="Number of shots",
         ),
-        "interval": RunParameterModel(
+        "interval": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=DEFAULT_INTERVAL,
+            default=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "average_readout_fidelity": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "average_readout_fidelity": OutputParameterSpec(
             unit="a.u.",
             description="Average readout fidelity",
         ),
-        "readout_fidelity_0": ParameterModel(
+        "readout_fidelity_0": OutputParameterSpec(
             unit="a.u.",
             description="Readout fidelity with preparation state 0",
         ),
-        "readout_fidelity_1": ParameterModel(
+        "readout_fidelity_1": OutputParameterSpec(
             unit="a.u.",
             description="Readout fidelity with preparation state 1",
         ),

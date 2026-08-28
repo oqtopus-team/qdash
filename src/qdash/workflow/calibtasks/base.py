@@ -1,7 +1,16 @@
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import Any, ClassVar
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel, TaskTypes
+from qdash.datamodel.task import (
+    InputParameterModel,
+    InputParameterSpec,
+    OutputParameterModel,
+    OutputParameterSpec,
+    RunParameterModel,
+    RunParameterSpec,
+    TaskTypes,
+)
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.backend.base import BaseBackend
 
@@ -19,27 +28,22 @@ class BaseTask(ABC):
 
     Attributes
     ----------
-    input_parameters : dict[str, ParameterModel | None]
-        Calibration parameters that this task depends on (for provenance tracking).
-        - None: Load entirely from DB (parameter name is the key)
-        - ParameterModel(...): Use as fallback if DB doesn't have the value
-    output_parameters : dict[str, ParameterModel]
-        Calibration parameters that this task produces.
-    run_parameters : dict[str, RunParameterModel]
-        Experiment configuration parameters (shots, ranges, etc.).
-        This was previously named input_parameters.
+    input_spec : Mapping[str, InputParameterSpec]
+        Class-level declarations for calibration dependencies and resolution policy.
+    run_spec : Mapping[str, RunParameterSpec]
+        Class-level declarations for experiment configuration.
+    output_spec : Mapping[str, OutputParameterSpec]
+        Class-level declarations for calibration values produced by the task.
     """
 
     name: str = ""
     task_type: str
-    # Calibration input parameters (for provenance tracking)
-    # - None: Load entirely from DB
-    # - ParameterModel(...): Use as fallback if DB doesn't have the value
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
-    # Calibration output parameters
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
-    # NEW: Experiment run configuration (renamed from old input_parameters)
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
+    # Class-level parameter declarations
+    input_spec: ClassVar[Mapping[str, InputParameterSpec]] = {}
+    # Experiment run configuration declarations
+    run_spec: ClassVar[Mapping[str, RunParameterSpec]] = {}
+    # Calibration output declarations
+    output_spec: ClassVar[Mapping[str, OutputParameterSpec]] = {}
     r2_threshold: float = 0.7
     timeout = 60 * 60  # Default timeout of 1 hour
     backend = "qubex"
@@ -65,18 +69,23 @@ class BaseTask(ABC):
             params: Optional dictionary containing task parameters
 
         """
-        # Create instance-specific deep copies of parameters
-        # to avoid sharing state between task instances
-        from copy import deepcopy
-
         # Calibration input parameters (for provenance)
-        self.input_parameters: dict[str, ParameterModel] = deepcopy(self.__class__.input_parameters)
+        self.input_parameters: dict[str, InputParameterModel] = {
+            name: declaration.create_model()
+            for name, declaration in self.__class__.input_spec.items()
+        }
         # Calibration output parameters
-        self.output_parameters: dict[str, ParameterModel] = deepcopy(
-            self.__class__.output_parameters
-        )
+        self.output_parameters: dict[str, OutputParameterModel] = {
+            name: declaration.create_model()
+            for name, declaration in self.__class__.output_spec.items()
+        }
         # Experiment run configuration
-        self.run_parameters: dict[str, RunParameterModel] = deepcopy(self.__class__.run_parameters)
+        self.run_parameters: dict[str, RunParameterModel] = {
+            name: declaration.create_model()
+            for name, declaration in self.__class__.run_spec.items()
+        }
+        # Set by TaskExecutor after a complete re-execution snapshot is applied.
+        self.input_parameters_from_snapshot = False
 
         if params is not None:
             self._convert_and_set_parameters(params)
@@ -91,6 +100,12 @@ class BaseTask(ABC):
         Backends that expose persistable raw results can override this hook.
         """
         return []
+
+    def prepare_run(self, backend: BaseBackend, qid: str) -> None:
+        """Apply resolved and validated inputs immediately before execution."""
+
+    def resolve_run_parameters(self, backend: BaseBackend, qid: str) -> None:
+        """Resolve backend-dependent defaults before run parameters are recorded."""
 
     def extract_batch_raw_data(
         self, backend: BaseBackend, run_result: RunResult, qids: list[str]
@@ -200,7 +215,7 @@ class BaseTask(ABC):
                         param.error = param_data["error"]
             else:
                 # Create new ParameterModel for calibration input
-                self.input_parameters[name] = ParameterModel(
+                self.input_parameters[name] = InputParameterModel(
                     value=param_data.get("value", 0),
                     unit=param_data.get("unit", ""),
                     error=param_data.get("error", 0.0),
@@ -300,13 +315,13 @@ class BaseTask(ABC):
         """Return True if the task is a MUX task."""
         return bool(self.task_type == TaskTypes.MUX)
 
-    def attach_execution_id(self, execution_id: str) -> dict[str, ParameterModel]:
+    def attach_execution_id(self, execution_id: str) -> dict[str, OutputParameterModel]:
         """Attach the execution id to the output parameters."""
         for value in self.output_parameters.values():
             value.execution_id = execution_id
         return self.output_parameters
 
-    def attach_task_id(self, task_id: str) -> dict[str, ParameterModel]:
+    def attach_task_id(self, task_id: str) -> dict[str, OutputParameterModel]:
         """Attach the task id to the output parameters."""
         for value in self.output_parameters.values():
             value.task_id = task_id

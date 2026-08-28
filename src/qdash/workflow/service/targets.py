@@ -47,7 +47,7 @@ class Target(ABC):
         """
 
     @abstractmethod
-    def to_coupling_ids(self, chip_id: str) -> list[str]:
+    def to_coupling_ids(self, chip_id: str, *, project_id: str | None = None) -> list[str]:
         """Convert target to a list of coupling IDs.
 
         Args:
@@ -94,9 +94,12 @@ class MuxTargets(Target):
             all_qids.extend(stage.qids)
         return sorted(set(all_qids))
 
-    def to_coupling_ids(self, chip_id: str) -> list[str]:
+    def to_coupling_ids(self, chip_id: str, *, project_id: str | None = None) -> list[str]:
         """Get coupling IDs for qubits in targeted MUXes."""
         from qdash.workflow.engine import CRScheduler
+
+        if not project_id:
+            raise ValueError("project_id is required to resolve coupling targets")
 
         qids = self.to_qids(chip_id)
         wiring_config_path = str(get_qubex_paths().wiring_yaml(chip_id))
@@ -107,6 +110,7 @@ class MuxTargets(Target):
             username="",  # Not needed for pair generation
             chip_id=chip_id,
             wiring_config_path=wiring_config_path,
+            project_id=project_id,
         )
         schedule = scheduler.generate(candidate_qubits=qids, max_parallel_ops=100)
 
@@ -137,15 +141,19 @@ class QubitTargets(Target):
         """Return the qubit IDs directly."""
         return list(self.qids)
 
-    def to_coupling_ids(self, chip_id: str) -> list[str]:
+    def to_coupling_ids(self, chip_id: str, *, project_id: str | None = None) -> list[str]:
         """Get coupling IDs for the specified qubits."""
         from qdash.workflow.engine import CRScheduler
+
+        if not project_id:
+            raise ValueError("project_id is required to resolve coupling targets")
 
         wiring_config_path = str(get_qubex_paths().wiring_yaml(chip_id))
         scheduler = CRScheduler(
             username="",
             chip_id=chip_id,
             wiring_config_path=wiring_config_path,
+            project_id=project_id,
         )
         schedule = scheduler.generate(candidate_qubits=self.qids, max_parallel_ops=100)
 
@@ -180,7 +188,7 @@ class CouplingTargets(Target):
             qids.add(target)
         return sorted(qids)
 
-    def to_coupling_ids(self, chip_id: str) -> list[str]:
+    def to_coupling_ids(self, chip_id: str, *, project_id: str | None = None) -> list[str]:
         """Return coupling IDs directly."""
         return [f"{c}-{t}" for c, t in self.pairs]
 
@@ -207,9 +215,9 @@ class AllMuxTargets(Target):
             exclude_qids=self.exclude_qids,
         ).to_qids(chip_id)
 
-    def to_coupling_ids(self, chip_id: str) -> list[str]:
+    def to_coupling_ids(self, chip_id: str, *, project_id: str | None = None) -> list[str]:
         """Get all coupling IDs for the chip."""
         return MuxTargets(
             mux_ids=list(range(16)),
             exclude_qids=self.exclude_qids,
-        ).to_coupling_ids(chip_id)
+        ).to_coupling_ids(chip_id, project_id=project_id)

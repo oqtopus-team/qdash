@@ -53,10 +53,10 @@ T2_echo should satisfy T2_echo ≤ 2\*T1. Compare with T2\* (Ramsey) to quantify
 
 - qubit_frequency: Loaded from DB
 - hpi_amplitude: Loaded from DB
-- hpi_length: Loaded from DB
+- hpi_duration: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_length: Readout pulse length (ns)
+- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 

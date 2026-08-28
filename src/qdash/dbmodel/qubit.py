@@ -56,7 +56,6 @@ class QubitDocument(Document):
                     ("project_id", ASCENDING),
                     ("chip_id", ASCENDING),
                     ("qid", ASCENDING),
-                    ("username", ASCENDING),
                 ],
                 unique=True,
             ),
@@ -83,26 +82,23 @@ class QubitDocument(Document):
         project_id: str | None,
     ) -> "QubitDocument":
         """Update the QubitDocument's calibration data with new values."""
-        query: dict[str, Any] = {"qid": qid, "chip_id": chip_id}
-        if project_id:
-            query["project_id"] = project_id
-            qubit_doc = cls.find_one(query).run()
+        if project_id is not None:
+            query = {"project_id": project_id, "qid": qid, "chip_id": chip_id}
         else:
-            qubit_doc = None
-
-        if qubit_doc is None:
-            qubit_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
+            query = {"username": username, "qid": qid, "chip_id": chip_id}
+        qubit_doc = cls.find_one(query).run()
 
         if qubit_doc is None:
             raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
         # Merge new calibration data into the existing data
         qubit_doc.user_id = cls._user_id_for_username(username)
+        qubit_doc.username = username
         qubit_doc.data = QubitDocument.merge_calib_data(qubit_doc.data, output_parameters)
         qubit_doc.system_info.update_time()
         qubit_doc.save()
         # Create history entry for the updated qubit
         qubit_model = QubitModel(
-            project_id=project_id,
+            project_id=qubit_doc.project_id,
             user_id=qubit_doc.user_id,
             qid=qid,
             chip_id=chip_id,

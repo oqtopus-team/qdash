@@ -37,6 +37,12 @@ if "prefect" not in sys.modules:
     sys.modules["prefect.deployments"] = MagicMock()
     sys.modules["prefect.exceptions"] = MagicMock()
     sys.modules["prefect.states"] = MagicMock()
+    sys.modules["prefect.client.schemas.objects"] = MagicMock()
+    sys.modules["prefect.events"] = MagicMock()
+    sys.modules["prefect.events.actions"] = MagicMock()
+    sys.modules["prefect.events.schemas"] = MagicMock()
+    sys.modules["prefect.events.schemas.automations"] = MagicMock()
+    sys.modules["prefect.events.schemas.events"] = MagicMock()
 
 import mongomock
 import pytest
@@ -54,13 +60,16 @@ pytest.mark.asyncio_default_fixture_loop_scope = "function"  # type: ignore[attr
 os.environ["ENV"] = "test"
 os.environ.setdefault("CLIENT_URL", "http://localhost:3000")
 os.environ.setdefault("PREFECT_API_URL", "http://localhost:4200/api")
-os.environ.setdefault("SLACK_BOT_TOKEN", "test-token")
-os.environ.setdefault("SLACK_CHANNEL_ID", "test-channel")
+# Never inherit real Slack credentials or enable outbound notifications in tests.
+os.environ["SLACK_BOT_TOKEN"] = "test-token"  # noqa: S105
+os.environ["SLACK_CHANNEL_ID"] = "test-channel"
+os.environ["SLACK_FORUM_NOTIFICATION"] = "false"
+os.environ["SLACK_FORUM_CHANNEL_ID"] = ""
 os.environ.setdefault("POSTGRES_DATA_PATH", "/tmp/postgres")
 os.environ.setdefault("MONGO_DATA_PATH", "/tmp/mongo")
 os.environ.setdefault("CALIB_DATA_PATH", "/tmp/calib")
 os.environ.setdefault("QPU_DATA_PATH", "/tmp/qpu")
-os.environ.setdefault("SLACK_APP_TOKEN", "test-app-token")
+os.environ["SLACK_APP_TOKEN"] = "test-app-token"  # noqa: S105
 os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
 
 

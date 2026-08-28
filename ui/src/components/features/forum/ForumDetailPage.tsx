@@ -8,7 +8,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CalendarDays,
-  Check,
   MessageSquare,
   Pencil,
   Crosshair,
@@ -25,7 +24,6 @@ import {
   getGetForumPostQueryKey,
   getGetForumPostRepliesQueryKey,
   getListForumPostsQueryKey,
-  useCloseForumPost,
   useCreateForumPost,
   useDeleteForumPost,
   useGetForumPost,
@@ -34,7 +32,6 @@ import {
   useListForumPosts,
   useUpdateForumPost,
 } from "@/client/forum/forum";
-import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
@@ -55,7 +52,8 @@ import {
   toForumCategoryDefinition,
 } from "./categories";
 import { ForumLabelPicker } from "./ForumLabelSelector";
-import { ForumBlockViewer, type ForumBlockSnapshotGetter } from "./ForumBlockEditor";
+import { type ForumBlockSnapshotGetter, type ForumMentionCandidate } from "./ForumBlockEditor";
+import { ForumPostContent } from "./ForumPostContent";
 
 const ForumBlockEditor = dynamic(
   () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
@@ -135,7 +133,6 @@ function PostBody({
   canEdit: canEditOverride,
   onEdit,
   onDelete,
-  postAction = "delete",
   editing,
   editContent,
   editInitialBlocks,
@@ -147,13 +144,13 @@ function PostBody({
   saving,
   onImageUpload,
   editorSnapshotRef,
+  mentionCandidates,
 }: {
   post: ForumPostResponse;
   currentUsername?: string;
   canEdit?: boolean;
   onEdit: () => void;
   onDelete?: () => void;
-  postAction?: "delete" | "close";
   editing: boolean;
   /** Current markdown projection — used only to gate the Save button. */
   editContent: string;
@@ -166,11 +163,10 @@ function PostBody({
   saving: boolean;
   onImageUpload: (file: File) => Promise<string>;
   editorSnapshotRef?: MutableRefObject<ForumBlockSnapshotGetter | null>;
+  mentionCandidates?: ForumMentionCandidate[];
 }) {
   const canEdit = canEditOverride ?? currentUsername === post.username;
   const isAi = post.is_ai_reply || post.username === "qdash";
-  const ActionIcon = postAction === "close" ? Check : Trash2;
-  const actionTitle = postAction === "close" ? "Close thread" : "Delete";
 
   return (
     <div
@@ -195,7 +191,7 @@ function PostBody({
             <span className="text-xs italic text-base-content/30">(edited)</span>
           )}
         </div>
-        {canEdit && !editing && !isAi && onDelete && (
+        {canEdit && !editing && !isAi && (
           <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -210,21 +206,21 @@ function PostBody({
               </TooltipTrigger>
               <TooltipContent>Edit</TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={`btn btn-ghost btn-sm btn-square text-base-content/40 ${
-                    postAction === "close" ? "hover:text-primary" : "hover:text-error"
-                  }`}
-                  onClick={onDelete}
-                  aria-label={actionTitle}
-                >
-                  <ActionIcon className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{actionTitle}</TooltipContent>
-            </Tooltip>
+            {onDelete && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-error"
+                    onClick={onDelete}
+                    aria-label="Delete"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Delete</TooltipContent>
+              </Tooltip>
+            )}
           </div>
         )}
       </div>
@@ -237,6 +233,7 @@ function PostBody({
             onChange={onEditChange}
             onImageUpload={onImageUpload}
             snapshotRef={editorSnapshotRef}
+            mentionCandidates={mentionCandidates}
           />
           <div className="flex justify-end gap-2">
             <button className="btn btn-ghost btn-sm" onClick={onCancel}>
@@ -252,14 +249,11 @@ function PostBody({
           </div>
         </div>
       ) : (
-        (() => {
-          const displayBlocks = (post.content_blocks ?? []) as Record<string, unknown>[];
-          return displayBlocks.length > 0 ? (
-            <ForumBlockViewer blocks={displayBlocks} />
-          ) : (
-            <MarkdownContent content={post.content} className="text-sm text-base-content/80" />
-          );
-        })()
+        <ForumPostContent
+          content={post.content}
+          contentBlocks={post.content_blocks}
+          markdownClassName="text-sm text-base-content/80"
+        />
       )}
     </div>
   );
@@ -270,7 +264,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { isOwner, projectId } = useProject();
+  const { canEdit, isOwner, projectId } = useProject();
   const { uploadImage } = useImageUpload("forum");
   const currentUsername = user?.username;
   const [replyText, setReplyText] = useState("");
@@ -319,6 +313,20 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const members = useMemo(
     () => (membersResponse?.data.members ?? []).filter((member) => member.status === "active"),
     [membersResponse?.data.members],
+  );
+  const mentionCandidates: ForumMentionCandidate[] = useMemo(
+    () => [
+      { id: "qdash", label: "QDash" },
+      { id: "project", label: "Project", secondaryLabel: "Notify all project members" },
+      ...members
+        .filter((member) => member.username !== currentUsername)
+        .map((member) => ({
+          id: member.username,
+          label: member.display_name || member.username,
+          secondaryLabel: member.organization ?? undefined,
+        })),
+    ],
+    [currentUsername, members],
   );
   const { data: chipsResponse } = useListChips({ query: { staleTime: 60_000 } });
   const chips = useMemo(
@@ -378,7 +386,6 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const createMutation = useCreateForumPost();
   const updateMutation = useUpdateForumPost();
   const deleteMutation = useDeleteForumPost();
-  const closeMutation = useCloseForumPost();
   const {
     isGenerating,
     statusMessage: aiStatus,
@@ -551,7 +558,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     assigneeUsername?: string | null;
     status?: ForumPostResponse["status"];
   }) => {
-    if (!post || !canManage) return;
+    if (!post || !canManageMetadata) return;
     const response = await updateMutation.mutateAsync({
       postId: post.id,
       data: {
@@ -648,7 +655,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const category = getForumCategory(post.category, categories);
   const CategoryIcon = category.icon;
   const targetContext = linkedTargetContext;
-  const canManage = isOwner || currentUsername === post.username;
+  const canManageContent = isOwner || currentUsername === post.username;
+  const canManageMetadata = canEdit || currentUsername === post.username;
   const statusDef = getForumStatus(post.status);
   const StatusIcon = statusDef.icon;
   const isTerminal = isForumTerminalStatus(post.status);
@@ -705,7 +713,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 {post.title || "Untitled topic"}
               </h1>
             )}
-            {canManage && !editingTitle && (
+            {canManageMetadata && !editingTitle && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -737,14 +745,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           <PostBody
             post={post}
             currentUsername={currentUsername}
-            canEdit={canManage}
+            canEdit={canManageContent}
             onEdit={handleStartEditRoot}
-            onDelete={
-              isTerminal
-                ? undefined
-                : () => closeMutation.mutate({ postId }, { onSuccess: invalidateThread })
-            }
-            postAction="close"
             editing={editingRoot}
             editContent={editRootContent}
             editInitialBlocks={editRootBlocks}
@@ -758,6 +760,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             saving={updateMutation.isPending}
             onImageUpload={uploadImage}
             editorSnapshotRef={editRootSnapshotRef}
+            mentionCandidates={mentionCandidates}
           />
 
           <div className="divider text-xs text-base-content/40">
@@ -792,6 +795,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                     saving={updateMutation.isPending}
                     onImageUpload={uploadImage}
                     editorSnapshotRef={editReplySnapshotRef}
+                    mentionCandidates={mentionCandidates}
                   />
                 ))}
                 {replies.length >= replyLimit && (
@@ -836,6 +840,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                   }}
                   onImageUpload={uploadImage}
                   snapshotRef={replyComposerSnapshotRef}
+                  mentionCandidates={mentionCandidates}
                 />
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-base-content/50">
@@ -866,7 +871,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <CategoryIcon className="h-3.5 w-3.5" />
               Category
             </div>
-            {canManage ? (
+            {canManageMetadata ? (
               <select
                 className="select select-bordered select-sm w-full"
                 value={post.category}
@@ -901,7 +906,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 </span>
               </Link>
             )}
-            {canManage ? (
+            {canManageMetadata ? (
               <div className="space-y-2">
                 <select
                   className="select select-bordered select-xs w-full"
@@ -1029,7 +1034,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <CalendarDays className="h-3.5 w-3.5" />
               Cooldown
             </div>
-            {canManage ? (
+            {canManageMetadata ? (
               <div className="space-y-2">
                 <select
                   className="select select-bordered select-xs w-full"
@@ -1070,7 +1075,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <UserRound className="h-3.5 w-3.5" />
               Assignee
             </div>
-            {canManage ? (
+            {canManageMetadata ? (
               <select
                 className="select select-bordered select-xs w-full"
                 value={post.assignee_username ?? ""}
@@ -1101,7 +1106,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <Tag className="h-3.5 w-3.5" />
               Labels
             </div>
-            {canManage ? (
+            {canManageMetadata ? (
               <ForumLabelPicker
                 selectedLabels={post.labels ?? []}
                 onToggle={togglePostLabel}
@@ -1130,7 +1135,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <StatusIcon className="h-3.5 w-3.5" />
               Status
             </div>
-            {canManage ? (
+            {canManageMetadata ? (
               <select
                 className="select select-bordered select-xs w-full"
                 value={post.status ?? "open"}

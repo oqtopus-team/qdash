@@ -62,7 +62,7 @@ Gate fidelity should exceed the non-DRAG version; leakage should be minimal.
 - drag_hpi_beta: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_length: Readout pulse length (ns)
+- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 

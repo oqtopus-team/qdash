@@ -9,7 +9,7 @@
 | Next.js    | 15.x    | React framework with App Router |
 | React      | 18.x    | UI library                      |
 | TypeScript | 5.x     | Type-safe JavaScript            |
-| Bun        | 1.x+    | Package manager and runtime     |
+| Bun        | 1.4.0+  | Package manager and runtime     |
 
 ### UI Libraries
 
@@ -47,7 +47,8 @@ ui/
 │   │   │   ├── chip/           # Chip management
 │   │   │   ├── execution/      # Execution monitoring
 │   │   │   ├── files/          # File management
-│   │   │   ├── inbox/          # Inbox (default landing page)
+│   │   │   ├── home/           # Home (default landing page)
+│   │   │   ├── inbox/          # Notification inbox
 │   │   │   ├── issues/         # Issue tracking
 │   │   │   ├── metrics/        # Metrics dashboard
 │   │   │   ├── provenance/     # Data provenance
@@ -60,7 +61,7 @@ ui/
 │   │   ├── api/                # API route handlers (SSE streaming)
 │   │   ├── globals.css         # Global styles
 │   │   ├── layout.tsx          # Root layout
-│   │   ├── page.tsx            # Root page (redirects to /inbox)
+│   │   ├── page.tsx            # Root page (redirects to /home)
 │   │   └── providers.tsx       # Provider composition
 │   ├── client/                 # Auto-generated API client (DO NOT EDIT)
 │   ├── components/             # Reusable components

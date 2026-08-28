@@ -5,7 +5,11 @@ from typing import ClassVar
 import numpy as np
 import plotly.graph_objects as go
 
-from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -28,47 +32,48 @@ class FakeCreateHPIPulse(FakeTask):
 
     Outputs:
         hpi_amplitude: Half-pi pulse amplitude
-        hpi_length: Half-pi pulse duration (ns)
+        hpi_duration: Half-pi pulse duration (ns)
     """
 
     name: str = "CreateHPIPulse"  # Same name as qubex task for backend-agnostic workflows
     task_type: str = "qubit"
     timeout: int = 60
 
-    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": ParameterModel(
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.default_only(
+            default=0,
             unit="GHz",
             description="Qubit frequency from CheckFineChevron",
         ),
     }
 
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "amplitude_range": RunParameterModel(
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "amplitude_range": RunParameterSpec(
             unit="a.u.",
             value_type="range",
-            value=(0.1, 0.5, 21),
+            default=(0.1, 0.5, 21),
             description="Amplitude range for HPI calibration",
         ),
-        "hpi_duration": RunParameterModel(
+        "hpi_duration": RunParameterSpec(
             unit="ns",
             value_type="int",
-            value=20,
+            default=20,
             description="HPI pulse duration",
         ),
-        "shots": RunParameterModel(
+        "shots": RunParameterSpec(
             unit="",
             value_type="int",
-            value=1024,
+            default=1024,
             description="Number of shots",
         ),
     }
 
-    output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "hpi_amplitude": ParameterModel(
+    output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "hpi_amplitude": OutputParameterSpec(
             unit="a.u.",
             description="Half-pi pulse amplitude",
         ),
-        "hpi_length": ParameterModel(
+        "hpi_duration": OutputParameterSpec(
             unit="ns",
             description="Half-pi pulse duration",
         ),
@@ -101,8 +106,8 @@ class FakeCreateHPIPulse(FakeTask):
         hpi_amplitude = base_amplitude + np.random.normal(0, 0.01)
         hpi_amplitude = max(0.15, min(0.45, hpi_amplitude))  # Clamp
 
-        # HPI length is typically fixed but can vary slightly
-        hpi_length = 20 + np.random.randint(-2, 3)  # 18-22 ns
+        # HPI duration is typically fixed but can vary slightly
+        hpi_duration = 20 + np.random.randint(-2, 3)  # 18-22 ns
 
         # Generate fake calibration data (Rabi-like oscillation)
         amplitudes = np.linspace(0.1, 0.5, 21)
@@ -114,7 +119,7 @@ class FakeCreateHPIPulse(FakeTask):
         return RunResult(
             raw_result={
                 "hpi_amplitude": hpi_amplitude,
-                "hpi_length": hpi_length,
+                "hpi_duration": hpi_duration,
                 "amplitudes": amplitudes,
                 "signal": signal,
             },
@@ -130,8 +135,8 @@ class FakeCreateHPIPulse(FakeTask):
         # Set output parameter values
         self.output_parameters["hpi_amplitude"].value = result["hpi_amplitude"]
         self.output_parameters["hpi_amplitude"].error = 0.005
-        self.output_parameters["hpi_length"].value = result["hpi_length"]
-        self.output_parameters["hpi_length"].error = 1.0
+        self.output_parameters["hpi_duration"].value = result["hpi_duration"]
+        self.output_parameters["hpi_duration"].error = 1.0
 
         output_parameters = self.attach_execution_id(execution_id)
 

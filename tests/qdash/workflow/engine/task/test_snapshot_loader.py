@@ -20,10 +20,21 @@ class TestSnapshotParameterLoaderInit:
             project_id="proj-1",
         )
         assert loader._source_execution_id == "exec-001"
+        assert loader._source_task_id is None
         assert loader._project_id == "proj-1"
         assert loader._parameter_overrides is None
         assert loader._limit == DEFAULT_SNAPSHOT_LIMIT
         assert loader._cache is None
+        assert loader.has_snapshot_source is True
+
+    def test_override_only_loader_has_no_snapshot_source(self) -> None:
+        loader = SnapshotParameterLoader(
+            source_execution_id=None,
+            project_id="proj-1",
+            parameter_overrides={"input": {}},
+        )
+
+        assert loader.has_snapshot_source is False
 
     def test_init_with_overrides(self) -> None:
         overrides: dict[str, dict[str, Any]] = {
@@ -62,6 +73,40 @@ class TestSnapshotParameterLoaderLoad:
         doc.input_parameters = input_params
         doc.run_parameters = run_params
         return doc
+
+    @patch("qdash.workflow.engine.task.snapshot_loader.TaskResultHistoryDocument")
+    def test_source_task_id_loads_exact_task(self, mock_doc_cls: MagicMock) -> None:
+        """Single-task re-execution uses its stable task result ID."""
+        doc = self._make_doc("CheckRabi", "0", {"freq": {"value": 5.0}}, {"shots": {"value": 1024}})
+        mock_doc_cls.find_one.return_value.run.return_value = doc
+
+        loader = SnapshotParameterLoader(
+            source_execution_id="exec-001",
+            project_id="proj-1",
+            source_task_id="task-001",
+        )
+
+        assert loader.get_snapshot("CheckRabi", "0") == (
+            {"freq": {"value": 5.0}},
+            {"shots": {"value": 1024}},
+        )
+        mock_doc_cls.find_one.assert_called_once_with(
+            {"project_id": "proj-1", "task_id": "task-001"}
+        )
+        mock_doc_cls.find.assert_not_called()
+
+    @patch("qdash.workflow.engine.task.snapshot_loader.TaskResultHistoryDocument")
+    def test_no_source_snapshot_skips_database_load(self, mock_doc_cls: MagicMock) -> None:
+        """Standalone quick-run overrides do not require a source execution."""
+        loader = SnapshotParameterLoader(
+            source_execution_id=None,
+            project_id="proj-1",
+            parameter_overrides={"input": {"frequency": 5.0}},
+        )
+
+        assert loader.get_snapshot("CheckRabi", "0") is None
+        assert loader._cache == {}
+        mock_doc_cls.find.assert_not_called()
 
     @patch("qdash.workflow.engine.task.snapshot_loader.TaskResultHistoryDocument")
     def test_load_populates_cache(self, mock_doc_cls: MagicMock) -> None:

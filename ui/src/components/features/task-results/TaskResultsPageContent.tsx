@@ -30,6 +30,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type {
@@ -328,6 +329,12 @@ function ParameterPreview({
   );
 }
 
+/**
+ * Slide-over preview of the selected row on the Task Results list page.
+ *
+ * Fetches the full result for `taskId` and shows its figures, metadata, message, and a
+ * trimmed set of parameters. Pass `taskId` as null to keep it closed.
+ */
 function TaskResultPreviewSidebar({
   taskId,
   onClose,
@@ -478,32 +485,12 @@ function TaskResultPreviewSidebar({
                 </dl>
               </div>
 
-              {taskResult.message ? (
-                <div className="overflow-hidden rounded-lg border border-error/40">
-                  <div className="flex items-center gap-2 bg-error/10 px-3 py-2 text-sm font-semibold text-error">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    Error Log
-                  </div>
-                  <pre className="whitespace-pre-wrap break-all bg-error/5 px-3 py-3 font-mono text-xs text-error/80">
-                    {taskResult.message}
-                  </pre>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-base-300 p-3 text-sm text-base-content/60">
-                  No error message recorded.
-                </div>
-              )}
-
-              {taskResult.stack_trace && (
-                <div className="overflow-hidden rounded-lg border border-error/30">
-                  <div className="bg-error/5 px-3 py-2 text-xs font-semibold text-error/70">
-                    Stack Trace
-                  </div>
-                  <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all bg-error/5 px-3 py-3 font-mono text-xs text-error/60">
-                    {taskResult.stack_trace}
-                  </pre>
-                </div>
-              )}
+              <TaskMessagePanel
+                status={taskResult.status}
+                message={taskResult.message}
+                stackTrace={taskResult.stack_trace}
+                showEmptyFallback
+              />
 
               <ParameterPreview
                 title="Output Parameters"
