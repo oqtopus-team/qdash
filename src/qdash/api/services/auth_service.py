@@ -15,7 +15,13 @@ from qdash.datamodel.user import SystemRole, generate_user_id
 from qdash.dbmodel.user import UserDocument
 
 if TYPE_CHECKING:
-    from qdash.api.schemas.auth import PasswordChange, PasswordReset, UserCreate, UserProfileUpdate
+    from qdash.api.schemas.auth import (
+        PasswordChange,
+        PasswordReset,
+        PasswordResetResponse,
+        UserCreate,
+        UserProfileUpdate,
+    )
     from qdash.api.services.project_service import ProjectService
     from qdash.repository import MongoUserRepository
 
@@ -241,7 +247,7 @@ class AuthService:
         self,
         admin_username: str,
         password_data: PasswordReset,
-    ) -> dict[str, str]:
+    ) -> PasswordResetResponse:
         """Reset a user's password (admin operation).
 
         Parameters
@@ -249,20 +255,20 @@ class AuthService:
         admin_username : str
             Username of the admin performing the reset.
         password_data : PasswordReset
-            Contains username and new_password.
+            Contains the target username.
 
         Returns
         -------
-        dict[str, str]
-            Success message.
+        PasswordResetResponse
+            Success message and one-time temporary password.
 
         Raises
         ------
         HTTPException
             404 if target user not found.
-            400 if new password is empty.
-
         """
+        from qdash.api.schemas.auth import PasswordResetResponse
+
         logger.debug(
             f"Admin {admin_username} attempting to reset password for: {password_data.username}"
         )
@@ -274,15 +280,13 @@ class AuthService:
                 detail=f"User '{password_data.username}' not found",
             )
 
-        if not password_data.new_password or len(password_data.new_password) < 1:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="New password cannot be empty",
-            )
-
-        new_hashed_password = get_password_hash(password_data.new_password)
+        temporary_password = generate_temporary_password()
+        new_hashed_password = get_password_hash(temporary_password)
         user_doc.hashed_password = new_hashed_password
         user_doc.must_change_password = True
         self._user_repo.save(user_doc)
         logger.info(f"Admin {admin_username} reset password for user: {password_data.username}")
-        return {"message": f"Password reset successfully for user '{password_data.username}'"}
+        return PasswordResetResponse(
+            message=f"Password reset successfully for user '{password_data.username}'",
+            initial_password=temporary_password,
+        )

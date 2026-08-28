@@ -31,7 +31,7 @@ import type {
   Logout200,
   PasswordChange,
   PasswordReset,
-  ResetPassword200,
+  PasswordResetResponse,
   TokenResponse,
   User,
   UserCreate,
@@ -535,7 +535,7 @@ export const useChangePassword = <TError = void | HTTPValidationError,
 Parameters
 ----------
 password_data : PasswordReset
-    Contains username and new_password
+    Contains the target username
 current_user : User
     Current authenticated admin user
 auth_service : AuthService
@@ -543,8 +543,8 @@ auth_service : AuthService
 
 Returns
 -------
-dict[str, str]
-    Success message confirming password reset
+PasswordResetResponse
+    Generated temporary password, returned only in this response
 
 Raises
 ------
@@ -558,7 +558,7 @@ export const resetPassword = (
 ) => {
       
       
-      return customInstance<ResetPassword200>(
+      return customInstance<PasswordResetResponse>(
       {url: `/auth/reset-password`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: passwordReset, signal
