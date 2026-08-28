@@ -51,6 +51,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2-dev \
     libgirepository1.0-dev \
     gir1.2-gtk-3.0 \
+    bubblewrap \
     && rm -rf /var/lib/apt/lists/*
 
 # 3. Development tools (Change frequency: Medium)

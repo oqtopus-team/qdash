@@ -7,8 +7,10 @@ import contextlib
 import json
 import logging
 import os
+import shutil
 import signal
 import sys
+import sysconfig
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -28,6 +30,60 @@ logger = logging.getLogger(__name__)
 
 WORKER_SCRIPT = Path(__file__).resolve().parent / "sandbox_worker.py"
 WORKER_WALL_TIMEOUT_SECONDS = EXECUTION_TIMEOUT_SECONDS + WORKER_STARTUP_GRACE_SECONDS
+
+# The OS-enforced security boundary. The worker only ever runs inside bubblewrap; if bwrap
+# is missing the sandbox is fail-closed (see ``_bwrap_path`` / ``execute_python_analysis``).
+BWRAP = "bwrap"
+
+
+def _bwrap_path() -> str | None:
+    """Return the bubblewrap executable path, or ``None`` if it is not installed."""
+    return shutil.which(BWRAP)
+
+
+def _read_only_binds() -> list[str]:
+    """Read-only paths the worker needs to import the interpreter and curated libraries."""
+    candidates = {
+        sys.base_prefix,
+        sys.prefix,
+        sysconfig.get_paths()["stdlib"],
+        sysconfig.get_paths()["purelib"],
+        str(Path(sys.executable).resolve().parent.parent),
+        str(WORKER_SCRIPT.parent),
+        "/usr",
+        "/lib",
+        "/lib64",
+        "/bin",
+        "/sbin",
+    }
+    args: list[str] = []
+    for path in sorted(p for p in candidates if p and Path(p).exists()):
+        args += ["--ro-bind", path, path]
+    return args
+
+
+def _bwrap_argv(bwrap: str, workdir: str) -> list[str]:
+    """Build the bubblewrap command that runs the worker in an isolated namespace."""
+    return [
+        bwrap,
+        "--unshare-all",
+        "--die-with-parent",
+        "--new-session",
+        "--proc",
+        "/proc",
+        "--dev",
+        "/dev",
+        *_read_only_binds(),
+        "--bind",
+        workdir,
+        workdir,
+        "--chdir",
+        workdir,
+        "--",
+        sys.executable,
+        str(WORKER_SCRIPT),
+    ]
+
 
 __all__ = ["SandboxChartSpec", "SandboxResult", "execute_python_analysis"]
 
@@ -72,6 +128,16 @@ async def execute_python_analysis(
     if validation_error is not None:
         return _error(validation_error)
 
+    bwrap = _bwrap_path()
+    if bwrap is None:
+        # Fail-closed: the OS boundary is mandatory, never fall back to running code
+        # without isolation.
+        logger.error("Python sandbox is disabled: bubblewrap (bwrap) is not installed")
+        return _error(
+            "Python sandbox is unavailable: the isolation runtime (bubblewrap) is not "
+            "installed on the server."
+        )
+
     try:
         request_bytes = await asyncio.to_thread(_serialize_request, code, context_data or {})
     except (TypeError, ValueError) as exc:
@@ -87,7 +153,7 @@ async def execute_python_analysis(
     with tempfile.TemporaryDirectory(
         prefix="qdash-sandbox-", ignore_cleanup_errors=True
     ) as workdir:
-        return await _run_worker(request_bytes, workdir)
+        return await _run_worker(_bwrap_argv(bwrap, workdir), request_bytes, workdir)
 
 
 def _kill_worker(process: asyncio.subprocess.Process) -> None:
@@ -131,11 +197,10 @@ def _exit_status_text(returncode: int | None) -> str:
     return f"was killed by {name}{_SIGNAL_HINTS.get(name, '')}"
 
 
-async def _run_worker(request_bytes: bytes, workdir: str) -> SandboxResult:
-    """Run the sandbox worker process and decode its response."""
+async def _run_worker(argv: list[str], request_bytes: bytes, workdir: str) -> SandboxResult:
+    """Run the sandbox worker process (under bubblewrap) and decode its response."""
     process = await asyncio.create_subprocess_exec(
-        sys.executable,
-        str(WORKER_SCRIPT),
+        *argv,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

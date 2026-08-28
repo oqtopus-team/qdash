@@ -6,7 +6,6 @@ import ast
 import io
 import signal
 from contextlib import redirect_stdout
-from types import ModuleType
 from typing import Any, TypedDict
 
 EXECUTION_TIMEOUT_SECONDS = 5
@@ -42,59 +41,7 @@ ALLOWED_MODULES = frozenset(
 )
 
 ALLOWED_MODULE_ROOTS = frozenset(name.split(".")[0] for name in ALLOWED_MODULES)
-
-# Private packages that the whitelisted ones re-export from: ``plotly.express.colors`` is
-# really ``_plotly_utils.colors``. They are not importable on their own, but attribute
-# traversal has to accept them for the whitelisted API to stay usable.
-ALLOWED_INTERNAL_MODULE_ROOTS = frozenset({"_plotly_utils"})
-
-ALLOWED_ATTRIBUTE_MODULE_ROOTS = ALLOWED_MODULE_ROOTS | ALLOWED_INTERNAL_MODULE_ROOTS
-
 FORBIDDEN_BUILTINS = frozenset({"eval", "exec", "compile", "open", "breakpoint", "exit", "quit"})
-
-FORBIDDEN_ATTRS = frozenset(
-    {
-        "os",
-        "sys",
-        "subprocess",
-        "importlib",
-        "ctypes",
-        "builtins",
-        "socket",
-        "shutil",
-        "signal",
-        "threading",
-        "multiprocessing",
-        "pickle",
-        "marshal",
-        "pty",
-        "system",
-        "popen",
-    }
-)
-
-FORBIDDEN_DUNDER_ATTRS = frozenset(
-    {
-        "__subclasses__",
-        "__bases__",
-        "__mro__",
-        "__globals__",
-        "__code__",
-        "__builtins__",
-        "__import__",
-        "__loader__",
-        "__spec__",
-        "__dict__",
-        "__class__",
-        "__getattribute__",
-        "__closure__",
-        "__self__",
-        "__func__",
-        "__wrapped__",
-    }
-)
-
-PROXY_VISIBLE_DUNDERS = frozenset({"__name__", "__version__", "__doc__", "__all__"})
 
 SAFE_BUILTINS = {
     "print": print,
@@ -144,59 +91,6 @@ class SandboxResult(TypedDict):
     error: str | None
 
 
-def _is_allowed_module(module: ModuleType) -> bool:
-    """Return whether a module belongs to one of the whitelisted package trees."""
-    name = getattr(module, "__name__", "")
-    return bool(name) and name.split(".")[0] in ALLOWED_ATTRIBUTE_MODULE_ROOTS
-
-
-class SafeModule:
-    """Module wrapper that enforces the whitelist across attribute chains.
-
-    Whitelisting imports is not enough: an allowed package may hold a reference to an
-    arbitrary module (``numpy.f2py.os`` is the real ``os``), which hands the sandboxed
-    code a way out. Every attribute lookup that yields a module is therefore checked
-    against ``ALLOWED_ATTRIBUTE_MODULE_ROOTS`` and re-wrapped, so the module boundary holds for
-    the whole chain rather than only for the import statement.
-    """
-
-    __slots__ = ("_module",)
-
-    def __init__(self, module: ModuleType) -> None:
-        object.__setattr__(self, "_module", module)
-
-    def __getattribute__(self, name: str) -> Any:
-        # __getattribute__ (not __getattr__) so that the wrapped module, stored in a slot,
-        # cannot be reached directly.
-        if name.startswith("_") and name not in PROXY_VISIBLE_DUNDERS:
-            msg = f"Access to '{name}' is not allowed in the sandbox"
-            raise AttributeError(msg)
-        module: ModuleType = object.__getattribute__(self, "_module")
-        value = getattr(module, name)
-        if isinstance(value, ModuleType):
-            if not _is_allowed_module(value):
-                msg = f"Access to module '{value.__name__}' is not allowed"
-                raise ImportError(msg)
-            return SafeModule(value)
-        return value
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        msg = "Sandboxed modules are read-only"
-        raise AttributeError(msg)
-
-    def __delattr__(self, name: str) -> None:
-        msg = "Sandboxed modules are read-only"
-        raise AttributeError(msg)
-
-    def __repr__(self) -> str:
-        module: ModuleType = object.__getattribute__(self, "_module")
-        return f"<sandboxed module '{module.__name__}'>"
-
-    def __dir__(self) -> list[str]:
-        module: ModuleType = object.__getattribute__(self, "_module")
-        return [name for name in dir(module) if not name.startswith("_")]
-
-
 def _safe_import(
     name: str,
     globals_: dict[str, Any] | None = None,
@@ -207,10 +101,11 @@ def _safe_import(
     """Custom __import__ that only allows whitelisted modules."""
     top_level = name.split(".", maxsplit=1)[0]
     if name not in ALLOWED_MODULES and top_level not in ALLOWED_MODULE_ROOTS:
-        msg = f"Import of '{name}' is not allowed. Allowed modules: {', '.join(sorted(ALLOWED_MODULES))}"
+        allowed = ", ".join(sorted(ALLOWED_MODULES))
+        msg = f"Import of '{name}' is not allowed. Allowed modules: {allowed}"
         raise ImportError(msg)
-    module = __builtins__["__import__"](name, globals_, locals_, fromlist, level)  # type: ignore[index]
-    return SafeModule(module) if isinstance(module, ModuleType) else module
+    real_import = __builtins__["__import__"]  # type: ignore[index]
+    return real_import(name, globals_, locals_, fromlist, level)
 
 
 class _TimeoutError(Exception):
@@ -247,12 +142,6 @@ def validate_code(code: str) -> str | None:
             func = node.func
             if isinstance(func, ast.Name) and func.id in FORBIDDEN_BUILTINS:
                 return f"Call to '{func.id}' is not allowed"
-        elif isinstance(node, ast.Name):
-            if node.id in FORBIDDEN_DUNDER_ATTRS:
-                return f"Access to '{node.id}' is not allowed"
-        elif isinstance(node, ast.Attribute):
-            if node.attr in FORBIDDEN_DUNDER_ATTRS or node.attr in FORBIDDEN_ATTRS:
-                return f"Access to '{node.attr}' is not allowed"
 
     return None
 
