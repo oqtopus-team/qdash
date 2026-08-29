@@ -52,7 +52,7 @@ export function ExecutionHistoryModalContent({
         </div>
       </div>
 
-      <div className="lg:hidden flex-1 min-h-0 overflow-hidden">
+      <div className="lg:hidden flex-1 min-h-0 overflow-y-auto">
         {mobileTab === "history" && history}
         {mobileTab === "tasks" && tasks}
         {mobileTab === "details" && details}
