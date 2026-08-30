@@ -8,6 +8,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+/** Render `ExecutionHistoryModalContent` with default props, allowing overrides. */
 function renderContent(props?: Partial<React.ComponentProps<typeof ExecutionHistoryModalContent>>) {
   const onMobileTabChange = props?.onMobileTabChange ?? vi.fn();
 
@@ -25,10 +26,12 @@ function renderContent(props?: Partial<React.ComponentProps<typeof ExecutionHist
   return { ...utils, onMobileTabChange };
 }
 
+/** Get the mobile tab panel from the rendered output. */
 function getMobilePanel(container: HTMLElement) {
   return container.querySelector(".lg\\:hidden.flex-1");
 }
 
+/** Get the desktop three-pane panel from the rendered output. */
 function getDesktopPanel(container: HTMLElement) {
   return container.querySelector(".hidden.lg\\:flex");
 }

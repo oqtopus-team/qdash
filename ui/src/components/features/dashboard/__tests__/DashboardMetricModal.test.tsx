@@ -26,6 +26,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+/** Render `DashboardMetricModal` with default props, allowing overrides. */
 function renderModal(overrides?: Partial<React.ComponentProps<typeof DashboardMetricModal>>) {
   const onClose = overrides?.onClose ?? vi.fn();
 
