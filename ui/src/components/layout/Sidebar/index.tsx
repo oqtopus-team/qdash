@@ -40,6 +40,28 @@ type ExternalNavItem = {
   visible?: boolean;
 };
 
+function SidebarLogo({ size, onClick }: { size: "sm" | "lg"; onClick: () => void }) {
+  const isLarge = size === "lg";
+
+  return (
+    <Link
+      href="/"
+      className={`flex items-center justify-center rounded-xl ${isLarge ? "min-h-16" : ""}`}
+      aria-label="QDash home"
+      onClick={onClick}
+    >
+      <Image
+        src="/oqtopus_logo.png"
+        alt="Oqtopus Logo"
+        width={72}
+        height={72}
+        className={`object-contain ${isLarge ? "h-16 w-16" : "h-10 w-10"}`}
+        priority
+      />
+    </Link>
+  );
+}
+
 function SectionHeader({ label, visible }: { label: string; visible: boolean }) {
   if (!visible) return null;
   return (
@@ -81,9 +103,11 @@ function SidebarNavItem({
         onClick={onClick}
       >
         <Icon size={18} />
-        {showLabel && <span className="ml-2">{item.label}</span>}
+        {showLabel && <span className="ml-2 truncate">{item.label}</span>}
         {badge > 0 && (
-          <span className="badge badge-primary badge-xs ml-auto">{badge > 99 ? "99+" : badge}</span>
+          <span className="badge badge-primary badge-xs ml-auto shrink-0">
+            {badge > 99 ? "99+" : badge}
+          </span>
         )}
       </Link>
     </li>
@@ -118,7 +142,7 @@ function SidebarExternalNavItem({
         onClick={onClick}
       >
         <Icon size={18} />
-        {(isOpen || isMobileOpen) && <span className="ml-2">{item.label}</span>}
+        {(isOpen || isMobileOpen) && <span className="ml-2 truncate">{item.label}</span>}
       </a>
     </li>
   );
@@ -227,24 +251,10 @@ export function Sidebar() {
 
   const sidebarContent = (
     <>
-      <ul className="menu p-2 py-0">
-        {(isOpen || isMobileOpen) && (
-          <li className="mb-1">
-            <Link
-              href="/"
-              className="flex min-h-16 items-center justify-center rounded-xl"
-              aria-label="QDash home"
-              onClick={handleLinkClick}
-            >
-              <Image
-                src="/oqtopus_logo.png"
-                alt="Oqtopus Logo"
-                width={72}
-                height={72}
-                className="h-16 w-16 object-contain"
-                priority
-              />
-            </Link>
+      <ul className="menu max-lg:w-full max-lg:flex-nowrap max-lg:[&>li]:flex-nowrap p-2 py-0">
+        {isOpen && (
+          <li className="mb-1 hidden lg:block">
+            <SidebarLogo size="lg" onClick={handleLinkClick} />
           </li>
         )}
 
@@ -432,11 +442,12 @@ export function Sidebar() {
       {/* Mobile Sidebar Drawer */}
       <aside
         aria-label="Primary navigation"
-        className={`fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-base-300 bg-base-200 shadow-2xl transition-transform duration-300 lg:hidden ${
+        className={`fixed left-0 top-0 z-50 flex h-full w-56 flex-col border-r border-base-300 bg-base-200 shadow-2xl transition-transform duration-300 lg:hidden ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex justify-end p-2 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center justify-between gap-2 p-2">
+          <SidebarLogo size="sm" onClick={handleLinkClick} />
           <button
             onClick={() => setMobileSidebarOpen(false)}
             className="btn btn-ghost btn-sm btn-square"
