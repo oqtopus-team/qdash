@@ -517,3 +517,496 @@ async def test_execute_single_task_supports_quick_run_without_snapshot(
     assert parameters["backend_name"] == "fake"
     assert parameters["default_run_parameters"] == defaults
     assert parameters["persist_output_parameters"] is False
+
+
+def _make_lock_repo(*, locked: bool = False, acquires: bool = True) -> MagicMock:
+    """Build a lock repository stub with the given is_locked and try_lock answers."""
+    repo = MagicMock()
+    repo.is_locked.return_value = locked
+    repo.try_lock.return_value = acquires
+    return repo
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_claims_the_lock_before_creating_the_flow_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The lock is taken before Prefect is asked for a flow run, not after."""
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        flow_service,
+        "generate_execution_id",
+        lambda *_args, **_kwargs: "20240101-001",
+    )
+    monkeypatch.setattr(
+        FlowService, "_create_scheduled_execution", lambda self, **kw: kw["execution_id"]
+    )
+
+    class _RecordingClient:
+        """Fake Prefect client that records when the flow run is created."""
+
+        async def create_flow_run_from_deployment(self, **_kwargs: object) -> SimpleNamespace:
+            """Record the dispatch and return a stub flow run."""
+            calls.append("create_flow_run")
+            return SimpleNamespace(id="flow-run-1")
+
+    class _RecordingClientContext:
+        """Fake async context manager yielding a _RecordingClient."""
+
+        async def __aenter__(self) -> _RecordingClient:
+            """Return a new _RecordingClient."""
+            return _RecordingClient()
+
+        async def __aexit__(self, *_args: object) -> None:
+            """Do nothing on context exit."""
+            return
+
+    monkeypatch.setattr(flow_service, "get_client", _RecordingClientContext)
+
+    def _record_try_lock(**_kwargs: object) -> bool:
+        """Record the claim and report that the lock was acquired."""
+        calls.append("try_lock")
+        return True
+
+    lock_repository = _make_lock_repo()
+    lock_repository.try_lock.side_effect = _record_try_lock
+
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
+
+    response = await FlowService(
+        flow_repository=flow_repo,
+        execution_lock_repository=lock_repository,
+    ).execute_flow(
+        name="my-flow",
+        request=ExecuteFlowRequest(parameters={}),
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert calls == ["try_lock", "create_flow_run"]
+    assert response.execution_id == "20240101-001"
+    lock_repository.try_lock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-001"
+    )
+    lock_repository.unlock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_rejects_when_another_run_holds_the_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A concurrent dispatch that loses the race is rejected with 409."""
+    monkeypatch.setattr(
+        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-002"
+    )
+
+    lock_repository = _make_lock_repo(acquires=False)
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
+
+    with pytest.raises(HTTPException) as exc_info:
+        await FlowService(
+            flow_repository=flow_repo,
+            execution_lock_repository=lock_repository,
+        ).execute_flow(
+            name="my-flow",
+            request=ExecuteFlowRequest(parameters={}),
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_releases_the_lock_when_the_flow_run_cannot_be_created(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A dispatch failure must not leave the project locked."""
+    monkeypatch.setattr(
+        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-003"
+    )
+
+    class _FailingClientContext:
+        """Fake async context manager whose client always fails."""
+
+        async def __aenter__(self) -> SimpleNamespace:
+            """Return a client that raises on flow run creation."""
+
+            async def _raise(**_kwargs: object) -> None:
+                raise RuntimeError("prefect is down")
+
+            return SimpleNamespace(create_flow_run_from_deployment=_raise)
+
+        async def __aexit__(self, *_args: object) -> None:
+            """Do nothing on context exit."""
+            return
+
+    monkeypatch.setattr(flow_service, "get_client", _FailingClientContext)
+
+    lock_repository = _make_lock_repo()
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
+
+    with pytest.raises(HTTPException) as exc_info:
+        await FlowService(
+            flow_repository=flow_repo,
+            execution_lock_repository=lock_repository,
+        ).execute_flow(
+            name="my-flow",
+            request=ExecuteFlowRequest(parameters={}),
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 500
+    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_releases_the_lock_when_the_scheduled_row_cannot_be_saved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without a scheduled row the flow cannot adopt the lock, so it is released."""
+    monkeypatch.setattr(
+        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-004"
+    )
+    monkeypatch.setattr(FlowService, "_create_scheduled_execution", lambda self, **_kwargs: None)
+    monkeypatch.setattr(
+        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-4")
+    )
+
+    lock_repository = _make_lock_repo()
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
+
+    response = await FlowService(
+        flow_repository=flow_repo,
+        execution_lock_repository=lock_repository,
+    ).execute_flow(
+        name="my-flow",
+        request=ExecuteFlowRequest(parameters={}),
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert response.execution_id == "flow-run-4"
+    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_skips_the_claim_when_no_chip_id_can_be_resolved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With no chip there is no execution ID to own the lock, so the flow takes it."""
+    monkeypatch.setattr(FlowService, "_create_scheduled_execution", lambda self, **_kwargs: None)
+    monkeypatch.setattr(
+        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-5")
+    )
+
+    lock_repository = _make_lock_repo()
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="")
+
+    response = await FlowService(
+        flow_repository=flow_repo,
+        execution_lock_repository=lock_repository,
+    ).execute_flow(
+        name="my-flow",
+        request=ExecuteFlowRequest(parameters={}),
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert response.flow_run_id == "flow-run-5"
+    lock_repository.try_lock.assert_not_called()
+    lock_repository.unlock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_re_execute_from_snapshot_claims_the_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Snapshot re-execution claims the lock with its own pre-minted execution ID."""
+    monkeypatch.setattr(
+        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-006"
+    )
+    monkeypatch.setattr(
+        FlowService, "_create_scheduled_execution", lambda self, **kw: kw["execution_id"]
+    )
+    monkeypatch.setattr(
+        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-6")
+    )
+
+    lock_repository = _make_lock_repo()
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
+
+    response = await FlowService(
+        flow_repository=flow_repo,
+        execution_lock_repository=lock_repository,
+    ).re_execute_from_snapshot(
+        flow_name="my-flow",
+        source_execution_id="exec-1",
+        parameter_overrides={},
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert response.execution_id == "20240101-006"
+    lock_repository.try_lock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-006"
+    )
+
+
+@pytest.mark.asyncio
+async def test_execute_single_task_claims_the_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Single-task execution claims the lock the same way as a full flow."""
+    monkeypatch.setattr(
+        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-007"
+    )
+    monkeypatch.setattr(
+        FlowService, "_create_scheduled_execution", lambda self, **kw: kw["execution_id"]
+    )
+
+    class _FakeClient:
+        """Fake Prefect client returning a stub deployment and flow run."""
+
+        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
+            """Return a stub deployment."""
+            return SimpleNamespace(id="deployment-1")
+
+        async def create_flow_run_from_deployment(self, **_kwargs: object) -> SimpleNamespace:
+            """Return a stub flow run."""
+            return SimpleNamespace(id="flow-run-7")
+
+    class _FakeClientContext:
+        """Fake async context manager yielding a _FakeClient."""
+
+        async def __aenter__(self) -> _FakeClient:
+            """Return a new _FakeClient."""
+            return _FakeClient()
+
+        async def __aexit__(self, *_args: object) -> None:
+            """Do nothing on context exit."""
+            return
+
+    monkeypatch.setattr(flow_service, "get_client", _FakeClientContext)
+
+    lock_repository = _make_lock_repo()
+
+    response = await FlowService(
+        flow_repository=MagicMock(),
+        execution_lock_repository=lock_repository,
+    ).execute_single_task_from_snapshot(
+        task_name="CheckRabi",
+        qid="Q00",
+        chip_id="chip-1",
+        source_execution_id=None,
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert response.execution_id == "20240101-007"
+    lock_repository.try_lock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-007"
+    )
+
+
+@pytest.mark.asyncio
+async def test_re_execute_from_snapshot_releases_the_lock_when_the_flow_run_cannot_be_created(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A re-execution dispatch failure must not leave the project locked."""
+    monkeypatch.setattr(
+        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-009"
+    )
+
+    class _FailingClientContext:
+        """Fake async context manager whose client always fails."""
+
+        async def __aenter__(self) -> SimpleNamespace:
+            """Return a client that raises on flow run creation."""
+
+            async def _raise(**_kwargs: object) -> None:
+                raise RuntimeError("prefect is down")
+
+            return SimpleNamespace(create_flow_run_from_deployment=_raise)
+
+        async def __aexit__(self, *_args: object) -> None:
+            """Do nothing on context exit."""
+            return
+
+    monkeypatch.setattr(flow_service, "get_client", _FailingClientContext)
+
+    lock_repository = _make_lock_repo()
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
+
+    with pytest.raises(HTTPException) as exc_info:
+        await FlowService(
+            flow_repository=flow_repo,
+            execution_lock_repository=lock_repository,
+        ).re_execute_from_snapshot(
+            flow_name="my-flow",
+            source_execution_id="exec-1",
+            parameter_overrides={},
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 500
+    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+
+
+@pytest.mark.asyncio
+async def test_re_execute_from_snapshot_releases_the_lock_when_the_scheduled_row_cannot_be_saved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without a scheduled row the re-executed flow cannot adopt the lock, so it is released."""
+    monkeypatch.setattr(
+        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-010"
+    )
+    monkeypatch.setattr(FlowService, "_create_scheduled_execution", lambda self, **_kwargs: None)
+    monkeypatch.setattr(
+        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-8")
+    )
+
+    lock_repository = _make_lock_repo()
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
+
+    response = await FlowService(
+        flow_repository=flow_repo,
+        execution_lock_repository=lock_repository,
+    ).re_execute_from_snapshot(
+        flow_name="my-flow",
+        source_execution_id="exec-1",
+        parameter_overrides={},
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert response.execution_id == "flow-run-8"
+    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+
+
+@pytest.mark.asyncio
+async def test_execute_single_task_releases_the_lock_when_the_flow_run_cannot_be_created(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A single-task dispatch failure must not leave the project locked."""
+    monkeypatch.setattr(
+        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-011"
+    )
+
+    class _FailingClient:
+        """Fake Prefect client that resolves the deployment but fails to dispatch."""
+
+        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
+            """Return a stub deployment."""
+            return SimpleNamespace(id="deployment-1")
+
+        async def create_flow_run_from_deployment(self, **_kwargs: object) -> SimpleNamespace:
+            """Raise to simulate a Prefect dispatch failure."""
+            raise RuntimeError("prefect is down")
+
+    class _FailingClientContext:
+        """Fake async context manager yielding a _FailingClient."""
+
+        async def __aenter__(self) -> _FailingClient:
+            """Return a new _FailingClient."""
+            return _FailingClient()
+
+        async def __aexit__(self, *_args: object) -> None:
+            """Do nothing on context exit."""
+            return
+
+    monkeypatch.setattr(flow_service, "get_client", _FailingClientContext)
+
+    lock_repository = _make_lock_repo()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await FlowService(
+            flow_repository=MagicMock(),
+            execution_lock_repository=lock_repository,
+        ).execute_single_task_from_snapshot(
+            task_name="CheckRabi",
+            qid="Q00",
+            chip_id="chip-1",
+            source_execution_id=None,
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 500
+    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+
+
+@pytest.mark.asyncio
+async def test_execute_single_task_releases_the_lock_when_the_scheduled_row_cannot_be_saved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without a scheduled row the single-task flow cannot adopt the lock, so it is released."""
+    monkeypatch.setattr(
+        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-012"
+    )
+    monkeypatch.setattr(FlowService, "_create_scheduled_execution", lambda self, **_kwargs: None)
+
+    class _FakeClient:
+        """Fake Prefect client returning a stub deployment and flow run."""
+
+        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
+            """Return a stub deployment."""
+            return SimpleNamespace(id="deployment-1")
+
+        async def create_flow_run_from_deployment(self, **_kwargs: object) -> SimpleNamespace:
+            """Return a stub flow run."""
+            return SimpleNamespace(id="flow-run-9")
+
+    class _FakeClientContext:
+        """Fake async context manager yielding a _FakeClient."""
+
+        async def __aenter__(self) -> _FakeClient:
+            """Return a new _FakeClient."""
+            return _FakeClient()
+
+        async def __aexit__(self, *_args: object) -> None:
+            """Do nothing on context exit."""
+            return
+
+    monkeypatch.setattr(flow_service, "get_client", _FakeClientContext)
+
+    lock_repository = _make_lock_repo()
+
+    response = await FlowService(
+        flow_repository=MagicMock(),
+        execution_lock_repository=lock_repository,
+    ).execute_single_task_from_snapshot(
+        task_name="CheckRabi",
+        qid="Q00",
+        chip_id="chip-1",
+        source_execution_id=None,
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert response.execution_id == "flow-run-9"
+    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+
+
+def test_release_execution_lock_survives_a_failing_unlock() -> None:
+    """_release_execution_lock logs and swallows an unlock failure."""
+    lock_repository = _make_lock_repo()
+    lock_repository.unlock.side_effect = RuntimeError("mongo is down")
+
+    FlowService(
+        flow_repository=MagicMock(),
+        execution_lock_repository=lock_repository,
+    )._release_execution_lock("project-1", "20240101-008")
+
+    lock_repository.unlock.assert_called_once_with(project_id="project-1")
