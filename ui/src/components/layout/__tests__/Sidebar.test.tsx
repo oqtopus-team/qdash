@@ -47,6 +47,11 @@ vi.mock("@/hooks/useNotifications", () => ({
   }),
 }));
 
+/**
+ * Pulls the desktop and mobile navigation asides out of a render. Both carry the
+ * same aria-label, so they are told apart by their `lg:` visibility class.
+ * Throws when either is missing so a broken render fails here, not on undefined.
+ */
 function getAsides(container: HTMLElement) {
   const asides = container.querySelectorAll('aside[aria-label="Primary navigation"]');
   const desktop = Array.from(asides).find((aside) => aside.className.includes("lg:flex"));

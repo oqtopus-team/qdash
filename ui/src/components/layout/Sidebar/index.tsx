@@ -40,6 +40,11 @@ type ExternalNavItem = {
   visible?: boolean;
 };
 
+/**
+ * QDash home link shared by both sidebars.
+ * `lg` is the in-nav logo on the expanded desktop rail; `sm` is the compact one
+ * that sits beside the close button in the mobile drawer header.
+ */
 function SidebarLogo({ size, onClick }: { size: "sm" | "lg"; onClick: () => void }) {
   const isLarge = size === "lg";
 
@@ -62,6 +67,10 @@ function SidebarLogo({ size, onClick }: { size: "sm" | "lg"; onClick: () => void
   );
 }
 
+/**
+ * Renders a navigation section label, or nothing while the sidebar is collapsed
+ * to the icon-only desktop rail and there is no room for one.
+ */
 function SectionHeader({ label, visible }: { label: string; visible: boolean }) {
   if (!visible) return null;
   return (
@@ -71,6 +80,11 @@ function SectionHeader({ label, visible }: { label: string; visible: boolean }) 
   );
 }
 
+/**
+ * One in-app navigation row. Marks itself active from `pathname` (exact or
+ * prefix match per `item.match`), truncates its label so a long entry cannot
+ * widen the row, and closes the mobile drawer through `onClick`.
+ */
 function SidebarNavItem({
   item,
   isMobileOpen,
@@ -114,6 +128,10 @@ function SidebarNavItem({
   );
 }
 
+/**
+ * One external-link navigation row (Docs, Prefect, API Docs). Opens in a new tab
+ * and is never marked active, since the current route never matches it.
+ */
 function SidebarExternalNavItem({
   item,
   isMobileOpen,
@@ -148,6 +166,11 @@ function SidebarExternalNavItem({
   );
 }
 
+/**
+ * Primary navigation, rendered as two asides sharing one set of nav rows:
+ * a desktop rail that expands to `w-48` and collapses to `w-16`, and a mobile
+ * drawer (`w-56`) that slides in over an overlay and closes on navigation.
+ */
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
