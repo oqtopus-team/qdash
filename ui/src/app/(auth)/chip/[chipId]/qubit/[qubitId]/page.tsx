@@ -23,6 +23,9 @@ import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { useChipUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 import { dateToDateTimeLocal, toIsoSeconds } from "@/lib/utils/datetime";
 
+/**
+ * Qubit detail page with dashboard, history, and time-series views for a single qubit
+ */
 function QubitDetailPageContent() {
   const params = useParams();
   const chipId = params.chipId as string;

@@ -105,6 +105,9 @@ function PaginationControls({
   );
 }
 
+/**
+ * Execution history page listing workflow runs with task results and cancellation controls
+ */
 export function ExecutionPageContent() {
   // URL state management
   const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();

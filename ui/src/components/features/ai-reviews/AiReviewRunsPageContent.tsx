@@ -119,6 +119,9 @@ function RunCard({ run }: { run: AiReviewRunSummary }) {
   );
 }
 
+/**
+ * Page listing AI review runs with chip/task filters and pagination
+ */
 export function AiReviewRunsPageContent() {
   const { data: taskFileSettings } = useGetTaskFileSettings();
   const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";

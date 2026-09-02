@@ -56,6 +56,9 @@ const getFromLocalStorage = (key: string): string | null => {
   }
 };
 
+/**
+ * Chip metrics dashboard showing qubit/coupling metric grids, CDF chart, and export options
+ */
 export function MetricsPageContent() {
   const {
     selectedChip,

@@ -63,6 +63,9 @@ function calculatePearsonCorrelation(x: number[], y: number[]): { r: number; n: 
   return { r, n };
 }
 
+/**
+ * Scatter plot view for correlating two chip metrics across qubits or couplings
+ */
 export function CorrelationView() {
   // URL state management
   const {

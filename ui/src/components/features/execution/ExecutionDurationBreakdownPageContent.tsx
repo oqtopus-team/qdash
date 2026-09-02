@@ -49,6 +49,9 @@ function PaginationControls({
   );
 }
 
+/**
+ * Page analyzing task duration breakdown across executions for a selected chip and time range
+ */
 export function ExecutionDurationBreakdownPageContent() {
   const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
   const { startDate, endDate, setStartDate, setEndDate, setQuickRange } = useRangeModeUrlState();

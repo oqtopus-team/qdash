@@ -212,6 +212,9 @@ function TaskResultRow({
   );
 }
 
+/**
+ * Dropdown for filtering task results by execution within a selected chip
+ */
 function ExecutionFilter({
   chipId,
   selectedExecutionId,
@@ -506,6 +509,9 @@ function TaskResultPreviewSidebar({
   );
 }
 
+/**
+ * Task results page listing outcomes across executions with filters and a preview sidebar
+ */
 export function TaskResultsPageContent() {
   const router = useRouter();
   const pathname = usePathname();

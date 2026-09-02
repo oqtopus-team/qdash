@@ -25,6 +25,9 @@ interface TaskSelectorProps {
 
 const PLACEHOLDER = "Select a task";
 
+/**
+ * Component for selecting a task from a list of available tasks
+ */
 export function TaskSelector({
   tasks,
   selectedTask,

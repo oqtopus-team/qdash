@@ -50,6 +50,9 @@ function dateKeyToRange(dateKey: string): { start: string; end: string } {
   return { start: `${formatted}T00:00`, end: `${formatted}T23:59` };
 }
 
+/**
+ * Chip experiments page showing qubit/coupling grids and task history for a selected chip
+ */
 export function ChipPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();

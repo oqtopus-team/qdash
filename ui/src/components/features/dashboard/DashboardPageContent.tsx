@@ -141,6 +141,9 @@ function EmptyMetricDisclosure({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Chip dashboard page summarizing qubit/coupling metrics, notes, and forum activity for a cooldown
+ */
 export function DashboardPageContent() {
   const { user } = useAuth();
   const { projectId } = useProject();
