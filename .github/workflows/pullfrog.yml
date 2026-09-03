@@ -28,11 +28,11 @@ jobs:
       OPENAI_COMPATIBLE_MAX_OUTPUT: "32768"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 1
 
       - name: Run agent
-        uses: pullfrog/pullfrog@v0
+        uses: pullfrog/pullfrog@1ab92a2eb5c2268dcd803ac8bfb0984375e210ab
         with:
           prompt: ${{ inputs.prompt }}
