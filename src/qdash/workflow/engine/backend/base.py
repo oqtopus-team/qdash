@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager, nullcontext
+
+from qdash.workflow.engine.progress import ProgressReporter
 
 
 class BaseBackend(ABC):
@@ -22,6 +25,12 @@ class BaseBackend(ABC):
         """Get the backend instance (e.g., Experiment object for qubex)."""
         msg = "This method should be implemented by subclasses."
         raise NotImplementedError(msg)
+
+    def capture_progress(
+        self, reporter: ProgressReporter, *, task_name: str
+    ) -> AbstractContextManager[None]:
+        """Capture task progress when supported by the backend."""
+        return nullcontext()
 
     def save_note(
         self,

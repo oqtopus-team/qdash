@@ -9,6 +9,7 @@ import type { TaskResultResponseUserId } from './taskResultResponseUserId';
 import type { TaskResultResponseInputParameters } from './taskResultResponseInputParameters';
 import type { TaskResultResponseOutputParameters } from './taskResultResponseOutputParameters';
 import type { TaskResultResponseRunParameters } from './taskResultResponseRunParameters';
+import type { TaskResultResponseNote } from './taskResultResponseNote';
 import type { TaskResultResponseSourceTaskId } from './taskResultResponseSourceTaskId';
 import type { ReExecutionEntry } from './reExecutionEntry';
 import type { TaskResultResponseStartAt } from './taskResultResponseStartAt';
@@ -56,6 +57,7 @@ export interface TaskResultResponse {
   output_parameters: TaskResultResponseOutputParameters;
   output_parameter_names?: string[];
   run_parameters?: TaskResultResponseRunParameters;
+  note?: TaskResultResponseNote;
   tags?: string[];
   message?: string;
   stack_trace?: string;

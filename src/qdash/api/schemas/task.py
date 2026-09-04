@@ -211,6 +211,7 @@ class TaskResultResponse(BaseModel):
     output_parameters: dict[str, TaskResultOutputParameter]
     output_parameter_names: list[str] = Field(default_factory=list)
     run_parameters: dict[str, Any] = {}
+    note: dict[str, Any] = {}
     tags: list[str] = []
     message: str = ""
     stack_trace: str = ""

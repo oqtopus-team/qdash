@@ -92,6 +92,15 @@ class InMemoryTaskResultHistoryRepository:
         )
         self._history.append(entry)
 
+    def update_progress(
+        self, *, project_id: str | None, task_id: str, progress: dict[str, object]
+    ) -> None:
+        """Store live progress in an in-memory task entry."""
+        for entry in reversed(self._history):
+            if entry.project_id == project_id and entry.task_id == task_id:
+                entry.note = {**(entry.note or {}), "progress": progress}
+                return
+
     def find_latest_by_chip_and_qids(
         self,
         *,

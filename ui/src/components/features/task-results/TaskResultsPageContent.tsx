@@ -24,6 +24,7 @@ import { useGetTaskResult } from "@/client/task/task";
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
 import { useListTaskResults } from "@/client/task-result/task-result";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -347,7 +348,16 @@ function TaskResultPreviewSidebar({
     isLoading,
     isError,
   } = useGetTaskResult(taskId ?? "", {
-    query: { enabled: !!taskId },
+    query: {
+      enabled: !!taskId,
+      refetchInterval: (query) => {
+        const status = query.state.data?.data.status;
+        return status === "running" || status === "scheduled" || status === "pending"
+          ? 2000
+          : false;
+      },
+      refetchIntervalInBackground: true,
+    },
   });
   const taskResult = response?.data;
   const isOpen = !!taskId;
@@ -397,6 +407,9 @@ function TaskResultPreviewSidebar({
               )}
             </div>
             <h2 className="text-xl font-bold">{taskResult?.task_name || "Task Result"}</h2>
+            {taskResult && (
+              <ExecutionTaskProgress status={taskResult.status} note={taskResult.note} />
+            )}
             <p className="mt-1 font-mono text-xs text-base-content/50">{taskId}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href={`/task-results/${taskId}`} className="btn btn-primary btn-sm gap-1">

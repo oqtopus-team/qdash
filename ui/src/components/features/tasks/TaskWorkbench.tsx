@@ -16,6 +16,7 @@ import {
   useGetExecutionLockStatus,
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useToast } from "@/components/ui/Toast";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
@@ -537,7 +538,12 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                   {(execution.status === "running" ||
                     execution.status === "scheduled" ||
                     execution.status === "pending") && (
-                    <progress className="progress progress-primary w-full" />
+                    <>
+                      <ExecutionTaskProgress status={resultTask?.status} note={resultTask?.note} />
+                      {!resultTask?.note?.progress && (
+                        <progress className="progress progress-primary w-full" />
+                      )}
+                    </>
                   )}
 
                   <div className="flex h-56 items-center justify-start gap-3 overflow-x-auto rounded-lg bg-base-200/60 p-3">

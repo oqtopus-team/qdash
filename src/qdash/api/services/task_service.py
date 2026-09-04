@@ -184,6 +184,7 @@ class TaskService:
             output_parameters=task_result.output_parameters,
             output_parameter_names=task_result.output_parameter_names,
             run_parameters=task_result.run_parameters,
+            note=task_result.note,
             tags=task_result.tags,
             message=task_result.message,
             stack_trace=task_result.stack_trace,
