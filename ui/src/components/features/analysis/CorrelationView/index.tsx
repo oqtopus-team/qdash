@@ -63,9 +63,6 @@ function calculatePearsonCorrelation(x: number[], y: number[]): { r: number; n: 
   return { r, n };
 }
 
-/**
- * Scatter plot view for correlating two chip metrics across qubits or couplings
- */
 export function CorrelationView() {
   // URL state management
   const {
@@ -546,7 +543,7 @@ export function CorrelationView() {
                 </button>
               </div>
 
-              <div className="w-full sm:w-64">
+              <div className="w-full sm:w-48">
                 <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
               </div>
 

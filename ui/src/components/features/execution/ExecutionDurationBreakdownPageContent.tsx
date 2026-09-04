@@ -49,9 +49,6 @@ function PaginationControls({
   );
 }
 
-/**
- * Page analyzing task duration breakdown across executions for a selected chip and time range
- */
 export function ExecutionDurationBreakdownPageContent() {
   const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
   const { startDate, endDate, setStartDate, setEndDate, setQuickRange } = useRangeModeUrlState();
@@ -132,10 +129,10 @@ export function ExecutionDurationBreakdownPageContent() {
 
       <PageFiltersBar className="mb-4 sm:mb-6">
         <PageFiltersBar.Group>
-          <PageFiltersBar.Item className="sm:w-64">
+          <PageFiltersBar.Item>
             <ChipSelector selectedChip={selectedChip || ""} onChipSelect={handleChipChange} />
           </PageFiltersBar.Item>
-          <PageFiltersBar.Item className="sm:w-56">
+          <PageFiltersBar.Item>
             <CooldownSelector
               chipId={selectedChip || ""}
               selectedCooldownId={selectedCooldownId}

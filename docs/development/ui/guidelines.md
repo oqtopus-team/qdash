@@ -554,26 +554,6 @@ Use Tailwind CSS utility classes for styling:
 </div>
 ```
 
-### Selector Width
-
-Selectors (`components/selectors/`) fill 100% of their parent. The container decides the width; `useSelectStyles` returns theme styles only and does not compute widths.
-
-```tsx
-// ✅ Good - container sets a fixed width
-<PageFiltersBar.Item className="sm:w-64">
-  <ChipSelector selectedChip={chip} onChipSelect={setChip} />
-</PageFiltersBar.Item>
-
-// ❌ Bad - no width on a shrink-to-fit container (selector collapses to placeholder width)
-<PageFiltersBar.Item>
-  <ChipSelector selectedChip={chip} onChipSelect={setChip} />
-</PageFiltersBar.Item>
-```
-
-- Use a fixed `sm:w-*`, not `sm:min-w-*`, so the control width stays constant across selections. Mobile keeps the `w-full` default from `PageFiltersBar.Item`.
-- When a selector shares a row with a button (for example a clear button), wrap it in `min-w-0 flex-1` so it shrinks instead of pushing the button out.
-- Long labels ellipsize inside the control; the dropdown menu grows to `max-content` so the full option text stays readable.
-
 ### DaisyUI Components
 
 Use DaisyUI component classes for consistent UI:

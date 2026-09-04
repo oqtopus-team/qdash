@@ -119,9 +119,6 @@ function RunCard({ run }: { run: AiReviewRunSummary }) {
   );
 }
 
-/**
- * Page listing AI review runs with chip/task filters and pagination
- */
 export function AiReviewRunsPageContent() {
   const { data: taskFileSettings } = useGetTaskFileSettings();
   const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
@@ -180,14 +177,12 @@ export function AiReviewRunsPageContent() {
       <div className="mb-4 rounded-lg border border-base-300 bg-base-100 p-3">
         <PageFiltersBar>
           <PageFiltersBar.Group>
-            <PageFiltersBar.Item label="Chip" className="sm:w-72">
+            <PageFiltersBar.Item label="Chip" className="sm:min-w-56">
               <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <ChipSelector
-                    selectedChip={filters.chipId}
-                    onChipSelect={(chipId) => updateFilter({ chipId })}
-                  />
-                </div>
+                <ChipSelector
+                  selectedChip={filters.chipId}
+                  onChipSelect={(chipId) => updateFilter({ chipId })}
+                />
                 {filters.chipId && (
                   <button
                     type="button"
@@ -200,16 +195,14 @@ export function AiReviewRunsPageContent() {
                 )}
               </div>
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Task" className="sm:w-80">
+            <PageFiltersBar.Item label="Task" className="sm:min-w-80">
               <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <TaskSelector
-                    tasks={aiReviewTasks}
-                    selectedTask={filters.taskName}
-                    onTaskSelect={(taskName) => updateFilter({ taskName })}
-                    disabled={aiReviewTasks.length === 0}
-                  />
-                </div>
+                <TaskSelector
+                  tasks={aiReviewTasks}
+                  selectedTask={filters.taskName}
+                  onTaskSelect={(taskName) => updateFilter({ taskName })}
+                  disabled={aiReviewTasks.length === 0}
+                />
                 {filters.taskName && (
                   <button
                     type="button"
