@@ -212,6 +212,9 @@ function TaskResultRow({
   );
 }
 
+/**
+ * Dropdown for filtering task results by execution within a selected chip
+ */
 function ExecutionFilter({
   chipId,
   selectedExecutionId,
@@ -246,10 +249,7 @@ function ExecutionFilter({
     return items;
   }, [executionData?.data?.executions, selectedExecutionId]);
 
-  const { styles } = useSelectStyles<ExecutionOption>({
-    labels: options.map((option) => option.label),
-    placeholder: "Select an execution",
-  });
+  const styles = useSelectStyles<ExecutionOption>();
 
   if (isLoading) {
     return <div className="h-[38px] animate-pulse rounded bg-base-300" />;
@@ -509,6 +509,9 @@ function TaskResultPreviewSidebar({
   );
 }
 
+/**
+ * Task results page listing outcomes across executions with filters and a preview sidebar
+ */
 export function TaskResultsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -628,14 +631,16 @@ export function TaskResultsPageContent() {
       <form onSubmit={handleSubmit}>
         <PageFiltersBar className="mb-4 sm:mb-6">
           <PageFiltersBar.Group className="flex-1">
-            <PageFiltersBar.Item label="Chip" className="sm:min-w-40">
+            <PageFiltersBar.Item label="Chip" className="sm:w-72">
               <div className="flex items-center gap-2">
-                <ChipSelector
-                  selectedChip={draftFilters.chipId}
-                  onChipSelect={(chipId) =>
-                    setDraftFilters((current) => ({ ...current, chipId, executionId: "" }))
-                  }
-                />
+                <div className="min-w-0 flex-1">
+                  <ChipSelector
+                    selectedChip={draftFilters.chipId}
+                    onChipSelect={(chipId) =>
+                      setDraftFilters((current) => ({ ...current, chipId, executionId: "" }))
+                    }
+                  />
+                </div>
                 {draftFilters.chipId && (
                   <button
                     type="button"
@@ -650,15 +655,17 @@ export function TaskResultsPageContent() {
                 )}
               </div>
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Execution" className="sm:min-w-44">
+            <PageFiltersBar.Item label="Execution" className="sm:w-72">
               <div className="flex items-center gap-2">
-                <ExecutionFilter
-                  chipId={draftFilters.chipId}
-                  selectedExecutionId={draftFilters.executionId}
-                  onExecutionSelect={(executionId) =>
-                    setDraftFilters((current) => ({ ...current, executionId }))
-                  }
-                />
+                <div className="min-w-0 flex-1">
+                  <ExecutionFilter
+                    chipId={draftFilters.chipId}
+                    selectedExecutionId={draftFilters.executionId}
+                    onExecutionSelect={(executionId) =>
+                      setDraftFilters((current) => ({ ...current, executionId }))
+                    }
+                  />
+                </div>
                 {draftFilters.executionId && (
                   <button
                     type="button"
@@ -671,16 +678,18 @@ export function TaskResultsPageContent() {
                 )}
               </div>
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Task" className="sm:min-w-44">
+            <PageFiltersBar.Item label="Task" className="sm:w-72">
               <div className="flex items-center gap-2">
-                <TaskSelector
-                  tasks={tasks}
-                  selectedTask={draftFilters.taskName}
-                  onTaskSelect={(taskName) =>
-                    setDraftFilters((current) => ({ ...current, taskName }))
-                  }
-                  disabled={tasks.length === 0}
-                />
+                <div className="min-w-0 flex-1">
+                  <TaskSelector
+                    tasks={tasks}
+                    selectedTask={draftFilters.taskName}
+                    onTaskSelect={(taskName) =>
+                      setDraftFilters((current) => ({ ...current, taskName }))
+                    }
+                    disabled={tasks.length === 0}
+                  />
+                </div>
                 {draftFilters.taskName && (
                   <button
                     type="button"
