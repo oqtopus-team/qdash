@@ -1,6 +1,6 @@
 # Developer Guide
 
-This guide is for people changing QDash code.
+This guide is for people who change QDash code.
 
 Read this short section first. Use the detailed development pages only when you need deeper
 design context or examples.
