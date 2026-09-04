@@ -266,7 +266,7 @@ export function MetricNotePanel({
 
   return (
     <aside
-      className="flex flex-col bg-base-200/40 border-l border-base-300 lg:h-full overflow-hidden"
+      className="flex lg:h-full flex-col bg-base-200/40 lg:border-l border-base-300 lg:overflow-hidden"
       aria-label="Pinned summary"
     >
       {/* Section header */}
@@ -283,7 +283,7 @@ export function MetricNotePanel({
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-auto p-4 space-y-3">
+      <div className="flex-1 lg:overflow-auto p-4 space-y-3">
         {mode === "view" ? (
           <ViewState existing={localExisting} onEdit={() => setMode("edit")} />
         ) : (

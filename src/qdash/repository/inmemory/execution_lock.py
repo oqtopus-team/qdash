@@ -43,6 +43,29 @@ class InMemoryExecutionLockRepository:
         """
         return self._locks.get(project_id, False)
 
+    def try_lock(self, project_id: str, execution_id: str | None = None) -> bool:
+        """Atomically acquire the execution lock, unless another execution holds it.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        execution_id : str | None
+            The execution that will own the lock
+
+        Returns
+        -------
+        bool
+            True when the lock was acquired or already owned, False when held
+
+        """
+        if self._locks.get(project_id, False) and (
+            execution_id is None or self._owners.get(project_id) != execution_id
+        ):
+            return False
+        self.lock(project_id, execution_id)
+        return True
+
     def lock(self, project_id: str, execution_id: str | None = None) -> None:
         """Acquire the execution lock.
 

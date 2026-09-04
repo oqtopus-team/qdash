@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Lock, Play, RefreshCw, RotateCcw } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 
 import type { ExecutionResponseDetail, TaskInfo } from "@/schemas";
 
 import { getChipCoupling, getChipQubit, useListChips } from "@/client/chip/chip";
-import { useGetExecution, useGetExecutionLockStatus } from "@/client/execution/execution";
+import {
+  getGetExecutionLockStatusQueryKey,
+  useGetExecution,
+  useGetExecutionLockStatus,
+} from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useToast } from "@/components/ui/Toast";
@@ -31,6 +36,7 @@ function badgeClass(status?: string | null) {
 
 export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
   const toast = useToast();
+  const queryClient = useQueryClient();
   const { data: chipsData } = useListChips();
   const chips = chipsData?.data?.chips ?? [];
   const defaultChipId = chips[0]?.chip_id ?? "";
@@ -188,6 +194,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
         ?.detail;
       toast.error(detail ?? (error instanceof Error ? error.message : "Failed to start task"));
     } finally {
+      await queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() });
       setIsStarting(false);
     }
   };

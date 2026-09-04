@@ -61,3 +61,62 @@ def test_is_locked_reflects_lock_state(init_db: object) -> None:
 
     repo.unlock(project_id=PROJECT_ID)
     assert repo.is_locked(project_id=PROJECT_ID) is False
+
+
+def test_try_lock_acquires_a_free_lock_and_records_the_owner(init_db: object) -> None:
+    """try_lock takes a free lock and records the execution that owns it."""
+    repo = MongoExecutionLockRepository()
+
+    assert repo.try_lock(project_id=PROJECT_ID, execution_id="exec-1") is True
+
+    doc = _reload_lock()
+    assert doc is not None
+    assert doc.locked is True
+    assert doc.execution_id == "exec-1"
+
+
+def test_try_lock_refuses_a_held_lock_and_leaves_the_owner_alone(init_db: object) -> None:
+    """A second try_lock is refused and does not overwrite the current owner."""
+    repo = MongoExecutionLockRepository()
+    repo.try_lock(project_id=PROJECT_ID, execution_id="exec-1")
+
+    assert repo.try_lock(project_id=PROJECT_ID, execution_id="exec-2") is False
+
+    doc = _reload_lock()
+    assert doc is not None
+    assert doc.locked is True
+    assert doc.execution_id == "exec-1"
+
+
+def test_try_lock_reacquires_a_lock_owned_by_the_same_execution(init_db: object) -> None:
+    """The owning execution can take the lock again, which is how a flow adopts it."""
+    repo = MongoExecutionLockRepository()
+    repo.try_lock(project_id=PROJECT_ID, execution_id="exec-1")
+
+    assert repo.try_lock(project_id=PROJECT_ID, execution_id="exec-1") is True
+
+    doc = _reload_lock()
+    assert doc is not None
+    assert doc.locked is True
+    assert doc.execution_id == "exec-1"
+
+
+def test_try_lock_succeeds_again_after_unlock(init_db: object) -> None:
+    """Releasing the lock lets the next execution take it."""
+    repo = MongoExecutionLockRepository()
+    repo.try_lock(project_id=PROJECT_ID, execution_id="exec-1")
+    repo.unlock(project_id=PROJECT_ID)
+
+    assert repo.try_lock(project_id=PROJECT_ID, execution_id="exec-2") is True
+
+    doc = _reload_lock()
+    assert doc is not None
+    assert doc.execution_id == "exec-2"
+
+
+def test_try_lock_is_scoped_to_the_project(init_db: object) -> None:
+    """A lock held by one project does not block another."""
+    repo = MongoExecutionLockRepository()
+    repo.try_lock(project_id=PROJECT_ID, execution_id="exec-1")
+
+    assert repo.try_lock(project_id="proj-2", execution_id="exec-2") is True
