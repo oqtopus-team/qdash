@@ -240,6 +240,53 @@ class TestInMemoryExecutionLockRepository:
 
         assert not repo.is_locked("proj-1")
 
+    def test_try_lock_acquires_free_lock(self):
+        """Test try_lock acquires a free lock."""
+        repo = InMemoryExecutionLockRepository()
+
+        result = repo.try_lock("proj-1", "exec-1")
+
+        assert result is True
+        assert repo.is_locked("proj-1")
+
+    def test_try_lock_refuses_lock_held_by_another_execution(self):
+        """Test try_lock refuses a lock held by another execution."""
+        repo = InMemoryExecutionLockRepository()
+        repo.try_lock("proj-1", "exec-1")
+
+        result = repo.try_lock("proj-1", "exec-2")
+
+        assert result is False
+        assert repo.is_locked("proj-1")
+
+    def test_try_lock_reacquires_lock_owned_by_same_execution(self):
+        """Test try_lock succeeds when the same execution already owns the lock."""
+        repo = InMemoryExecutionLockRepository()
+        repo.try_lock("proj-1", "exec-1")
+
+        result = repo.try_lock("proj-1", "exec-1")
+
+        assert result is True
+
+    def test_try_lock_refuses_held_lock_without_owner(self):
+        """Test try_lock refuses a held lock with no recorded owner."""
+        repo = InMemoryExecutionLockRepository()
+        repo.lock("proj-1")
+
+        result = repo.try_lock("proj-1", "exec-1")
+
+        assert result is False
+
+    def test_try_lock_succeeds_after_unlock(self):
+        """Test try_lock succeeds for a new execution after the lock is released."""
+        repo = InMemoryExecutionLockRepository()
+        repo.try_lock("proj-1", "exec-1")
+        repo.unlock("proj-1")
+
+        result = repo.try_lock("proj-1", "exec-2")
+
+        assert result is True
+
 
 class TestInMemoryUserRepository:
     """Test InMemoryUserRepository."""

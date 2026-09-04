@@ -98,8 +98,8 @@ export function DashboardMetricModal({
         </div>
 
         {/* Body — history (main) + metric note (side/top panel) */}
-        <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
-          <div className="flex-1 min-w-0 overflow-auto p-3 sm:p-6 order-2 lg:order-1">
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+          <div className="w-full flex-none min-w-0 lg:flex-1 lg:min-h-0 lg:overflow-auto p-3 sm:p-6 order-2 lg:order-1">
             {isCoupling ? (
               <CouplingMetricHistoryModal
                 chipId={chipId}

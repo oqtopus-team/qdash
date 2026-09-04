@@ -3,7 +3,9 @@ from typing import ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
+from pymongo.errors import DuplicateKeyError
 
+from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
 
 
@@ -58,6 +60,58 @@ class ExecutionLockDocument(Document):
         doc.locked = lock
         doc.execution_id = owner
         doc.save()
+
+    @classmethod
+    def try_lock(cls, project_id: str, execution_id: str | None = None) -> bool:
+        """Acquire the lock atomically, unless another execution holds it.
+
+        A lock already owned by ``execution_id`` is reacquired, which is how a
+        flow run adopts the lock the API claimed for it at dispatch time.
+        Otherwise the upsert only matches an unlocked record; when the project
+        is locked it falls through to an insert that the unique index on
+        ``project_id`` rejects, so a ``DuplicateKeyError`` is the "someone
+        else holds it" answer rather than a failure.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        execution_id : str | None
+            The execution that will own the lock
+
+        Returns
+        -------
+        bool
+            True when the lock was acquired or already owned, False when held
+
+        """
+        query: dict[str, object] = {"project_id": project_id, "locked": False}
+        if execution_id is not None:
+            query = {
+                "project_id": project_id,
+                "$or": [{"locked": False}, {"execution_id": execution_id}],
+            }
+        # Raw pymongo bypasses Bunnet encoding, so system_info is written explicitly.
+        timestamp = now()
+        try:
+            cls.get_motor_collection().update_one(
+                query,
+                {
+                    "$set": {
+                        "locked": True,
+                        "execution_id": execution_id,
+                        "system_info.updated_at": timestamp,
+                    },
+                    "$setOnInsert": {
+                        "project_id": project_id,
+                        "system_info.created_at": timestamp,
+                    },
+                },
+                upsert=True,
+            )
+        except DuplicateKeyError:
+            return False
+        return True
 
     @classmethod
     def lock(cls, project_id: str, execution_id: str | None = None) -> None:

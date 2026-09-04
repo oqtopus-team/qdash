@@ -63,6 +63,24 @@ class MongoExecutionLockRepository:
         result: bool | None = ExecutionLockDocument.get_lock_status(project_id=project_id)
         return result
 
+    def try_lock(self, project_id: str, execution_id: str | None = None) -> bool:
+        """Atomically acquire the execution lock, unless another execution holds it.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        execution_id : str | None
+            The execution that will own the lock
+
+        Returns
+        -------
+        bool
+            True when the lock was acquired or already owned, False when held
+
+        """
+        return ExecutionLockDocument.try_lock(project_id=project_id, execution_id=execution_id)
+
     def lock(self, project_id: str, execution_id: str | None = None) -> None:
         """Acquire the execution lock.
 
