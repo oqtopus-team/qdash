@@ -32,9 +32,6 @@ function isPercentageMetric(unit: string | undefined): boolean {
   return unit === "%";
 }
 
-/**
- * Cumulative distribution function view for comparing chip metrics across qubits or couplings
- */
 export function CDFView() {
   // URL state management
   const {
@@ -697,7 +694,7 @@ export function CDFView() {
                 </button>
               </div>
 
-              <div className="w-full sm:w-64">
+              <div className="w-full sm:w-48">
                 <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
               </div>
 

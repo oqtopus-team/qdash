@@ -67,12 +67,15 @@ export function DateSelector({
     }));
   }, [datesResponse]);
 
-  const styles = useSelectStyles<DateOption>();
+  const { minWidth, styles } = useSelectStyles<DateOption>({
+    labels: dateOptions.map((opt) => opt.label),
+    placeholder: PLACEHOLDER,
+  });
 
   // Show loading state but keep the current selection visible
   if (isLoading) {
     return (
-      <div className="w-full animate-pulse">
+      <div className="animate-pulse" style={{ minWidth }}>
         <div className="h-[38px] bg-base-300 rounded"></div>
       </div>
     );
@@ -81,26 +84,30 @@ export function DateSelector({
   // Show error state but keep "latest" option available
   if (isError) {
     return (
-      <Select<DateOption>
-        options={[{ value: "latest", label: "Latest" }]}
-        value={{ value: "latest", label: "Latest" }}
-        onChange={handleChange}
-        isDisabled={disabled}
-        className="text-base-content"
-        styles={styles}
-      />
+      <div style={{ minWidth }}>
+        <Select<DateOption>
+          options={[{ value: "latest", label: "Latest" }]}
+          value={{ value: "latest", label: "Latest" }}
+          onChange={handleChange}
+          isDisabled={disabled}
+          className="text-base-content"
+          styles={styles}
+        />
+      </div>
     );
   }
 
   return (
-    <Select<DateOption>
-      options={dateOptions}
-      value={dateOptions.find((option) => option.value === selectedDate) ?? null}
-      onChange={handleChange}
-      placeholder={PLACEHOLDER}
-      className="text-base-content"
-      isDisabled={disabled}
-      styles={styles}
-    />
+    <div style={{ minWidth }}>
+      <Select<DateOption>
+        options={dateOptions}
+        value={dateOptions.find((option) => option.value === selectedDate) ?? null}
+        onChange={handleChange}
+        placeholder={PLACEHOLDER}
+        className="text-base-content"
+        isDisabled={disabled}
+        styles={styles}
+      />
+    </div>
   );
 }

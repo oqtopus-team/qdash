@@ -141,9 +141,6 @@ function EmptyMetricDisclosure({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * Chip dashboard page summarizing qubit/coupling metrics, notes, and forum activity for a cooldown
- */
 export function DashboardPageContent() {
   const { user } = useAuth();
   const { projectId } = useProject();
@@ -543,7 +540,7 @@ export function DashboardPageContent() {
           <div className="flex flex-col gap-4">
             <PageFiltersBar className="gap-3">
               <PageFiltersBar.Group className="gap-3">
-                <PageFiltersBar.Item label="Chip" className="sm:w-64">
+                <PageFiltersBar.Item label="Chip">
                   <ChipSelector
                     selectedChip={selectedChip}
                     onChipSelect={(chipId) => {
@@ -555,7 +552,7 @@ export function DashboardPageContent() {
                 </PageFiltersBar.Item>
                 <PageFiltersBar.Item
                   label="Cooldown"
-                  className="sm:w-56 [&:not(:has(.cooldown-selector-control))]:hidden"
+                  className="[&:not(:has(.cooldown-selector-control))]:hidden"
                 >
                   <CooldownSelector
                     chipId={selectedChip}

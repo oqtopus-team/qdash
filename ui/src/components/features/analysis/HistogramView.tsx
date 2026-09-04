@@ -35,9 +35,6 @@ function isPercentageMetric(unit: string | undefined): boolean {
   return unit === "%";
 }
 
-/**
- * Histogram view showing the distribution of a chip metric across qubits or couplings
- */
 export function HistogramView() {
   // URL state management
   const {
@@ -722,7 +719,7 @@ export function HistogramView() {
                 </button>
               </div>
 
-              <div className="w-full sm:w-64">
+              <div className="w-full sm:w-48">
                 <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
               </div>
 

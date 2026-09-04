@@ -23,9 +23,6 @@ import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { useChipUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 import { dateToDateTimeLocal, toIsoSeconds } from "@/lib/utils/datetime";
 
-/**
- * Qubit detail page with dashboard, history, and time-series views for a single qubit
- */
 function QubitDetailPageContent() {
   const params = useParams();
   const chipId = params.chipId as string;
@@ -128,7 +125,7 @@ function QubitDetailPageContent() {
           {/* Controls */}
           <PageFiltersBar>
             <PageFiltersBar.Group>
-              <PageFiltersBar.Item className="sm:w-64">
+              <PageFiltersBar.Item>
                 <ChipSelector
                   selectedChip={chipId}
                   onChipSelect={(newChipId) => {
@@ -136,7 +133,7 @@ function QubitDetailPageContent() {
                   }}
                 />
               </PageFiltersBar.Item>
-              <PageFiltersBar.Item className="sm:w-56">
+              <PageFiltersBar.Item>
                 <CooldownSelector
                   chipId={chipId}
                   selectedCooldownId={selectedCooldownId}
@@ -152,7 +149,7 @@ function QubitDetailPageContent() {
                 />
               </PageFiltersBar.Item>
               {viewMode === "history" && (
-                <PageFiltersBar.Item className="sm:w-80">
+                <PageFiltersBar.Item>
                   <TaskSelector
                     tasks={filteredTasks}
                     selectedTask={selectedTask}
