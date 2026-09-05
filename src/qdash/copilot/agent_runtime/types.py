@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-ToolExecutor = Callable[[dict[str, Any]], Any]
+ToolExecutor = Callable[[dict[str, Any]], Any | Awaitable[Any]]
 ToolExecutors = dict[str, ToolExecutor]
 StoredToolKey = str | Callable[[dict[str, Any]], str]
 OnToolCallHook = Callable[[str, dict[str, Any]], Awaitable[None]] | None

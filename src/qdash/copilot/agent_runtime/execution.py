@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+from inspect import isawaitable
 from typing import TYPE_CHECKING, Any, cast
 
 from qdash.copilot.agent_runtime.client import litellm_completion, litellm_responses
@@ -36,6 +37,14 @@ _STORED_TOOLS: dict[str, StoredToolKey] = {
 }
 
 
+async def execute_tool_executor(executor: ToolExecutor, args: dict[str, Any]) -> Any:
+    """Run a tool executor and await coroutine-like results."""
+    result = executor(args)
+    if isawaitable(result):
+        return await result
+    return result
+
+
 def wrap_tool_executors(
     tool_executors: ToolExecutors,
     data_store: dict[str, Any],
@@ -49,12 +58,12 @@ def wrap_tool_executors(
         if original:
             original_executor = cast("ToolExecutor", original)
 
-            def stored_wrapper(
+            async def stored_wrapper(
                 args: dict[str, Any],
                 _orig: ToolExecutor = original_executor,
                 _kfn: StoredToolKey = key_fn,
             ) -> Any:
-                result = _orig(args)
+                result = await execute_tool_executor(_orig, args)
                 if isinstance(result, dict) and "error" not in result:
                     key = _kfn(args) if callable(_kfn) else _kfn
                     data_store[key] = result
@@ -67,10 +76,10 @@ def wrap_tool_executors(
     if original_heatmap:
         original_heatmap_executor = cast("ToolExecutor", original_heatmap)
 
-        def heatmap_wrapper(
+        async def heatmap_wrapper(
             args: dict[str, Any], _orig: ToolExecutor = original_heatmap_executor
         ) -> Any:
-            result = _orig(args)
+            result = await execute_tool_executor(_orig, args)
             if isinstance(result, dict) and "chart" in result:
                 collected_charts.append(result["chart"])
                 return {
@@ -85,10 +94,10 @@ def wrap_tool_executors(
 
         wrapped["generate_chip_heatmap"] = heatmap_wrapper
 
-    def python_wrapper(args: dict[str, Any]) -> SandboxResult | dict[str, Any]:
+    async def python_wrapper(args: dict[str, Any]) -> SandboxResult | dict[str, Any]:
         from qdash.copilot.tooling.sandbox import execute_python_analysis
 
-        result = execute_python_analysis(args["code"], data_store)
+        result = await execute_python_analysis(args["code"], data_store)
         if isinstance(result, dict) and result.get("chart"):
             chart = result["chart"]
             if isinstance(chart, list):
@@ -448,7 +457,7 @@ async def run_litellm_responses(
                     tool_result = {"error": f"Unknown tool: {name}"}
                 else:
                     try:
-                        tool_result = executor(args)
+                        tool_result = await execute_tool_executor(executor, args)
                     except KeyError as e:
                         logger.warning("Tool %s missing required argument: %s", name, e)
                         tool_result = {
@@ -714,7 +723,7 @@ async def run_litellm_completion_with_tools(
                 tool_result: Any = {"error": f"Unknown tool: {name}"}
             else:
                 try:
-                    tool_result = executor(args)
+                    tool_result = await execute_tool_executor(executor, args)
                 except KeyError as e:
                     tool_result = {
                         "error": f"Missing required argument: {e}. Please provide all required parameters."
