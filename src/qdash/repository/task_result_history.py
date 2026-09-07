@@ -103,6 +103,18 @@ class MongoTaskResultHistoryRepository:
             doc.source_task_id = source_task_id
             doc.save()
 
+    def update_progress(
+        self, *, project_id: str | None, task_id: str, progress: dict[str, object]
+    ) -> None:
+        """Store live progress in the task's calibration metadata."""
+        doc = TaskResultHistoryDocument.find_one(
+            {"project_id": project_id, "task_id": task_id}
+        ).run()
+        if doc is None:
+            return
+        doc.note = {**doc.note, "progress": progress}
+        doc.save()
+
     def find_latest_by_chip_and_qids(
         self,
         *,

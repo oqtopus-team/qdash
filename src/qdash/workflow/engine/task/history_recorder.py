@@ -18,6 +18,7 @@ from qdash.repository import (
 if TYPE_CHECKING:
     from qdash.datamodel.execution import ExecutionModel
     from qdash.datamodel.task import BaseTaskResultModel, CalibDataModel
+    from qdash.workflow.engine.progress import TaskProgress
     from qdash.workflow.engine.task.provenance_recorder import ProvenanceRecorder
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,12 @@ class TaskResultHistoryRepoProtocol(Protocol):
         self, *, project_id: str | None, task_id: str, source_task_id: str
     ) -> None:
         """Set source_task_id on a task result document."""
+        ...
+
+    def update_progress(
+        self, *, project_id: str | None, task_id: str, progress: dict[str, object]
+    ) -> None:
+        """Update live progress on a task result document."""
         ...
 
 
@@ -152,6 +159,16 @@ class TaskHistoryRecorder:
             enqueue_ai_review_note(task, execution_model)
         except Exception as e:
             logger.warning(f"Failed to attach AI review note for task {task.name}: {e}")
+
+    def update_progress(
+        self, *, project_id: str | None, task_id: str, progress: TaskProgress
+    ) -> None:
+        """Persist a live task progress snapshot without result side effects."""
+        self.task_result_history_repo.update_progress(
+            project_id=project_id,
+            task_id=task_id,
+            progress=progress.to_dict(),
+        )
 
     def set_source_task_id(
         self,
