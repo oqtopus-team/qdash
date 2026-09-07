@@ -115,6 +115,7 @@ async def test_execute_python_analysis_accepts_multi_megabyte_context_data() -> 
 
 @pytest.mark.asyncio
 async def test_execute_python_analysis_rejects_oversized_context_data(monkeypatch) -> None:
+    monkeypatch.setattr(sandbox, "_bwrap_path", lambda: "/usr/bin/bwrap")
     monkeypatch.setattr(sandbox, "MAX_WORKER_INPUT_BYTES", 1024)
 
     result = await execute_python_analysis(
@@ -178,6 +179,8 @@ async def test_execute_python_analysis_kills_worker_on_timeout() -> None:
 
 @pytest.mark.asyncio
 async def test_execute_python_analysis_returns_error_for_worker_crash(monkeypatch) -> None:
+    monkeypatch.setattr(sandbox, "_bwrap_path", lambda: "/usr/bin/bwrap")
+
     async def fake_create_subprocess_exec(*_args: Any, **_kwargs: Any) -> Any:
         return _FakeProcess(returncode=2, stdout=b"", stderr=b"boom")
 
@@ -193,6 +196,7 @@ async def test_execute_python_analysis_returns_error_for_worker_crash(monkeypatc
 @pytest.mark.asyncio
 async def test_execute_python_analysis_reports_signal_name_for_killed_worker(monkeypatch) -> None:
     """A signalled worker reports its signal: '-24' alone reads like an exit code, not SIGXCPU."""
+    monkeypatch.setattr(sandbox, "_bwrap_path", lambda: "/usr/bin/bwrap")
 
     async def fake_create_subprocess_exec(*_args: Any, **_kwargs: Any) -> Any:
         return _FakeProcess(returncode=-signal.SIGXCPU, stdout=b"", stderr=b"")
@@ -210,6 +214,8 @@ async def test_execute_python_analysis_reports_signal_name_for_killed_worker(mon
 
 @pytest.mark.asyncio
 async def test_execute_python_analysis_returns_error_for_invalid_worker_json(monkeypatch) -> None:
+    monkeypatch.setattr(sandbox, "_bwrap_path", lambda: "/usr/bin/bwrap")
+
     async def fake_create_subprocess_exec(*_args: Any, **_kwargs: Any) -> Any:
         return _FakeProcess(returncode=0, stdout=b"not json", stderr=b"")
 

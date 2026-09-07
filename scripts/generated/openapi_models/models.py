@@ -887,7 +887,11 @@ class ExecuteFlowResponse(BaseModel):
 
     execution_id: Annotated[str, Field(title="Execution Id")]
     """
-    Execution ID
+    QDash execution ID (falls back to the Prefect flow run ID when no execution row could be pre-created)
+    """
+    flow_run_id: Annotated[str, Field(title="Flow Run Id")]
+    """
+    Prefect flow run ID
     """
     flow_run_url: Annotated[str, Field(title="Flow Run Url")]
     """
@@ -931,6 +935,10 @@ class ExecutionLockStatusResponse(BaseModel):
     """
 
     lock: Annotated[bool, Field(title="Lock")]
+    execution_id: Annotated[str | None, Field(title="Execution Id")] = None
+    chip_id: Annotated[str | None, Field(title="Chip Id")] = None
+    name: Annotated[str | None, Field(title="Name")] = None
+    status: Annotated[str | None, Field(title="Status")] = None
 
 
 class ExecutionResponseSummary(BaseModel):
@@ -954,6 +962,7 @@ class ExecutionResponseSummary(BaseModel):
     name: Annotated[str, Field(title="Name")]
     execution_id: Annotated[str, Field(title="Execution Id")]
     status: Annotated[str, Field(title="Status")]
+    message: Annotated[str, Field(title="Message")] = ""
     user_id: Annotated[str | None, Field(title="User Id")] = None
     username: Annotated[str, Field(title="Username")] = ""
     start_at: Annotated[AwareDatetime | None, Field(title="Start At")] = None
@@ -2284,6 +2293,21 @@ class ListIssuesResponse(BaseModel):
     limit: Annotated[int, Field(title="Limit")]
 
 
+class ManualCorrectionPoint(BaseModel):
+    """
+    A point selected from the source spectroscopy figure.
+    """
+
+    x: Annotated[float, Field(title="X")]
+    """
+    Selected frequency coordinate
+    """
+    y: Annotated[float, Field(title="Y")]
+    """
+    Selected power coordinate
+    """
+
+
 class ManualEditItem(BaseModel):
     """
     A single manual edit record.
@@ -2325,6 +2349,14 @@ class ManualParameterUpdateRequest(BaseModel):
     """
     Parameters to update. Format: {"param_name": {"value": 4.85, "unit": "GHz"}}
     """
+    source_task_id: Annotated[str | None, Field(title="Source Task Id")] = None
+    """
+    Task result whose output values are being manually corrected
+    """
+    correction_point: ManualCorrectionPoint | None = None
+    """
+    Plotly point selected as the visual basis for this correction
+    """
 
 
 class ManualParameterUpdateResponse(BaseModel):
@@ -2333,6 +2365,14 @@ class ManualParameterUpdateResponse(BaseModel):
     """
 
     updated_count: Annotated[int, Field(title="Updated Count")]
+    task_id: Annotated[str, Field(title="Task Id")]
+    """
+    Created ManualParameterEdit task result ID
+    """
+    execution_id: Annotated[str, Field(title="Execution Id")]
+    """
+    Created manual edit execution ID
+    """
     provenance_activity_id: Annotated[str | None, Field(title="Provenance Activity Id")] = None
 
 
@@ -2360,6 +2400,68 @@ class MetricHeatmapResponse(BaseModel):
     unit: Annotated[str | None, Field(title="Unit")] = None
 
 
+class SourceEnum(StrEnum):
+    database = "database"
+
+
+class Source(RootModel[SourceEnum | None]):
+    root: Annotated[SourceEnum | None, Field(title="Source")] = None
+
+
+class InputParameters(BaseModel):
+    """
+    Input parameter persisted in task-result history.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
+    qid_role: Annotated[str, Field(title="Qid Role")] = ""
+    source: Annotated[Source | None, Field(title="Source")] = None
+    required: Annotated[bool, Field(title="Required")] = False
+    value: Annotated[Any | None, Field(title="Value")] = None
+    value_type: Annotated[str, Field(title="Value Type")] = ""
+    error: Annotated[float, Field(title="Error")] = 0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    description: Annotated[str, Field(title="Description")] = ""
+    calibrated_at: Annotated[AwareDatetime | None, Field(title="Calibrated At")] = None
+    execution_id: Annotated[str, Field(title="Execution Id")] = ""
+    task_id: Annotated[str, Field(title="Task Id")] = ""
+
+
+class Source1Enum(StrEnum):
+    database = "database"
+
+
+class Source1(RootModel[Source1Enum | None]):
+    root: Annotated[Source1Enum | None, Field(title="Source")] = None
+
+
+class OutputParameters(BaseModel):
+    """
+    Output parameter persisted in task-result history with DB comparison metadata.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
+    qid_role: Annotated[str, Field(title="Qid Role")] = ""
+    source: Annotated[Source1 | None, Field(title="Source")] = None
+    required: Annotated[bool, Field(title="Required")] = False
+    value: Annotated[Any | None, Field(title="Value")] = None
+    value_type: Annotated[str, Field(title="Value Type")] = ""
+    error: Annotated[float, Field(title="Error")] = 0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    description: Annotated[str, Field(title="Description")] = ""
+    calibrated_at: Annotated[AwareDatetime | None, Field(title="Calibrated At")] = None
+    execution_id: Annotated[str, Field(title="Execution Id")] = ""
+    task_id: Annotated[str, Field(title="Task Id")] = ""
+    previous_database_value: Annotated[Any | None, Field(title="Previous Database Value")] = None
+    database_updated: Annotated[bool, Field(title="Database Updated")] = False
+
+
 class MetricHistoryItem(BaseModel):
     """
     Single historical metric data point.
@@ -2371,8 +2473,14 @@ class MetricHistoryItem(BaseModel):
     timestamp: Annotated[AwareDatetime, Field(title="Timestamp")]
     calibrated_at: Annotated[AwareDatetime | None, Field(title="Calibrated At")] = None
     name: Annotated[str | None, Field(title="Name")] = None
-    input_parameters: Annotated[dict[str, Any] | None, Field(title="Input Parameters")] = None
-    output_parameters: Annotated[dict[str, Any] | None, Field(title="Output Parameters")] = None
+    input_parameters: Annotated[
+        dict[str, InputParameters | str | float | bool | list[Any] | None] | None,
+        Field(title="Input Parameters"),
+    ] = None
+    output_parameters: Annotated[
+        dict[str, OutputParameters | str | float | bool | list[Any] | None] | None,
+        Field(title="Output Parameters"),
+    ] = None
     excluded: Annotated[bool, Field(title="Excluded")] = False
     excluded_reason: Annotated[str, Field(title="Excluded Reason")] = ""
     excluded_by_user_id: Annotated[str | None, Field(title="Excluded By User Id")] = None
@@ -2427,6 +2535,68 @@ class ModelConfig(BaseModel):
     api_style: Annotated[str, Field(title="Api Style")] = "responses"
 
 
+class Source2Enum(StrEnum):
+    database = "database"
+
+
+class Source2(RootModel[Source2Enum | None]):
+    root: Annotated[Source2Enum | None, Field(title="Source")] = None
+
+
+class InputParameters1(BaseModel):
+    """
+    Input parameter persisted in task-result history.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
+    qid_role: Annotated[str, Field(title="Qid Role")] = ""
+    source: Annotated[Source2 | None, Field(title="Source")] = None
+    required: Annotated[bool, Field(title="Required")] = False
+    value: Annotated[Any | None, Field(title="Value")] = None
+    value_type: Annotated[str, Field(title="Value Type")] = ""
+    error: Annotated[float, Field(title="Error")] = 0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    description: Annotated[str, Field(title="Description")] = ""
+    calibrated_at: Annotated[AwareDatetime | None, Field(title="Calibrated At")] = None
+    execution_id: Annotated[str, Field(title="Execution Id")] = ""
+    task_id: Annotated[str, Field(title="Task Id")] = ""
+
+
+class Source3Enum(StrEnum):
+    database = "database"
+
+
+class Source3(RootModel[Source3Enum | None]):
+    root: Annotated[Source3Enum | None, Field(title="Source")] = None
+
+
+class OutputParameters1(BaseModel):
+    """
+    Output parameter persisted in task-result history with DB comparison metadata.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
+    qid_role: Annotated[str, Field(title="Qid Role")] = ""
+    source: Annotated[Source3 | None, Field(title="Source")] = None
+    required: Annotated[bool, Field(title="Required")] = False
+    value: Annotated[Any | None, Field(title="Value")] = None
+    value_type: Annotated[str, Field(title="Value Type")] = ""
+    error: Annotated[float, Field(title="Error")] = 0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    description: Annotated[str, Field(title="Description")] = ""
+    calibrated_at: Annotated[AwareDatetime | None, Field(title="Calibrated At")] = None
+    execution_id: Annotated[str, Field(title="Execution Id")] = ""
+    task_id: Annotated[str, Field(title="Task Id")] = ""
+    previous_database_value: Annotated[Any | None, Field(title="Previous Database Value")] = None
+    database_updated: Annotated[bool, Field(title="Database Updated")] = False
+
+
 class MuxTask(BaseModel):
     """
     Task information for mux display.
@@ -2438,8 +2608,14 @@ class MuxTask(BaseModel):
     upstream_id: Annotated[str | None, Field(title="Upstream Id")] = None
     status: Annotated[str, Field(title="Status")] = "pending"
     message: Annotated[str | None, Field(title="Message")] = None
-    input_parameters: Annotated[dict[str, Any] | None, Field(title="Input Parameters")] = None
-    output_parameters: Annotated[dict[str, Any] | None, Field(title="Output Parameters")] = None
+    input_parameters: Annotated[
+        dict[str, InputParameters1 | str | float | bool | list[Any] | None] | None,
+        Field(title="Input Parameters"),
+    ] = None
+    output_parameters: Annotated[
+        dict[str, OutputParameters1 | str | float | bool | list[Any] | None] | None,
+        Field(title="Output Parameters"),
+    ] = None
     output_parameter_names: Annotated[list[str] | None, Field(title="Output Parameter Names")] = (
         None
     )
@@ -2671,20 +2847,17 @@ class ParameterDiffResponse(BaseModel):
     delta_percent: Annotated[float | None, Field(title="Delta Percent")] = None
 
 
-class SourceEnum(StrEnum):
+class Source4Enum(StrEnum):
     database = "database"
 
 
-class Source(RootModel[SourceEnum | None]):
-    root: Annotated[SourceEnum | None, Field(title="Source")] = None
+class Source4(RootModel[Source4Enum | None]):
+    root: Annotated[Source4Enum | None, Field(title="Source")] = None
 
 
 class ParameterModel(BaseModel):
     """
-    Calibration parameter model.
-
-    Used for both input_parameters (calibration dependencies) and
-    output_parameters (calibration outputs) in tasks.
+    Common persisted metadata for resolved calibration parameters.
 
     Attributes
     ----------
@@ -2709,7 +2882,7 @@ class ParameterModel(BaseModel):
 
     parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
     qid_role: Annotated[str, Field(title="Qid Role")] = ""
-    source: Annotated[Source | None, Field(title="Source")] = None
+    source: Annotated[Source4 | None, Field(title="Source")] = None
     required: Annotated[bool, Field(title="Required")] = False
     value: Annotated[float | int | None, Field(title="Value")] = 0
     value_type: Annotated[str, Field(title="Value Type")] = "float"
@@ -2794,7 +2967,15 @@ class PasswordReset(BaseModel):
     """
 
     username: Annotated[str, Field(pattern="^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$", title="Username")]
-    new_password: Annotated[str, Field(title="New Password")]
+
+
+class PasswordResetResponse(BaseModel):
+    """
+    One-time response containing a generated temporary password.
+    """
+
+    message: Annotated[str, Field(title="Message")]
+    initial_password: Annotated[str, Field(title="Initial Password")]
 
 
 class Position(BaseModel):
@@ -3070,6 +3251,27 @@ class BareShiftEstimatorType(StrEnum):
     high_frequency_strength = "high_frequency_strength"
 
 
+class ResonatorAssignmentOrderItem(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=3)]
+
+
+class ResonatorAssignmentOrder(RootModel[list[ResonatorAssignmentOrderItem]]):
+    root: Annotated[
+        list[ResonatorAssignmentOrderItem],
+        Field(max_length=4, min_length=4, title="Resonator Assignment Order"),
+    ]
+    """
+    Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once.
+    """
+
+
+class ResonatorAssignmentOrder1(RootModel[None]):
+    root: Annotated[None, Field(title="Resonator Assignment Order")]
+    """
+    Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once.
+    """
+
+
 class ReanalyzeResonatorSpectroscopyParams(BaseModel):
     """
     Optional analysis-parameter overrides for resonator spectroscopy.
@@ -3106,11 +3308,12 @@ class ReanalyzeResonatorSpectroscopyParams(BaseModel):
     """
     Strength cutoff for the high_frequency_strength estimator.
     """
-    resonator_assignment_pattern: Annotated[
-        str | None, Field(title="Resonator Assignment Pattern")
+    resonator_assignment_order: Annotated[
+        ResonatorAssignmentOrder | ResonatorAssignmentOrder1 | None,
+        Field(title="Resonator Assignment Order"),
     ] = None
     """
-    Named resonator assignment pattern: default or 16q. Use 16q for mux[0], mux[3], mux[1], mux[2].
+    Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once.
     """
 
 
@@ -3465,6 +3668,68 @@ class TargetNoteEntry(BaseModel):
     metric_notes: Annotated[dict[str, NoteModel] | None, Field(title="Metric Notes")] = None
 
 
+class Source5Enum(StrEnum):
+    database = "database"
+
+
+class Source5(RootModel[Source5Enum | None]):
+    root: Annotated[Source5Enum | None, Field(title="Source")] = None
+
+
+class InputParameters2(BaseModel):
+    """
+    Input parameter persisted in task-result history.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
+    qid_role: Annotated[str, Field(title="Qid Role")] = ""
+    source: Annotated[Source5 | None, Field(title="Source")] = None
+    required: Annotated[bool, Field(title="Required")] = False
+    value: Annotated[Any | None, Field(title="Value")] = None
+    value_type: Annotated[str, Field(title="Value Type")] = ""
+    error: Annotated[float, Field(title="Error")] = 0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    description: Annotated[str, Field(title="Description")] = ""
+    calibrated_at: Annotated[AwareDatetime | None, Field(title="Calibrated At")] = None
+    execution_id: Annotated[str, Field(title="Execution Id")] = ""
+    task_id: Annotated[str, Field(title="Task Id")] = ""
+
+
+class Source6Enum(StrEnum):
+    database = "database"
+
+
+class Source6(RootModel[Source6Enum | None]):
+    root: Annotated[Source6Enum | None, Field(title="Source")] = None
+
+
+class OutputParameters2(BaseModel):
+    """
+    Output parameter persisted in task-result history with DB comparison metadata.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
+    qid_role: Annotated[str, Field(title="Qid Role")] = ""
+    source: Annotated[Source6 | None, Field(title="Source")] = None
+    required: Annotated[bool, Field(title="Required")] = False
+    value: Annotated[Any | None, Field(title="Value")] = None
+    value_type: Annotated[str, Field(title="Value Type")] = ""
+    error: Annotated[float, Field(title="Error")] = 0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    description: Annotated[str, Field(title="Description")] = ""
+    calibrated_at: Annotated[AwareDatetime | None, Field(title="Calibrated At")] = None
+    execution_id: Annotated[str, Field(title="Execution Id")] = ""
+    task_id: Annotated[str, Field(title="Task Id")] = ""
+    previous_database_value: Annotated[Any | None, Field(title="Previous Database Value")] = None
+    database_updated: Annotated[bool, Field(title="Database Updated")] = False
+
+
 class Task(BaseModel):
     """
     Task is a Pydantic model that represents a task.
@@ -3478,8 +3743,14 @@ class Task(BaseModel):
     upstream_id: Annotated[str | None, Field(title="Upstream Id")] = None
     status: Annotated[str, Field(title="Status")] = "pending"
     message: Annotated[str | None, Field(title="Message")] = None
-    input_parameters: Annotated[dict[str, Any] | None, Field(title="Input Parameters")] = None
-    output_parameters: Annotated[dict[str, Any] | None, Field(title="Output Parameters")] = None
+    input_parameters: Annotated[
+        dict[str, InputParameters2 | str | float | bool | list[Any] | None] | None,
+        Field(title="Input Parameters"),
+    ] = None
+    output_parameters: Annotated[
+        dict[str, OutputParameters2 | str | float | bool | list[Any] | None] | None,
+        Field(title="Output Parameters"),
+    ] = None
     output_parameter_names: Annotated[list[str] | None, Field(title="Output Parameter Names")] = (
         None
     )
@@ -3576,6 +3847,68 @@ class TaskResponse(BaseModel):
     output_parameters: Annotated[dict[str, InputParameterModel], Field(title="Output Parameters")]
 
 
+class Source7Enum(StrEnum):
+    database = "database"
+
+
+class Source7(RootModel[Source7Enum | None]):
+    root: Annotated[Source7Enum | None, Field(title="Source")] = None
+
+
+class InputParameters3(BaseModel):
+    """
+    Input parameter persisted in task-result history.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
+    qid_role: Annotated[str, Field(title="Qid Role")] = ""
+    source: Annotated[Source7 | None, Field(title="Source")] = None
+    required: Annotated[bool, Field(title="Required")] = False
+    value: Annotated[Any | None, Field(title="Value")] = None
+    value_type: Annotated[str, Field(title="Value Type")] = ""
+    error: Annotated[float, Field(title="Error")] = 0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    description: Annotated[str, Field(title="Description")] = ""
+    calibrated_at: Annotated[AwareDatetime | None, Field(title="Calibrated At")] = None
+    execution_id: Annotated[str, Field(title="Execution Id")] = ""
+    task_id: Annotated[str, Field(title="Task Id")] = ""
+
+
+class Source8Enum(StrEnum):
+    database = "database"
+
+
+class Source8(RootModel[Source8Enum | None]):
+    root: Annotated[Source8Enum | None, Field(title="Source")] = None
+
+
+class OutputParameters3(BaseModel):
+    """
+    Output parameter persisted in task-result history with DB comparison metadata.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
+    qid_role: Annotated[str, Field(title="Qid Role")] = ""
+    source: Annotated[Source8 | None, Field(title="Source")] = None
+    required: Annotated[bool, Field(title="Required")] = False
+    value: Annotated[Any | None, Field(title="Value")] = None
+    value_type: Annotated[str, Field(title="Value Type")] = ""
+    error: Annotated[float, Field(title="Error")] = 0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    description: Annotated[str, Field(title="Description")] = ""
+    calibrated_at: Annotated[AwareDatetime | None, Field(title="Calibrated At")] = None
+    execution_id: Annotated[str, Field(title="Execution Id")] = ""
+    task_id: Annotated[str, Field(title="Task Id")] = ""
+    previous_database_value: Annotated[Any | None, Field(title="Previous Database Value")] = None
+    database_updated: Annotated[bool, Field(title="Database Updated")] = False
+
+
 class TaskResult(BaseModel):
     """
     TaskResult is a Pydantic model that represents a task result.
@@ -3588,8 +3921,14 @@ class TaskResult(BaseModel):
     upstream_id: Annotated[str | None, Field(title="Upstream Id")] = None
     status: Annotated[str, Field(title="Status")] = "pending"
     message: Annotated[str | None, Field(title="Message")] = None
-    input_parameters: Annotated[dict[str, Any] | None, Field(title="Input Parameters")] = None
-    output_parameters: Annotated[dict[str, Any] | None, Field(title="Output Parameters")] = None
+    input_parameters: Annotated[
+        dict[str, InputParameters3 | str | float | bool | list[Any] | None] | None,
+        Field(title="Input Parameters"),
+    ] = None
+    output_parameters: Annotated[
+        dict[str, OutputParameters3 | str | float | bool | list[Any] | None] | None,
+        Field(title="Output Parameters"),
+    ] = None
     output_parameter_names: Annotated[list[str] | None, Field(title="Output Parameter Names")] = (
         None
     )
@@ -3662,6 +4001,68 @@ class TaskResultListResponse(BaseModel):
     status_counts: Annotated[dict[str, int], Field(title="Status Counts")]
 
 
+class Source9Enum(StrEnum):
+    database = "database"
+
+
+class Source9(RootModel[Source9Enum | None]):
+    root: Annotated[Source9Enum | None, Field(title="Source")] = None
+
+
+class InputParameters4(BaseModel):
+    """
+    Input parameter persisted in task-result history.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
+    qid_role: Annotated[str, Field(title="Qid Role")] = ""
+    source: Annotated[Source9 | None, Field(title="Source")] = None
+    required: Annotated[bool, Field(title="Required")] = False
+    value: Annotated[Any | None, Field(title="Value")] = None
+    value_type: Annotated[str, Field(title="Value Type")] = ""
+    error: Annotated[float, Field(title="Error")] = 0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    description: Annotated[str, Field(title="Description")] = ""
+    calibrated_at: Annotated[AwareDatetime | None, Field(title="Calibrated At")] = None
+    execution_id: Annotated[str, Field(title="Execution Id")] = ""
+    task_id: Annotated[str, Field(title="Task Id")] = ""
+
+
+class Source10Enum(StrEnum):
+    database = "database"
+
+
+class Source10(RootModel[Source10Enum | None]):
+    root: Annotated[Source10Enum | None, Field(title="Source")] = None
+
+
+class OutputParameters4(BaseModel):
+    """
+    Output parameter persisted in task-result history with DB comparison metadata.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+    parameter_name: Annotated[str, Field(title="Parameter Name")] = ""
+    qid_role: Annotated[str, Field(title="Qid Role")] = ""
+    source: Annotated[Source10 | None, Field(title="Source")] = None
+    required: Annotated[bool, Field(title="Required")] = False
+    value: Annotated[Any | None, Field(title="Value")] = None
+    value_type: Annotated[str, Field(title="Value Type")] = ""
+    error: Annotated[float, Field(title="Error")] = 0
+    unit: Annotated[str, Field(title="Unit")] = ""
+    description: Annotated[str, Field(title="Description")] = ""
+    calibrated_at: Annotated[AwareDatetime | None, Field(title="Calibrated At")] = None
+    execution_id: Annotated[str, Field(title="Execution Id")] = ""
+    task_id: Annotated[str, Field(title="Task Id")] = ""
+    previous_database_value: Annotated[Any | None, Field(title="Previous Database Value")] = None
+    database_updated: Annotated[bool, Field(title="Database Updated")] = False
+
+
 class TaskResultResponse(BaseModel):
     """
     Response model for task result by task_id.
@@ -3699,9 +4100,19 @@ class TaskResultResponse(BaseModel):
     figure_path: Annotated[list[str], Field(title="Figure Path")]
     json_figure_path: Annotated[list[str], Field(title="Json Figure Path")]
     raw_data_path: Annotated[list[str], Field(title="Raw Data Path")]
-    input_parameters: Annotated[dict[str, Any], Field(title="Input Parameters")]
-    output_parameters: Annotated[dict[str, Any], Field(title="Output Parameters")]
+    input_parameters: Annotated[
+        dict[str, InputParameters4 | str | float | bool | list[Any] | None],
+        Field(title="Input Parameters"),
+    ]
+    output_parameters: Annotated[
+        dict[str, OutputParameters4 | str | float | bool | list[Any] | None],
+        Field(title="Output Parameters"),
+    ]
+    output_parameter_names: Annotated[list[str] | None, Field(title="Output Parameter Names")] = (
+        None
+    )
     run_parameters: Annotated[dict[str, Any], Field(title="Run Parameters")] = {}
+    note: Annotated[dict[str, Any], Field(title="Note")] = {}
     tags: Annotated[list[str], Field(title="Tags")] = []
     message: Annotated[str, Field(title="Message")] = ""
     stack_trace: Annotated[str, Field(title="Stack Trace")] = ""
@@ -4379,6 +4790,7 @@ class ExecutionResponseDetail(BaseModel):
 
     name: Annotated[str, Field(title="Name")]
     status: Annotated[str, Field(title="Status")]
+    message: Annotated[str, Field(title="Message")] = ""
     flow_name: Annotated[str, Field(title="Flow Name")] = ""
     user_id: Annotated[str | None, Field(title="User Id")] = None
     username: Annotated[str, Field(title="Username")] = ""

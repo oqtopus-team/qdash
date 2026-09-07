@@ -16,6 +16,7 @@ module.exports = {
       clean: true,
       mock: false,
       override: {
+        aliasCombinedTypes: true,
         mutator: {
           path: "./src/orval-request.ts",
           name: "qdashRequest",

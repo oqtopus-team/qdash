@@ -24,8 +24,8 @@ tasks:
         OPENAPI_TMP="$(mktemp)"
         ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
         mv "$OPENAPI_TMP" docs/oas/openapi.json
-      - cd ui && bunx orval@7.14.0 --config ./orval.config.cjs
-      - cd clients/typescript && bunx orval@7.14.0 --config ./orval.config.cjs
+      - cd clients/typescript && bun run generate:ui
+      - cd clients/typescript && bun run generate
       - cd ui && bun run fmt
       - cd ui && bun run lint:fix
     desc: Generate the TypeScript clients
