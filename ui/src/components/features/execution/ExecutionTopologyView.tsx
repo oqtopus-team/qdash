@@ -232,6 +232,10 @@ const CouplingMarker = memo(function CouplingMarker({
   );
 });
 
+/**
+ * Chip topology grid for one execution, with a detail modal listing every task
+ * the clicked qubit or coupling ran
+ */
 export function ExecutionTopologyView({
   chipId,
   executionId,
