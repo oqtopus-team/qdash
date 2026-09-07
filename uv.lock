@@ -378,30 +378,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.43.87"
+version = "1.43.88"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5c/0c/b14374e9458030076cd22ff9381cf86d170f31b648fd901db1d88011094b/boto3-1.43.87.tar.gz", hash = "sha256:8d9521c7c292194b8ce9fb61043d52e45cdba29b5f690981f3eb5e75103ba57d", size = 112691, upload-time = "2026-09-02T19:23:13.603Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/71/a4/d7b6ca0c2c21722c12b6ecc942ff3e2304c40f00724182500236616c4236/boto3-1.43.88.tar.gz", hash = "sha256:b3d03fba8ace049de27e3a6ed69b25a55d752f49d563394985e805ed5f0a0a74", size = 112730, upload-time = "2026-09-03T19:24:05.814Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9c/a9/7dd7cc1a2387f3c78f66e49682957b7e7d590706dc6552d108b48125022d/boto3-1.43.87-py3-none-any.whl", hash = "sha256:671cf88a353f887774603980898bc34249d05a994e1c5e24aba4f4e1bbef0951", size = 140026, upload-time = "2026-09-02T19:23:12.044Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/04/b024d6c8ba2ae18ebaf6597981069a6f51d97ab64d769d466936f1454954/boto3-1.43.88-py3-none-any.whl", hash = "sha256:62efee681fefc9b14244d66ab66ead11dd4a32fec0a54ac9f23106003ef210ca", size = 140024, upload-time = "2026-09-03T19:24:04.27Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.43.87"
+version = "1.43.88"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/97/c4/64ebb159810a9840c57659f3ed98439bbc5680dc9708e3b08212deea301a/botocore-1.43.87.tar.gz", hash = "sha256:928598e7275fa70385d7f694d60d59afe115a0b914cc699dbf3eb60954c23bf1", size = 16064894, upload-time = "2026-09-02T19:23:08.777Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/49/16/8944ffdbd6df92c463b77e933bae41a46fb1ec903c48a286e855761ce115/botocore-1.43.88.tar.gz", hash = "sha256:3c8a6e2292f05c590c5d5299934dd23c81d19a2b6dd70b9eb724f79bd432d04f", size = 16072325, upload-time = "2026-09-03T19:24:01.045Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/eb/5c/f15aa7a5da42fc85254f0150df7d377bb965b0c130c68f9701fba88e0df4/botocore-1.43.87-py3-none-any.whl", hash = "sha256:01e1e2255a8f4b959c19b210d74a5a916d13841c0344ceee15d8a3eaa4daa892", size = 15755750, upload-time = "2026-09-02T19:23:05.937Z" },
+    { url = "https://files.pythonhosted.org/packages/72/b0/2981d533ebf7f93a3fa8493fb243e11225f31ad5ae36f3259fe7215d9141/botocore-1.43.88-py3-none-any.whl", hash = "sha256:1b59b6d74fb77b0c3934014b6693d56da4a9a172edb9454f9a5f711b4b3f7353", size = 15765383, upload-time = "2026-09-03T19:23:57.936Z" },
 ]
 
 [[package]]
@@ -2505,7 +2505,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "platform_machine != 'ARM64' or sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -2604,7 +2604,7 @@ wheels = [
 
 [[package]]
 name = "prefect"
-version = "3.8.4"
+version = "3.8.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -2664,9 +2664,9 @@ dependencies = [
     { name = "uvicorn" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2b/8d/0844fb814a6a02f03fe87a1c26cc3b8236a9c1f3e16364883f89d101d99d/prefect-3.8.4.tar.gz", hash = "sha256:ab7d7980db95e90a949b09732147324b939d1daf9a754b19c122040ff6a3a559", size = 14614713, upload-time = "2026-08-25T17:37:40.313Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/28/79/970fa14809c4aff938535cacae9cb52458984b6c49a98ab7fe368b24bac1/prefect-3.8.5.tar.gz", hash = "sha256:d393bf6809c8bbb1c584c6fbfdbb0bde9e247432e7a3d258351071e7bd818d6e", size = 14627954, upload-time = "2026-09-03T21:42:04.198Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/76/87/39588aab2c3b2e12bfd84d64bcb2fe605376dbd6450edaf9da0a30ea814e/prefect-3.8.4-py3-none-any.whl", hash = "sha256:f7b4a5be5e186c34ca73485060062ebb4277771df8441f78fcaea5f86c8aa012", size = 15563985, upload-time = "2026-08-25T17:37:36.818Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/ee/8bb42ac39f1ee09671973be22f39091d787e3be44fdfe49d99013754d69d/prefect-3.8.5-py3-none-any.whl", hash = "sha256:2f48380ada06c8d31f35bddebb0f3aea40b7a23151f9d281832540a7803faece", size = 15575897, upload-time = "2026-09-03T21:42:01.043Z" },
 ]
 
 [package.optional-dependencies]
@@ -2676,7 +2676,7 @@ dask = [
 
 [[package]]
 name = "prefect-client"
-version = "3.8.4"
+version = "3.8.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "amplitude-analytics" },
@@ -2721,9 +2721,9 @@ dependencies = [
     { name = "uvicorn" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d7/95/e7a214a7fa25123fdf590cbcd686cd8d880da6ccad2282d75a87d150c710/prefect_client-3.8.4.tar.gz", hash = "sha256:079add0985e334253d9d633569e3e0401cea47faf2aa7fa90b9bffcc6f1de6cd", size = 937869, upload-time = "2026-08-25T17:37:25.068Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1d/61/89a7818082f2ff6ef20849a520bed230a451a807eeb7e6110e6b115c075c/prefect_client-3.8.5.tar.gz", hash = "sha256:12742a367264e262796ff8ac665812f45a2c1043bacab4abfa777e311aef01cd", size = 939246, upload-time = "2026-09-03T21:42:13.842Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e1/d7/362bd2bb3108ff50a0204faa1cea6be434de5f0bbbf2bb2e8f04fc7ca3bf/prefect_client-3.8.4-py3-none-any.whl", hash = "sha256:999c48dfab826769eb34fe5a03c5aaef51e5111cadf9dc1cf2364e10902610ac", size = 1158220, upload-time = "2026-08-25T17:37:23.08Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/c5/37286f3e04603f7d1a40a65d13b746a504c6489b3861da92ae4f6c117e0b/prefect_client-3.8.5-py3-none-any.whl", hash = "sha256:d608cadeb61aa3f21013cf13fa0f492fb7339f90105880e78005d98fdf50120a", size = 1159554, upload-time = "2026-09-03T21:42:11.881Z" },
 ]
 
 [[package]]
@@ -3581,7 +3581,7 @@ wheels = [
 [[package]]
 name = "qubex"
 version = "1.5.0rc2"
-source = { git = "https://github.com/amachino/qubex.git?branch=develop#b5a499b9fa20a42a1e1e79d762f86c50bf857064" }
+source = { git = "https://github.com/amachino/qubex.git?branch=develop#fb95e6b9fcce3e7d86a4de5ae2f41dd873cee2b3" }
 dependencies = [
     { name = "anywidget" },
     { name = "cma" },
@@ -3679,7 +3679,7 @@ runtime-compilation = [
 [[package]]
 name = "qxcore"
 version = "1.5.0rc2"
-source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxcore&branch=develop#b5a499b9fa20a42a1e1e79d762f86c50bf857064" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxcore&branch=develop#fb95e6b9fcce3e7d86a4de5ae2f41dd873cee2b3" }
 dependencies = [
     { name = "netcdf4" },
     { name = "numpy" },
@@ -3693,7 +3693,7 @@ dependencies = [
 [[package]]
 name = "qxdriver-quel1"
 version = "1.5.0rc2"
-source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxdriver-quel1&branch=develop#b5a499b9fa20a42a1e1e79d762f86c50bf857064" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxdriver-quel1&branch=develop#fb95e6b9fcce3e7d86a4de5ae2f41dd873cee2b3" }
 dependencies = [
     { name = "numpy" },
     { name = "plotly" },
@@ -3705,12 +3705,12 @@ dependencies = [
 [[package]]
 name = "qxfitting"
 version = "1.5.0rc2"
-source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxfitting&branch=develop#b5a499b9fa20a42a1e1e79d762f86c50bf857064" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxfitting&branch=develop#fb95e6b9fcce3e7d86a4de5ae2f41dd873cee2b3" }
 
 [[package]]
 name = "qxpulse"
 version = "1.5.0rc2"
-source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxpulse&branch=develop#b5a499b9fa20a42a1e1e79d762f86c50bf857064" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxpulse&branch=develop#fb95e6b9fcce3e7d86a4de5ae2f41dd873cee2b3" }
 dependencies = [
     { name = "numpy" },
     { name = "plotly" },
@@ -3723,7 +3723,7 @@ dependencies = [
 [[package]]
 name = "qxschema"
 version = "1.5.0rc2"
-source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxschema&branch=develop#b5a499b9fa20a42a1e1e79d762f86c50bf857064" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxschema&branch=develop#fb95e6b9fcce3e7d86a4de5ae2f41dd873cee2b3" }
 dependencies = [
     { name = "numpy" },
     { name = "qxcore" },
@@ -3732,7 +3732,7 @@ dependencies = [
 [[package]]
 name = "qxsimulator"
 version = "1.5.0rc2"
-source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxsimulator&branch=develop#b5a499b9fa20a42a1e1e79d762f86c50bf857064" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxsimulator&branch=develop#fb95e6b9fcce3e7d86a4de5ae2f41dd873cee2b3" }
 dependencies = [
     { name = "networkx" },
     { name = "numpy" },
@@ -3750,7 +3750,7 @@ dependencies = [
 [[package]]
 name = "qxvisualizer"
 version = "1.5.0rc2"
-source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxvisualizer&branch=develop#b5a499b9fa20a42a1e1e79d762f86c50bf857064" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxvisualizer&branch=develop#fb95e6b9fcce3e7d86a4de5ae2f41dd873cee2b3" }
 dependencies = [
     { name = "numpy" },
     { name = "plotly" },
@@ -4071,7 +4071,7 @@ resolution-markers = [
     "(python_full_version < '3.12' and platform_machine != 'ARM64') or (python_full_version < '3.12' and sys_platform != 'win32')",
 ]
 dependencies = [
-    { name = "numpy" },
+    { name = "numpy", marker = "python_full_version < '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7a/97/5a3609c4f8d58b039179648e62dd220f89864f56f7357f5d4f45c29eb2cc/scipy-1.17.1.tar.gz", hash = "sha256:95d8e012d8cb8816c226aef832200b1d45109ed4464303e997c5b13122b297c0", size = 30573822, upload-time = "2026-02-23T00:26:24.851Z" }
 wheels = [
@@ -4106,7 +4106,7 @@ resolution-markers = [
     "(python_full_version >= '3.12' and platform_machine != 'ARM64') or (python_full_version >= '3.12' and sys_platform != 'win32')",
 ]
 dependencies = [
-    { name = "numpy" },
+    { name = "numpy", marker = "python_full_version >= '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7e/74/66de6258867beb2ef08f35f9f2ac017a52cacd5081714d239ff1a442d458/scipy-1.18.1.tar.gz", hash = "sha256:52c4b7422442aba924d03ad4019852b08a92e64ea187b933135687bfe2747307", size = 30781235, upload-time = "2026-08-21T23:28:50.599Z" }
 wheels = [
