@@ -30,6 +30,13 @@ vi.mock("@/client/execution/execution", () => ({
             elapsed_time: "1m",
             username: "tester",
           },
+          {
+            execution_id: "exec-2",
+            name: "Completed Execution",
+            status: "completed",
+            start_at: "2026-06-01T00:00:00Z",
+            username: "tester",
+          },
         ],
       },
     },
@@ -177,6 +184,68 @@ describe("ExecutionPageContent cancel confirmation", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(panel.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("browses adjacent executions without closing the panel and resets its scroll", () => {
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    const previous = within(panel).getByRole("button", {
+      name: "Previous execution",
+    }) as HTMLButtonElement;
+    const next = within(panel).getByRole("button", { name: "Next execution" }) as HTMLButtonElement;
+    expect(previous.disabled).toBe(true);
+    expect(next.disabled).toBe(false);
+    expect(within(panel).getByText("1 of 2 on this page")).toBeTruthy();
+
+    panel.scrollTop = 300;
+    fireEvent.click(next);
+    expect(panel.scrollTop).toBe(0);
+    expect(within(panel).getByRole("heading", { name: "Completed Execution" })).toBeTruthy();
+    expect(within(panel).getByRole("link", { name: "View Details" }).getAttribute("href")).toBe(
+      "/execution/chip-1/exec-2",
+    );
+    expect(within(panel).getByText("2 of 2 on this page")).toBeTruthy();
+    expect(next.disabled).toBe(true);
+    expect(previous.disabled).toBe(false);
+    expect(within(panel).queryByRole("button", { name: "Cancel" })).toBeNull();
+
+    fireEvent.click(previous);
+    expect(within(panel).getByRole("heading", { name: "Running Execution" })).toBeTruthy();
+  });
+
+  it("moves focus into the panel and returns it to the last viewed execution on close", () => {
+    render(<ExecutionPageContent />);
+    const firstCard = screen.getByRole("button", {
+      name: "View Running Execution execution details",
+    });
+    firstCard.focus();
+    fireEvent.keyDown(firstCard, { key: "Enter" });
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Close execution details" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Next execution" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    const lastCard = screen.getByRole("button", {
+      name: "View Completed Execution execution details",
+    });
+    expect(document.activeElement).toBe(lastCard);
+    expect(lastCard.getAttribute("aria-expanded")).toBe("false");
+    expect(document.getElementById("execution-details-panel")?.hasAttribute("inert")).toBe(true);
+  });
+
+  it("does not close the panel for Escape handled by another dialog or during composition", () => {
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    fireEvent.keyDown(document, { key: "Escape", isComposing: true });
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    document.body.appendChild(dialog);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+    dialog.remove();
   });
 
   it("cancels the execution with its flow_run_id after confirming in the dialog", () => {
