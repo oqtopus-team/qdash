@@ -27,34 +27,32 @@ jobs:
       OPENAI_COMPATIBLE_CONTEXT: "131072"
       OPENAI_COMPATIBLE_MAX_OUTPUT: "32768"
     steps:
-      # Pullfrog dispatches this workflow itself, so the base branch has to be
-      # read out of its payload rather than filtered with `on: pull_request`.
-      - name: Check the review target branch
-        id: target
+      - name: Check the pull request target branch
+        id: gate
         env:
           PULLFROG_PROMPT: ${{ inputs.prompt }}
-          REVIEW_BASE_REF: develop
+          REVIEW_TARGET_BRANCH: develop
         run: |
           set -euo pipefail
 
-          trigger=$(jq -r 'if type == "object" then (.event.trigger // "") else "" end' <<<"${PULLFROG_PROMPT}" 2>/dev/null || true)
-          base_ref=$(jq -r 'if type == "object" then (.event.context.base_ref // "") else "" end' <<<"${PULLFROG_PROMPT}" 2>/dev/null || true)
+          trigger=$(jq -r 'try (.event.trigger // "") catch ""' <<<"${PULLFROG_PROMPT}" 2>/dev/null || true)
+          target_branch=$(jq -r 'try (.event.context.base_ref // "") catch ""' <<<"${PULLFROG_PROMPT}" 2>/dev/null || true)
 
-          if [ -n "${base_ref}" ] && [ "${base_ref}" != "${REVIEW_BASE_REF}" ] && [[ "${trigger}" != *comment* ]]; then
-            echo "run=false" >> "${GITHUB_OUTPUT}"
-            echo "::notice::Skipping the review. This pull request targets ${base_ref}, and reviews are limited to ${REVIEW_BASE_REF}."
-          else
+          if [ -z "${target_branch}" ] || [ "${target_branch}" = "${REVIEW_TARGET_BRANCH}" ] || [[ "${trigger}" == *comment* ]]; then
             echo "run=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "run=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice::Skipping the review. Only pull requests targeting ${REVIEW_TARGET_BRANCH} are reviewed, and this one targets ${target_branch}."
           fi
 
       - name: Checkout code
-        if: steps.target.outputs.run == 'true'
+        if: steps.gate.outputs.run == 'true'
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 1
 
       - name: Run agent
-        if: steps.target.outputs.run == 'true'
+        if: steps.gate.outputs.run == 'true'
         uses: pullfrog/pullfrog@1ab92a2eb5c2268dcd803ac8bfb0984375e210ab
         with:
           prompt: ${{ inputs.prompt }}
