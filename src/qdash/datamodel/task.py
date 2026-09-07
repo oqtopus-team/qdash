@@ -60,7 +60,7 @@ class RunParameterModel(BaseModel):
 
     unit: str = ""
     value_type: str = "float"
-    value: tuple[int | float, ...] | list[int | float] | int | float | str | None = None
+    value: tuple[int | float, ...] | list[int | float] | bool | int | float | str | None = None
     description: str = ""
 
     def get_value(self) -> Any:
@@ -122,7 +122,7 @@ class RunParameterModel(BaseModel):
 class RunParameterSpec(ParameterSpec):
     """Class-level declaration for experiment run configuration."""
 
-    default: tuple[int | float, ...] | list[int | float] | int | float | str | None = None
+    default: tuple[int | float, ...] | list[int | float] | bool | int | float | str | None = None
 
     def create_model(self) -> RunParameterModel:
         """Create an independent runtime model from this declaration."""

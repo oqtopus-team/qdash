@@ -50,6 +50,15 @@ class CheckControlAmplitude(QubexTask):
         "coarse_control_amplitude": InputParameterSpec.required_database(),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "simultaneous_drive": RunParameterSpec(
+            unit="a.u.",
+            value_type="bool",
+            default=True,
+            description=(
+                "Whether control and readout pulses start together. "
+                "False starts readout after the control pulse ends."
+            ),
+        ),
         "frequency_span": RunParameterSpec(
             unit="GHz",
             value_type="float",
@@ -242,6 +251,7 @@ class CheckControlAmplitude(QubexTask):
         ):
             result = exp.measure_qubit_resonance(
                 label,
+                simultaneous_drive=self.run_parameters["simultaneous_drive"].get_value(),
                 frequency_range=frequency_range,
                 control_amplitude=coarse_control_amplitude,
                 readout_amplitude=readout_amplitude,
