@@ -79,6 +79,22 @@ describe("SearchInput", () => {
     },
   );
 
+  it.each(["combobox", "menu"])("does not steal focus from a %s", (role) => {
+    render(
+      <>
+        <SearchInput value="" onChange={vi.fn()} />
+        <div role={role} tabIndex={0}>
+          Editor
+        </div>
+      </>,
+    );
+    makeVisible(screen.getByRole("textbox"));
+    const editor = screen.getByRole(role);
+    editor.focus();
+    fireEvent.keyDown(editor, { key: "/" });
+    expect(editor).toHaveFocus();
+  });
+
   it("ignores shortcuts while a dialog is open", () => {
     render(
       <>

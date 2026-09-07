@@ -127,6 +127,8 @@ export function ExecutionPageContent() {
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const executionCards = useRef(new Map<string, HTMLDivElement>());
+  const pendingFocusRestore = useRef<string | null>(null);
+  const executionListHeading = useRef<HTMLHeadingElement>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -212,13 +214,23 @@ export function ExecutionPageContent() {
   );
 
   const handleCloseSidebar = useCallback(() => {
-    if (selectedExecutionId) {
-      executionCards.current.get(selectedExecutionId)?.focus({ preventScroll: true });
-    }
+    if (selectedExecutionId) pendingFocusRestore.current = selectedExecutionId;
+    if (sidebarRef.current) sidebarRef.current.scrollTop = 0;
     setIsSidebarOpen(false);
     setSelectedExecutionId(null);
     setExpandedTaskIndex(null);
   }, [selectedExecutionId]);
+
+  useEffect(() => {
+    if (isSidebarOpen || isLoading || !pendingFocusRestore.current) return;
+    const firstId = cardData[0]?.execution_id;
+    const target =
+      executionCards.current.get(pendingFocusRestore.current) ??
+      (firstId ? executionCards.current.get(firstId) : null) ??
+      executionListHeading.current;
+    target?.focus({ preventScroll: true });
+    pendingFocusRestore.current = null;
+  }, [cardData, isLoading, isSidebarOpen]);
 
   useEffect(() => {
     if (isSidebarOpen) closeButtonRef.current?.focus({ preventScroll: true });
@@ -261,9 +273,8 @@ export function ExecutionPageContent() {
 
   // Chip selection change handler
   const handleChipChange = (chipId: string) => {
+    handleCloseSidebar();
     setSelectedChip(chipId || null);
-    setSelectedExecutionId(null);
-    setIsSidebarOpen(false);
     setCurrentPage(1);
   };
 
@@ -421,7 +432,12 @@ export function ExecutionPageContent() {
       </section>
       <section aria-labelledby="recent-executions-heading">
         <div className="mb-3">
-          <h2 id="recent-executions-heading" className="text-lg font-semibold">
+          <h2
+            ref={executionListHeading}
+            tabIndex={-1}
+            id="recent-executions-heading"
+            className="text-lg font-semibold"
+          >
             Recent executions
           </h2>
           <p className="text-sm text-base-content/60">
