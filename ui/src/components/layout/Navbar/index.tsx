@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, Folder, FolderLock } from "lucide-react";
+import { Suspense } from "react";
 
 import {
   DropdownMenu,
@@ -105,7 +106,9 @@ export function Navbar() {
         <HiddenIcon />
         <ProjectSelector />
         <EnvironmentBadge className="badge-sm sm:badge-md" />
-        <GlobalCommandPalette />
+        <Suspense fallback={null}>
+          <GlobalCommandPalette />
+        </Suspense>
         <div className="ml-auto">
           <GlobalExecutionIndicator />
         </div>
