@@ -41,6 +41,7 @@
     "build": "tsup src/index.ts src/models.ts src/generated/api.ts --format esm --dts --sourcemap --clean --out-dir dist",
     "check": "tsc --noEmit && vitest run",
     "generate": "orval --config ./orval.config.cjs",
+    "generate:ui": "cd ../../ui && orval --config ./orval.config.cjs",
     "prepack": "bun run build",
     "test": "vitest run"
   },
