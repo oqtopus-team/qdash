@@ -20,11 +20,13 @@ from bunnet import SortDirection
 from fastapi import HTTPException
 
 from qdash.api.schemas.calibration import (
+    CalibrationGitHubSync,
     ManualEditItem,
     ManualEditsResponse,
     ManualParameterUpdateRequest,
     ManualParameterUpdateResponse,
 )
+from qdash.api.services.calibration_github_service import CalibrationGitHubService
 from qdash.common.config.backend import get_default_backend
 from qdash.common.config.params_updater import YamlParamsUpdater, resolve_param_yaml_file_names
 from qdash.common.config.path_resolver import resolve_calib_data_path
@@ -238,7 +240,22 @@ class ManualUpdateService:
             task_id=task_id,
             execution_id=execution_id,
             provenance_activity_id=activity.activity_id,
+            github_sync=CalibrationGitHubService().sync(task_result),
         )
+
+    def retry_github_sync(self, task_id: str, project_id: str) -> CalibrationGitHubSync:
+        """Retry publication of current YAML without applying another calibration edit."""
+        result = TaskResultHistoryDocument.find_one(
+            {
+                "project_id": project_id,
+                "task_id": task_id,
+                "name": "ManualParameterEdit",
+                "status": "completed",
+            }
+        ).run()
+        if result is None:
+            raise HTTPException(status_code=404, detail="Completed manual edit not found")
+        return CalibrationGitHubService().sync(result)
 
     @staticmethod
     def _backend_update(

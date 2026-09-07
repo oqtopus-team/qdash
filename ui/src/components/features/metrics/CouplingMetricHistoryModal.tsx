@@ -1,5 +1,8 @@
 "use client";
 
+import { CalibrationGitHubSyncNotice } from "@/components/features/task-results/CalibrationGitHubSyncNotice";
+import type { ManualParameterUpdateResponse } from "@/schemas";
+
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
@@ -65,6 +68,7 @@ export function CouplingMetricHistoryModal({
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
+  const [githubResult, setGithubResult] = useState<ManualParameterUpdateResponse | null>(null);
   const [saveMessage, setSaveMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -231,6 +235,7 @@ export function CouplingMetricHistoryModal({
           queryKey: [`/calibrations/manual-edits/${activeCouplingId}`],
         });
         const count = res.data?.updated_count ?? 0;
+        setGithubResult(res.data);
         setSaveMessage({
           type: "success",
           text: `${count} parameter(s) saved to DB`,
@@ -635,6 +640,9 @@ export function CouplingMetricHistoryModal({
                   isSaving={updateParamsMutation.isPending}
                   overrides={manualOverrides}
                 />
+                {githubResult && (
+                  <CalibrationGitHubSyncNotice key={githubResult.task_id} result={githubResult} />
+                )}
                 {saveMessage && (
                   <div
                     className={`text-xs px-2 py-1 rounded ${

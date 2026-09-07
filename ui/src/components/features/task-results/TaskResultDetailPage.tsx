@@ -25,6 +25,8 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import { SpectroscopyManualCorrection } from "@/components/features/task-results/SpectroscopyManualCorrection";
+import { CalibrationGitHubSyncNotice } from "@/components/features/task-results/CalibrationGitHubSyncNotice";
+import type { CalibrationGitHubSync } from "@/schemas";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
@@ -508,6 +510,15 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       </div>
 
       {/* Task Info Box */}
+      {taskResult.task_name === "ManualParameterEdit" && taskResult.status === "completed" && (
+        <CalibrationGitHubSyncNotice
+          key={taskId}
+          result={{
+            task_id: taskId,
+            github_sync: taskResult.note?.github_sync as CalibrationGitHubSync | undefined,
+          }}
+        />
+      )}
       {taskResult.task_name === "ManualParameterEdit" && (
         <div className="mb-4 overflow-hidden rounded-xl border border-success/30 bg-success/5">
           <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">

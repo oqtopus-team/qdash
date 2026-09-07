@@ -1,5 +1,8 @@
 "use client";
 
+import { CalibrationGitHubSyncNotice } from "@/components/features/task-results/CalibrationGitHubSyncNotice";
+import type { ManualParameterUpdateResponse } from "@/schemas";
+
 import React, { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
@@ -49,6 +52,7 @@ export function TaskHistoryModal({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedExecutionTaskIndex, setSelectedExecutionTaskIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
+  const [githubResult, setGithubResult] = useState<ManualParameterUpdateResponse | null>(null);
   const [saveMessage, setSaveMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -98,6 +102,7 @@ export function TaskHistoryModal({
         await queryClient.invalidateQueries({
           queryKey: [`/calibrations/manual-edits/${qid}`],
         });
+        setGithubResult(res.data);
         const count = res.data?.updated_count ?? 0;
         setSaveMessage({
           type: "success",
@@ -566,6 +571,9 @@ export function TaskHistoryModal({
                   isSaving={updateParamsMutation.isPending}
                   overrides={manualOverrides}
                 />
+                {githubResult && (
+                  <CalibrationGitHubSyncNotice key={githubResult.task_id} result={githubResult} />
+                )}
                 {saveMessage && (
                   <div
                     className={`text-xs px-2 py-1 rounded ${

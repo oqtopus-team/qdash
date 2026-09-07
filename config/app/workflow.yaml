@@ -4,6 +4,7 @@
 params_updater:
   # Map calibration output parameter names to params/*.yaml files.
   # Shared by workflow results and manual calibration updates from the UI.
+  # Missing mapped files are created with a data section for the updated qubit/coupling.
   # These files are updated before GitHub ALL_PARAMS push.
   parameter_file_map:
     t1: t1.yaml
@@ -26,6 +27,9 @@ params_updater:
       - control_frequency.yaml
 
 github:
+  # Automatically publish manual calibration updates when GitHub credentials are configured.
+  enabled: true
+  branch: main
   # Optional allowlist for params/*.yaml files pushed by ALL_PARAMS.
   # Leave empty to preserve the historical behavior of pushing all *.yaml files.
   # Example:

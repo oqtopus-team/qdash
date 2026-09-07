@@ -85,13 +85,13 @@ def _load_extra_file_map() -> dict[str, list[str]]:
 class ParamsUpdater(Protocol):
     """Protocol for backend-specific parameter updaters."""
 
-    def snapshot(self, qid: str, output_parameters: dict[str, Any]) -> dict[str, bytes]: ...
+    def snapshot(self, qid: str, output_parameters: dict[str, Any]) -> dict[str, bytes | None]: ...
 
     def update(self, qid: str, output_parameters: dict[str, Any]) -> set[str]: ...
 
     def verify(self, qid: str, output_parameters: dict[str, Any]) -> set[str]: ...
 
-    def restore(self, snapshot: dict[str, bytes]) -> None: ...
+    def restore(self, snapshot: dict[str, bytes | None]) -> None: ...
 
 
 def resolve_param_yaml_file_names(output_parameters: dict[str, Any]) -> set[str]:
@@ -180,21 +180,22 @@ class YamlParamsUpdater:
                     raise RuntimeError("Manual update failed and YAML rollback failed") from exc
                 raise
 
-    def snapshot(self, _qid: str, output_parameters: dict[str, Any]) -> dict[str, bytes]:
-        """Capture mapped parameter files before a multi-file update."""
+    def snapshot(self, _qid: str, output_parameters: dict[str, Any]) -> dict[str, bytes | None]:
+        """Capture mapped files, using None for files that do not yet exist."""
         params_dir = self._resolve_params_dir()
         if params_dir is None:
             raise ValueError("Qubex params directory is not available")
 
-        snapshots: dict[str, bytes] = {}
+        snapshots: dict[str, bytes | None] = {}
         for file_name in sorted(self._resolve_file_names(output_parameters)):
             file_path = params_dir / file_name
-            if not file_path.exists():
-                raise ValueError(f"Mapped params file does not exist: {file_name}")
             lock_path = file_path.with_suffix(file_path.suffix + ".lock")
             lock_path.touch(exist_ok=True)
             with self._file_lock(lock_path):
-                snapshots[file_name] = file_path.read_bytes()
+                try:
+                    snapshots[file_name] = file_path.read_bytes()
+                except FileNotFoundError:
+                    snapshots[file_name] = None
         return snapshots
 
     def update(self, qid: str, output_parameters: dict[str, Any]) -> set[str]:
@@ -257,8 +258,8 @@ class YamlParamsUpdater:
                 verified.add(file_name)
         return verified
 
-    def restore(self, snapshot: dict[str, bytes]) -> None:
-        """Atomically restore parameter files captured before an update."""
+    def restore(self, snapshot: dict[str, bytes | None]) -> None:
+        """Restore original files and remove files created during the update."""
         params_dir = self._resolve_params_dir()
         if params_dir is None:
             raise ValueError("Qubex params directory is not available")
@@ -268,6 +269,9 @@ class YamlParamsUpdater:
             lock_path = file_path.with_suffix(file_path.suffix + ".lock")
             lock_path.touch(exist_ok=True)
             with self._file_lock(lock_path):
+                if content is None:
+                    file_path.unlink(missing_ok=True)
+                    continue
                 with tempfile.NamedTemporaryFile(
                     mode="wb",
                     dir=params_dir,
@@ -322,17 +326,17 @@ class YamlParamsUpdater:
         return None
 
     def _update_yaml(self, file_path: Path, qubit_label: str, value: float | int | str) -> bool:
-        """Update YAML file with file locking and atomic write to prevent race conditions."""
-        if not file_path.exists():
-            return False
-
+        """Create or update a mapped YAML file under a lock with an atomic write."""
         lock_path = file_path.with_suffix(file_path.suffix + ".lock")
         lock_path.touch(exist_ok=True)
 
         with self._file_lock(lock_path):
             # Read current data under lock
-            with file_path.open("r") as fp:
-                data = self._yaml.load(fp) or CommentedMap()
+            try:
+                with file_path.open("r") as fp:
+                    data = self._yaml.load(fp) or CommentedMap()
+            except FileNotFoundError:
+                data = CommentedMap()
 
             if not isinstance(data, CommentedMap):
                 data = CommentedMap(data)

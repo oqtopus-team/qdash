@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { CalibrationGitHubSync } from './calibrationGitHubSync';
 import type { ManualParameterUpdateResponseProvenanceActivityId } from './manualParameterUpdateResponseProvenanceActivityId';
 
 /**
@@ -17,4 +18,5 @@ export interface ManualParameterUpdateResponse {
   /** Created manual edit execution ID */
   execution_id: string;
   provenance_activity_id?: ManualParameterUpdateResponseProvenanceActivityId;
+  github_sync?: CalibrationGitHubSync;
 }

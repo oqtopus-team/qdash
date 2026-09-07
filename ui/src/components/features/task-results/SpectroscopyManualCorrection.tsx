@@ -1,5 +1,8 @@
 "use client";
 
+import { CalibrationGitHubSyncNotice } from "@/components/features/task-results/CalibrationGitHubSyncNotice";
+import type { ManualParameterUpdateResponse } from "@/schemas";
+
 import { useMemo, useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
@@ -56,6 +59,7 @@ export function SpectroscopyManualCorrection({
   const [pendingPoint, setPendingPoint] = useState<PickedPoint | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<PickedPoint | null>(null);
   const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
+  const [githubResult, setGithubResult] = useState<ManualParameterUpdateResponse | null>(null);
   const queryClient = useQueryClient();
   const mutation = useUpdateCalibrationParameters();
   const { data: qubitResponse } = useGetChipQubit(chipId, qid);
@@ -106,6 +110,7 @@ export function SpectroscopyManualCorrection({
       },
       {
         onSuccess: (response) => {
+          setGithubResult(response.data);
           setConfirming(false);
           setEditing(false);
           setCreatedTaskId(response.data.task_id);
@@ -165,6 +170,9 @@ export function SpectroscopyManualCorrection({
               View correction result
             </a>
           </div>
+        )}
+        {githubResult && (
+          <CalibrationGitHubSyncNotice key={githubResult.task_id} result={githubResult} />
         )}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
