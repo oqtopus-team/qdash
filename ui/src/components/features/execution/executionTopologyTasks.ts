@@ -61,50 +61,6 @@ export function filterTaskGroupsByName(groups: TaskGroups, taskName: string): Ta
 }
 
 /**
- * Narrows one entity's tasks to the selected task plus the tasks directly linked
- * to it: its upstream task and every task declaring it as upstream.
- *
- * A task with no link recorded on either side falls back to its neighbours in
- * execution order, so the selected task is never shown on its own.
- */
-export function selectTaskNeighborhood(entityTasks: Task[], taskName: string): Task[] {
-  if (!taskName) return entityTasks;
-
-  const selectedIndexes = entityTasks.reduce<number[]>((indexes, task, index) => {
-    if (task.name === taskName) indexes.push(index);
-    return indexes;
-  }, []);
-  if (selectedIndexes.length === 0) return entityTasks;
-
-  const indexByTaskId = new Map<string, number>();
-  entityTasks.forEach((task, index) => {
-    if (task.task_id) indexByTaskId.set(task.task_id, index);
-  });
-  const kept = new Set<number>(selectedIndexes);
-  for (const selectedIndex of selectedIndexes) {
-    const selected = entityTasks[selectedIndex];
-    const upstreamIndex = selected.upstream_id
-      ? indexByTaskId.get(selected.upstream_id)
-      : undefined;
-    const downstreamIndexes = entityTasks.reduce<number[]>((indexes, task, index) => {
-      if (selected.task_id && task.upstream_id === selected.task_id) indexes.push(index);
-      return indexes;
-    }, []);
-
-    if (upstreamIndex === undefined && downstreamIndexes.length === 0) {
-      if (selectedIndex > 0) kept.add(selectedIndex - 1);
-      if (selectedIndex < entityTasks.length - 1) kept.add(selectedIndex + 1);
-      continue;
-    }
-
-    if (upstreamIndex !== undefined) kept.add(upstreamIndex);
-    for (const downstreamIndex of downstreamIndexes) kept.add(downstreamIndex);
-  }
-
-  return entityTasks.filter((_, index) => kept.has(index));
-}
-
-/**
  * Position of the task selected in the filter, used as the detail modal's
  * initial selection. Falls back to the first task when the name is not present.
  */

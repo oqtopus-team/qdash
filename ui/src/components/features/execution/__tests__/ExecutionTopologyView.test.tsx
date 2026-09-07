@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Task } from "@/schemas";
@@ -38,6 +38,24 @@ vi.mock("@/hooks/useTopologyConfig", () => ({
       "1": { row: 0, col: 1 },
     },
     gridSize: 2,
+  }),
+}));
+
+vi.mock("@/contexts/AnalysisChatContext", () => ({
+  useAnalysisChatContext: () => ({
+    openMiniChat: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({
+    username: "tester",
+  }),
+}));
+
+vi.mock("@/contexts/ProjectContext", () => ({
+  useProject: () => ({
+    isOwner: false,
   }),
 }));
 
@@ -94,5 +112,34 @@ describe("ExecutionTopologyView grid figures", () => {
 
     expect(screen.getByAltText("Result for QID 0-1")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Expand figure" })).toBeNull();
+  });
+});
+
+describe("ExecutionTopologyView task detail modal", () => {
+  it("lists every task of the selected qid regardless of which task name is filtered", () => {
+    const tasks: Task[] = [
+      { task_id: "task-1", qid: "0", name: "CheckStatus", status: "completed" },
+      { task_id: "task-2", qid: "0", name: "CheckRabi", status: "completed" },
+      { task_id: "task-3", qid: "0", name: "CreateHPIPulse", status: "completed" },
+      { task_id: "task-4", qid: "0", name: "CheckT1", status: "completed" },
+    ];
+
+    renderTopologyView({
+      chipId: "chip-1",
+      executionId: "exec-1",
+      executionName: "Execution 1",
+      tasks,
+      topologyMode: "1q",
+      filterTaskName: "CheckRabi",
+      onToggleFullscreen: vi.fn(),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "0" }));
+
+    expect(screen.getAllByText("CheckStatus").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("CheckRabi").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("CreateHPIPulse").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("CheckT1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2 / 4").length).toBeGreaterThan(0);
   });
 });
