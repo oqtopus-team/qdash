@@ -27,7 +27,7 @@ params_updater:
       - control_frequency.yaml
 
 github:
-  # Automatically publish manual calibration updates when GitHub credentials are configured.
+  # Publish manual edits and saved Tasks runs when GitHub credentials are configured.
   enabled: true
   branch: main
   # Optional allowlist for params/*.yaml files pushed by ALL_PARAMS.

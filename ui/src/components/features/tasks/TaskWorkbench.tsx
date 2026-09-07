@@ -433,6 +433,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                   </span>
                   <span className="block break-words text-xs text-base-content/50">
                     Store this run&apos;s output parameters as the current calibration values.
+                    Update mapped YAML files and push to GitHub when integration is enabled.
                   </span>
                 </span>
               </label>
