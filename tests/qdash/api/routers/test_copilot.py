@@ -6,17 +6,22 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from qdash.api.lib.ai_labels import TOOL_LABELS
 from qdash.copilot.agent import (
     _wrap_tool_executors,
 )
+from qdash.copilot.agent_runtime.execution import execute_tool_executor
 from qdash.copilot.agent_runtime.rendering import build_llm_summary, legacy_to_blocks
 from qdash.copilot.contracts import AnalysisResponse
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.copilot.tooling.schemas import AGENT_TOOLS
+from tests._sandbox import requires_sandbox
 
 if TYPE_CHECKING:
     from qdash.api.schemas.provenance import LineageResponse
+    from qdash.copilot.agent_runtime.types import ToolExecutors
 
 
 class TestAnalysisRendering:
@@ -280,7 +285,8 @@ class TestBuildLlmSummary:
 class TestDataStoreWrapper:
     """Tests for _wrap_tool_executors data store behaviour."""
 
-    def test_stored_tool_saves_to_data_store(self):
+    @pytest.mark.asyncio
+    async def test_stored_tool_saves_to_data_store(self):
         data_store: dict[str, Any] = {}
         mock_result = {
             "chip_id": "chip-1",
@@ -288,11 +294,13 @@ class TestDataStoreWrapper:
             "timeseries": [{"qid": "0", "v": 45.2, "t": "2026-01-01"}],
             "qubits": [{"qid": "0", "latest": 45.2}],
         }
-        executors = {
+        executors: ToolExecutors = {
             "get_chip_parameter_timeseries": lambda args: mock_result,
         }
         wrapped, _ = _wrap_tool_executors(executors, data_store)
-        result = wrapped["get_chip_parameter_timeseries"]({"parameter_name": "t1"})
+        result = await execute_tool_executor(
+            wrapped["get_chip_parameter_timeseries"], {"parameter_name": "t1"}
+        )
 
         # Full data stored
         assert "t1" in data_store
@@ -302,39 +310,46 @@ class TestDataStoreWrapper:
         assert result["data_key"] == "t1"
         assert result["timeseries"]["_rows"] == 1
 
-    def test_stored_tool_error_not_saved(self):
+    @pytest.mark.asyncio
+    async def test_stored_tool_error_not_saved(self):
         data_store: dict[str, Any] = {}
-        executors = {
+        executors: ToolExecutors = {
             "get_chip_parameter_timeseries": lambda args: {"error": "No data"},
         }
         wrapped, _ = _wrap_tool_executors(executors, data_store)
-        result = wrapped["get_chip_parameter_timeseries"]({"parameter_name": "t1"})
+        result = await execute_tool_executor(
+            wrapped["get_chip_parameter_timeseries"], {"parameter_name": "t1"}
+        )
 
         assert data_store == {}
         assert result["error"] == "No data"
 
-    def test_chip_summary_uses_fixed_key(self):
+    @pytest.mark.asyncio
+    async def test_chip_summary_uses_fixed_key(self):
         data_store: dict[str, Any] = {}
         mock_result = {"chip_id": "c", "qubits": [{"qid": "0"}], "statistics": {}}
-        executors = {
+        executors: ToolExecutors = {
             "get_chip_summary": lambda args: mock_result,
         }
         wrapped, _ = _wrap_tool_executors(executors, data_store)
-        result = wrapped["get_chip_summary"]({"chip_id": "c"})
+        result = await execute_tool_executor(wrapped["get_chip_summary"], {"chip_id": "c"})
 
         assert "chip_summary" in data_store
         assert result["data_key"] == "chip_summary"
 
-    def test_python_analysis_receives_data_store(self):
+    @requires_sandbox
+    @pytest.mark.asyncio
+    async def test_python_analysis_receives_data_store(self):
         data_store = {"t1": {"timeseries": [{"v": 45.2}]}}
-        executors = {
+        executors: ToolExecutors = {
             "execute_python_analysis": lambda args: None,  # overridden
         }
         wrapped, _ = _wrap_tool_executors(executors, data_store)
 
         # Call with code that accesses data
-        result = wrapped["execute_python_analysis"](
-            {"code": "result = {'output': str(data.get('t1', {})), 'chart': None}"}
+        result = await execute_tool_executor(
+            wrapped["execute_python_analysis"],
+            {"code": "result = {'output': str(data.get('t1', {})), 'chart': None}"},
         )
         assert result["error"] is None
         assert "timeseries" in result["output"]
