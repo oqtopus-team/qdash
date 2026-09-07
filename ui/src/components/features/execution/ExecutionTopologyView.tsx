@@ -12,7 +12,6 @@ import {
   filterTaskGroupsByName,
   groupTasksByEntity,
   resolveInitialTaskIndex,
-  selectTaskNeighborhood,
 } from "@/components/features/execution/executionTopologyTasks";
 import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
@@ -233,6 +232,10 @@ const CouplingMarker = memo(function CouplingMarker({
   );
 });
 
+/**
+ * Chip topology grid for one execution, with a detail modal listing every task
+ * the clicked qubit or coupling ran
+ */
 export function ExecutionTopologyView({
   chipId,
   executionId,
@@ -366,9 +369,8 @@ export function ExecutionTopologyView({
       topologyMode === "2q"
         ? allTasksByEntity.coupling[selectedEntityId]
         : allTasksByEntity.oneQubit[selectedEntityId];
-    if (!entityTasks) return [];
-    return selectTaskNeighborhood(entityTasks, filterTaskName);
-  }, [allTasksByEntity, selectedEntityId, topologyMode, filterTaskName]);
+    return entityTasks ?? [];
+  }, [allTasksByEntity, selectedEntityId, topologyMode]);
 
   const initialTaskIndex = useMemo(
     () => (selectedTasks ? resolveInitialTaskIndex(selectedTasks, filterTaskName) : 0),
