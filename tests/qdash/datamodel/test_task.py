@@ -151,3 +151,15 @@ class TestRunParameterModelDump:
         assert dumped["value"] == (0, 100, 50)
         assert dumped["value_type"] == "np.linspace"
         assert dumped["unit"] == "ns"
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_boolean_run_parameter_preserves_type_through_serialization(value: bool) -> None:
+    """Boolean settings must reach qubex as booleans, including explicit False."""
+    spec = RunParameterSpec(value_type="bool", default=value)
+    model = spec.create_model()
+    restored = RunParameterModel.model_validate_json(model.model_dump_json())
+
+    assert spec.default is value
+    assert model.get_value() is value
+    assert restored.get_value() is value

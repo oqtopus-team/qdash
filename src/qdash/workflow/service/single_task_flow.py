@@ -20,12 +20,15 @@ from typing import Any
 
 from prefect import flow, get_run_logger
 
+from qdash.common.config.backend import get_default_backend
+from qdash.common.config.loader import ConfigLoader
 from qdash.workflow.service.calib_service import (
     CalibService,
     on_flow_cancellation_keep_lock,
     on_flow_crashed_keep_lock,
     on_flow_failure_keep_lock,
 )
+from qdash.workflow.service.github import GitHubPushConfig
 
 
 @flow(
@@ -77,6 +80,17 @@ def single_task_executor(
         f"source={source_execution_id}, chip={chip_id}"
     )
 
+    github_settings = ConfigLoader.load_workflow().get("github", {})
+    github_enabled = (
+        github_settings.get("enabled", True) is True
+        and (backend_name or get_default_backend()) == "qubex"
+    )
+    # Persistence controls publication; update_params only overrides quality checks.
+    push_config = GitHubPushConfig(
+        enabled=persist_output_parameters and github_enabled,
+        branch=github_settings.get("branch", "main"),
+    )
+
     cal = CalibService(
         username,
         chip_id,
@@ -87,8 +101,9 @@ def single_task_executor(
         project_id=project_id,
         backend_name=backend_name,
         default_run_parameters=default_run_parameters,
-        enable_github_pull=True,
-        enable_github=update_params,
+        enable_github_pull=github_enabled,
+        enable_github=push_config.enabled,
+        github_push_config=push_config,
         use_lock=True,
         parameter_overrides=parameter_overrides,
         source_task_id=source_task_id,

@@ -57,18 +57,11 @@ export function ChipSelector({ selectedChip, onChipSelect }: ChipSelectorProps) 
       });
   }, [chips]);
 
-  const { minWidth, styles } = useSelectStyles<ChipOption>({
-    labels: sortedOptions.map((opt) => opt.label),
-    placeholder: PLACEHOLDER,
-    // Chip labels include the id plus an install-date suffix (e.g. "seed-chip (2026-07-02)"),
-    // whose rendered width slightly exceeds the default per-char estimate. Widen the estimate
-    // so the longest label always fits and the control width stays constant across selections.
-    charWidth: 9,
-  });
+  const styles = useSelectStyles<ChipOption>();
 
   if (isLoading) {
     return (
-      <div className="animate-pulse" style={{ minWidth }}>
+      <div className="w-full animate-pulse">
         <div className="h-[38px] bg-base-300 rounded"></div>
       </div>
     );
@@ -83,15 +76,13 @@ export function ChipSelector({ selectedChip, onChipSelect }: ChipSelectorProps) 
   };
 
   return (
-    <div style={{ minWidth }}>
-      <Select<ChipOption>
-        options={sortedOptions}
-        value={sortedOptions.find((option) => option.value === selectedChip) ?? null}
-        onChange={handleChange}
-        placeholder={PLACEHOLDER}
-        className="text-base-content"
-        styles={styles}
-      />
-    </div>
+    <Select<ChipOption>
+      options={sortedOptions}
+      value={sortedOptions.find((option) => option.value === selectedChip) ?? null}
+      onChange={handleChange}
+      placeholder={PLACEHOLDER}
+      className="text-base-content"
+      styles={styles}
+    />
   );
 }

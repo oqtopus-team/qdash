@@ -277,7 +277,7 @@
           "auth"
         ],
         "summary": "Reset user password (admin only)",
-        "description": "Reset a user's password (admin only).\n\nParameters\n----------\npassword_data : PasswordReset\n    Contains the target username\ncurrent_user : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\nPasswordResetResponse\n    Generated temporary password, returned only in this response\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin",
+        "description": "Reset a user's password (admin only).\n\nParameters\n----------\npassword_data : PasswordReset\n    Contains the target username\nadmin : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\nPasswordResetResponse\n    Generated temporary password, returned only in this response",
         "operationId": "resetPassword",
         "requestBody": {
           "content": {
@@ -3362,6 +3362,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AgentActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibrations/manual-edits/{task_id}/github-sync": {
+      "post": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Retry Calibration Github Sync",
+        "description": "Publish current mapped YAML for a completed manual edit without changing DB values.",
+        "operationId": "retryCalibrationGitHubSync",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationGitHubSync"
                 }
               }
             }
@@ -18399,6 +18463,39 @@
         "title": "BulkUserImportResult",
         "description": "Result for a single row in a bulk user import."
       },
+      "CalibrationGitHubSync": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "synced",
+              "failed"
+            ],
+            "title": "Status",
+            "default": "disabled"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "CalibrationGitHubSync",
+        "description": "GitHub synchronization result, independent of the applied calibration values."
+      },
       "CalibrationNoteResponse": {
         "properties": {
           "username": {
@@ -23611,6 +23708,9 @@
               }
             ],
             "title": "Provenance Activity Id"
+          },
+          "github_sync": {
+            "$ref": "#/components/schemas/CalibrationGitHubSync"
           }
         },
         "type": "object",
@@ -29209,6 +29309,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Run Parameters",
+            "default": {}
+          },
+          "note": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Note",
             "default": {}
           },
           "tags": {

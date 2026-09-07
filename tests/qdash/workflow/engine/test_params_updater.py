@@ -198,12 +198,13 @@ data:
         assert updated is False
         assert original_mtime == new_mtime
 
-    def test_nonexistent_file_is_skipped(self, updater, tmp_path):
-        """Test that nonexistent file is gracefully skipped."""
+    def test_nonexistent_file_is_created(self, updater, tmp_path):
+        """Missing mapped files use the structured Qubex data format."""
         nonexistent = tmp_path / "nonexistent.yaml"
 
         # Should not raise
-        assert updater._update_yaml(nonexistent, "Q00", 10.0) is False
+        assert updater._update_yaml(nonexistent, "Q00", 10.0) is True
+        assert YAML().load(nonexistent.read_text()) == {"data": {"Q00": 10.0}}
 
     def test_extract_value_from_db_parameter_dict(self, updater):
         """Test DB calibration data dictionaries can be written to params files."""

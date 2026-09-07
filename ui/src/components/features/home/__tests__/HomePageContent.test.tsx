@@ -108,6 +108,16 @@ describe("HomePageContent", () => {
     );
   });
 
+  it("keeps the home grids single column until the layout breakpoints", () => {
+    const { container } = render(<HomePageContent />);
+
+    const quickActions = container.querySelector("[aria-labelledby='quick-actions-heading'] > div");
+    expect(quickActions?.className).toContain("grid-cols-1");
+
+    const overview = container.querySelector('[class*="xl:grid-cols-[minmax(0,1.15fr)"]');
+    expect(overview?.className).toContain("grid-cols-1");
+  });
+
   it("shows calm empty states when no work is waiting", () => {
     mockExecutionLock.mockReturnValue({
       data: { data: { lock: false } },

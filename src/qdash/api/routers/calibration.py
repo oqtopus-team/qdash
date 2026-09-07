@@ -12,6 +12,7 @@ from qdash.api.dependencies import (
 )
 from qdash.api.lib.project import ProjectContext, get_project_context, get_project_context_editor
 from qdash.api.schemas.calibration import (
+    CalibrationGitHubSync,
     CalibrationNoteResponse,
     ManualEditsResponse,
     ManualParameterUpdateRequest,
@@ -25,6 +26,20 @@ from qdash.api.services.seed_import_service import SeedImportService
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
+
+
+@router.post(
+    "/calibrations/manual-edits/{task_id}/github-sync",
+    response_model=CalibrationGitHubSync,
+    operation_id="retryCalibrationGitHubSync",
+)
+def retry_calibration_github_sync(
+    task_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[ManualUpdateService, Depends(get_manual_update_service)],
+) -> CalibrationGitHubSync:
+    """Publish current mapped YAML for a completed manual edit without changing DB values."""
+    return service.retry_github_sync(task_id, ctx.project_id)
 
 
 @router.get(

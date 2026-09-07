@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
 import {
   AlertCircle,
   ArrowUpRight,
   BarChart3,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   StopCircle,
   UserRound,
@@ -28,6 +30,7 @@ import {
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
+import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { getCancelErrorMessage } from "@/components/features/execution/getCancelErrorMessage";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
@@ -105,6 +108,9 @@ function PaginationControls({
   );
 }
 
+/**
+ * Execution history page listing workflow runs with task results and cancellation controls
+ */
 export function ExecutionPageContent() {
   // URL state management
   const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
@@ -118,6 +124,11 @@ export function ExecutionPageContent() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDurationBreakdown, setShowDurationBreakdown] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const executionCards = useRef(new Map<string, HTMLDivElement>());
+  const pendingFocusRestore = useRef<string | null>(null);
+  const executionListHeading = useRef<HTMLHeadingElement>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -198,6 +209,37 @@ export function ExecutionPageContent() {
     });
   }, [executionData, selectedDate]);
 
+  const selectedExecutionIndex = cardData.findIndex(
+    (execution) => execution.execution_id === selectedExecutionId,
+  );
+
+  const handleCloseSidebar = useCallback(() => {
+    if (selectedExecutionId) pendingFocusRestore.current = selectedExecutionId;
+    if (sidebarRef.current) sidebarRef.current.scrollTop = 0;
+    setIsSidebarOpen(false);
+    setSelectedExecutionId(null);
+    setExpandedTaskIndex(null);
+  }, [selectedExecutionId]);
+
+  useEffect(() => {
+    if (isSidebarOpen || isLoading || !pendingFocusRestore.current) return;
+    const firstId = cardData[0]?.execution_id;
+    const target =
+      executionCards.current.get(pendingFocusRestore.current) ??
+      (firstId ? executionCards.current.get(firstId) : null) ??
+      executionListHeading.current;
+    target?.focus({ preventScroll: true });
+    pendingFocusRestore.current = null;
+  }, [cardData, isLoading, isSidebarOpen]);
+
+  useEffect(() => {
+    if (isSidebarOpen) closeButtonRef.current?.focus({ preventScroll: true });
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    if (sidebarRef.current) sidebarRef.current.scrollTop = 0;
+  }, [selectedExecutionId]);
+
   const statusSummary = useMemo(
     () => ({
       total: cardData.length,
@@ -214,27 +256,31 @@ export function ExecutionPageContent() {
     if (!isSidebarOpen) return;
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !showCancelConfirm) {
-        setIsSidebarOpen(false);
-        setSelectedExecutionId(null);
-        setExpandedTaskIndex(null);
+      if (
+        event.key === "Escape" &&
+        !event.defaultPrevented &&
+        !event.isComposing &&
+        !showCancelConfirm &&
+        !document.querySelector('[role="dialog"], [role="alertdialog"]')
+      ) {
+        handleCloseSidebar();
       }
     };
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isSidebarOpen, showCancelConfirm]);
+  }, [isSidebarOpen, showCancelConfirm, handleCloseSidebar]);
 
   // Chip selection change handler
   const handleChipChange = (chipId: string) => {
+    handleCloseSidebar();
     setSelectedChip(chipId || null);
-    setSelectedExecutionId(null);
-    setIsSidebarOpen(false);
     setCurrentPage(1);
   };
 
   // Wrap date setter to reset page
   const handleDateChange = (date: string) => {
+    handleCloseSidebar();
     setSelectedDate(date);
     setCurrentPage(1);
   };
@@ -261,12 +307,6 @@ export function ExecutionPageContent() {
   const handleCardClick = (execution: ExecutionResponseSummary) => {
     setSelectedExecutionId(execution.execution_id);
     setIsSidebarOpen(true);
-    setExpandedTaskIndex(null);
-  };
-
-  const handleCloseSidebar = () => {
-    setIsSidebarOpen(false);
-    setSelectedExecutionId(null);
     setExpandedTaskIndex(null);
   };
 
@@ -323,10 +363,10 @@ export function ExecutionPageContent() {
       <PageHeader title="Execution History" description="Monitor workflow runs and task results" />
       <PageFiltersBar className="mb-4 sm:mb-6">
         <PageFiltersBar.Group>
-          <PageFiltersBar.Item>
+          <PageFiltersBar.Item className="sm:w-64">
             <ChipSelector selectedChip={selectedChip || ""} onChipSelect={handleChipChange} />
           </PageFiltersBar.Item>
-          <PageFiltersBar.Item>
+          <PageFiltersBar.Item className="sm:w-44">
             <DateSelector
               chipId={selectedChip || ""}
               selectedDate={selectedDate}
@@ -392,7 +432,12 @@ export function ExecutionPageContent() {
       </section>
       <section aria-labelledby="recent-executions-heading">
         <div className="mb-3">
-          <h2 id="recent-executions-heading" className="text-lg font-semibold">
+          <h2
+            ref={executionListHeading}
+            tabIndex={-1}
+            id="recent-executions-heading"
+            className="text-lg font-semibold"
+          >
             Recent executions
           </h2>
           <p className="text-sm text-base-content/60">
@@ -418,7 +463,13 @@ export function ExecutionPageContent() {
             return (
               <div
                 key={executionKey}
+                ref={(element) => {
+                  if (element) executionCards.current.set(execution.execution_id, element);
+                  else executionCards.current.delete(execution.execution_id);
+                }}
                 role="button"
+                aria-expanded={isSelected && isSidebarOpen}
+                aria-controls="execution-details-panel"
                 tabIndex={0}
                 aria-label={`View ${execution.name} execution details`}
                 className={`relative flex cursor-pointer overflow-hidden rounded-box border border-base-200 bg-base-100 p-3 shadow-sm transition-colors hover:border-primary/40 hover:bg-base-200/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:p-4 ${statusBorderStyle}`}
@@ -468,18 +519,25 @@ export function ExecutionPageContent() {
         {shouldShowPagination && (
           <PaginationControls
             currentPage={currentPage}
-            setCurrentPage={setCurrentPage}
+            setCurrentPage={(page) => {
+              handleCloseSidebar();
+              setCurrentPage(page);
+            }}
             hasMore={hasMorePages}
             totalPages={totalPages}
           />
         )}
       </section>
       <aside
+        id="execution-details-panel"
+        ref={sidebarRef}
+        inert={!isSidebarOpen}
         aria-label="Execution details"
         aria-hidden={!isSidebarOpen}
         className={`fixed right-0 top-0 z-50 h-full w-full overflow-y-auto border-l border-base-300 bg-base-100 p-4 shadow-xl transition-transform duration-300 sm:w-3/4 sm:p-6 lg:w-2/5 ${isSidebarOpen ? "translate-x-0" : "translate-x-full"}`}
       >
         <button
+          ref={closeButtonRef}
           onClick={handleCloseSidebar}
           className="btn btn-ghost btn-sm btn-circle absolute top-3 right-3 z-10 sm:top-4 sm:right-4"
           aria-label="Close execution details"
@@ -488,18 +546,47 @@ export function ExecutionPageContent() {
         </button>
         {selectedExecutionId && (
           <div>
+            <nav aria-label="Browse executions" className="mb-4 flex items-center gap-2 pr-10">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                aria-label="Previous execution"
+                disabled={selectedExecutionIndex <= 0}
+                onClick={() => handleCardClick(cardData[selectedExecutionIndex - 1])}
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                Previous
+              </button>
+              <span className="text-xs text-base-content/60" role="status">
+                {selectedExecutionIndex >= 0
+                  ? `${selectedExecutionIndex + 1} of ${cardData.length} on this page`
+                  : "Outside current results"}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                aria-label="Next execution"
+                disabled={
+                  selectedExecutionIndex < 0 || selectedExecutionIndex >= cardData.length - 1
+                }
+                onClick={() => handleCardClick(cardData[selectedExecutionIndex + 1])}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </nav>
             <div className="p-2 sm:p-4 bg-base-100 mb-4 sm:mb-6">
               <h2 className="text-lg sm:text-2xl font-bold pr-8">
                 {cardData.find((exec) => getExecutionKey(exec) === selectedExecutionId)?.name}
               </h2>
               <div className="mt-3 sm:mt-4 flex flex-wrap gap-2">
-                <a
+                <Link
                   href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}
                   className="btn btn-primary btn-sm sm:btn-md"
                 >
                   <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4" />
                   View Details
-                </a>
+                </Link>
                 {(() => {
                   const selectedExec = cardData.find(
                     (exec) => getExecutionKey(exec) === selectedExecutionId,
@@ -529,7 +616,12 @@ export function ExecutionPageContent() {
             </div>
             <div>
               <h3 className="text-base sm:text-xl font-bold mb-3 sm:mb-4">Execution Details</h3>
-              {isDetailLoading && <div>Loading details...</div>}
+              {isDetailLoading && (
+                <div role="status" className="flex items-center gap-2 py-4 text-base-content/60">
+                  <span className="loading loading-spinner loading-sm" aria-hidden="true" />
+                  Loading details...
+                </div>
+              )}
               {isDetailError && <div>Error loading details.</div>}
               {executionDetailData?.data.status === "failed" &&
                 executionDetailData.data.message && (
@@ -606,6 +698,7 @@ export function ExecutionPageContent() {
                           {formatActorLabel(detailTask)}
                         </span>
                       </div>
+                      <ExecutionTaskProgress status={detailTask.status} note={detailTask.note} />
                       {expandedTaskIndex === idx && (
                         <div className="mt-2 sm:mt-3 space-y-2 sm:space-y-3">
                           {Array.isArray(detailTask.figure_path) &&

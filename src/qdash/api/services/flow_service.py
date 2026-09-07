@@ -46,6 +46,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger("uvicorn.app")
 
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
+EXECUTION_IN_PROGRESS_DETAIL = (
+    "Another calibration execution is already in progress for this project"
+)
 
 
 def _to_deployment_service_path(file_path: Path) -> Path:
@@ -397,6 +400,11 @@ class FlowService:
             f"with parameters: {parameters}"
         )
 
+        chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
+        claimed_execution_id = self._claim_execution_lock(
+            project_id=project_id, username=username, chip_id=chip_id
+        )
+
         try:
             async with get_client() as client:
                 deployment_id = cast("UUID", flow.deployment_id)
@@ -405,37 +413,37 @@ class FlowService:
                     parameters=parameters,
                 )
 
-                chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
                 flow_run_id = str(flow_run.id)
                 flow_run_url = (
                     f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
                 )
 
                 logger.info(f"Flow run created: {flow_run_id}")
-
-                qdash_execution_id = self._create_scheduled_execution(
-                    project_id=project_id,
-                    username=username,
-                    chip_id=chip_id,
-                    name=name,
-                    flow_run_id=flow_run_id,
-                    tags=parameters.get("tags") or flow.tags,
-                )
-                qdash_ui_url = self._build_qdash_ui_url(
-                    settings.ui_port, chip_id, qdash_execution_id
-                )
-
-                return ExecuteFlowResponse(
-                    execution_id=qdash_execution_id or flow_run_id,
-                    flow_run_id=flow_run_id,
-                    flow_run_url=flow_run_url,
-                    qdash_ui_url=qdash_ui_url,
-                    message=f"Flow '{name}' execution started successfully",
-                )
-
         except Exception as e:
+            self._release_execution_lock(project_id, claimed_execution_id)
             logger.error(f"Failed to execute flow: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to execute flow: {e}")
+
+        qdash_execution_id = self._create_scheduled_execution(
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            name=name,
+            flow_run_id=flow_run_id,
+            execution_id=claimed_execution_id,
+            tags=parameters.get("tags") or flow.tags,
+        )
+        if qdash_execution_id is None:
+            self._release_execution_lock(project_id, claimed_execution_id)
+        qdash_ui_url = self._build_qdash_ui_url(settings.ui_port, chip_id, qdash_execution_id)
+
+        return ExecuteFlowResponse(
+            execution_id=qdash_execution_id or flow_run_id,
+            flow_run_id=flow_run_id,
+            flow_run_url=flow_run_url,
+            qdash_ui_url=qdash_ui_url,
+            message=f"Flow '{name}' execution started successfully",
+        )
 
     async def re_execute_from_snapshot(
         self,
@@ -500,6 +508,11 @@ class FlowService:
             f"(deployment={flow.deployment_id}) with parameters: {parameters}"
         )
 
+        chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
+        claimed_execution_id = self._claim_execution_lock(
+            project_id=project_id, username=username, chip_id=chip_id
+        )
+
         try:
             async with get_client() as client:
                 deployment_id = cast("UUID", flow.deployment_id)
@@ -508,37 +521,39 @@ class FlowService:
                     parameters=parameters,
                 )
 
-                chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
                 flow_run_id = str(flow_run.id)
                 flow_run_url = (
                     f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
                 )
 
                 logger.info(f"Re-execution flow run created: {flow_run_id}")
-
-                qdash_execution_id = self._create_scheduled_execution(
-                    project_id=project_id,
-                    username=username,
-                    chip_id=chip_id,
-                    name=flow_name,
-                    flow_run_id=flow_run_id,
-                    tags=parameters.get("tags") or flow.tags,
-                )
-                qdash_ui_url = self._build_qdash_ui_url(
-                    settings.ui_port, chip_id, qdash_execution_id
-                )
-
-                return ExecuteFlowResponse(
-                    execution_id=qdash_execution_id or flow_run_id,
-                    flow_run_id=flow_run_id,
-                    flow_run_url=flow_run_url,
-                    qdash_ui_url=qdash_ui_url,
-                    message=f"Flow '{flow_name}' re-execution started from snapshot {source_execution_id}",
-                )
-
         except Exception as e:
+            self._release_execution_lock(project_id, claimed_execution_id)
             logger.error(f"Failed to re-execute flow: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to re-execute flow: {e}")
+
+        qdash_execution_id = self._create_scheduled_execution(
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            name=flow_name,
+            flow_run_id=flow_run_id,
+            execution_id=claimed_execution_id,
+            tags=parameters.get("tags") or flow.tags,
+        )
+        if qdash_execution_id is None:
+            self._release_execution_lock(project_id, claimed_execution_id)
+        qdash_ui_url = self._build_qdash_ui_url(settings.ui_port, chip_id, qdash_execution_id)
+
+        return ExecuteFlowResponse(
+            execution_id=qdash_execution_id or flow_run_id,
+            flow_run_id=flow_run_id,
+            flow_run_url=flow_run_url,
+            qdash_ui_url=qdash_ui_url,
+            message=(
+                f"Flow '{flow_name}' re-execution started from snapshot {source_execution_id}"
+            ),
+        )
 
     async def execute_single_task_from_snapshot(
         self,
@@ -593,14 +608,6 @@ class FlowService:
         settings = get_settings()
         deployment_name = "single-task-executor/system-single-task"
 
-        if self._execution_lock_repo is not None and self._execution_lock_repo.is_locked(
-            project_id
-        ):
-            raise HTTPException(
-                status_code=409,
-                detail="Another calibration execution is already running for this project",
-            )
-
         try:
             async with get_client() as client:
                 deployment = await client.read_deployment_by_name(deployment_name)
@@ -635,6 +642,10 @@ class FlowService:
             f"(deployment={deployment.id}) with parameters: {parameters}"
         )
 
+        claimed_execution_id = self._claim_execution_lock(
+            project_id=project_id, username=username, chip_id=chip_id
+        )
+
         try:
             async with get_client() as client:
                 flow_run = await client.create_flow_run_from_deployment(
@@ -648,36 +659,37 @@ class FlowService:
                 )
 
                 logger.info(f"Single-task flow run created: {flow_run_id}")
-
-                qdash_execution_id = self._create_scheduled_execution(
-                    project_id=project_id,
-                    username=username,
-                    chip_id=chip_id,
-                    name=flow_name,
-                    flow_run_id=flow_run_id,
-                    tags=tags,
-                )
-                qdash_ui_url = self._build_qdash_ui_url(
-                    settings.ui_port, chip_id, qdash_execution_id
-                )
-
-                return ExecuteFlowResponse(
-                    execution_id=qdash_execution_id or flow_run_id,
-                    flow_run_id=flow_run_id,
-                    flow_run_url=flow_run_url,
-                    qdash_ui_url=qdash_ui_url,
-                    message=(
-                        f"Single task '{task_name}' (qid={qid}) "
-                        f"re-execution started from snapshot {source_execution_id}"
-                    ),
-                )
-
         except Exception as e:
+            self._release_execution_lock(project_id, claimed_execution_id)
             logger.error(f"Failed to execute single task: {e}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to execute single task: {e}",
             )
+
+        qdash_execution_id = self._create_scheduled_execution(
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            name=flow_name,
+            flow_run_id=flow_run_id,
+            execution_id=claimed_execution_id,
+            tags=tags,
+        )
+        if qdash_execution_id is None:
+            self._release_execution_lock(project_id, claimed_execution_id)
+        qdash_ui_url = self._build_qdash_ui_url(settings.ui_port, chip_id, qdash_execution_id)
+
+        return ExecuteFlowResponse(
+            execution_id=qdash_execution_id or flow_run_id,
+            flow_run_id=flow_run_id,
+            flow_run_url=flow_run_url,
+            qdash_ui_url=qdash_ui_url,
+            message=(
+                f"Single task '{task_name}' (qid={qid}) "
+                f"re-execution started from snapshot {source_execution_id}"
+            ),
+        )
 
     async def execute_agent_candidate_apply(
         self,
@@ -859,6 +871,80 @@ class FlowService:
 
     # --- Private helpers ---
 
+    def _claim_execution_lock(self, *, project_id: str, username: str, chip_id: str) -> str | None:
+        """Claim the project execution lock for a run about to be dispatched.
+
+        The claim is atomic, so concurrent requests are serialized before any
+        Prefect flow run is created. It is skipped when no ``chip_id`` can be
+        resolved, since there is then no execution ID to own the lock; such a
+        run falls back to the flow taking the lock itself, as cron schedules
+        do.
+
+        Parameters
+        ----------
+        project_id : str
+            The project whose calibration runs are mutually exclusive.
+        username : str
+            The user triggering the run, used to mint the execution ID.
+        chip_id : str
+            The chip targeted by the run. Empty when it cannot be resolved.
+
+        Returns
+        -------
+        str | None
+            The execution ID that now owns the lock, or None when no lock was
+            claimed. Callers must release a claimed lock if they fail to reach
+            the point where the flow can adopt it.
+
+        Raises
+        ------
+        HTTPException
+            409 when another calibration already holds the lock.
+
+        """
+        if self._execution_lock_repo is None:
+            return None
+
+        # Cheap reject before minting an execution ID; try_lock settles the race.
+        if self._execution_lock_repo.is_locked(project_id):
+            raise HTTPException(status_code=409, detail=EXECUTION_IN_PROGRESS_DETAIL)
+
+        if not chip_id:
+            return None
+
+        execution_id = generate_execution_id(username, chip_id, project_id=project_id)
+        if not self._execution_lock_repo.try_lock(project_id=project_id, execution_id=execution_id):
+            raise HTTPException(status_code=409, detail=EXECUTION_IN_PROGRESS_DETAIL)
+        return execution_id
+
+    def _release_execution_lock(self, project_id: str, execution_id: str | None) -> None:
+        """Release a lock claimed for a run that never reached the flow process.
+
+        Once the ``scheduled`` execution exists, the lock is released by
+        whoever closes it, so this only covers dispatch failures in between.
+        Releasing is best effort: a failure here is logged rather than raised
+        over the original error.
+
+        Parameters
+        ----------
+        project_id : str
+            The project holding the lock.
+        execution_id : str | None
+            The execution the lock was claimed for. None means nothing was
+            claimed and there is nothing to release.
+
+        """
+        if execution_id is None or self._execution_lock_repo is None:
+            return
+        try:
+            self._execution_lock_repo.unlock(project_id=project_id)
+        except Exception:
+            logger.warning(
+                "Failed to release the execution lock claimed for execution_id=%s",
+                execution_id,
+                exc_info=True,
+            )
+
     def _create_scheduled_execution(
         self,
         *,
@@ -867,6 +953,7 @@ class FlowService:
         chip_id: str | None,
         name: str,
         flow_run_id: str,
+        execution_id: str | None = None,
         tags: list[str] | None = None,
     ) -> str | None:
         """Pre-create a scheduled execution row for a freshly created flow run.
@@ -898,6 +985,9 @@ class FlowService:
             Execution/flow name to record.
         flow_run_id : str
             The Prefect flow run ID, stored in ``note.flow_run_id``.
+        execution_id : str | None
+            The execution ID already minted to own the project lock. A new one
+            is generated when the caller claimed no lock.
         tags : list[str] | None
             Tags to record on the execution.
 
@@ -915,7 +1005,8 @@ class FlowService:
             return None
 
         try:
-            execution_id = generate_execution_id(username, chip_id, project_id=project_id)
+            if execution_id is None:
+                execution_id = generate_execution_id(username, chip_id, project_id=project_id)
             calib_data_path = str(execution_calib_data_dir(username, execution_id))
 
             model = ExecutionModel(

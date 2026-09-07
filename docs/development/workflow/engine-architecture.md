@@ -288,6 +288,14 @@ Runs that do not go through the API — cron schedules, where the Prefect schedu
 
 Pre-creation is best effort. It is skipped when no `chip_id` can be resolved, and any failure is logged and swallowed: the Prefect flow run already exists at that point, and a bookkeeping failure is not a reason to cancel a healthy calibration. Such a run simply falls back to the cron-schedule path above — `CalibService` allocates its own `execution_id` at flow start — and the API response reports the Prefect flow run ID as `execution_id` until then.
 
+### Mutual Exclusion
+
+Calibrations are mutually exclusive per project, guarded by `ExecutionLockDocument`. The lock is claimed by the API at dispatch time rather than by the flow process at start time, so it covers the whole life of a run: `FlowService._claim_execution_lock` mints the `execution_id` and takes the lock with it as owner before the Prefect flow run is created, answering `409` when the lock is held. The claim is a single atomic upsert — it matches an unlocked record, and when the project is already locked it falls through to an insert that the unique index on `project_id` rejects — so two simultaneous requests cannot both dispatch. `CalibService._initialize()` then reacquires the lock owned by the execution it claims (`try_lock` yields to the same owner), while a lock owned by anything else still raises `RuntimeError`.
+
+Runs that do not go through the API, such as cron schedules, find the lock free and take it in `CalibService` as before. The claim is also skipped when no `chip_id` can be resolved, since there is then no `execution_id` to own the lock; those runs fall back to the same path.
+
+Claiming at dispatch means the API takes the lock and the flow releases it, so dispatch failures in between have to release it themselves: `FlowService` does that when the flow run cannot be created, and when the `scheduled` row cannot be saved. Everything after that point is covered by the finalizer, which releases a lock owned by the execution it closes. The one case with no owner left to act is a run that dies before its flow process starts; `ExecutionService.get_lock_status()` reconciles a still `scheduled` execution against Prefect for exactly that reason, on the poll the UI already makes.
+
 ### Reconciliation with Prefect
 
 Hooks only fire while the Prefect runner is alive. When the runner itself dies, nothing closes the execution and it stays `running` forever. `ExecutionService._reconcile_with_prefect()` (API) closes that gap when an execution detail is read: open executions holding a `note.flow_run_id` are looked up in Prefect and finalized when their flow run has already reached a terminal state. Execution-list reads do not call Prefect synchronously, so history remains available when Prefect is slow or unavailable.

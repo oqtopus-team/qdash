@@ -137,6 +137,7 @@ def test_run_parameters_only_expose_measurement_settings() -> None:
     assert set(CheckQubitSpectroscopy.run_spec) == {
         "frequency_range",
         "power_range",
+        "simultaneous_drive",
     }
 
 
@@ -149,7 +150,11 @@ def test_power_range_has_qdash_default() -> None:
     )
 
 
-def test_power_range_is_forwarded_to_qubex(monkeypatch) -> None:
+@pytest.mark.parametrize("simultaneous_drive", [None, True, False])
+@pytest.mark.parametrize("batch", [False, True])
+def test_measurement_settings_are_forwarded_to_qubex(
+    monkeypatch, simultaneous_drive, batch
+) -> None:
     """Verify the resolved power range is forwarded to the qubex experiment."""
     task = CheckQubitSpectroscopy()
     task.run_parameters = copy.deepcopy(task.run_parameters)
@@ -165,7 +170,19 @@ def test_power_range_is_forwarded_to_qubex(monkeypatch) -> None:
         task, "_modified_qubit_readout_frequencies", lambda *args, **kwargs: nullcontext()
     )
 
-    task.batch_run(backend, ["0"])
+    if simultaneous_drive is not None:
+        task.run_parameters["simultaneous_drive"].value = simultaneous_drive
+
+    if batch:
+        task.batch_run(backend, ["0", "1"])
+    else:
+        task.run(backend, "0")
+
+    assert exp.qubit_spectroscopy.call_count == (2 if batch else 1)
+    for call in exp.qubit_spectroscopy.call_args_list:
+        assert call.kwargs["simultaneous_drive"] is (
+            True if simultaneous_drive is None else simultaneous_drive
+        )
 
     assert list(exp.qubit_spectroscopy.call_args.kwargs["power_range"]) == pytest.approx(
         [-40.0, -30.0, -20.0]

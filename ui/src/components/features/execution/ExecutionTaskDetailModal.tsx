@@ -7,6 +7,7 @@ import { Bot, ChevronRight, FileText, GitBranch, History, ListTodo } from "lucid
 import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import {
   ExecutionHistoryModalContent,
   type ExecutionHistoryMobileTab,
@@ -214,6 +215,10 @@ export function ExecutionTaskDetailModal({
             Next →
           </button>
         </div>
+      )}
+
+      {selectedTask && (
+        <ExecutionTaskProgress status={selectedTask.status} note={selectedTask.note} />
       )}
 
       <div className="h-[280px] bg-base-200 rounded-lg p-3 overflow-x-auto overflow-y-hidden flex items-center justify-start">

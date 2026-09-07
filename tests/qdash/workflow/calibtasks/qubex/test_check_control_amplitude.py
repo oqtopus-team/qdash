@@ -2,6 +2,7 @@ from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any, cast
 
 import plotly.graph_objects as go
+import pytest
 
 from qdash.datamodel.task import InputParameterModel as ParameterModel
 from qdash.workflow.calibtasks.base import RunResult
@@ -116,14 +117,19 @@ def test_check_control_amplitude_propagates_spectroscopy_coarse_values_when_fit_
     assert result.output_parameters["coarse_qubit_frequency"].value == 4.25
 
 
+@pytest.mark.parametrize("simultaneous_drive", [None, True, False])
 def test_check_control_amplitude_run_uses_coarse_control_amplitude_without_extra_uplift(
     monkeypatch,
+    simultaneous_drive,
 ) -> None:
     task = CheckControlAmplitude()
     task.input_parameters["coarse_qubit_frequency"] = ParameterModel(value=4.25, unit="GHz")
     task.input_parameters["readout_frequency"] = ParameterModel(value=6.1, unit="GHz")
     task.input_parameters["readout_amplitude"] = ParameterModel(value=0.031, unit="a.u.")
     task.input_parameters["coarse_control_amplitude"] = ParameterModel(value=0.07, unit="a.u.")
+
+    if simultaneous_drive is not None:
+        task.run_parameters["simultaneous_drive"].value = simultaneous_drive
 
     captured: dict[str, object] = {}
 
@@ -146,3 +152,7 @@ def test_check_control_amplitude_run_uses_coarse_control_amplitude_without_extra
     assert captured["label"] == "Q00"
     assert captured["control_amplitude"] == 0.07
     assert captured["readout_amplitude"] == 0.031
+
+    assert captured["simultaneous_drive"] is (
+        True if simultaneous_drive is None else simultaneous_drive
+    )

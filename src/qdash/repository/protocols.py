@@ -38,6 +38,12 @@ class TaskResultHistoryRepository(Protocol):
         """
         ...
 
+    def update_progress(
+        self, *, project_id: str | None, task_id: str, progress: dict[str, object]
+    ) -> None:
+        """Update a live task progress snapshot."""
+        ...
+
     def find_latest_by_chip_and_qids(
         self,
         *,
@@ -1084,6 +1090,24 @@ class ExecutionLockRepository(Protocol):
         -------
         bool
             True if locked, False otherwise
+
+        """
+        ...
+
+    def try_lock(self, project_id: str, execution_id: str | None = None) -> bool:
+        """Atomically acquire the execution lock, unless another execution holds it.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        execution_id : str | None
+            The execution that will own the lock
+
+        Returns
+        -------
+        bool
+            True when the lock was acquired or already owned, False when held
 
         """
         ...

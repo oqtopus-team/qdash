@@ -12,10 +12,12 @@ The TaskExecutor is responsible for the complete task execution lifecycle:
 
 import logging
 import traceback
-from typing import TYPE_CHECKING, Any
+from contextlib import AbstractContextManager, nullcontext
+from typing import TYPE_CHECKING, Any, cast
 
 from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
+from qdash.workflow.engine.progress import ProgressPlan
 from qdash.workflow.engine.task.backend_saver import BackendSaver
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.mux_distributor import MuxDistributor
@@ -151,6 +153,56 @@ class TaskExecutor:
     ) -> RunResult | None:
         """Run the main task logic."""
         return task.run(backend, qid)
+
+    def _progress_context(
+        self,
+        backend: BackendProtocol,
+        task_name: str,
+        task_type: str,
+        qids: list[str],
+        execution_service: "ExecutionService | None",
+        task: TaskProtocol,
+    ) -> AbstractContextManager[None]:
+        """Capture backend progress for the active persisted task results."""
+        capture_progress = getattr(backend, "capture_progress", None)
+        if execution_service is None or not callable(capture_progress):
+            return nullcontext()
+
+        task_models = [self.state_manager.get_task(task_name, task_type, qid) for qid in qids]
+
+        def report(progress: Any) -> None:
+            progress_data = progress.to_dict()
+            for task_model in task_models:
+                task_model.note = {**task_model.note, "progress": progress_data}
+                self.history_recorder.update_progress(
+                    project_id=execution_service.project_id,
+                    task_id=task_model.task_id,
+                    progress=progress,
+                )
+
+        return cast(
+            "AbstractContextManager[None]",
+            capture_progress(report, task_name=task_name, plan=self._progress_plan(task)),
+        )
+
+    @staticmethod
+    def _progress_plan(task: TaskProtocol) -> ProgressPlan | None:
+        """Return honest phase-count bounds for tasks with sequential sweeps."""
+        name = task.get_name()
+        if name in {"CheckRamsey"}:
+            return ProgressPlan(2, 2)
+        if name in {"CheckT1Average", "CheckT2EchoAverage"}:
+            n_runs = int(task.run_parameters["n_runs"].get_value())
+            return ProgressPlan(n_runs, n_runs)
+        if name in {"CreateDRAGHPIPulse", "CreateDRAGPIPulse"}:
+            return ProgressPlan(4, 4)
+        if name == "CheckChevron":
+            return ProgressPlan(2, 4)
+        if name == "CheckCrossResonance":
+            return ProgressPlan(4, 8)
+        if name == "CreateZX90":
+            return ProgressPlan(3, 4)
+        return None
 
     def _prepare_run(
         self,
@@ -356,7 +408,15 @@ class TaskExecutor:
             self._prepare_run(task, backend, qid)
 
             # 3. Run
-            run_result = self._run_task(task, backend, qid)
+            with self._progress_context(
+                backend,
+                task_name,
+                task_type,
+                [qid],
+                execution_service,
+                task,
+            ):
+                run_result = self._run_task(task, backend, qid)
             result.r2 = run_result.r2 if run_result else None
             if run_result is not None and run_result.r2 is not None:
                 r2_value = run_result.r2.get(qid)
@@ -577,7 +637,15 @@ class TaskExecutor:
             if execution_service is not None:
                 execution_service = self._update_execution(execution_service)
 
-            run_result = self._run_batch_task(task, backend, qids)
+            with self._progress_context(
+                backend,
+                task_name,
+                task_type,
+                qids,
+                execution_service,
+                task,
+            ):
+                run_result = self._run_batch_task(task, backend, qids)
             for qid, result in results.items():
                 r2_value = run_result.r2.get(qid) if run_result and run_result.r2 else None
                 result.r2 = {qid: r2_value} if r2_value is not None else None

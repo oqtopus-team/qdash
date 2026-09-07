@@ -495,3 +495,59 @@ def test_get_lock_status_without_execution_returns_lock_only() -> None:
 
     assert result.lock is False
     assert result.execution_id is None
+
+
+def test_get_lock_status_releases_a_claimed_lock_whose_flow_run_crashed(
+    monkeypatch: Any, init_db: Any
+) -> None:
+    """A lock claimed at dispatch is freed when its run died before the flow started."""
+    flow_run_id = str(uuid4())
+    _make_execution(execution_id="exec-1", status="scheduled", note={"flow_run_id": flow_run_id})
+    MongoExecutionLockRepository().try_lock(project_id=PROJECT_ID, execution_id="exec-1")
+
+    calls: list[dict[str, Any]] = []
+    client = _FakeSyncClient([_make_run(flow_run_id, "CRASHED")])
+    monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, calls))
+
+    result = _make_service().get_lock_status(PROJECT_ID)
+
+    assert len(calls) == 1
+    assert result.lock is False
+    assert result.status == "failed"
+    assert MongoExecutionLockRepository().is_locked(PROJECT_ID) is False
+
+
+def test_get_lock_status_keeps_the_lock_while_the_flow_run_is_still_scheduled(
+    monkeypatch: Any, init_db: Any
+) -> None:
+    """A run that is merely queued keeps its claim; only terminal runs release it."""
+    flow_run_id = str(uuid4())
+    _make_execution(execution_id="exec-1", status="scheduled", note={"flow_run_id": flow_run_id})
+    MongoExecutionLockRepository().try_lock(project_id=PROJECT_ID, execution_id="exec-1")
+
+    calls: list[dict[str, Any]] = []
+    client = _FakeSyncClient([_make_run(flow_run_id, "SCHEDULED")])
+    monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, calls))
+
+    result = _make_service().get_lock_status(PROJECT_ID)
+
+    assert result.lock is True
+    assert result.status == "scheduled"
+
+
+def test_get_lock_status_does_not_query_prefect_once_the_flow_has_started(
+    monkeypatch: Any, init_db: Any
+) -> None:
+    """A running execution needs no reconciliation, so the poll stays Prefect-free."""
+    _make_execution(execution_id="exec-1", status="running", note={"flow_run_id": str(uuid4())})
+    MongoExecutionLockRepository().try_lock(project_id=PROJECT_ID, execution_id="exec-1")
+
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        execution_service, "get_client", _make_get_client(_RaisingSyncClient(), calls)
+    )
+
+    result = _make_service().get_lock_status(PROJECT_ID)
+
+    assert calls == []
+    assert result.lock is True

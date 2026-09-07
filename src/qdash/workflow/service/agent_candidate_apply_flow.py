@@ -71,7 +71,7 @@ def agent_candidate_apply(
         )
 
     updater = None
-    params_snapshot: dict[str, bytes] | None = None
+    params_snapshot: dict[str, bytes | None] | None = None
     try:
         if commit.after_snapshot is None:
             raise ValueError("Candidate commit has no authoritative after snapshot")

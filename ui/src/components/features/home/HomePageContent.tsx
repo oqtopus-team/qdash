@@ -100,7 +100,7 @@ function QuickActions({ canEdit }: QuickActionsProps) {
       <h2 id="quick-actions-heading" className="mb-3 text-sm font-semibold text-base-content/60">
         Quick actions
       </h2>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {actions.map(({ href, label, description, icon: Icon }) => (
           <Link
             key={href}
@@ -268,7 +268,7 @@ export function HomePageContent() {
 
         <QuickActions canEdit={canEdit} />
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
           <div className="space-y-6">
             <section className="card bg-base-200 shadow-lg">
               <div className="card-body gap-4 p-5">

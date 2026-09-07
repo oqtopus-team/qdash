@@ -50,6 +50,9 @@ function dateKeyToRange(dateKey: string): { start: string; end: string } {
   return { start: `${formatted}T00:00`, end: `${formatted}T23:59` };
 }
 
+/**
+ * Chip experiments page showing qubit/coupling grids and task history for a selected chip
+ */
 export function ChipPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -489,10 +492,10 @@ export function ChipPageContent() {
           {/* Selection Controls */}
           <PageFiltersBar>
             <PageFiltersBar.Group>
-              <PageFiltersBar.Item className="sm:min-w-48">
+              <PageFiltersBar.Item className="sm:w-64">
                 <ChipSelector selectedChip={selectedChip} onChipSelect={handleChipSelect} />
               </PageFiltersBar.Item>
-              <PageFiltersBar.Item className="sm:min-w-48">
+              <PageFiltersBar.Item className="sm:w-56">
                 <CooldownSelector
                   chipId={selectedChip}
                   selectedCooldownId={selectedCooldownId}
@@ -507,7 +510,7 @@ export function ChipPageContent() {
                   }}
                 />
               </PageFiltersBar.Item>
-              <PageFiltersBar.Item className="sm:min-w-96">
+              <PageFiltersBar.Item className="sm:w-96">
                 <TaskSelector
                   tasks={filteredTasks}
                   selectedTask={selectedTask}

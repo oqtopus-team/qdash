@@ -151,6 +151,8 @@ omit = [
     "src/qdash/dbmodel/*",
     # API schemas - request/response models
     "src/qdash/api/schemas/*",
+    # Repository protocols - interface declarations only
+    "src/qdash/repository/protocols.py",
     # Auto-generated client code
     "clients/python/src/qdash/client/*",
     # Internal service modules

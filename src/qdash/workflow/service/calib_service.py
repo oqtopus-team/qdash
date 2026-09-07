@@ -531,10 +531,12 @@ class CalibService:
 
                 self._lock_repo = MongoExecutionLockRepository()
 
-            if self._lock_repo.is_locked(project_id=self.project_id):
+            # try_lock also reacquires a lock the API already claimed for this execution.
+            if not self._lock_repo.try_lock(
+                project_id=self.project_id, execution_id=self.execution_id
+            ):
                 msg = "Calibration is already running. Cannot start a new session."
                 raise RuntimeError(msg)
-            self._lock_repo.lock(project_id=self.project_id, execution_id=self.execution_id)
             self._lock_acquired = True
 
         # Wrap all initialization in try/except to ensure lock is released on failure

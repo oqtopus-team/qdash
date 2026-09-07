@@ -1,18 +1,24 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
-async function formatDirectory(directory) {
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      await formatDirectory(path);
-    } else if (entry.isFile() && entry.name.endsWith(".ts")) {
-      const source = await readFile(path, "utf8");
-      const formatted = source.replace(/[ \t]+$/gm, "");
-      if (formatted !== source) await writeFile(path, formatted);
+async function formatPath(path) {
+  const info = await stat(path);
+  if (info.isDirectory()) {
+    for (const entry of await readdir(path)) {
+      await formatPath(join(path, entry));
     }
+  } else if (info.isFile() && path.endsWith(".ts")) {
+    const source = await readFile(path, "utf8");
+    const formatted = source.replace(/[ \t]+$/gm, "").trimEnd() + "\n";
+    if (formatted !== source) await writeFile(path, formatted);
   }
 }
 
-await formatDirectory(fileURLToPath(new URL("../src/generated", import.meta.url)));
+const directories = process.argv.slice(2);
+if (directories.length === 0) {
+  directories.push(fileURLToPath(new URL("../src/generated", import.meta.url)));
+}
+for (const directory of directories) {
+  await formatPath(resolve(directory));
+}

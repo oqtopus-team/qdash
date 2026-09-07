@@ -24,6 +24,7 @@ import { useGetTaskResult } from "@/client/task/task";
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
 import { useListTaskResults } from "@/client/task-result/task-result";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -212,6 +213,9 @@ function TaskResultRow({
   );
 }
 
+/**
+ * Dropdown for filtering task results by execution within a selected chip
+ */
 function ExecutionFilter({
   chipId,
   selectedExecutionId,
@@ -246,10 +250,7 @@ function ExecutionFilter({
     return items;
   }, [executionData?.data?.executions, selectedExecutionId]);
 
-  const { styles } = useSelectStyles<ExecutionOption>({
-    labels: options.map((option) => option.label),
-    placeholder: "Select an execution",
-  });
+  const styles = useSelectStyles<ExecutionOption>();
 
   if (isLoading) {
     return <div className="h-[38px] animate-pulse rounded bg-base-300" />;
@@ -347,7 +348,16 @@ function TaskResultPreviewSidebar({
     isLoading,
     isError,
   } = useGetTaskResult(taskId ?? "", {
-    query: { enabled: !!taskId },
+    query: {
+      enabled: !!taskId,
+      refetchInterval: (query) => {
+        const status = query.state.data?.data.status;
+        return status === "running" || status === "scheduled" || status === "pending"
+          ? 2000
+          : false;
+      },
+      refetchIntervalInBackground: true,
+    },
   });
   const taskResult = response?.data;
   const isOpen = !!taskId;
@@ -397,6 +407,9 @@ function TaskResultPreviewSidebar({
               )}
             </div>
             <h2 className="text-xl font-bold">{taskResult?.task_name || "Task Result"}</h2>
+            {taskResult && (
+              <ExecutionTaskProgress status={taskResult.status} note={taskResult.note} />
+            )}
             <p className="mt-1 font-mono text-xs text-base-content/50">{taskId}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href={`/task-results/${taskId}`} className="btn btn-primary btn-sm gap-1">
@@ -509,6 +522,9 @@ function TaskResultPreviewSidebar({
   );
 }
 
+/**
+ * Task results page listing outcomes across executions with filters and a preview sidebar
+ */
 export function TaskResultsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -628,14 +644,16 @@ export function TaskResultsPageContent() {
       <form onSubmit={handleSubmit}>
         <PageFiltersBar className="mb-4 sm:mb-6">
           <PageFiltersBar.Group className="flex-1">
-            <PageFiltersBar.Item label="Chip" className="sm:min-w-40">
+            <PageFiltersBar.Item label="Chip" className="sm:w-72">
               <div className="flex items-center gap-2">
-                <ChipSelector
-                  selectedChip={draftFilters.chipId}
-                  onChipSelect={(chipId) =>
-                    setDraftFilters((current) => ({ ...current, chipId, executionId: "" }))
-                  }
-                />
+                <div className="min-w-0 flex-1">
+                  <ChipSelector
+                    selectedChip={draftFilters.chipId}
+                    onChipSelect={(chipId) =>
+                      setDraftFilters((current) => ({ ...current, chipId, executionId: "" }))
+                    }
+                  />
+                </div>
                 {draftFilters.chipId && (
                   <button
                     type="button"
@@ -650,15 +668,17 @@ export function TaskResultsPageContent() {
                 )}
               </div>
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Execution" className="sm:min-w-44">
+            <PageFiltersBar.Item label="Execution" className="sm:w-72">
               <div className="flex items-center gap-2">
-                <ExecutionFilter
-                  chipId={draftFilters.chipId}
-                  selectedExecutionId={draftFilters.executionId}
-                  onExecutionSelect={(executionId) =>
-                    setDraftFilters((current) => ({ ...current, executionId }))
-                  }
-                />
+                <div className="min-w-0 flex-1">
+                  <ExecutionFilter
+                    chipId={draftFilters.chipId}
+                    selectedExecutionId={draftFilters.executionId}
+                    onExecutionSelect={(executionId) =>
+                      setDraftFilters((current) => ({ ...current, executionId }))
+                    }
+                  />
+                </div>
                 {draftFilters.executionId && (
                   <button
                     type="button"
@@ -671,16 +691,18 @@ export function TaskResultsPageContent() {
                 )}
               </div>
             </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Task" className="sm:min-w-44">
+            <PageFiltersBar.Item label="Task" className="sm:w-72">
               <div className="flex items-center gap-2">
-                <TaskSelector
-                  tasks={tasks}
-                  selectedTask={draftFilters.taskName}
-                  onTaskSelect={(taskName) =>
-                    setDraftFilters((current) => ({ ...current, taskName }))
-                  }
-                  disabled={tasks.length === 0}
-                />
+                <div className="min-w-0 flex-1">
+                  <TaskSelector
+                    tasks={tasks}
+                    selectedTask={draftFilters.taskName}
+                    onTaskSelect={(taskName) =>
+                      setDraftFilters((current) => ({ ...current, taskName }))
+                    }
+                    disabled={tasks.length === 0}
+                  />
+                </div>
                 {draftFilters.taskName && (
                   <button
                     type="button"

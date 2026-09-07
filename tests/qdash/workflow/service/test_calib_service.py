@@ -136,14 +136,29 @@ class MockGitHubIntegration:
 class MockExecutionLockRepository:
     """Mock ExecutionLockRepository for testing."""
 
+    def __init__(self, locked: bool = False, owner: str | None = None) -> None:
+        self.locked = locked
+        self.owner = owner
+        self.try_lock_calls: list[str | None] = []
+
     def is_locked(self, project_id: str) -> bool:
-        return False
+        return self.locked
+
+    def try_lock(self, project_id: str, execution_id: str | None = None) -> bool:
+        self.try_lock_calls.append(execution_id)
+        if self.locked and (execution_id is None or self.owner != execution_id):
+            return False
+        self.locked = True
+        self.owner = execution_id
+        return True
 
     def lock(self, project_id: str, execution_id: str | None = None) -> None:
-        pass
+        self.locked = True
+        self.owner = execution_id
 
     def unlock(self, project_id: str) -> None:
-        pass
+        self.locked = False
+        self.owner = None
 
 
 class MockUserRepository:
@@ -347,6 +362,99 @@ class TestCalibServiceInitialization:
         assert fake_repo.calls == [{"project_id": "test_project", "flow_run_id": "flow-run-9"}]
         assert session.execution_id is not None
         assert re.fullmatch(r"\d{8}-007", session.execution_id)
+
+    def test_initialize_adopts_a_lock_claimed_by_the_api_for_this_execution(
+        self, mock_flow_session_deps, mock_user_repo, monkeypatch
+    ):
+        """A lock the API claimed for the execution being claimed is adopted, not contested."""
+        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
+        monkeypatch.setattr(
+            "qdash.repository.MongoExecutionRepository",
+            lambda: FakeExecutionRepository(claimed_execution_id="20240101-777"),
+        )
+        lock_repo = MockExecutionLockRepository(locked=True, owner="20240101-777")
+
+        session = CalibService(
+            username="test_user",
+            chip_id="chip_1",
+            qids=["0"],
+            project_id="test_project",
+            lock_repo=lock_repo,
+            user_repo=mock_user_repo,
+        )
+
+        assert session.execution_id == "20240101-777"
+        assert session._lock_acquired is True
+        assert lock_repo.try_lock_calls == ["20240101-777"]
+        assert lock_repo.owner == "20240101-777"
+
+    def test_initialize_refuses_a_lock_owned_by_another_execution(
+        self, mock_flow_session_deps, mock_user_repo, monkeypatch
+    ):
+        """A lock owned by a different execution still blocks the session."""
+        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
+        monkeypatch.setattr(
+            "qdash.repository.MongoExecutionRepository",
+            lambda: FakeExecutionRepository(claimed_execution_id="20240101-777"),
+        )
+        lock_repo = MockExecutionLockRepository(locked=True, owner="20240101-111")
+
+        with pytest.raises(RuntimeError, match="Calibration is already running"):
+            CalibService(
+                username="test_user",
+                chip_id="chip_1",
+                qids=["0"],
+                project_id="test_project",
+                lock_repo=lock_repo,
+                user_repo=mock_user_repo,
+            )
+
+        assert lock_repo.owner == "20240101-111"
+
+    def test_initialize_refuses_an_unowned_lock(
+        self, mock_flow_session_deps, mock_user_repo, monkeypatch
+    ):
+        """A held lock with no recorded owner is not adopted either."""
+        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
+        monkeypatch.setattr(
+            "qdash.repository.MongoExecutionRepository",
+            lambda: FakeExecutionRepository(claimed_execution_id="20240101-777"),
+        )
+        lock_repo = MockExecutionLockRepository(locked=True, owner=None)
+
+        with pytest.raises(RuntimeError, match="Calibration is already running"):
+            CalibService(
+                username="test_user",
+                chip_id="chip_1",
+                qids=["0"],
+                project_id="test_project",
+                lock_repo=lock_repo,
+                user_repo=mock_user_repo,
+            )
+
+    def test_initialize_takes_a_free_lock_itself(
+        self, mock_flow_session_deps, mock_user_repo, monkeypatch
+    ):
+        """Runs that never went through the API, such as cron schedules, lock here."""
+        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
+        monkeypatch.setattr(
+            "qdash.repository.MongoExecutionRepository",
+            lambda: FakeExecutionRepository(claimed_execution_id="20240101-777"),
+        )
+        lock_repo = MockExecutionLockRepository()
+
+        session = CalibService(
+            username="test_user",
+            chip_id="chip_1",
+            qids=["0"],
+            project_id="test_project",
+            lock_repo=lock_repo,
+            user_repo=mock_user_repo,
+        )
+
+        assert lock_repo.try_lock_calls == ["20240101-777"]
+        assert lock_repo.locked is True
+        assert lock_repo.owner == session.execution_id
 
 
 class TestCalibServiceParameterManagement:

@@ -54,10 +54,7 @@ export function CooldownSelector({
     [cooldowns],
   );
 
-  const { minWidth, styles } = useSelectStyles<CooldownOption>({
-    labels: options.map((o) => o.label),
-    placeholder,
-  });
+  const styles = useSelectStyles<CooldownOption>();
   const isControlled = selectedCooldownId !== undefined;
   const [internalSelectedCooldownId, setInternalSelectedCooldownId] = useState<string | null>(null);
   const effectiveSelectedCooldownId = isControlled
@@ -93,7 +90,7 @@ export function CooldownSelector({
   if (!chipId) return null;
   if (isLoading) {
     return (
-      <div className="animate-pulse" style={{ minWidth }}>
+      <div className="w-full animate-pulse">
         <div className="h-[38px] bg-base-300 rounded"></div>
       </div>
     );

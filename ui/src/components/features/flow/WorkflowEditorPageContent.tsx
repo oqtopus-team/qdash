@@ -23,6 +23,7 @@ import {
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
 import {
+  getGetExecutionLockStatusQueryKey,
   useCancelExecution,
   useGetExecution,
   useGetExecutionLockStatus,
@@ -227,6 +228,8 @@ export function WorkflowEditorPageContent() {
         setLastFlowRunId(response.data.flow_run_id || null);
         toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`);
       },
+      onSettled: () =>
+        queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() }),
     },
   });
 
@@ -247,6 +250,13 @@ export function WorkflowEditorPageContent() {
   });
 
   const canCancel = !!lastFlowRunId && !!lockStatus?.data.lock;
+  const executeErrorDetail = (
+    executeMutation.error as { response?: { data?: { detail?: unknown } } } | null
+  )?.response?.data?.detail;
+  const executeErrorMessage =
+    (typeof executeErrorDetail === "string" ? executeErrorDetail : undefined) ||
+    (executeMutation.error as Error | null)?.message ||
+    "Unknown error";
   useEffect(() => {
     if (data?.data) {
       const flow = data.data;
@@ -780,7 +790,8 @@ export function WorkflowEditorPageContent() {
                 saveMutation.isPending ||
                 deleteMutation.isPending ||
                 executeMutation.isPending ||
-                isLockStatusLoading
+                isLockStatusLoading ||
+                !!lockStatus?.data.lock
               }
               title={
                 lockStatus?.data.lock
@@ -855,9 +866,7 @@ export function WorkflowEditorPageContent() {
 
         {executeMutation.isError && (
           <div className="alert alert-error mx-4 mt-2">
-            <span>
-              Failed to execute flow: {(executeMutation.error as Error)?.message || "Unknown error"}
-            </span>
+            <span>Failed to execute flow: {executeErrorMessage}</span>
           </div>
         )}
 
@@ -1475,7 +1484,8 @@ export function WorkflowEditorPageContent() {
                 saveMutation.isPending ||
                 deleteMutation.isPending ||
                 executeMutation.isPending ||
-                isLockStatusLoading
+                isLockStatusLoading ||
+                !!lockStatus?.data.lock
               }
             >
               {executeMutation.isPending ? (

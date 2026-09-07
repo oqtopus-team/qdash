@@ -41,6 +41,15 @@ class CheckQubitSpectroscopy(QubexTask):
         "readout_amplitude": InputParameterSpec.required_database(),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "simultaneous_drive": RunParameterSpec(
+            unit="a.u.",
+            value_type="bool",
+            default=True,
+            description=(
+                "Whether control and readout pulses start together. "
+                "False starts readout after the control pulse ends."
+            ),
+        ),
         "frequency_range": RunParameterSpec(
             unit="GHz",
             value_type="np.arange",
@@ -271,6 +280,7 @@ class CheckQubitSpectroscopy(QubexTask):
         ):
             result = exp.qubit_spectroscopy(
                 label,
+                simultaneous_drive=self.run_parameters["simultaneous_drive"].get_value(),
                 frequency_range=self._frequency_range(),
                 power_range=self.run_parameters["power_range"].get_value(),
                 readout_amplitude=self._get_readout_amplitude_value(),
@@ -295,6 +305,7 @@ class CheckQubitSpectroscopy(QubexTask):
         for label in labels:
             result = exp.qubit_spectroscopy(
                 label,
+                simultaneous_drive=self.run_parameters["simultaneous_drive"].get_value(),
                 frequency_range=frequency_range,
                 power_range=self.run_parameters["power_range"].get_value(),
                 readout_amplitude=readout_amplitude,

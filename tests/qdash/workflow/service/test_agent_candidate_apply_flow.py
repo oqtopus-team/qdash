@@ -10,8 +10,9 @@ from qdash.workflow.engine.params_updater import get_params_updater
 from qdash.workflow.service import agent_candidate_apply_flow
 
 
+@pytest.mark.parametrize("missing", [False, True])
 def test_agent_candidate_apply_uses_audited_snapshot_and_verifies(
-    init_db, monkeypatch, tmp_path
+    init_db, monkeypatch, tmp_path, missing
 ) -> None:
     """The worker reads the committed value, updates mapped files, and records verification."""
     commit = AgentCandidateCommitDocument(
@@ -40,7 +41,8 @@ def test_agent_candidate_apply_uses_audited_snapshot_and_verifies(
     params_dir = tmp_path / "params"
     params_dir.mkdir()
     params_file = params_dir / "drive_amplitude.yaml"
-    params_file.write_text("data:\n  Q00: 0.1\n")
+    if not missing:
+        params_file.write_text("data:\n  Q00: 0.1\n")
     backend = FakeBackend(
         {
             "task_type": "qubit",

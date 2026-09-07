@@ -14,6 +14,7 @@ interface ExecutionHistoryModalContentProps {
   topContent?: ReactNode;
 }
 
+/** Shared layout for execution-history modals: tabbed panels on mobile, three panes on desktop. */
 export function ExecutionHistoryModalContent({
   mobileTab,
   onMobileTabChange,
@@ -52,7 +53,7 @@ export function ExecutionHistoryModalContent({
         </div>
       </div>
 
-      <div className="lg:hidden flex-1 min-h-0 overflow-hidden">
+      <div className="lg:hidden flex-1 min-h-0 overflow-y-auto">
         {mobileTab === "history" && history}
         {mobileTab === "tasks" && tasks}
         {mobileTab === "details" && details}

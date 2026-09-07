@@ -1034,6 +1034,12 @@
             "value": 8192,
             "value_type": "int"
           },
+          "simultaneous_drive": {
+            "description": "Whether control and readout pulses start together. False starts readout after the control pulse ends.",
+            "unit": "a.u.",
+            "value": true,
+            "value_type": "bool"
+          },
           "target_rabi_rate": {
             "description": "Target Rabi rate used to scale the estimated control amplitude",
             "unit": "GHz",
@@ -1480,6 +1486,12 @@
               5
             ],
             "value_type": "np.arange"
+          },
+          "simultaneous_drive": {
+            "description": "Whether control and readout pulses start together. False starts readout after the control pulse ends.",
+            "unit": "a.u.",
+            "value": true,
+            "value_type": "bool"
           }
         },
         "task_type": "qubit"
