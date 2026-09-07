@@ -8,7 +8,7 @@ from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.datamodel.task import TaskTypes
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
-from qdash.workflow.engine.progress import ProgressReporter
+from qdash.workflow.engine.progress import ProgressPlan, ProgressReporter
 
 logger = logging.getLogger(__name__)
 
@@ -22,14 +22,18 @@ class QubexBackend(BaseBackend):
     name: str = "qubex"
 
     def capture_progress(
-        self, reporter: ProgressReporter, *, task_name: str
+        self,
+        reporter: ProgressReporter,
+        *,
+        task_name: str,
+        plan: ProgressPlan | None = None,
     ) -> AbstractContextManager[None]:
         """Capture qubex tqdm sweeps for the current task."""
         from qdash.workflow.engine.backend.plugins.qubex_progress import (
             capture_qubex_progress,
         )
 
-        return capture_qubex_progress(reporter, task_name=task_name)
+        return capture_qubex_progress(reporter, task_name=task_name, plan=plan)
 
     from qubex import Experiment
 

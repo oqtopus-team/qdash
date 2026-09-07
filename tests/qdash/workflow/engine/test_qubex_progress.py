@@ -3,12 +3,25 @@
 from __future__ import annotations
 
 from io import StringIO
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
-from qdash.workflow.engine.backend.plugins.qubex_progress import capture_qubex_progress
+import pytest
+
+from qdash.workflow.engine.backend.plugins.qubex_progress import (
+    ReportingTqdm,
+    capture_qubex_progress,
+)
+from qdash.workflow.engine.progress import ProgressPlan
 
 if TYPE_CHECKING:
+    from types import ModuleType
+
     from qdash.workflow.engine.progress import TaskProgress
+
+
+def _service_tqdm(service: ModuleType) -> type[ReportingTqdm]:
+    """Read the dynamically patched internal attribute, not a public qubex export."""
+    return cast("type[ReportingTqdm]", service.tqdm)
 
 
 def test_capture_qubex_progress_reports_completion() -> None:
@@ -18,7 +31,7 @@ def test_capture_qubex_progress_reports_completion() -> None:
     events: list[TaskProgress] = []
 
     with capture_qubex_progress(events.append):
-        for _ in characterization_service.tqdm(
+        for _ in _service_tqdm(characterization_service)(
             range(3),
             desc="control power sweep for Q00",
             file=StringIO(),
@@ -31,6 +44,52 @@ def test_capture_qubex_progress_reports_completion() -> None:
     assert events[-1].description == "control power sweep for Q00"
     assert events[-1].eta_seconds == 0.0
     assert events[-1].updated_at
+    assert events[-1].phase == 1
+    assert events[-1].has_multiple_phases is False
+
+
+@pytest.mark.parametrize(
+    "task_name",
+    [
+        "CheckChevron",
+        "CheckCrossResonance",
+        "CheckRamsey",
+        "CheckT1Average",
+        "CheckT2EchoAverage",
+        "CreateDRAGHPIPulse",
+        "CreateDRAGPIPulse",
+        "CreateZX90",
+    ],
+)
+def test_known_multi_phase_tasks_announce_sequential_sweeps(task_name: str) -> None:
+    """Known multi-phase tasks should warn before their first progress reset."""
+    from qubex.experiment.services import measurement_service
+
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(events.append, task_name=task_name):
+        list(_service_tqdm(measurement_service)(range(2), disable=True, file=StringIO()))
+        list(_service_tqdm(measurement_service)(range(3), disable=True, file=StringIO()))
+
+    assert events[0].phase == 1
+    assert events[0].has_multiple_phases is True
+    assert events[-1].phase == 2
+    assert events[-1].has_multiple_phases is True
+
+
+def test_capture_qubex_progress_includes_phase_count_bounds() -> None:
+    """Progress snapshots should carry the task's complete phase plan."""
+    from qubex.experiment.services import measurement_service
+
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(
+        events.append,
+        task_name="CheckChevron",
+        plan=ProgressPlan(minimum_phases=2, maximum_phases=4),
+    ):
+        list(_service_tqdm(measurement_service)(range(2), disable=True, file=StringIO()))
+
+    assert events[-1].phase_total_min == 2
+    assert events[-1].phase_total_max == 4
 
 
 def test_capture_qubex_progress_reports_before_first_iteration() -> None:
@@ -39,7 +98,7 @@ def test_capture_qubex_progress_reports_before_first_iteration() -> None:
 
     events: list[TaskProgress] = []
     with capture_qubex_progress(events.append, task_name="CheckQubitSpectroscopy"):
-        progress = characterization_service.tqdm(
+        progress = _service_tqdm(characterization_service)(
             range(3),
             desc="control power sweep for Q00",
             file=StringIO(),
@@ -56,7 +115,7 @@ def test_capture_qubex_progress_patches_measurement_service() -> None:
     events: list[TaskProgress] = []
     with capture_qubex_progress(events.append):
         list(
-            measurement_service.tqdm(
+            _service_tqdm(measurement_service)(
                 range(2),
                 desc="Sweeping parameters",
                 disable=True,
@@ -75,7 +134,7 @@ def test_rabi_progress_labels_disabled_qubex_sweep() -> None:
     events: list[TaskProgress] = []
     with capture_qubex_progress(events.append, task_name="CheckRabi"):
         list(
-            measurement_service.tqdm(
+            _service_tqdm(measurement_service)(
                 range(4),
                 desc="Sweeping parameters",
                 disable=True,
@@ -95,10 +154,10 @@ def test_capture_qubex_progress_is_scoped_to_context() -> None:
 
     events: list[TaskProgress] = []
     with capture_qubex_progress(events.append):
-        list(characterization_service.tqdm(range(1), file=StringIO()))
+        list(_service_tqdm(characterization_service)(range(1), file=StringIO()))
 
     reported_count = len(events)
-    list(characterization_service.tqdm(range(1), file=StringIO()))
+    list(_service_tqdm(characterization_service)(range(1), file=StringIO()))
 
     assert len(events) == reported_count
 
@@ -109,8 +168,14 @@ def test_capture_qubex_progress_ignores_nested_bars() -> None:
 
     events: list[TaskProgress] = []
     with capture_qubex_progress(events.append):
-        for _ in characterization_service.tqdm(range(2), desc="outer sweep", file=StringIO()):
-            list(characterization_service.tqdm(range(3), desc="inner sweep", file=StringIO()))
+        for _ in _service_tqdm(characterization_service)(
+            range(2), desc="outer sweep", file=StringIO()
+        ):
+            list(
+                _service_tqdm(characterization_service)(
+                    range(3), desc="inner sweep", file=StringIO()
+                )
+            )
 
     assert events
     assert {event.description for event in events} == {"outer sweep"}
@@ -125,12 +190,12 @@ def test_qubit_spectroscopy_reports_only_control_power_sweep() -> None:
     events: list[TaskProgress] = []
     with capture_qubex_progress(events.append, task_name="CheckQubitSpectroscopy"):
         list(
-            characterization_service.tqdm(
+            _service_tqdm(characterization_service)(
                 range(2), desc="qubit freq. scan subranges for Q00", file=StringIO()
             )
         )
         list(
-            characterization_service.tqdm(
+            _service_tqdm(characterization_service)(
                 range(3), desc="control power sweep for Q00", file=StringIO()
             )
         )
@@ -147,16 +212,16 @@ def test_resonator_spectroscopy_ignores_setup_and_subrange_bars() -> None:
     events: list[TaskProgress] = []
     with capture_qubex_progress(events.append, task_name="CheckResonatorSpectroscopy"):
         list(
-            characterization_service.tqdm(
+            _service_tqdm(characterization_service)(
                 range(2), desc="electrical delay for Q00", file=StringIO()
             )
         )
         list(
-            characterization_service.tqdm(
+            _service_tqdm(characterization_service)(
                 range(4), desc="resonator freq. scan subranges for Q00", file=StringIO()
             )
         )
-        list(characterization_service.tqdm(range(5), file=StringIO()))
+        list(_service_tqdm(characterization_service)(range(5), file=StringIO()))
 
     assert events
     assert {event.description for event in events} == {"readout power sweep"}

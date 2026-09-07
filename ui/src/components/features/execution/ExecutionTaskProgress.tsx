@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Check } from "lucide-react";
 
 type TaskProgress = {
   current: number;
@@ -8,6 +9,10 @@ type TaskProgress = {
   description: string;
   etaSeconds: number | null;
   updatedAt: string;
+  phase: number;
+  hasMultiplePhases: boolean;
+  phaseTotalMin: number | null;
+  phaseTotalMax: number | null;
 };
 
 type ExecutionTaskProgressProps = {
@@ -30,6 +35,16 @@ function readProgress(note?: Record<string, unknown> | null): TaskProgress | nul
     description: typeof value.description === "string" ? value.description : "",
     etaSeconds: typeof value.eta_seconds === "number" ? value.eta_seconds : null,
     updatedAt: value.updated_at,
+    phase: typeof value.phase === "number" && value.phase >= 1 ? value.phase : 1,
+    hasMultiplePhases: value.has_multiple_phases === true,
+    phaseTotalMin:
+      typeof value.phase_total_min === "number" && value.phase_total_min >= 1
+        ? value.phase_total_min
+        : null,
+    phaseTotalMax:
+      typeof value.phase_total_max === "number" && value.phase_total_max >= 1
+        ? value.phase_total_max
+        : null,
   };
 }
 
@@ -60,16 +75,49 @@ export function ExecutionTaskProgress({ status, note }: ExecutionTaskProgressPro
   const ageSeconds = Math.max((now - Date.parse(progress.updatedAt)) / 1000, 0);
   const remainingSeconds =
     progress.etaSeconds == null ? null : Math.max(progress.etaSeconds - ageSeconds, 0);
+  const hasExactPhaseTotal =
+    progress.phaseTotalMin !== null && progress.phaseTotalMin === progress.phaseTotalMax;
+  const overallPercentage =
+    percentage !== null && hasExactPhaseTotal && progress.phaseTotalMax !== null
+      ? Math.min(
+          Math.max(((progress.phase - 1 + percentage / 100) / progress.phaseTotalMax) * 100, 0),
+          100,
+        )
+      : null;
+  const phaseCount =
+    progress.phaseTotalMin === null || progress.phaseTotalMax === null
+      ? `${progress.phase}`
+      : hasExactPhaseTotal
+        ? `${progress.phase} / ${progress.phaseTotalMax}`
+        : `${progress.phase} / ${progress.phaseTotalMin}–${progress.phaseTotalMax}`;
 
   return (
     <div className="mt-3 space-y-1.5" aria-label="Task progress">
+      {progress.hasMultiplePhases && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="badge badge-info badge-sm">Sweep {phaseCount}</span>
+          {progress.phase > 1 && (
+            <span className="inline-flex items-center gap-1 text-success">
+              <Check size={14} aria-hidden="true" />
+              {progress.phase - 1} {progress.phase === 2 ? "sweep" : "sweeps"} completed
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 text-xs text-base-content/70">
         <span className="truncate">{progress.description || "Measurement in progress"}</span>
         <span className="shrink-0 tabular-nums">
           {progress.total == null ? progress.current : `${progress.current} / ${progress.total}`}
         </span>
       </div>
-      {percentage === null ? (
+      {overallPercentage !== null ? (
+        <progress
+          className="progress progress-info w-full"
+          value={overallPercentage}
+          max={100}
+          aria-label={`${Math.round(overallPercentage)}% of task complete`}
+        />
+      ) : percentage === null ? (
         <progress className="progress progress-info w-full" />
       ) : (
         <progress
@@ -84,6 +132,15 @@ export function ExecutionTaskProgress({ status, note }: ExecutionTaskProgressPro
           ? "Calculating phase estimate…"
           : `Estimated ${formatEta(remainingSeconds)} remaining in this phase`}
       </p>
+      {progress.hasMultiplePhases && (
+        <p className="text-xs text-base-content/60">
+          {hasExactPhaseTotal
+            ? "Progress includes all planned sweeps."
+            : progress.phaseTotalMin !== null && progress.phaseTotalMax !== null
+              ? `This adaptive task will run ${progress.phaseTotalMin} to ${progress.phaseTotalMax} sweeps in total.`
+              : "This task runs multiple sweeps. Another progress bar may start after this one."}
+        </p>
+      )}
     </div>
   );
 }

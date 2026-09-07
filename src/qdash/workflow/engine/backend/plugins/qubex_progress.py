@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from tqdm.auto import tqdm as Tqdm
 
-from qdash.workflow.engine.progress import ProgressReporter, TaskProgress
+from qdash.workflow.engine.progress import ProgressPlan, ProgressReporter, TaskProgress
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -24,11 +24,27 @@ _reporter: ContextVar[ProgressReporter | None] = ContextVar(
     default=None,
 )
 _task_name: ContextVar[str] = ContextVar("qdash_qubex_progress_task_name", default="")
+_plan: ContextVar[ProgressPlan | None] = ContextVar("qdash_qubex_progress_plan", default=None)
 _active_bar: ContextVar[object | None] = ContextVar(
     "qdash_qubex_active_progress_bar",
     default=None,
 )
+_phase: ContextVar[int] = ContextVar("qdash_qubex_progress_phase", default=0)
 _installed = False
+
+# These tasks are known to open multiple sequential top-level progress bars.
+# Keep this explicit so the UI can warn before the first bar completes; once a
+# second bar is observed, the adapter also detects multi-phase work generically.
+_MULTI_PHASE_TASKS = {
+    "CheckChevron",
+    "CheckCrossResonance",
+    "CheckRamsey",
+    "CheckT1Average",
+    "CheckT2EchoAverage",
+    "CreateDRAGHPIPulse",
+    "CreateDRAGPIPulse",
+    "CreateZX90",
+}
 
 
 class ReportingTqdm(Tqdm):
@@ -37,6 +53,7 @@ class ReportingTqdm(Tqdm):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         reporter = _reporter.get()
         task_name = _task_name.get()
+        plan = _plan.get()
         self._qdash_render_disabled = reporter is not None and bool(kwargs.get("disable", False))
         if self._qdash_render_disabled:
             # qubex disables tqdm for most parameter sweeps. tqdm then also
@@ -45,6 +62,9 @@ class ReportingTqdm(Tqdm):
             kwargs["disable"] = False
         self._qdash_reporter: ProgressReporter | None = None
         self._qdash_description = ""
+        self._qdash_has_multiple_phases = False
+        self._qdash_phase = 1
+        self._qdash_plan = plan
         self._qdash_active_token: Token[object | None] | None = None
         self._qdash_last_reported_at = 0.0
         kwargs.setdefault("mininterval", 1.0)
@@ -59,6 +79,11 @@ class ReportingTqdm(Tqdm):
                 self._qdash_reporter = reporter
                 self._qdash_description = _progress_description(task_name, self.desc or "")
                 self._qdash_active_token = _active_bar.set(self)
+                self._qdash_phase = _phase.get() + 1
+                _phase.set(self._qdash_phase)
+                self._qdash_has_multiple_phases = (
+                    plan.maximum_phases > 1 if plan is not None else task_name in _MULTI_PHASE_TASKS
+                ) or self._qdash_phase > 1
                 # tqdm normally emits the next snapshot only after the first
                 # iteration. A single qubex sweep point can take minutes, so
                 # publish 0 / total immediately to make the active phase visible.
@@ -111,6 +136,14 @@ class ReportingTqdm(Tqdm):
                     elapsed_seconds=elapsed,
                     eta_seconds=eta,
                     updated_at=datetime.now(UTC).isoformat(),
+                    phase=self._qdash_phase,
+                    has_multiple_phases=self._qdash_has_multiple_phases,
+                    phase_total_min=(
+                        self._qdash_plan.minimum_phases if self._qdash_plan is not None else None
+                    ),
+                    phase_total_max=(
+                        self._qdash_plan.maximum_phases if self._qdash_plan is not None else None
+                    ),
                 )
             )
             self._qdash_last_reported_at = now
@@ -170,13 +203,18 @@ def capture_qubex_progress(
     reporter: ProgressReporter,
     *,
     task_name: str = "",
+    plan: ProgressPlan | None = None,
 ) -> Iterator[None]:
     """Forward qubex tqdm updates to ``reporter`` for the current context."""
     _install_adapter()
     reporter_token = _reporter.set(reporter)
     task_name_token = _task_name.set(task_name)
+    plan_token = _plan.set(plan)
+    phase_token = _phase.set(0)
     try:
         yield
     finally:
+        _phase.reset(phase_token)
+        _plan.reset(plan_token)
         _task_name.reset(task_name_token)
         _reporter.reset(reporter_token)

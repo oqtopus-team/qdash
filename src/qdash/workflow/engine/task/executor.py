@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
+from qdash.workflow.engine.progress import ProgressPlan
 from qdash.workflow.engine.task.backend_saver import BackendSaver
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.mux_distributor import MuxDistributor
@@ -160,6 +161,7 @@ class TaskExecutor:
         task_type: str,
         qids: list[str],
         execution_service: "ExecutionService | None",
+        task: TaskProtocol,
     ) -> AbstractContextManager[None]:
         """Capture backend progress for the active persisted task results."""
         capture_progress = getattr(backend, "capture_progress", None)
@@ -180,8 +182,27 @@ class TaskExecutor:
 
         return cast(
             "AbstractContextManager[None]",
-            capture_progress(report, task_name=task_name),
+            capture_progress(report, task_name=task_name, plan=self._progress_plan(task)),
         )
+
+    @staticmethod
+    def _progress_plan(task: TaskProtocol) -> ProgressPlan | None:
+        """Return honest phase-count bounds for tasks with sequential sweeps."""
+        name = task.get_name()
+        if name in {"CheckRamsey"}:
+            return ProgressPlan(2, 2)
+        if name in {"CheckT1Average", "CheckT2EchoAverage"}:
+            n_runs = int(task.run_parameters["n_runs"].get_value())
+            return ProgressPlan(n_runs, n_runs)
+        if name in {"CreateDRAGHPIPulse", "CreateDRAGPIPulse"}:
+            return ProgressPlan(4, 4)
+        if name == "CheckChevron":
+            return ProgressPlan(2, 4)
+        if name == "CheckCrossResonance":
+            return ProgressPlan(4, 8)
+        if name == "CreateZX90":
+            return ProgressPlan(3, 4)
+        return None
 
     def _prepare_run(
         self,
@@ -393,6 +414,7 @@ class TaskExecutor:
                 task_type,
                 [qid],
                 execution_service,
+                task,
             ):
                 run_result = self._run_task(task, backend, qid)
             result.r2 = run_result.r2 if run_result else None
@@ -621,6 +643,7 @@ class TaskExecutor:
                 task_type,
                 qids,
                 execution_service,
+                task,
             ):
                 run_result = self._run_batch_task(task, backend, qids)
             for qid, result in results.items():

@@ -53,4 +53,55 @@ describe("ExecutionTaskProgress", () => {
 
     expect(screen.queryByLabelText("Task progress")).toBeNull();
   });
+
+  it("warns that another sweep may follow and shows completed sweeps", () => {
+    render(
+      <ExecutionTaskProgress
+        status="running"
+        note={{
+          progress: {
+            current: 1,
+            total: 10,
+            description: "Chevron sweep",
+            eta_seconds: null,
+            updated_at: new Date().toISOString(),
+            phase: 2,
+            has_multiple_phases: true,
+            phase_total_min: 4,
+            phase_total_max: 4,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Sweep 2 / 4")).toBeTruthy();
+    expect(screen.getByText("1 sweep completed")).toBeTruthy();
+    expect(screen.getByText("Progress includes all planned sweeps.")).toBeTruthy();
+    expect(screen.getByRole("progressbar").getAttribute("aria-label")).toBe("28% of task complete");
+  });
+
+  it("shows honest phase-count bounds for an adaptive task", () => {
+    render(
+      <ExecutionTaskProgress
+        status="running"
+        note={{
+          progress: {
+            current: 5,
+            total: 10,
+            description: "Chevron sweep",
+            eta_seconds: null,
+            updated_at: new Date().toISOString(),
+            phase: 1,
+            has_multiple_phases: true,
+            phase_total_min: 2,
+            phase_total_max: 4,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Sweep 1 / 2–4")).toBeTruthy();
+    expect(screen.getByText("This adaptive task will run 2 to 4 sweeps in total.")).toBeTruthy();
+    expect(screen.getByRole("progressbar").getAttribute("aria-label")).toBe("50% complete");
+  });
 });

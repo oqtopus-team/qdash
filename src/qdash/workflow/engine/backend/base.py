@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager, nullcontext
 
-from qdash.workflow.engine.progress import ProgressReporter
+from qdash.workflow.engine.progress import ProgressPlan, ProgressReporter
 
 
 class BaseBackend(ABC):
@@ -27,7 +27,11 @@ class BaseBackend(ABC):
         raise NotImplementedError(msg)
 
     def capture_progress(
-        self, reporter: ProgressReporter, *, task_name: str
+        self,
+        reporter: ProgressReporter,
+        *,
+        task_name: str,
+        plan: ProgressPlan | None = None,
     ) -> AbstractContextManager[None]:
         """Capture task progress when supported by the backend."""
         return nullcontext()
