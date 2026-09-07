@@ -1,13 +1,16 @@
 """Manual parameter update service.
 
-Allows users to manually update calibration parameters from the UI,
+Applies UI edits to the calibration database and mapped Qubex YAML files,
 with provenance tracking for audit trail.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 import uuid
+from contextlib import AbstractContextManager, nullcontext
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -22,11 +25,18 @@ from qdash.api.schemas.calibration import (
     ManualParameterUpdateRequest,
     ManualParameterUpdateResponse,
 )
+from qdash.common.config.backend import get_default_backend
+from qdash.common.config.params_updater import YamlParamsUpdater, resolve_param_yaml_file_names
 from qdash.common.config.path_resolver import resolve_calib_data_path
+from qdash.common.config.paths import QUBEX_CONFIG_BASE
+from qdash.common.domain.qubit import qid_to_label
 from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.provenance import ParameterVersionDocument, ProvenanceRelationType
+from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.repository.chip import MongoChipRepository
 from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.filesystem import FilesystemCalibDataSaver
 from qdash.repository.provenance import (
@@ -194,34 +204,18 @@ class ManualUpdateService:
             activity.ended_at = now()
             activity.save()
 
-            # Apply calibration values only after every audit record has been persisted. QDash's
-            # default standalone MongoDB deployment does not support multi-document transactions;
-            # keeping this as the final write prevents later persistence failures from leaving an
-            # untracked calibration change.
-            if is_coupling:
-                self._coupling_repo.update_calib_data(
-                    username=username,
-                    qid=request.qid,
-                    chip_id=request.chip_id,
-                    output_parameters=output_parameters,
-                    project_id=project_id,
-                )
-            else:
-                self._qubit_repo.update_calib_data(
-                    username=username,
-                    qid=request.qid,
-                    chip_id=request.chip_id,
-                    output_parameters=output_parameters,
-                    project_id=project_id,
-                )
-        except Exception:
+            # Persist audit records before applying calibration values. Keep YAML locks held
+            # through the database write so a failed commit can restore the original files.
+            with self._backend_update(request, project_id, output_parameters):
+                self._persist_calibration_values(request, project_id, username, output_parameters)
+        except Exception as exc:
             try:
                 activity.status = "failed"
                 activity.ended_at = now()
                 activity.save()
                 if task_result is not None:
                     task_result.status = "failed"
-                    task_result.message = f"Manual parameter edit failed for {username}"
+                    task_result.message = f"Manual parameter edit failed for {username}: {exc}"
                     task_result.figure_path = []
                     task_result.json_figure_path = []
                     task_result.save()
@@ -245,6 +239,75 @@ class ManualUpdateService:
             execution_id=execution_id,
             provenance_activity_id=activity.activity_id,
         )
+
+    @staticmethod
+    def _backend_update(
+        request: ManualParameterUpdateRequest,
+        project_id: str,
+        parameters: dict[str, Any],
+    ) -> AbstractContextManager[None]:
+        """Use the same YAML mapping and shared files as the workflow worker."""
+        if get_default_backend() != "qubex" or not resolve_param_yaml_file_names(parameters):
+            return nullcontext()
+        if not re.fullmatch(r"[a-zA-Z0-9_-]+", request.chip_id):
+            raise HTTPException(status_code=400, detail="Invalid chip ID")
+        chip = MongoChipRepository().find_by_id(project_id=project_id, chip_id=request.chip_id)
+        if chip is None:
+            raise HTTPException(status_code=404, detail="Chip not found in this project")
+        label = "-".join(qid_to_label(qid, chip.size) for qid in request.qid.split("-"))
+        params_dir = QUBEX_CONFIG_BASE / request.chip_id / "params"
+        updater = YamlParamsUpdater(params_dir=params_dir, label=label)
+        return updater.applied(request.qid, parameters)
+
+    def _persist_calibration_values(
+        self,
+        request: ManualParameterUpdateRequest,
+        project_id: str,
+        username: str,
+        parameters: dict[str, Any],
+    ) -> None:
+        """Restore current values if a repository's subsequent history write fails."""
+        is_coupling = "-" in request.qid
+        document = CouplingDocument if is_coupling else QubitDocument
+        collection = document.get_motor_collection()
+        query = {"project_id": project_id, "chip_id": request.chip_id, "qid": request.qid}
+        before = collection.find_one(query)
+        if before is None:
+            raise ValueError(
+                f"Calibration target {request.qid} not found in chip {request.chip_id}"
+            )
+        previous = deepcopy(before.get("data", {}))
+        expected = document.merge_calib_data(deepcopy(previous), deepcopy(parameters))
+        repository = self._coupling_repo if is_coupling else self._qubit_repo
+        try:
+            repository.update_calib_data(
+                username=username,
+                qid=request.qid,
+                chip_id=request.chip_id,
+                output_parameters=parameters,
+                project_id=project_id,
+            )
+        except Exception:
+            current = collection.find_one({"_id": before["_id"]})
+            if current is None:
+                raise RuntimeError("Calibration rollback failed: target was removed")
+            data = current.get("data", {})
+            if all(data.get(key) == previous.get(key) for key in parameters):
+                raise
+            if any(data.get(key) != expected.get(key) for key in parameters):
+                raise RuntimeError("Calibration rollback failed: values changed concurrently")
+            restored = deepcopy(data)
+            for key in parameters:
+                if key in previous:
+                    restored[key] = previous[key]
+                else:
+                    restored.pop(key, None)
+            result = collection.update_one(
+                {"_id": before["_id"], "data": data}, {"$set": {"data": restored}}
+            )
+            if result.matched_count != 1:
+                raise RuntimeError("Calibration rollback failed: values changed concurrently")
+            raise
 
     def _validate_source_task(
         self,
