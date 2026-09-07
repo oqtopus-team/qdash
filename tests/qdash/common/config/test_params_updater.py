@@ -45,7 +45,10 @@ def test_db_failure_restores_all_files_byte_for_byte(updater, tmp_path):
     assert {p.name: p.read_bytes() for p in tmp_path.glob("*.yaml")} == before
 
 
-def test_partial_write_failure_restores_all_files(updater, tmp_path, monkeypatch):
+@pytest.mark.parametrize("missing", [False, True])
+def test_partial_write_failure_restores_all_files(updater, tmp_path, monkeypatch, missing):
+    if missing:
+        (tmp_path / "control.yaml").unlink()
     before = {p.name: p.read_bytes() for p in tmp_path.glob("*.yaml")}
     original = updater._update_yaml
 
@@ -74,15 +77,61 @@ def test_verification_failure_rolls_back(updater, tmp_path, monkeypatch):
     assert (tmp_path / "frequency.yaml").read_bytes() == before
 
 
-def test_missing_extra_file_blocks_commit(updater, tmp_path):
-    (tmp_path / "control.yaml").unlink()
-    before = (tmp_path / "frequency.yaml").read_bytes()
+@pytest.mark.parametrize("missing", [("control.yaml",), ("frequency.yaml", "control.yaml")])
+def test_missing_mapped_files_are_created_and_verified(updater, tmp_path, missing):
+    for name in missing:
+        (tmp_path / name).unlink()
+    with updater.applied("4", {"frequency": {"value": 5.0}}):
+        for name in missing:
+            assert YAML().load((tmp_path / name).read_text()) == {"data": {"Q04": 5.0}}
+    assert updater.verify("4", {"frequency": {"value": 5.0}}) == {
+        "frequency.yaml",
+        "control.yaml",
+    }
+
+
+def test_rollback_removes_new_files_and_restores_existing_files(updater, tmp_path):
+    new_file = tmp_path / "control.yaml"
+    new_file.unlink()
+    original = (tmp_path / "frequency.yaml").read_bytes()
     with (
-        pytest.raises(ValueError, match="does not exist"),
+        pytest.raises(RuntimeError, match="DB failed"),
         updater.applied("4", {"frequency": {"value": 5.0}}),
     ):
-        pytest.fail("DB commit must not be reached")
-    assert (tmp_path / "frequency.yaml").read_bytes() == before
+        assert new_file.exists()
+        raise RuntimeError("DB failed")
+    assert not new_file.exists()
+    assert (tmp_path / "frequency.yaml").read_bytes() == original
+
+
+def test_snapshot_distinguishes_empty_and_missing_files(updater, tmp_path):
+    (tmp_path / "control.yaml").unlink()
+    (tmp_path / "frequency.yaml").write_bytes(b"")
+    snapshot = updater.snapshot("4", {"frequency": {"value": 5.0}})
+    assert snapshot == {"control.yaml": None, "frequency.yaml": b""}
+    updater.update("4", {"frequency": {"value": 5.0}})
+    updater.restore(snapshot)
+    updater.restore(snapshot)
+    assert not (tmp_path / "control.yaml").exists()
+    assert (tmp_path / "frequency.yaml").read_bytes() == b""
+
+
+def test_workflow_update_creates_missing_files_without_snapshot(updater, tmp_path):
+    for path in tmp_path.glob("*.yaml"):
+        path.unlink()
+    assert updater.update("4", {"frequency": {"value": 5.0}}) == {
+        "frequency.yaml",
+        "control.yaml",
+    }
+    assert updater.verify("4", {"frequency": {"value": 5.0}}) == {
+        "frequency.yaml",
+        "control.yaml",
+    }
+
+
+def test_unmapped_values_do_not_create_files(updater, tmp_path):
+    assert updater.update("4", {"unmapped": {"value": 5.0}}) == set()
+    assert not (tmp_path / "unmapped.yaml").exists()
 
 
 def test_unchanged_yaml_is_still_verified(updater):

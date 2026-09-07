@@ -2,6 +2,48 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
+
+@pytest.mark.parametrize("persist", [False, True])
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize("force", [False, True])
+@pytest.mark.parametrize("backend", ["qubex", "fake"])
+def test_single_task_publication_follows_persistence_and_integration(
+    monkeypatch, persist, enabled, force, backend
+):
+    """Tasks saves publish without forcing rejected calibration values into YAML."""
+    from unittest.mock import MagicMock
+
+    from qdash.workflow.service.single_task_flow import single_task_executor
+
+    service = MagicMock()
+    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
+    monkeypatch.setattr(
+        "qdash.workflow.service.single_task_flow.ConfigLoader.load_workflow",
+        lambda: {"github": {"enabled": enabled, "branch": "calibration"}},
+    )
+    monkeypatch.setattr("qdash.workflow.service.single_task_flow.get_run_logger", MagicMock)
+
+    single_task_executor(
+        username="alice",
+        chip_id="chip-1",
+        qid="0",
+        task_name="CheckRabi",
+        backend_name=backend,
+        persist_output_parameters=persist,
+        update_params=force,
+    )
+
+    kwargs = service.call_args.kwargs
+    assert kwargs["github_push_config"].enabled is (persist and enabled and backend == "qubex")
+    assert kwargs["github_push_config"].branch == "calibration"
+    assert kwargs["persist_output_parameters"] is persist
+    assert kwargs["force_update_params"] is force
+    assert kwargs["enable_github_pull"] is (enabled and backend == "qubex")
+    service.return_value.execute_task.assert_called_once_with("CheckRabi", "0")
+    service.return_value.finish_calibration.assert_called_once_with()
+
 
 def test_single_task_executor_pulls_config_before_reexecute(monkeypatch):
     """Re-execute must pull latest config before a possible params batch push."""
@@ -52,8 +94,9 @@ def test_single_task_executor_pulls_config_before_reexecute(monkeypatch):
         update_params=False,
     )
 
-    assert captured["kwargs"]["enable_github"] is False
+    assert captured["kwargs"]["enable_github"] is True
     assert captured["kwargs"]["persist_output_parameters"] is True
+    assert captured["kwargs"]["force_update_params"] is False
 
 
 def test_single_task_executor_exempts_reconfigure_from_snapshot(monkeypatch):

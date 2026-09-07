@@ -20,6 +20,14 @@ from qdash.dbmodel.qubit_history import QubitHistoryDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 
+@pytest.fixture(autouse=True)
+def disable_config_push(monkeypatch):
+    monkeypatch.setattr(
+        "qdash.api.services.calibration_github_service.config_github_credentials_available",
+        lambda: False,
+    )
+
+
 def _request(**overrides: Any) -> ManualParameterUpdateRequest:
     values: dict[str, Any] = {
         "chip_id": "16Q",
@@ -181,6 +189,7 @@ def test_save_correction_figure_persists_marker_artifacts(tmp_path) -> None:
 def manual_backend(tmp_path, init_db, monkeypatch):
     """Use real service/repository code with in-memory MongoDB and temporary YAML."""
     monkeypatch.setattr("qdash.api.services.manual_update_service.QUBEX_CONFIG_BASE", tmp_path)
+    monkeypatch.setattr("qdash.api.services.calibration_github_service.QUBEX_CONFIG_BASE", tmp_path)
     monkeypatch.setattr(
         "qdash.api.services.manual_update_service.get_default_backend", lambda: "qubex"
     )
@@ -206,10 +215,86 @@ def manual_backend(tmp_path, init_db, monkeypatch):
     return ManualUpdateService(), path
 
 
-def _qubit_data():
-    return (
-        QubitDocument.find_one({"project_id": "project", "chip_id": "16Q", "qid": "4"}).run().data
+@pytest.mark.parametrize("push_failure", [False, True])
+def test_manual_edit_pushes_after_local_commit_and_keeps_values_on_failure(
+    manual_backend,
+    monkeypatch,
+    push_failure,
+):
+    service, path = manual_backend
+    monkeypatch.setattr(
+        "qdash.api.services.calibration_github_service.config_github_credentials_available",
+        lambda: True,
     )
+    captured = []
+
+    def publish(files, message, branch):
+        assert _qubit_data()["readout_frequency"]["value"] == 10.123
+        assert files == {"16Q/params/readout_frequency.yaml": path.read_bytes()}
+        assert "manual-edit-" in message
+        assert branch == "main"
+        captured.append(files)
+        TaskResultHistoryDocument.get_motor_collection().update_one(
+            {"name": "ManualParameterEdit"}, {"$set": {"note.concurrent_note": "keep me"}}
+        )
+        if push_failure:
+            raise RuntimeError("remote unavailable")
+        return "abc123"
+
+    monkeypatch.setattr("qdash.api.services.calibration_github_service.push_config_files", publish)
+    result = service.update_parameters(_request(source_task_id=None), "project", "tester")
+    assert len(captured) == 1
+    assert result.github_sync.status == ("failed" if push_failure else "synced")
+    assert _qubit_data()["readout_frequency"]["value"] == 10.123
+    assert "10.123" in path.read_text()
+    history = TaskResultHistoryDocument.find_one({"task_id": result.task_id}).run()
+    assert history is not None
+    assert history.status == "completed"
+    assert history.note["github_sync"]["status"] == result.github_sync.status
+    assert history.note["concurrent_note"] == "keep me"
+
+
+def test_retry_publishes_current_yaml_without_another_edit(manual_backend, monkeypatch):
+    service, path = manual_backend
+    result = service.update_parameters(_request(source_task_id=None), "project", "tester")
+    path.write_text("data:\n  Q04: 10.2\n")
+    monkeypatch.setattr(
+        "qdash.api.services.calibration_github_service.config_github_credentials_available",
+        lambda: True,
+    )
+    push = Mock(return_value="abc123")
+    monkeypatch.setattr("qdash.api.services.calibration_github_service.push_config_files", push)
+    count = TaskResultHistoryDocument.find_all().count()
+    sync = service.retry_github_sync(result.task_id, "project")
+    assert sync.status == "synced"
+    assert push.call_args.args[0] == {"16Q/params/readout_frequency.yaml": path.read_bytes()}
+    assert TaskResultHistoryDocument.find_all().count() == count
+    assert _qubit_data()["readout_frequency"]["value"] == 10.123
+    with pytest.raises(HTTPException, match="not found"):
+        service.retry_github_sync(result.task_id, "other-project")
+    assert push.call_count == 1
+
+
+def test_disabled_github_never_pushes_even_with_credentials(manual_backend, monkeypatch):
+    service, _ = manual_backend
+    result = service.update_parameters(_request(source_task_id=None), "project", "tester")
+    monkeypatch.setattr(
+        "qdash.api.services.calibration_github_service.config_github_credentials_available",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.calibration_github_service.ConfigLoader.load_workflow",
+        lambda: {"github": {"enabled": False}},
+    )
+    with patch("qdash.api.services.calibration_github_service.push_config_files") as push:
+        assert service.retry_github_sync(result.task_id, "project").status == "disabled"
+    push.assert_not_called()
+
+
+def _qubit_data():
+    qubit = QubitDocument.find_one({"project_id": "project", "chip_id": "16Q", "qid": "4"}).run()
+    assert qubit is not None
+    return qubit.data
 
 
 def test_manual_update_persists_yaml_and_database(manual_backend):
@@ -222,6 +307,7 @@ def test_manual_update_persists_yaml_and_database(manual_backend):
     assert _qubit_data()["untouched"] == {"value": 7}
     assert YAML().load(path.read_text())["data"] == {"Q04": 10.123, "Q05": 8.0}
     history = TaskResultHistoryDocument.find_one({"task_id": result.task_id}).run()
+    assert history is not None
     assert history.status == "completed"
 
 
@@ -232,23 +318,32 @@ def test_spectroscopy_correction_also_updates_yaml(manual_backend):
         result = service.update_parameters(_request(), "project", "tester")
     assert "10.123" in path.read_text()
     history = TaskResultHistoryDocument.find_one({"task_id": result.task_id}).run()
+    assert history is not None
     assert history.source_task_id == "source-task"
 
 
 def test_yaml_failure_does_not_update_database(manual_backend):
-    service, path = manual_backend
-    path.unlink()
-    with pytest.raises(ValueError, match="does not exist"):
+    service, _path = manual_backend
+    with (
+        patch(
+            "qdash.common.config.params_updater.YamlParamsUpdater._update_yaml",
+            side_effect=OSError("write failed"),
+        ),
+        pytest.raises(OSError, match="write failed"),
+    ):
         service.update_parameters(_request(source_task_id=None), "project", "tester")
     assert _qubit_data()["readout_frequency"]["value"] == 9.0
-    assert (
-        TaskResultHistoryDocument.find_one({"name": "ManualParameterEdit"}).run().status == "failed"
-    )
+    history = TaskResultHistoryDocument.find_one({"name": "ManualParameterEdit"}).run()
+    assert history is not None
+    assert history.status == "failed"
 
 
-def test_database_failure_restores_yaml(manual_backend):
+@pytest.mark.parametrize("missing", [False, True])
+def test_database_failure_restores_yaml(manual_backend, missing):
     service, path = manual_backend
     before = path.read_bytes()
+    if missing:
+        path.unlink()
     with (
         patch.object(
             service._qubit_repo, "update_calib_data", side_effect=RuntimeError("DB failed")
@@ -256,8 +351,24 @@ def test_database_failure_restores_yaml(manual_backend):
         pytest.raises(RuntimeError, match="DB failed"),
     ):
         service.update_parameters(_request(source_task_id=None), "project", "tester")
-    assert path.read_bytes() == before
+    if missing:
+        assert not path.exists()
+    else:
+        assert path.read_bytes() == before
     assert _qubit_data()["readout_frequency"]["value"] == 9.0
+
+
+def test_manual_update_creates_missing_yaml(manual_backend):
+    from ruamel.yaml import YAML
+
+    service, path = manual_backend
+    path.unlink()
+    result = service.update_parameters(_request(source_task_id=None), "project", "tester")
+    assert YAML().load(path.read_text()) == {"data": {"Q04": 10.123}}
+    assert _qubit_data()["readout_frequency"]["value"] == 10.123
+    history = TaskResultHistoryDocument.find_one({"task_id": result.task_id}).run()
+    assert history is not None
+    assert history.status == "completed"
 
 
 def test_failure_after_database_write_restores_database_and_yaml(manual_backend):
@@ -352,5 +463,6 @@ def test_coupling_update_and_rollback_use_coupling_label(manual_backend, history
     coupling = CouplingDocument.find_one(
         {"project_id": "project", "chip_id": "16Q", "qid": "4-5"}
     ).run()
+    assert coupling is not None
     assert coupling.data["zx90_gate_fidelity"]["value"] == expected
     assert YAML().load(path.read_text())["data"] == {"Q04-Q05": expected}

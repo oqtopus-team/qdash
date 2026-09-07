@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -125,6 +125,14 @@ class ManualParameterUpdateRequest(BaseModel):
         return self
 
 
+class CalibrationGitHubSync(BaseModel):
+    """GitHub synchronization result, independent of the applied calibration values."""
+
+    status: Literal["disabled", "synced", "failed"] = "disabled"
+    commit: str | None = None
+    message: str = ""
+
+
 class ManualParameterUpdateResponse(BaseModel):
     """Response from manual parameter update."""
 
@@ -132,6 +140,7 @@ class ManualParameterUpdateResponse(BaseModel):
     task_id: str = Field(..., description="Created ManualParameterEdit task result ID")
     execution_id: str = Field(..., description="Created manual edit execution ID")
     provenance_activity_id: str | None = None
+    github_sync: CalibrationGitHubSync = Field(default_factory=CalibrationGitHubSync)
 
 
 class ManualEditItem(BaseModel):

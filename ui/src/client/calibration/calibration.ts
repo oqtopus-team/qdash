@@ -25,6 +25,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CalibrationGitHubSync,
   CalibrationNoteResponse,
   CompareSeedValues200,
   CompareSeedValuesParams,
@@ -59,6 +60,69 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
+ * Publish current mapped YAML for a completed manual edit without changing DB values.
+ * @summary Retry Calibration Github Sync
+ */
+export const retryCalibrationGitHubSync = (
+    taskId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CalibrationGitHubSync>(
+      {url: `/calibrations/manual-edits/${taskId}/github-sync`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getRetryCalibrationGitHubSyncMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryCalibrationGitHubSync>>, TError,{taskId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryCalibrationGitHubSync>>, TError,{taskId: string}, TContext> => {
+
+const mutationKey = ['retryCalibrationGitHubSync'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryCalibrationGitHubSync>>, {taskId: string}> = (props) => {
+          const {taskId} = props ?? {};
+
+          return  retryCalibrationGitHubSync(taskId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryCalibrationGitHubSyncMutationResult = NonNullable<Awaited<ReturnType<typeof retryCalibrationGitHubSync>>>
+
+    export type RetryCalibrationGitHubSyncMutationError = HTTPValidationError
+
+    /**
+ * @summary Retry Calibration Github Sync
+ */
+export const useRetryCalibrationGitHubSync = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryCalibrationGitHubSync>>, TError,{taskId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof retryCalibrationGitHubSync>>,
+        TError,
+        {taskId: string},
+        TContext
+      > => {
+      return useMutation(getRetryCalibrationGitHubSyncMutationOptions(options), queryClient);
+    }
+    /**
  * Get the latest calibration note for the master task.
  *
  * Retrieves the most recent calibration note from the database, sorted by timestamp
