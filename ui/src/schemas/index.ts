@@ -744,6 +744,7 @@ export * from './taskResultResponseInputParameters';
 export * from './taskResultResponseInputParametersAnyOf';
 export * from './taskResultResponseInputParametersAnyOfCalibratedAt';
 export * from './taskResultResponseInputParametersAnyOfSource';
+export * from './taskResultResponseNote';
 export * from './taskResultResponseOutputParameters';
 export * from './taskResultResponseOutputParametersAnyOf';
 export * from './taskResultResponseOutputParametersAnyOfCalibratedAt';
