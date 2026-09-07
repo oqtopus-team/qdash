@@ -277,7 +277,7 @@
           "auth"
         ],
         "summary": "Reset user password (admin only)",
-        "description": "Reset a user's password (admin only).\n\nParameters\n----------\npassword_data : PasswordReset\n    Contains the target username\ncurrent_user : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\nPasswordResetResponse\n    Generated temporary password, returned only in this response\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin",
+        "description": "Reset a user's password (admin only).\n\nParameters\n----------\npassword_data : PasswordReset\n    Contains the target username\nadmin : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\nPasswordResetResponse\n    Generated temporary password, returned only in this response",
         "operationId": "resetPassword",
         "requestBody": {
           "content": {

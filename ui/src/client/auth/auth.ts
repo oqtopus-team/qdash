@@ -536,7 +536,7 @@ Parameters
 ----------
 password_data : PasswordReset
     Contains the target username
-current_user : User
+admin : User
     Current authenticated admin user
 auth_service : AuthService
     The auth service instance
@@ -545,11 +545,6 @@ Returns
 -------
 PasswordResetResponse
     Generated temporary password, returned only in this response
-
-Raises
-------
-HTTPException
-    403 if the current user is not an admin
  * @summary Reset user password (admin only)
  */
 export const resetPassword = (
