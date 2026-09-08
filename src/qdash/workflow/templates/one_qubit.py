@@ -49,19 +49,27 @@ ONE_QUBIT_CHECK_TASKS: list[str] = [
 # Step 3: fine calibration after the successful-qubit filter.
 ONE_QUBIT_FINE_TUNE_TASKS: list[str] = [
     "Configure",
-    # Round 1: prepare the state pulses, then tune amplitude and frequency consecutively.
+    # Round 1: calibrate HPI -> PI -> DRAG HPI -> DRAG PI, then tune amplitude/frequency.
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
     "CreateDRAGPIPulse",
     "CheckDRAGPIPulse",
     "CheckOptimalReadoutAmplitude",
     "CheckOptimalReadoutFrequency",
     "Configure",  # Apply round 1's readout frequency before recalibrating pulses.
-    # Round 2: refresh the state pulses at the updated settings, then repeat the pair.
+    # Round 2: recalibrate all four pulse types at the updated settings, then repeat the pair.
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
     "CreateDRAGPIPulse",
     "CheckDRAGPIPulse",
     "CheckOptimalReadoutAmplitude",
