@@ -40,6 +40,14 @@
     "function_name": "coarse_one"
   },
   {
+    "id": "fine_one",
+    "name": "Fine 1Q Calibration",
+    "description": "Fine 1-qubit calibration after coarse_one or equivalent calibration: Configure -> Rabi/HPI/PI -> DRAG -> readout classification -> coherence averages -> randomized benchmarking. Requires explicit mux_ids or qids and runs only the fine-tuning stage.",
+    "category": "production",
+    "filename": "fine_one.py",
+    "function_name": "fine_one"
+  },
+  {
     "id": "full_calibration",
     "name": "Full Calibration",
     "description": "Complete calibration for explicitly selected mux_ids using step-based pipeline: ConfigureAll -> 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule (forward/reverse) -> 2Q.",
