@@ -282,7 +282,7 @@ An execution record exists from the moment a run is requested, not from the mome
 | Flow start | `CalibService._initialize()` | Claims that row via `MongoExecutionRepository.claim_scheduled_execution()` and reuses its `execution_id`; `scheduled` → `running` |
 | Flow end | `finish_calibration()` / `fail_calibration()` / `cancel_calibration()` | `running` → `completed` / `failed` / `cancelled` |
 
-The claim is a single atomic `find_one_and_update` guarded by `note.claimed_at`, so only the first session of a flow run adopts the row. Sessions with `skip_execution=True` never claim, because they do not persist an execution document. A flow that creates several executions (one per strategy invocation) adopts the pre-created row for the first one and allocates new IDs for the rest.
+The claim is a single atomic `find_one_and_update` guarded by `note.claimed_at`, so only the first eligible session of a flow run adopts the row. A wrapper with `skip_execution=True` and `use_lock=True` also claims the API-created row: it uses the same execution ID to acquire its reserved lock and sets `skip_execution=False` to own the row's start and terminal states. Without a pre-created row, the wrapper keeps skipping execution creation. Isolated workers with `skip_execution=True` and `use_lock=False` never claim or finalize the parent's row. Subsequent strategy sessions allocate their own execution IDs.
 
 Runs that do not go through the API — cron schedules, where the Prefect scheduler creates the flow run directly — have no pre-created row, so `CalibService` allocates the `execution_id` itself as before.
 

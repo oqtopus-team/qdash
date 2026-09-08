@@ -326,7 +326,9 @@ class CalibService:
             project_id: Project ID for multi-tenancy support. If None, auto-resolved
                 from username's default_project_id.
             skip_execution: Skip Execution document creation (for wrapper/parent sessions
-                where child sessions will create their own Executions). Default: False.
+                where child sessions will create their own Executions). A lock-owning
+                wrapper still adopts and finalizes an execution pre-created by the API
+                for its flow run. Default: False.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
@@ -485,13 +487,21 @@ class CalibService:
 
         if self.execution_id is None:
             claimed_execution_id: str | None = None
-            if not self.skip_execution and flow_run_id is not None:
+            # Lock-owning wrappers must adopt the API's execution ID as well:
+            # minting another ID would collide with their own pre-acquired lock.
+            # Isolated workers (skip_execution=True, use_lock=False) must never
+            # claim the parent execution or take over its lifecycle.
+            if flow_run_id is not None and (not self.skip_execution or self.use_lock):
                 from qdash.repository import MongoExecutionRepository
 
                 claimed_execution_id = MongoExecutionRepository().claim_scheduled_execution(
                     project_id=self.project_id, flow_run_id=flow_run_id
                 )
                 if claimed_execution_id is not None:
+                    # The API has already created a visible parent row. Own its
+                    # start/terminal states even if this wrapper normally skips
+                    # creating an Execution and delegates measurements to children.
+                    self.skip_execution = False
                     logger.info(
                         "Adopted pre-created execution_id=%s for flow_run_id=%s",
                         claimed_execution_id,

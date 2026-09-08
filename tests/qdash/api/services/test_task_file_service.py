@@ -161,6 +161,27 @@ def test_list_task_info_extracts_input_parameter_metadata() -> None:
     assert task.input_parameters["qubit_frequency"]["resolution"] == "default_only"
 
 
+def test_coarse_readout_task_is_enabled_with_resolvable_input_metadata() -> None:
+    clear_backend_config_cache()
+    task = next(
+        task
+        for task in TaskFileService().list_task_info("qubex", enabled_only=True).tasks
+        if task.name == "CheckCoarseReadoutParams"
+    )
+
+    assert task.enabled
+    assert set(task.input_parameters) == {
+        "qubit_frequency",
+        "control_amplitude",
+        "readout_frequency",
+        "readout_amplitude",
+        "readout_duration",
+    }
+    duration = task.input_parameters["readout_duration"]["default_value"]
+    assert isinstance(duration, (int, float))
+    assert duration > 0
+
+
 def test_list_task_info_resolves_local_and_qubex_constants() -> None:
     from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
     from qubex.measurement.measurement_defaults import DEFAULT_READOUT_DURATION

@@ -30,6 +30,7 @@ _active_bar: ContextVar[object | None] = ContextVar(
     default=None,
 )
 _phase: ContextVar[int] = ContextVar("qdash_qubex_progress_phase", default=0)
+_started_at: ContextVar[float | None] = ContextVar("qdash_qubex_progress_started_at", default=None)
 _installed = False
 
 # These tasks are known to open multiple sequential top-level progress bars.
@@ -127,6 +128,25 @@ class ReportingTqdm(Tqdm):
         if total is not None and self.n > 0 and elapsed > 0:
             eta = max(elapsed * (total - self.n) / self.n, 0.0)
 
+        overall_eta = None
+        plan = self._qdash_plan
+        started_at = _started_at.get()
+        if (
+            plan is not None
+            and plan.minimum_phases == plan.maximum_phases
+            and plan.maximum_phases >= self._qdash_phase
+            and started_at is not None
+            and total is not None
+            and total > 0
+        ):
+            completed = self._qdash_phase - 1 + min(max(self.n / total, 0.0), 1.0)
+            # Wait for a complete sweep before extrapolating. Use elapsed time
+            # across sweeps, including the gaps for reference measurements/fits.
+            if completed >= 1:
+                overall_eta = max(
+                    (now - started_at) * (plan.maximum_phases - completed) / completed, 0.0
+                )
+
         try:
             reporter(
                 TaskProgress(
@@ -135,6 +155,7 @@ class ReportingTqdm(Tqdm):
                     description=self._qdash_description,
                     elapsed_seconds=elapsed,
                     eta_seconds=eta,
+                    overall_eta_seconds=overall_eta,
                     updated_at=datetime.now(UTC).isoformat(),
                     phase=self._qdash_phase,
                     has_multiple_phases=self._qdash_has_multiple_phases,
@@ -170,6 +191,7 @@ def _progress_description(task_name: str, description: str) -> str:
     task_labels = {
         "CheckChevron": "Chevron sweep",
         "CheckRabi": "Rabi time sweep",
+        "CheckCoarseReadoutParams": "Readout parameter search",
         "CheckRamsey": "Ramsey delay sweep",
         "CheckT1": "T1 delay sweep",
         "CheckT1Average": "T1 measurement sweep",
@@ -211,9 +233,11 @@ def capture_qubex_progress(
     task_name_token = _task_name.set(task_name)
     plan_token = _plan.set(plan)
     phase_token = _phase.set(0)
+    started_at_token = _started_at.set(time.monotonic())
     try:
         yield
     finally:
+        _started_at.reset(started_at_token)
         _phase.reset(phase_token)
         _plan.reset(plan_token)
         _task_name.reset(task_name_token)

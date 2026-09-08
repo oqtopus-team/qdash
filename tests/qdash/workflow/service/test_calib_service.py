@@ -363,8 +363,9 @@ class TestCalibServiceInitialization:
         assert session.execution_id is not None
         assert re.fullmatch(r"\d{8}-007", session.execution_id)
 
+    @pytest.mark.parametrize("skip_execution", [False, True])
     def test_initialize_adopts_a_lock_claimed_by_the_api_for_this_execution(
-        self, mock_flow_session_deps, mock_user_repo, monkeypatch
+        self, mock_flow_session_deps, mock_user_repo, monkeypatch, skip_execution
     ):
         """A lock the API claimed for the execution being claimed is adopted, not contested."""
         _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
@@ -381,15 +382,21 @@ class TestCalibServiceInitialization:
             project_id="test_project",
             lock_repo=lock_repo,
             user_repo=mock_user_repo,
+            skip_execution=skip_execution,
+            counter_repo=FakeExecutionCounterRepository(next_index=7),
         )
 
         assert session.execution_id == "20240101-777"
         assert session._lock_acquired is True
         assert lock_repo.try_lock_calls == ["20240101-777"]
         assert lock_repo.owner == "20240101-777"
+        assert session.skip_execution is False
+        assert session._orchestrator is not None
+        assert session._orchestrator.config.skip_execution is False
 
+    @pytest.mark.parametrize("skip_execution", [False, True])
     def test_initialize_refuses_a_lock_owned_by_another_execution(
-        self, mock_flow_session_deps, mock_user_repo, monkeypatch
+        self, mock_flow_session_deps, mock_user_repo, monkeypatch, skip_execution
     ):
         """A lock owned by a different execution still blocks the session."""
         _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
@@ -407,12 +414,15 @@ class TestCalibServiceInitialization:
                 project_id="test_project",
                 lock_repo=lock_repo,
                 user_repo=mock_user_repo,
+                skip_execution=skip_execution,
+                counter_repo=FakeExecutionCounterRepository(next_index=7),
             )
 
         assert lock_repo.owner == "20240101-111"
 
+    @pytest.mark.parametrize("skip_execution", [False, True])
     def test_initialize_refuses_an_unowned_lock(
-        self, mock_flow_session_deps, mock_user_repo, monkeypatch
+        self, mock_flow_session_deps, mock_user_repo, monkeypatch, skip_execution
     ):
         """A held lock with no recorded owner is not adopted either."""
         _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
@@ -430,7 +440,107 @@ class TestCalibServiceInitialization:
                 project_id="test_project",
                 lock_repo=lock_repo,
                 user_repo=mock_user_repo,
+                skip_execution=skip_execution,
+                counter_repo=FakeExecutionCounterRepository(next_index=7),
             )
+
+    @pytest.mark.parametrize("terminal", ["complete", "fail", "cancel"])
+    def test_api_wrapper_finalizes_its_adopted_execution_and_releases_lock(
+        self, mock_flow_session_deps, mock_user_repo, monkeypatch, terminal
+    ):
+        """The UI's parent row must reach a terminal state when its pipeline ends."""
+        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
+        monkeypatch.setattr(
+            "qdash.repository.MongoExecutionRepository",
+            lambda: FakeExecutionRepository(claimed_execution_id="20240101-777"),
+        )
+        lock_repo = MockExecutionLockRepository(locked=True, owner="20240101-777")
+        session = CalibService(
+            username="test_user",
+            chip_id="chip_1",
+            qids=["0"],
+            project_id="test_project",
+            skip_execution=True,
+            lock_repo=lock_repo,
+            user_repo=mock_user_repo,
+            counter_repo=FakeExecutionCounterRepository(next_index=7),
+        )
+        execution_service = MagicMock()
+        session.execution_service = execution_service
+        monkeypatch.setattr(session, "_finalize_stale_running_tasks", MagicMock())
+        monkeypatch.setattr(session, "_finalize_tasks_on_cancel", MagicMock())
+
+        if terminal == "complete":
+            session.finish_calibration(update_chip_history=False, push_to_github=False)
+        elif terminal == "fail":
+            session.fail_calibration("measurement failed")
+        else:
+            session.cancel_calibration()
+
+        getattr(execution_service.reload.return_value, terminal).assert_called_once()
+        assert lock_repo.locked is False
+        assert session._lock_acquired is False
+
+    @pytest.mark.parametrize("execution_id", [None, "parent-execution"])
+    def test_isolated_worker_does_not_claim_or_finalize_parent_execution(
+        self, mock_flow_session_deps, mock_user_repo, monkeypatch, execution_id
+    ):
+        """Workers borrowing a parent's execution must not take over its lifecycle."""
+        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
+        fake_repo = FakeExecutionRepository(claimed_execution_id="20240101-777")
+        monkeypatch.setattr("qdash.repository.MongoExecutionRepository", lambda: fake_repo)
+        lock_repo = MockExecutionLockRepository(locked=True, owner="parent-execution")
+        session = CalibService(
+            username="test_user",
+            chip_id="chip_1",
+            qids=["0"],
+            project_id="test_project",
+            execution_id=execution_id,
+            skip_execution=True,
+            use_lock=False,
+            lock_repo=lock_repo,
+            user_repo=mock_user_repo,
+            counter_repo=FakeExecutionCounterRepository(next_index=7),
+        )
+        execution_service = MagicMock()
+        session.execution_service = execution_service
+
+        session.finish_calibration(update_chip_history=False, push_to_github=False)
+        session.fail_calibration()
+        session.cancel_calibration()
+
+        assert fake_repo.calls == []
+        assert session.skip_execution is True
+        assert lock_repo.try_lock_calls == []
+        assert lock_repo.owner == "parent-execution"
+        assert lock_repo.locked is True
+        execution_service.reload.assert_not_called()
+
+    def test_wrapper_without_api_execution_keeps_skipping_execution_creation(
+        self, mock_flow_session_deps, mock_user_repo, monkeypatch
+    ):
+        """Scheduled or direct pipelines can still run without a pre-created parent row."""
+        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
+        fake_repo = FakeExecutionRepository(claimed_execution_id=None)
+        monkeypatch.setattr("qdash.repository.MongoExecutionRepository", lambda: fake_repo)
+        lock_repo = MockExecutionLockRepository()
+        session = CalibService(
+            username="test_user",
+            chip_id="chip_1",
+            qids=["0"],
+            project_id="test_project",
+            skip_execution=True,
+            lock_repo=lock_repo,
+            user_repo=mock_user_repo,
+            counter_repo=FakeExecutionCounterRepository(next_index=7),
+        )
+
+        assert session.skip_execution is True
+        assert session.execution_id is not None
+        assert re.fullmatch(r"\d{8}-007", session.execution_id)
+        assert lock_repo.owner == session.execution_id
+        session.finish_calibration(update_chip_history=False, push_to_github=False)
+        assert lock_repo.locked is False
 
     def test_initialize_takes_a_free_lock_itself(
         self, mock_flow_session_deps, mock_user_repo, monkeypatch

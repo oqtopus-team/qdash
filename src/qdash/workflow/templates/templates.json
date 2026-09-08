@@ -32,6 +32,14 @@
     "function_name": "one_qubit"
   },
   {
+    "id": "coarse_one",
+    "name": "Coarse 1Q Calibration",
+    "description": "Coarse 1-qubit calibration after bring-up: Configure -> readout parameter search -> Configure -> Rabi/HPI calibration -> T1/T2Echo -> Ramsey. Requires explicit mux_ids or qids and ends after the check stage.",
+    "category": "production",
+    "filename": "coarse_one.py",
+    "function_name": "coarse_one"
+  },
+  {
     "id": "full_calibration",
     "name": "Full Calibration",
     "description": "Complete calibration for explicitly selected mux_ids using step-based pipeline: ConfigureAll -> 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule (forward/reverse) -> 2Q.",

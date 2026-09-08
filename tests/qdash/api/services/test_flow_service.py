@@ -93,6 +93,22 @@ async def test_list_templates_uses_resolved_templates_metadata(
     assert any(template.id == "full_calibration" for template in templates)
 
 
+@pytest.mark.asyncio
+async def test_coarse_one_template_is_listed_and_loads_its_flow_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    templates_dir = Path(__file__).resolve().parents[4] / "src/qdash/workflow/templates"
+    monkeypatch.setattr(flow_service, "TEMPLATES_DIR", templates_dir)
+    monkeypatch.setattr(flow_service, "TEMPLATES_METADATA_FILE", templates_dir / "templates.json")
+    service = FlowService(flow_repository=MagicMock())
+
+    templates = await service.list_templates()
+    assert any(template.id == "coarse_one" for template in templates)
+    template = await service.get_template("coarse_one")
+    assert template.function_name == "coarse_one"
+    assert template.code == (templates_dir / "coarse_one.py").read_text(encoding="utf-8")
+
+
 @pytest.mark.parametrize(
     ("execution_name", "expected_flow_name"),
     [

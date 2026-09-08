@@ -2,6 +2,8 @@
 
 The workflow engine resolves task inputs, experiment configuration, snapshots, user overrides, and output persistence at different lifecycle stages.
 
+The [Frequency Parameter Policy](./frequency-parameter-policy.md) specifies the agreed design for exploration and calibrated frequencies, derived drive frequencies, YAML export, and update UX. Its implementation gaps are tracked separately from the current lifecycle described here.
+
 ## Parameter model contracts
 
 `BaseTask` defines three symmetric declaration/runtime pairs:

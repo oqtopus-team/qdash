@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Lock, Play, RefreshCw, RotateCcw } from "lucide-react";
@@ -36,6 +36,7 @@ function badgeClass(status?: string | null) {
 }
 
 export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
+  const runDisabledReasonId = useId();
   const toast = useToast();
   const queryClient = useQueryClient();
   const { data: chipsData } = useListChips();
@@ -135,6 +136,21 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
     isStarting ||
     (executionId.length > 0 &&
       (!execution || ["running", "scheduled", "pending"].includes(execution.status)));
+  const runDisabledReason = (() => {
+    if (!task.enabled) return `This task is not enabled for the ${backend} backend.`;
+    if (isStarting) return "Starting this task…";
+    if (isLockStatusLoading) return "Checking whether another calibration is running…";
+    if (isExecutionLocked)
+      return "Another calibration execution is running. Wait for it to finish before starting this task.";
+    if (isExecutionActive) {
+      if (executionError && !isExecutionPendingCreation)
+        return "Unable to confirm the previous execution status. Reload the page to check again.";
+      return "Waiting for this execution to finish before starting another run.";
+    }
+    if (!chipId) return "Select a chip to run this task.";
+    if (!target.trim()) return "Enter a qubit or coupling to run this task.";
+    return null;
+  })();
   const resultTasks = useMemo(
     () =>
       (execution?.task ?? []).filter(
@@ -156,7 +172,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
       : [];
 
   const handleRun = async () => {
-    if (!chipId || !target.trim()) return;
+    if (runDisabledReason) return;
     const requestedTarget = target.trim();
     setIsStarting(true);
     try {
@@ -444,30 +460,22 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                 </div>
               )}
 
-              {isExecutionLocked && (
-                <div className="alert alert-warning py-2 text-xs">
-                  Another calibration execution is running. Wait for it to finish before starting
-                  this task.
+              {runDisabledReason && (
+                <div
+                  id={runDisabledReasonId}
+                  role="status"
+                  className="rounded-lg bg-base-200 p-3 text-xs text-base-content/70"
+                >
+                  {runDisabledReason}
                 </div>
               )}
 
               <button
                 className={`btn ${isExecutionLocked ? "btn-disabled" : "btn-primary"}`}
                 onClick={handleRun}
-                disabled={
-                  isStarting ||
-                  isLockStatusLoading ||
-                  isExecutionLocked ||
-                  isExecutionActive ||
-                  !task.enabled ||
-                  !chipId ||
-                  !target.trim()
-                }
-                title={
-                  isExecutionLocked
-                    ? "Execution locked - another calibration is running"
-                    : "Run task"
-                }
+                disabled={Boolean(runDisabledReason)}
+                aria-describedby={runDisabledReason ? runDisabledReasonId : undefined}
+                title={runDisabledReason ?? "Run task"}
               >
                 {isStarting ? (
                   <span className="loading loading-spinner loading-sm" />
@@ -539,12 +547,10 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                   {(execution.status === "running" ||
                     execution.status === "scheduled" ||
                     execution.status === "pending") && (
-                    <>
-                      <ExecutionTaskProgress status={resultTask?.status} note={resultTask?.note} />
-                      {!resultTask?.note?.progress && (
-                        <progress className="progress progress-primary w-full" />
-                      )}
-                    </>
+                    <ExecutionTaskProgress
+                      status={resultTask?.status ?? execution.status}
+                      note={resultTask?.note}
+                    />
                   )}
 
                   <div className="flex h-56 items-center justify-start gap-3 overflow-x-auto rounded-lg bg-base-200/60 p-3">

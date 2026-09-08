@@ -17,6 +17,7 @@ from qdash.workflow.calibtasks.base import (
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.validation import DEFAULT_RABI_R2_THRESHOLD
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 DEFAULT_READOUT_AMPLITUDE = 0.2
@@ -127,8 +128,8 @@ def _rabi_validation_error(result: Any, label: str) -> str | None:
     if error is not None:
         return error
     assert r2 is not None
-    if float(r2) < 0.6:
-        return f"CheckRabi produced rabi_r2 below 0.6 for {label}: {r2}"
+    if float(r2) < DEFAULT_RABI_R2_THRESHOLD:
+        return f"CheckRabi produced rabi_r2 below {DEFAULT_RABI_R2_THRESHOLD} for {label}: {r2}"
     return None
 
 
@@ -137,7 +138,7 @@ class CheckRabi(QubexTask):
 
     name: str = "CheckRabi"
     task_type: str = "qubit"
-    r2_threshold: float = 0.6
+    r2_threshold: float = DEFAULT_RABI_R2_THRESHOLD
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "qubit_frequency": InputParameterSpec.required_database(),
         "control_amplitude": InputParameterSpec.database_or_default(
