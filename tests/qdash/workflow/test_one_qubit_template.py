@@ -74,7 +74,9 @@ def test_one_qubit_template_check_only_passes_template_task_list(monkeypatch) ->
 
 
 @pytest.mark.parametrize("use_mux", [False, True])
-def test_fine_one_runs_only_configure_and_existing_fine_tune_stage(monkeypatch, use_mux) -> None:
+def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
+    monkeypatch, use_mux
+) -> None:
     from qdash.workflow.service.steps import OneQubitFineTune
 
     fine_one_module = importlib.import_module("qdash.workflow.templates.fine_one")
@@ -102,7 +104,30 @@ def test_fine_one_runs_only_configure_and_existing_fine_tune_stage(monkeypatch, 
     step = result["steps"][0]
     assert isinstance(step, OneQubitFineTune)
     assert step.mode == "synchronized"
-    assert step.tasks == ["Configure", *one_qubit_module.ONE_QUBIT_FINE_TUNE_TASKS]
+    tasks = step.tasks
+    assert tasks is not None
+    assert tasks[0] == "Configure"
+    optimization_indices = [
+        i for i, name in enumerate(tasks) if name.startswith("CheckOptimalReadout")
+    ]
+    assert [tasks[i] for i in optimization_indices] == [
+        "CheckOptimalReadoutAmplitude",
+        "CheckOptimalReadoutFrequency",
+        "CheckOptimalReadoutAmplitude",
+        "CheckOptimalReadoutFrequency",
+    ]
+    for index in optimization_indices:
+        # Both the sweep's DRAG PI preparation and classifier's HPI preparation
+        # must be recalibrated after the preceding readout update.
+        assert tasks[index - 5 : index] == [
+            "CheckRabi",
+            "CreateHPIPulse",
+            "CheckHPIPulse",
+            "CreateDRAGPIPulse",
+            "CheckDRAGPIPulse",
+        ]
+    # Finish with the full pulse calibration at the final readout settings.
+    assert tasks[optimization_indices[-1] + 1 :] == one_qubit_module.ONE_QUBIT_FINE_TUNE_TASKS
     full = one_qubit_module.one_qubit(username="alice", chip_id="64Q", qids=["8"])
     assert result["kwargs"]["default_run_parameters"] == full["kwargs"]["default_run_parameters"]
     assert result["kwargs"]["flow_name"] == "fine-check"

@@ -138,9 +138,10 @@ def test_list_task_info_uses_configured_category_and_task_order() -> None:
     enabled_tasks = [task for task in tasks if task.enabled]
 
     assert [task.category for task in enabled_tasks[:3]] == ["One Qubit"] * 3
-    assert [task.name for task in enabled_tasks[:3]] == [
+    assert [task.name for task in enabled_tasks[:4]] == [
         "CheckChevron",
         "CheckOptimalReadoutAmplitude",
+        "CheckOptimalReadoutFrequency",
         "CheckRabi",
     ]
     assert list(dict.fromkeys(task.category for task in enabled_tasks)) == [

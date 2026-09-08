@@ -29,6 +29,7 @@ backends:
       One Qubit:
         - CheckChevron
         - CheckOptimalReadoutAmplitude
+        - CheckOptimalReadoutFrequency
         - RabiOscillation
         - CheckRabi
         - CheckCoarseReadoutParams
