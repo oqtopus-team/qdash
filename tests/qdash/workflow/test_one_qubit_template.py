@@ -116,10 +116,13 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
         "CheckOptimalReadoutAmplitude",
         "CheckOptimalReadoutFrequency",
     ]
-    for index in optimization_indices:
+    for amplitude_index, frequency_index in zip(
+        optimization_indices[::2], optimization_indices[1::2], strict=True
+    ):
+        assert frequency_index == amplitude_index + 1
         # Both the sweep's DRAG PI preparation and classifier's HPI preparation
-        # must be recalibrated after the preceding readout update.
-        assert tasks[index - 5 : index] == [
+        # must be recalibrated before each amplitude/frequency pair.
+        assert tasks[amplitude_index - 5 : amplitude_index] == [
             "CheckRabi",
             "CreateHPIPulse",
             "CheckHPIPulse",
@@ -127,7 +130,11 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
             "CheckDRAGPIPulse",
         ]
     # Finish with the full pulse calibration at the final readout settings.
-    assert tasks[optimization_indices[-1] + 1 :] == one_qubit_module.ONE_QUBIT_FINE_TUNE_TASKS
+    omitted_tasks = {"CheckT1Average", "CheckT2EchoAverage", "Check1QGateCoherenceLimit"}
+    assert omitted_tasks.isdisjoint(tasks)
+    assert tasks[optimization_indices[-1] + 1 :] == [
+        name for name in one_qubit_module.ONE_QUBIT_FINE_TUNE_TASKS if name not in omitted_tasks
+    ]
     full = one_qubit_module.one_qubit(username="alice", chip_id="64Q", qids=["8"])
     assert result["kwargs"]["default_run_parameters"] == full["kwargs"]["default_run_parameters"]
     assert result["kwargs"]["flow_name"] == "fine-check"

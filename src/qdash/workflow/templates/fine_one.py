@@ -3,10 +3,10 @@
 Run this after coarse_one or an equivalent calibration has established the
 qubit frequency, control amplitude, and readout settings. The flow applies
 those settings and tunes readout amplitude -> frequency -> amplitude -> frequency.
-Each optimization starts with fresh Rabi, HPI, and DRAG PI calibration: the
+Each amplitude/frequency pair starts with fresh Rabi, HPI, and DRAG PI calibration: the
 sweep prepares |1> with DRAG PI, and its final classifier uses two HPI pulses.
 After both rounds, all pulses are calibrated at the final readout settings
-before readout classification, coherence measurements, and randomized benchmarking.
+before readout classification and randomized benchmarking.
 
 Example:
     fine_one(username="alice", chip_id="64Qv3", mux_ids=[0, 1])
@@ -27,33 +27,21 @@ from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 FINE_ONE_TASKS: list[str] = [
     "Configure",
-    # Round 1: prepare HPI and DRAG PI at current readout settings, then tune amplitude.
+    # Round 1: prepare the state pulses, then tune amplitude and frequency consecutively.
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
     "CreateDRAGPIPulse",
     "CheckDRAGPIPulse",
     "CheckOptimalReadoutAmplitude",
-    # Round 1: prepare HPI and DRAG PI at current readout settings, then tune frequency.
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
     "CheckOptimalReadoutFrequency",
-    # Round 2: prepare HPI and DRAG PI at current readout settings, then tune amplitude.
+    # Round 2: refresh the state pulses at the updated settings, then repeat the pair.
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
     "CreateDRAGPIPulse",
     "CheckDRAGPIPulse",
     "CheckOptimalReadoutAmplitude",
-    # Round 2: prepare HPI and DRAG PI at current readout settings, then tune frequency.
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
     "CheckOptimalReadoutFrequency",
     # Calibrate all pulses at the final readout settings before classification and RB.
     "CheckRabi",
@@ -66,9 +54,6 @@ FINE_ONE_TASKS: list[str] = [
     "CreateDRAGPIPulse",
     "CheckDRAGPIPulse",
     "ReadoutClassification",
-    "CheckT1Average",
-    "CheckT2EchoAverage",
-    "Check1QGateCoherenceLimit",
     "RandomizedBenchmarking",
     "X90InterleavedRandomizedBenchmarking",
 ]
