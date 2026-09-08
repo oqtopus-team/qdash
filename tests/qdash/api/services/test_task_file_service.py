@@ -138,9 +138,10 @@ def test_list_task_info_uses_configured_category_and_task_order() -> None:
     enabled_tasks = [task for task in tasks if task.enabled]
 
     assert [task.category for task in enabled_tasks[:3]] == ["One Qubit"] * 3
-    assert [task.name for task in enabled_tasks[:3]] == [
+    assert [task.name for task in enabled_tasks[:4]] == [
         "CheckChevron",
         "CheckOptimalReadoutAmplitude",
+        "CheckOptimalReadoutFrequency",
         "CheckRabi",
     ]
     assert list(dict.fromkeys(task.category for task in enabled_tasks)) == [
@@ -159,6 +160,27 @@ def test_list_task_info_extracts_input_parameter_metadata() -> None:
     task = next(t for t in tasks if t.name == "CheckRabi")
 
     assert task.input_parameters["qubit_frequency"]["resolution"] == "default_only"
+
+
+def test_coarse_readout_task_is_enabled_with_resolvable_input_metadata() -> None:
+    clear_backend_config_cache()
+    task = next(
+        task
+        for task in TaskFileService().list_task_info("qubex", enabled_only=True).tasks
+        if task.name == "CheckCoarseReadoutParams"
+    )
+
+    assert task.enabled
+    assert set(task.input_parameters) == {
+        "qubit_frequency",
+        "control_amplitude",
+        "readout_frequency",
+        "readout_amplitude",
+        "readout_duration",
+    }
+    duration = task.input_parameters["readout_duration"]["default_value"]
+    assert isinstance(duration, (int, float))
+    assert duration > 0
 
 
 def test_list_task_info_resolves_local_and_qubex_constants() -> None:

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
@@ -372,6 +374,34 @@ def test_returns_empty_list_when_nothing_matches(init_db) -> None:
     )
 
     assert closed == []
+
+
+@pytest.mark.parametrize("has_running_step", [False, True])
+@pytest.mark.parametrize("release_lock", [False, True])
+def test_terminal_flow_releases_lock_owned_by_completed_first_step(
+    init_db, has_running_step: bool, release_lock: bool
+) -> None:
+    """A crash between or during later steps preserves the completed first step."""
+    _make_execution(status="completed", execution_id="exec-first")
+    if has_running_step:
+        _make_execution(status="running", execution_id="exec-second")
+    ExecutionLockDocument(project_id=PROJECT_ID, locked=True, execution_id="exec-first").save()
+
+    closed = finalize_executions_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+        status="failed",
+        message="Flow crashed",
+        release_lock=release_lock,
+    )
+
+    assert closed == (["exec-second"] if has_running_step else [])
+    first = _reload_execution("exec-first")
+    assert first is not None
+    assert first.status == "completed"
+    lock = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert lock is not None
+    assert lock.locked is not release_lock
 
 
 def test_release_lock_swallows_lookup_failure(init_db) -> None:

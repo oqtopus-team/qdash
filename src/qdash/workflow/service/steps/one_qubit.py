@@ -34,39 +34,15 @@ def _execute_direct_one_qubit(
     from qdash.workflow.service._internal.scheduling_tasks import (
         run_qubit_calibrations_parallel,
     )
-    from qdash.workflow.service.calib_service import finish_calibration, init_calibration
-    from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
 
     if not qids:
         return {"direct": {}}
-
-    stage_flow_name = f"{service.flow_name}_{stage_name}" if service.flow_name else stage_name
-    session = init_calibration(
-        service.username,
-        service.chip_id,
-        qids,
-        flow_name=stage_flow_name,
-        backend_name=service.backend_name,
-        tags=service.tags,
-        project_id=service.project_id,
-        use_lock=False,
-        enable_github_pull=True,
-        github_push_config=GitHubPushConfig(
-            enabled=True,
-            file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
-        ),
-        note={
-            "type": "1-qubit-direct",
-            "stage": stage_name,
-            "total_qubits": len(qids),
-        },
-    )
 
     session_config = {
         "username": service.username,
         "chip_id": service.chip_id,
         "backend_name": service.backend_name,
-        "execution_id": session.execution_id,
+        "execution_id": service.execution_id,
         "project_id": service.project_id,
         "default_run_parameters": service.default_run_parameters,
         "tags": service.tags,
@@ -80,8 +56,7 @@ def _execute_direct_one_qubit(
         session_config=session_config,
     )
     wrapped_results = {"direct": results}
-    session.record_stage_result(stage_name, wrapped_results)
-    finish_calibration()
+    service.record_stage_result(stage_name, wrapped_results)
     return wrapped_results
 
 
@@ -415,7 +390,12 @@ class OneQubitFineTune(CalibrationStep):
             tasks.insert(0, "Configure")
 
         # Use filtered candidates from context if available
-        qids = ctx.candidate_qids if ctx.candidate_qids else targets.to_qids(service.chip_id)
+        has_previous_selection = bool(ctx.filters) or ctx.get_latest_one_qubit_result() is not None
+        qids = (
+            ctx.candidate_qids
+            if ctx.candidate_qids or has_previous_selection
+            else targets.to_qids(service.chip_id)
+        )
 
         logger.info(
             f"[{self.name}] Starting with mode={self.mode}, {len(tasks)} tasks, {len(qids)} qubits"

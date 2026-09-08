@@ -113,6 +113,5 @@ def fake_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        skip_execution=False,  # Child sessions create their own Executions
     )
     return cal.run(targets, steps=steps)

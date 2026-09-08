@@ -26,10 +26,26 @@
   {
     "id": "one_qubit",
     "name": "1Q Calibration",
-    "description": "1-qubit calibration using step-based pipeline. Requires explicit mux_ids or qids and supports check-only or full calibration with fine-tune.",
+    "description": "Combined coarse_one and fine_one calibration, proceeding to fine-tuning only for successful qubits. Requires explicit mux_ids or qids; check_only runs the coarse stage alone. Each calibration stage has its own Execution.",
     "category": "production",
     "filename": "one_qubit.py",
     "function_name": "one_qubit"
+  },
+  {
+    "id": "coarse_one",
+    "name": "Coarse 1Q Calibration",
+    "description": "Coarse 1-qubit calibration after bring-up: Configure -> readout parameter search -> Configure -> Rabi/HPI calibration -> T1/T2Echo -> Ramsey. Requires explicit mux_ids or qids and ends after the check stage.",
+    "category": "production",
+    "filename": "coarse_one.py",
+    "function_name": "coarse_one"
+  },
+  {
+    "id": "fine_one",
+    "name": "Fine 1Q Calibration",
+    "description": "Fine 1-qubit calibration after coarse_one or equivalent calibration: Configure -> two amplitude/frequency optimization pairs, recalibrating Rabi/HPI/DRAG PI before each pair and applying Configure after each frequency update -> final pulse calibration -> readout classification -> randomized benchmarking. Requires explicit mux_ids or qids.",
+    "category": "production",
+    "filename": "fine_one.py",
+    "function_name": "fine_one"
   },
   {
     "id": "full_calibration",

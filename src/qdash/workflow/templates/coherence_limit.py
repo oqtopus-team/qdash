@@ -103,7 +103,6 @@ def coherence_limit(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        skip_execution=True,
         default_run_parameters={
             "drag_hpi_duration": {"value": 16, "value_type": "int"},
         },

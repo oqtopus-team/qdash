@@ -964,20 +964,92 @@
         "class_name": "CheckCoarseReadoutParams",
         "description": "Task to check the Optimal Readout Frequency",
         "file_path": "one_qubit_coarse/check_coarse_readout_params.py",
-        "input_parameters": {},
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "description": "Control pulse amplitude for the Rabi sweep",
+            "greater_than": 0,
+            "less_than": 1,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "description": "Qubit drive frequency for the Rabi sweep",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "description": "Reference amplitude of the readout sweep",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_duration": {
+            "default_value": 384.0,
+            "description": "Readout pulse duration for reference and Rabi measurements",
+            "greater_than": 0,
+            "resolution": "database_or_default",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "description": "Center frequency of the readout sweep",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
         "name": "CheckCoarseReadoutParams",
         "run_parameters": {
+          "detuning_range": {
+            "description": "Offsets from readout_frequency (start, stop, number of points)",
+            "unit": "GHz",
+            "value": [
+              -0.015,
+              0.015,
+              13
+            ],
+            "value_type": "np.linspace"
+          },
           "interval": {
             "description": "Time interval for Rabi oscillation",
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
           },
+          "readout_amplitude_ratio_range": {
+            "description": "Multipliers of readout_amplitude (start, stop, number of points). Sweep amplitudes are capped at 1 and duplicate points are removed.",
+            "unit": "",
+            "value": [
+              0.8,
+              1.2,
+              5
+            ],
+            "value_type": "np.linspace"
+          },
           "shots": {
-            "description": "Number of shots for Rabi oscillation",
+            "description": "Number of shots per Rabi drive duration at each readout point",
             "unit": "a.u.",
-            "value": 2048,
+            "value": 1024,
             "value_type": "int"
+          },
+          "time_range": {
+            "description": "Rabi drive durations at each readout point (start, stop, step)",
+            "unit": "ns",
+            "value": [
+              0,
+              101,
+              4
+            ],
+            "value_type": "np.arange"
           }
         },
         "task_type": "qubit"

@@ -27,6 +27,7 @@ class TaskProgress:
     has_multiple_phases: bool = False
     phase_total_min: int | None = None
     phase_total_max: int | None = None
+    overall_eta_seconds: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-safe representation for task metadata."""

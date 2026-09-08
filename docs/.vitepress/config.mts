@@ -184,6 +184,7 @@ export default withMermaid(
                 { text: "Quickstart", link: "/development/workflow/quickstart" },
                 { text: "Engine Architecture", link: "/development/workflow/engine-architecture" },
                 { text: "Parameter Resolution", link: "/development/workflow/parameter-resolution" },
+                { text: "Frequency Parameter Policy", link: "/development/workflow/frequency-parameter-policy" },
                 { text: "Testing", link: "/development/workflow/testing" },
               ],
             },

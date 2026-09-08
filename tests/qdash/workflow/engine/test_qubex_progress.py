@@ -90,6 +90,58 @@ def test_capture_qubex_progress_includes_phase_count_bounds() -> None:
 
     assert events[-1].phase_total_min == 2
     assert events[-1].phase_total_max == 4
+    assert events[-1].overall_eta_seconds is None
+
+
+def test_overall_eta_uses_elapsed_time_across_sweeps_and_resets_per_task(monkeypatch) -> None:
+    """Whole-search ETA survives phase boundaries and includes time between sweeps."""
+    clock = [100.0]
+    monkeypatch.setattr(
+        "qdash.workflow.engine.backend.plugins.qubex_progress.time.monotonic", lambda: clock[0]
+    )
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(events.append, plan=ProgressPlan(3, 3)):
+        with ReportingTqdm(total=2, disable=True, file=StringIO()) as bar:
+            assert events[-1].overall_eta_seconds is None
+            clock[0] = 102
+            bar.update()
+            bar.display()
+            assert events[-1].overall_eta_seconds is None
+            clock[0] = 104
+            bar.update()
+            bar.display()
+            assert events[-1].overall_eta_seconds == pytest.approx(8)
+        clock[0] = 106
+        with ReportingTqdm(total=2, disable=True, file=StringIO()) as bar:
+            assert events[-1].current == 0
+            assert events[-1].overall_eta_seconds == pytest.approx(12)
+            clock[0] = 108
+            bar.update()
+            bar.display()
+            assert events[-1].overall_eta_seconds == pytest.approx(8)
+            clock[0] = 110
+            bar.update()
+            bar.display()
+            assert events[-1].overall_eta_seconds == pytest.approx(5)
+        clock[0] = 112
+        with ReportingTqdm(total=2, disable=True, file=StringIO()) as bar:
+            assert events[-1].overall_eta_seconds == pytest.approx(6)
+            clock[0] = 116
+            bar.update(2)
+            bar.display()
+            assert events[-1].overall_eta_seconds == 0
+
+    clock[0] = 200
+    with (
+        capture_qubex_progress(events.append, plan=ProgressPlan(2, 2)),
+        ReportingTqdm(total=2, disable=True, file=StringIO()) as bar,
+    ):
+        assert events[-1].phase == 1
+        assert events[-1].overall_eta_seconds is None
+        clock[0] = 204
+        bar.update(2)
+        bar.display()
+        assert events[-1].overall_eta_seconds == pytest.approx(4)
 
 
 def test_capture_qubex_progress_reports_before_first_iteration() -> None:

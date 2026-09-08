@@ -2,8 +2,8 @@
 # =====================
 # This file defines available backends and their tasks.
 #
-# Tasks not listed here will NOT be shown in the UI or available
-# for workflow execution, even if the code exists in the codebase.
+# Tasks not listed here may appear in the task catalog, but cannot be run
+# from the UI or workflows, even if the code exists in the codebase.
 #
 # Use this to:
 #   - Control which tasks are exposed to users per backend
@@ -29,8 +29,10 @@ backends:
       One Qubit:
         - CheckChevron
         - CheckOptimalReadoutAmplitude
+        - CheckOptimalReadoutFrequency
         - RabiOscillation
         - CheckRabi
+        - CheckCoarseReadoutParams
         - CreateHPIPulse
         - CheckHPIPulse
         - CreatePIPulse
