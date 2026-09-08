@@ -63,6 +63,17 @@ FAST_1Q_FINE_TUNE_TASKS: list[str] = [
     "X90InterleavedRandomizedBenchmarking",
 ]
 
+# Final step: calibrate and validate each scheduled coupling, then benchmark it.
+FAST_2Q_TASKS: list[str] = [
+    "CheckCrossResonance",
+    "CreateZX90",
+    "CheckZX90",
+    "CheckBellState",
+    "CheckBellStateTomography",
+    "Check2QGateCoherenceLimit",
+    "ZX90InterleavedRandomizedBenchmarking",
+]
+
 
 @flow(
     on_cancellation=[on_flow_cancellation],
@@ -116,7 +127,7 @@ def fast_full_calibration(
         OneQubitFineTune(mode="synchronized", tasks=FAST_1Q_FINE_TUNE_TASKS),
         FilterByMetric(metric="x90_fidelity", threshold=fidelity_threshold),
         GenerateCRSchedule(max_parallel_ops=max_parallel_ops, inverse=inverse),
-        TwoQubitCalibration(),
+        TwoQubitCalibration(tasks=FAST_2Q_TASKS),
     ]
 
     cal = CalibService(

@@ -29,12 +29,58 @@ from qdash.workflow.service.steps import (
     Step,
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
-from qdash.workflow.templates.coarse_one import COARSE_ONE_TASKS
-from qdash.workflow.templates.fine_one import FINE_ONE_TASKS
 
-# Keep the standalone templates as the source of truth for both stages.
-ONE_QUBIT_CHECK_TASKS: list[str] = list(COARSE_ONE_TASKS)
-ONE_QUBIT_FINE_TUNE_TASKS: list[str] = list(FINE_ONE_TASKS)
+# Task lists are explicit so this template can be reviewed and edited on its own.
+# Tests keep these stages aligned with coarse_one and fine_one.
+# Step 1: coarse calibration through Ramsey.
+ONE_QUBIT_CHECK_TASKS: list[str] = [
+    "Configure",  # Apply the starting configuration before the readout search.
+    "CheckCoarseReadoutParams",
+    "Configure",  # Apply the updated readout settings before pulse calibration.
+    "CheckRabi",  # Update control amplitude from the measured Rabi frequency.
+    "CheckRabi",  # Measure again at the updated amplitude for HPI creation.
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CheckT1",
+    "CheckT2Echo",
+    "CheckRamsey",
+]
+
+# Step 3: fine calibration after the successful-qubit filter.
+ONE_QUBIT_FINE_TUNE_TASKS: list[str] = [
+    "Configure",
+    # Round 1: prepare the state pulses, then tune amplitude and frequency consecutively.
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
+    "CheckOptimalReadoutAmplitude",
+    "CheckOptimalReadoutFrequency",
+    "Configure",  # Apply round 1's readout frequency before recalibrating pulses.
+    # Round 2: refresh the state pulses at the updated settings, then repeat the pair.
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
+    "CheckOptimalReadoutAmplitude",
+    "CheckOptimalReadoutFrequency",
+    "Configure",  # Apply the final readout frequency before final pulse calibration.
+    # Calibrate all pulses at the final readout settings before classification and RB.
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
+    "ReadoutClassification",
+    "RandomizedBenchmarking",
+    "X90InterleavedRandomizedBenchmarking",
+]
 
 
 @flow(
@@ -81,12 +127,12 @@ def one_qubit(
 
     steps: list[Step]
     if check_only:
-        # Basic check only
+        # Run only the coarse stage shown above.
         steps = [
             OneQubitCheck(mode="synchronized", tasks=ONE_QUBIT_CHECK_TASKS),
         ]
     else:
-        # Full 1Q calibration
+        # Run coarse -> filter successful qubits -> fine, with one Execution per calibration stage.
         steps = [
             OneQubitCheck(mode="synchronized", tasks=ONE_QUBIT_CHECK_TASKS),
             FilterByStatus(),  # Only proceed with successful qubits
