@@ -120,6 +120,7 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
         optimization_indices[::2], optimization_indices[1::2], strict=True
     ):
         assert frequency_index == amplitude_index + 1
+        assert tasks[frequency_index + 1] == "Configure"
         # Both the sweep's DRAG PI preparation and classifier's HPI preparation
         # must be recalibrated before each amplitude/frequency pair.
         assert tasks[amplitude_index - 5 : amplitude_index] == [
@@ -132,7 +133,7 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     # Finish with the full pulse calibration at the final readout settings.
     omitted_tasks = {"CheckT1Average", "CheckT2EchoAverage", "Check1QGateCoherenceLimit"}
     assert omitted_tasks.isdisjoint(tasks)
-    assert tasks[optimization_indices[-1] + 1 :] == [
+    assert tasks[optimization_indices[-1] + 2 :] == [
         name for name in one_qubit_module.ONE_QUBIT_FINE_TUNE_TASKS if name not in omitted_tasks
     ]
     full = one_qubit_module.one_qubit(username="alice", chip_id="64Q", qids=["8"])

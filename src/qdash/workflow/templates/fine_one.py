@@ -3,6 +3,7 @@
 Run this after coarse_one or an equivalent calibration has established the
 qubit frequency, control amplitude, and readout settings. The flow applies
 those settings and tunes readout amplitude -> frequency -> amplitude -> frequency.
+Configure applies the updated frequency after each amplitude/frequency pair.
 Each amplitude/frequency pair starts with fresh Rabi, HPI, and DRAG PI calibration: the
 sweep prepares |1> with DRAG PI, and its final classifier uses two HPI pulses.
 After both rounds, all pulses are calibrated at the final readout settings
@@ -35,6 +36,7 @@ FINE_ONE_TASKS: list[str] = [
     "CheckDRAGPIPulse",
     "CheckOptimalReadoutAmplitude",
     "CheckOptimalReadoutFrequency",
+    "Configure",  # Apply round 1's readout frequency before recalibrating pulses.
     # Round 2: refresh the state pulses at the updated settings, then repeat the pair.
     "CheckRabi",
     "CreateHPIPulse",
@@ -43,6 +45,7 @@ FINE_ONE_TASKS: list[str] = [
     "CheckDRAGPIPulse",
     "CheckOptimalReadoutAmplitude",
     "CheckOptimalReadoutFrequency",
+    "Configure",  # Apply the final readout frequency before final pulse calibration.
     # Calibrate all pulses at the final readout settings before classification and RB.
     "CheckRabi",
     "CreateHPIPulse",

@@ -42,7 +42,7 @@
   {
     "id": "fine_one",
     "name": "Fine 1Q Calibration",
-    "description": "Fine 1-qubit calibration after coarse_one or equivalent calibration: Configure -> two consecutive amplitude/frequency optimization pairs, recalibrating Rabi/HPI/DRAG PI before each pair -> final pulse calibration -> readout classification -> randomized benchmarking. Requires explicit mux_ids or qids.",
+    "description": "Fine 1-qubit calibration after coarse_one or equivalent calibration: Configure -> two amplitude/frequency optimization pairs, recalibrating Rabi/HPI/DRAG PI before each pair and applying Configure after each frequency update -> final pulse calibration -> readout classification -> randomized benchmarking. Requires explicit mux_ids or qids.",
     "category": "production",
     "filename": "fine_one.py",
     "function_name": "fine_one"
