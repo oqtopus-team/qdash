@@ -26,7 +26,7 @@
   {
     "id": "one_qubit",
     "name": "1Q Calibration",
-    "description": "1-qubit calibration using step-based pipeline. Requires explicit mux_ids or qids and supports check-only or full calibration with fine-tune.",
+    "description": "Combined coarse_one and fine_one calibration, proceeding to fine-tuning only for successful qubits. Requires explicit mux_ids or qids; check_only runs the coarse stage alone. Each calibration stage has its own Execution.",
     "category": "production",
     "filename": "one_qubit.py",
     "function_name": "one_qubit"

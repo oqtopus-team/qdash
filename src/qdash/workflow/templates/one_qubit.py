@@ -1,6 +1,7 @@
 """1-Qubit calibration using step-based pipeline.
 
-This template demonstrates the step-based API for 1-qubit calibration.
+This template combines coarse_one and fine_one, advancing successful qubits
+from the coarse stage to the fine stage. Each stage has its own Execution.
 
 Example:
     one_qubit(
@@ -28,39 +29,12 @@ from qdash.workflow.service.steps import (
     Step,
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
+from qdash.workflow.templates.coarse_one import COARSE_ONE_TASKS
+from qdash.workflow.templates.fine_one import FINE_ONE_TASKS
 
-ONE_QUBIT_CHECK_TASKS: list[str] = [
-    "CheckCoarseReadoutParams",
-    "Configure",
-    "CheckRabi",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CheckT1",
-    "CheckT2Echo",
-    "CheckRamsey",
-]
-
-ONE_QUBIT_FINE_TUNE_TASKS: list[str] = [
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "ReadoutClassification",
-    "CheckT1Average",
-    "CheckT2EchoAverage",
-    "Check1QGateCoherenceLimit",
-    "RandomizedBenchmarking",
-    "X90InterleavedRandomizedBenchmarking",
-]
+# Keep the standalone templates as the source of truth for both stages.
+ONE_QUBIT_CHECK_TASKS: list[str] = list(COARSE_ONE_TASKS)
+ONE_QUBIT_FINE_TUNE_TASKS: list[str] = list(FINE_ONE_TASKS)
 
 
 @flow(
@@ -89,7 +63,7 @@ def one_qubit(
         qids: Qubit IDs to calibrate when mux_ids is not set
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
-        check_only: If True, only run basic check (no fine-tune)
+        check_only: If True, run only the coarse_one stage
 
     Returns:
         Pipeline results with typed step outputs

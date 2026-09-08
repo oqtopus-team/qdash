@@ -308,6 +308,16 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
             allowed_qids=config.qids,
         )
 
+        # Match the per-qubit status supplied by the other strategies so a
+        # successful batch remains eligible for the pipeline's status filter.
+        for step_results in all_results.values():
+            for qubit_results in step_results.values():
+                qubit_results["status"] = (
+                    "success"
+                    if all(task_name in qubit_results for task_name in config.tasks)
+                    else "failed"
+                )
+
         cal_service.record_stage_result("experimental_simultaneous_spectroscopy", all_results)
         return all_results
 

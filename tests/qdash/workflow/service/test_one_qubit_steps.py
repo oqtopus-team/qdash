@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
+import pytest
+
 from qdash.workflow.service.steps.one_qubit import CustomOneQubit
 
 if TYPE_CHECKING:
@@ -117,3 +119,34 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
     assert calls[0].qids == ["2", "5"]
     assert calls[0].tasks == ["CheckRabi"]
     assert calls[0].flow_name == "one_qubit_one_qubit_check"
+
+
+@pytest.mark.parametrize("successful_qids", [[], ["1"]])
+def test_fine_tune_respects_coarse_status_filter(monkeypatch, successful_qids) -> None:
+    from unittest.mock import MagicMock
+
+    from qdash.workflow.service.results import OneQubitResult, QubitCalibData
+    from qdash.workflow.service.steps import FilterByStatus, OneQubitFineTune, StepContext
+    from qdash.workflow.service.targets import QubitTargets
+
+    coarse_result = OneQubitResult()
+    for qid in ["0", "1"]:
+        coarse_result.add_qubit(
+            qid, QubitCalibData(status="success" if qid in successful_qids else "failed")
+        )
+    ctx = StepContext(candidate_qids=["0", "1"], one_qubit_check=coarse_result)
+    service = cast("CalibService", SimpleNamespace(chip_id="64Q"))
+    targets = QubitTargets(["0", "1"])
+    ctx = FilterByStatus().execute(service, targets, ctx)
+    execute = MagicMock(return_value={})
+    step = OneQubitFineTune()
+    monkeypatch.setattr(step, "_execute_with_qids", execute)
+
+    step.execute(service, targets, ctx)
+
+    if successful_qids:
+        assert execute.call_args.args[1] == successful_qids
+    else:
+        execute.assert_not_called()
+        assert ctx.one_qubit_fine_tune is not None
+        assert ctx.one_qubit_fine_tune.qubits == {}

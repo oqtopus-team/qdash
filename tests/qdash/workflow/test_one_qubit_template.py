@@ -54,23 +54,32 @@ def test_one_qubit_template_requires_explicit_targets(monkeypatch) -> None:
 
 
 def test_one_qubit_template_passes_template_task_lists(monkeypatch) -> None:
+    from qdash.workflow.service.steps import FilterByStatus
+    from qdash.workflow.templates.coarse_one import COARSE_ONE_TASKS
+    from qdash.workflow.templates.fine_one import FINE_ONE_TASKS
+
     monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
 
     result = one_qubit_module.one_qubit(username="alice", chip_id="64Q", mux_ids=[0])
 
     steps = result["steps"]
-    assert steps[0].tasks == one_qubit_module.ONE_QUBIT_CHECK_TASKS
-    assert steps[2].tasks == one_qubit_module.ONE_QUBIT_FINE_TUNE_TASKS
+    assert len(steps) == 3
+    assert steps[0].tasks == COARSE_ONE_TASKS
+    assert isinstance(steps[1], FilterByStatus)
+    assert steps[2].tasks == FINE_ONE_TASKS
 
 
 def test_one_qubit_template_check_only_passes_template_task_list(monkeypatch) -> None:
+    from qdash.workflow.templates.coarse_one import COARSE_ONE_TASKS
+
     monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
 
     result = one_qubit_module.one_qubit(
         username="alice", chip_id="64Q", mux_ids=[0], check_only=True
     )
 
-    assert result["steps"][0].tasks == one_qubit_module.ONE_QUBIT_CHECK_TASKS
+    assert len(result["steps"]) == 1
+    assert result["steps"][0].tasks == COARSE_ONE_TASKS
 
 
 @pytest.mark.parametrize("use_mux", [False, True])
@@ -134,7 +143,18 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     omitted_tasks = {"CheckT1Average", "CheckT2EchoAverage", "Check1QGateCoherenceLimit"}
     assert omitted_tasks.isdisjoint(tasks)
     assert tasks[optimization_indices[-1] + 2 :] == [
-        name for name in one_qubit_module.ONE_QUBIT_FINE_TUNE_TASKS if name not in omitted_tasks
+        "CheckRabi",
+        "CreateHPIPulse",
+        "CheckHPIPulse",
+        "CreatePIPulse",
+        "CheckPIPulse",
+        "CreateDRAGHPIPulse",
+        "CheckDRAGHPIPulse",
+        "CreateDRAGPIPulse",
+        "CheckDRAGPIPulse",
+        "ReadoutClassification",
+        "RandomizedBenchmarking",
+        "X90InterleavedRandomizedBenchmarking",
     ]
     full = one_qubit_module.one_qubit(username="alice", chip_id="64Q", qids=["8"])
     assert result["kwargs"]["default_run_parameters"] == full["kwargs"]["default_run_parameters"]
