@@ -82,7 +82,6 @@ def coarse_one(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        skip_execution=True,
         default_run_parameters={
             "hpi_duration": {"value": 32, "value_type": "int"},
             "pi_duration": {"value": 32, "value_type": "int"},

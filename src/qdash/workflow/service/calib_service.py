@@ -325,10 +325,9 @@ class CalibService:
             muxes: List of MUX IDs for system-level tasks (default: None)
             project_id: Project ID for multi-tenancy support. If None, auto-resolved
                 from username's default_project_id.
-            skip_execution: Skip Execution document creation (for wrapper/parent sessions
-                where child sessions will create their own Executions). A lock-owning
-                wrapper still adopts and finalizes an execution pre-created by the API
-                for its flow run. Default: False.
+            skip_execution: Internal option for isolated workers borrowing an existing
+                Execution. Pipelines automatically create one Execution per calibration
+                step, including when older templates pass this option. Default: False.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
@@ -403,6 +402,7 @@ class CalibService:
 
         # Session state
         self._initialized = False
+        self._pipeline_active = False
         self.execution_id: str | None = execution_id
         self._orchestrator: CalibOrchestrator | None = None
         self.github_integration: GitHubIntegration | None = None
@@ -535,7 +535,7 @@ class CalibService:
             self.github_push_config = GitHubPushConfig()
 
         # Acquire lock if requested
-        if self.use_lock:
+        if self.use_lock and not self._lock_acquired:
             if self._lock_repo is None:
                 from qdash.repository import MongoExecutionLockRepository
 
@@ -1180,6 +1180,8 @@ class CalibService:
 
     def _release_lock_if_acquired(self) -> None:
         """Release the execution lock if it was acquired by this session."""
+        if getattr(self, "_pipeline_active", False):
+            return
         if self.use_lock and self._lock_acquired and self._lock_repo is not None:
             self._lock_repo.unlock(project_id=self.project_id)
             self._lock_acquired = False
@@ -1305,18 +1307,20 @@ class CalibService:
             set_current_session,
         )
         from qdash.workflow.service.steps import Pipeline, StepContext
+        from qdash.workflow.service.steps.base import TransformStep
 
         logger = get_run_logger()
 
         # Set this CalibService as the current session for task execution
         set_current_session(self)
+        self._pipeline_active = True
+        active_step = False
+        completed_steps = 0
+        pipeline_flow_name = self.flow_name
+        pipeline_note = self.note
 
         try:
-            # Initialize session if not already initialized
             qids = targets.to_qids(self.chip_id)
-            if not self._initialized:
-                self._initialize(qids, self.tags, self.note)
-
             # Validate pipeline dependencies
             pipeline = Pipeline(steps)
             logger.info(f"Starting calibration pipeline with {len(pipeline)} steps")
@@ -1329,15 +1333,44 @@ class CalibService:
             for i, step in enumerate(pipeline):
                 logger.info(f"Step {i + 1}/{len(pipeline)}: {step.name}")
                 try:
+                    # Transform-only steps do not create an Execution. Hardware
+                    # steps share one session across all workers and strategies.
+                    if not isinstance(step, TransformStep):
+                        if completed_steps:
+                            self._initialized = False
+                            self._orchestrator = None
+                            self.execution_id = None
+                        self.flow_name = (
+                            f"{pipeline_flow_name}_{step.name}" if pipeline_flow_name else step.name
+                        )
+                        self.note = {
+                            **(pipeline_note or {}),
+                            "step_name": step.name,
+                            "step_index": i + 1,
+                            "pipeline_name": pipeline_flow_name,
+                        }
+                        active_step = True
+                        # Compatibility with saved templates that still pass
+                        # skip_execution=True for the old wrapper session.
+                        was_skipped = self.skip_execution
+                        self.skip_execution = False
+                        if not self._initialized:
+                            self._initialize(ctx.candidate_qids, self.tags, self.note)
+                        elif was_skipped and self.execution_service is not None:
+                            assert self._orchestrator is not None
+                            self._orchestrator.config.skip_execution = False
+                            self.execution_service.save().start()
                     ctx = step.execute(self, targets, ctx)
+                    if active_step:
+                        self.finish_calibration()
+                        active_step = False
+                        completed_steps += 1
                 except Exception as e:
                     logger.error(f"Step {step.name} failed: {e}")
                     raise
 
             logger.info("Pipeline completed successfully")
 
-            # Finalize execution (mark as completed, update chip history)
-            self.finish_calibration()
         except BaseException as exc:
             # Distinguish cancellation from failure.
             # Prefect 3 raises CancelledRun (subclass of BaseException) on cancel.
@@ -1349,15 +1382,20 @@ class CalibService:
                     type(exc.__context__).__name__ if exc.__context__ else None,
                     [type(sub).__name__ for sub in getattr(exc, "exceptions", [])] or None,
                 )
-                if _is_cancellation(exc):
+                if active_step and _is_cancellation(exc):
                     logger.info("Execution was cancelled")
                     self.cancel_calibration()
-                else:
+                elif active_step:
                     self.fail_calibration()
             raise
         finally:
-            # Clear session when done
-            clear_current_session()
+            self.flow_name = pipeline_flow_name
+            self.note = pipeline_note
+            self._pipeline_active = False
+            try:
+                self._release_lock_if_acquired()
+            finally:
+                clear_current_session()
 
         # Build results from typed context fields
         results: dict[str, Any] = {

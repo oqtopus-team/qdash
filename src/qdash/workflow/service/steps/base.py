@@ -73,8 +73,9 @@ class Step(ABC):
 class CalibrationStep(Step):
     """Base class for steps that execute actual calibration on hardware.
 
-    CalibrationSteps create execution history entries because they involve
-    real hardware interaction and produce calibration data.
+    The pipeline creates one Execution for each CalibrationStep and owns its
+    completion, failure, and cancellation. Steps and their strategies use the
+    supplied session without creating additional execution history entries.
 
     Examples: OneQubitCheck, OneQubitFineTune, TwoQubitCalibration
     """

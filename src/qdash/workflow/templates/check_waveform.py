@@ -77,7 +77,6 @@ def check_waveform(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        skip_execution=True,
         default_run_parameters={
             "interval": {"value": 150 * 1024, "value_type": "int"},
         },

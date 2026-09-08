@@ -40,7 +40,7 @@ class CalibConfig:
     project_id: str | None = None
     enable_github_pull: bool = True
     enable_provenance_tracking: bool = True
-    skip_execution: bool = False  # Skip Execution creation (for wrapper/parent sessions)
+    skip_execution: bool = False  # Isolated worker borrowing its step's Execution
     force_update_params: bool = False  # Force backend params update regardless of R² validation
     persist_output_parameters: bool = True  # Write task outputs to calibration/backend stores
     configuration_mode: str | None = field(

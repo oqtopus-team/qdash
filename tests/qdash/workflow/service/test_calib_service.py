@@ -804,3 +804,253 @@ class TestRunPipelineFailureLogging:
 
         with pytest.raises(RuntimeError, match="boom"):
             session._run_pipeline(QubitTargets(["0"]), [BoomStep()])
+
+
+@pytest.fixture
+def pipeline_execution_env(mock_flow_session_deps, monkeypatch):
+    """Exercise real pipeline/strategy lifecycle without hardware or database I/O."""
+    records = []
+    lock = MockExecutionLockRepository(locked=True, owner="exec-reserved")
+    claims = MagicMock(side_effect=["exec-reserved", None])
+    monkeypatch.setattr(CalibService, "_read_flow_run_id_from_context", lambda self: "flow-1")
+    monkeypatch.setattr(
+        "qdash.repository.MongoExecutionRepository",
+        lambda: SimpleNamespace(claim_scheduled_execution=claims),
+    )
+
+    class RecordingOrchestrator(MockCalibOrchestrator):
+        def initialize(self):
+            super().initialize()
+            record = SimpleNamespace(config=self.config, status="running")
+            records.append(record)
+            for method, status in (
+                ("complete", "completed"),
+                ("fail", "failed"),
+                ("cancel", "cancelled"),
+            ):
+
+                def close(status=status):
+                    assert lock.locked  # No stage may release the pipeline lock.
+                    record.status = status
+                    return self._execution_service
+
+                setattr(self._execution_service, method, close)
+
+    monkeypatch.setattr(
+        "qdash.workflow.service.calib_service.CalibOrchestrator", RecordingOrchestrator
+    )
+    for method in (
+        "record_stage_result",
+        "_finalize_stale_running_tasks",
+        "_finalize_tasks_on_cancel",
+        "_update_chip_history",
+        "_push_to_github_if_configured",
+    ):
+        monkeypatch.setattr(CalibService, method, MagicMock())
+    schedule = SimpleNamespace(
+        stages=[SimpleNamespace(box_type="A", parallel_groups=[["0", "1"]])],
+        steps=[SimpleNamespace(box_type="A", parallel_qids=["0", "1"], step_index=0)],
+        total_steps=1,
+        metadata={"strategy": "test"},
+    )
+    scheduler = MagicMock()
+    scheduler.generate_from_mux.return_value = schedule
+    scheduler.generate_synchronized_from_mux.return_value = schedule
+    scheduler.generate_simultaneous_spectroscopy_batches_from_mux.return_value = schedule
+    monkeypatch.setattr("qdash.workflow.service.strategy.OneQubitScheduler", lambda **kw: scheduler)
+    return SimpleNamespace(records=records, lock=lock, claims=claims)
+
+
+@pytest.mark.parametrize("skip_execution", [False, True])
+@pytest.mark.parametrize(
+    "mode", ["synchronized", "scheduled", "serial", "simultaneous_spectroscopy"]
+)
+def test_pipeline_owns_one_execution_per_calibration_step(
+    pipeline_execution_env, monkeypatch, skip_execution, mode
+):
+    from qdash.workflow.service.steps import FilterByStatus, OneQubitCheck, OneQubitFineTune
+
+    env = pipeline_execution_env
+    worker_ids = []
+
+    def run_workers(*, tasks, qids=None, mux_groups=None, session_config=None):
+        session = get_session()
+        assert env.lock.owner == "exec-reserved"
+        assert all(record.status == "completed" for record in env.records[:-1])
+        worker_ids.append(
+            session_config["execution_id"] if session_config else session.execution_id
+        )
+        return {"0": {"status": "success"}, "1": {"status": "success"}}
+
+    for method in (
+        "run_qubit_calibrations_parallel",
+        "run_mux_calibrations_parallel",
+        "_calibrate_mux_qubits",
+    ):
+        monkeypatch.setattr(f"qdash.workflow.service.strategy.{method}", run_workers)
+    monkeypatch.setattr(
+        CalibService, "execute_task_batch", lambda self, name, qids: run_workers(tasks=[name])
+    )
+    session = CalibService(
+        "alice",
+        "chip-1",
+        project_id="project-1",
+        flow_name="one",
+        skip_execution=skip_execution,
+        enable_github=False,
+        lock_repo=env.lock,
+        counter_repo=FakeExecutionCounterRepository(2),
+    )
+
+    session.run(
+        QubitTargets(["0", "1"]),
+        steps=[
+            OneQubitCheck(mode=mode, tasks=["CheckRabi"]),
+            FilterByStatus(),
+            OneQubitFineTune(mode=mode, tasks=["CheckRamsey"]),
+        ],
+    )
+
+    assert len(env.records) == 2
+    first, second = env.records
+    assert first.config.execution_id == "exec-reserved"
+    assert second.config.execution_id != first.config.execution_id
+    assert worker_ids == [first.config.execution_id, second.config.execution_id]
+    assert [record.status for record in env.records] == ["completed", "completed"]
+    assert [record.config.flow_name for record in env.records] == [
+        "one_one_qubit_check",
+        "one_one_qubit_fine_tune",
+    ]
+    assert [record.config.note["step_index"] for record in env.records] == [1, 3]
+    assert all(record.config.note["flow_run_id"] == "flow-1" for record in env.records)
+    assert all(record.config.skip_execution is False for record in env.records)
+    assert env.lock.try_lock_calls == ["exec-reserved"]
+    assert env.lock.locked is False
+    assert session.flow_name == "one"
+    with pytest.raises(RuntimeError, match="No active"):
+        get_session()
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+@pytest.mark.parametrize("transform_failure", [False, True])
+def test_pipeline_failure_preserves_completed_steps(
+    pipeline_execution_env, cancel, transform_failure
+):
+    from qdash.workflow.service.steps.base import TransformStep
+
+    env = pipeline_execution_env
+
+    class CancelledRun(BaseException):
+        pass
+
+    class FirstStep(BoomStep):
+        def execute(self, service, targets, ctx):
+            return ctx
+
+    class FailureStep(BoomStep):
+        def execute(self, service, targets, ctx):
+            assert env.lock.locked
+            assert env.records[0].status == "completed"
+            raise CancelledRun() if cancel else RuntimeError("boom")
+
+    class FailureTransform(FailureStep, TransformStep):
+        pass
+
+    session = CalibService(
+        "alice",
+        "chip-1",
+        project_id="project-1",
+        enable_github=False,
+        lock_repo=env.lock,
+        counter_repo=FakeExecutionCounterRepository(2),
+    )
+    with pytest.raises(CancelledRun if cancel else RuntimeError):
+        session.run(
+            QubitTargets(["0"]),
+            steps=[
+                FirstStep(),
+                FailureTransform() if transform_failure else FailureStep(),
+            ],
+        )
+    expected = (
+        ["completed"] if transform_failure else ["completed", "cancelled" if cancel else "failed"]
+    )
+    assert [record.status for record in env.records] == expected
+    assert env.lock.locked is False
+
+
+@pytest.mark.parametrize("skip_execution", [False, True])
+def test_single_step_without_api_reservation_creates_one_execution(
+    pipeline_execution_env, monkeypatch, skip_execution
+):
+    from qdash.workflow.service.steps import CustomOneQubit
+
+    env = pipeline_execution_env
+    env.lock.unlock("project-1")
+    env.claims.side_effect = [None]
+    worker = MagicMock(return_value={"0": {"status": "success"}})
+    monkeypatch.setattr(
+        "qdash.workflow.service.strategy.run_qubit_calibrations_parallel",
+        worker,
+    )
+    session = CalibService(
+        "alice",
+        "chip-1",
+        project_id="project-1",
+        enable_github=False,
+        skip_execution=skip_execution,
+        lock_repo=env.lock,
+        counter_repo=FakeExecutionCounterRepository(2),
+    )
+    session.run(QubitTargets(["0"]), steps=[CustomOneQubit(tasks=["CheckRabi"])])
+
+    assert len(env.records) == 1
+    assert env.records[0].status == "completed"
+    assert env.records[0].config.skip_execution is False
+    assert (
+        worker.call_args.kwargs["session_config"]["execution_id"]
+        == env.records[0].config.execution_id
+    )
+    assert env.lock.locked is False
+
+
+def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, monkeypatch):
+    from qdash.workflow.service.steps import CustomTwoQubit, TwoQubitCalibration
+
+    env = pipeline_execution_env
+    scheduler = MagicMock()
+    scheduler.generate.return_value = SimpleNamespace(parallel_groups=[[("0", "1")]])
+    monkeypatch.setattr("qdash.workflow.engine.CRScheduler", lambda *a, **kw: scheduler)
+    worker = MagicMock(return_value={"0-1": {"status": "success"}})
+    monkeypatch.setattr(
+        "qdash.workflow.service._internal.scheduling_tasks.run_coupling_calibrations_parallel",
+        worker,
+    )
+    session = CalibService(
+        "alice",
+        "chip-1",
+        project_id="project-1",
+        backend_name="fake",
+        enable_github=False,
+        lock_repo=env.lock,
+        counter_repo=FakeExecutionCounterRepository(2),
+        default_run_parameters={"interval": {"value": 1024, "value_type": "int"}},
+    )
+    session.run(
+        QubitTargets(["0", "1"]),
+        steps=[
+            CustomTwoQubit(tasks=["CheckCrossResonance"]),
+            TwoQubitCalibration(),
+        ],
+    )
+    assert len(env.records) == 2
+    configs = [call.kwargs["session_config"] for call in worker.call_args_list]
+    assert [config["execution_id"] for config in configs] == [
+        record.config.execution_id for record in env.records
+    ]
+    assert all(config["backend_name"] == "fake" for config in configs)
+    assert all(
+        config["default_run_parameters"] == session.default_run_parameters for config in configs
+    )
+    assert [record.status for record in env.records] == ["completed", "completed"]
+    assert env.lock.locked is False

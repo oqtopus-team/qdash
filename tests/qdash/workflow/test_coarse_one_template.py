@@ -85,7 +85,6 @@ def test_coarse_one_forwards_execution_context_and_preserves_task_scan_defaults(
         "project_id": "project-1",
         "flow_name": "coarse-check",
         "tags": ["coarse"],
-        "skip_execution": True,
         "default_run_parameters": {
             "hpi_duration": {"value": 32, "value_type": "int"},
             "pi_duration": {"value": 32, "value_type": "int"},

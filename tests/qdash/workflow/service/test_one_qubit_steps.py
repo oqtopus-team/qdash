@@ -7,90 +7,41 @@ if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
 
 
-def test_custom_one_qubit_direct_targets_create_visible_execution(monkeypatch) -> None:
-    init_calls = []
-    run_calls = []
-    finish_calls = []
-    recorded = []
+def test_custom_one_qubit_direct_targets_reuse_step_execution(monkeypatch) -> None:
+    from unittest.mock import MagicMock
 
-    session = SimpleNamespace(
-        execution_id="exec-visible",
-        record_stage_result=lambda stage_name, result: recorded.append((stage_name, result)),
-    )
-
-    def fake_init_calibration(*args, **kwargs):
-        init_calls.append((args, kwargs))
-        return session
-
-    def fake_run_qubit_calibrations_parallel(*, qids, tasks, session_config):
-        run_calls.append(
-            {
-                "qids": qids,
-                "tasks": tasks,
-                "session_config": session_config,
-            }
-        )
-        return {qid: {"status": "success"} for qid in qids}
-
-    def fake_finish_calibration():
-        finish_calls.append(True)
-
-    monkeypatch.setattr(
-        "qdash.workflow.service.calib_service.init_calibration",
-        fake_init_calibration,
-    )
-    monkeypatch.setattr(
-        "qdash.workflow.service.calib_service.finish_calibration",
-        fake_finish_calibration,
-    )
+    init = MagicMock(side_effect=AssertionError("must reuse the step Execution"))
+    finish = MagicMock(side_effect=AssertionError("pipeline owns completion"))
+    run = MagicMock(return_value={"1": {"status": "success"}})
+    monkeypatch.setattr("qdash.workflow.service.calib_service.init_calibration", init)
+    monkeypatch.setattr("qdash.workflow.service.calib_service.finish_calibration", finish)
     monkeypatch.setattr(
         "qdash.workflow.service._internal.scheduling_tasks.run_qubit_calibrations_parallel",
-        fake_run_qubit_calibrations_parallel,
+        run,
     )
-
     service = SimpleNamespace(
         username="alice",
         chip_id="64Qv3",
         backend_name="qubex",
         project_id="project-1",
-        default_run_parameters={"interval": {"value": 128, "value_type": "int"}},
-        tags=["simple"],
-        flow_name="simple_calibration",
-        note={"source": "test"},
+        execution_id="exec-step",
+        default_run_parameters={},
+        tags=[],
+        flow_name="simple_tasks",
+        note={},
+        record_stage_result=MagicMock(),
     )
     step = CustomOneQubit(step_name="simple_tasks", tasks=["CheckRabi"])
+    result = step._execute_direct(cast("CalibService", service), ["1"])
 
-    result = step._execute_direct(cast("CalibService", service), ["1", "2"])
-
-    assert result == {"direct": {"1": {"status": "success"}, "2": {"status": "success"}}}
-    assert init_calls
-    assert init_calls[0][0][:3] == ("alice", "64Qv3", ["1", "2"])
-    assert init_calls[0][1]["flow_name"] == "simple_calibration_simple_tasks"
-    assert init_calls[0][1]["project_id"] == "project-1"
-    assert init_calls[0][1]["note"] == {
-        "type": "1-qubit-direct",
-        "stage": "simple_tasks",
-        "total_qubits": 2,
-    }
-    assert run_calls == [
-        {
-            "qids": ["1", "2"],
-            "tasks": ["CheckRabi"],
-            "session_config": {
-                "username": "alice",
-                "chip_id": "64Qv3",
-                "backend_name": "qubex",
-                "execution_id": "exec-visible",
-                "project_id": "project-1",
-                "default_run_parameters": {"interval": {"value": 128, "value_type": "int"}},
-                "tags": ["simple"],
-                "flow_name": "simple_calibration",
-                "note": {"source": "test"},
-            },
-        }
-    ]
-    assert recorded == [("simple_tasks", result)]
-    assert finish_calls == [True]
+    assert result == {"direct": {"1": {"status": "success"}}}
+    config = run.call_args.kwargs["session_config"]
+    assert config["execution_id"] == "exec-step"
+    assert config["tags"] == []
+    assert config["flow_name"] == "simple_tasks"
+    service.record_stage_result.assert_called_once_with("simple_tasks", result)
+    init.assert_not_called()
+    finish.assert_not_called()
 
 
 def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> None:
@@ -166,45 +117,3 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
     assert calls[0].qids == ["2", "5"]
     assert calls[0].tasks == ["CheckRabi"]
     assert calls[0].flow_name == "one_qubit_one_qubit_check"
-
-
-def test_custom_one_qubit_direct_targets_do_not_fallback_tags_to_flow_name(monkeypatch) -> None:
-    init_calls = []
-    session = SimpleNamespace(
-        execution_id="exec-visible",
-        record_stage_result=lambda stage_name, result: None,
-    )
-
-    def fake_init_calibration(*args, **kwargs):
-        init_calls.append((args, kwargs))
-        return session
-
-    monkeypatch.setattr(
-        "qdash.workflow.service.calib_service.init_calibration",
-        fake_init_calibration,
-    )
-    monkeypatch.setattr(
-        "qdash.workflow.service.calib_service.finish_calibration",
-        lambda: None,
-    )
-    monkeypatch.setattr(
-        "qdash.workflow.service._internal.scheduling_tasks.run_qubit_calibrations_parallel",
-        lambda *, qids, tasks, session_config: {qid: {"status": "success"} for qid in qids},
-    )
-
-    service = SimpleNamespace(
-        username="alice",
-        chip_id="64Qv3",
-        backend_name="qubex",
-        project_id="project-1",
-        default_run_parameters={},
-        tags=[],
-        flow_name="t1_simple_tasks",
-        note={},
-    )
-    step = CustomOneQubit(step_name="simple_tasks", tasks=["CheckRabi"])
-
-    step._execute_direct(cast("CalibService", service), ["1"])
-
-    assert init_calls[0][1]["flow_name"] == "t1_simple_tasks_simple_tasks"
-    assert init_calls[0][1]["tags"] == []
