@@ -52,6 +52,24 @@ orchestrator.complete()
 2. `orchestrator.run_task()` - Executes a single calibration task
 3. `orchestrator.complete()` - Finalizes session, saves results to MongoDB
 
+## Writing Flow Templates
+
+Flow templates are user-editable recipes. Keep each step's task names and execution
+order visible in the template file itself.
+
+- Define task lists as explicit lists of task-name strings in the template, or pass
+  a literal list directly to `tasks=`. Do not import task lists from other templates
+  or rely on a calibration step's default task list.
+- Add short comments explaining each stage, repeated calibration round, filter,
+  and hardware configuration checkpoint.
+- When a combined template reproduces standalone stages, keep the task lists
+  explicit in both places and test that their contents and order agree.
+- Preserve intentional repetitions: repeated Rabi checks and readout optimization
+  rounds should remain visible so users can review and edit them.
+
+`one_qubit.py` lists its coarse and fine tasks locally, with a status filter between
+them. Its tests compare those lists with `coarse_one.py` and `fine_one.py`.
+
 ## Adding a New Calibration Task
 
 1. Create a task class in `workflow/calibtasks/`:
