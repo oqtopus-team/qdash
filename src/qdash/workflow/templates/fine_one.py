@@ -4,8 +4,9 @@ Run this after coarse_one or an equivalent calibration has established the
 qubit frequency, control amplitude, and readout settings. The flow applies
 those settings and tunes readout amplitude -> frequency -> amplitude -> frequency.
 Configure applies the updated frequency after each amplitude/frequency pair.
-Each amplitude/frequency pair starts with fresh Rabi, HPI, and DRAG PI calibration: the
-sweep prepares |1> with DRAG PI, and its final classifier uses two HPI pulses.
+Each amplitude/frequency pair starts with fresh Rabi and full pulse calibration
+in HPI -> PI -> DRAG HPI -> DRAG PI order, including a check of each pulse.
+This refreshes the base pulses as well as the DRAG pulses used for state preparation.
 After both rounds, all pulses are calibrated at the final readout settings
 before readout classification and randomized benchmarking.
 
@@ -28,19 +29,27 @@ from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 FINE_ONE_TASKS: list[str] = [
     "Configure",
-    # Round 1: prepare the state pulses, then tune amplitude and frequency consecutively.
+    # Round 1: calibrate HPI -> PI -> DRAG HPI -> DRAG PI, then tune amplitude/frequency.
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
     "CreateDRAGPIPulse",
     "CheckDRAGPIPulse",
     "CheckOptimalReadoutAmplitude",
     "CheckOptimalReadoutFrequency",
     "Configure",  # Apply round 1's readout frequency before recalibrating pulses.
-    # Round 2: refresh the state pulses at the updated settings, then repeat the pair.
+    # Round 2: recalibrate all four pulse types at the updated settings, then repeat the pair.
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
     "CreateDRAGPIPulse",
     "CheckDRAGPIPulse",
     "CheckOptimalReadoutAmplitude",

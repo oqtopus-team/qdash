@@ -130,12 +130,15 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     ):
         assert frequency_index == amplitude_index + 1
         assert tasks[frequency_index + 1] == "Configure"
-        # Both the sweep's DRAG PI preparation and classifier's HPI preparation
-        # must be recalibrated before each amplitude/frequency pair.
-        assert tasks[amplitude_index - 5 : amplitude_index] == [
+        # Refresh the base pulses and both DRAG pulses, with checks, before each pair.
+        assert tasks[amplitude_index - 9 : amplitude_index] == [
             "CheckRabi",
             "CreateHPIPulse",
             "CheckHPIPulse",
+            "CreatePIPulse",
+            "CheckPIPulse",
+            "CreateDRAGHPIPulse",
+            "CheckDRAGHPIPulse",
             "CreateDRAGPIPulse",
             "CheckDRAGPIPulse",
         ]
