@@ -143,6 +143,8 @@ class SnapshotParameterLoader:
             Tuple of (input_parameters, run_parameters), or None if not found.
 
         """
+        if task_name in self._snapshot_exempt_tasks:
+            return None
         self._load()
         assert self._cache is not None
         result = self._cache.get((task_name, qid))

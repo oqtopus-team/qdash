@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Lock, Play, RefreshCw, RotateCcw } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 
-import type { ExecutionResponseDetail, TaskInfo } from "@/schemas";
+import type { ExecutionResponseDetail, TaskInfo, TaskResultResponse } from "@/schemas";
 
 import { getChipCoupling, getChipQubit, useListChips } from "@/client/chip/chip";
 import {
@@ -21,11 +21,13 @@ import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useToast } from "@/components/ui/Toast";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
-import { formatTaskParameter, parseTaskParameter } from "@/lib/utils/task-parameters";
+import { parseTaskParameter } from "@/lib/utils/task-parameters";
+import { buildTaskPrefill } from "./task-prefill";
 
 interface TaskWorkbenchProps {
   task: TaskInfo;
   backend: string;
+  sourceTask?: TaskResultResponse;
 }
 
 function badgeClass(status?: string | null) {
@@ -36,7 +38,7 @@ function badgeClass(status?: string | null) {
   return "badge-warning";
 }
 
-export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
+export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps) {
   const runDisabledReasonId = useId();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -58,8 +60,8 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
     "executionTarget",
     parseAsString,
   );
-  const chipId = chipIdQuery ?? "";
-  const target = targetQuery ?? "";
+  const chipId = sourceTask ? (sourceTask.chip_id ?? "") : (chipIdQuery ?? "");
+  const target = sourceTask ? sourceTask.qid : (targetQuery ?? "");
   const executionId = executionIdQuery ?? "";
   const submittedChipId = submittedChipIdQuery ?? "";
   const submittedTarget = submittedTargetQuery ?? "";
@@ -67,9 +69,12 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
   const [runValues, setRunValues] = useState<Record<string, string>>({});
   const [reconfigure, setReconfigure] = useState(false);
   const [persistOutputParameters, setPersistOutputParameters] = useState(false);
+  const [updateParams, setUpdateParams] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [isReloadingInputs, setIsReloadingInputs] = useState(false);
   const previousTask = useRef(`${backend}:${task.name}`);
+  const initializedTask = useRef<string | null>(null);
+  const prefill = useMemo(() => buildTaskPrefill(task, sourceTask), [task, sourceTask]);
 
   const { data: lockStatus, isLoading: isLockStatusLoading } = useGetExecutionLockStatus({
     query: {
@@ -79,20 +84,18 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
   const isExecutionLocked = lockStatus?.data.lock ?? false;
 
   useEffect(() => {
-    if (!chipIdQuery && defaultChipId) setChipIdQuery(defaultChipId);
-  }, [chipIdQuery, defaultChipId, setChipIdQuery]);
+    if (!sourceTask && !chipIdQuery && defaultChipId) setChipIdQuery(defaultChipId);
+  }, [sourceTask, chipIdQuery, defaultChipId, setChipIdQuery]);
 
   useEffect(() => {
-    setRunValues(
-      Object.fromEntries(
-        Object.entries(task.run_parameters ?? {}).map(([name, parameter]) => [
-          name,
-          formatTaskParameter(parameter.value),
-        ]),
-      ),
-    );
+    const formKey = `${backend}:${task.name}:${sourceTask?.task_id ?? ""}`;
+    if (initializedTask.current === formKey) return;
+    initializedTask.current = formKey;
+    setRunValues(prefill.run);
     setReconfigure(false);
     setPersistOutputParameters(false);
+    setUpdateParams(true);
+    setInputValues(prefill.input);
     const taskKey = `${backend}:${task.name}`;
     if (previousTask.current !== taskKey) {
       setTargetQuery(null);
@@ -107,14 +110,10 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
     setSubmittedChipIdQuery,
     setSubmittedTargetQuery,
     setTargetQuery,
+    sourceTask,
+    prefill,
     task,
   ]);
-
-  useEffect(() => {
-    setInputValues(
-      Object.fromEntries(Object.keys(task.input_parameters ?? {}).map((name) => [name, ""])),
-    );
-  }, [task.input_parameters]);
 
   const {
     data: executionResponse,
@@ -182,7 +181,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
     try {
       const runParameterOverrides = Object.fromEntries(
         Object.entries(runValues)
-          .filter(([, value]) => value.trim() !== "")
+          .filter(([name, value]) => name in (task.run_parameters ?? {}) && value.trim() !== "")
           .map(([name, value]) => [
             name,
             parseTaskParameter(value, task.run_parameters?.[name]?.value_type),
@@ -190,22 +189,31 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
       );
       const inputParameterOverrides = Object.fromEntries(
         Object.entries(inputValues)
-          .filter(([, value]) => value.trim() !== "")
+          .filter(
+            ([name, value]) =>
+              name in (task.input_parameters ?? {}) &&
+              task.input_parameters?.[name]?.user_override !== "forbidden" &&
+              value.trim() !== "",
+          )
           .map(([name, value]) => [
             name,
             parseTaskParameter(value, task.input_parameters?.[name]?.value_type ?? "float"),
           ]),
       );
-      const response = await AXIOS_INSTANCE.post(`/tasks/${task.name}/execute`, {
-        chip_id: chipId,
-        qid: requestedTarget,
-        backend_name: backend,
-        input_parameter_overrides: inputParameterOverrides,
-        run_parameter_overrides: runParameterOverrides,
-        reconfigure,
-        persist_output_parameters: persistOutputParameters,
-        update_params: false,
-      });
+      const response = await AXIOS_INSTANCE.post(
+        `/tasks/${encodeURIComponent(task.name)}/execute`,
+        {
+          chip_id: chipId,
+          qid: requestedTarget,
+          backend_name: backend,
+          input_parameter_overrides: inputParameterOverrides,
+          run_parameter_overrides: runParameterOverrides,
+          reconfigure,
+          persist_output_parameters: sourceTask ? true : persistOutputParameters,
+          update_params: sourceTask ? updateParams : false,
+          ...(sourceTask ? { source_task_id: sourceTask.task_id } : {}),
+        },
+      );
       setExecutionIdQuery(response.data.execution_id);
       setSubmittedChipIdQuery(chipId);
       setSubmittedTargetQuery(requestedTarget);
@@ -264,7 +272,10 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
               ? (stored as { value?: unknown }).value
               : stored;
           if (value === null || value === undefined) value = parameter.default_value;
-          if (value === null || value === undefined) return [name, ""];
+          if (value === null || value === undefined) {
+            if (sourceTask) throw new Error(`No current value found for ${name}`);
+            return [name, ""];
+          }
           loadedCount += 1;
           return [name, Array.isArray(value) ? JSON.stringify(value) : String(value)];
         }),
@@ -280,7 +291,10 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
         ?.detail;
-      toast.error(detail ?? "Failed to load current input parameters");
+      toast.error(
+        detail ??
+          (error instanceof Error ? error.message : "Failed to load current input parameters"),
+      );
     } finally {
       setIsReloadingInputs(false);
     }
@@ -304,6 +318,28 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
           </div>
         </div>
 
+        {sourceTask && (
+          <div className="alert alert-info text-sm">
+            <div>
+              Using the current task definition with matching values from a previous result.
+              <Link
+                className="link ml-2"
+                href={`/task-results/${encodeURIComponent(sourceTask.task_id)}`}
+              >
+                View source result
+              </Link>
+              <p className="mt-1">Calibrated outputs will be saved to the database.</p>
+            </div>
+          </div>
+        )}
+        {sourceTask && prefill.skipped.length > 0 && (
+          <div role="status" className="alert alert-warning text-sm">
+            Historical parameters not applied because they are missing or incompatible with the
+            current definition: {prefill.skipped.join(", ")}. Unfilled fields use the current task
+            defaults or calibration values.
+          </div>
+        )}
+
         <div className="grid items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
           <section className="min-w-0 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm">
             <div className="flex min-w-0 flex-col gap-4">
@@ -314,6 +350,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                   <select
                     className="select select-bordered w-full"
                     value={chipId}
+                    disabled={Boolean(sourceTask)}
                     onChange={(event) => setChipIdQuery(event.target.value)}
                   >
                     <option value="" disabled>
@@ -324,6 +361,9 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                         {chip.chip_id}
                       </option>
                     ))}
+                    {sourceTask && !chips.some((chip) => chip.chip_id === chipId) && (
+                      <option value={chipId}>{chipId}</option>
+                    )}
                   </select>
                 </label>
                 <label className="form-control min-w-0">
@@ -332,7 +372,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                     className="input input-bordered w-full"
                     value={target}
                     onChange={(event) => setTargetQuery(event.target.value)}
-                    disabled={isExecutionActive}
+                    disabled={isExecutionActive || Boolean(sourceTask)}
                     placeholder="e.g. 0 or 0-1"
                   />
                 </label>
@@ -374,6 +414,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                         <input
                           className="input input-sm input-bordered font-mono"
                           value={inputValues[name] ?? ""}
+                          disabled={parameter.user_override === "forbidden"}
                           onChange={(event) =>
                             setInputValues((current) => ({
                               ...current,
@@ -444,21 +485,26 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                 <input
                   type="checkbox"
                   className="toggle toggle-sm toggle-success mt-0.5 shrink-0"
-                  checked={persistOutputParameters}
-                  onChange={(event) => setPersistOutputParameters(event.target.checked)}
+                  checked={sourceTask ? updateParams : persistOutputParameters}
+                  onChange={(event) =>
+                    sourceTask
+                      ? setUpdateParams(event.target.checked)
+                      : setPersistOutputParameters(event.target.checked)
+                  }
                 />
                 <span className="min-w-0 break-words">
                   <span className="block break-words text-sm font-medium">
-                    Save calibrated outputs to DB
+                    {sourceTask ? "Update backend params" : "Save calibrated outputs to DB"}
                   </span>
                   <span className="block break-words text-xs text-base-content/50">
-                    Store this run&apos;s output parameters as the current calibration values.
-                    Update mapped YAML files and push to GitHub when integration is enabled.
+                    {sourceTask
+                      ? "Write output parameters back to qubex YAML files."
+                      : "Store this run's output parameters as the current calibration values. Update mapped YAML files and push to GitHub when integration is enabled."}
                   </span>
                 </span>
               </label>
 
-              {persistOutputParameters && (
+              {(sourceTask || persistOutputParameters) && (
                 <div className="alert alert-warning py-2 text-xs">
                   This run can change the calibration values used by later tasks.
                 </div>

@@ -91,6 +91,11 @@ def single_task_executor(
         branch=github_settings.get("branch", "main"),
     )
 
+    snapshot_exempt_tasks = {"Configure"} if reconfigure else set()
+    if source_execution_id is None and default_run_parameters is not None:
+        # Catalog runs can keep a source result for provenance without restoring its parameters.
+        snapshot_exempt_tasks.add(task_name)
+
     cal = CalibService(
         username,
         chip_id,
@@ -107,7 +112,7 @@ def single_task_executor(
         use_lock=True,
         parameter_overrides=parameter_overrides,
         source_task_id=source_task_id,
-        snapshot_exempt_tasks={"Configure"} if reconfigure else None,
+        snapshot_exempt_tasks=snapshot_exempt_tasks or None,
         force_update_params=update_params,
         persist_output_parameters=persist_output_parameters,
     )

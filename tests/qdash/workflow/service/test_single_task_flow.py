@@ -133,7 +133,8 @@ def test_single_task_executor_exempts_reconfigure_from_snapshot(monkeypatch):
     assert calls == ["Configure", "CheckRabi"]
 
 
-def test_single_task_executor_accepts_quick_run_parameters(monkeypatch):
+@pytest.mark.parametrize("source_task_id", [None, "source-task"])
+def test_single_task_executor_accepts_quick_run_parameters(monkeypatch, source_task_id):
     from qdash.workflow.service.single_task_flow import single_task_executor
 
     captured: dict[str, Any] = {}
@@ -158,12 +159,15 @@ def test_single_task_executor_accepts_quick_run_parameters(monkeypatch):
         task_name="CheckRabi",
         project_id="project-1",
         backend_name="fake",
+        source_task_id=source_task_id,
         default_run_parameters=defaults,
         persist_output_parameters=False,
         update_params=False,
     )
 
     assert captured["kwargs"]["source_execution_id"] is None
+    assert captured["kwargs"]["source_task_id"] == source_task_id
+    assert captured["kwargs"]["snapshot_exempt_tasks"] == {"CheckRabi"}
     assert captured["kwargs"]["backend_name"] == "fake"
     assert captured["kwargs"]["default_run_parameters"] == defaults
     assert captured["kwargs"]["persist_output_parameters"] is False

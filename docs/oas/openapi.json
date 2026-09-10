@@ -26253,6 +26253,18 @@
             ],
             "title": "Backend Name"
           },
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id",
+            "description": "Source result for provenance only; execution uses current task definitions"
+          },
           "input_parameter_overrides": {
             "additionalProperties": true,
             "type": "object",

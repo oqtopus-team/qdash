@@ -14,6 +14,20 @@ _CacheType = dict[tuple[str, str], tuple[dict[str, Any], dict[str, Any]]]
 class TestSnapshotParameterLoaderInit:
     """Test SnapshotParameterLoader initialization."""
 
+    def test_exempt_catalog_task_never_restores_history(self) -> None:
+        loader = SnapshotParameterLoader(
+            source_execution_id=None,
+            source_task_id="source-result",
+            project_id="proj-1",
+            snapshot_exempt_tasks={"CheckRabi"},
+            parameter_overrides={"input": {"freq": 5.0}},
+        )
+        with patch.object(loader, "_load") as load:
+            assert loader.get_snapshot("CheckRabi", "0") is None
+            load.assert_not_called()
+        assert loader.requires_snapshot("CheckRabi") is False
+        assert loader._parameter_overrides == {"input": {"freq": 5.0}}
+
     def test_init_defaults(self) -> None:
         loader = SnapshotParameterLoader(
             source_execution_id="exec-001",
