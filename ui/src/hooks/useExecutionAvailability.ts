@@ -20,6 +20,7 @@ export function useExecutionAvailability(request: ExecutionAvailabilityRequest, 
   });
 
   let disabledReason: string | null = null;
+  let isConflict = false;
   if (query.fetchStatus === "paused") {
     disabledReason = "Unable to check hardware availability while offline.";
   } else if (query.isError) {
@@ -27,8 +28,9 @@ export function useExecutionAvailability(request: ExecutionAvailabilityRequest, 
   } else if (!query.data || !query.isFetchedAfterMount) {
     disabledReason = "Checking hardware availability…";
   } else if (!query.data.data.available) {
+    isConflict = true;
     disabledReason = query.data.data.reason || "Hardware required by this run is in use.";
   }
 
-  return { disabledReason, refetch: query.refetch };
+  return { disabledReason, isConflict, refetch: query.refetch };
 }

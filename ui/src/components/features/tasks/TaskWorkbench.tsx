@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Play, RefreshCw, RotateCcw } from "lucide-react";
+import { ExternalLink, LockKeyhole, Play, RefreshCw, RotateCcw } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 
 import type { ExecutionResponseDetail, TaskInfo, TaskResultResponse } from "@/schemas";
@@ -144,6 +144,15 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     if (isReloadingInputs) return "Reloading inputs and checking hardware availability…";
     return availability.disabledReason;
   })();
+  const showHardwareConflict =
+    availability.isConflict && runDisabledReason === availability.disabledReason;
+  const isRunInProgress = isExecutionActive && (!executionError || isExecutionPendingCreation);
+  const runLabel =
+    isStarting || (isRunInProgress && execution?.status !== "running")
+      ? "Starting…"
+      : isRunInProgress
+        ? "Running…"
+        : "Run task";
   const resultTasks = useMemo(
     () =>
       (execution?.task ?? []).filter(
@@ -502,10 +511,15 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
               {runDisabledReason && (
                 <div
                   id={runDisabledReasonId}
-                  role="status"
-                  className="rounded-lg bg-base-200 p-3 text-xs text-base-content/70"
+                  role={showHardwareConflict ? "alert" : "status"}
+                  className={
+                    showHardwareConflict
+                      ? "alert alert-warning alert-soft sm:alert-horizontal p-3 text-xs"
+                      : "rounded-lg bg-base-200 p-3 text-xs text-base-content/70"
+                  }
                 >
-                  {runDisabledReason}
+                  {showHardwareConflict && <LockKeyhole size={16} aria-hidden="true" />}
+                  <span>{runDisabledReason}</span>
                 </div>
               )}
 
@@ -516,12 +530,12 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 aria-describedby={runDisabledReason ? runDisabledReasonId : undefined}
                 title={runDisabledReason ?? "Run task"}
               >
-                {isStarting ? (
-                  <span className="loading loading-spinner loading-sm" />
+                {isStarting || isRunInProgress ? (
+                  <span className="loading loading-spinner loading-sm" aria-hidden="true" />
                 ) : (
                   <Play size={17} />
                 )}
-                Run task
+                {runLabel}
               </button>
             </div>
           </section>

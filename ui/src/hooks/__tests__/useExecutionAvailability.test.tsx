@@ -34,6 +34,7 @@ describe("useExecutionAvailability", () => {
       { initialProps: { qid: "0" }, wrapper },
     );
     expect(result.current.disabledReason).toMatch(/Checking/);
+    expect(result.current.isConflict).toBe(false);
     await waitFor(() => expect(result.current.disabledReason).toBeNull());
     let resolve!: (value: unknown) => void;
     mocks.check.mockImplementationOnce(
@@ -55,7 +56,9 @@ describe("useExecutionAvailability", () => {
     const { wrapper } = setup();
     const { result } = renderHook(() => useExecutionAvailability(request), { wrapper });
     await waitFor(() => expect(result.current.disabledReason).toBe("Hardware in use"));
+    expect(result.current.isConflict).toBe(true);
     await waitFor(() => expect(result.current.disabledReason).toBeNull(), { timeout: 3500 });
+    expect(result.current.isConflict).toBe(false);
   });
 
   it("disables on a failed refresh even if the last response was available", async () => {
@@ -68,6 +71,7 @@ describe("useExecutionAvailability", () => {
       await result.current.refetch();
     });
     await waitFor(() => expect(result.current.disabledReason).toMatch(/Unable to check/));
+    expect(result.current.isConflict).toBe(false);
   });
 
   it("does not reuse another project's availability", async () => {
