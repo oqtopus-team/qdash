@@ -332,11 +332,13 @@ describe("TaskWorkbench run availability", () => {
   it("blocks conflicting targets and explains why", () => {
     mocks.availability.mockReturnValue({
       disabledReason: "Another calibration is using hardware required by this run.",
+      isConflict: true,
     });
     renderWorkbench();
     const button = screen.getByRole("button", { name: "Run task" });
     expect(button).toBeDisabled();
     expect(button).toHaveAccessibleDescription(/Another calibration is using hardware/);
+    expect(screen.getByRole("alert")).toHaveClass("alert-warning", "alert-soft");
     fireEvent.click(button);
     expect(mocks.post).not.toHaveBeenCalled();
     expect(mocks.availability).toHaveBeenCalledWith(
@@ -367,6 +369,7 @@ describe("TaskWorkbench run availability", () => {
     );
     await act(async () => resolve({ data: { available: false, reason: "MUX is busy" } }));
     await waitFor(() => expect(button).toHaveAccessibleDescription("MUX is busy"));
+    expect(screen.getByRole("alert")).toHaveTextContent("MUX is busy");
     expect(button).toBeDisabled();
     expect(mocks.post).not.toHaveBeenCalled();
   });
@@ -442,6 +445,7 @@ describe("TaskWorkbench run availability", () => {
     const button = screen.getByRole("button", { name: "Run task" });
     expect(button).toBeDisabled();
     expect(button).toHaveAccessibleDescription(disabledReason);
+    expect(screen.queryByRole("alert")).toBeNull();
     fireEvent.click(button);
     expect(mocks.post).not.toHaveBeenCalled();
   });
@@ -468,10 +472,40 @@ describe("TaskWorkbench run availability", () => {
 
   it("explains when a previous execution is still being awaited", () => {
     renderWorkbench({}, "?chip=chip-1&target=0&execution=execution-1");
-    expect(screen.getByRole("button", { name: "Run task" })).toHaveAccessibleDescription(
+    expect(screen.getByRole("button", { name: "Starting…" })).toHaveAccessibleDescription(
       "Waiting for this execution to finish before starting another run.",
     );
-    expect(screen.getByRole("button", { name: "Run task" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Starting…" })).toBeDisabled();
+  });
+
+  it("shows Starting while submission is pending", async () => {
+    let resolve!: (value: unknown) => void;
+    mocks.post.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    renderWorkbench();
+    fireEvent.click(screen.getByRole("button", { name: "Run task" }));
+    expect(screen.getByRole("button", { name: "Starting…" })).toBeDisabled();
+    await act(async () => resolve({ data: { execution_id: "execution-1" } }));
+  });
+
+  it.each([
+    ["scheduled", "Starting…", true],
+    ["pending", "Starting…", true],
+    ["running", "Running…", true],
+    ["completed", "Run task", false],
+    ["failed", "Run task", false],
+    ["cancelled", "Run task", false],
+  ])("labels a %s execution as %s", (status, label, disabled) => {
+    mocks.execution.mockReturnValue({ data: { data: { status, task: [] } } });
+    renderWorkbench({}, "?chip=chip-1&target=0&execution=execution-1");
+    const button = screen.getByRole("button", { name: label });
+    if (disabled) expect(button).toBeDisabled();
+    else expect(button).toBeEnabled();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("shows preparation status before the worker reports task progress", () => {
