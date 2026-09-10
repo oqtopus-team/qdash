@@ -744,6 +744,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             qid={taskResult.qid}
             taskId={taskResult.task_id}
             taskName={taskResult.task_name}
+            taskStatus={taskResult.status}
             outputParameters={(taskResult.output_parameters ?? {}) as Record<string, unknown>}
             outputParameterNames={taskResult.output_parameter_names ?? []}
             jsonFigurePaths={taskResult.json_figure_path ?? []}

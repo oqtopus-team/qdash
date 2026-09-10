@@ -43,6 +43,7 @@ def _source(**overrides: Any) -> SimpleNamespace:
     values: dict[str, Any] = {
         "task_id": "source-task",
         "name": "CheckResonatorSpectroscopy",
+        "status": "completed",
         "chip_id": "16Q",
         "qid": "4",
         "output_parameter_names": ["readout_frequency", "optimal_power"],
@@ -71,6 +72,64 @@ def test_validate_source_accepts_failed_spectroscopy_result() -> None:
     ) as find_one:
         find_one.return_value.run.return_value = source
         assert service._validate_source_task(_request(), "project") is source
+
+
+def test_validate_source_accepts_declared_parameter_from_failed_qubit_spectroscopy() -> None:
+    service = ManualUpdateService()
+    source = _source(
+        name="CheckQubitSpectroscopy",
+        status="failed",
+        output_parameter_names=[],
+    )
+    request = _request(parameters={"coarse_qubit_frequency": {"value": 5.0, "unit": "GHz"}})
+
+    with patch(
+        "qdash.api.services.manual_update_service.TaskResultHistoryDocument.find_one"
+    ) as find_one:
+        find_one.return_value.run.return_value = source
+        assert service._validate_source_task(request, "project") is source
+
+
+def test_validate_source_does_not_invent_parameters_for_completed_qubit_spectroscopy() -> None:
+    service = ManualUpdateService()
+    source = _source(
+        name="CheckQubitSpectroscopy",
+        status="completed",
+        output_parameter_names=[],
+    )
+
+    with (
+        patch(
+            "qdash.api.services.manual_update_service.TaskResultHistoryDocument.find_one"
+        ) as find_one,
+        pytest.raises(HTTPException, match="Unknown source output parameter"),
+    ):
+        find_one.return_value.run.return_value = source
+        service._validate_source_task(
+            _request(parameters={"coarse_qubit_frequency": {"value": 5.0, "unit": "GHz"}}),
+            "project",
+        )
+
+
+def test_validate_source_rejects_unknown_parameter_from_failed_qubit_spectroscopy() -> None:
+    service = ManualUpdateService()
+    source = _source(
+        name="CheckQubitSpectroscopy",
+        status="failed",
+        output_parameter_names=[],
+    )
+
+    with (
+        patch(
+            "qdash.api.services.manual_update_service.TaskResultHistoryDocument.find_one"
+        ) as find_one,
+        pytest.raises(HTTPException, match="Unknown source output parameter"),
+    ):
+        find_one.return_value.run.return_value = source
+        service._validate_source_task(
+            _request(parameters={"unsupported": {"value": 5.0, "unit": "GHz"}}),
+            "project",
+        )
 
 
 @pytest.mark.parametrize(
