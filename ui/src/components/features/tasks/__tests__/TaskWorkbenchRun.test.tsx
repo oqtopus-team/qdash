@@ -114,21 +114,33 @@ describe("TaskWorkbench run availability", () => {
         source_task_id: "source-task",
         run_parameter_overrides: { shots: 200 },
         input_parameter_overrides: { qubit_frequency: 5.2 },
-        persist_output_parameters: true,
-        update_params: true,
+        persist_output_parameters: false,
+        update_params: false,
         reconfigure: false,
       }),
     );
     expect(mocks.post).toHaveBeenCalledTimes(1);
   });
 
-  it("submits matching historical values and allows disabling backend updates", async () => {
+  it("uses the same save and reconfigure controls for re-execution", async () => {
     renderWorkbench(
       { input_parameters: { qubit_frequency: { value: 5.2, value_type: "float" } } },
       undefined,
       source,
     );
-    fireEvent.click(screen.getByRole("checkbox", { name: /Update backend params/ }));
+    const save = screen.getByRole("checkbox", { name: /Save calibrated outputs to DB/ });
+    const reconfigure = screen.getByRole("checkbox", { name: /Reconfigure hardware first/ });
+    expect(save).not.toBeChecked();
+    expect(reconfigure).not.toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: /Update backend params/ })).toBeNull();
+    expect(
+      screen.queryByText("This run can change the calibration values used by later tasks."),
+    ).toBeNull();
+    fireEvent.click(save);
+    fireEvent.click(reconfigure);
+    expect(
+      screen.getByText("This run can change the calibration values used by later tasks."),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Run task" }));
     await waitFor(() =>
       expect(mocks.post).toHaveBeenCalledWith("/tasks/CheckCoarseReadoutParams/execute", {
@@ -140,7 +152,7 @@ describe("TaskWorkbench run availability", () => {
         input_parameter_overrides: { qubit_frequency: 5.2 },
         persist_output_parameters: true,
         update_params: false,
-        reconfigure: false,
+        reconfigure: true,
       }),
     );
   });

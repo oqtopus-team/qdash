@@ -69,7 +69,6 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   const [runValues, setRunValues] = useState<Record<string, string>>({});
   const [reconfigure, setReconfigure] = useState(false);
   const [persistOutputParameters, setPersistOutputParameters] = useState(false);
-  const [updateParams, setUpdateParams] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [isReloadingInputs, setIsReloadingInputs] = useState(false);
   const previousTask = useRef(`${backend}:${task.name}`);
@@ -94,7 +93,6 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     setRunValues(prefill.run);
     setReconfigure(false);
     setPersistOutputParameters(false);
-    setUpdateParams(true);
     setInputValues(prefill.input);
     const taskKey = `${backend}:${task.name}`;
     if (previousTask.current !== taskKey) {
@@ -209,8 +207,8 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
           input_parameter_overrides: inputParameterOverrides,
           run_parameter_overrides: runParameterOverrides,
           reconfigure,
-          persist_output_parameters: sourceTask ? true : persistOutputParameters,
-          update_params: sourceTask ? updateParams : false,
+          persist_output_parameters: persistOutputParameters,
+          update_params: false,
           ...(sourceTask ? { source_task_id: sourceTask.task_id } : {}),
         },
       );
@@ -328,7 +326,6 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
               >
                 View source result
               </Link>
-              <p className="mt-1">Calibrated outputs will be saved to the database.</p>
             </div>
           </div>
         )}
@@ -485,26 +482,21 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 <input
                   type="checkbox"
                   className="toggle toggle-sm toggle-success mt-0.5 shrink-0"
-                  checked={sourceTask ? updateParams : persistOutputParameters}
-                  onChange={(event) =>
-                    sourceTask
-                      ? setUpdateParams(event.target.checked)
-                      : setPersistOutputParameters(event.target.checked)
-                  }
+                  checked={persistOutputParameters}
+                  onChange={(event) => setPersistOutputParameters(event.target.checked)}
                 />
                 <span className="min-w-0 break-words">
                   <span className="block break-words text-sm font-medium">
-                    {sourceTask ? "Update backend params" : "Save calibrated outputs to DB"}
+                    Save calibrated outputs to DB
                   </span>
                   <span className="block break-words text-xs text-base-content/50">
-                    {sourceTask
-                      ? "Write output parameters back to qubex YAML files."
-                      : "Store this run's output parameters as the current calibration values. Update mapped YAML files and push to GitHub when integration is enabled."}
+                    Store this run&apos;s output parameters as the current calibration values.
+                    Update mapped YAML files and push to GitHub when integration is enabled.
                   </span>
                 </span>
               </label>
 
-              {(sourceTask || persistOutputParameters) && (
+              {persistOutputParameters && (
                 <div className="alert alert-warning py-2 text-xs">
                   This run can change the calibration values used by later tasks.
                 </div>
