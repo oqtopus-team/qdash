@@ -37,8 +37,11 @@ jobs:
 
           trigger=$(jq -r 'try (.event.trigger) catch null | strings // ""' <<<"${PULLFROG_PROMPT}" 2>/dev/null || true)
           target_branch=$(jq -r 'try (.event.context.base_ref) catch null | strings // ""' <<<"${PULLFROG_PROMPT}" 2>/dev/null || true)
+          target_branch=${target_branch//[$'\n\r']/ }
 
-          if [ -z "${target_branch}" ] || [ "${target_branch}" = "${REVIEW_TARGET_BRANCH}" ] || [[ "${trigger}" == *comment* ]]; then
+          if [[ "${trigger}" == *comment* ]]; then
+            echo "run=true" >> "${GITHUB_OUTPUT}"
+          elif [ -z "${target_branch}" ] || [ "${target_branch}" = "${REVIEW_TARGET_BRANCH}" ]; then
             echo "run=true" >> "${GITHUB_OUTPUT}"
           else
             echo "run=false" >> "${GITHUB_OUTPUT}"
