@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,8 @@ import { TaskWorkbench } from "../TaskWorkbench";
 
 const mocks = vi.hoisted(() => ({
   availability: vi.fn(),
+  refetchAvailability: vi.fn(),
+  check: vi.fn(),
   chips: vi.fn(),
   execution: vi.fn(),
   post: vi.fn(),
@@ -22,8 +24,12 @@ vi.mock("@/client/chip/chip", () => ({
   getChipQubit: mocks.qubit,
 }));
 vi.mock("@/client/execution/execution", () => ({
+  checkExecutionAvailability: mocks.check,
   useGetExecution: mocks.execution,
   getGetExecutionLockStatusQueryKey: () => ["execution-lock"],
+}));
+vi.mock("@/contexts/ProjectContext", () => ({
+  useProject: () => ({ projectId: "project-1" }),
 }));
 vi.mock("@/hooks/useExecutionAvailability", () => ({
   useExecutionAvailability: mocks.availability,
@@ -53,7 +59,7 @@ function renderWorkbench(
 ) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <NuqsTestingAdapter searchParams={searchParams}>
+    <NuqsTestingAdapter searchParams={searchParams} hasMemory>
       <QueryClientProvider client={queryClient}>
         <TaskWorkbench
           task={{ ...task, ...taskOverrides }}
@@ -67,7 +73,8 @@ function renderWorkbench(
 
 beforeEach(() => {
   mocks.chips.mockReturnValue({ data: { data: { chips: [{ chip_id: "chip-1" }] } } });
-  mocks.availability.mockReturnValue({ disabledReason: null });
+  mocks.refetchAvailability.mockResolvedValue({});
+  mocks.availability.mockReturnValue({ disabledReason: null, refetch: mocks.refetchAvailability });
   mocks.execution.mockReturnValue({});
   mocks.post.mockResolvedValue({ data: { execution_id: "execution-1" } });
 });
@@ -184,6 +191,7 @@ describe("TaskWorkbench run availability", () => {
       expect(screen.getByRole("textbox", { name: "qubit_frequency" })).toHaveValue("5.5"),
     );
     expect(mocks.qubit).toHaveBeenCalledWith("source-chip", "2");
+    expect(mocks.refetchAvailability).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Run task" }));
     await waitFor(() =>
       expect(mocks.post).toHaveBeenCalledWith(
@@ -335,6 +343,94 @@ describe("TaskWorkbench run availability", () => {
       { parameters: { chip_id: "chip-1", qid: "0" } },
       true,
     );
+  });
+
+  it("checks a loaded QID before allowing execution without a Run click", async () => {
+    const { useExecutionAvailability } = await vi.importActual<
+      typeof import("@/hooks/useExecutionAvailability")
+    >("@/hooks/useExecutionAvailability");
+    mocks.availability.mockImplementation(useExecutionAvailability);
+    let resolve!: (value: unknown) => void;
+    mocks.check.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    renderWorkbench();
+    const button = screen.getByRole("button", { name: "Run task" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription("Checking hardware availability…");
+    expect(mocks.check).toHaveBeenCalledWith(
+      { parameters: { chip_id: "chip-1", qid: "0" } },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    await act(async () => resolve({ data: { available: false, reason: "MUX is busy" } }));
+    await waitFor(() => expect(button).toHaveAccessibleDescription("MUX is busy"));
+    expect(button).toBeDisabled();
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
+
+  it("keeps Run disabled until Reload has refreshed hardware availability", async () => {
+    const { useExecutionAvailability } = await vi.importActual<
+      typeof import("@/hooks/useExecutionAvailability")
+    >("@/hooks/useExecutionAvailability");
+    mocks.availability.mockImplementation(useExecutionAvailability);
+    mocks.check.mockResolvedValueOnce({ data: { available: true } });
+    mocks.qubit.mockResolvedValue({ data: { data: { qubit_frequency: { value: 5.5 } } } });
+    renderWorkbench();
+    const button = screen.getByRole("button", { name: "Run task" });
+    await waitFor(() => expect(button).toBeEnabled());
+    let resolve!: (value: unknown) => void;
+    mocks.check.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+    expect(button).toBeDisabled();
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: /qubit_frequency/ })).toHaveValue("5.5"),
+    );
+    expect(button).toBeDisabled();
+    await act(async () => resolve({ data: { available: false, reason: "MUX is busy" } }));
+    await waitFor(() => expect(button).toHaveAccessibleDescription("MUX is busy"));
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
+
+  it("checks a changed QID before enabling Run", async () => {
+    const { useExecutionAvailability } = await vi.importActual<
+      typeof import("@/hooks/useExecutionAvailability")
+    >("@/hooks/useExecutionAvailability");
+    mocks.availability.mockImplementation(useExecutionAvailability);
+    mocks.check.mockResolvedValueOnce({ data: { available: true } });
+    renderWorkbench();
+    const button = screen.getByRole("button", { name: "Run task" });
+    await waitFor(() => expect(button).toBeEnabled());
+    let resolve!: (value: unknown) => void;
+    mocks.check.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Qubit or coupling" }), {
+      target: { value: "4" },
+    });
+    expect(button).toBeDisabled();
+    await waitFor(() =>
+      expect(mocks.check).toHaveBeenLastCalledWith(
+        { parameters: { chip_id: "chip-1", qid: "4" } },
+        expect.anything(),
+      ),
+    );
+    await act(async () => resolve({ data: { available: false, reason: "MUX is busy" } }));
+    await waitFor(() => expect(button).toHaveAccessibleDescription("MUX is busy"));
+    expect(button).toBeDisabled();
+    expect(mocks.post).not.toHaveBeenCalled();
   });
 
   it.each([
