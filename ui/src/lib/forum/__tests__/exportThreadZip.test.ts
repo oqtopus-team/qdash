@@ -32,7 +32,7 @@ describe("buildForumThreadZip", () => {
     vi.restoreAllMocks();
   });
 
-  it("writes the expected front matter keys and omits null/empty ones, while always writing labels", async () => {
+  it("writes the OKF front matter keys in order, with the qdash block omitting absent fields", async () => {
     const post = makePost({
       number: 42,
       title: "Readout error spike",
@@ -51,19 +51,178 @@ describe("buildForumThreadZip", () => {
 
     const files = await unzipBlob(blob);
     const md = strFromU8(files["forum-0042-readout-error-spike/thread.md"]);
+    const topLevelKeys = [...md.matchAll(/^([a-z_]+):/gm)].map((m) => m[1]);
 
-    expect(md).toContain("number: 42");
+    expect(topLevelKeys).toEqual([
+      "type",
+      "title",
+      "description",
+      "resource",
+      "status",
+      "generated",
+      "qdash",
+    ]);
+    expect(md).toContain("type: Forum Thread");
     expect(md).toContain("title: Readout error spike");
+    expect(md).toContain("description: Hello from the plain content field.");
+    expect(md).toMatch(/^resource: .+\/forum\/post-1$/m);
+    expect(md).toContain("status: draft");
+    expect(md).toContain(`by: human:alice`);
+    expect(md).toMatch(/at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/);
+    expect(md).not.toMatch(/^tags:/m);
+    expect(md).not.toMatch(/^verified:/m);
+    expect(md).not.toMatch(/^sources:/m);
+    expect(md).toContain("number: 42");
     expect(md).toContain("category: bug");
-    expect(md).toContain("status: open");
-    expect(md).toContain("labels: []");
+    expect(md).toContain("thread_status: open");
     expect(md).toContain("author: alice");
     expect(md).toContain("chip_id: chip-64");
-    expect(md).not.toMatch(/^assignee:/m);
-    expect(md).not.toMatch(/^target_type:/m);
-    expect(md).not.toMatch(/^target_id:/m);
-    expect(md).not.toMatch(/^cooldown_id:/m);
+    expect(md).not.toMatch(/^\s+assignee:/m);
+    expect(md).not.toMatch(/^\s+target_type:/m);
+    expect(md).not.toMatch(/^\s+target_id:/m);
+    expect(md).not.toMatch(/^\s+cooldown_id:/m);
+    expect(md).toContain("reply_count: 0");
+    expect(md).toContain("exported_by: process:qdash-forum-export");
     expect(md).toMatch(/exported_at: ['"]?\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  });
+
+  it("maps a resolved thread to status: stable and an open thread to status: draft", async () => {
+    const resolvedPost = makePost({ number: 1, status: "resolved" });
+    const { blob: resolvedBlob } = await buildForumThreadZip(resolvedPost, []);
+    const resolvedMd = strFromU8((await unzipBlob(resolvedBlob))["forum-0001/thread.md"]);
+    expect(resolvedMd).toContain("status: stable");
+    expect(resolvedMd).toContain("thread_status: resolved");
+
+    const openPost = makePost({ number: 2, status: "open" });
+    const { blob: openBlob } = await buildForumThreadZip(openPost, []);
+    const openMd = strFromU8((await unzipBlob(openBlob))["forum-0002/thread.md"]);
+    expect(openMd).toContain("status: draft");
+    expect(openMd).toContain("thread_status: open");
+  });
+
+  it("emits verified only for a resolved thread with an assignee", async () => {
+    const resolvedWithAssignee = makePost({
+      number: 1,
+      status: "resolved",
+      assignee_username: "carol",
+      updated_at: "2026-08-02T04:00:00+00:00",
+    });
+    const { blob: verifiedBlob } = await buildForumThreadZip(resolvedWithAssignee, []);
+    const verifiedMd = strFromU8((await unzipBlob(verifiedBlob))["forum-0001/thread.md"]);
+    expect(verifiedMd).toMatch(/^verified:/m);
+    expect(verifiedMd).toContain("by: human:carol");
+    expect(verifiedMd).toContain("at: 2026-08-02T04:00:00.000Z");
+
+    const resolvedWithoutAssignee = makePost({ number: 2, status: "resolved" });
+    const { blob: noAssigneeBlob } = await buildForumThreadZip(resolvedWithoutAssignee, []);
+    const noAssigneeMd = strFromU8((await unzipBlob(noAssigneeBlob))["forum-0002/thread.md"]);
+    expect(noAssigneeMd).not.toMatch(/^verified:/m);
+
+    const openWithAssignee = makePost({
+      number: 3,
+      status: "open",
+      assignee_username: "carol",
+    });
+    const { blob: openBlob } = await buildForumThreadZip(openWithAssignee, []);
+    const openMd = strFromU8((await unzipBlob(openBlob))["forum-0003/thread.md"]);
+    expect(openMd).not.toMatch(/^verified:/m);
+  });
+
+  it("credits generated.by to the AI reply process identifier when the root post is an AI reply", async () => {
+    const humanPost = makePost({ number: 1, username: "alice" });
+    const { blob: humanBlob } = await buildForumThreadZip(humanPost, []);
+    const humanMd = strFromU8((await unzipBlob(humanBlob))["forum-0001/thread.md"]);
+    expect(humanMd).toContain("by: human:alice");
+
+    const aiPost = makePost({ number: 2, username: "qdash-bot", is_ai_reply: true });
+    const { blob: aiBlob } = await buildForumThreadZip(aiPost, []);
+    const aiMd = strFromU8((await unzipBlob(aiBlob))["forum-0002/thread.md"]);
+    expect(aiMd).toContain("by: process:qdash-ai-reply");
+  });
+
+  it("emits sources only when chip_id, target_type and target_id are all set, in the qubit and coupling URL forms", async () => {
+    const noTarget = makePost({ number: 1 });
+    const { blob: noTargetBlob } = await buildForumThreadZip(noTarget, []);
+    const noTargetMd = strFromU8((await unzipBlob(noTargetBlob))["forum-0001/thread.md"]);
+    expect(noTargetMd).not.toMatch(/^sources:/m);
+
+    const qubitPost = makePost({
+      number: 2,
+      chip_id: "chip-64",
+      target_type: "qubit",
+      target_id: "12",
+    });
+    const { blob: qubitBlob } = await buildForumThreadZip(qubitPost, []);
+    const qubitMd = strFromU8((await unzipBlob(qubitBlob))["forum-0002/thread.md"]);
+    expect(qubitMd).toMatch(/^sources:/m);
+    expect(qubitMd).toContain("id: target");
+    expect(qubitMd).toContain(`resource: ${window.location.origin}/chip/chip-64/qubit/12`);
+    expect(qubitMd).toContain("title: 12 · chip-64");
+
+    const couplingPost = makePost({
+      number: 3,
+      chip_id: "chip-64",
+      target_type: "coupling",
+      target_id: "12-13",
+    });
+    const { blob: couplingBlob } = await buildForumThreadZip(couplingPost, []);
+    const couplingMd = strFromU8((await unzipBlob(couplingBlob))["forum-0003/thread.md"]);
+    expect(couplingMd).toContain(
+      `resource: ${window.location.origin}/dashboard?chip=chip-64&type=coupling`,
+    );
+    expect(couplingMd).toContain("title: 12-13 · chip-64");
+  });
+
+  it("derives description from the first plain-text line of the rendered root markdown, skipping code/image/heading lines", async () => {
+    const post = makePost({
+      number: 1,
+      content: [
+        "```js",
+        "const skipped = true;",
+        "```",
+        "![alt](image.png)",
+        "# Heading not counted",
+        "",
+        "Some **bold** and ~~struck~~ and _italic_ and `code` and [link text](https://example.com) keeps target_id and chip_id intact.",
+      ].join("\n"),
+    });
+
+    const { blob } = await buildForumThreadZip(post, []);
+    const md = strFromU8((await unzipBlob(blob))["forum-0001/thread.md"]);
+    expect(md).toContain(
+      "description: Some bold and struck and italic and code and link text keeps target_id and chip_id intact.",
+    );
+  });
+
+  it("truncates a long description to 200 characters with a trailing ellipsis", async () => {
+    const longLine = "A".repeat(250);
+    const post = makePost({ number: 1, content: longLine });
+
+    const { blob } = await buildForumThreadZip(post, []);
+    const md = strFromU8((await unzipBlob(blob))["forum-0001/thread.md"]);
+    expect(md).toContain(`description: ${"A".repeat(200)}…`);
+  });
+
+  it("omits description when the root markdown has no plain-text content", async () => {
+    const post = makePost({ number: 1, content: "![alt](image.png)" });
+
+    const { blob } = await buildForumThreadZip(post, []);
+    const md = strFromU8((await unzipBlob(blob))["forum-0001/thread.md"]);
+    expect(md).not.toMatch(/^description:/m);
+  });
+
+  it("omits tags when the thread has no labels, and emits them otherwise", async () => {
+    const withoutLabels = makePost({ number: 1, labels: [] });
+    const { blob: withoutBlob } = await buildForumThreadZip(withoutLabels, []);
+    const withoutMd = strFromU8((await unzipBlob(withoutBlob))["forum-0001/thread.md"]);
+    expect(withoutMd).not.toMatch(/^tags:/m);
+
+    const withLabels = makePost({ number: 2, labels: ["hardware", "readout"] });
+    const { blob: withBlob } = await buildForumThreadZip(withLabels, []);
+    const withMd = strFromU8((await unzipBlob(withBlob))["forum-0002/thread.md"]);
+    expect(withMd).toMatch(/^tags:/m);
+    expect(withMd).toContain("- hardware");
+    expect(withMd).toContain("- readout");
   });
 
   it("concatenates replies as headings, marks AI replies, and omits the section when there are no replies", async () => {

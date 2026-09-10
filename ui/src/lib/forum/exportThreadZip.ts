@@ -62,24 +62,123 @@ function setIfPresent(target: Record<string, unknown>, key: string, value: unkno
   target[key] = value;
 }
 
-function buildFrontMatter(post: ForumPostResponse, replyCount: number): Record<string, unknown> {
+function resolveThreadTitle(post: ForumPostResponse): string {
+  return post.title?.trim() ? post.title : "Untitled topic";
+}
+
+function resourceUrl(path: string): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return origin ? `${origin}${path}` : path;
+}
+
+/** Mirrors `dashboardTargetHref` in ForumDetailPage.tsx without importing it. */
+function targetResourcePath(chipId: string, targetType: string, targetId: string): string {
+  if (targetType === "qubit") return `/chip/${chipId}/qubit/${targetId}`;
+  return `/dashboard?chip=${encodeURIComponent(chipId)}&type=coupling`;
+}
+
+const BARE_ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
+
+/** Normalizes a possibly timezone-less API timestamp to ISO8601; returns the raw value if it can't be parsed. */
+function toIsoTimestamp(raw: string): string {
+  const normalized = BARE_ISO_DATETIME.test(raw) ? `${raw}Z` : raw;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? raw : date.toISOString();
+}
+
+const HEADING_LINE = /^#{1,6}\s/;
+const IMAGE_OR_EMBED_LINE = /^!\[[^\]]*\]\([^)]*\)/;
+const DESCRIPTION_MAX_LENGTH = 200;
+
+function firstDescriptionLine(markdown: string): string | undefined {
+  let inFence = false;
+  for (const rawLine of markdown.split("\n")) {
+    const line = rawLine.trim();
+    if (/^```/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence || line === "") continue;
+    if (IMAGE_OR_EMBED_LINE.test(line) || HEADING_LINE.test(line)) continue;
+    return line;
+  }
+  return undefined;
+}
+
+function stripInlineMarkdown(text: string): string {
+  return text
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/~~([^~]+)~~/g, "$1")
+    .replace(/(^|[^A-Za-z0-9_])__([^_]+)__(?![A-Za-z0-9_])/g, "$1$2")
+    .replace(/(^|[^A-Za-z0-9_])_([^_]+)_(?![A-Za-z0-9_])/g, "$1$2")
+    .replace(/^#{1,6}\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function deriveDescription(rootMarkdown: string): string | undefined {
+  const line = firstDescriptionLine(rootMarkdown);
+  if (!line) return undefined;
+  const text = stripInlineMarkdown(line);
+  if (!text) return undefined;
+  if (text.length <= DESCRIPTION_MAX_LENGTH) return text;
+  return `${text.slice(0, DESCRIPTION_MAX_LENGTH)}…`;
+}
+
+/** Partial Open Knowledge Format v0.2 front matter; QDash-only fields live under `qdash`. */
+function buildFrontMatter(
+  post: ForumPostResponse,
+  replies: ForumPostResponse[],
+  rootMarkdown: string,
+): Record<string, unknown> {
   const frontMatter: Record<string, unknown> = {};
 
-  setIfPresent(frontMatter, "number", post.number);
-  setIfPresent(frontMatter, "title", post.title);
-  setIfPresent(frontMatter, "category", post.category);
-  setIfPresent(frontMatter, "status", post.status);
-  frontMatter.labels = post.labels ?? [];
-  setIfPresent(frontMatter, "author", post.username);
-  setIfPresent(frontMatter, "assignee", post.assignee_username);
-  setIfPresent(frontMatter, "chip_id", post.chip_id);
-  setIfPresent(frontMatter, "target_type", post.target_type);
-  setIfPresent(frontMatter, "target_id", post.target_id);
-  setIfPresent(frontMatter, "cooldown_id", post.cooldown_id);
-  setIfPresent(frontMatter, "created_at", post.created_at);
-  setIfPresent(frontMatter, "updated_at", post.updated_at);
-  frontMatter.reply_count = replyCount;
-  frontMatter.exported_at = new Date().toISOString();
+  frontMatter.type = "Forum Thread";
+  frontMatter.title = resolveThreadTitle(post);
+  setIfPresent(frontMatter, "description", deriveDescription(rootMarkdown));
+  frontMatter.resource = resourceUrl(`/forum/${post.id}`);
+  if (post.labels && post.labels.length > 0) {
+    frontMatter.tags = post.labels;
+  }
+  frontMatter.status = post.status === "resolved" ? "stable" : "draft";
+  frontMatter.generated = {
+    by: post.is_ai_reply ? "process:qdash-ai-reply" : `human:${post.username}`,
+    at: toIsoTimestamp(post.created_at),
+  };
+  if (post.status === "resolved" && post.assignee_username) {
+    frontMatter.verified = [
+      { by: `human:${post.assignee_username}`, at: toIsoTimestamp(post.updated_at) },
+    ];
+  }
+  if (post.chip_id && post.target_type && post.target_id) {
+    frontMatter.sources = [
+      {
+        id: "target",
+        resource: resourceUrl(targetResourcePath(post.chip_id, post.target_type, post.target_id)),
+        title: `${post.target_id} · ${post.chip_id}`,
+      },
+    ];
+  }
+
+  const qdash: Record<string, unknown> = {};
+  setIfPresent(qdash, "number", post.number);
+  setIfPresent(qdash, "category", post.category);
+  setIfPresent(qdash, "thread_status", post.status);
+  setIfPresent(qdash, "author", post.username);
+  setIfPresent(qdash, "assignee", post.assignee_username);
+  setIfPresent(qdash, "chip_id", post.chip_id);
+  setIfPresent(qdash, "target_type", post.target_type);
+  setIfPresent(qdash, "target_id", post.target_id);
+  setIfPresent(qdash, "cooldown_id", post.cooldown_id);
+  qdash.reply_count = replies.length;
+  setIfPresent(qdash, "created_at", post.created_at);
+  setIfPresent(qdash, "updated_at", post.updated_at);
+  qdash.exported_at = new Date().toISOString();
+  qdash.exported_by = "process:qdash-forum-export";
+  frontMatter.qdash = qdash;
 
   return frontMatter;
 }
@@ -90,9 +189,9 @@ function buildThreadMarkdown(
   rootMarkdown: string,
   replyMarkdowns: string[],
 ): string {
-  const frontMatter = buildFrontMatter(post, replies.length);
-  const yamlBlock = ["---", stringify(frontMatter).trimEnd(), "---"].join("\n");
-  const title = post.title?.trim() ? post.title : "Untitled topic";
+  const frontMatter = buildFrontMatter(post, replies, rootMarkdown);
+  const yamlBlock = ["---", stringify(frontMatter, { lineWidth: 0 }).trimEnd(), "---"].join("\n");
+  const title = resolveThreadTitle(post);
 
   const sections = [yamlBlock, `# ${title}`, rootMarkdown.trim()];
 
