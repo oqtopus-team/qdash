@@ -101,6 +101,38 @@ describe("TaskWorkbench run availability", () => {
     expect(screen.getByRole("button", { name: "Run task" })).toBeDisabled();
   });
 
+  it("defaults to the newest active chip when none is selected", async () => {
+    mocks.chips.mockReturnValue({
+      data: {
+        data: {
+          chips: [
+            {
+              chip_id: "inactive-new",
+              activity_status: "inactive",
+              installed_at: "2026-06-01T00:00:00Z",
+            },
+            {
+              chip_id: "active-old",
+              activity_status: "active",
+              installed_at: "2024-06-01T00:00:00Z",
+            },
+            {
+              chip_id: "active-new",
+              activity_status: "active",
+              installed_at: "2025-06-01T00:00:00Z",
+            },
+          ],
+        },
+      },
+    });
+
+    renderWorkbench({}, "?target=0");
+
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Chip" })).toHaveValue("active-new"),
+    );
+  });
+
   it("explains the missing chip", () => {
     mocks.chips.mockReturnValue({ data: { data: { chips: [] } } });
     renderWorkbench({}, "?target=0");

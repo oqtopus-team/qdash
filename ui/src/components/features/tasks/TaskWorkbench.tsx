@@ -20,6 +20,7 @@ import { ExecutionTaskProgress } from "@/components/features/execution/Execution
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useToast } from "@/components/ui/Toast";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
+import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
 import { formatTaskParameter, parseTaskParameter } from "@/lib/utils/task-parameters";
 
 interface TaskWorkbenchProps {
@@ -40,7 +41,10 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { data: chipsData } = useListChips();
-  const chips = chipsData?.data?.chips ?? [];
+  const chips = useMemo(
+    () => sortChipsByDefaultPriority(chipsData?.data?.chips ?? []),
+    [chipsData?.data?.chips],
+  );
   const defaultChipId = chips[0]?.chip_id ?? "";
 
   const [chipIdQuery, setChipIdQuery] = useQueryState("chip", parseAsString);

@@ -8,6 +8,7 @@ import type { SingleValue } from "react-select";
 
 import { useListChips } from "@/client/chip/chip";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
+import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
 import { formatDate } from "@/lib/utils/datetime";
 
 interface ChipOption {
@@ -34,27 +35,18 @@ export function ChipSelector({ selectedChip, onChipSelect }: ChipSelectorProps) 
   const sortedOptions = useMemo(() => {
     if (!chips?.data?.chips) return [];
 
-    return [...chips.data.chips]
-      .sort((a, b) => {
-        const statusA = a.activity_status === "inactive" ? 1 : 0;
-        const statusB = b.activity_status === "inactive" ? 1 : 0;
-        if (statusA !== statusB) return statusA - statusB;
-        const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
-        const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
-        return dateB - dateA;
-      })
-      .map((chip) => {
-        const activityStatus = chip.activity_status ?? "active";
-        const installedAt = chip.installed_at ? `(${formatDate(chip.installed_at)})` : "";
-        const inactiveLabel = activityStatus === "inactive" ? "Inactive" : "";
+    return sortChipsByDefaultPriority(chips.data.chips).map((chip) => {
+      const activityStatus = chip.activity_status ?? "active";
+      const installedAt = chip.installed_at ? `(${formatDate(chip.installed_at)})` : "";
+      const inactiveLabel = activityStatus === "inactive" ? "Inactive" : "";
 
-        return {
-          value: chip.chip_id,
-          label: [chip.chip_id, installedAt, inactiveLabel].filter(Boolean).join(" "),
-          installed_at: chip.installed_at,
-          activity_status: activityStatus,
-        };
-      });
+      return {
+        value: chip.chip_id,
+        label: [chip.chip_id, installedAt, inactiveLabel].filter(Boolean).join(" "),
+        installed_at: chip.installed_at,
+        activity_status: activityStatus,
+      };
+    });
   }, [chips]);
 
   const styles = useSelectStyles<ChipOption>();
