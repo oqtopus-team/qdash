@@ -56,6 +56,33 @@ def scopes_conflict(left: ExecutionResourceScope, right: ExecutionResourceScope)
     return bool(set(left.resources).intersection(right.resources))
 
 
+def merge_resource_scopes(
+    left: ExecutionResourceScope, right: ExecutionResourceScope
+) -> ExecutionResourceScope:
+    """Keep every reservation when planning additional steps on the same chip."""
+    if left.chip_id != right.chip_id:
+        raise ValueError("A pipeline cannot change chips within its hardware reservation")
+    return ExecutionResourceScope(
+        left.chip_id,
+        tuple(sorted(set(left.resources).union(right.resources))),
+        left.exclusive or right.exclusive,
+    )
+
+
+def scope_contains(reserved: ExecutionResourceScope, requested: ExecutionResourceScope) -> bool:
+    """Whether an operation is entirely covered by the original reservation."""
+    if reserved.chip_id != requested.chip_id:
+        return False
+    return reserved.exclusive or (
+        not requested.exclusive and set(requested.resources).issubset(reserved.resources)
+    )
+
+
+def resolve_workflow_resource_scope(chip_id: str) -> ExecutionResourceScope:
+    """Saved Python flows have unknown future steps: reserve the complete chip."""
+    return ExecutionResourceScope(chip_id.strip(), exclusive=True)
+
+
 def _target_mux_ids(parameters: dict[str, Any]) -> set[int] | None:
     mux_ids = parameters.get("mux_ids")
     if isinstance(mux_ids, list) and mux_ids:

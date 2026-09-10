@@ -61,6 +61,10 @@ def finalize_executions_by_flow_run_id(
     ).run()
 
     if not executions:
+        if release_lock:
+            # Cron pipelines reserve before their first transform, which may
+            # fail before any step history exists.
+            ExecutionLockDocument.unlock(project_id, execution_id=f"flow:{flow_run_id}")
         logger.info(
             "%s: no matching executions for flow_run_id=%s",
             context,
@@ -139,6 +143,7 @@ def finalize_executions_by_flow_run_id(
         if execution.execution_id in closed_execution_ids
         or execution.status in ("completed", "failed", "cancelled")
     ]
+    lock_owner_ids.append(f"flow:{flow_run_id}")
     if release_lock and lock_owner_ids:
         try:
             collection = ExecutionLockDocument.get_motor_collection()

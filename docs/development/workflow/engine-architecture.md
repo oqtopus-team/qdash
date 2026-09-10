@@ -209,6 +209,19 @@ channels on the same module. Module claims use the same resource resolver as
 the CR scheduler. Runs whose targets or wiring cannot be resolved claim the
 whole chip as a conservative fallback.
 
+Before a step pipeline starts, its reservation includes the union of its input
+targets, explicit `ConfigureAll` MUXes, and predefined `SetCRSchedule` pairs.
+Unknown step classes reserve the whole chip. The reservation remains held
+across filtering and step transitions, using a fixed owner independent of the
+execution-history ID created for each step. Task calls and isolated workers
+reject targets outside that reservation before touching hardware.
+
+The API cannot determine every future step of a saved Python flow from its
+input parameters, so saved-flow dispatch and UI availability checks reserve
+the whole chip. Single-task runs retain target-scoped reservations. The UI
+disables conflicting runs and explains the chip-wide reservation in the flow
+confirmation dialog. No user flow code is executed by the availability check.
+
 **InMemory Implementations** (for testing):
 - `InMemoryExecutionRepository`
 - `InMemoryChipRepository`

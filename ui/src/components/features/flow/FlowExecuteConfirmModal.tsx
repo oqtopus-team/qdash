@@ -70,6 +70,10 @@ export function FlowExecuteConfirmModal({
             <div>
               <h3 className="font-medium mb-2">Chip ID</h3>
               <p className="text-base-content/80">{chipId}</p>
+              <p className="mt-1 text-sm text-base-content/70">
+                This workflow reserves the entire chip for all its steps. Other runs on this chip
+                must wait until the workflow finishes.
+              </p>
             </div>
 
             {description && (

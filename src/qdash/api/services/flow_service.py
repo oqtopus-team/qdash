@@ -35,7 +35,10 @@ from qdash.common.config.path_resolver import (
     resolve_workflow_templates_dir,
     to_container_user_flow_path,
 )
-from qdash.common.execution_resources import resolve_execution_resource_scope
+from qdash.common.execution_resources import (
+    resolve_execution_resource_scope,
+    resolve_workflow_resource_scope,
+)
 from qdash.common.utils.datetime import now
 from qdash.config import get_settings
 from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
@@ -411,6 +414,7 @@ class FlowService:
             username=username,
             chip_id=chip_id,
             parameters=parameters,
+            workflow=True,
         )
 
         try:
@@ -522,6 +526,7 @@ class FlowService:
             username=username,
             chip_id=chip_id,
             parameters=parameters,
+            workflow=True,
         )
 
         try:
@@ -902,12 +907,19 @@ class FlowService:
             )
         if self._execution_lock_repo is None:
             raise HTTPException(status_code=503, detail="Execution availability is unavailable")
-        scope = resolve_execution_resource_scope(chip_id, parameters)
+        scope = (
+            resolve_workflow_resource_scope(chip_id)
+            if request.flow_name is not None
+            else resolve_execution_resource_scope(chip_id, parameters)
+        )
         if self._execution_lock_repo.has_conflict(project_id, scope):
             return ExecutionAvailabilityResponse(
                 available=False,
                 reason=(
-                    "Another calibration is using hardware required by this run. "
+                    "This workflow requires the entire chip for its steps. "
+                    "Another calibration is using this chip; wait for it to finish."
+                    if request.flow_name is not None
+                    else "Another calibration is using hardware required by this run. "
                     "Wait for it to finish or select different targets."
                 ),
             )
@@ -922,6 +934,7 @@ class FlowService:
         username: str,
         chip_id: str,
         parameters: dict[str, Any],
+        workflow: bool = False,
     ) -> str | None:
         """Claim the project execution lock for a run about to be dispatched.
 
@@ -960,7 +973,11 @@ class FlowService:
             return None
 
         execution_id = generate_execution_id(username, chip_id, project_id=project_id)
-        scope = resolve_execution_resource_scope(chip_id, parameters)
+        scope = (
+            resolve_workflow_resource_scope(chip_id)
+            if workflow
+            else resolve_execution_resource_scope(chip_id, parameters)
+        )
         if not self._execution_lock_repo.try_lock(
             project_id=project_id,
             execution_id=execution_id,

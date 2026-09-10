@@ -140,6 +140,7 @@ class MockExecutionLockRepository:
         self.locked = locked
         self.owner = owner
         self.try_lock_calls: list[str | None] = []
+        self.unlock_calls: list[str | None] = []
 
     def is_locked(self, project_id: str) -> bool:
         return self.locked
@@ -164,6 +165,9 @@ class MockExecutionLockRepository:
         self.owner = execution_id
 
     def unlock(self, project_id: str, execution_id: str | None = None) -> None:
+        self.unlock_calls.append(execution_id)
+        if execution_id is not None and execution_id != self.owner:
+            return
         self.locked = False
         self.owner = None
 
@@ -932,6 +936,7 @@ def test_pipeline_owns_one_execution_per_calibration_step(
     assert all(record.config.note["flow_run_id"] == "flow-1" for record in env.records)
     assert all(record.config.skip_execution is False for record in env.records)
     assert env.lock.try_lock_calls == ["exec-reserved"]
+    assert env.lock.unlock_calls == ["exec-reserved"]
     assert env.lock.locked is False
     assert session.flow_name == "one"
     with pytest.raises(RuntimeError, match="No active"):
@@ -1061,3 +1066,205 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
     )
     assert [record.status for record in env.records] == ["completed", "completed"]
     assert env.lock.locked is False
+
+
+@pytest.fixture
+def pipeline_wiring(tmp_path, monkeypatch):
+    from qdash.common import execution_resources
+
+    path = tmp_path / "chip-1" / "config" / "wiring.yaml"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        "chip-1:\n"
+        + "".join(
+            f"  - mux: {mux}\n    ctrl: [C{mux}-1]\n    read_out: R{mux}-1\n" for mux in range(4)
+        )
+    )
+    monkeypatch.setattr(execution_resources, "resolve_config_base_path", lambda: tmp_path)
+
+
+def test_pipeline_plan_includes_later_configuration_and_schedule(pipeline_wiring):
+    from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
+    from qdash.workflow.service.steps import ConfigureAll, OneQubitCheck, SetCRSchedule
+
+    scope = plan_pipeline_resources(
+        "chip-1",
+        QubitTargets(["0"]),
+        [OneQubitCheck(), ConfigureAll(mux_ids=[1]), SetCRSchedule(schedule=[[("8", "12")]])],
+    )
+    assert not scope.exclusive
+    assert {r for r in scope.resources if r.startswith("mux:")} == {
+        "mux:0",
+        "mux:1",
+        "mux:2",
+        "mux:3",
+    }
+
+
+def test_unknown_step_plan_is_chip_exclusive(pipeline_wiring):
+    from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
+
+    scope = plan_pipeline_resources("chip-1", QubitTargets(["0"]), [BoomStep()])
+    assert scope.exclusive
+
+
+def test_pipeline_blocks_on_later_step_resources_before_running_any_step(
+    pipeline_execution_env,
+    pipeline_wiring,
+    monkeypatch,
+):
+    from qdash.repository.inmemory.execution_lock import InMemoryExecutionLockRepository
+    from qdash.workflow.service.steps import ConfigureAll, CustomOneQubit
+
+    repo = InMemoryExecutionLockRepository()
+    assert repo.try_lock("project-1", "other-run", "chip-1", ("mux:1",), False)
+    run_step = MagicMock()
+    monkeypatch.setattr(CustomOneQubit, "execute", run_step)
+    session = CalibService(
+        "alice", "chip-1", project_id="project-1", enable_github=False, lock_repo=repo
+    )
+    with pytest.raises(RuntimeError, match="already running"):
+        session.run(QubitTargets(["0"]), [CustomOneQubit(), ConfigureAll(mux_ids=[1])])
+    run_step.assert_not_called()
+    assert repo.is_locked("project-1")
+    assert not repo.try_lock("project-1", "third", "chip-1", ("mux:1",), False)
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_pipeline_retains_whole_plan_and_releases_its_original_owner(
+    pipeline_execution_env,
+    pipeline_wiring,
+    monkeypatch,
+    fail,
+):
+    from qdash.repository.inmemory.execution_lock import InMemoryExecutionLockRepository
+    from qdash.workflow.service.steps import ConfigureAll, CustomOneQubit
+
+    repo = InMemoryExecutionLockRepository()
+    assert repo.try_lock("project-1", "exec-reserved", "chip-1", ("mux:0",), False)
+    assert repo.try_lock("project-1", "other-chip", "chip-2", ("mux:0",), False)
+    seen = []
+
+    def first(self, service, targets, ctx):
+        seen.append(service.execution_id)
+        assert not repo.try_lock("project-1", "intruder", "chip-1", ("mux:1",), False)
+        return ctx
+
+    def second(self, service, targets, ctx):
+        seen.append(service.execution_id)
+        assert not repo.try_lock("project-1", "intruder", "chip-1", ("mux:0",), False)
+        assert not repo.try_lock("project-1", "intruder", "chip-1", ("mux:1",), False)
+        if fail:
+            raise RuntimeError("second step failed")
+        return ctx
+
+    monkeypatch.setattr(CustomOneQubit, "execute", first)
+    monkeypatch.setattr(ConfigureAll, "execute", second)
+    session = CalibService(
+        "alice",
+        "chip-1",
+        project_id="project-1",
+        enable_github=False,
+        lock_repo=repo,
+        counter_repo=FakeExecutionCounterRepository(2),
+    )
+    if fail:
+        with pytest.raises(RuntimeError, match="second step failed"):
+            session.run(QubitTargets(["0"]), [CustomOneQubit(), ConfigureAll(mux_ids=[1])])
+    else:
+        session.run(QubitTargets(["0"]), [CustomOneQubit(), ConfigureAll(mux_ids=[1])])
+    assert seen[0] == "exec-reserved"
+    assert seen[1] != seen[0]
+    assert repo.try_lock("project-1", "next-run", "chip-1", (), True)
+    assert not repo.try_lock("project-1", "other", "chip-2", ("mux:0",), False)
+
+
+def test_pipeline_rejects_unplanned_targets_before_later_hardware_step(
+    pipeline_execution_env,
+    pipeline_wiring,
+    monkeypatch,
+):
+    from qdash.workflow.service.steps import CustomOneQubit, SetCRSchedule
+
+    def change_targets(self, service, targets, ctx):
+        ctx.candidate_qids = ["12"]  # The declared schedule only reserved MUX 0.
+        return ctx
+
+    run_step = MagicMock()
+    monkeypatch.setattr(SetCRSchedule, "execute", change_targets)
+    monkeypatch.setattr(CustomOneQubit, "execute", run_step)
+    session = CalibService(
+        "alice",
+        "chip-1",
+        project_id="project-1",
+        enable_github=False,
+        lock_repo=pipeline_execution_env.lock,
+    )
+    with pytest.raises(RuntimeError, match="outside the workflow"):
+        session.run(QubitTargets(["0"]), [SetCRSchedule(schedule=[[("0", "1")]]), CustomOneQubit()])
+    run_step.assert_not_called()
+    assert not pipeline_execution_env.lock.locked
+
+
+def test_task_and_isolated_worker_reject_unreserved_hardware(pipeline_wiring, monkeypatch):
+    from qdash.common.execution_resources import resolve_execution_resource_scope
+    from qdash.workflow.service._internal.scheduling_tasks import _create_isolated_session
+
+    scope = resolve_execution_resource_scope("chip-1", {"qid": "0"})
+    session = CalibService(
+        "alice",
+        "chip-1",
+        project_id="project-1",
+        use_lock=False,
+        resource_scope=scope,
+        enable_github=False,
+    )
+    orchestrator = MagicMock()
+    session._orchestrator = orchestrator
+    with pytest.raises(RuntimeError, match="outside the workflow"):
+        session.execute_task("CheckRabi", "4")
+    with pytest.raises(RuntimeError, match="outside the workflow"):
+        session.execute_task_batch("CheckRabi", ["0", "4"])
+    with pytest.raises(RuntimeError, match="outside the workflow"):
+        session.execute_task(
+            "ConfigureAll", "", {"ConfigureAll": {"run_parameters": {"mux_ids": {"value": [1]}}}}
+        )
+    orchestrator.run_task.assert_not_called()
+    orchestrator.run_task_batch.assert_not_called()
+    with pytest.raises(RuntimeError, match="outside the workflow"):
+        _create_isolated_session(
+            {
+                "username": "alice",
+                "chip_id": "chip-1",
+                "project_id": "project-1",
+                "execution_id": "child",
+                "backend_name": "fake",
+                "note": {
+                    "hardware_reservation": {
+                        "chip_id": scope.chip_id,
+                        "resources": list(scope.resources),
+                        "exclusive": False,
+                    }
+                },
+            },
+            ["4"],
+        )
+
+
+def test_pipeline_keeps_supplied_reservation_owner(pipeline_execution_env, monkeypatch):
+    from qdash.workflow.service.steps import CustomOneQubit
+
+    monkeypatch.setattr(CustomOneQubit, "execute", lambda self, service, targets, ctx: ctx)
+    session = CalibService(
+        "alice",
+        "chip-1",
+        project_id="project-1",
+        enable_github=False,
+        execution_id="exec-reserved",
+        lock_repo=pipeline_execution_env.lock,
+    )
+    session.run(QubitTargets(["0"]), [CustomOneQubit()])
+    assert pipeline_execution_env.lock.try_lock_calls == ["exec-reserved"]
+    assert pipeline_execution_env.lock.unlock_calls == ["exec-reserved"]
+    with pytest.raises(RuntimeError, match="No hardware reservation"):
+        session.execute_task("CheckRabi", "0")

@@ -1059,7 +1059,7 @@ def test_release_execution_lock_survives_a_failing_unlock() -> None:
     )
 
 
-def test_availability_resolves_saved_flow_defaults_and_request_overrides(
+def test_workflow_availability_is_chip_exclusive_despite_target_overrides(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from qdash.api.schemas.execution import ExecutionAvailabilityRequest
@@ -1082,12 +1082,12 @@ def test_availability_resolves_saved_flow_defaults_and_request_overrides(
         "project-1",
     )
     assert not result.available
-    assert result.reason and "hardware required by this run" in result.reason
+    assert result.reason and "entire chip" in result.reason
     flow_repo.find_by_project_and_name.assert_called_once_with("project-1", "my-flow")
-    resolve.assert_called_once_with(
-        "selected-chip", {"chip_id": "selected-chip", "mux_ids": [1], "qids": ["4"]}
+    resolve.assert_not_called()
+    lock_repo.has_conflict.assert_called_once_with(
+        "project-1", ExecutionResourceScope("selected-chip", exclusive=True)
     )
-    lock_repo.has_conflict.assert_called_once_with("project-1", scope)
     lock_repo.try_lock.assert_not_called()
 
 
@@ -1101,3 +1101,31 @@ def test_availability_rejects_missing_flow() -> None:
             ExecutionAvailabilityRequest(flow_name="missing"), "project-1"
         )
     assert error.value.status_code == 404
+
+
+def test_workflow_dispatch_reserves_whole_chip_while_single_task_stays_scoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from qdash.common.execution_resources import ExecutionResourceScope
+
+    scope = ExecutionResourceScope("chip-1", ("mux:0",), False)
+    monkeypatch.setattr(flow_service, "resolve_execution_resource_scope", lambda *args: scope)
+    monkeypatch.setattr(flow_service, "generate_execution_id", lambda *args, **kwargs: "owner")
+    lock_repo = MagicMock()
+    lock_repo.try_lock.return_value = True
+    service = FlowService(MagicMock(), lock_repo)
+    for workflow in (True, False):
+        service._claim_execution_lock(
+            project_id="project-1",
+            username="alice",
+            chip_id="chip-1",
+            parameters={"qid": "0"},
+            workflow=workflow,
+        )
+        lock_repo.try_lock.assert_called_with(
+            project_id="project-1",
+            execution_id="owner",
+            chip_id="chip-1",
+            resources=() if workflow else ("mux:0",),
+            exclusive=workflow,
+        )
