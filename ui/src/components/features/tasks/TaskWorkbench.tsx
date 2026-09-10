@@ -141,6 +141,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     }
     if (!chipId) return "Select a chip to run this task.";
     if (!target.trim()) return "Enter a qubit or coupling to run this task.";
+    if (isReloadingInputs) return "Reloading inputs and checking hardware availability…";
     return availability.disabledReason;
   })();
   const resultTasks = useMemo(
@@ -223,6 +224,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   const handleReloadInputParameters = async () => {
     if (!chipId || !target.trim()) return;
     setIsReloadingInputs(true);
+    const availabilityCheck = availability.refetch();
     try {
       const qid = target.trim();
       const isCoupling = task.task_type === "coupling" || qid.includes("-");
@@ -288,6 +290,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
           (error instanceof Error ? error.message : "Failed to load current input parameters"),
       );
     } finally {
+      await availabilityCheck;
       setIsReloadingInputs(false);
     }
   };
