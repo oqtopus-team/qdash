@@ -86,43 +86,49 @@ function toIsoTimestamp(raw: string): string {
   return Number.isNaN(date.getTime()) ? raw : date.toISOString();
 }
 
-const HEADING_LINE = /^#{1,6}\s/;
-const IMAGE_OR_EMBED_LINE = /^!\[[^\]]*\]\([^)]*\)/;
 const DESCRIPTION_MAX_LENGTH = 200;
+const NON_DESCRIPTIVE_BLOCK_TYPES = new Set([
+  "heading",
+  "codeBlock",
+  "table",
+  "image",
+  "video",
+  "audio",
+  "file",
+]);
 
-function firstDescriptionLine(markdown: string): string | undefined {
-  let inFence = false;
-  for (const rawLine of markdown.split("\n")) {
-    const line = rawLine.trim();
-    if (/^```/.test(line)) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence || line === "") continue;
-    if (IMAGE_OR_EMBED_LINE.test(line) || HEADING_LINE.test(line)) continue;
-    return line;
+/** Concatenates the plain text of BlockNote inline content, descending into links. */
+function inlineText(node: unknown): string {
+  if (Array.isArray(node)) return node.map(inlineText).join("");
+  if (node === null || typeof node !== "object") return "";
+  const obj = node as BlockRecord;
+  if (typeof obj.text === "string") return obj.text;
+  return inlineText(obj.content);
+}
+
+function blockText(block: BlockRecord): string {
+  const own = inlineText(block.content).replace(/\s+/g, " ").trim();
+  if (own) return own;
+  return firstBlockText(block.children);
+}
+
+function firstBlockText(node: unknown): string {
+  if (!Array.isArray(node)) return "";
+  for (const block of node as BlockRecord[]) {
+    if (block === null || typeof block !== "object") continue;
+    if (typeof block.type === "string" && NON_DESCRIPTIVE_BLOCK_TYPES.has(block.type)) continue;
+    const text = blockText(block);
+    if (text) return text;
   }
-  return undefined;
+  return "";
 }
 
-function stripInlineMarkdown(text: string): string {
-  return text
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/\*([^*]+)\*/g, "$1")
-    .replace(/~~([^~]+)~~/g, "$1")
-    .replace(/(^|[^A-Za-z0-9_])__([^_]+)__(?![A-Za-z0-9_])/g, "$1$2")
-    .replace(/(^|[^A-Za-z0-9_])_([^_]+)_(?![A-Za-z0-9_])/g, "$1$2")
-    .replace(/^#{1,6}\s*/, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function deriveDescription(rootMarkdown: string): string | undefined {
-  const line = firstDescriptionLine(rootMarkdown);
-  if (!line) return undefined;
-  const text = stripInlineMarkdown(line);
+/**
+ * Takes the description from the block JSON rather than from the rendered markdown: styles live in
+ * `styles`, so there is no markup to strip and no way to confuse a literal `*` with emphasis.
+ */
+function deriveDescription(blocks: BlockRecord[]): string | undefined {
+  const text = firstBlockText(blocks);
   if (!text) return undefined;
   if (text.length <= DESCRIPTION_MAX_LENGTH) return text;
   return `${text.slice(0, DESCRIPTION_MAX_LENGTH)}…`;
@@ -132,13 +138,13 @@ function deriveDescription(rootMarkdown: string): string | undefined {
 function buildFrontMatter(
   post: ForumPostResponse,
   replies: ForumPostResponse[],
-  rootMarkdown: string,
+  description: string | undefined,
 ): Record<string, unknown> {
   const frontMatter: Record<string, unknown> = {};
 
   frontMatter.type = "Forum Thread";
   frontMatter.title = resolveThreadTitle(post);
-  setIfPresent(frontMatter, "description", deriveDescription(rootMarkdown));
+  setIfPresent(frontMatter, "description", description);
   frontMatter.resource = resourceUrl(`/forum/${post.id}`);
   if (post.labels && post.labels.length > 0) {
     frontMatter.tags = post.labels;
@@ -188,8 +194,9 @@ function buildThreadMarkdown(
   replies: ForumPostResponse[],
   rootMarkdown: string,
   replyMarkdowns: string[],
+  description: string | undefined,
 ): string {
-  const frontMatter = buildFrontMatter(post, replies, rootMarkdown);
+  const frontMatter = buildFrontMatter(post, replies, description);
   const yamlBlock = ["---", stringify(frontMatter, { lineWidth: 0 }).trimEnd(), "---"].join("\n");
   const title = resolveThreadTitle(post);
 
@@ -213,6 +220,14 @@ function renderMarkdown(content: string, blocks: BlockRecord[]): string {
     initialContent: blocks as unknown as PartialBlock[],
   });
   return editor.blocksToMarkdownLossy();
+}
+
+/** Posts written before `content_blocks` only have markdown, so let BlockNote parse it back. */
+function descriptionBlocks(post: ForumPostResponse, blocks: BlockRecord[]): BlockRecord[] {
+  if (blocks.length > 0) return blocks;
+  if (!post.content.trim()) return [];
+  const editor = BlockNoteEditor.create();
+  return editor.tryParseMarkdownToBlocks(post.content) as unknown as BlockRecord[];
 }
 
 /**
@@ -374,7 +389,8 @@ export async function buildForumThreadZip(
     renderMarkdown(reply.content, replyBlocksList[index]),
   );
 
-  const threadMd = buildThreadMarkdown(post, replies, rootMarkdown, replyMarkdowns);
+  const description = deriveDescription(descriptionBlocks(post, rootBlocks));
+  const threadMd = buildThreadMarkdown(post, replies, rootMarkdown, replyMarkdowns, description);
   const rootName = buildRootFolderName(post);
 
   const files: AsyncZippable = {

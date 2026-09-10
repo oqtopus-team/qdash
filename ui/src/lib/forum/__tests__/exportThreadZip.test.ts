@@ -194,6 +194,32 @@ describe("buildForumThreadZip", () => {
     );
   });
 
+  it("keeps literal markdown characters in the description and flattens styled runs", async () => {
+    const post = makePost({
+      number: 12,
+      content_blocks: [
+        { type: "heading", content: [{ type: "text", text: "Not the description", styles: {} }] },
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "5 * 3 * 2 shots in _raw_ mode, ", styles: {} },
+            { type: "text", text: "retried", styles: { bold: true } },
+            { type: "text", text: " via ", styles: {} },
+            {
+              type: "link",
+              href: "https://example.com",
+              content: [{ type: "text", text: "the runbook", styles: {} }],
+            },
+          ],
+        },
+      ],
+    });
+
+    const { blob } = await buildForumThreadZip(post, []);
+    const md = strFromU8((await unzipBlob(blob))["forum-0012/thread.md"]);
+    expect(md).toContain("description: 5 * 3 * 2 shots in _raw_ mode, retried via the runbook");
+  });
+
   it("truncates a long description to 200 characters with a trailing ellipsis", async () => {
     const longLine = "A".repeat(250);
     const post = makePost({ number: 1, content: longLine });
