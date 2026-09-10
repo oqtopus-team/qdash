@@ -31,6 +31,8 @@ import type {
   DownloadArtifactByPathParams,
   DownloadArtifactsAsArchiveParams,
   ExecuteFlowResponse,
+  ExecutionAvailabilityRequest,
+  ExecutionAvailabilityResponse,
   ExecutionLockStatusResponse,
   ExecutionResponseDetail,
   GetFigureByPathParams,
@@ -567,6 +569,71 @@ export function useGetExecutionLockStatus<TData = Awaited<ReturnType<typeof getE
 
 
 /**
+ * Read project-scoped hardware conflicts; this does not reserve resources.
+ * @summary Check resource availability without starting an execution
+ */
+export const checkExecutionAvailability = (
+    executionAvailabilityRequest: ExecutionAvailabilityRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ExecutionAvailabilityResponse>(
+      {url: `/executions/check-availability`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: executionAvailabilityRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getCheckExecutionAvailabilityMutationOptions = <TError = Detail | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkExecutionAvailability>>, TError,{data: ExecutionAvailabilityRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkExecutionAvailability>>, TError,{data: ExecutionAvailabilityRequest}, TContext> => {
+
+const mutationKey = ['checkExecutionAvailability'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkExecutionAvailability>>, {data: ExecutionAvailabilityRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  checkExecutionAvailability(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckExecutionAvailabilityMutationResult = NonNullable<Awaited<ReturnType<typeof checkExecutionAvailability>>>
+    export type CheckExecutionAvailabilityMutationBody = ExecutionAvailabilityRequest
+    export type CheckExecutionAvailabilityMutationError = Detail | HTTPValidationError
+
+    /**
+ * @summary Check resource availability without starting an execution
+ */
+export const useCheckExecutionAvailability = <TError = Detail | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkExecutionAvailability>>, TError,{data: ExecutionAvailabilityRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof checkExecutionAvailability>>,
+        TError,
+        {data: ExecutionAvailabilityRequest},
+        TContext
+      > => {
+      return useMutation(getCheckExecutionAvailabilityMutationOptions(options), queryClient);
+    }
+    /**
  * List executions for a given chip with pagination.
  *
  * Parameters

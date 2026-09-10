@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
@@ -31,6 +31,20 @@ class ExecutionLockStatusResponse(BaseModel):
     chip_id: str | None = None
     name: str | None = None
     status: str | None = None
+
+
+class ExecutionAvailabilityRequest(BaseModel):
+    """Targets to check without reserving hardware or creating an execution."""
+
+    flow_name: str | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExecutionAvailabilityResponse(BaseModel):
+    """Current resource availability; execution admission still checks atomically."""
+
+    available: bool
+    reason: str | None = None
 
 
 class Task(BaseModel):

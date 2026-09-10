@@ -13,6 +13,10 @@ import httpx
 from fastapi import HTTPException
 from prefect.client.orchestration import get_client
 
+from qdash.api.schemas.execution import (
+    ExecutionAvailabilityRequest,
+    ExecutionAvailabilityResponse,
+)
 from qdash.api.schemas.flow import (
     ExecuteFlowRequest,
     ExecuteFlowResponse,
@@ -878,6 +882,36 @@ class FlowService:
         except Exception as e:
             logger.error(f"Failed to read flow helper file {filename}: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
+
+    def check_execution_availability(
+        self, request: ExecutionAvailabilityRequest, project_id: str
+    ) -> ExecutionAvailabilityResponse:
+        """Preview admission using the same saved defaults and wiring as execution."""
+        parameters = dict(request.parameters)
+        fallback_chip_id = ""
+        if request.flow_name is not None:
+            flow = self._flow_repo.find_by_project_and_name(project_id, request.flow_name)
+            if flow is None:
+                raise HTTPException(status_code=404, detail=f"Flow '{request.flow_name}' not found")
+            parameters = {**flow.default_parameters, **parameters}
+            fallback_chip_id = flow.chip_id or ""
+        chip_id = str(parameters.get("chip_id") or fallback_chip_id).strip()
+        if not chip_id:
+            return ExecutionAvailabilityResponse(
+                available=False, reason="Select a chip to check execution availability."
+            )
+        if self._execution_lock_repo is None:
+            raise HTTPException(status_code=503, detail="Execution availability is unavailable")
+        scope = resolve_execution_resource_scope(chip_id, parameters)
+        if self._execution_lock_repo.has_conflict(project_id, scope):
+            return ExecutionAvailabilityResponse(
+                available=False,
+                reason=(
+                    "Another calibration is using hardware required by this run. "
+                    "Wait for it to finish or select different targets."
+                ),
+            )
+        return ExecutionAvailabilityResponse(available=True)
 
     # --- Private helpers ---
 

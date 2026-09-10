@@ -1057,3 +1057,47 @@ def test_release_execution_lock_survives_a_failing_unlock() -> None:
     lock_repository.unlock.assert_called_once_with(
         project_id="project-1", execution_id="20240101-008"
     )
+
+
+def test_availability_resolves_saved_flow_defaults_and_request_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from qdash.api.schemas.execution import ExecutionAvailabilityRequest
+    from qdash.common.execution_resources import ExecutionResourceScope
+
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = SimpleNamespace(
+        chip_id="fallback-chip", default_parameters={"mux_ids": [0], "qids": ["4"]}
+    )
+    lock_repo = MagicMock()
+    lock_repo.has_conflict.return_value = True
+    scope = ExecutionResourceScope("selected-chip", ("mux:1",))
+    resolve = MagicMock(return_value=scope)
+    monkeypatch.setattr(flow_service, "resolve_execution_resource_scope", resolve)
+    service = FlowService(flow_repo, lock_repo)
+    result = service.check_execution_availability(
+        ExecutionAvailabilityRequest(
+            flow_name="my-flow", parameters={"chip_id": "selected-chip", "mux_ids": [1]}
+        ),
+        "project-1",
+    )
+    assert not result.available
+    assert result.reason and "hardware required by this run" in result.reason
+    flow_repo.find_by_project_and_name.assert_called_once_with("project-1", "my-flow")
+    resolve.assert_called_once_with(
+        "selected-chip", {"chip_id": "selected-chip", "mux_ids": [1], "qids": ["4"]}
+    )
+    lock_repo.has_conflict.assert_called_once_with("project-1", scope)
+    lock_repo.try_lock.assert_not_called()
+
+
+def test_availability_rejects_missing_flow() -> None:
+    from qdash.api.schemas.execution import ExecutionAvailabilityRequest
+
+    repo = MagicMock()
+    repo.find_by_project_and_name.return_value = None
+    with pytest.raises(HTTPException) as error:
+        FlowService(repo, MagicMock()).check_execution_availability(
+            ExecutionAvailabilityRequest(flow_name="missing"), "project-1"
+        )
+    assert error.value.status_code == 404

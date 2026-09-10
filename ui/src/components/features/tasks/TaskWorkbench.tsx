@@ -15,6 +15,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useToast } from "@/components/ui/Toast";
+import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
 import { parseTaskParameter } from "@/lib/utils/task-parameters";
@@ -70,6 +71,10 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   const previousTask = useRef(`${backend}:${task.name}`);
   const initializedTask = useRef<string | null>(null);
   const prefill = useMemo(() => buildTaskPrefill(task, sourceTask), [task, sourceTask]);
+  const availability = useExecutionAvailability(
+    { parameters: { chip_id: chipId, qid: target.trim() } },
+    Boolean(chipId && target.trim() && task.enabled),
+  );
 
   useEffect(() => {
     if (!sourceTask && !chipIdQuery && defaultChipId) setChipIdQuery(defaultChipId);
@@ -136,7 +141,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     }
     if (!chipId) return "Select a chip to run this task.";
     if (!target.trim()) return "Enter a qubit or coupling to run this task.";
-    return null;
+    return availability.disabledReason;
   })();
   const resultTasks = useMemo(
     () =>
@@ -207,7 +212,10 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
         ?.detail;
       toast.error(detail ?? (error instanceof Error ? error.message : "Failed to start task"));
     } finally {
-      await queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: ["execution-availability"] }),
+      ]);
       setIsStarting(false);
     }
   };

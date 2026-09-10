@@ -249,3 +249,57 @@ def test_reacquisition_does_not_trust_stale_owner_snapshot(
     raw = ExecutionLockDocument.get_motor_collection().find_one({"project_id": PROJECT_ID})
     assert raw is not None
     assert [claim["execution_id"] for claim in raw["claims"]] == ["B"]
+
+
+@pytest.mark.parametrize(
+    (
+        "held_chip",
+        "held_resources",
+        "held_exclusive",
+        "target_chip",
+        "target_resources",
+        "target_exclusive",
+    ),
+    [
+        ("chip-1", ("mux:0",), False, "chip-1", ("mux:0",), False),
+        ("chip-1", ("mux:0",), False, "chip-1", ("mux:1",), False),
+        ("chip-1", ("mux:0",), False, "chip-2", ("mux:0",), False),
+        ("chip-1", (), True, "chip-1", ("mux:1",), False),
+        ("chip-1", ("mux:0",), False, "chip-1", (), True),
+        ("", (), True, "chip-1", ("mux:1",), False),
+        ("chip-1", ("module:ctrl:box",), False, "chip-1", ("module:ctrl:box",), False),
+    ],
+)
+def test_availability_matches_admission_without_mutating_claims(
+    init_db: object,
+    held_chip: str,
+    held_resources: tuple[str, ...],
+    held_exclusive: bool,
+    target_chip: str,
+    target_resources: tuple[str, ...],
+    target_exclusive: bool,
+) -> None:
+    from qdash.common.execution_resources import ExecutionResourceScope
+
+    repo = MongoExecutionLockRepository()
+    assert repo.try_lock(PROJECT_ID, "A", held_chip, held_resources, held_exclusive)
+    before = _reload_lock()
+    scope = ExecutionResourceScope(target_chip, target_resources, target_exclusive)
+    conflict = repo.has_conflict(PROJECT_ID, scope)
+    assert _reload_lock() == before
+    assert (
+        repo.try_lock(PROJECT_ID, "B", target_chip, target_resources, target_exclusive) != conflict
+    )
+
+
+def test_availability_does_not_create_lock_and_respects_legacy_lock(init_db: object) -> None:
+    from qdash.common.execution_resources import ExecutionResourceScope
+
+    repo = MongoExecutionLockRepository()
+    scope = ExecutionResourceScope("chip-1", ("mux:0",))
+    assert not repo.has_conflict(PROJECT_ID, scope)
+    assert _reload_lock() is None
+    repo.lock(PROJECT_ID, "legacy")
+    assert repo.has_conflict(PROJECT_ID, scope)
+    repo.unlock(PROJECT_ID, "legacy")
+    assert not repo.has_conflict(PROJECT_ID, scope)

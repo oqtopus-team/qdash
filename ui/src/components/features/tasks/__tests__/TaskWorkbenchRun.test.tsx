@@ -8,7 +8,7 @@ import type { TaskInfo, TaskResultResponse } from "@/schemas";
 import { TaskWorkbench } from "../TaskWorkbench";
 
 const mocks = vi.hoisted(() => ({
-  lock: vi.fn(),
+  availability: vi.fn(),
   chips: vi.fn(),
   execution: vi.fn(),
   post: vi.fn(),
@@ -22,9 +22,11 @@ vi.mock("@/client/chip/chip", () => ({
   getChipQubit: mocks.qubit,
 }));
 vi.mock("@/client/execution/execution", () => ({
-  useGetExecutionLockStatus: mocks.lock,
   useGetExecution: mocks.execution,
   getGetExecutionLockStatusQueryKey: () => ["execution-lock"],
+}));
+vi.mock("@/hooks/useExecutionAvailability", () => ({
+  useExecutionAvailability: mocks.availability,
 }));
 vi.mock("@/lib/api/custom-instance", () => ({ AXIOS_INSTANCE: { post: mocks.post } }));
 vi.mock("@/components/ui/Toast", () => ({ useToast: () => mocks.toast }));
@@ -65,7 +67,7 @@ function renderWorkbench(
 
 beforeEach(() => {
   mocks.chips.mockReturnValue({ data: { data: { chips: [{ chip_id: "chip-1" }] } } });
-  mocks.lock.mockReturnValue({ data: { data: { lock: false } }, isLoading: false });
+  mocks.availability.mockReturnValue({ disabledReason: null });
   mocks.execution.mockReturnValue({});
   mocks.post.mockResolvedValue({ data: { execution_id: "execution-1" } });
 });
@@ -319,16 +321,53 @@ describe("TaskWorkbench run availability", () => {
     );
   });
 
-  it("allows the API to evaluate resource conflicts while another run exists", () => {
-    mocks.lock.mockReturnValue({ data: { data: { lock: true } }, isLoading: false });
+  it("blocks conflicting targets and explains why", () => {
+    mocks.availability.mockReturnValue({
+      disabledReason: "Another calibration is using hardware required by this run.",
+    });
+    renderWorkbench();
+    const button = screen.getByRole("button", { name: "Run task" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(/Another calibration is using hardware/);
+    fireEvent.click(button);
+    expect(mocks.post).not.toHaveBeenCalled();
+    expect(mocks.availability).toHaveBeenCalledWith(
+      { parameters: { chip_id: "chip-1", qid: "0" } },
+      true,
+    );
+  });
+
+  it.each([
+    "Checking hardware availability…",
+    "Unable to check hardware availability. Retrying automatically…",
+  ])("blocks starting when availability is unknown: %s", (disabledReason) => {
+    mocks.availability.mockReturnValue({ disabledReason });
+    renderWorkbench();
+    const button = screen.getByRole("button", { name: "Run task" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(disabledReason);
+    fireEvent.click(button);
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
+
+  it("allows non-conflicting targets", () => {
     renderWorkbench();
     expect(screen.getByRole("button", { name: "Run task" })).toBeEnabled();
   });
 
-  it("does not block a run while global activity status is loading", () => {
-    mocks.lock.mockReturnValue({ isLoading: true });
+  it("still displays a conflict rejected by final API admission", async () => {
+    mocks.post.mockRejectedValueOnce({
+      response: {
+        data: { detail: "Another calibration execution is using overlapping hardware resources" },
+      },
+    });
     renderWorkbench();
-    expect(screen.getByRole("button", { name: "Run task" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Run task" }));
+    await waitFor(() =>
+      expect(mocks.toast.error).toHaveBeenCalledWith(
+        "Another calibration execution is using overlapping hardware resources",
+      ),
+    );
   });
 
   it("explains when a previous execution is still being awaited", () => {

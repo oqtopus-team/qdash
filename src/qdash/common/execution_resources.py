@@ -49,7 +49,7 @@ def resolve_execution_resource_scope(
 
 def scopes_conflict(left: ExecutionResourceScope, right: ExecutionResourceScope) -> bool:
     """Return whether two scopes contend for the same physical hardware."""
-    if left.chip_id != right.chip_id:
+    if left.chip_id and right.chip_id and left.chip_id != right.chip_id:
         return False
     if left.exclusive or right.exclusive:
         return True

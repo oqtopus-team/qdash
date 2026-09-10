@@ -6,6 +6,7 @@ lock operations.
 
 import logging
 
+from qdash.common.execution_resources import ExecutionResourceScope, scopes_conflict
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,21 @@ class MongoExecutionLockRepository:
         """
         result: bool | None = ExecutionLockDocument.get_lock_status(project_id=project_id)
         return result
+
+    def has_conflict(self, project_id: str, scope: ExecutionResourceScope) -> bool:
+        """Inspect current claims without acquiring a lock or creating a record."""
+        doc = ExecutionLockDocument.find_one({"project_id": project_id}).run()
+        if doc is None:
+            return False
+        if not doc.claims:
+            return doc.locked
+        return any(
+            scopes_conflict(
+                scope,
+                ExecutionResourceScope(claim.chip_id, tuple(claim.resources), claim.exclusive),
+            )
+            for claim in doc.claims
+        )
 
     def try_lock(
         self,

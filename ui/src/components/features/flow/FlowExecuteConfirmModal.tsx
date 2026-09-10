@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 import { Plus } from "lucide-react";
 
 interface FlowExecuteConfirmModalProps {
@@ -8,6 +10,7 @@ interface FlowExecuteConfirmModalProps {
   chipId: string;
   description: string;
   tags: string;
+  disabledReason: string | null;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -18,9 +21,11 @@ export function FlowExecuteConfirmModal({
   chipId,
   description,
   tags,
+  disabledReason,
   onConfirm,
   onClose,
 }: FlowExecuteConfirmModalProps) {
+  const disabledReasonId = useId();
   const tagList = tags
     .split(",")
     .map((t) => t.trim())
@@ -89,11 +94,24 @@ export function FlowExecuteConfirmModal({
           </div>
         </div>
 
+        {disabledReason && (
+          <div id={disabledReasonId} className="alert alert-info mx-6 mb-4" role="status">
+            <span>{disabledReason}</span>
+          </div>
+        )}
+
         <div className="px-6 py-4 border-t border-base-300 flex justify-end gap-2">
           <button className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn-success" onClick={onConfirm}>
+          <button
+            className="btn btn-success"
+            disabled={Boolean(disabledReason)}
+            aria-describedby={disabledReason ? disabledReasonId : undefined}
+            onClick={() => {
+              if (!disabledReason) onConfirm();
+            }}
+          >
             Execute
           </button>
         </div>
