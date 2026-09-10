@@ -51,6 +51,7 @@ if TYPE_CHECKING:
 from prefect import get_run_logger
 
 from qdash.common.config.backend import get_default_backend
+from qdash.common.execution_resources import resolve_execution_resource_scope
 from qdash.common.utils.datetime import now
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
 from qdash.workflow.engine.params_updater import get_params_updater
@@ -541,9 +542,19 @@ class CalibService:
 
                 self._lock_repo = MongoExecutionLockRepository()
 
-            # try_lock also reacquires a lock the API already claimed for this execution.
+            # try_lock also reacquires a more precise lock the API already claimed
+            # for this execution. Scheduled flows without an API claim resolve
+            # their scope here from the targets available during initialization.
+            lock_parameters: dict[str, Any] = (
+                {"mux_ids": self.muxes} if self.muxes is not None else {"qids": qids}
+            )
+            lock_scope = resolve_execution_resource_scope(self.chip_id, lock_parameters)
             if not self._lock_repo.try_lock(
-                project_id=self.project_id, execution_id=self.execution_id
+                project_id=self.project_id,
+                execution_id=self.execution_id,
+                chip_id=lock_scope.chip_id,
+                resources=lock_scope.resources,
+                exclusive=lock_scope.exclusive,
             ):
                 msg = "Calibration is already running. Cannot start a new session."
                 raise RuntimeError(msg)
@@ -610,7 +621,10 @@ class CalibService:
         except Exception:
             # Release lock if initialization fails
             if self._lock_acquired and self._lock_repo is not None:
-                self._lock_repo.unlock(project_id=self.project_id)
+                self._lock_repo.unlock(
+                    project_id=self.project_id,
+                    execution_id=self.execution_id,
+                )
                 self._lock_acquired = False
             raise
 
@@ -1183,7 +1197,10 @@ class CalibService:
         if getattr(self, "_pipeline_active", False):
             return
         if self.use_lock and self._lock_acquired and self._lock_repo is not None:
-            self._lock_repo.unlock(project_id=self.project_id)
+            self._lock_repo.unlock(
+                project_id=self.project_id,
+                execution_id=self.execution_id,
+            )
             self._lock_acquired = False
 
     def fail_calibration(self, error_message: str = "") -> None:

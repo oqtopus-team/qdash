@@ -63,7 +63,14 @@ class MongoExecutionLockRepository:
         result: bool | None = ExecutionLockDocument.get_lock_status(project_id=project_id)
         return result
 
-    def try_lock(self, project_id: str, execution_id: str | None = None) -> bool:
+    def try_lock(
+        self,
+        project_id: str,
+        execution_id: str | None = None,
+        chip_id: str = "",
+        resources: tuple[str, ...] = (),
+        exclusive: bool = True,
+    ) -> bool:
         """Atomically acquire the execution lock, unless another execution holds it.
 
         Parameters
@@ -79,7 +86,13 @@ class MongoExecutionLockRepository:
             True when the lock was acquired or already owned, False when held
 
         """
-        return ExecutionLockDocument.try_lock(project_id=project_id, execution_id=execution_id)
+        return ExecutionLockDocument.try_lock(
+            project_id=project_id,
+            execution_id=execution_id,
+            chip_id=chip_id,
+            resources=resources,
+            exclusive=exclusive,
+        )
 
     def lock(self, project_id: str, execution_id: str | None = None) -> None:
         """Acquire the execution lock.
@@ -94,7 +107,7 @@ class MongoExecutionLockRepository:
         """
         ExecutionLockDocument.lock(project_id=project_id, execution_id=execution_id)
 
-    def unlock(self, project_id: str) -> None:
+    def unlock(self, project_id: str, execution_id: str | None = None) -> None:
         """Release the execution lock.
 
         Parameters
@@ -103,4 +116,4 @@ class MongoExecutionLockRepository:
             The project identifier
 
         """
-        ExecutionLockDocument.unlock(project_id=project_id)
+        ExecutionLockDocument.unlock(project_id=project_id, execution_id=execution_id)

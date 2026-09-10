@@ -184,7 +184,7 @@ The Repository Pattern is visualized in the Task Executor Flow diagram (see abov
 | `QubitCalibrationRepository` | Qubit calibration data updates |
 | `CouplingCalibrationRepository` | Coupling calibration data updates |
 | `ExecutionCounterRepository` | Atomic execution ID counter |
-| `ExecutionLockRepository` | Project execution locking |
+| `ExecutionLockRepository` | Wiring-aware execution resource locking |
 | `UserRepository` | User preferences |
 | `TaskRepository` | Task name lookup |
 
@@ -200,6 +200,14 @@ The Repository Pattern is visualized in the Task Executor Flow diagram (see abov
 - `MongoExecutionLockRepository`
 - `MongoUserRepository`
 - `MongoTaskRepository`
+
+Execution locks are scoped to a chip and the MUX/wiring resources resolved from
+the run's `mux_ids`, `qids`, or single `qid` target. Runs on different chips or
+disjoint hardware resources can execute concurrently. Runs with overlapping
+readout or control modules remain mutually exclusive, including different
+channels on the same module. Module claims use the same resource resolver as
+the CR scheduler. Runs whose targets or wiring cannot be resolved claim the
+whole chip as a conservative fallback.
 
 **InMemory Implementations** (for testing):
 - `InMemoryExecutionRepository`

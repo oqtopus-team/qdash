@@ -120,3 +120,34 @@ def test_try_lock_is_scoped_to_the_project(init_db: object) -> None:
     repo.try_lock(project_id=PROJECT_ID, execution_id="exec-1")
 
     assert repo.try_lock(project_id="proj-2", execution_id="exec-2") is True
+
+
+def test_non_conflicting_resource_claims_run_concurrently(init_db: object) -> None:
+    repo = MongoExecutionLockRepository()
+
+    assert repo.try_lock(PROJECT_ID, "exec-1", "chip-1", ("mux:0",), False)
+    assert repo.try_lock(PROJECT_ID, "exec-2", "chip-1", ("mux:1",), False)
+
+    doc = _reload_lock()
+    assert doc is not None
+    assert {claim.execution_id for claim in doc.claims} == {"exec-1", "exec-2"}
+
+
+def test_overlapping_resource_claim_is_rejected(init_db: object) -> None:
+    repo = MongoExecutionLockRepository()
+
+    assert repo.try_lock(PROJECT_ID, "exec-1", "chip-1", ("channel:box-1",), False)
+    assert not repo.try_lock(PROJECT_ID, "exec-2", "chip-1", ("channel:box-1",), False)
+
+
+def test_unlock_releases_only_the_owning_execution(init_db: object) -> None:
+    repo = MongoExecutionLockRepository()
+    repo.try_lock(PROJECT_ID, "exec-1", "chip-1", ("mux:0",), False)
+    repo.try_lock(PROJECT_ID, "exec-2", "chip-1", ("mux:1",), False)
+
+    repo.unlock(PROJECT_ID, "exec-1")
+
+    doc = _reload_lock()
+    assert doc is not None
+    assert doc.locked is True
+    assert [claim.execution_id for claim in doc.claims] == ["exec-2"]

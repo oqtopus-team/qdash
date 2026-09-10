@@ -17,9 +17,12 @@ from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 
 
 @pytest.mark.asyncio
-async def test_execute_single_task_rejects_locked_project() -> None:
+async def test_execute_single_task_rejects_conflicting_resources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(flow_service, "generate_execution_id", lambda *args, **kwargs: "exec-1")
     lock_repository = MagicMock()
-    lock_repository.is_locked.return_value = True
+    lock_repository.try_lock.return_value = False
     service = FlowService(
         flow_repository=MagicMock(),
         execution_lock_repository=lock_repository,
@@ -36,7 +39,7 @@ async def test_execute_single_task_rejects_locked_project() -> None:
         )
 
     assert getattr(exc_info.value, "status_code", None) == 409
-    lock_repository.is_locked.assert_called_once_with("project-1")
+    lock_repository.try_lock.assert_called_once()
 
 
 def test_resolve_workflow_path_uses_container_path_when_available(tmp_path: Path) -> None:
@@ -606,7 +609,11 @@ async def test_execute_flow_claims_the_lock_before_creating_the_flow_run(
     assert calls == ["try_lock", "create_flow_run"]
     assert response.execution_id == "20240101-001"
     lock_repository.try_lock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-001"
+        project_id="project-1",
+        execution_id="20240101-001",
+        chip_id="chip-1",
+        resources=(),
+        exclusive=True,
     )
     lock_repository.unlock.assert_not_called()
 
@@ -680,7 +687,9 @@ async def test_execute_flow_releases_the_lock_when_the_flow_run_cannot_be_create
         )
 
     assert exc_info.value.status_code == 500
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-003"
+    )
 
 
 @pytest.mark.asyncio
@@ -711,7 +720,9 @@ async def test_execute_flow_releases_the_lock_when_the_scheduled_row_cannot_be_s
     )
 
     assert response.execution_id == "flow-run-4"
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-004"
+    )
 
 
 @pytest.mark.asyncio
@@ -775,7 +786,11 @@ async def test_re_execute_from_snapshot_claims_the_lock(
 
     assert response.execution_id == "20240101-006"
     lock_repository.try_lock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-006"
+        project_id="project-1",
+        execution_id="20240101-006",
+        chip_id="chip-1",
+        resources=(),
+        exclusive=True,
     )
 
 
@@ -831,7 +846,11 @@ async def test_execute_single_task_claims_the_lock(
 
     assert response.execution_id == "20240101-007"
     lock_repository.try_lock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-007"
+        project_id="project-1",
+        execution_id="20240101-007",
+        chip_id="chip-1",
+        resources=(),
+        exclusive=True,
     )
 
 
@@ -878,7 +897,9 @@ async def test_re_execute_from_snapshot_releases_the_lock_when_the_flow_run_cann
         )
 
     assert exc_info.value.status_code == 500
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-009"
+    )
 
 
 @pytest.mark.asyncio
@@ -910,7 +931,9 @@ async def test_re_execute_from_snapshot_releases_the_lock_when_the_scheduled_row
     )
 
     assert response.execution_id == "flow-run-8"
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-010"
+    )
 
 
 @pytest.mark.asyncio
@@ -962,7 +985,9 @@ async def test_execute_single_task_releases_the_lock_when_the_flow_run_cannot_be
         )
 
     assert exc_info.value.status_code == 500
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-011"
+    )
 
 
 @pytest.mark.asyncio
@@ -1014,7 +1039,9 @@ async def test_execute_single_task_releases_the_lock_when_the_scheduled_row_cann
     )
 
     assert response.execution_id == "flow-run-9"
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-012"
+    )
 
 
 def test_release_execution_lock_survives_a_failing_unlock() -> None:
@@ -1027,4 +1054,6 @@ def test_release_execution_lock_survives_a_failing_unlock() -> None:
         execution_lock_repository=lock_repository,
     )._release_execution_lock("project-1", "20240101-008")
 
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-008"
+    )

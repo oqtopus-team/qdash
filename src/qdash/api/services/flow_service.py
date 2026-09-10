@@ -31,6 +31,7 @@ from qdash.common.config.path_resolver import (
     resolve_workflow_templates_dir,
     to_container_user_flow_path,
 )
+from qdash.common.execution_resources import resolve_execution_resource_scope
 from qdash.common.utils.datetime import now
 from qdash.config import get_settings
 from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
@@ -47,7 +48,7 @@ logger = logging.getLogger("uvicorn.app")
 
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
 EXECUTION_IN_PROGRESS_DETAIL = (
-    "Another calibration execution is already in progress for this project"
+    "Another calibration execution is using overlapping hardware resources"
 )
 
 
@@ -402,7 +403,10 @@ class FlowService:
 
         chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
         claimed_execution_id = self._claim_execution_lock(
-            project_id=project_id, username=username, chip_id=chip_id
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            parameters=parameters,
         )
 
         try:
@@ -510,7 +514,10 @@ class FlowService:
 
         chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
         claimed_execution_id = self._claim_execution_lock(
-            project_id=project_id, username=username, chip_id=chip_id
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            parameters=parameters,
         )
 
         try:
@@ -643,7 +650,10 @@ class FlowService:
         )
 
         claimed_execution_id = self._claim_execution_lock(
-            project_id=project_id, username=username, chip_id=chip_id
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            parameters=parameters,
         )
 
         try:
@@ -871,7 +881,14 @@ class FlowService:
 
     # --- Private helpers ---
 
-    def _claim_execution_lock(self, *, project_id: str, username: str, chip_id: str) -> str | None:
+    def _claim_execution_lock(
+        self,
+        *,
+        project_id: str,
+        username: str,
+        chip_id: str,
+        parameters: dict[str, Any],
+    ) -> str | None:
         """Claim the project execution lock for a run about to be dispatched.
 
         The claim is atomic, so concurrent requests are serialized before any
@@ -905,15 +922,18 @@ class FlowService:
         if self._execution_lock_repo is None:
             return None
 
-        # Cheap reject before minting an execution ID; try_lock settles the race.
-        if self._execution_lock_repo.is_locked(project_id):
-            raise HTTPException(status_code=409, detail=EXECUTION_IN_PROGRESS_DETAIL)
-
         if not chip_id:
             return None
 
         execution_id = generate_execution_id(username, chip_id, project_id=project_id)
-        if not self._execution_lock_repo.try_lock(project_id=project_id, execution_id=execution_id):
+        scope = resolve_execution_resource_scope(chip_id, parameters)
+        if not self._execution_lock_repo.try_lock(
+            project_id=project_id,
+            execution_id=execution_id,
+            chip_id=scope.chip_id,
+            resources=scope.resources,
+            exclusive=scope.exclusive,
+        ):
             raise HTTPException(status_code=409, detail=EXECUTION_IN_PROGRESS_DETAIL)
         return execution_id
 
@@ -937,7 +957,10 @@ class FlowService:
         if execution_id is None or self._execution_lock_repo is None:
             return
         try:
-            self._execution_lock_repo.unlock(project_id=project_id)
+            self._execution_lock_repo.unlock(
+                project_id=project_id,
+                execution_id=execution_id,
+            )
         except Exception:
             logger.warning(
                 "Failed to release the execution lock claimed for execution_id=%s",

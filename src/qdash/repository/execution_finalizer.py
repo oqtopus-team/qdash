@@ -141,11 +141,20 @@ def finalize_executions_by_flow_run_id(
     ]
     if release_lock and lock_owner_ids:
         try:
-            result = (
+            collection = ExecutionLockDocument.get_motor_collection()
+            result = collection.update_one(
+                {"project_id": project_id},
+                {"$pull": {"claims": {"execution_id": {"$in": lock_owner_ids}}}},
+            )
+            legacy_result = (
                 ExecutionLockDocument.find(
                     {
                         "project_id": project_id,
                         "locked": True,
+                        "$or": [
+                            {"claims": {"$exists": False}},
+                            {"claims": {"$size": 0}},
+                        ],
                         "execution_id": {
                             "$in": ([None] if closed_execution_ids else []) + lock_owner_ids
                         },
@@ -154,8 +163,13 @@ def finalize_executions_by_flow_run_id(
                 .update_many({"$set": {"locked": False, "execution_id": None}})
                 .run()
             )
-            if result and result.modified_count:
-                logger.info("Released execution lock for project %s", project_id)
+            if result.modified_count:
+                collection.update_one(
+                    {"project_id": project_id, "claims": {"$size": 0}},
+                    {"$set": {"locked": False, "execution_id": None}},
+                )
+            if result.modified_count or (legacy_result and legacy_result.modified_count):
+                logger.info("Released execution resource claim(s) for project %s", project_id)
             else:
                 logger.info(
                     "%s: execution lock for project %s is absent or owned by another execution",

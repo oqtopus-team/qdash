@@ -144,7 +144,14 @@ class MockExecutionLockRepository:
     def is_locked(self, project_id: str) -> bool:
         return self.locked
 
-    def try_lock(self, project_id: str, execution_id: str | None = None) -> bool:
+    def try_lock(
+        self,
+        project_id: str,
+        execution_id: str | None = None,
+        chip_id: str = "",
+        resources: tuple[str, ...] = (),
+        exclusive: bool = True,
+    ) -> bool:
         self.try_lock_calls.append(execution_id)
         if self.locked and (execution_id is None or self.owner != execution_id):
             return False
@@ -156,7 +163,7 @@ class MockExecutionLockRepository:
         self.locked = True
         self.owner = execution_id
 
-    def unlock(self, project_id: str) -> None:
+    def unlock(self, project_id: str, execution_id: str | None = None) -> None:
         self.locked = False
         self.owner = None
 

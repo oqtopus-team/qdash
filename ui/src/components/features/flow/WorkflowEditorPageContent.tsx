@@ -432,7 +432,7 @@ export function WorkflowEditorPageContent() {
       shortcut: "",
       icon: Play,
       action: () => setShowExecuteConfirm(true),
-      enabled: !lockStatus?.data.lock,
+      enabled: true,
     },
     {
       id: "properties",
@@ -785,28 +785,21 @@ export function WorkflowEditorPageContent() {
             </button>
             <button
               onClick={() => setShowExecuteConfirm(true)}
-              className={`btn btn-sm ${lockStatus?.data.lock ? "btn-disabled" : "btn-success"}`}
+              className="btn btn-sm btn-success"
               disabled={
                 saveMutation.isPending ||
                 deleteMutation.isPending ||
                 executeMutation.isPending ||
-                isLockStatusLoading ||
-                !!lockStatus?.data.lock
+                isLockStatusLoading
               }
-              title={
-                lockStatus?.data.lock
-                  ? "Execution locked - another calibration is running"
-                  : "Execute Flow"
-              }
+              title="Execute Flow"
             >
               {executeMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
-              ) : lockStatus?.data.lock ? (
-                <Lock size={16} />
               ) : (
                 <Play size={16} />
               )}
-              <span className="ml-1">{lockStatus?.data.lock ? "Locked" : "Execute"}</span>
+              <span className="ml-1">Execute</span>
             </button>
             {canCancel && (
               <button
@@ -1473,25 +1466,20 @@ export function WorkflowEditorPageContent() {
           {/* Execute Button */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              {lockStatus?.data.lock ? "Locked" : "Execute"}
+              Execute
             </span>
             <button
               onClick={() => setShowExecuteConfirm(true)}
-              className={`btn btn-circle shadow-lg ${
-                lockStatus?.data.lock ? "btn-disabled" : "btn-success"
-              }`}
+              className="btn btn-circle btn-success shadow-lg"
               disabled={
                 saveMutation.isPending ||
                 deleteMutation.isPending ||
                 executeMutation.isPending ||
-                isLockStatusLoading ||
-                !!lockStatus?.data.lock
+                isLockStatusLoading
               }
             >
               {executeMutation.isPending ? (
                 <span className="loading loading-spinner loading-sm"></span>
-              ) : lockStatus?.data.lock ? (
-                <Lock size={20} />
               ) : (
                 <Play size={20} />
               )}
@@ -1755,8 +1743,6 @@ export function WorkflowEditorPageContent() {
             chipId={chipId}
             description={description}
             tags={tags}
-            isLocked={lockStatus?.data.lock ?? false}
-            isLockStatusLoading={isLockStatusLoading}
             onConfirm={() => {
               setShowExecuteConfirm(false);
               executeMutation.mutate({

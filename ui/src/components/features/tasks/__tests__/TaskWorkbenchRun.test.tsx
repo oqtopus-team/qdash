@@ -319,23 +319,16 @@ describe("TaskWorkbench run availability", () => {
     );
   });
 
-  it("retains the execution lock and explains why another run cannot start", () => {
+  it("allows the API to evaluate resource conflicts while another run exists", () => {
     mocks.lock.mockReturnValue({ data: { data: { lock: true } }, isLoading: false });
     renderWorkbench();
-    const button = screen.getByRole("button", { name: "Locked" });
-    expect(button).toBeDisabled();
-    expect(button).toHaveAccessibleDescription(/Another calibration execution is running/);
-    fireEvent.click(button);
-    expect(mocks.post).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Run task" })).toBeEnabled();
   });
 
-  it("explains when lock status is still loading", () => {
+  it("does not block a run while global activity status is loading", () => {
     mocks.lock.mockReturnValue({ isLoading: true });
     renderWorkbench();
-    expect(screen.getByRole("button", { name: "Run task" })).toHaveAccessibleDescription(
-      "Checking whether another calibration is running…",
-    );
-    expect(screen.getByRole("button", { name: "Run task" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Run task" })).toBeEnabled();
   });
 
   it("explains when a previous execution is still being awaited", () => {

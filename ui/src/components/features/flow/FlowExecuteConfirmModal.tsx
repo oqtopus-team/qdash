@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 interface FlowExecuteConfirmModalProps {
   flowName: string;
@@ -8,8 +8,6 @@ interface FlowExecuteConfirmModalProps {
   chipId: string;
   description: string;
   tags: string;
-  isLocked: boolean;
-  isLockStatusLoading: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -20,8 +18,6 @@ export function FlowExecuteConfirmModal({
   chipId,
   description,
   tags,
-  isLocked,
-  isLockStatusLoading,
   onConfirm,
   onClose,
 }: FlowExecuteConfirmModalProps) {
@@ -90,16 +86,6 @@ export function FlowExecuteConfirmModal({
                 </div>
               </div>
             )}
-
-            {isLocked && (
-              <div className="alert alert-warning">
-                <Lock className="h-5 w-5" />
-                <span>
-                  Execution is locked. Another calibration is currently running. Please wait until
-                  it completes.
-                </span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -107,19 +93,8 @@ export function FlowExecuteConfirmModal({
           <button className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button
-            className={`btn ${isLocked ? "btn-disabled" : "btn-success"}`}
-            onClick={onConfirm}
-            disabled={isLocked || isLockStatusLoading}
-          >
-            {isLocked ? (
-              <>
-                <Lock className="mr-2" size={16} />
-                Locked
-              </>
-            ) : (
-              "Execute"
-            )}
+          <button className="btn btn-success" onClick={onConfirm}>
+            Execute
           </button>
         </div>
       </div>
