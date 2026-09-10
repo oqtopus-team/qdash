@@ -27,7 +27,7 @@ def fake_calibration_service(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(coarse_one_module, "CalibService", FakeCalibService)
 
 
-def test_coarse_one_configures_before_readout_search_and_runs_one_hpi_cycle() -> None:
+def test_coarse_one_configures_before_readout_search_and_calibrates_all_pulses() -> None:
     result = coarse_one_module.coarse_one(username="alice", chip_id="64Q", qids=["0"])
 
     assert len(result["steps"]) == 1
@@ -42,6 +42,12 @@ def test_coarse_one_configures_before_readout_search_and_runs_one_hpi_cycle() ->
         "CheckRabi",
         "CreateHPIPulse",
         "CheckHPIPulse",
+        "CreatePIPulse",
+        "CheckPIPulse",
+        "CreateDRAGHPIPulse",
+        "CheckDRAGHPIPulse",
+        "CreateDRAGPIPulse",
+        "CheckDRAGPIPulse",
         "CheckT1",
         "CheckT2Echo",
         "CheckRamsey",
@@ -88,6 +94,8 @@ def test_coarse_one_forwards_execution_context_and_preserves_task_scan_defaults(
         "default_run_parameters": {
             "hpi_duration": {"value": 32, "value_type": "int"},
             "pi_duration": {"value": 32, "value_type": "int"},
+            "drag_hpi_duration": {"value": 16, "value_type": "int"},
+            "drag_pi_duration": {"value": 24, "value_type": "int"},
             "interval": {"value": 150 * 1024, "value_type": "int"},
         },
     }

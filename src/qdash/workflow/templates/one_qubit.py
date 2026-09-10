@@ -32,7 +32,7 @@ from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 # Task lists are explicit so this template can be reviewed and edited on its own.
 # Tests keep these stages aligned with coarse_one and fine_one.
-# Step 1: coarse calibration through Ramsey.
+# Step 1: coarse calibration through Ramsey, calibrating and checking all four pulse types.
 ONE_QUBIT_CHECK_TASKS: list[str] = [
     "Configure",  # Apply the starting configuration before the readout search.
     "CheckCoarseReadoutParams",
@@ -41,6 +41,12 @@ ONE_QUBIT_CHECK_TASKS: list[str] = [
     "CheckRabi",  # Measure again at the updated amplitude for HPI creation.
     "CreateHPIPulse",
     "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
     "CheckT1",
     "CheckT2Echo",
     "CheckRamsey",
@@ -117,7 +123,7 @@ def one_qubit(
         qids: Qubit IDs to calibrate when mux_ids is not set
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
-        check_only: If True, run only the coarse_one stage
+        check_only: If True, run only the coarse stage with all four pulse types
 
     Returns:
         Pipeline results with typed step outputs

@@ -34,7 +34,7 @@
   {
     "id": "coarse_one",
     "name": "Coarse 1Q Calibration",
-    "description": "Coarse 1-qubit calibration after bring-up: Configure -> readout parameter search -> Configure -> Rabi/HPI calibration -> T1/T2Echo -> Ramsey. Requires explicit mux_ids or qids and ends after the check stage.",
+    "description": "Coarse 1-qubit calibration after bring-up: Configure -> readout parameter search -> Configure -> Rabi -> calibration and checks for HPI, PI, DRAG HPI, and DRAG PI -> T1/T2Echo -> Ramsey. Requires explicit mux_ids or qids and ends after the check stage.",
     "category": "production",
     "filename": "coarse_one.py",
     "function_name": "coarse_one"
