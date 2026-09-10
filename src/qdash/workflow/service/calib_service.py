@@ -51,6 +51,12 @@ if TYPE_CHECKING:
 from prefect import get_run_logger
 
 from qdash.common.config.backend import get_default_backend
+from qdash.common.execution_resources import (
+    ExecutionResourceScope,
+    merge_resource_scopes,
+    resolve_execution_resource_scope,
+    scope_contains,
+)
 from qdash.common.utils.datetime import now
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
 from qdash.workflow.engine.params_updater import get_params_updater
@@ -289,6 +295,7 @@ class CalibService:
         user_repo: UserRepository | None = None,
         lock_repo: ExecutionLockRepository | None = None,
         counter_repo: ExecutionCounterRepository | None = None,
+        resource_scope: ExecutionResourceScope | None = None,
     ) -> None:
         """Initialize the calibration service.
 
@@ -345,6 +352,8 @@ class CalibService:
         self.skip_execution = skip_execution
         self.default_run_parameters = default_run_parameters or {}
         self._lock_acquired = False
+        self._lock_execution_id: str | None = None
+        self._reserved_scope = resource_scope
 
         # Resolve source_execution_id from Prefect runtime context if not provided
         if source_execution_id is None:
@@ -464,29 +473,12 @@ class CalibService:
                 exc_info=True,
             )
 
-    def _initialize(
-        self,
-        qids: list[str],
-        tags: list[str] | None = None,
-        note: dict[str, Any] | None = None,
-    ) -> None:
-        """Initialize session with given qids (internal method).
-
-        Args:
-            qids: List of qubit IDs to calibrate
-            tags: List of tags for categorization
-            note: Additional notes to store with execution
-
-        """
-        if self._initialized:
-            return
-
-        self.qids = qids
-
+    def _ensure_execution_id(self) -> None:
+        """Adopt the API reservation or mint a history ID, retaining the lock owner."""
         flow_run_id = self._read_flow_run_id_from_context()
-
+        claimed_execution_id: str | None = None
+        supplied_execution_id = self.execution_id is not None
         if self.execution_id is None:
-            claimed_execution_id: str | None = None
             # Lock-owning wrappers must adopt the API's execution ID as well:
             # minting another ID would collide with their own pre-acquired lock.
             # Isolated workers (skip_execution=True, use_lock=False) must never
@@ -515,6 +507,75 @@ class CalibService:
                 counter_repo=self._counter_repo,
             )
 
+        if self._lock_execution_id is None:
+            self._lock_execution_id = (
+                f"flow:{flow_run_id}"
+                if self._pipeline_active
+                and flow_run_id
+                and claimed_execution_id is None
+                and not supplied_execution_id
+                else self.execution_id
+            )
+
+    def _acquire_resource_scope(self, scope: ExecutionResourceScope) -> None:
+        """Atomically reserve the whole plan, never dropping already held resources."""
+        if not self.use_lock:
+            return
+        self._ensure_execution_id()
+        if self._lock_repo is None:
+            from qdash.repository import MongoExecutionLockRepository
+
+            self._lock_repo = MongoExecutionLockRepository()
+        if self._reserved_scope is not None:
+            scope = merge_resource_scopes(self._reserved_scope, scope)
+        if not self._lock_repo.try_lock(
+            project_id=self.project_id,
+            execution_id=self._lock_execution_id,
+            chip_id=scope.chip_id,
+            resources=scope.resources,
+            exclusive=scope.exclusive,
+        ):
+            raise RuntimeError("Calibration is already running. Cannot start a new session.")
+        self._reserved_scope = scope
+        self._lock_acquired = True
+
+    def _validate_resource_scope(self, parameters: dict[str, Any]) -> None:
+        """Reject operations beyond the plan, including operations in borrowed workers."""
+        if self._reserved_scope is None:
+            return
+        if parameters.get("qids") == []:
+            return
+        requested = resolve_execution_resource_scope(self.chip_id, parameters)
+        if not scope_contains(self._reserved_scope, requested):
+            raise RuntimeError("Requested hardware is outside the workflow's reserved resources")
+
+    def _initialize(
+        self,
+        qids: list[str],
+        tags: list[str] | None = None,
+        note: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize session with given qids (internal method).
+
+        Args:
+            qids: List of qubit IDs to calibrate
+            tags: List of tags for categorization
+            note: Additional notes to store with execution
+
+        """
+        if self._initialized:
+            return
+
+        self.qids = qids
+
+        flow_run_id = self._read_flow_run_id_from_context()
+
+        self._ensure_execution_id()
+        self._validate_resource_scope({"qids": qids})
+        assert self.execution_id is not None
+        if self.muxes is not None:
+            self._validate_resource_scope({"mux_ids": self.muxes})
+
         # Initialize GitHub integration
         self.github_integration = GitHubIntegration(
             username=self.username,
@@ -534,26 +595,30 @@ class CalibService:
         elif self.github_push_config is None:
             self.github_push_config = GitHubPushConfig()
 
-        # Acquire lock if requested
+        # A pipeline reserves its complete plan before any step starts. Later
+        # step execution IDs never change the reservation owner or narrow scope.
         if self.use_lock and not self._lock_acquired:
-            if self._lock_repo is None:
-                from qdash.repository import MongoExecutionLockRepository
-
-                self._lock_repo = MongoExecutionLockRepository()
-
-            # try_lock also reacquires a lock the API already claimed for this execution.
-            if not self._lock_repo.try_lock(
-                project_id=self.project_id, execution_id=self.execution_id
-            ):
-                msg = "Calibration is already running. Cannot start a new session."
-                raise RuntimeError(msg)
-            self._lock_acquired = True
+            lock_parameters: dict[str, Any] = (
+                {"mux_ids": self.muxes} if self.muxes is not None else {"qids": qids}
+            )
+            self._acquire_resource_scope(
+                resolve_execution_resource_scope(self.chip_id, lock_parameters)
+            )
 
         # Wrap all initialization in try/except to ensure lock is released on failure
         try:
             if flow_run_id:
                 note = {**(note or {}), "flow_run_id": flow_run_id}
-                self.note = note
+            if self._reserved_scope is not None:
+                note = {
+                    **(note or {}),
+                    "hardware_reservation": {
+                        "chip_id": self._reserved_scope.chip_id,
+                        "resources": list(self._reserved_scope.resources),
+                        "exclusive": self._reserved_scope.exclusive,
+                    },
+                }
+            self.note = note
 
             # Create CalibConfig
             logger.debug("CalibConfig default_run_parameters=%s", self.default_run_parameters)
@@ -610,8 +675,12 @@ class CalibService:
         except Exception:
             # Release lock if initialization fails
             if self._lock_acquired and self._lock_repo is not None:
-                self._lock_repo.unlock(project_id=self.project_id)
+                self._lock_repo.unlock(
+                    project_id=self.project_id,
+                    execution_id=self._lock_execution_id,
+                )
                 self._lock_acquired = False
+                self._lock_execution_id = None
             raise
 
     @property
@@ -672,6 +741,18 @@ class CalibService:
             result2 = session.execute_task("CheckRabi", "32", upstream_id=result1["task_id"])
             ```
         """
+        if self.use_lock and not self._lock_acquired:
+            raise RuntimeError("No hardware reservation is held for this execution")
+        parameters: dict[str, Any] = {"qid": qid}
+        if task_name == "ConfigureAll":
+            parameters = {
+                "mux_ids": (task_details or {})
+                .get(task_name, {})
+                .get("run_parameters", {})
+                .get("mux_ids", {})
+                .get("value")
+            }
+        self._validate_resource_scope(parameters)
         assert self._orchestrator is not None, "Session not initialized"
         result: dict[str, Any] = self._orchestrator.run_task(
             task_name, qid, task_details, upstream_id
@@ -686,6 +767,9 @@ class CalibService:
         upstream_id: str | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Execute one calibration task with a single batch_run over qids."""
+        if self.use_lock and not self._lock_acquired:
+            raise RuntimeError("No hardware reservation is held for this execution")
+        self._validate_resource_scope({"qids": qids})
         assert self._orchestrator is not None, "Session not initialized"
         return self._orchestrator.run_task_batch(task_name, qids, task_details, upstream_id)
 
@@ -1183,8 +1267,12 @@ class CalibService:
         if getattr(self, "_pipeline_active", False):
             return
         if self.use_lock and self._lock_acquired and self._lock_repo is not None:
-            self._lock_repo.unlock(project_id=self.project_id)
+            self._lock_repo.unlock(
+                project_id=self.project_id,
+                execution_id=self._lock_execution_id,
+            )
             self._lock_acquired = False
+            self._lock_execution_id = None
 
     def fail_calibration(self, error_message: str = "") -> None:
         """Mark the calibration as failed and cleanup.
@@ -1323,6 +1411,10 @@ class CalibService:
             qids = targets.to_qids(self.chip_id)
             # Validate pipeline dependencies
             pipeline = Pipeline(steps)
+            from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
+
+            planned_scope = plan_pipeline_resources(self.chip_id, targets, steps, self.muxes)
+            self._acquire_resource_scope(planned_scope)
             logger.info(f"Starting calibration pipeline with {len(pipeline)} steps")
 
             # Initialize context
@@ -1336,6 +1428,7 @@ class CalibService:
                     # Transform-only steps do not create an Execution. Hardware
                     # steps share one session across all workers and strategies.
                     if not isinstance(step, TransformStep):
+                        self._validate_resource_scope({"qids": ctx.candidate_qids})
                         if completed_steps:
                             self._initialized = False
                             self._orchestrator = None

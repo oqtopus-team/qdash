@@ -14,6 +14,8 @@ from typing import Any
 
 import networkx as nx
 
+from qdash.common.wiring_resources import mux_module_resources
+
 logger = logging.getLogger(__name__)
 
 
@@ -116,40 +118,16 @@ def build_mux_conflict_map(yaml_mux_list: list[dict[str, Any]]) -> dict[int, set
 
     MUXes conflict if they share the same readout or control module.
     """
-    module_to_muxes_readout: dict[str, set[int]] = defaultdict(set)
-    module_to_muxes_ctrl: dict[str, set[int]] = defaultdict(set)
+    module_to_muxes: dict[str, set[int]] = defaultdict(set)
+    for entry in yaml_mux_list:
+        for resource in mux_module_resources(entry):
+            module_to_muxes[resource].add(entry["mux"])
 
-    # Group MUXes by readout and control modules
-    for mux_entry in yaml_mux_list:
-        mux_id = mux_entry["mux"]
-
-        # Readout module conflicts
-        read_out = mux_entry.get("read_out")
-        if read_out:
-            readout_module = read_out.split("-")[0]
-            module_to_muxes_readout[readout_module].add(mux_id)
-
-        # Control module conflicts
-        for ctrl in mux_entry.get("ctrl", []):
-            ctrl_module = ctrl.split("-")[0]
-            module_to_muxes_ctrl[ctrl_module].add(mux_id)
-
-    def create_conflict_map(module_to_muxes: dict[str, set[int]]) -> dict[int, set[int]]:
-        """Create bidirectional conflict map from module groupings."""
-        mux_conflict: dict[int, set[int]] = defaultdict(set)
-        for muxes in module_to_muxes.values():
-            for mux_a, mux_b in itertools.combinations(muxes, 2):
-                mux_conflict[mux_a].add(mux_b)
-                mux_conflict[mux_b].add(mux_a)
-        return mux_conflict
-
-    # Merge readout and control conflicts
-    conflict_map = create_conflict_map(module_to_muxes_readout)
-    ctrl_conflict_map = create_conflict_map(module_to_muxes_ctrl)
-
-    for mux_id, conflicts in ctrl_conflict_map.items():
-        conflict_map[mux_id].update(conflicts)
-
+    conflict_map: dict[int, set[int]] = defaultdict(set)
+    for muxes in module_to_muxes.values():
+        for mux_a, mux_b in itertools.combinations(muxes, 2):
+            conflict_map[mux_a].add(mux_b)
+            conflict_map[mux_b].add(mux_a)
     return dict(conflict_map)
 
 

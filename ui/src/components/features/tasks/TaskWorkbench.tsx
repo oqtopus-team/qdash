@@ -4,21 +4,18 @@ import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Lock, Play, RefreshCw, RotateCcw } from "lucide-react";
+import { ExternalLink, Play, RefreshCw, RotateCcw } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 
 import type { ExecutionResponseDetail, TaskInfo, TaskResultResponse } from "@/schemas";
 
 import { getChipCoupling, getChipQubit, useListChips } from "@/client/chip/chip";
-import {
-  getGetExecutionLockStatusQueryKey,
-  useGetExecution,
-  useGetExecutionLockStatus,
-} from "@/client/execution/execution";
+import { getGetExecutionLockStatusQueryKey, useGetExecution } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useToast } from "@/components/ui/Toast";
+import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
 import { parseTaskParameter } from "@/lib/utils/task-parameters";
@@ -74,13 +71,10 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   const previousTask = useRef(`${backend}:${task.name}`);
   const initializedTask = useRef<string | null>(null);
   const prefill = useMemo(() => buildTaskPrefill(task, sourceTask), [task, sourceTask]);
-
-  const { data: lockStatus, isLoading: isLockStatusLoading } = useGetExecutionLockStatus({
-    query: {
-      refetchInterval: 5000,
-    },
-  });
-  const isExecutionLocked = lockStatus?.data.lock ?? false;
+  const availability = useExecutionAvailability(
+    { parameters: { chip_id: chipId, qid: target.trim() } },
+    Boolean(chipId && target.trim() && task.enabled),
+  );
 
   useEffect(() => {
     if (!sourceTask && !chipIdQuery && defaultChipId) setChipIdQuery(defaultChipId);
@@ -140,9 +134,6 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   const runDisabledReason = (() => {
     if (!task.enabled) return `This task is not enabled for the ${backend} backend.`;
     if (isStarting) return "Starting this task…";
-    if (isLockStatusLoading) return "Checking whether another calibration is running…";
-    if (isExecutionLocked)
-      return "Another calibration execution is running. Wait for it to finish before starting this task.";
     if (isExecutionActive) {
       if (executionError && !isExecutionPendingCreation)
         return "Unable to confirm the previous execution status. Reload the page to check again.";
@@ -150,7 +141,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     }
     if (!chipId) return "Select a chip to run this task.";
     if (!target.trim()) return "Enter a qubit or coupling to run this task.";
-    return null;
+    return availability.disabledReason;
   })();
   const resultTasks = useMemo(
     () =>
@@ -221,7 +212,10 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
         ?.detail;
       toast.error(detail ?? (error instanceof Error ? error.message : "Failed to start task"));
     } finally {
-      await queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: ["execution-availability"] }),
+      ]);
       setIsStarting(false);
     }
   };
@@ -513,7 +507,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
               )}
 
               <button
-                className={`btn ${isExecutionLocked ? "btn-disabled" : "btn-primary"}`}
+                className="btn btn-primary"
                 onClick={handleRun}
                 disabled={Boolean(runDisabledReason)}
                 aria-describedby={runDisabledReason ? runDisabledReasonId : undefined}
@@ -521,12 +515,10 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
               >
                 {isStarting ? (
                   <span className="loading loading-spinner loading-sm" />
-                ) : isExecutionLocked ? (
-                  <Lock size={17} />
                 ) : (
                   <Play size={17} />
                 )}
-                {isExecutionLocked ? "Locked" : "Run task"}
+                Run task
               </button>
             </div>
           </section>

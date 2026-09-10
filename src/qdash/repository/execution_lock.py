@@ -6,6 +6,7 @@ lock operations.
 
 import logging
 
+from qdash.common.execution_resources import ExecutionResourceScope, scopes_conflict
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,29 @@ class MongoExecutionLockRepository:
         result: bool | None = ExecutionLockDocument.get_lock_status(project_id=project_id)
         return result
 
-    def try_lock(self, project_id: str, execution_id: str | None = None) -> bool:
+    def has_conflict(self, project_id: str, scope: ExecutionResourceScope) -> bool:
+        """Inspect current claims without acquiring a lock or creating a record."""
+        doc = ExecutionLockDocument.find_one({"project_id": project_id}).run()
+        if doc is None:
+            return False
+        if not doc.claims:
+            return doc.locked
+        return any(
+            scopes_conflict(
+                scope,
+                ExecutionResourceScope(claim.chip_id, tuple(claim.resources), claim.exclusive),
+            )
+            for claim in doc.claims
+        )
+
+    def try_lock(
+        self,
+        project_id: str,
+        execution_id: str | None = None,
+        chip_id: str = "",
+        resources: tuple[str, ...] = (),
+        exclusive: bool = True,
+    ) -> bool:
         """Atomically acquire the execution lock, unless another execution holds it.
 
         Parameters
@@ -79,7 +102,13 @@ class MongoExecutionLockRepository:
             True when the lock was acquired or already owned, False when held
 
         """
-        return ExecutionLockDocument.try_lock(project_id=project_id, execution_id=execution_id)
+        return ExecutionLockDocument.try_lock(
+            project_id=project_id,
+            execution_id=execution_id,
+            chip_id=chip_id,
+            resources=resources,
+            exclusive=exclusive,
+        )
 
     def lock(self, project_id: str, execution_id: str | None = None) -> None:
         """Acquire the execution lock.
@@ -94,7 +123,7 @@ class MongoExecutionLockRepository:
         """
         ExecutionLockDocument.lock(project_id=project_id, execution_id=execution_id)
 
-    def unlock(self, project_id: str) -> None:
+    def unlock(self, project_id: str, execution_id: str | None = None) -> None:
         """Release the execution lock.
 
         Parameters
@@ -103,4 +132,4 @@ class MongoExecutionLockRepository:
             The project identifier
 
         """
-        ExecutionLockDocument.unlock(project_id=project_id)
+        ExecutionLockDocument.unlock(project_id=project_id, execution_id=execution_id)

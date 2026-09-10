@@ -424,3 +424,31 @@ def test_release_lock_swallows_lookup_failure(init_db) -> None:
     execution = _reload_execution()
     assert execution is not None
     assert execution.status == "failed"
+
+
+def test_finalizer_releases_cron_pipeline_before_first_step_history(init_db) -> None:
+    owner = f"flow:{FLOW_RUN_ID}"
+    assert ExecutionLockDocument.try_lock(PROJECT_ID, owner, "chip-1", ("mux:0",), False)
+    assert ExecutionLockDocument.try_lock(PROJECT_ID, "other", "chip-2", (), True)
+    assert (
+        finalize_executions_by_flow_run_id(
+            project_id=PROJECT_ID, flow_run_id=FLOW_RUN_ID, status="failed", message="crashed"
+        )
+        == []
+    )
+    doc = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert doc is not None
+    assert [c.execution_id for c in doc.claims] == ["other"]
+
+
+def test_finalizer_releases_original_owner_after_step_ids_change(init_db) -> None:
+    _make_execution(status="completed", execution_id="first-step")
+    _make_execution(status="running", execution_id="second-step")
+    assert ExecutionLockDocument.try_lock(PROJECT_ID, "first-step", "chip-1", (), True)
+    assert ExecutionLockDocument.try_lock(PROJECT_ID, "other", "chip-2", (), True)
+    finalize_executions_by_flow_run_id(
+        project_id=PROJECT_ID, flow_run_id=FLOW_RUN_ID, status="cancelled", message="cancelled"
+    )
+    doc = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert doc is not None
+    assert [c.execution_id for c in doc.claims] == ["other"]

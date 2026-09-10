@@ -27,6 +27,8 @@ from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
     ArtifactPreviewResponse,
     CancelExecutionResponse,
+    ExecutionAvailabilityRequest,
+    ExecutionAvailabilityResponse,
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ListExecutionsResponse,
@@ -204,6 +206,22 @@ def get_execution_lock_status(
 
     """
     return execution_service.get_lock_status(ctx.project_id)
+
+
+@router.post(
+    "/executions/check-availability",
+    response_model=ExecutionAvailabilityResponse,
+    summary="Check resource availability without starting an execution",
+    operation_id="checkExecutionAvailability",
+    responses={404: {"model": Detail}, 503: {"model": Detail}},
+)
+def check_execution_availability(
+    request: ExecutionAvailabilityRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    flow_service: Annotated[FlowService, Depends(get_flow_service)],
+) -> ExecutionAvailabilityResponse:
+    """Read project-scoped hardware conflicts; this does not reserve resources."""
+    return flow_service.check_execution_availability(request, ctx.project_id)
 
 
 @router.get(
