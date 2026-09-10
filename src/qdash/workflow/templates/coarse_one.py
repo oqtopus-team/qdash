@@ -2,7 +2,8 @@
 
 Run this after bring-up has established the qubit frequency, control amplitude,
 and readout settings. The flow applies the current hardware configuration,
-refines readout settings, calibrates Rabi/HPI, and measures T1/T2Echo and Ramsey
+refines readout settings, runs Rabi and calibrates/checks HPI, PI, DRAG HPI, and
+DRAG PI, then measures T1/T2Echo and Ramsey
 for explicitly selected MUXes or qubits.
 
 Example:
@@ -30,6 +31,12 @@ COARSE_ONE_TASKS: list[str] = [
     "CheckRabi",  # Measure again at the updated amplitude for HPI creation.
     "CreateHPIPulse",
     "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
     "CheckT1",
     "CheckT2Echo",
     "CheckRamsey",
@@ -85,6 +92,8 @@ def coarse_one(
         default_run_parameters={
             "hpi_duration": {"value": 32, "value_type": "int"},
             "pi_duration": {"value": 32, "value_type": "int"},
+            "drag_hpi_duration": {"value": 16, "value_type": "int"},
+            "drag_pi_duration": {"value": 24, "value_type": "int"},
             "interval": {"value": 150 * 1024, "value_type": "int"},
         },
     )

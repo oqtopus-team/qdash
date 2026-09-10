@@ -69,17 +69,33 @@ def test_one_qubit_template_passes_template_task_lists(monkeypatch) -> None:
     assert steps[2].tasks == FINE_ONE_TASKS
 
 
-def test_one_qubit_template_check_only_passes_template_task_list(monkeypatch) -> None:
-    from qdash.workflow.templates.coarse_one import COARSE_ONE_TASKS
-
+@pytest.mark.parametrize("check_only", [False, True])
+def test_one_qubit_template_check_calibrates_and_checks_all_pulses(monkeypatch, check_only) -> None:
     monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
 
     result = one_qubit_module.one_qubit(
-        username="alice", chip_id="64Q", mux_ids=[0], check_only=True
+        username="alice", chip_id="64Q", mux_ids=[0], check_only=check_only
     )
 
-    assert len(result["steps"]) == 1
-    assert result["steps"][0].tasks == COARSE_ONE_TASKS
+    assert len(result["steps"]) == (1 if check_only else 3)
+    assert result["steps"][0].tasks == [
+        "Configure",
+        "CheckCoarseReadoutParams",
+        "Configure",
+        "CheckRabi",
+        "CheckRabi",
+        "CreateHPIPulse",
+        "CheckHPIPulse",
+        "CreatePIPulse",
+        "CheckPIPulse",
+        "CreateDRAGHPIPulse",
+        "CheckDRAGHPIPulse",
+        "CreateDRAGPIPulse",
+        "CheckDRAGPIPulse",
+        "CheckT1",
+        "CheckT2Echo",
+        "CheckRamsey",
+    ]
 
 
 @pytest.mark.parametrize("use_mux", [False, True])
