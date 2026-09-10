@@ -26,11 +26,22 @@ const PARAMETER_UNITS: Record<string, string> = {
   coarse_control_amplitude: "a.u.",
 };
 
+const FAILED_TASK_PARAMETER_NAMES: Record<string, readonly string[]> = {
+  CheckQubitSpectroscopy: [
+    "coarse_qubit_frequency",
+    "anharmonicity",
+    "f01_repr_db",
+    "f01_quality_level",
+    "coarse_control_amplitude",
+  ],
+};
+
 interface SpectroscopyManualCorrectionProps {
   chipId: string;
   qid: string;
   taskId: string;
   taskName: string;
+  taskStatus: string;
   outputParameters: Record<string, unknown>;
   outputParameterNames: string[];
   jsonFigurePaths: string[];
@@ -47,6 +58,7 @@ export function SpectroscopyManualCorrection({
   qid,
   taskId,
   taskName,
+  taskStatus,
   outputParameters,
   outputParameterNames,
   jsonFigurePaths,
@@ -65,8 +77,14 @@ export function SpectroscopyManualCorrection({
   const { data: qubitResponse } = useGetChipQubit(chipId, qid);
 
   const names = useMemo(
-    () => [...new Set([...outputParameterNames, ...Object.keys(outputParameters)])],
-    [outputParameterNames, outputParameters],
+    () =>
+      spectroscopyCorrectionParameterNames(
+        taskName,
+        taskStatus,
+        outputParameterNames,
+        outputParameters,
+      ),
+    [taskName, taskStatus, outputParameterNames, outputParameters],
   );
   const currentData = (qubitResponse?.data?.data ?? {}) as Record<string, unknown>;
 
@@ -433,6 +451,19 @@ export function SpectroscopyManualCorrection({
       </Dialog>
     </div>
   );
+}
+
+export function spectroscopyCorrectionParameterNames(
+  taskName: string,
+  taskStatus: string,
+  outputParameterNames: string[],
+  outputParameters: Record<string, unknown>,
+): string[] {
+  const failedTaskNames =
+    taskStatus === "failed" ? (FAILED_TASK_PARAMETER_NAMES[taskName] ?? []) : [];
+  return [
+    ...new Set([...outputParameterNames, ...Object.keys(outputParameters), ...failedTaskNames]),
+  ];
 }
 
 function parameterValue(raw: unknown): number | null {
