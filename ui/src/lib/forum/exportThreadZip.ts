@@ -244,14 +244,18 @@ function collectAssetRefs(
   }
 }
 
+/** Matches any URL carrying a scheme (`https:`, `blob:`, ...) or a protocol-relative `//host` prefix. */
+const HAS_SCHEME_OR_AUTHORITY = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
+
 function collectAllAssets(blocksList: BlockRecord[][]): Map<string, CollectedAsset> {
   const assets = new Map<string, CollectedAsset>();
   const register = (url: string, props: BlockRecord) => {
     let kind: "data" | "relative";
     if (url.startsWith("data:")) {
       kind = "data";
-    } else if (/^https?:\/\//i.test(url)) {
-      // External hosts are never fetched (CORS, third-party content); leave as-is.
+    } else if (HAS_SCHEME_OR_AUTHORITY.test(url)) {
+      // Anything that can point off-origin (absolute, protocol-relative, blob:, ...) is never
+      // fetched (CORS, third-party content); leave as-is.
       return;
     } else {
       kind = "relative";

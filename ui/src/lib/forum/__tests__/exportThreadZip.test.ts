@@ -336,6 +336,30 @@ describe("buildForumThreadZip", () => {
     expect(Object.keys(files).some((path) => path.includes("/assets/"))).toBe(false);
   });
 
+  it("leaves protocol-relative and blob URLs untouched and never fetches them", async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const post = makePost({
+      number: 11,
+      title: "Off origin image",
+      content_blocks: [
+        { type: "image", props: { url: "//example.com/cat.png" } },
+        { type: "image", props: { url: "blob:http://localhost:3000/9f8e" } },
+      ],
+    });
+
+    const { blob } = await buildForumThreadZip(post, []);
+    const files = await unzipBlob(blob);
+    const rootName = "forum-0011-off-origin-image";
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    const md = strFromU8(files[`${rootName}/thread.md`]);
+    expect(md).toContain("//example.com/cat.png");
+    expect(md).toContain("blob:http://localhost:3000/9f8e");
+    expect(Object.keys(files).some((path) => path.includes("/assets/"))).toBe(false);
+  });
+
   it("falls back to post.content when content_blocks is empty", async () => {
     const post = makePost({
       number: 9,
