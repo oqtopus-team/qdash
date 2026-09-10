@@ -593,6 +593,7 @@ export * from './quickRunTaskRequest';
 export * from './quickRunTaskRequestBackendName';
 export * from './quickRunTaskRequestInputParameterOverrides';
 export * from './quickRunTaskRequestRunParameterOverrides';
+export * from './quickRunTaskRequestSourceTaskId';
 export * from './reanalyzeOutputParameter';
 export * from './reanalyzeQubitSpectroscopyParams';
 export * from './reanalyzeQubitSpectroscopyParamsBinarizeThresholdSigmaMinus';

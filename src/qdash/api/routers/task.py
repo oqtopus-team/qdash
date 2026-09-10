@@ -139,6 +139,7 @@ async def quick_run_task(
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
     task_file_service: Annotated[TaskFileService, Depends(get_task_file_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> ExecuteFlowResponse:
     """Execute one task without requiring a previous execution snapshot."""
     backend_name = body.backend_name or get_default_backend()
@@ -168,11 +169,25 @@ async def quick_run_task(
         )
     _validate_quick_run_overrides(task, body)
 
+    source = None
+    if body.source_task_id:
+        source = task_service.get_task_result(ctx.project_id, body.source_task_id)
+        if source.username != ctx.user.username:
+            raise HTTPException(
+                status_code=403, detail="You can only re-execute your own task results"
+            )
+        if (source.task_name, source.chip_id, source.qid) != (task_name, body.chip_id, body.qid):
+            raise HTTPException(
+                status_code=400, detail="Source task does not match the task and target"
+            )
+
     return await flow_service.execute_single_task_from_snapshot(
         task_name=task_name,
         qid=body.qid,
         chip_id=body.chip_id,
         source_execution_id=None,
+        source_task_id=body.source_task_id,
+        tags=source.tags if source else None,
         username=ctx.user.username,
         project_id=ctx.project_id,
         backend_name=backend_name,

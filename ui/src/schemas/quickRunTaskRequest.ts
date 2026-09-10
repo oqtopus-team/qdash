@@ -8,6 +8,7 @@
 import type { QuickRunTaskRequestBackendName } from './quickRunTaskRequestBackendName';
 import type { QuickRunTaskRequestInputParameterOverrides } from './quickRunTaskRequestInputParameterOverrides';
 import type { QuickRunTaskRequestRunParameterOverrides } from './quickRunTaskRequestRunParameterOverrides';
+import type { QuickRunTaskRequestSourceTaskId } from './quickRunTaskRequestSourceTaskId';
 
 /**
  * Request to execute one task directly from the task catalog.
@@ -16,6 +17,8 @@ export interface QuickRunTaskRequest {
   chip_id: string;
   qid: string;
   backend_name?: QuickRunTaskRequestBackendName;
+  /** Source result for provenance only; execution uses current task definitions */
+  source_task_id?: QuickRunTaskRequestSourceTaskId;
   input_parameter_overrides?: QuickRunTaskRequestInputParameterOverrides;
   run_parameter_overrides?: QuickRunTaskRequestRunParameterOverrides;
   reconfigure?: boolean;

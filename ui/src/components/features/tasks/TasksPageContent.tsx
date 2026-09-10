@@ -12,6 +12,7 @@ import type {
   TaskFileBackend,
   TaskFileSettings,
   TaskInfo,
+  TaskResultResponse,
 } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
@@ -24,9 +25,32 @@ import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useToast } from "@/components/ui/Toast";
 
 import { TaskWorkbench } from "./TaskWorkbench";
+import { useGetTaskResult } from "@/client/task/task";
 
 export function TasksPageContent() {
+  const [sourceTaskId] = useQueryState("sourceTaskId", parseAsString);
+  const { data, isLoading, error } = useGetTaskResult(sourceTaskId ?? "", {
+    query: { enabled: Boolean(sourceTaskId), staleTime: Infinity },
+  });
+  if (sourceTaskId && isLoading)
+    return (
+      <div role="status" className="p-8">
+        Loading source task…
+      </div>
+    );
+  if (sourceTaskId && (error || !data?.data))
+    return <div className="alert alert-error m-4">Unable to load the source task result.</div>;
+  return (
+    <TasksCatalog
+      key={sourceTaskId ?? "catalog"}
+      sourceTask={sourceTaskId ? data?.data : undefined}
+    />
+  );
+}
+
+function TasksCatalog({ sourceTask }: { sourceTask?: TaskResultResponse }) {
   const toast = useToast();
+  const [, setSourceTaskId] = useQueryState("sourceTaskId", parseAsString);
   const [selectedBackend, setSelectedBackend] = useQueryState("backend", parseAsString);
   const [selectedTaskName, setSelectedTaskName] = useQueryState("task", parseAsString);
   const [, setExecutionId] = useQueryState("execution", parseAsString);
@@ -77,15 +101,18 @@ export function TasksPageContent() {
   });
 
   const selectedTask = useMemo(
-    () => taskListData?.tasks.find((task) => task.name === selectedTaskName) ?? null,
-    [selectedTaskName, taskListData?.tasks],
+    () =>
+      taskListData?.tasks.find(
+        (task) => task.name === (sourceTask?.task_name ?? selectedTaskName),
+      ) ?? null,
+    [sourceTask?.task_name, selectedTaskName, taskListData?.tasks],
   );
 
   useEffect(() => {
-    if (!taskListData?.tasks.length || selectedTask) return;
+    if (sourceTask || !taskListData?.tasks.length || selectedTask) return;
     const fallbackTask = taskListData.tasks.find((task) => task.enabled) ?? taskListData.tasks[0];
     setSelectedTaskName(fallbackTask.name);
-  }, [selectedTask, setSelectedTaskName, taskListData?.tasks]);
+  }, [sourceTask, selectedTask, setSelectedTaskName, taskListData?.tasks]);
 
   const filteredTasks = useMemo(() => {
     const tasks = taskListData?.tasks ?? [];
@@ -220,7 +247,13 @@ export function TasksPageContent() {
                             <button
                               type="button"
                               className={`flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-base-200 ${selectedTask?.name === task.name ? "bg-base-200" : ""}`}
-                              onClick={() => setSelectedTaskName(task.name)}
+                              onClick={() => {
+                                setSourceTaskId(null);
+                                setSelectedTaskName(task.name);
+                                setExecutionId(null);
+                                setExecutionChip(null);
+                                setExecutionTarget(null);
+                              }}
                             >
                               <Braces className="shrink-0 text-purple-400" size={14} />
                               <span className="truncate text-sm text-base-content/80">
@@ -255,7 +288,18 @@ export function TasksPageContent() {
 
         <section className="min-w-0 flex-1">
           {selectedTask && selectedBackend ? (
-            <TaskWorkbench task={selectedTask} backend={selectedBackend} />
+            <TaskWorkbench
+              key={`${selectedBackend}:${selectedTask.name}:${sourceTask?.task_id ?? ""}`}
+              task={selectedTask}
+              backend={selectedBackend}
+              sourceTask={sourceTask}
+            />
+          ) : sourceTask ? (
+            <div className="p-4" role="status">
+              {isTaskListLoading || !selectedBackend
+                ? "Loading current task definition…"
+                : `Task '${sourceTask.task_name}' is not available in the current ${selectedBackend} catalog. Select another backend or task.`}
+            </div>
           ) : (
             <div className="flex h-full items-center justify-center text-base-content/50">
               Select a task to configure and run
