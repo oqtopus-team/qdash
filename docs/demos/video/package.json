@@ -1,0 +1,22 @@
+{
+  "name": "qdash-demo-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "remotion studio",
+    "render": "remotion render QDashDemo out/qdash-demo.mp4",
+    "still": "remotion still QDashDemo out/poster.png --frame=60"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.523",
+    "@remotion/player": "^4.0.523",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "remotion": "^4.0.523"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5.9.0"
+  }
+}

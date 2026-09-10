@@ -118,6 +118,17 @@ tasks:
     cmds:
       - uv run --with playwright python3 docs/demos/record.py --scenario docs/demos/scenarios/{{.CLI_ARGS}}.yaml
 
+  docs-video:
+    desc: "Render the 30s demo video (docs/demos/video) and derive the README GIF, docs MP4 and poster."
+    dir: docs/demos/video
+    cmds:
+      - bun install
+      - bun run render
+      - mkdir -p ../../public/videos
+      - ffmpeg -v error -y -i out/qdash-demo.mp4 -vf "fps=10,scale=720:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" -loop 0 ../../public/images/qdash-demo.gif
+      - ffmpeg -v error -y -i out/qdash-demo.mp4 -vf "scale=1280:-2" -c:v libx264 -preset slow -crf 26 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k ../../public/videos/qdash-demo.mp4
+      - ffmpeg -v error -y -ss 6.5 -i out/qdash-demo.mp4 -frames:v 1 -vf "scale=1280:-2" ../../public/images/qdash-demo-poster.png
+
   # =============================================================================
   # Lightweight local development (Nix shell + Docker services)
   # =============================================================================

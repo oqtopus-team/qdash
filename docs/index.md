@@ -19,6 +19,9 @@ hero:
     - theme: alt
       text: Set Up QDash
       link: /operator-guide/setup
+    - theme: alt
+      text: Watch the Demo
+      link: /getting-started/what-is-qdash#demo
 
 features:
   - title: Run Calibrations
