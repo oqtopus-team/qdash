@@ -65,6 +65,6 @@ class ConfigureAll(QubexTask):
             params_dir=exp.params_path,
         )
         print(f"[ConfigureAll] Pushing system_manager (box_ids={exp.box_ids})")
-        exp.system_manager.push(box_ids=exp.box_ids, confirm=False)
+        exp.system_manager.push(box_ids=exp.box_ids, confirm=False, parallel=False)
         print("[ConfigureAll] Done")
         return RunResult(raw_result={"mux_ids": mux_ids, "box_ids": exp.box_ids})
