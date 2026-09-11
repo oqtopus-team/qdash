@@ -59,6 +59,7 @@ class CheckZX90(QubexTask):
         ),
         "control_drag_hpi_duration": InputParameterSpec.required_database(
             parameter_name="drag_hpi_duration",
+            parameter_aliases=("drag_hpi_length",),
             qid_role="control",
             unit="ns",
         ),
@@ -74,6 +75,7 @@ class CheckZX90(QubexTask):
         ),
         "control_drag_pi_duration": InputParameterSpec.required_database(
             parameter_name="drag_pi_duration",
+            parameter_aliases=("drag_pi_length",),
             qid_role="control",
             unit="ns",
         ),

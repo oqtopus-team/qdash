@@ -568,6 +568,9 @@
           },
           "control_drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "parameter_name": "drag_hpi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -592,6 +595,9 @@
           },
           "control_drag_pi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_pi_length"
+            ],
             "parameter_name": "drag_pi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -676,6 +682,33 @@
             "qid_role": "control",
             "resolution": "database_required",
             "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_drag_hpi_amplitude": {
+            "default_value": null,
+            "parameter_name": "drag_hpi_amplitude",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_drag_hpi_beta": {
+            "default_value": null,
+            "parameter_name": "drag_hpi_beta",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_drag_hpi_duration": {
+            "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
+            "parameter_name": "drag_hpi_duration",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "ns",
             "user_override": "allowed"
           },
           "target_qubit_frequency": {
@@ -791,6 +824,9 @@
           },
           "control_drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "parameter_name": "drag_hpi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -815,6 +851,9 @@
           },
           "control_drag_pi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_pi_length"
+            ],
             "parameter_name": "drag_pi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -899,6 +938,33 @@
             "qid_role": "control",
             "resolution": "database_required",
             "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_drag_hpi_amplitude": {
+            "default_value": null,
+            "parameter_name": "drag_hpi_amplitude",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_drag_hpi_beta": {
+            "default_value": null,
+            "parameter_name": "drag_hpi_beta",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_drag_hpi_duration": {
+            "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
+            "parameter_name": "drag_hpi_duration",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "ns",
             "user_override": "allowed"
           },
           "target_qubit_frequency": {
@@ -1192,6 +1258,9 @@
           },
           "control_drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "parameter_name": "drag_hpi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -1248,6 +1317,9 @@
           },
           "target_drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "parameter_name": "drag_hpi_duration",
             "qid_role": "target",
             "resolution": "database_required",
@@ -1321,6 +1393,9 @@
           },
           "drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -1381,6 +1456,9 @@
           },
           "drag_pi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_pi_length"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -1554,6 +1632,9 @@
           },
           "pi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "pi_length"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -1987,6 +2068,9 @@
           },
           "pi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "pi_length"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -2062,6 +2146,9 @@
           },
           "pi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "pi_length"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -2214,6 +2301,9 @@
           },
           "control_drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "parameter_name": "drag_hpi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2238,6 +2328,9 @@
           },
           "control_drag_pi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_pi_length"
+            ],
             "parameter_name": "drag_pi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2872,6 +2965,9 @@
           },
           "control_drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "parameter_name": "drag_hpi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2896,6 +2992,9 @@
           },
           "control_drag_pi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_pi_length"
+            ],
             "parameter_name": "drag_pi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -3075,6 +3174,9 @@
           },
           "drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -3141,6 +3243,9 @@
           },
           "drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -3217,6 +3322,9 @@
           },
           "drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -3232,6 +3340,9 @@
           },
           "drag_pi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_pi_length"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -3298,6 +3409,9 @@
           },
           "drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -3394,6 +3508,9 @@
           },
           "control_drag_hpi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
             "parameter_name": "drag_hpi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -3418,6 +3535,9 @@
           },
           "control_drag_pi_duration": {
             "default_value": null,
+            "parameter_aliases": [
+              "drag_pi_length"
+            ],
             "parameter_name": "drag_pi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -3502,6 +3622,33 @@
             "qid_role": "control",
             "resolution": "database_required",
             "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_drag_hpi_amplitude": {
+            "default_value": null,
+            "parameter_name": "drag_hpi_amplitude",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_drag_hpi_beta": {
+            "default_value": null,
+            "parameter_name": "drag_hpi_beta",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_drag_hpi_duration": {
+            "default_value": null,
+            "parameter_aliases": [
+              "drag_hpi_length"
+            ],
+            "parameter_name": "drag_hpi_duration",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "ns",
             "user_override": "allowed"
           },
           "target_qubit_frequency": {

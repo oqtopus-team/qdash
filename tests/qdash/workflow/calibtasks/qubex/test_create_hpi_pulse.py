@@ -142,6 +142,7 @@ def test_create_pulse_publishes_effective_duration(
     duration: int,
 ) -> None:
     task = task_type({"run_parameters": {run_name: {"value": duration, "value_type": "int"}}})
+    raw_result: Any
     if task_type is CreatePIPulse:
         raw_result = SimpleNamespace(data={"Q01": PulseCalibrationData()})
     else:

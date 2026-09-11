@@ -149,6 +149,7 @@ class InputParameterSpec(ParameterSpec):
     user_override: Literal["allowed", "forbidden"]
     default: float | int | None
     parameter_name: str = ""
+    parameter_aliases: tuple[str, ...] = ()
     qid_role: Literal["self", "control", "target", "coupling"] = "self"
     greater_than: float | None = None
     less_than: float | None = None

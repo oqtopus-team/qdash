@@ -55,6 +55,7 @@ class CheckBellStateTomography(QubexTask):
         ),
         "control_drag_hpi_duration": InputParameterSpec.required_database(
             parameter_name="drag_hpi_duration",
+            parameter_aliases=("drag_hpi_length",),
             qid_role="control",
             unit="ns",
         ),
@@ -70,6 +71,7 @@ class CheckBellStateTomography(QubexTask):
         ),
         "control_drag_pi_duration": InputParameterSpec.required_database(
             parameter_name="drag_pi_duration",
+            parameter_aliases=("drag_pi_length",),
             qid_role="control",
             unit="ns",
         ),
@@ -102,6 +104,22 @@ class CheckBellStateTomography(QubexTask):
             parameter_name="qubit_frequency",
             qid_role="target",
             unit="GHz",
+        ),
+        "target_drag_hpi_amplitude": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_amplitude",
+            qid_role="target",
+            unit="a.u.",
+        ),
+        "target_drag_hpi_duration": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_duration",
+            parameter_aliases=("drag_hpi_length",),
+            qid_role="target",
+            unit="ns",
+        ),
+        "target_drag_hpi_beta": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_beta",
+            qid_role="target",
+            unit="a.u.",
         ),
         "target_readout_frequency": InputParameterSpec.database_or_default(
             default=0,

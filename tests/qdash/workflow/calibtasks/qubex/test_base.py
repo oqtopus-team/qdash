@@ -60,6 +60,41 @@ class TestLoadParametersFromDbQubitTask:
         assert param is not None
         assert param.value == 5.2
 
+    def test_input_parameter_alias_resolves_legacy_database_key(self) -> None:
+        class AliasedInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "pi_duration": InputParameterSpec.required_database(
+                    parameter_aliases=("pi_length",),
+                )
+            }
+
+        task = AliasedInputTask()
+        task._populate_parameters(
+            {
+                "": [
+                    {"pi_length": {"value": 32, "unit": "ns"}},
+                    {"pi_duration": {"value": 48, "unit": "ns"}},
+                ]
+            }
+        )
+
+        assert task.input_parameters["pi_duration"].value == 32
+        assert task.input_parameters["pi_duration"].unit == "ns"
+
+        canonical_task = AliasedInputTask()
+        canonical_task._populate_parameters(
+            {
+                "": [
+                    {
+                        "pi_duration": {"value": 48, "unit": "ns"},
+                        "pi_length": {"value": 32, "unit": "ns"},
+                    }
+                ]
+            }
+        )
+
+        assert canonical_task.input_parameters["pi_duration"].value == 48
+
     def test_qubit_task_falls_back_to_dict_key_when_no_parameter_name(self):
         """When parameter_name is empty, dict key is used as lookup."""
         task = ConcreteQubexTask()

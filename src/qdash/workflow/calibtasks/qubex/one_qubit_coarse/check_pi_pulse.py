@@ -23,7 +23,7 @@ class CheckPIPulse(QubexTask):
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "qubit_frequency": InputParameterSpec.required_database(),
         "pi_amplitude": InputParameterSpec.required_database(),
-        "pi_duration": InputParameterSpec.required_database(),
+        "pi_duration": InputParameterSpec.required_database(parameter_aliases=("pi_length",)),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
         "readout_duration": InputParameterSpec.database_or_default(

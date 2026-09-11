@@ -51,7 +51,16 @@ X180 gate error should be low; error should be consistent with X90 error (X180 â
 
 ## Input parameters
 
-None.
+- qubit_frequency: Loaded from DB
+- drag_hpi_amplitude: Loaded from DB
+- drag_hpi_duration: Loaded from DB
+- drag_hpi_beta: Loaded from DB
+- drag_pi_amplitude: Loaded from DB
+- drag_pi_duration: Loaded from DB
+- drag_pi_beta: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 

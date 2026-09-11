@@ -42,7 +42,9 @@ def test_t2_echo_passes_resolved_pi_pulse_as_cpmg(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task = task_type()
-    pi = object()
+    pi = MagicMock()
+    pi_y180 = object()
+    pi.shifted.return_value = pi_y180
     datum = SimpleNamespace(t2=10.0, t2_err=0.1, r2=0.99)
     t2_experiment = MagicMock(return_value=SimpleNamespace(data={"Q01": datum}))
     exp = SimpleNamespace(
@@ -61,7 +63,8 @@ def test_t2_echo_passes_resolved_pi_pulse_as_cpmg(
 
     assert task_type.input_spec["pi_amplitude"].resolution == "database_required"
     assert task_type.input_spec["pi_duration"].resolution == "database_required"
-    assert t2_experiment.call_args.kwargs["pi_cpmg"] is pi
+    pi.shifted.assert_called_once_with(pytest.approx(1.5707963267948966))
+    assert t2_experiment.call_args.kwargs["pi_cpmg"] is pi_y180
 
 
 def test_x180_irb_passes_resolved_x90_and_x180_explicitly(
@@ -160,18 +163,20 @@ def test_create_zx90_passes_resolved_control_x180_explicitly(
         "zx_rotation_rate": 0.003,
         "ramptime": 16.0,
     }
+    zx90 = MagicMock(return_value=SimpleNamespace(duration=120.0))
     exp = SimpleNamespace(
         drag_pi_pulse={"Q00": control_x180},
         get_qubit_label=lambda qid: f"Q0{qid}",
         calibrate_zx90=calibrate_zx90,
         calib_note=SimpleNamespace(get_cr_param=lambda _label: cr_params),
-        zx90=lambda **_kwargs: SimpleNamespace(duration=120.0),
+        zx90=zx90,
     )
     monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
 
     task.run(cast("QubexBackend", _backend_for(exp)), "0-1")
 
     assert calibrate_zx90.call_args.kwargs["x180"] == {"Q00": control_x180}
+    assert zx90.call_args.kwargs["x180"] == {"Q00": control_x180}
     assert {
         "control_drag_pi_amplitude",
         "control_drag_pi_duration",
@@ -184,6 +189,14 @@ def _assert_control_drag_pi_inputs(task: Any) -> None:
         "control_drag_pi_amplitude",
         "control_drag_pi_duration",
         "control_drag_pi_beta",
+    } <= task.input_spec.keys()
+
+
+def _assert_target_drag_hpi_inputs(task: Any) -> None:
+    assert {
+        "target_drag_hpi_amplitude",
+        "target_drag_hpi_duration",
+        "target_drag_hpi_beta",
     } <= task.input_spec.keys()
 
 
@@ -240,17 +253,21 @@ def test_bell_tasks_pass_explicit_zx90_built_with_resolved_x180(
     assert zx90.call_args.kwargs["x180"] == {"Q00": control_x180}
     assert method.call_args.kwargs["zx90"] is zx90_pulse
     _assert_control_drag_pi_inputs(task)
+    _assert_target_drag_hpi_inputs(task)
 
 
 def test_zx90_irb_passes_explicit_zx90_built_with_resolved_x180(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task = ZX90InterleavedRandomizedBenchmarking()
+    control_x90 = object()
+    target_x90 = object()
     control_x180 = object()
     zx90_pulse = object()
     zx90 = MagicMock(return_value=zx90_pulse)
     interleaved_rb = MagicMock(return_value={"Q00-Q01": {"rb_fit_result": {"r2": 0.99}}})
     exp = SimpleNamespace(
+        drag_hpi_pulse={"Q00": control_x90, "Q01": target_x90},
         drag_pi_pulse={"Q00": control_x180},
         get_qubit_label=lambda qid: f"Q0{qid}",
         zx90=zx90,
@@ -264,4 +281,9 @@ def test_zx90_irb_passes_explicit_zx90_built_with_resolved_x180(
     assert zx90.call_args.kwargs["x180"] == {"Q00": control_x180}
     assert interleaved_rb.call_args.kwargs["zx90"] == expected
     assert interleaved_rb.call_args.kwargs["interleaved_waveform"] == expected
+    assert interleaved_rb.call_args.kwargs["x90"] == {
+        "Q00": control_x90,
+        "Q01": target_x90,
+    }
     _assert_control_drag_pi_inputs(task)
+    _assert_target_drag_hpi_inputs(task)

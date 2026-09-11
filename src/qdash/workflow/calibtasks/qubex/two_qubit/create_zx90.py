@@ -54,6 +54,7 @@ class CreateZX90(QubexTask):
         ),
         "control_drag_hpi_duration": InputParameterSpec.required_database(
             parameter_name="drag_hpi_duration",
+            parameter_aliases=("drag_hpi_length",),
             qid_role="control",
             unit="ns",
         ),
@@ -69,6 +70,7 @@ class CreateZX90(QubexTask):
         ),
         "control_drag_pi_duration": InputParameterSpec.required_database(
             parameter_name="drag_pi_duration",
+            parameter_aliases=("drag_pi_length",),
             qid_role="control",
             unit="ns",
         ),
@@ -314,7 +316,7 @@ class CreateZX90(QubexTask):
             "fig": raw_result["fig"],
         }
 
-        zx90 = exp.zx90(control_qubit=control, target_qubit=target)
+        zx90 = exp.zx90(control_qubit=control, target_qubit=target, x180=x180)
         result["zx90_gate_time"] = zx90.duration
 
         self.save_calibration(backend)

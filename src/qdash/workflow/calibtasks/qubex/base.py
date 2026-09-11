@@ -366,11 +366,20 @@ class QubexTask(BaseTask):
             # Get the ordered list of data sources for this role
             sources = role_data_sources.get(qid_role, role_data_sources.get("", []))
 
-            # Search sources in order for the lookup key
+            lookup_keys: tuple[str, ...] = (lookup_key,)
+            if isinstance(declaration, InputParameterSpec):
+                lookup_keys += declaration.parameter_aliases
+
+            # Search sources in order, preferring the canonical key within each source.
             db_value = None
+            value_found = False
             for source in sources:
-                if lookup_key in source:
-                    db_value = source[lookup_key]
+                for candidate_key in lookup_keys:
+                    if candidate_key in source:
+                        db_value = source[candidate_key]
+                        value_found = True
+                        break
+                if value_found:
                     break
 
             if db_value is not None:

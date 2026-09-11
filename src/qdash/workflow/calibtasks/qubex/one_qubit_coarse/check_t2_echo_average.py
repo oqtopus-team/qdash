@@ -39,7 +39,7 @@ class CheckT2EchoAverage(QubexTask):
         "hpi_amplitude": InputParameterSpec.required_database(),
         "hpi_duration": InputParameterSpec.required_database(),
         "pi_amplitude": InputParameterSpec.required_database(),
-        "pi_duration": InputParameterSpec.required_database(),
+        "pi_duration": InputParameterSpec.required_database(parameter_aliases=("pi_length",)),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
         "readout_duration": InputParameterSpec.database_or_default(
@@ -100,7 +100,7 @@ class CheckT2EchoAverage(QubexTask):
             result = exp.t2_experiment(
                 labels,
                 time_range=self.run_parameters["time_range"].get_value(),
-                pi_cpmg=exp.pi_pulse[label],
+                pi_cpmg=exp.pi_pulse[label].shifted(np.pi / 2),
                 n_shots=self.run_parameters["shots"].get_value(),
                 shot_interval=self.run_parameters["interval"].get_value(),
                 save_image=False,

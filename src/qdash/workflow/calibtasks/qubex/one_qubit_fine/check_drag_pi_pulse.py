@@ -23,7 +23,9 @@ class CheckDRAGPIPulse(QubexTask):
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "qubit_frequency": InputParameterSpec.required_database(),
         "drag_pi_amplitude": InputParameterSpec.required_database(),
-        "drag_pi_duration": InputParameterSpec.required_database(),
+        "drag_pi_duration": InputParameterSpec.required_database(
+            parameter_aliases=("drag_pi_length",)
+        ),
         "drag_pi_beta": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
