@@ -271,6 +271,11 @@ def test_extract_parameter_metadata_understands_named_spec_constructors() -> Non
                 user_override="forbidden",
                 greater_than=0.0,
             ),
+            "coarse_amplitude": InputParameterSpec.database_or_default(
+                default=0.0625,
+                greater_than_or_equal=0.0001,
+                less_than_or_equal=1.0,
+            ),
         }""",
         mode="eval",
     ).body
@@ -287,5 +292,12 @@ def test_extract_parameter_metadata_understands_named_spec_constructors() -> Non
             "user_override": "forbidden",
             "default_value": 0.1,
             "greater_than": 0.0,
+        },
+        "coarse_amplitude": {
+            "resolution": "database_or_default",
+            "user_override": "allowed",
+            "default_value": 0.0625,
+            "greater_than_or_equal": 0.0001,
+            "less_than_or_equal": 1.0,
         },
     }

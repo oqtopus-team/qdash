@@ -33,8 +33,8 @@ class CheckChevron(QubexTask):
         "readout_amplitude": InputParameterSpec.required_database(),
         "coarse_control_amplitude": InputParameterSpec.database_or_default(
             default=DEFAULT_COARSE_CONTROL_AMPLITUDE,
-            greater_than=CONTROL_AMPLITUDE_MIN,
-            less_than=CONTROL_AMPLITUDE_MAX,
+            greater_than_or_equal=CONTROL_AMPLITUDE_MIN,
+            less_than_or_equal=CONTROL_AMPLITUDE_MAX,
             unit="a.u.",
             description="Coarse control pulse amplitude",
         ),
