@@ -163,7 +163,7 @@ def test_check_cross_resonance_passes_control_and_target_x90_explicitly(
         assert task.input_spec[f"{role}_drag_hpi_duration"].resolution == "database_required"
 
 
-def test_create_zx90_passes_resolved_control_x180_explicitly(
+def test_create_zx90_uses_calibrated_cr_values_and_resolved_control_x180(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task = CreateZX90()
@@ -177,16 +177,16 @@ def test_create_zx90_passes_resolved_control_x180_explicitly(
         }
     )
     cr_params = {
-        "duration": 100.0,
-        "cr_amplitude": 0.2,
-        "cr_phase": 0.1,
-        "cr_beta": 0.0,
-        "cancel_amplitude": 0.01,
-        "cancel_phase": 0.0,
-        "cancel_beta": 0.0,
-        "rotary_amplitude": 0.02,
-        "zx_rotation_rate": 0.003,
-        "ramptime": 16.0,
+        "duration": 128.0,
+        "cr_amplitude": 0.27,
+        "cr_phase": 0.12,
+        "cr_beta": 0.013,
+        "cancel_amplitude": 0.031,
+        "cancel_phase": 0.4,
+        "cancel_beta": 0.05,
+        "rotary_amplitude": 0.06,
+        "zx_rotation_rate": 0.004,
+        "ramptime": 24.0,
     }
     zx90 = MagicMock(return_value=SimpleNamespace(duration=120.0))
     exp = SimpleNamespace(
@@ -201,7 +201,20 @@ def test_create_zx90_passes_resolved_control_x180_explicitly(
     task.run(cast("QubexBackend", _backend_for(exp)), "0-1")
 
     assert calibrate_zx90.call_args.kwargs["x180"] == {"Q00": control_x180}
-    _assert_explicit_zx90_call(zx90, control_x180)
+    assert zx90.call_args.kwargs == {
+        "control_qubit": "Q00",
+        "target_qubit": "Q01",
+        "x180": {"Q00": control_x180},
+        "cr_duration": 128.0,
+        "cr_ramptime": 24.0,
+        "cr_amplitude": 0.27,
+        "cr_phase": 0.12,
+        "cr_beta": 0.013,
+        "cancel_amplitude": 0.031,
+        "cancel_phase": 0.4,
+        "cancel_beta": 0.05,
+        "rotary_amplitude": 0.06,
+    }
     assert {
         "control_drag_pi_amplitude",
         "control_drag_pi_duration",

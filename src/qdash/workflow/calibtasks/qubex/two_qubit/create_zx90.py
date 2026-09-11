@@ -320,7 +320,15 @@ class CreateZX90(QubexTask):
             control_qubit=control,
             target_qubit=target,
             x180=x180,
-            **self._resolved_zx90_kwargs(),
+            cr_duration=float(fit_result["duration"]),
+            cr_ramptime=float(fit_result["ramptime"]),
+            cr_amplitude=float(fit_result["cr_amplitude"]),
+            cr_phase=float(fit_result["cr_phase"]),
+            cr_beta=float(fit_result["cr_beta"]),
+            cancel_amplitude=float(fit_result["cancel_amplitude"]),
+            cancel_phase=float(fit_result["cancel_phase"]),
+            cancel_beta=float(fit_result["cancel_beta"]),
+            rotary_amplitude=float(fit_result["rotary_amplitude"]),
         )
         result["zx90_gate_time"] = zx90.duration
 
