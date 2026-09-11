@@ -1307,7 +1307,7 @@ class CalibService:
                 )
             # Reload and mark as failed
             if self.execution_service:
-                self.execution_service = self.execution_service.reload().fail()
+                self.execution_service = self.execution_service.reload().fail(error_message)
         finally:
             self._release_lock_if_acquired()
             self._initialized = False

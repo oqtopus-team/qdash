@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -165,20 +166,28 @@ class CalibOrchestrator:
         else:
             logger.info("Isolated session: ExecutionService created (no save/start)")
 
-        # Initialize TaskContext with optional provenance tracking
-        self._task_context = TaskContext(
-            username=config.username,
-            execution_id=config.execution_id,
-            qids=config.qids,
-            calib_dir=config.calib_data_path,
-            history_recorder=self._create_history_recorder(),
-            force_update_params=config.force_update_params,
-            persist_output_parameters=config.persist_output_parameters,
-        )
+        try:
+            # Initialize TaskContext with optional provenance tracking
+            self._task_context = TaskContext(
+                username=config.username,
+                execution_id=config.execution_id,
+                qids=config.qids,
+                calib_dir=config.calib_data_path,
+                history_recorder=self._create_history_recorder(),
+                force_update_params=config.force_update_params,
+                persist_output_parameters=config.persist_output_parameters,
+            )
 
-        # Initialize Backend
-        self._backend = self._create_backend()
-        self._backend.connect()
+            # Initialize Backend
+            self._backend = self._create_backend()
+            self._backend.connect()
+        except Exception:
+            if not config.skip_execution:
+                try:
+                    self._execution_service.fail(traceback.format_exc())
+                except Exception:
+                    logger.exception("Failed to persist session initialization error")
+            raise
 
         self._initialized = True
         logger.info(f"Session initialized: execution_id={config.execution_id}")

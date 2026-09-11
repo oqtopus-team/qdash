@@ -45,7 +45,7 @@ class MockExecutionService:
         self.completed = True
         return self
 
-    def fail(self):
+    def fail(self, error_message=""):
         return self
 
     def reload(self):
@@ -489,6 +489,8 @@ class TestCalibServiceInitialization:
             session.cancel_calibration()
 
         getattr(execution_service.reload.return_value, terminal).assert_called_once()
+        if terminal == "fail":
+            execution_service.reload.return_value.fail.assert_called_once_with("measurement failed")
         assert lock_repo.locked is False
         assert session._lock_acquired is False
 
@@ -840,7 +842,7 @@ def pipeline_execution_env(mock_flow_session_deps, monkeypatch):
                 ("cancel", "cancelled"),
             ):
 
-                def close(status=status):
+                def close(*args, status=status):
                     assert lock.locked  # No stage may release the pipeline lock.
                     record.status = status
                     return self._execution_service
