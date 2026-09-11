@@ -15,6 +15,23 @@ else:
     QubexBackend = Any
 
 
+@pytest.mark.parametrize("value", [1e-4, 0.07, 1.0])
+def test_chevron_control_amplitude_accepts_inclusive_bounds(value: float) -> None:
+    CheckChevron.input_spec["coarse_control_amplitude"].validate_effective_value(
+        "coarse_control_amplitude", value
+    )
+
+
+@pytest.mark.parametrize(
+    "value", [0.000099, 1.000001, float("nan"), float("inf"), None, True, "0.5"]
+)
+def test_chevron_control_amplitude_rejects_invalid_values(value: Any) -> None:
+    with pytest.raises(ValueError, match="coarse_control_amplitude"):
+        CheckChevron.input_spec["coarse_control_amplitude"].validate_effective_value(
+            "coarse_control_amplitude", value
+        )
+
+
 class _DummyExperiment:
     def __init__(self) -> None:
         self.params = SimpleNamespace(readout_amplitude={"Q00": 0.0})

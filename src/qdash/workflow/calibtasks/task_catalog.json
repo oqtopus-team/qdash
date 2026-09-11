@@ -927,8 +927,8 @@
           "coarse_control_amplitude": {
             "default_value": 0.0625,
             "description": "Coarse control pulse amplitude",
-            "greater_than": 0.0001,
-            "less_than": 1.0,
+            "greater_than_or_equal": 0.0001,
+            "less_than_or_equal": 1.0,
             "resolution": "database_or_default",
             "unit": "a.u.",
             "user_override": "allowed"

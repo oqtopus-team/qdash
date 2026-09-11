@@ -73,22 +73,30 @@ class RunParameterModel(BaseModel):
         """
         if self.value_type == "np.linspace":
             if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
-                raise ValueError("np.linspace requires a tuple/list of (start, stop, num)")
+                raise ValueError(
+                    f"np.linspace requires a tuple/list of (start, stop, num), got {self.value!r}"
+                )
             start, stop, num = self.value
             return np.linspace(float(start), float(stop), int(num))
         elif self.value_type == "np.logspace":
             if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
-                raise ValueError("np.logspace requires a tuple/list of (start, stop, num)")
+                raise ValueError(
+                    f"np.logspace requires a tuple/list of (start, stop, num), got {self.value!r}"
+                )
             start, stop, num = self.value
             return np.logspace(float(start), float(stop), int(num))
         elif self.value_type == "np.arange":
             if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
-                raise ValueError("np.arange requires a tuple/list of (start, stop, step)")
+                raise ValueError(
+                    f"np.arange requires a tuple/list of (start, stop, step), got {self.value!r}"
+                )
             start, stop, step = self.value
             return np.arange(float(start), float(stop), float(step))
         elif self.value_type == "range":
             if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
-                raise ValueError("range requires a tuple/list of (start, stop, step)")
+                raise ValueError(
+                    f"range requires a tuple/list of (start, stop, step), got {self.value!r}"
+                )
             start, stop, step = self.value
             return range(int(start), int(stop), int(step))
         elif self.value_type == "int":
@@ -144,6 +152,8 @@ class InputParameterSpec(ParameterSpec):
     qid_role: Literal["self", "control", "target", "coupling"] = "self"
     greater_than: float | None = None
     less_than: float | None = None
+    greater_than_or_equal: float | None = None
+    less_than_or_equal: float | None = None
 
     @classmethod
     def required_database(
@@ -199,19 +209,29 @@ class InputParameterSpec(ParameterSpec):
             raise ValueError("database_required must not declare a default")
         if self.resolution != "database_required" and self.default is None:
             raise ValueError(f"{self.resolution} requires a default")
-        if (
-            self.greater_than is not None
-            and self.less_than is not None
-            and self.greater_than >= self.less_than
-        ):
-            raise ValueError("greater_than must be less than less_than")
+        lower_bounds = [(self.greater_than, False), (self.greater_than_or_equal, True)]
+        upper_bounds = [(self.less_than, False), (self.less_than_or_equal, True)]
+        for lower, lower_inclusive in lower_bounds:
+            for upper, upper_inclusive in upper_bounds:
+                if lower is None or upper is None:
+                    continue
+                if lower > upper or (lower == upper and not (lower_inclusive and upper_inclusive)):
+                    raise ValueError("Numeric bounds must define a non-empty interval")
         return self
 
     def validate_effective_value(self, name: str, value: Any) -> None:
         """Validate a resolved value without changing it or applying a fallback."""
         if value is None:
             raise ValueError(f"Input parameter '{name}' was not resolved")
-        if self.greater_than is None and self.less_than is None:
+        if all(
+            bound is None
+            for bound in (
+                self.greater_than,
+                self.less_than,
+                self.greater_than_or_equal,
+                self.less_than_or_equal,
+            )
+        ):
             return
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValueError(f"Input parameter '{name}' must be numeric, got {value!r}")
@@ -225,6 +245,17 @@ class InputParameterSpec(ParameterSpec):
         if self.less_than is not None and numeric >= self.less_than:
             raise ValueError(
                 f"Input parameter '{name}' must be less than {self.less_than}, got {value!r}"
+            )
+
+        if self.greater_than_or_equal is not None and numeric < self.greater_than_or_equal:
+            raise ValueError(
+                f"Input parameter '{name}' must be greater than or equal to "
+                f"{self.greater_than_or_equal}, got {value!r}"
+            )
+        if self.less_than_or_equal is not None and numeric > self.less_than_or_equal:
+            raise ValueError(
+                f"Input parameter '{name}' must be less than or equal to "
+                f"{self.less_than_or_equal}, got {value!r}"
             )
 
     def create_model(self) -> "InputParameterModel":
