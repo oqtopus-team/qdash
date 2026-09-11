@@ -583,6 +583,53 @@ class TestCalibServiceInitialization:
 class TestCalibServiceParameterManagement:
     """Test parameter get/set operations."""
 
+    def test_later_step_pushes_readout_amplitude_after_frequency_only_step(
+        self, monkeypatch, tmp_path
+    ):
+        """Each step must filter its own push without narrowing later steps' allowlist."""
+        from ruamel.yaml import YAML
+
+        from qdash.common.config.params_updater import YamlParamsUpdater
+        from qdash.workflow.service.github import GitHubPushConfig
+
+        updater = YamlParamsUpdater(params_dir=tmp_path, label="Q00")
+        monkeypatch.setattr(
+            "qdash.workflow.service.calib_service.get_params_updater",
+            lambda backend, chip_id: updater,
+        )
+        monkeypatch.setattr(
+            "qdash.workflow.service.calib_service.GitHubIntegration.check_credentials",
+            lambda: True,
+        )
+        orchestrator = MagicMock()
+        orchestrator._execution_service = MockExecutionService()
+        session = CalibService.__new__(CalibService)
+        session.chip_id = "chip_1"
+        session._orchestrator = orchestrator
+        session.github_push_config = GitHubPushConfig(
+            enabled=True,
+            params_file_names=["qubit_frequency.yaml", "readout_amplitude.yaml"],
+        )
+        session.github_integration = MagicMock()
+        session.github_integration.push_files.return_value = None
+        pushed_files = []
+        session.github_integration.push_files.side_effect = lambda config: pushed_files.append(
+            list(config.params_file_names)
+        )
+        logger = MagicMock()
+
+        session.execution_service.calib_data.qubit = {"0": {"qubit_frequency": 5.0}}
+        session._push_to_github_if_configured(logger, None)
+        session.execution_service.calib_data.qubit = {"0": {"readout_amplitude": 0.15}}
+        session._push_to_github_if_configured(logger, None)
+
+        assert pushed_files == [["qubit_frequency.yaml"], ["readout_amplitude.yaml"]]
+        assert session.github_push_config.params_file_names == [
+            "qubit_frequency.yaml",
+            "readout_amplitude.yaml",
+        ]
+        assert YAML().load(tmp_path / "readout_amplitude.yaml")["data"]["Q00"] == 0.15
+
     def test_set_and_get_parameter(self, mock_flow_session_deps, mock_lock_repo, mock_user_repo):
         """Test setting and getting parameters."""
         session = CalibService(
@@ -653,9 +700,10 @@ class TestCalibServiceParameterManagement:
         )
         logger = MagicMock()
 
-        session._sync_backend_params_before_push(logger)
+        push_config = session._sync_backend_params_before_push(logger)
 
-        assert session.github_push_config.params_file_names == ["t1.yaml"]
+        assert push_config.params_file_names == ["t1.yaml"]
+        assert session.github_push_config.params_file_names == ["t1.yaml", "t2_echo.yaml"]
         logger.info.assert_called_once()
 
     def test_sync_backend_params_keeps_touched_files_when_already_updated(
@@ -702,9 +750,10 @@ class TestCalibServiceParameterManagement:
         )
         logger = MagicMock()
 
-        session._sync_backend_params_before_push(logger)
+        push_config = session._sync_backend_params_before_push(logger)
 
-        assert session.github_push_config.params_file_names == ["t1.yaml"]
+        assert push_config.params_file_names == ["t1.yaml"]
+        assert session.github_push_config.params_file_names == ["t1.yaml", "t2_echo.yaml"]
         logger.info.assert_called_once()
 
     def test_merge_task_result_calib_data_before_push_loads_completed_outputs(
