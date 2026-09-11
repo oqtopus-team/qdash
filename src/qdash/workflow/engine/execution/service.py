@@ -177,8 +177,10 @@ class ExecutionService:
         self.state_manager.complete()
         return self.save()
 
-    def fail(self) -> "ExecutionService":
-        """Fail the execution and persist."""
+    def fail(self, error_message: str = "") -> "ExecutionService":
+        """Fail the execution and persist, preserving an existing message if none is given."""
+        if error_message:
+            self.state_manager.message = error_message
         self.state_manager.fail()
         return self.save()
 
