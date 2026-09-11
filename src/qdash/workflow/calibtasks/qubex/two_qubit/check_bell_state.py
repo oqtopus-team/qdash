@@ -206,7 +206,7 @@ class CheckBellState(QubexTask):
             exp.get_qubit_label(int(q)) for q in qid.split("-")
         )  # e.g., "0-1" → "Q00","Q01"
         x180 = {control: exp.drag_pi_pulse[control]}
-        zx90 = exp.zx90(control, target, x180=x180)
+        zx90 = exp.zx90(control, target, x180=x180, **self._resolved_zx90_kwargs())
         result = exp.measure_bell_state(
             control,
             target,

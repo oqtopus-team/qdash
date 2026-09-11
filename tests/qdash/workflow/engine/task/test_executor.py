@@ -883,6 +883,28 @@ class TestSnapshotOverrides:
         assert set(canonical_task.input_parameters) == {"control_drag_pi_duration"}
         assert canonical_task.input_parameters["control_drag_pi_duration"].value == 48
 
+    def test_incompatible_snapshot_prompts_fresh_calibration(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        class ExpandedTask(MockTask):
+            input_spec = {
+                "existing": InputParameterSpec.required_database(),
+                "new_dependency": InputParameterSpec.required_database(),
+            }
+
+        mock_snapshot_loader.has_snapshot_source = True
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {"existing": {"value": 1.0}},
+            {},
+        )
+
+        with pytest.raises(ValueError, match="run a fresh calibration instead"):
+            executor_with_snapshot._apply_snapshot_overrides(
+                ExpandedTask(), "ExpandedTask", "qubit", "0"
+            )
+
     def test_apply_snapshot_overrides_missing_snapshot(
         self,
         executor_with_snapshot: TaskExecutor,

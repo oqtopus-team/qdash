@@ -201,7 +201,7 @@ class CheckZX90(QubexTask):
             exp.get_qubit_label(int(q)) for q in qid.split("-")
         )  # e.g., "0-1" → "Q00","Q01"
         x180 = {control: exp.drag_pi_pulse[control]}
-        zx90_pulse = exp.zx90(control, target, x180=x180)
+        zx90_pulse = exp.zx90(control, target, x180=x180, **self._resolved_zx90_kwargs())
         result = exp.repeat_sequence(
             sequence=zx90_pulse,
             repetitions=self.run_parameters["repetitions"].get_value(),

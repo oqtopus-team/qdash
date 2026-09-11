@@ -196,6 +196,24 @@ class QubexTask(BaseTask):
                     },
                 )
 
+    def _resolved_zx90_kwargs(self) -> dict[str, float]:
+        """Return the resolved CR parameters accepted directly by Qubex ``zx90``."""
+        names = (
+            "cr_duration",
+            "cr_ramptime",
+            "cr_amplitude",
+            "cr_phase",
+            "cr_beta",
+            "cancel_amplitude",
+            "cancel_phase",
+            "cancel_beta",
+            "rotary_amplitude",
+        )
+        values = self._resolved_input_values(names)
+        if values is None:
+            raise ValueError(f"{self.name} does not declare the inputs required to build ZX90")
+        return values
+
     def _restore_cr_context(self, backend: "QubexBackend", qid: str) -> None:
         """Restore CR parameters consumed implicitly by Qubex two-qubit methods."""
         if "-" not in qid:

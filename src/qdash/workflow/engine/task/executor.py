@@ -871,8 +871,9 @@ class TaskExecutor:
             if missing_inputs:
                 missing = ", ".join(sorted(missing_inputs))
                 raise ValueError(
-                    f"Snapshot inputs for task '{task_name}' and qid '{qid}' "
-                    f"are incomplete; missing: {missing}"
+                    f"Snapshot inputs for task '{task_name}' and qid '{qid}' are incompatible "
+                    f"with the current task definition; run a fresh calibration instead. "
+                    f"Missing inputs: {missing}"
                 )
         logger.info(
             "Applying snapshot overrides for task=%s, qid=%s (input_params=%d, run_params=%d)",

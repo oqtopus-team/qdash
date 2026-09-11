@@ -234,7 +234,7 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
             target: exp.drag_hpi_pulse[target],
         }
         x180 = {control: exp.drag_pi_pulse[control]}
-        zx90 = {label: exp.zx90(control, target, x180=x180)}
+        zx90 = {label: exp.zx90(control, target, x180=x180, **self._resolved_zx90_kwargs())}
         result = exp.interleaved_randomized_benchmarking(
             targets=label,
             interleaved_clifford="ZX90",

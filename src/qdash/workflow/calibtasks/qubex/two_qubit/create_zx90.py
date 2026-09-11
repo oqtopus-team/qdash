@@ -316,7 +316,12 @@ class CreateZX90(QubexTask):
             "fig": raw_result["fig"],
         }
 
-        zx90 = exp.zx90(control_qubit=control, target_qubit=target, x180=x180)
+        zx90 = exp.zx90(
+            control_qubit=control,
+            target_qubit=target,
+            x180=x180,
+            **self._resolved_zx90_kwargs(),
+        )
         result["zx90_gate_time"] = zx90.duration
 
         self.save_calibration(backend)

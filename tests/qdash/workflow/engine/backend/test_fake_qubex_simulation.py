@@ -98,3 +98,30 @@ def test_fake_explicit_lifetimes_are_preserved() -> None:
 
     assert exp._qubit_lifetime(0) == (11.0, 12.0)
     assert exp._qubit_lifetime(1) == (21.0, 22.0)
+
+
+def test_fake_zx90_accepts_explicit_cr_parameters_and_x180(monkeypatch) -> None:
+    exp = FakeExperiment()
+    x180 = object()
+    monkeypatch.setattr(
+        "qdash.workflow.engine.backend.fake_qubex.simulation._simulation_dependencies",
+        lambda: (_ for _ in ()).throw(ImportError),
+    )
+
+    schedule = exp.zx90(
+        "Q00",
+        "Q01",
+        cr_duration=100.0,
+        cr_ramptime=16.0,
+        cr_amplitude=0.2,
+        cr_phase=0.1,
+        cr_beta=0.01,
+        cancel_amplitude=0.02,
+        cancel_phase=0.3,
+        cancel_beta=0.04,
+        rotary_amplitude=0.05,
+        x180={"Q00": x180},
+    )
+
+    assert schedule.duration == 100.0
+    assert exp._resolve_zx90_x180("Q00", {"Q00": x180}) is x180
