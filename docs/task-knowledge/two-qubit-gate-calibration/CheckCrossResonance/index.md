@@ -58,7 +58,7 @@ Clear ZX oscillation with parasitic terms (IX, IY, IZ) small relative to ZX. The
 
 - control_qubit_frequency: (control qubit) (GHz)
 - control_drag_hpi_amplitude: (control qubit) (a.u.)
-- control_drag_hpi_length: (control qubit) (ns)
+- control_drag_hpi_duration: (control qubit) (ns)
 - control_drag_hpi_beta: (control qubit) (a.u.)
 - control_readout_frequency: (control qubit) (GHz)
 - control_readout_amplitude: (control qubit) (a.u.)

@@ -44,7 +44,7 @@ class CreatePIPulse(QubexTask):
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "pi_duration": RunParameterSpec(
-            unit="ns", value_type="int", default=PI_DURATION, description="PI pulse length"
+            unit="ns", value_type="int", default=PI_DURATION, description="PI pulse duration"
         ),
         "shots": RunParameterSpec(
             unit="",
@@ -61,8 +61,8 @@ class CreatePIPulse(QubexTask):
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "pi_amplitude": OutputParameterSpec(unit="", description="PI pulse amplitude"),
-        "pi_length": OutputParameterSpec(
-            default=PI_DURATION, unit="ns", description="PI pulse length"
+        "pi_duration": OutputParameterSpec(
+            default=None, unit="ns", description="PI pulse duration"
         ),
     }
 
@@ -73,6 +73,7 @@ class CreatePIPulse(QubexTask):
         label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
         self.output_parameters["pi_amplitude"].value = result.data[label].calib_value
+        self.output_parameters["pi_duration"].value = self.run_parameters["pi_duration"].get_value()
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         validation_error = finite_value_error(

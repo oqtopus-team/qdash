@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
 from qdash.datamodel.task import (
     InputParameterSpec,
@@ -22,7 +22,20 @@ class X180InterleavedRandomizedBenchmarking(QubexTask):
     name: str = "X180InterleavedRandomizedBenchmarking"
     task_type: str = "qubit"
     timeout: int = 60 * 30
-    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qubit_frequency": InputParameterSpec.required_database(),
+        "drag_hpi_amplitude": InputParameterSpec.required_database(),
+        "drag_hpi_duration": InputParameterSpec.required_database(),
+        "drag_hpi_beta": InputParameterSpec.required_database(),
+        "drag_pi_amplitude": InputParameterSpec.required_database(),
+        "drag_pi_duration": InputParameterSpec.required_database(),
+        "drag_pi_beta": InputParameterSpec.required_database(),
+        "readout_amplitude": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_duration": InputParameterSpec.database_or_default(
+            default=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse duration"
+        ),
+    }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "n_trials": RunParameterSpec(
             unit="a.u.",
@@ -72,9 +85,16 @@ class X180InterleavedRandomizedBenchmarking(QubexTask):
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
+        readout_amp_param = self.input_parameters["readout_amplitude"]
+        if readout_amp_param is not None:
+            exp.params.readout_amplitude[label] = readout_amp_param.value
+        x90 = {label: exp.drag_hpi_pulse[label]}
+        x180 = {label: exp.drag_pi_pulse[label]}
         result = exp.interleaved_randomized_benchmarking(
             targets=label,
             interleaved_clifford="X180",
+            interleaved_waveform=x180,
+            x90=x90,
             n_trials=self.run_parameters["n_trials"].get_value(),
             save_image=False,
             n_shots=self.run_parameters["shots"].get_value(),

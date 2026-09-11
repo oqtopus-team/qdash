@@ -49,7 +49,7 @@ class CreateDRAGPIPulse(QubexTask):
             unit="ns",
             value_type="int",
             default=DRAG_PI_DURATION,
-            description="PI pulse length",
+            description="PI pulse duration",
         ),
         "shots": RunParameterSpec(
             unit="a.u.",
@@ -67,8 +67,8 @@ class CreateDRAGPIPulse(QubexTask):
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "drag_pi_beta": OutputParameterSpec(unit="", description="DRAG PI pulse beta"),
         "drag_pi_amplitude": OutputParameterSpec(unit="", description="DRAG PI pulse amplitude"),
-        "drag_pi_length": OutputParameterSpec(
-            default=DRAG_PI_DURATION, unit="ns", description="DRAG PI pulse length"
+        "drag_pi_duration": OutputParameterSpec(
+            default=None, unit="ns", description="DRAG PI pulse duration"
         ),
     }
 
@@ -80,6 +80,9 @@ class CreateDRAGPIPulse(QubexTask):
         result = run_result.raw_result
         self.output_parameters["drag_pi_beta"].value = result["beta"][label]
         self.output_parameters["drag_pi_amplitude"].value = result["amplitude"][label]["amplitude"]
+        self.output_parameters["drag_pi_duration"].value = self.run_parameters[
+            "drag_pi_duration"
+        ].get_value()
         output_parameters = self.attach_execution_id(execution_id)
         figures: list[go.Figure] = [result["amplitude"][label]["fig"]]
         validation_error = first_validation_error(

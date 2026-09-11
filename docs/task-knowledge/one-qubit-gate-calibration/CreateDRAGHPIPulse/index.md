@@ -64,11 +64,11 @@ Optimal beta should minimize leakage; rotation angle error should be minimal.
 
 - drag_hpi_beta: DRAG HPI pulse beta (a.u.)
 - drag_hpi_amplitude: DRAG HPI pulse amplitude (a.u.)
-- drag_hpi_length: DRAG HPI pulse length (ns)
+- drag_hpi_duration: DRAG HPI pulse duration (ns)
 
 ## Run parameters
 
-- drag_hpi_duration: HPI pulse length (ns)
+- drag_hpi_duration: HPI pulse duration (ns)
 - shots: Number of shots (a.u.)
 - interval: Time interval (ns)
 

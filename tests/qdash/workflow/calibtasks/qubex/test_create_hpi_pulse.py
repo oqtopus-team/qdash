@@ -3,9 +3,11 @@
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
+import plotly.graph_objects as go
 import pytest
 
 from qdash.datamodel.task import InputParameterModel
+from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_hpi_pulse import CreateHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_pi_pulse import CreatePIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_hpi_pulse import (
@@ -71,6 +73,19 @@ class RecordingExperiment:
         return SimpleNamespace(data={"Q01": SimpleNamespace(r2=0.99)})
 
 
+class PostprocessExperiment:
+    def get_qubit_label(self, _qid: int) -> str:
+        return "Q01"
+
+
+class PulseCalibrationData:
+    calib_value = 0.25
+
+    @staticmethod
+    def fit() -> dict[str, go.Figure]:
+        return {"fig": go.Figure()}
+
+
 def test_run_restores_same_rabi_context_for_same_and_split_sessions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -99,9 +114,51 @@ def test_preprocess_fails_explicitly_when_rabi_inputs_are_missing() -> None:
 
 
 def test_hpi_duration_is_used_consistently_for_run_and_output_parameters() -> None:
-    assert "hpi_duration" in CreateHPIPulse.run_spec
-    assert "hpi_duration" in CreateHPIPulse.output_spec
-    assert "hpi_length" not in CreateHPIPulse.run_spec
+    task = CreateHPIPulse({"run_parameters": {"hpi_duration": {"value": 52, "value_type": "int"}}})
+
+    result = task.postprocess(
+        cast("QubexBackend", _backend_for(PostprocessExperiment())),
+        "execution-id",
+        RunResult(raw_result=SimpleNamespace(data={"Q01": PulseCalibrationData()})),
+        "1",
+    )
+
+    assert CreateHPIPulse.output_spec["hpi_duration"].default is None
+    assert result.output_parameters["hpi_duration"].value == 52
+
+
+@pytest.mark.parametrize(
+    ("task_type", "run_name", "output_name", "duration"),
+    [
+        (CreatePIPulse, "pi_duration", "pi_duration", 40),
+        (CreateDRAGHPIPulse, "drag_hpi_duration", "drag_hpi_duration", 20),
+        (CreateDRAGPIPulse, "drag_pi_duration", "drag_pi_duration", 28),
+    ],
+)
+def test_create_pulse_publishes_effective_duration(
+    task_type: type[CreatePIPulse],
+    run_name: str,
+    output_name: str,
+    duration: int,
+) -> None:
+    task = task_type({"run_parameters": {run_name: {"value": duration, "value_type": "int"}}})
+    if task_type is CreatePIPulse:
+        raw_result = SimpleNamespace(data={"Q01": PulseCalibrationData()})
+    else:
+        raw_result = {
+            "beta": {"Q01": 0.1},
+            "amplitude": {"Q01": {"amplitude": 0.25, "fig": go.Figure()}},
+        }
+
+    result = task.postprocess(
+        cast("QubexBackend", _backend_for(PostprocessExperiment())),
+        "execution-id",
+        RunResult(raw_result=raw_result),
+        "1",
+    )
+
+    assert task_type.output_spec[output_name].default is None
+    assert result.output_parameters[output_name].value == duration
 
 
 def test_restore_rabi_context_rejects_low_quality_database_value() -> None:

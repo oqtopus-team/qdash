@@ -445,6 +445,35 @@ class TestRestoreCalibrationContext:
         assert pulse["amplitude"] == 0.12
         assert pulse["duration"] == 32
 
+    @pytest.mark.parametrize(
+        ("pulse_type", "duration"),
+        [("pi", 40), ("drag_hpi", 20), ("drag_pi", 28)],
+    )
+    def test_restores_other_pulses_from_duration_inputs(
+        self,
+        pulse_type: str,
+        duration: int,
+    ) -> None:
+        task = ConcreteQubexTask()
+        task.input_parameters = {
+            f"{pulse_type}_amplitude": ParameterModel(value=0.12),
+            f"{pulse_type}_duration": ParameterModel(value=duration),
+        }
+        if pulse_type.startswith("drag_"):
+            task.input_parameters[f"{pulse_type}_beta"] = ParameterModel(value=0.25)
+        exp = MagicMock()
+        backend = MagicMock()
+        backend.get_instance.return_value = exp
+
+        task._restore_qubit_pulse_context(backend, "0")
+
+        update = getattr(exp.calib_note, f"update_{pulse_type}_param")
+        update.assert_called_once()
+        _, pulse = update.call_args.args
+        assert pulse["duration"] == duration
+        if pulse_type.startswith("drag_"):
+            assert pulse["beta"] == 0.25
+
     def test_restores_two_qubit_pulses_using_each_qubit_id(self) -> None:
         task = ConcreteQubexTask()
         task.input_parameters = {

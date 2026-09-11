@@ -24,7 +24,7 @@ class RandomizedBenchmarking(QubexTask):
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "qubit_frequency": InputParameterSpec.required_database(),
         "drag_hpi_amplitude": InputParameterSpec.required_database(),
-        "drag_hpi_length": InputParameterSpec.required_database(),
+        "drag_hpi_duration": InputParameterSpec.required_database(),
         "drag_hpi_beta": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),

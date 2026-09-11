@@ -55,11 +55,11 @@ Fit quality should be high; the amplitude should be in the linear drive regime. 
 ## Output parameters
 
 - pi_amplitude: PI pulse amplitude
-- pi_length: PI pulse length (ns)
+- pi_duration: PI pulse duration (ns)
 
 ## Run parameters
 
-- pi_duration: PI pulse length (ns)
+- pi_duration: PI pulse duration (ns)
 - shots: Number of shots for calibration
 - interval: Time interval for calibration (ns)
 

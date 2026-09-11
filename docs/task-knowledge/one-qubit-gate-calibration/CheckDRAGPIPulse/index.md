@@ -58,7 +58,7 @@ Gate fidelity should exceed the non-DRAG version; leakage to |2⟩ should be min
 
 - qubit_frequency: Loaded from DB
 - drag_pi_amplitude: Loaded from DB
-- drag_pi_length: Loaded from DB
+- drag_pi_duration: Loaded from DB
 - drag_pi_beta: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB

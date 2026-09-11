@@ -164,13 +164,13 @@ class QubexTask(BaseTask):
                     },
                 )
 
-            pi = self._resolved_input_values((f"{prefix}pi_amplitude", f"{prefix}pi_length"))
+            pi = self._resolved_input_values((f"{prefix}pi_amplitude", f"{prefix}pi_duration"))
             if pi is not None:
                 exp.calib_note.update_pi_param(
                     label,
                     {
                         "target": label,
-                        "duration": pi[f"{prefix}pi_length"],
+                        "duration": pi[f"{prefix}pi_duration"],
                         "amplitude": pi[f"{prefix}pi_amplitude"],
                         "tau": PI_RAMPTIME,
                     },
@@ -180,7 +180,7 @@ class QubexTask(BaseTask):
                 drag = self._resolved_input_values(
                     (
                         f"{prefix}{pulse_type}_amplitude",
-                        f"{prefix}{pulse_type}_length",
+                        f"{prefix}{pulse_type}_duration",
                         f"{prefix}{pulse_type}_beta",
                     )
                 )
@@ -190,7 +190,7 @@ class QubexTask(BaseTask):
                     label,
                     {
                         "target": label,
-                        "duration": drag[f"{prefix}{pulse_type}_length"],
+                        "duration": drag[f"{prefix}{pulse_type}_duration"],
                         "amplitude": drag[f"{prefix}{pulse_type}_amplitude"],
                         "beta": drag[f"{prefix}{pulse_type}_beta"],
                     },

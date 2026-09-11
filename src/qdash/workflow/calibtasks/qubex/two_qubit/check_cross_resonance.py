@@ -54,8 +54,8 @@ class CheckCrossResonance(QubexTask):
             qid_role="control",
             unit="a.u.",
         ),
-        "control_drag_hpi_length": InputParameterSpec.required_database(
-            parameter_name="drag_hpi_length",
+        "control_drag_hpi_duration": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_duration",
             qid_role="control",
             unit="ns",
         ),
@@ -88,6 +88,21 @@ class CheckCrossResonance(QubexTask):
             parameter_name="qubit_frequency",
             qid_role="target",
             unit="GHz",
+        ),
+        "target_drag_hpi_amplitude": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_amplitude",
+            qid_role="target",
+            unit="a.u.",
+        ),
+        "target_drag_hpi_duration": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_duration",
+            qid_role="target",
+            unit="ns",
+        ),
+        "target_drag_hpi_beta": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_beta",
+            qid_role="target",
+            unit="a.u.",
         ),
         "target_readout_frequency": InputParameterSpec.database_or_default(
             default=0,
@@ -247,9 +262,14 @@ class CheckCrossResonance(QubexTask):
             exp.get_qubit_label(int(q)) for q in qid.split("-")
         )  # e.g., "0-1" → "Q00","Q01"
 
+        x90 = {
+            control: exp.drag_hpi_pulse[control],
+            target: exp.drag_hpi_pulse[target],
+        }
         raw_result = exp.obtain_cr_params(
             control,
             target,
+            x90=x90,
             n_shots=self.run_parameters["shots"].get_value(),
             shot_interval=self.run_parameters["interval"].get_value(),
         )
