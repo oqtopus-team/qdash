@@ -528,7 +528,7 @@ async def test_execute_single_task_supports_quick_run_without_snapshot(
         project_id="project-1",
         execution_name="quick-run:CheckRabi",
         backend_name="fake",
-        default_run_parameters=defaults,
+        task_run_parameters=defaults,
         persist_output_parameters=False,
         update_params=False,
     )
@@ -536,7 +536,7 @@ async def test_execute_single_task_supports_quick_run_without_snapshot(
     parameters = captured_parameters[0]
     assert parameters["source_execution_id"] is None
     assert parameters["backend_name"] == "fake"
-    assert parameters["default_run_parameters"] == defaults
+    assert parameters["task_run_parameters"] == defaults
     assert parameters["persist_output_parameters"] is False
 
 

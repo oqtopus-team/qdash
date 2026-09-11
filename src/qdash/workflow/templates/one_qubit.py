@@ -159,7 +159,7 @@ def one_qubit(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        default_run_parameters={
+        task_run_parameters={
             "CreateHPIPulse": {
                 "hpi_duration": {"value": 32, "value_type": "int"},
             },
@@ -172,7 +172,6 @@ def one_qubit(
             "CreateDRAGPIPulse": {
                 "drag_pi_duration": {"value": 24, "value_type": "int"},
             },
-            "interval": {"value": 150 * 1024, "value_type": "int"},
             # Per-task overrides — uncomment to extend coherence sweep ranges.
             # "CheckT1": {
             #     "time_range": {
@@ -186,6 +185,9 @@ def one_qubit(
             #         "value_type": "np.logspace",
             #     },
             # },
+        },
+        default_run_parameters={
+            "interval": {"value": 150 * 1024, "value_type": "int"},
         },
     )
     return cal.run(targets, steps=steps)

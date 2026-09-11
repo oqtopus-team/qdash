@@ -192,7 +192,7 @@ async def quick_run_task(
         project_id=ctx.project_id,
         backend_name=backend_name,
         parameter_overrides={"input": body.input_parameter_overrides},
-        default_run_parameters={
+        task_run_parameters={
             task_name: {
                 name: {"value": value} for name, value in body.run_parameter_overrides.items()
             }

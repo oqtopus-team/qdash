@@ -38,7 +38,10 @@ def test_bringup_step_accepts_resonator_assignment_order() -> None:
     service = type(
         "Service",
         (),
-        {"default_run_parameters": {"interval": {"value": 1, "value_type": "int"}}},
+        {
+            "default_run_parameters": {"interval": {"value": 1, "value_type": "int"}},
+            "task_run_parameters": {},
+        },
     )()
     step = BringUp(mode="scheduled", resonator_assignment_order=[0, 3, 1, 2])
 
@@ -46,6 +49,8 @@ def test_bringup_step_accepts_resonator_assignment_order() -> None:
 
     assert service.default_run_parameters == {
         "interval": {"value": 1, "value_type": "int"},
+    }
+    assert service.task_run_parameters == {
         "CheckResonatorSpectroscopy": {
             "resonator_assignment_order": {"value": [0, 3, 1, 2], "value_type": "list"}
         },

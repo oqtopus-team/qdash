@@ -45,6 +45,7 @@ def _execute_direct_one_qubit(
         "execution_id": service.execution_id,
         "project_id": service.project_id,
         "default_run_parameters": service.default_run_parameters,
+        "task_run_parameters": service.task_run_parameters,
         "tags": service.tags,
         "flow_name": service.flow_name,
         "note": service.note,

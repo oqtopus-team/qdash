@@ -132,13 +132,14 @@ class BringUp(CalibrationStep):
         if self.resonator_assignment_order is None:
             return
 
-        default_run_parameters = copy.deepcopy(service.default_run_parameters)
-        task_params = default_run_parameters.setdefault("CheckResonatorSpectroscopy", {})
+        task_run_parameters = copy.deepcopy(service.task_run_parameters)
+        task_params = task_run_parameters.setdefault("CheckResonatorSpectroscopy", {})
         task_params["resonator_assignment_order"] = {
             "value": self.resonator_assignment_order,
             "value_type": "list",
         }
-        service.default_run_parameters = default_run_parameters
+        service.task_run_parameters.clear()
+        service.task_run_parameters.update(task_run_parameters)
 
     def _execute_direct(
         self,
@@ -159,6 +160,7 @@ class BringUp(CalibrationStep):
             "execution_id": service.execution_id,
             "project_id": service.project_id,
             "default_run_parameters": service.default_run_parameters,
+            "task_run_parameters": service.task_run_parameters,
             "tags": service.tags,
             "flow_name": service.flow_name,
             "note": service.note,
