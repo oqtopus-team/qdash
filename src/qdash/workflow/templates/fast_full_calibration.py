@@ -137,10 +137,18 @@ def fast_full_calibration(
         tags=tags,
         project_id=project_id,
         default_run_parameters={
-            "hpi_duration": {"value": 32, "value_type": "int"},
-            "pi_duration": {"value": 32, "value_type": "int"},
-            "drag_hpi_duration": {"value": 16, "value_type": "int"},
-            "drag_pi_duration": {"value": 24, "value_type": "int"},
+            "CreateHPIPulse": {
+                "hpi_duration": {"value": 32, "value_type": "int"},
+            },
+            "CreatePIPulse": {
+                "pi_duration": {"value": 32, "value_type": "int"},
+            },
+            "CreateDRAGHPIPulse": {
+                "drag_hpi_duration": {"value": 16, "value_type": "int"},
+            },
+            "CreateDRAGPIPulse": {
+                "drag_pi_duration": {"value": 24, "value_type": "int"},
+            },
             "interval": {"value": 150 * 1024, "value_type": "int"},
         },
     )
