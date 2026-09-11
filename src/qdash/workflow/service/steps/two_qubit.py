@@ -117,47 +117,17 @@ class CustomTwoQubit(CalibrationStep):
         from qdash.workflow.service._internal.scheduling_tasks import (
             run_coupling_calibrations_parallel,
         )
-        from qdash.workflow.service.calib_service import (
-            finish_calibration,
-            get_session,
-            init_calibration,
-        )
-        from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
 
-        init_calibration(
-            service.username,
-            service.chip_id,
-            candidate_qubits,
-            flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
-            tags=service.tags,
-            project_id=service.project_id,
-            use_lock=False,  # Parent pipeline already holds the lock
-            enable_github_pull=False,
-            github_push_config=GitHubPushConfig(
-                enabled=True,
-                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
-            ),
-            note={
-                "type": "2-qubit",
-                "step_name": self.step_name,
-                "tasks": self.tasks,
-                "candidate_qubits": candidate_qubits,
-                "schedule": coupling_groups,
-            },
-        )
-
-        # Get session config for multiprocess execution
-        session = get_session()
         session_config = {
-            "username": session.username,
-            "chip_id": session.chip_id,
-            "backend_name": session.backend_name,
-            "execution_id": session.execution_id,
-            "project_id": session.project_id,
-            "default_run_parameters": session.default_run_parameters,
-            "tags": session.tags,
-            "flow_name": session.flow_name,
-            "note": session.note,
+            "username": service.username,
+            "chip_id": service.chip_id,
+            "backend_name": service.backend_name,
+            "execution_id": service.execution_id,
+            "project_id": service.project_id,
+            "default_run_parameters": service.default_run_parameters,
+            "tags": service.tags,
+            "flow_name": service.flow_name,
+            "note": service.note,
         }
 
         # Execute groups sequentially (groups are scheduled to avoid resource conflicts)
@@ -171,8 +141,7 @@ class CustomTwoQubit(CalibrationStep):
             )
             all_raw_results.update(group_results)
 
-        session.record_stage_result(self.name, all_raw_results)
-        finish_calibration()
+        service.record_stage_result(self.name, all_raw_results)
 
         # Build typed result
         result = self._build_result(all_raw_results)
@@ -440,45 +409,17 @@ class TwoQubitCalibration(CalibrationStep):
         from qdash.workflow.service._internal.scheduling_tasks import (
             run_coupling_calibrations_parallel,
         )
-        from qdash.workflow.service.calib_service import (
-            finish_calibration,
-            get_session,
-            init_calibration,
-        )
-        from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
 
-        init_calibration(
-            service.username,
-            service.chip_id,
-            candidate_qubits,
-            flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
-            tags=service.tags,
-            project_id=service.project_id,
-            use_lock=False,  # Parent pipeline already holds the lock
-            enable_github_pull=False,
-            github_push_config=GitHubPushConfig(
-                enabled=True,
-                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
-            ),
-            note={
-                "type": "2-qubit",
-                "candidate_qubits": candidate_qubits,
-                "schedule": coupling_groups,
-            },
-        )
-
-        # Get session config for multiprocess execution
-        session = get_session()
         session_config = {
-            "username": session.username,
-            "chip_id": session.chip_id,
-            "backend_name": session.backend_name,
-            "execution_id": session.execution_id,
-            "project_id": session.project_id,
-            "default_run_parameters": session.default_run_parameters,
-            "tags": session.tags,
-            "flow_name": session.flow_name,
-            "note": session.note,
+            "username": service.username,
+            "chip_id": service.chip_id,
+            "backend_name": service.backend_name,
+            "execution_id": service.execution_id,
+            "project_id": service.project_id,
+            "default_run_parameters": service.default_run_parameters,
+            "tags": service.tags,
+            "flow_name": service.flow_name,
+            "note": service.note,
         }
 
         # Execute groups sequentially (groups are scheduled to avoid resource conflicts)
@@ -492,8 +433,7 @@ class TwoQubitCalibration(CalibrationStep):
             )
             all_raw_results.update(group_results)
 
-        session.record_stage_result(self.name, all_raw_results)
-        finish_calibration()
+        service.record_stage_result(self.name, all_raw_results)
 
         # Build typed result
         result = self._build_result(all_raw_results)

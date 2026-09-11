@@ -26,7 +26,7 @@
 }
 
 /* Button active press effect */
-.btn:active:not(:disabled) {
+.btn:active:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
   transform: scale(0.97);
 }
 
@@ -125,14 +125,18 @@ a.card:hover {
   border-radius: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  box-shadow:
-    0 2px 4px 0 rgb(0 0 0 / 0.1),
-    inset 0 1px 0 0 rgb(255 255 255 / 0.1);
   position: relative;
   overflow: hidden;
 }
 
-.btn::before {
+/* Leave disabled colors and effects to DaisyUI. */
+.btn:where(:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled)) {
+  box-shadow:
+    0 2px 4px 0 rgb(0 0 0 / 0.1),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.1);
+}
+
+.btn:where(:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled))::before {
   content: "";
   position: absolute;
   top: 0;
@@ -143,7 +147,7 @@ a.card:hover {
   pointer-events: none;
 }
 
-.btn:hover:not(:disabled) {
+.btn:hover:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
   transform: translateY(-2px);
   box-shadow:
     0 8px 12px -2px rgb(0 0 0 / 0.15),
@@ -151,7 +155,7 @@ a.card:hover {
     inset 0 1px 0 0 rgb(255 255 255 / 0.15);
 }
 
-.btn:active:not(:disabled) {
+.btn:active:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
   transform: translateY(0);
   box-shadow:
     0 1px 2px 0 rgb(0 0 0 / 0.1),
@@ -159,7 +163,7 @@ a.card:hover {
 }
 
 /* Primary button with gradient */
-.btn-primary {
+.btn-primary:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
   background: linear-gradient(
     135deg,
     var(--color-primary),
@@ -168,7 +172,7 @@ a.card:hover {
   color: var(--color-primary-content);
 }
 
-.btn-primary:hover:not(:disabled) {
+.btn-primary:hover:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
   background: linear-gradient(
     135deg,
     color-mix(in oklch, var(--color-primary) 90%, white),
@@ -177,7 +181,7 @@ a.card:hover {
 }
 
 /* Secondary button with gradient */
-.btn-secondary {
+.btn-secondary:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
   background: linear-gradient(
     135deg,
     var(--color-secondary),
@@ -196,7 +200,7 @@ a.card:hover {
   display: none;
 }
 
-.btn-ghost:hover:not(:disabled) {
+.btn-ghost:hover:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
   box-shadow: none;
   transform: none;
   background-color: color-mix(in oklch, var(--color-base-content) 10%, transparent);
@@ -208,8 +212,8 @@ a.card:hover {
   border-radius: 0.5rem;
 }
 
-.btn-xs:hover:not(:disabled),
-.btn-sm:hover:not(:disabled) {
+.btn-xs:hover:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled),
+.btn-sm:hover:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
   transform: translateY(-1px);
 }
 

@@ -174,8 +174,17 @@ def _create_isolated_session(
     Returns:
         CalibService instance with isolated backend/Experiment
     """
+    from qdash.common.execution_resources import ExecutionResourceScope
     from qdash.workflow.service.calib_service import CalibService
 
+    reservation = (session_config.get("note") or {}).get("hardware_reservation")
+    resource_scope = (
+        ExecutionResourceScope(
+            reservation["chip_id"], tuple(reservation["resources"]), reservation["exclusive"]
+        )
+        if reservation is not None
+        else None
+    )
     return CalibService(
         username=session_config["username"],
         chip_id=session_config["chip_id"],
@@ -192,6 +201,7 @@ def _create_isolated_session(
         tags=session_config.get("tags"),
         flow_name=session_config.get("flow_name"),
         note=session_config.get("note"),
+        resource_scope=resource_scope,
     )
 
 

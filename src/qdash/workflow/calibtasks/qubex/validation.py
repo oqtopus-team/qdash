@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+DEFAULT_RABI_R2_THRESHOLD = 0.6
+
 
 def finite_value_error(
     value: Any, name: str, *, minimum: float | None = None, maximum: float | None = None

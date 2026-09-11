@@ -1,30 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Lock, Play, RefreshCw, RotateCcw } from "lucide-react";
+import { ExternalLink, LockKeyhole, Play, RefreshCw, RotateCcw } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 
-import type { ExecutionResponseDetail, TaskInfo } from "@/schemas";
+import type { ExecutionResponseDetail, TaskInfo, TaskResultResponse } from "@/schemas";
 
 import { getChipCoupling, getChipQubit, useListChips } from "@/client/chip/chip";
-import {
-  getGetExecutionLockStatusQueryKey,
-  useGetExecution,
-  useGetExecutionLockStatus,
-} from "@/client/execution/execution";
+import { getGetExecutionLockStatusQueryKey, useGetExecution } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useToast } from "@/components/ui/Toast";
+import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
-import { formatTaskParameter, parseTaskParameter } from "@/lib/utils/task-parameters";
+import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
+import { parseTaskParameter } from "@/lib/utils/task-parameters";
+import { buildTaskPrefill } from "./task-prefill";
 
 interface TaskWorkbenchProps {
   task: TaskInfo;
   backend: string;
+  sourceTask?: TaskResultResponse;
 }
 
 function badgeClass(status?: string | null) {
@@ -35,11 +35,15 @@ function badgeClass(status?: string | null) {
   return "badge-warning";
 }
 
-export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
+export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps) {
+  const runDisabledReasonId = useId();
   const toast = useToast();
   const queryClient = useQueryClient();
   const { data: chipsData } = useListChips();
-  const chips = chipsData?.data?.chips ?? [];
+  const chips = useMemo(
+    () => sortChipsByDefaultPriority(chipsData?.data?.chips ?? []),
+    [chipsData?.data?.chips],
+  );
   const defaultChipId = chips[0]?.chip_id ?? "";
 
   const [chipIdQuery, setChipIdQuery] = useQueryState("chip", parseAsString);
@@ -53,8 +57,8 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
     "executionTarget",
     parseAsString,
   );
-  const chipId = chipIdQuery ?? "";
-  const target = targetQuery ?? "";
+  const chipId = sourceTask ? (sourceTask.chip_id ?? "") : (chipIdQuery ?? "");
+  const target = sourceTask ? sourceTask.qid : (targetQuery ?? "");
   const executionId = executionIdQuery ?? "";
   const submittedChipId = submittedChipIdQuery ?? "";
   const submittedTarget = submittedTargetQuery ?? "";
@@ -65,29 +69,25 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
   const [isStarting, setIsStarting] = useState(false);
   const [isReloadingInputs, setIsReloadingInputs] = useState(false);
   const previousTask = useRef(`${backend}:${task.name}`);
-
-  const { data: lockStatus, isLoading: isLockStatusLoading } = useGetExecutionLockStatus({
-    query: {
-      refetchInterval: 5000,
-    },
-  });
-  const isExecutionLocked = lockStatus?.data.lock ?? false;
-
-  useEffect(() => {
-    if (!chipIdQuery && defaultChipId) setChipIdQuery(defaultChipId);
-  }, [chipIdQuery, defaultChipId, setChipIdQuery]);
+  const initializedTask = useRef<string | null>(null);
+  const prefill = useMemo(() => buildTaskPrefill(task, sourceTask), [task, sourceTask]);
+  const availability = useExecutionAvailability(
+    { parameters: { chip_id: chipId, qid: target.trim() } },
+    Boolean(chipId && target.trim() && task.enabled),
+  );
 
   useEffect(() => {
-    setRunValues(
-      Object.fromEntries(
-        Object.entries(task.run_parameters ?? {}).map(([name, parameter]) => [
-          name,
-          formatTaskParameter(parameter.value),
-        ]),
-      ),
-    );
+    if (!sourceTask && !chipIdQuery && defaultChipId) setChipIdQuery(defaultChipId);
+  }, [sourceTask, chipIdQuery, defaultChipId, setChipIdQuery]);
+
+  useEffect(() => {
+    const formKey = `${backend}:${task.name}:${sourceTask?.task_id ?? ""}`;
+    if (initializedTask.current === formKey) return;
+    initializedTask.current = formKey;
+    setRunValues(prefill.run);
     setReconfigure(false);
     setPersistOutputParameters(false);
+    setInputValues(prefill.input);
     const taskKey = `${backend}:${task.name}`;
     if (previousTask.current !== taskKey) {
       setTargetQuery(null);
@@ -102,14 +102,10 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
     setSubmittedChipIdQuery,
     setSubmittedTargetQuery,
     setTargetQuery,
+    sourceTask,
+    prefill,
     task,
   ]);
-
-  useEffect(() => {
-    setInputValues(
-      Object.fromEntries(Object.keys(task.input_parameters ?? {}).map((name) => [name, ""])),
-    );
-  }, [task.input_parameters]);
 
   const {
     data: executionResponse,
@@ -135,6 +131,28 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
     isStarting ||
     (executionId.length > 0 &&
       (!execution || ["running", "scheduled", "pending"].includes(execution.status)));
+  const runDisabledReason = (() => {
+    if (!task.enabled) return `This task is not enabled for the ${backend} backend.`;
+    if (isStarting) return "Starting this task…";
+    if (isExecutionActive) {
+      if (executionError && !isExecutionPendingCreation)
+        return "Unable to confirm the previous execution status. Reload the page to check again.";
+      return "Waiting for this execution to finish before starting another run.";
+    }
+    if (!chipId) return "Select a chip to run this task.";
+    if (!target.trim()) return "Enter a qubit or coupling to run this task.";
+    if (isReloadingInputs) return "Reloading inputs and checking hardware availability…";
+    return availability.disabledReason;
+  })();
+  const showHardwareConflict =
+    availability.isConflict && runDisabledReason === availability.disabledReason;
+  const isRunInProgress = isExecutionActive && (!executionError || isExecutionPendingCreation);
+  const runLabel =
+    isStarting || (isRunInProgress && execution?.status !== "running")
+      ? "Starting…"
+      : isRunInProgress
+        ? "Running…"
+        : "Run task";
   const resultTasks = useMemo(
     () =>
       (execution?.task ?? []).filter(
@@ -156,13 +174,13 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
       : [];
 
   const handleRun = async () => {
-    if (!chipId || !target.trim()) return;
+    if (runDisabledReason) return;
     const requestedTarget = target.trim();
     setIsStarting(true);
     try {
       const runParameterOverrides = Object.fromEntries(
         Object.entries(runValues)
-          .filter(([, value]) => value.trim() !== "")
+          .filter(([name, value]) => name in (task.run_parameters ?? {}) && value.trim() !== "")
           .map(([name, value]) => [
             name,
             parseTaskParameter(value, task.run_parameters?.[name]?.value_type),
@@ -170,22 +188,31 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
       );
       const inputParameterOverrides = Object.fromEntries(
         Object.entries(inputValues)
-          .filter(([, value]) => value.trim() !== "")
+          .filter(
+            ([name, value]) =>
+              name in (task.input_parameters ?? {}) &&
+              task.input_parameters?.[name]?.user_override !== "forbidden" &&
+              value.trim() !== "",
+          )
           .map(([name, value]) => [
             name,
             parseTaskParameter(value, task.input_parameters?.[name]?.value_type ?? "float"),
           ]),
       );
-      const response = await AXIOS_INSTANCE.post(`/tasks/${task.name}/execute`, {
-        chip_id: chipId,
-        qid: requestedTarget,
-        backend_name: backend,
-        input_parameter_overrides: inputParameterOverrides,
-        run_parameter_overrides: runParameterOverrides,
-        reconfigure,
-        persist_output_parameters: persistOutputParameters,
-        update_params: false,
-      });
+      const response = await AXIOS_INSTANCE.post(
+        `/tasks/${encodeURIComponent(task.name)}/execute`,
+        {
+          chip_id: chipId,
+          qid: requestedTarget,
+          backend_name: backend,
+          input_parameter_overrides: inputParameterOverrides,
+          run_parameter_overrides: runParameterOverrides,
+          reconfigure,
+          persist_output_parameters: persistOutputParameters,
+          update_params: false,
+          ...(sourceTask ? { source_task_id: sourceTask.task_id } : {}),
+        },
+      );
       setExecutionIdQuery(response.data.execution_id);
       setSubmittedChipIdQuery(chipId);
       setSubmittedTargetQuery(requestedTarget);
@@ -195,7 +222,10 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
         ?.detail;
       toast.error(detail ?? (error instanceof Error ? error.message : "Failed to start task"));
     } finally {
-      await queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: ["execution-availability"] }),
+      ]);
       setIsStarting(false);
     }
   };
@@ -203,6 +233,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
   const handleReloadInputParameters = async () => {
     if (!chipId || !target.trim()) return;
     setIsReloadingInputs(true);
+    const availabilityCheck = availability.refetch();
     try {
       const qid = target.trim();
       const isCoupling = task.task_type === "coupling" || qid.includes("-");
@@ -244,7 +275,10 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
               ? (stored as { value?: unknown }).value
               : stored;
           if (value === null || value === undefined) value = parameter.default_value;
-          if (value === null || value === undefined) return [name, ""];
+          if (value === null || value === undefined) {
+            if (sourceTask) throw new Error(`No current value found for ${name}`);
+            return [name, ""];
+          }
           loadedCount += 1;
           return [name, Array.isArray(value) ? JSON.stringify(value) : String(value)];
         }),
@@ -260,8 +294,12 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
         ?.detail;
-      toast.error(detail ?? "Failed to load current input parameters");
+      toast.error(
+        detail ??
+          (error instanceof Error ? error.message : "Failed to load current input parameters"),
+      );
     } finally {
+      await availabilityCheck;
       setIsReloadingInputs(false);
     }
   };
@@ -284,6 +322,27 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
           </div>
         </div>
 
+        {sourceTask && (
+          <div className="alert alert-info text-sm">
+            <div>
+              Using the current task definition with matching values from a previous result.
+              <Link
+                className="link ml-2"
+                href={`/task-results/${encodeURIComponent(sourceTask.task_id)}`}
+              >
+                View source result
+              </Link>
+            </div>
+          </div>
+        )}
+        {sourceTask && prefill.skipped.length > 0 && (
+          <div role="status" className="alert alert-warning text-sm">
+            Historical parameters not applied because they are missing or incompatible with the
+            current definition: {prefill.skipped.join(", ")}. Unfilled fields use the current task
+            defaults or calibration values.
+          </div>
+        )}
+
         <div className="grid items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
           <section className="min-w-0 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm">
             <div className="flex min-w-0 flex-col gap-4">
@@ -294,6 +353,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                   <select
                     className="select select-bordered w-full"
                     value={chipId}
+                    disabled={Boolean(sourceTask)}
                     onChange={(event) => setChipIdQuery(event.target.value)}
                   >
                     <option value="" disabled>
@@ -304,6 +364,9 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                         {chip.chip_id}
                       </option>
                     ))}
+                    {sourceTask && !chips.some((chip) => chip.chip_id === chipId) && (
+                      <option value={chipId}>{chipId}</option>
+                    )}
                   </select>
                 </label>
                 <label className="form-control min-w-0">
@@ -312,7 +375,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                     className="input input-bordered w-full"
                     value={target}
                     onChange={(event) => setTargetQuery(event.target.value)}
-                    disabled={isExecutionActive}
+                    disabled={isExecutionActive || Boolean(sourceTask)}
                     placeholder="e.g. 0 or 0-1"
                   />
                 </label>
@@ -354,6 +417,7 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                         <input
                           className="input input-sm input-bordered font-mono"
                           value={inputValues[name] ?? ""}
+                          disabled={parameter.user_override === "forbidden"}
                           onChange={(event) =>
                             setInputValues((current) => ({
                               ...current,
@@ -444,39 +508,34 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                 </div>
               )}
 
-              {isExecutionLocked && (
-                <div className="alert alert-warning py-2 text-xs">
-                  Another calibration execution is running. Wait for it to finish before starting
-                  this task.
+              {runDisabledReason && (
+                <div
+                  id={runDisabledReasonId}
+                  role={showHardwareConflict ? "alert" : "status"}
+                  className={
+                    showHardwareConflict
+                      ? "alert alert-warning alert-soft sm:alert-horizontal p-3 text-xs"
+                      : "rounded-lg bg-base-200 p-3 text-xs text-base-content/70"
+                  }
+                >
+                  {showHardwareConflict && <LockKeyhole size={16} aria-hidden="true" />}
+                  <span>{runDisabledReason}</span>
                 </div>
               )}
 
               <button
-                className={`btn ${isExecutionLocked ? "btn-disabled" : "btn-primary"}`}
+                className="btn btn-primary"
                 onClick={handleRun}
-                disabled={
-                  isStarting ||
-                  isLockStatusLoading ||
-                  isExecutionLocked ||
-                  isExecutionActive ||
-                  !task.enabled ||
-                  !chipId ||
-                  !target.trim()
-                }
-                title={
-                  isExecutionLocked
-                    ? "Execution locked - another calibration is running"
-                    : "Run task"
-                }
+                disabled={Boolean(runDisabledReason)}
+                aria-describedby={runDisabledReason ? runDisabledReasonId : undefined}
+                title={runDisabledReason ?? "Run task"}
               >
-                {isStarting ? (
-                  <span className="loading loading-spinner loading-sm" />
-                ) : isExecutionLocked ? (
-                  <Lock size={17} />
+                {isStarting || isRunInProgress ? (
+                  <span className="loading loading-spinner loading-sm" aria-hidden="true" />
                 ) : (
                   <Play size={17} />
                 )}
-                {isExecutionLocked ? "Locked" : "Run task"}
+                {runLabel}
               </button>
             </div>
           </section>
@@ -539,12 +598,10 @@ export function TaskWorkbench({ task, backend }: TaskWorkbenchProps) {
                   {(execution.status === "running" ||
                     execution.status === "scheduled" ||
                     execution.status === "pending") && (
-                    <>
-                      <ExecutionTaskProgress status={resultTask?.status} note={resultTask?.note} />
-                      {!resultTask?.note?.progress && (
-                        <progress className="progress progress-primary w-full" />
-                      )}
-                    </>
+                    <ExecutionTaskProgress
+                      status={resultTask?.status ?? execution.status}
+                      note={resultTask?.note}
+                    />
                   )}
 
                   <div className="flex h-56 items-center justify-start gap-3 overflow-x-auto rounded-lg bg-base-200/60 p-3">

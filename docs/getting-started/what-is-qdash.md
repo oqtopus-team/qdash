@@ -41,11 +41,15 @@ QDash has three main application components:
   result analysis.
 - **Client access**: Integrate through the REST API or the generated Python and TypeScript clients.
 
-## Screenshots
+## Demo
 
-Here are some screenshots of QDash in action:
+A 30-second tour of QDash: chip dashboard, chip topology, workflows, live executions, and
+time-series analysis.
 
-![qdash-demo](/images/qdash-demo.gif)
+<video controls playsinline preload="metadata" poster="/images/qdash-demo-poster.png" src="/videos/qdash-demo.mp4" style="width: 100%; border-radius: 8px;"></video>
+
+The video is rendered from screenshots with [Remotion](https://www.remotion.dev/); the source
+lives in `docs/demos/video/`.
 
 ## Technology Stack
 

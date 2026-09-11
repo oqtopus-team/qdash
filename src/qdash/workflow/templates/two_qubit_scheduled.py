@@ -158,7 +158,6 @@ def two_qubit_scheduled(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        skip_execution=True,  # Child sessions create their own Executions
         default_run_parameters={
             "interval": {"value": 150 * 1024, "value_type": "int"},
         },

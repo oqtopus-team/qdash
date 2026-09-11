@@ -13,6 +13,10 @@ import httpx
 from fastapi import HTTPException
 from prefect.client.orchestration import get_client
 
+from qdash.api.schemas.execution import (
+    ExecutionAvailabilityRequest,
+    ExecutionAvailabilityResponse,
+)
 from qdash.api.schemas.flow import (
     ExecuteFlowRequest,
     ExecuteFlowResponse,
@@ -31,6 +35,10 @@ from qdash.common.config.path_resolver import (
     resolve_workflow_templates_dir,
     to_container_user_flow_path,
 )
+from qdash.common.execution_resources import (
+    resolve_execution_resource_scope,
+    resolve_workflow_resource_scope,
+)
 from qdash.common.utils.datetime import now
 from qdash.config import get_settings
 from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
@@ -47,7 +55,7 @@ logger = logging.getLogger("uvicorn.app")
 
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
 EXECUTION_IN_PROGRESS_DETAIL = (
-    "Another calibration execution is already in progress for this project"
+    "Another calibration execution is using overlapping hardware resources"
 )
 
 
@@ -402,7 +410,11 @@ class FlowService:
 
         chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
         claimed_execution_id = self._claim_execution_lock(
-            project_id=project_id, username=username, chip_id=chip_id
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            parameters=parameters,
+            workflow=True,
         )
 
         try:
@@ -510,7 +522,11 @@ class FlowService:
 
         chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
         claimed_execution_id = self._claim_execution_lock(
-            project_id=project_id, username=username, chip_id=chip_id
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            parameters=parameters,
+            workflow=True,
         )
 
         try:
@@ -643,7 +659,10 @@ class FlowService:
         )
 
         claimed_execution_id = self._claim_execution_lock(
-            project_id=project_id, username=username, chip_id=chip_id
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            parameters=parameters,
         )
 
         try:
@@ -869,9 +888,54 @@ class FlowService:
             logger.error(f"Failed to read flow helper file {filename}: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
 
+    def check_execution_availability(
+        self, request: ExecutionAvailabilityRequest, project_id: str
+    ) -> ExecutionAvailabilityResponse:
+        """Preview admission using the same saved defaults and wiring as execution."""
+        parameters = dict(request.parameters)
+        fallback_chip_id = ""
+        if request.flow_name is not None:
+            flow = self._flow_repo.find_by_project_and_name(project_id, request.flow_name)
+            if flow is None:
+                raise HTTPException(status_code=404, detail=f"Flow '{request.flow_name}' not found")
+            parameters = {**flow.default_parameters, **parameters}
+            fallback_chip_id = flow.chip_id or ""
+        chip_id = str(parameters.get("chip_id") or fallback_chip_id).strip()
+        if not chip_id:
+            return ExecutionAvailabilityResponse(
+                available=False, reason="Select a chip to check execution availability."
+            )
+        if self._execution_lock_repo is None:
+            raise HTTPException(status_code=503, detail="Execution availability is unavailable")
+        scope = (
+            resolve_workflow_resource_scope(chip_id)
+            if request.flow_name is not None
+            else resolve_execution_resource_scope(chip_id, parameters)
+        )
+        if self._execution_lock_repo.has_conflict(project_id, scope):
+            return ExecutionAvailabilityResponse(
+                available=False,
+                reason=(
+                    "This workflow requires the entire chip for its steps. "
+                    "Another calibration is using this chip; wait for it to finish."
+                    if request.flow_name is not None
+                    else "Another calibration is using hardware required by this run. "
+                    "Wait for it to finish or select different targets."
+                ),
+            )
+        return ExecutionAvailabilityResponse(available=True)
+
     # --- Private helpers ---
 
-    def _claim_execution_lock(self, *, project_id: str, username: str, chip_id: str) -> str | None:
+    def _claim_execution_lock(
+        self,
+        *,
+        project_id: str,
+        username: str,
+        chip_id: str,
+        parameters: dict[str, Any],
+        workflow: bool = False,
+    ) -> str | None:
         """Claim the project execution lock for a run about to be dispatched.
 
         The claim is atomic, so concurrent requests are serialized before any
@@ -905,15 +969,22 @@ class FlowService:
         if self._execution_lock_repo is None:
             return None
 
-        # Cheap reject before minting an execution ID; try_lock settles the race.
-        if self._execution_lock_repo.is_locked(project_id):
-            raise HTTPException(status_code=409, detail=EXECUTION_IN_PROGRESS_DETAIL)
-
         if not chip_id:
             return None
 
         execution_id = generate_execution_id(username, chip_id, project_id=project_id)
-        if not self._execution_lock_repo.try_lock(project_id=project_id, execution_id=execution_id):
+        scope = (
+            resolve_workflow_resource_scope(chip_id)
+            if workflow
+            else resolve_execution_resource_scope(chip_id, parameters)
+        )
+        if not self._execution_lock_repo.try_lock(
+            project_id=project_id,
+            execution_id=execution_id,
+            chip_id=scope.chip_id,
+            resources=scope.resources,
+            exclusive=scope.exclusive,
+        ):
             raise HTTPException(status_code=409, detail=EXECUTION_IN_PROGRESS_DETAIL)
         return execution_id
 
@@ -937,7 +1008,10 @@ class FlowService:
         if execution_id is None or self._execution_lock_repo is None:
             return
         try:
-            self._execution_lock_repo.unlock(project_id=project_id)
+            self._execution_lock_repo.unlock(
+                project_id=project_id,
+                execution_id=execution_id,
+            )
         except Exception:
             logger.warning(
                 "Failed to release the execution lock claimed for execution_id=%s",

@@ -42,6 +42,10 @@ class QuickRunTaskRequest(BaseModel):
     chip_id: str
     qid: str
     backend_name: str | None = None
+    source_task_id: str | None = Field(
+        default=None,
+        description="Source result for provenance only; execution uses current task definitions",
+    )
     input_parameter_overrides: dict[str, Any] = Field(default_factory=dict)
     run_parameter_overrides: dict[str, Any] = Field(default_factory=dict)
     reconfigure: bool = False

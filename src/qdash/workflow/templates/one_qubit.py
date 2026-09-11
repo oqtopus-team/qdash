@@ -1,6 +1,7 @@
 """1-Qubit calibration using step-based pipeline.
 
-This template demonstrates the step-based API for 1-qubit calibration.
+This template combines coarse_one and fine_one, advancing successful qubits
+from the coarse stage to the fine stage. Each stage has its own Execution.
 
 Example:
     one_qubit(
@@ -29,22 +30,58 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
+# Task lists are explicit so this template can be reviewed and edited on its own.
+# Tests keep these stages aligned with coarse_one and fine_one.
+# Step 1: coarse calibration through Ramsey, calibrating and checking all four pulse types.
 ONE_QUBIT_CHECK_TASKS: list[str] = [
+    "Configure",  # Apply the starting configuration before the readout search.
     "CheckCoarseReadoutParams",
-    "Configure",
-    "CheckRabi",
-    "CheckRabi",
+    "Configure",  # Apply the updated readout settings before pulse calibration.
+    "CheckRabi",  # Update control amplitude from the measured Rabi frequency.
+    "CheckRabi",  # Measure again at the updated amplitude for HPI creation.
     "CreateHPIPulse",
     "CheckHPIPulse",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
     "CheckT1",
     "CheckT2Echo",
     "CheckRamsey",
 ]
 
+# Step 3: fine calibration after the successful-qubit filter.
 ONE_QUBIT_FINE_TUNE_TASKS: list[str] = [
+    "Configure",
+    # Round 1: calibrate HPI -> PI -> DRAG HPI -> DRAG PI, then tune amplitude/frequency.
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
+    "CheckOptimalReadoutAmplitude",
+    "CheckOptimalReadoutFrequency",
+    "Configure",  # Apply round 1's readout frequency before recalibrating pulses.
+    # Round 2: recalibrate all four pulse types at the updated settings, then repeat the pair.
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CreatePIPulse",
+    "CheckPIPulse",
+    "CreateDRAGHPIPulse",
+    "CheckDRAGHPIPulse",
+    "CreateDRAGPIPulse",
+    "CheckDRAGPIPulse",
+    "CheckOptimalReadoutAmplitude",
+    "CheckOptimalReadoutFrequency",
+    "Configure",  # Apply the final readout frequency before final pulse calibration.
+    # Calibrate all pulses at the final readout settings before classification and RB.
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
@@ -55,9 +92,6 @@ ONE_QUBIT_FINE_TUNE_TASKS: list[str] = [
     "CreateDRAGPIPulse",
     "CheckDRAGPIPulse",
     "ReadoutClassification",
-    "CheckT1Average",
-    "CheckT2EchoAverage",
-    "Check1QGateCoherenceLimit",
     "RandomizedBenchmarking",
     "X90InterleavedRandomizedBenchmarking",
 ]
@@ -89,7 +123,7 @@ def one_qubit(
         qids: Qubit IDs to calibrate when mux_ids is not set
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
-        check_only: If True, only run basic check (no fine-tune)
+        check_only: If True, run only the coarse stage with all four pulse types
 
     Returns:
         Pipeline results with typed step outputs
@@ -107,12 +141,12 @@ def one_qubit(
 
     steps: list[Step]
     if check_only:
-        # Basic check only
+        # Run only the coarse stage shown above.
         steps = [
             OneQubitCheck(mode="synchronized", tasks=ONE_QUBIT_CHECK_TASKS),
         ]
     else:
-        # Full 1Q calibration
+        # Run coarse -> filter successful qubits -> fine, with one Execution per calibration stage.
         steps = [
             OneQubitCheck(mode="synchronized", tasks=ONE_QUBIT_CHECK_TASKS),
             FilterByStatus(),  # Only proceed with successful qubits
@@ -125,7 +159,6 @@ def one_qubit(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        skip_execution=True,  # Child sessions create their own Executions
         default_run_parameters={
             "hpi_duration": {"value": 32, "value_type": "int"},
             "pi_duration": {"value": 32, "value_type": "int"},

@@ -124,7 +124,6 @@ def bringup(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        skip_execution=True,
         default_run_parameters=default_run_parameters,
     )
     return cal.run(targets, steps=steps)

@@ -60,6 +60,11 @@ def test_fast_full_calibration_uses_shortened_one_qubit_steps(monkeypatch) -> No
     assert "CheckT2EchoAverage" not in one_qubit_fine_tune.tasks
     assert "Check1QGateCoherenceLimit" not in one_qubit_fine_tune.tasks
 
+    # Making the default tasks visible in the template must preserve their order.
+    from qdash.workflow.service.tasks import FULL_2Q_TASKS
+
+    assert steps[6].tasks == FULL_2Q_TASKS
+
 
 def test_fast_full_calibration_requires_explicit_mux_ids(monkeypatch) -> None:
     monkeypatch.setattr(fast_full_module, "CalibService", FakeCalibService)

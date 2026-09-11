@@ -43,7 +43,7 @@ def test_calibration_input_validates_effective_numeric_bounds_without_fallback()
 
 
 def test_calibration_input_rejects_inverted_numeric_bounds() -> None:
-    with pytest.raises(ValidationError, match="greater_than must be less than"):
+    with pytest.raises(ValidationError, match="Numeric bounds must define a non-empty interval"):
         InputParameterSpec(
             resolution="database_or_default",
             user_override="allowed",
@@ -71,6 +71,38 @@ def test_parameter_specs_create_matching_runtime_models() -> None:
     assert run_model.value == 1024
     assert isinstance(output_model, OutputParameterModel)
     assert output_model.value == 0.5
+
+
+@pytest.mark.parametrize("value_type", ["np.linspace", "np.logspace", "np.arange", "range"])
+@pytest.mark.parametrize("value", [None, [1, 2], "invalid"])
+def test_invalid_run_parameter_range_reports_value(value_type, value) -> None:
+    parameter = RunParameterModel(value_type=value_type, value=value)
+
+    with pytest.raises(ValueError) as error:
+        parameter.get_value()
+
+    assert str(error.value).startswith(f"{value_type} requires a tuple/list")
+    assert f"got {value!r}" in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "bounds",
+    [
+        {"greater_than_or_equal": 1.0, "less_than_or_equal": 0.0},
+        {"greater_than": 1.0, "less_than_or_equal": 1.0},
+        {"greater_than_or_equal": 1.0, "less_than": 1.0},
+    ],
+)
+def test_calibration_input_rejects_empty_mixed_bounds(bounds) -> None:
+    with pytest.raises(ValidationError, match="non-empty interval"):
+        InputParameterSpec.database_or_default(default=0.5, **bounds)
+
+
+def test_calibration_input_accepts_single_value_inclusive_interval() -> None:
+    declaration = InputParameterSpec.default_only(
+        default=1.0, greater_than_or_equal=1.0, less_than_or_equal=1.0
+    )
+    declaration.validate_effective_value("amplitude", 1.0)
 
 
 class TestBaseTaskResultModelRunParameters:

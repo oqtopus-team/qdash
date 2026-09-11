@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
@@ -374,6 +376,34 @@ def test_returns_empty_list_when_nothing_matches(init_db) -> None:
     assert closed == []
 
 
+@pytest.mark.parametrize("has_running_step", [False, True])
+@pytest.mark.parametrize("release_lock", [False, True])
+def test_terminal_flow_releases_lock_owned_by_completed_first_step(
+    init_db, has_running_step: bool, release_lock: bool
+) -> None:
+    """A crash between or during later steps preserves the completed first step."""
+    _make_execution(status="completed", execution_id="exec-first")
+    if has_running_step:
+        _make_execution(status="running", execution_id="exec-second")
+    ExecutionLockDocument(project_id=PROJECT_ID, locked=True, execution_id="exec-first").save()
+
+    closed = finalize_executions_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+        status="failed",
+        message="Flow crashed",
+        release_lock=release_lock,
+    )
+
+    assert closed == (["exec-second"] if has_running_step else [])
+    first = _reload_execution("exec-first")
+    assert first is not None
+    assert first.status == "completed"
+    lock = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert lock is not None
+    assert lock.locked is not release_lock
+
+
 def test_release_lock_swallows_lookup_failure(init_db) -> None:
     """A lock lookup failure is logged and swallowed, not raised."""
     _make_execution(status="running")
@@ -394,3 +424,31 @@ def test_release_lock_swallows_lookup_failure(init_db) -> None:
     execution = _reload_execution()
     assert execution is not None
     assert execution.status == "failed"
+
+
+def test_finalizer_releases_cron_pipeline_before_first_step_history(init_db) -> None:
+    owner = f"flow:{FLOW_RUN_ID}"
+    assert ExecutionLockDocument.try_lock(PROJECT_ID, owner, "chip-1", ("mux:0",), False)
+    assert ExecutionLockDocument.try_lock(PROJECT_ID, "other", "chip-2", (), True)
+    assert (
+        finalize_executions_by_flow_run_id(
+            project_id=PROJECT_ID, flow_run_id=FLOW_RUN_ID, status="failed", message="crashed"
+        )
+        == []
+    )
+    doc = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert doc is not None
+    assert [c.execution_id for c in doc.claims] == ["other"]
+
+
+def test_finalizer_releases_original_owner_after_step_ids_change(init_db) -> None:
+    _make_execution(status="completed", execution_id="first-step")
+    _make_execution(status="running", execution_id="second-step")
+    assert ExecutionLockDocument.try_lock(PROJECT_ID, "first-step", "chip-1", (), True)
+    assert ExecutionLockDocument.try_lock(PROJECT_ID, "other", "chip-2", (), True)
+    finalize_executions_by_flow_run_id(
+        project_id=PROJECT_ID, flow_run_id=FLOW_RUN_ID, status="cancelled", message="cancelled"
+    )
+    doc = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert doc is not None
+    assert [c.execution_id for c in doc.claims] == ["other"]

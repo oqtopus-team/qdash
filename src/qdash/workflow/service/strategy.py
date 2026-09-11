@@ -20,8 +20,6 @@ from qdash.workflow.service._internal.scheduling_tasks import (
     run_mux_calibrations_parallel,
     run_qubit_calibrations_parallel,
 )
-from qdash.workflow.service.calib_service import finish_calibration, get_session, init_calibration
-from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
 
 if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
@@ -161,41 +159,14 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
         # Deduplicate while preserving order
         all_qids = list(dict.fromkeys(all_qids))
 
-        # Create a SINGLE execution for the entire strategy
-        # This ensures the execution only completes after ALL box types finish
-        stage_flow_name = config.flow_name or "1q_scheduled"
-
-        init_calibration(
-            cal_service.username,
-            cal_service.chip_id,
-            all_qids,
-            flow_name=stage_flow_name,
-            backend_name=cal_service.backend_name,
-            tags=cal_service.tags,
-            project_id=config.project_id,
-            use_lock=False,
-            enable_github_pull=True,
-            github_push_config=GitHubPushConfig(
-                enabled=True,
-                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
-            ),
-            note={
-                "type": "1-qubit-scheduled",
-                "box_types": list(box_sequential_groups.keys()),
-                "total_qubits": len(all_qids),
-            },
-        )
-
-        parent_session = get_session()
-        parent_execution_id = parent_session.execution_id
-
+        # Workers borrow the Execution owned by the pipeline step.
         session_config = {
             "username": cal_service.username,
             "chip_id": cal_service.chip_id,
             "backend_name": cal_service.backend_name,
             "project_id": config.project_id,
             "muxes": None,
-            "execution_id": parent_execution_id,
+            "execution_id": cal_service.execution_id,
             "default_run_parameters": cal_service.default_run_parameters,
             "tags": cal_service.tags,
             "flow_name": cal_service.flow_name,
@@ -217,10 +188,8 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
 
             all_results[stage_name] = stage_results
 
-        # Record results and finish the single execution after ALL box types complete
-        session = get_session()
-        session.record_stage_result("1q_scheduled", all_results)
-        finish_calibration()
+        # Record all box results within the current step Execution
+        cal_service.record_stage_result("1q_scheduled", all_results)
 
         return all_results
 
@@ -269,41 +238,14 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
         if not all_qids:
             return {}
 
-        # Create a SINGLE execution for the entire strategy
-        # This ensures the execution only completes after ALL box types finish
-        stage_flow_name = config.flow_name or "1q_synchronized"
-
-        init_calibration(
-            cal_service.username,
-            cal_service.chip_id,
-            all_qids,
-            flow_name=stage_flow_name,
-            backend_name=cal_service.backend_name,
-            tags=cal_service.tags,
-            project_id=config.project_id,
-            use_lock=False,
-            enable_github_pull=True,
-            github_push_config=GitHubPushConfig(
-                enabled=True,
-                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
-            ),
-            note={
-                "type": "1-qubit-synchronized",
-                "total_steps": schedule.total_steps,
-                "total_qubits": len(all_qids),
-            },
-        )
-
-        parent_session = get_session()
-        parent_execution_id = parent_session.execution_id
-
+        # Workers borrow the Execution owned by the pipeline step.
         session_config = {
             "username": cal_service.username,
             "chip_id": cal_service.chip_id,
             "backend_name": cal_service.backend_name,
             "project_id": config.project_id,
             "muxes": None,
-            "execution_id": parent_execution_id,
+            "execution_id": cal_service.execution_id,
             "default_run_parameters": cal_service.default_run_parameters,
             "tags": cal_service.tags,
             "flow_name": cal_service.flow_name,
@@ -328,10 +270,8 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
                 all_results[box_key] = {}
             all_results[box_key].update(step_results)
 
-        # Record results and finish the single execution after ALL steps complete
-        session = get_session()
-        session.record_stage_result("1q_synchronized", all_results)
-        finish_calibration()
+        # Record all scheduling rounds within the current step Execution
+        cal_service.record_stage_result("1q_synchronized", all_results)
 
         return all_results
 
@@ -362,38 +302,23 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
         if not all_qids:
             return {}
 
-        stage_flow_name = config.flow_name or "simultaneous_spectroscopy"
-        init_calibration(
-            cal_service.username,
-            cal_service.chip_id,
-            all_qids,
-            flow_name=stage_flow_name,
-            backend_name=cal_service.backend_name,
-            tags=cal_service.tags,
-            project_id=config.project_id,
-            use_lock=False,
-            enable_github_pull=True,
-            github_push_config=GitHubPushConfig(
-                enabled=True,
-                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
-            ),
-            note={
-                "type": "experimental-simultaneous-spectroscopy",
-                "strategy": schedule.metadata["strategy"],
-                "total_qubits": len(all_qids),
-                "total_steps": schedule.total_steps,
-            },
-        )
-
         all_results = runner.execute_simultaneous_spectroscopy_schedule(
             schedule,
             tasks=config.tasks,
             allowed_qids=config.qids,
         )
 
-        session = get_session()
-        session.record_stage_result("experimental_simultaneous_spectroscopy", all_results)
-        finish_calibration()
+        # Match the per-qubit status supplied by the other strategies so a
+        # successful batch remains eligible for the pipeline's status filter.
+        for step_results in all_results.values():
+            for qubit_results in step_results.values():
+                qubit_results["status"] = (
+                    "success"
+                    if all(task_name in qubit_results for task_name in config.tasks)
+                    else "failed"
+                )
+
+        cal_service.record_stage_result("experimental_simultaneous_spectroscopy", all_results)
         return all_results
 
 
@@ -435,30 +360,6 @@ class OneQubitSerialStrategy(OneQubitStrategy):
         if not all_qids:
             return {}
 
-        # Single session for all MUXes
-        stage_flow_name = f"{config.flow_name}_serial" if config.flow_name else "serial"
-
-        init_calibration(
-            cal_service.username,
-            cal_service.chip_id,
-            all_qids,
-            flow_name=stage_flow_name,
-            backend_name=cal_service.backend_name,
-            tags=cal_service.tags,
-            project_id=config.project_id,
-            use_lock=False,
-            enable_github_pull=True,
-            github_push_config=GitHubPushConfig(
-                enabled=True,
-                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
-            ),
-            note={
-                "type": "1-qubit-serial",
-                "total_mux_groups": len(all_mux_groups),
-                "total_qubits": len(all_qids),
-            },
-        )
-
         # Execute MUX groups one by one (completely serial)
         all_results = {}
         for mux_group in all_mux_groups:
@@ -466,9 +367,7 @@ class OneQubitSerialStrategy(OneQubitStrategy):
             result = _calibrate_mux_qubits(qids=mux_group, tasks=config.tasks)
             all_results.update(result)
 
-        session = get_session()
-        session.record_stage_result("1q_serial", all_results)
-        finish_calibration()
+        cal_service.record_stage_result("1q_serial", all_results)
 
         return {"serial": all_results}
 

@@ -188,6 +188,11 @@ class TaskExecutor:
     @staticmethod
     def _progress_plan(task: TaskProtocol) -> ProgressPlan | None:
         """Return honest phase-count bounds for tasks with sequential sweeps."""
+        # Tasks with input-dependent sweep sizes calculate their own plan after
+        # database/snapshot resolution and user overrides have been applied.
+        get_progress_plan = getattr(task, "get_progress_plan", None)
+        if callable(get_progress_plan):
+            return cast("ProgressPlan | None", get_progress_plan())
         name = task.get_name()
         if name in {"CheckRamsey"}:
             return ProgressPlan(2, 2)

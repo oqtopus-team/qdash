@@ -55,6 +55,16 @@ _MANUALLY_CORRECTABLE_TASKS = {
     "CheckResonatorSpectroscopy",
 }
 
+_FAILED_TASK_CORRECTABLE_PARAMETERS = {
+    "CheckQubitSpectroscopy": {
+        "coarse_qubit_frequency",
+        "anharmonicity",
+        "f01_repr_db",
+        "f01_quality_level",
+        "coarse_control_amplitude",
+    },
+}
+
 
 class ManualUpdateService:
     """Service for manually updating calibration parameters."""
@@ -352,6 +362,8 @@ class ManualUpdateService:
             )
 
         allowed_names = set(source_doc.output_parameter_names)
+        if source_doc.status == "failed":
+            allowed_names.update(_FAILED_TASK_CORRECTABLE_PARAMETERS.get(source_doc.name, set()))
         unknown_names = sorted(set(request.parameters) - allowed_names)
         if unknown_names:
             raise HTTPException(

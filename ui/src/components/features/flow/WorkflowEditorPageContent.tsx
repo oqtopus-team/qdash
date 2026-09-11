@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ExecutionResponseDetail, SaveFlowRequest, ExecuteFlowResponse } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
+import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
 import { useToast } from "@/components/ui/Toast";
 import { PierreFileTree } from "@/components/ui/PierreFileTree";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -152,7 +153,7 @@ export function WorkflowEditorPageContent() {
   const { data: chipsData } = useListChips();
 
   // Fetch execution lock status (refresh every 5 seconds)
-  const { data: lockStatus, isLoading: isLockStatusLoading } = useGetExecutionLockStatus({
+  const { data: lockStatus } = useGetExecutionLockStatus({
     query: {
       refetchInterval: 5000,
     },
@@ -202,11 +203,17 @@ export function WorkflowEditorPageContent() {
     queryFn: () => getFlow(name),
   });
 
+  const availability = useExecutionAvailability(
+    { flow_name: name, parameters: { chip_id: chipId } },
+    Boolean(data?.data && chipId),
+  );
+
   const saveMutation = useMutation({
     mutationFn: (request: SaveFlowRequest) => saveFlow(request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flow", name] });
       queryClient.invalidateQueries({ queryKey: ["flows"] });
+      queryClient.invalidateQueries({ queryKey: ["execution-availability"] });
       setOriginalCode(code);
       toast.success("Flow saved successfully!");
     },
@@ -229,7 +236,10 @@ export function WorkflowEditorPageContent() {
         toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`);
       },
       onSettled: () =>
-        queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() }),
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() }),
+          queryClient.invalidateQueries({ queryKey: ["execution-availability"] }),
+        ]),
     },
   });
 
@@ -248,6 +258,13 @@ export function WorkflowEditorPageContent() {
       },
     },
   });
+
+  const executeDisabledReason =
+    saveMutation.isPending || deleteMutation.isPending
+      ? "Wait for the current operation to finish."
+      : executeMutation.isPending
+        ? "Starting this flow…"
+        : availability.disabledReason;
 
   const canCancel = !!lastFlowRunId && !!lockStatus?.data.lock;
   const executeErrorDetail = (
@@ -432,7 +449,7 @@ export function WorkflowEditorPageContent() {
       shortcut: "",
       icon: Play,
       action: () => setShowExecuteConfirm(true),
-      enabled: !lockStatus?.data.lock,
+      enabled: !executeDisabledReason,
     },
     {
       id: "properties",
@@ -785,28 +802,17 @@ export function WorkflowEditorPageContent() {
             </button>
             <button
               onClick={() => setShowExecuteConfirm(true)}
-              className={`btn btn-sm ${lockStatus?.data.lock ? "btn-disabled" : "btn-success"}`}
-              disabled={
-                saveMutation.isPending ||
-                deleteMutation.isPending ||
-                executeMutation.isPending ||
-                isLockStatusLoading ||
-                !!lockStatus?.data.lock
-              }
-              title={
-                lockStatus?.data.lock
-                  ? "Execution locked - another calibration is running"
-                  : "Execute Flow"
-              }
+              className="btn btn-sm btn-success"
+              disabled={Boolean(executeDisabledReason)}
+              aria-describedby={executeDisabledReason ? "flow-execution-availability" : undefined}
+              title={executeDisabledReason ?? "Execute Flow"}
             >
               {executeMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
-              ) : lockStatus?.data.lock ? (
-                <Lock size={16} />
               ) : (
                 <Play size={16} />
               )}
-              <span className="ml-1">{lockStatus?.data.lock ? "Locked" : "Execute"}</span>
+              <span className="ml-1">Execute</span>
             </button>
             {canCancel && (
               <button
@@ -867,6 +873,16 @@ export function WorkflowEditorPageContent() {
         {executeMutation.isError && (
           <div className="alert alert-error mx-4 mt-2">
             <span>Failed to execute flow: {executeErrorMessage}</span>
+          </div>
+        )}
+
+        {executeDisabledReason && (
+          <div
+            id="flow-execution-availability"
+            className="alert alert-info mx-4 mt-2"
+            role="status"
+          >
+            <span>{executeDisabledReason}</span>
           </div>
         )}
 
@@ -1473,25 +1489,16 @@ export function WorkflowEditorPageContent() {
           {/* Execute Button */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              {lockStatus?.data.lock ? "Locked" : "Execute"}
+              Execute
             </span>
             <button
               onClick={() => setShowExecuteConfirm(true)}
-              className={`btn btn-circle shadow-lg ${
-                lockStatus?.data.lock ? "btn-disabled" : "btn-success"
-              }`}
-              disabled={
-                saveMutation.isPending ||
-                deleteMutation.isPending ||
-                executeMutation.isPending ||
-                isLockStatusLoading ||
-                !!lockStatus?.data.lock
-              }
+              className="btn btn-circle btn-success shadow-lg"
+              disabled={Boolean(executeDisabledReason)}
+              aria-describedby={executeDisabledReason ? "flow-execution-availability" : undefined}
             >
               {executeMutation.isPending ? (
                 <span className="loading loading-spinner loading-sm"></span>
-              ) : lockStatus?.data.lock ? (
-                <Lock size={20} />
               ) : (
                 <Play size={20} />
               )}
@@ -1755,9 +1762,9 @@ export function WorkflowEditorPageContent() {
             chipId={chipId}
             description={description}
             tags={tags}
-            isLocked={lockStatus?.data.lock ?? false}
-            isLockStatusLoading={isLockStatusLoading}
+            disabledReason={executeDisabledReason}
             onConfirm={() => {
+              if (executeDisabledReason) return;
               setShowExecuteConfirm(false);
               executeMutation.mutate({
                 name,

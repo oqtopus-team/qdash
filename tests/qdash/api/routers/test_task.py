@@ -1,7 +1,7 @@
 """Tests for task API routes."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import HTTPException
@@ -44,6 +44,50 @@ def _task_info() -> TaskInfo:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("source_error", [None, "owner", "target", "missing"])
+async def test_catalog_run_source_is_provenance_only(
+    monkeypatch: pytest.MonkeyPatch, source_error: str | None
+) -> None:
+    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
+    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: True)
+    execute = AsyncMock()
+    source = SimpleNamespace(
+        username="bob" if source_error == "owner" else "alice",
+        task_name="CheckRabi",
+        chip_id="chip-1",
+        qid="1" if source_error == "target" else "0",
+        tags=["calibration"],
+    )
+    lookup = Mock(return_value=source)
+    if source_error == "missing":
+        lookup.side_effect = HTTPException(status_code=404, detail="Not found")
+    kwargs = {
+        "task_name": "CheckRabi",
+        "body": QuickRunTaskRequest(
+            chip_id="chip-1", qid="0", backend_name="fake", source_task_id="source-1"
+        ),
+        "ctx": _project_context(),
+        "flow_service": SimpleNamespace(execute_single_task_from_snapshot=execute),
+        "task_service": SimpleNamespace(get_task_result=lookup),
+        "task_file_service": _task_file_service(_task_info()),
+    }
+    if source_error:
+        with pytest.raises(HTTPException) as exc:
+            await quick_run_task(**kwargs)  # type: ignore[arg-type]
+        assert exc.value.status_code == {"owner": 403, "target": 400, "missing": 404}[source_error]
+        execute.assert_not_awaited()
+    else:
+        await quick_run_task(**kwargs)  # type: ignore[arg-type]
+        lookup.assert_called_once_with("project-1", "source-1")
+        sent = execute.await_args_list[0].kwargs
+        assert sent["source_task_id"] == "source-1"
+        assert sent["source_execution_id"] is None
+        assert sent["default_run_parameters"] == {"CheckRabi": {}}
+        assert sent["parameter_overrides"] == {"input": {}}
+        assert sent["tags"] == ["calibration"]
+
+
+@pytest.mark.asyncio
 async def test_quick_run_task_rejects_disabled_task(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
     monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: False)
@@ -55,6 +99,7 @@ async def test_quick_run_task_rejects_disabled_task(monkeypatch: pytest.MonkeyPa
             body=QuickRunTaskRequest(chip_id="chip-1", qid="0", backend_name="fake"),
             ctx=_project_context(),  # type: ignore[arg-type]
             flow_service=flow_service,  # type: ignore[arg-type]
+            task_service=SimpleNamespace(),  # type: ignore[arg-type]
             task_file_service=_task_file_service(),  # type: ignore[arg-type]
         )
 
@@ -84,6 +129,7 @@ async def test_quick_run_task_resolves_and_validates_default_backend(
         body=QuickRunTaskRequest(chip_id="chip-1", qid="0"),
         ctx=_project_context(),  # type: ignore[arg-type]
         flow_service=flow_service,  # type: ignore[arg-type]
+        task_service=SimpleNamespace(),  # type: ignore[arg-type]
         task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
     )
 
@@ -168,6 +214,7 @@ async def test_quick_run_task_rejects_invalid_overrides(
             body=body,
             ctx=_project_context(),  # type: ignore[arg-type]
             flow_service=flow_service,  # type: ignore[arg-type]
+            task_service=SimpleNamespace(),  # type: ignore[arg-type]
             task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
         )
 

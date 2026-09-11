@@ -1094,7 +1094,14 @@ class ExecutionLockRepository(Protocol):
         """
         ...
 
-    def try_lock(self, project_id: str, execution_id: str | None = None) -> bool:
+    def try_lock(
+        self,
+        project_id: str,
+        execution_id: str | None = None,
+        chip_id: str = "",
+        resources: tuple[str, ...] = (),
+        exclusive: bool = True,
+    ) -> bool:
         """Atomically acquire the execution lock, unless another execution holds it.
 
         Parameters
@@ -1125,7 +1132,7 @@ class ExecutionLockRepository(Protocol):
         """
         ...
 
-    def unlock(self, project_id: str) -> None:
+    def unlock(self, project_id: str, execution_id: str | None = None) -> None:
         """Release the execution lock.
 
         Parameters

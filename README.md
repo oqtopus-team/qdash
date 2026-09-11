@@ -15,6 +15,8 @@ QDash is a web application that provides a user-friendly interface to manage and
 
 ![qdash-demo](docs/public/images/qdash-demo.gif)
 
+[▶ Watch the 30-second demo with sound](https://oqtopus-team.github.io/qdash/getting-started/what-is-qdash#demo)
+
 ## Key Features
 
 - **⚡ Workflows**: Centrally manage and track the progress of calibration workflows, from creation to completion.

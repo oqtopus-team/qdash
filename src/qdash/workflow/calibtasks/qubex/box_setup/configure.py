@@ -50,7 +50,7 @@ class Configure(QubexTask):
             load_kwargs["configuration_mode"] = exp.configuration_mode
         exp.system_manager.load(**load_kwargs)
         print(f"[Configure] Pushing system_manager for {label} (box_ids={exp.box_ids})")
-        exp.system_manager.push(box_ids=exp.box_ids, confirm=False)
+        exp.system_manager.push(box_ids=exp.box_ids, confirm=False, parallel=False)
         print(f"[Configure] Done for {label}")
         self.save_calibration(backend)
         return RunResult(raw_result=None)

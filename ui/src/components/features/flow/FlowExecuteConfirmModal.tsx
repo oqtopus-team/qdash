@@ -1,6 +1,8 @@
 "use client";
 
-import { Lock, Plus } from "lucide-react";
+import { useId } from "react";
+
+import { Plus } from "lucide-react";
 
 interface FlowExecuteConfirmModalProps {
   flowName: string;
@@ -8,8 +10,7 @@ interface FlowExecuteConfirmModalProps {
   chipId: string;
   description: string;
   tags: string;
-  isLocked: boolean;
-  isLockStatusLoading: boolean;
+  disabledReason: string | null;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -20,11 +21,11 @@ export function FlowExecuteConfirmModal({
   chipId,
   description,
   tags,
-  isLocked,
-  isLockStatusLoading,
+  disabledReason,
   onConfirm,
   onClose,
 }: FlowExecuteConfirmModalProps) {
+  const disabledReasonId = useId();
   const tagList = tags
     .split(",")
     .map((t) => t.trim())
@@ -69,6 +70,10 @@ export function FlowExecuteConfirmModal({
             <div>
               <h3 className="font-medium mb-2">Chip ID</h3>
               <p className="text-base-content/80">{chipId}</p>
+              <p className="mt-1 text-sm text-base-content/70">
+                This workflow reserves the entire chip for all its steps. Other runs on this chip
+                must wait until the workflow finishes.
+              </p>
             </div>
 
             {description && (
@@ -90,36 +95,28 @@ export function FlowExecuteConfirmModal({
                 </div>
               </div>
             )}
-
-            {isLocked && (
-              <div className="alert alert-warning">
-                <Lock className="h-5 w-5" />
-                <span>
-                  Execution is locked. Another calibration is currently running. Please wait until
-                  it completes.
-                </span>
-              </div>
-            )}
           </div>
         </div>
+
+        {disabledReason && (
+          <div id={disabledReasonId} className="alert alert-info mx-6 mb-4" role="status">
+            <span>{disabledReason}</span>
+          </div>
+        )}
 
         <div className="px-6 py-4 border-t border-base-300 flex justify-end gap-2">
           <button className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
           <button
-            className={`btn ${isLocked ? "btn-disabled" : "btn-success"}`}
-            onClick={onConfirm}
-            disabled={isLocked || isLockStatusLoading}
+            className="btn btn-success"
+            disabled={Boolean(disabledReason)}
+            aria-describedby={disabledReason ? disabledReasonId : undefined}
+            onClick={() => {
+              if (!disabledReason) onConfirm();
+            }}
           >
-            {isLocked ? (
-              <>
-                <Lock className="mr-2" size={16} />
-                Locked
-              </>
-            ) : (
-              "Execute"
-            )}
+            Execute
           </button>
         </div>
       </div>

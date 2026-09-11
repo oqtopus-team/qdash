@@ -744,3 +744,54 @@ class TestGetExecution:
             headers=auth_headers,
         )
         assert response.status_code == 404
+
+
+def test_execution_availability_tracks_target_conflicts_without_creating_executions(
+    test_client: TestClient,
+    test_project: ProjectDocument,
+    auth_headers: dict[str, str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from qdash.common import execution_resources
+    from qdash.repository.execution_lock import MongoExecutionLockRepository
+
+    wiring = tmp_path / "chip-1" / "config" / "wiring.yaml"
+    wiring.parent.mkdir(parents=True)
+    wiring.write_text(
+        "chip-1:\n"
+        "  - mux: 0\n    ctrl: [C0-1]\n    read_out: R0-1\n"
+        "  - mux: 1\n    ctrl: [C1-1]\n    read_out: R1-1\n"
+    )
+    monkeypatch.setattr(execution_resources, "resolve_config_base_path", lambda: tmp_path)
+    repo = MongoExecutionLockRepository()
+    assert repo.try_lock(test_project.project_id, "running", "chip-1", ("mux:0",), False)
+    before = list(ExecutionHistoryDocument.find_all().run())
+    for chip, qid, available in [
+        ("chip-1", "0", False),
+        ("chip-1", "4", True),
+        ("chip-2", "0", True),
+    ]:
+        response = test_client.post(
+            "/executions/check-availability",
+            headers=auth_headers,
+            json={"parameters": {"chip_id": chip, "qid": qid}},
+        )
+        assert response.status_code == 200
+        assert response.json()["available"] is available
+        assert bool(response.json()["reason"]) is not available
+    assert list(ExecutionHistoryDocument.find_all().run()) == before
+    repo.unlock(test_project.project_id, "running")
+    response = test_client.post(
+        "/executions/check-availability",
+        headers=auth_headers,
+        json={"parameters": {"chip_id": "chip-1", "qid": "0"}},
+    )
+    assert response.json()["available"] is True
+
+
+def test_execution_availability_requires_authentication(test_client: TestClient) -> None:
+    response = test_client.post(
+        "/executions/check-availability", json={"parameters": {"chip_id": "chip-1", "qid": "0"}}
+    )
+    assert response.status_code in (401, 403)

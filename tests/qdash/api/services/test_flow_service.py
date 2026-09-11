@@ -17,9 +17,12 @@ from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 
 
 @pytest.mark.asyncio
-async def test_execute_single_task_rejects_locked_project() -> None:
+async def test_execute_single_task_rejects_conflicting_resources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(flow_service, "generate_execution_id", lambda *args, **kwargs: "exec-1")
     lock_repository = MagicMock()
-    lock_repository.is_locked.return_value = True
+    lock_repository.try_lock.return_value = False
     service = FlowService(
         flow_repository=MagicMock(),
         execution_lock_repository=lock_repository,
@@ -36,7 +39,7 @@ async def test_execute_single_task_rejects_locked_project() -> None:
         )
 
     assert getattr(exc_info.value, "status_code", None) == 409
-    lock_repository.is_locked.assert_called_once_with("project-1")
+    lock_repository.try_lock.assert_called_once()
 
 
 def test_resolve_workflow_path_uses_container_path_when_available(tmp_path: Path) -> None:
@@ -91,6 +94,24 @@ async def test_list_templates_uses_resolved_templates_metadata(
     templates = await FlowService(flow_repository=MagicMock()).list_templates()
 
     assert any(template.id == "full_calibration" for template in templates)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("template_id", ["coarse_one", "fine_one"])
+async def test_partial_one_qubit_template_is_listed_and_loads_its_flow_code(
+    monkeypatch: pytest.MonkeyPatch,
+    template_id: str,
+) -> None:
+    templates_dir = Path(__file__).resolve().parents[4] / "src/qdash/workflow/templates"
+    monkeypatch.setattr(flow_service, "TEMPLATES_DIR", templates_dir)
+    monkeypatch.setattr(flow_service, "TEMPLATES_METADATA_FILE", templates_dir / "templates.json")
+    service = FlowService(flow_repository=MagicMock())
+
+    templates = await service.list_templates()
+    assert any(template.id == template_id for template in templates)
+    template = await service.get_template(template_id)
+    assert template.function_name == template_id
+    assert template.code == (templates_dir / f"{template_id}.py").read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize(
@@ -588,7 +609,11 @@ async def test_execute_flow_claims_the_lock_before_creating_the_flow_run(
     assert calls == ["try_lock", "create_flow_run"]
     assert response.execution_id == "20240101-001"
     lock_repository.try_lock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-001"
+        project_id="project-1",
+        execution_id="20240101-001",
+        chip_id="chip-1",
+        resources=(),
+        exclusive=True,
     )
     lock_repository.unlock.assert_not_called()
 
@@ -662,7 +687,9 @@ async def test_execute_flow_releases_the_lock_when_the_flow_run_cannot_be_create
         )
 
     assert exc_info.value.status_code == 500
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-003"
+    )
 
 
 @pytest.mark.asyncio
@@ -693,7 +720,9 @@ async def test_execute_flow_releases_the_lock_when_the_scheduled_row_cannot_be_s
     )
 
     assert response.execution_id == "flow-run-4"
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-004"
+    )
 
 
 @pytest.mark.asyncio
@@ -757,7 +786,11 @@ async def test_re_execute_from_snapshot_claims_the_lock(
 
     assert response.execution_id == "20240101-006"
     lock_repository.try_lock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-006"
+        project_id="project-1",
+        execution_id="20240101-006",
+        chip_id="chip-1",
+        resources=(),
+        exclusive=True,
     )
 
 
@@ -813,7 +846,11 @@ async def test_execute_single_task_claims_the_lock(
 
     assert response.execution_id == "20240101-007"
     lock_repository.try_lock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-007"
+        project_id="project-1",
+        execution_id="20240101-007",
+        chip_id="chip-1",
+        resources=(),
+        exclusive=True,
     )
 
 
@@ -860,7 +897,9 @@ async def test_re_execute_from_snapshot_releases_the_lock_when_the_flow_run_cann
         )
 
     assert exc_info.value.status_code == 500
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-009"
+    )
 
 
 @pytest.mark.asyncio
@@ -892,7 +931,9 @@ async def test_re_execute_from_snapshot_releases_the_lock_when_the_scheduled_row
     )
 
     assert response.execution_id == "flow-run-8"
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-010"
+    )
 
 
 @pytest.mark.asyncio
@@ -944,7 +985,9 @@ async def test_execute_single_task_releases_the_lock_when_the_flow_run_cannot_be
         )
 
     assert exc_info.value.status_code == 500
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-011"
+    )
 
 
 @pytest.mark.asyncio
@@ -996,7 +1039,9 @@ async def test_execute_single_task_releases_the_lock_when_the_scheduled_row_cann
     )
 
     assert response.execution_id == "flow-run-9"
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-012"
+    )
 
 
 def test_release_execution_lock_survives_a_failing_unlock() -> None:
@@ -1009,4 +1054,78 @@ def test_release_execution_lock_survives_a_failing_unlock() -> None:
         execution_lock_repository=lock_repository,
     )._release_execution_lock("project-1", "20240101-008")
 
-    lock_repository.unlock.assert_called_once_with(project_id="project-1")
+    lock_repository.unlock.assert_called_once_with(
+        project_id="project-1", execution_id="20240101-008"
+    )
+
+
+def test_workflow_availability_is_chip_exclusive_despite_target_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from qdash.api.schemas.execution import ExecutionAvailabilityRequest
+    from qdash.common.execution_resources import ExecutionResourceScope
+
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = SimpleNamespace(
+        chip_id="fallback-chip", default_parameters={"mux_ids": [0], "qids": ["4"]}
+    )
+    lock_repo = MagicMock()
+    lock_repo.has_conflict.return_value = True
+    scope = ExecutionResourceScope("selected-chip", ("mux:1",))
+    resolve = MagicMock(return_value=scope)
+    monkeypatch.setattr(flow_service, "resolve_execution_resource_scope", resolve)
+    service = FlowService(flow_repo, lock_repo)
+    result = service.check_execution_availability(
+        ExecutionAvailabilityRequest(
+            flow_name="my-flow", parameters={"chip_id": "selected-chip", "mux_ids": [1]}
+        ),
+        "project-1",
+    )
+    assert not result.available
+    assert result.reason and "entire chip" in result.reason
+    flow_repo.find_by_project_and_name.assert_called_once_with("project-1", "my-flow")
+    resolve.assert_not_called()
+    lock_repo.has_conflict.assert_called_once_with(
+        "project-1", ExecutionResourceScope("selected-chip", exclusive=True)
+    )
+    lock_repo.try_lock.assert_not_called()
+
+
+def test_availability_rejects_missing_flow() -> None:
+    from qdash.api.schemas.execution import ExecutionAvailabilityRequest
+
+    repo = MagicMock()
+    repo.find_by_project_and_name.return_value = None
+    with pytest.raises(HTTPException) as error:
+        FlowService(repo, MagicMock()).check_execution_availability(
+            ExecutionAvailabilityRequest(flow_name="missing"), "project-1"
+        )
+    assert error.value.status_code == 404
+
+
+def test_workflow_dispatch_reserves_whole_chip_while_single_task_stays_scoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from qdash.common.execution_resources import ExecutionResourceScope
+
+    scope = ExecutionResourceScope("chip-1", ("mux:0",), False)
+    monkeypatch.setattr(flow_service, "resolve_execution_resource_scope", lambda *args: scope)
+    monkeypatch.setattr(flow_service, "generate_execution_id", lambda *args, **kwargs: "owner")
+    lock_repo = MagicMock()
+    lock_repo.try_lock.return_value = True
+    service = FlowService(MagicMock(), lock_repo)
+    for workflow in (True, False):
+        service._claim_execution_lock(
+            project_id="project-1",
+            username="alice",
+            chip_id="chip-1",
+            parameters={"qid": "0"},
+            workflow=workflow,
+        )
+        lock_repo.try_lock.assert_called_with(
+            project_id="project-1",
+            execution_id="owner",
+            chip_id="chip-1",
+            resources=() if workflow else ("mux:0",),
+            exclusive=workflow,
+        )

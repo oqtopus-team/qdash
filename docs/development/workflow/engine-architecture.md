@@ -184,7 +184,7 @@ The Repository Pattern is visualized in the Task Executor Flow diagram (see abov
 | `QubitCalibrationRepository` | Qubit calibration data updates |
 | `CouplingCalibrationRepository` | Coupling calibration data updates |
 | `ExecutionCounterRepository` | Atomic execution ID counter |
-| `ExecutionLockRepository` | Project execution locking |
+| `ExecutionLockRepository` | Wiring-aware execution resource locking |
 | `UserRepository` | User preferences |
 | `TaskRepository` | Task name lookup |
 
@@ -200,6 +200,27 @@ The Repository Pattern is visualized in the Task Executor Flow diagram (see abov
 - `MongoExecutionLockRepository`
 - `MongoUserRepository`
 - `MongoTaskRepository`
+
+Execution locks are scoped to a chip and the MUX/wiring resources resolved from
+the run's `mux_ids`, `qids`, or single `qid` target. Runs on different chips or
+disjoint hardware resources can execute concurrently. Runs with overlapping
+readout or control modules remain mutually exclusive, including different
+channels on the same module. Module claims use the same resource resolver as
+the CR scheduler. Runs whose targets or wiring cannot be resolved claim the
+whole chip as a conservative fallback.
+
+Before a step pipeline starts, its reservation includes the union of its input
+targets, explicit `ConfigureAll` MUXes, and predefined `SetCRSchedule` pairs.
+Unknown step classes reserve the whole chip. The reservation remains held
+across filtering and step transitions, using a fixed owner independent of the
+execution-history ID created for each step. Task calls and isolated workers
+reject targets outside that reservation before touching hardware.
+
+The API cannot determine every future step of a saved Python flow from its
+input parameters, so saved-flow dispatch and UI availability checks reserve
+the whole chip. Single-task runs retain target-scoped reservations. The UI
+disables conflicting runs and explains the chip-wide reservation in the flow
+confirmation dialog. No user flow code is executed by the availability check.
 
 **InMemory Implementations** (for testing):
 - `InMemoryExecutionRepository`
@@ -279,10 +300,15 @@ An execution record exists from the moment a run is requested, not from the mome
 | Step | Actor | Effect |
 |------|-------|--------|
 | Trigger | API (`FlowService._create_scheduled_execution`) | Creates the `execution_history` row with `status=scheduled` and `note.flow_run_id`, immediately after the Prefect flow run is created |
-| Flow start | `CalibService._initialize()` | Claims that row via `MongoExecutionRepository.claim_scheduled_execution()` and reuses its `execution_id`; `scheduled` → `running` |
-| Flow end | `finish_calibration()` / `fail_calibration()` / `cancel_calibration()` | `running` → `completed` / `failed` / `cancelled` |
+| First calibration step | `CalibService._initialize()` | Claims that row via `MongoExecutionRepository.claim_scheduled_execution()` and reuses its `execution_id`; `scheduled` → `running` |
+| Later calibration steps | `CalibService._run_pipeline()` | Creates a separate Execution for each calibration step |
+| Step end | `finish_calibration()` / `fail_calibration()` / `cancel_calibration()` | The current step becomes `completed`, `failed`, or `cancelled`; earlier completed steps retain their status |
 
-The claim is a single atomic `find_one_and_update` guarded by `note.claimed_at`, so only the first session of a flow run adopts the row. Sessions with `skip_execution=True` never claim, because they do not persist an execution document. A flow that creates several executions (one per strategy invocation) adopts the pre-created row for the first one and allocates new IDs for the rest.
+`CalibService.run(targets, steps=...)` owns the Execution lifecycle. Each calibration step gets one Execution, and its tasks, scheduling rounds, and isolated workers share that ID. Transform steps, such as filters and schedule generation, do not create Executions. No additional parent Execution is created. For example, `coarse_one` creates one Execution for `OneQubitCheck`, while the `one_qubit` template creates separate Executions for `OneQubitCheck` and `OneQubitFineTune`.
+
+The first calibration step adopts the API reservation through an atomic `find_one_and_update` guarded by `note.claimed_at`. Later calibration steps allocate their own IDs. Each step records `step_name`, its position in the pipeline as `step_index`, and `pipeline_name` in its note; `flow_run_id` associates all steps with the same Prefect run.
+
+Templates do not configure `skip_execution`. Saved templates that still pass `skip_execution=True` are supported: `run()` automatically enables Execution persistence for calibration steps. The flag remains an internal option for isolated workers, which borrow their step's Execution without claiming, creating, or finalizing another row. Strategies execute within the session supplied by the pipeline and do not call `init_calibration()` or `finish_calibration()` themselves.
 
 Runs that do not go through the API — cron schedules, where the Prefect scheduler creates the flow run directly — have no pre-created row, so `CalibService` allocates the `execution_id` itself as before.
 
@@ -294,7 +320,7 @@ Calibrations are mutually exclusive per project, guarded by `ExecutionLockDocume
 
 Runs that do not go through the API, such as cron schedules, find the lock free and take it in `CalibService` as before. The claim is also skipped when no `chip_id` can be resolved, since there is then no `execution_id` to own the lock; those runs fall back to the same path.
 
-Claiming at dispatch means the API takes the lock and the flow releases it, so dispatch failures in between have to release it themselves: `FlowService` does that when the flow run cannot be created, and when the `scheduled` row cannot be saved. Everything after that point is covered by the finalizer, which releases a lock owned by the execution it closes. The one case with no owner left to act is a run that dies before its flow process starts; `ExecutionService.get_lock_status()` reconciles a still `scheduled` execution against Prefect for exactly that reason, on the poll the UI already makes.
+Claiming at dispatch means the API takes the lock and the flow releases it, so dispatch failures in between have to release it themselves: `FlowService` does that when the flow run cannot be created, and when the `scheduled` row cannot be saved. The lock remains owned by the first step throughout the pipeline, including between steps, and is released only when the pipeline exits. Terminal flow hooks also release a lock owned by an already completed step from the same flow, so a crash during a later step or a transform does not strand the lock. The one case with no owner left to act is a run that dies before its flow process starts; `ExecutionService.get_lock_status()` reconciles a still `scheduled` execution against Prefect for exactly that reason, on the poll the UI already makes.
 
 ### Reconciliation with Prefect
 
@@ -339,7 +365,7 @@ The hook:
 3. Finds the execution by `note.flow_run_id` in `execution_history`
 4. Updates all non-terminal tasks (running/scheduled/pending) to `cancelled`
 5. Sets the execution status to `cancelled`
-6. Releases the execution lock, but only when it is unowned or owned by the execution being closed
+6. Releases the execution lock when it is owned by an Execution from this flow, including a completed earlier step; legacy unowned locks are released when an open Execution is closed
 
 ### flow_run_id Bridge
 
