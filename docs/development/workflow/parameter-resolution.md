@@ -46,9 +46,14 @@ For coupling tasks, `InputParameterSpec.parameter_name` selects the database key
 Task construction resolves Run parameters in this order, from highest to lowest precedence:
 
 1. Explicit `task_details[task_name].run_parameters`
-2. Per-task entries in `CalibConfig.default_run_parameters`
-3. Flat entries in `CalibConfig.default_run_parameters`
-4. `run_spec` specified on the task class
+2. Task-specific entries in `CalibConfig.task_run_parameters`
+3. Legacy per-task entries in `CalibConfig.default_run_parameters`
+4. Shared entries in `CalibConfig.default_run_parameters`
+5. `run_spec` specified on the task class
+
+Use `default_run_parameters` only for shared fallback values such as `interval` and `shots`.
+Use `task_run_parameters` when a template intentionally configures one named task. Nested
+entries in `default_run_parameters` remain readable only for existing flow documents.
 
 `QubexTask.preprocess()` then resolves each declared Input parameter:
 
@@ -219,7 +224,7 @@ The task-result re-execution modal should show the snapshot value as the baselin
 `POST /tasks/{task_name}/execute` also uses `single-task-executor`, but sets `source_execution_id` to `None`.
 
 - `input_parameter_overrides` becomes `parameter_overrides.input`.
-- `run_parameter_overrides` becomes a per-task `default_run_parameters` entry.
+- `run_parameter_overrides` becomes an entry in `task_run_parameters` for the selected task.
 - A `SnapshotParameterLoader` is still created when Input overrides exist so they can be reapplied after preprocessing.
 - With no Input override, Qubex preprocessing loads current database values normally.
 

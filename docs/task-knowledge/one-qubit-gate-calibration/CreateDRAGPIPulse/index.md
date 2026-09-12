@@ -64,11 +64,11 @@ The optimal beta should produce minimal leakage; the amplitude should give exact
 
 - drag_pi_beta: DRAG PI pulse beta
 - drag_pi_amplitude: DRAG PI pulse amplitude
-- drag_pi_length: DRAG PI pulse length (ns)
+- drag_pi_duration: DRAG PI pulse duration (ns)
 
 ## Run parameters
 
-- drag_pi_duration: PI pulse length (ns)
+- drag_pi_duration: PI pulse duration (ns)
 - shots: Number of shots (a.u.)
 - interval: Time interval (ns)
 

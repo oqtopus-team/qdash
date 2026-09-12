@@ -177,6 +177,7 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     ]
     full = one_qubit_module.one_qubit(username="alice", chip_id="64Q", qids=["8"])
     assert result["kwargs"]["default_run_parameters"] == full["kwargs"]["default_run_parameters"]
+    assert result["kwargs"]["task_run_parameters"] == full["kwargs"]["task_run_parameters"]
     assert result["kwargs"]["flow_name"] == "fine-check"
     assert result["kwargs"]["project_id"] == "project-1"
     assert result["kwargs"]["tags"] == ["fine"]

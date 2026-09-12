@@ -82,7 +82,7 @@ async def test_catalog_run_source_is_provenance_only(
         sent = execute.await_args_list[0].kwargs
         assert sent["source_task_id"] == "source-1"
         assert sent["source_execution_id"] is None
-        assert sent["default_run_parameters"] == {"CheckRabi": {}}
+        assert sent["task_run_parameters"] == {"CheckRabi": {}}
         assert sent["parameter_overrides"] == {"input": {}}
         assert sent["tags"] == ["calibration"]
 

@@ -2019,8 +2019,58 @@ class FakeExperiment:
             results[f"{control}-{target}"] = self.obtain_cr_params(control, target, **kwargs)
         return self._result(data=results)
 
-    def zx90(self, control_qubit: str, target_qubit: str) -> Any:
-        """Build the calibrated echoed ZX90 pulse schedule."""
+    def _resolve_zx90_x180(
+        self,
+        control_qubit: str,
+        x180: Any | Mapping[str, Any] | None,
+    ) -> Any:
+        """Resolve an explicit X180 waveform before falling back to stored calibration."""
+        if isinstance(x180, Mapping):
+            return x180[control_qubit]
+        if x180 is not None:
+            return x180
+        pi_pulse = self.drag_pi_pulses.get(control_qubit)
+        if pi_pulse is None:
+            self.calibrate_drag_pi_pulse([control_qubit], plot=False)
+            pi_pulse = self.drag_pi_pulses[control_qubit]
+        return pi_pulse
+
+    def zx90(
+        self,
+        control_qubit: str,
+        target_qubit: str,
+        *,
+        cr_duration: float | None = None,
+        cr_ramptime: float | None = None,
+        cr_amplitude: float | None = None,
+        cr_phase: float | None = None,
+        cr_beta: float | None = None,
+        cancel_amplitude: float | None = None,
+        cancel_phase: float | None = None,
+        cancel_beta: float | None = None,
+        rotary_amplitude: float | None = None,
+        echo: bool | None = None,
+        x180: Any | Mapping[str, Any] | None = None,
+        x180_margin: float | None = None,
+    ) -> Any:
+        """Build an echoed ZX90 schedule from explicit or stored calibration values."""
+        del x180_margin
+        cr_label = f"{control_qubit}-{target_qubit}"
+        if cr_label not in self.cr_params:
+            self.obtain_cr_params(control_qubit, target_qubit, plot=False)
+        param = dict(self.cr_params[cr_label])
+        overrides = {
+            "duration": cr_duration,
+            "ramptime": cr_ramptime,
+            "cr_amplitude": cr_amplitude,
+            "cr_phase": cr_phase,
+            "cr_beta": cr_beta,
+            "cancel_amplitude": cancel_amplitude,
+            "cancel_phase": cancel_phase,
+            "cancel_beta": cancel_beta,
+            "rotary_amplitude": rotary_amplitude,
+        }
+        param.update({name: value for name, value in overrides.items() if value is not None})
         try:
             (
                 np,
@@ -2033,34 +2083,32 @@ class FakeExperiment:
                 _QuantumSimulator,
             ) = _simulation_dependencies()
         except ImportError:
-            return self._lightweight_zx90(control_qubit, target_qubit)
-        cr_label = f"{control_qubit}-{target_qubit}"
-        if cr_label not in self.cr_params:
-            self.obtain_cr_params(control_qubit, target_qubit, plot=False)
-        param = self.cr_params[cr_label]
+            return self._lightweight_zx90(control_qubit, target_qubit, parameters=param)
         control_index = self.qubit_labels.index(control_qubit)
         target_index = self.qubit_labels.index(target_qubit)
         frequency_diff = (
             self.qubit_frequencies[control_index] - self.qubit_frequencies[target_index]
         )
-        pi_pulse = self.drag_pi_pulses.get(control_qubit)
-        if pi_pulse is None:
-            self.calibrate_drag_pi_pulse([control_qubit], plot=False)
-            pi_pulse = self.drag_pi_pulses[control_qubit]
-        cr_beta = -1 / (2 * np.pi * frequency_diff)
+        pi_pulse = self._resolve_zx90_x180(control_qubit, x180)
+        effective_cr_beta = param.get("cr_beta", -1 / (2 * np.pi * frequency_diff))
+        effective_cancel_beta = param.get(
+            "cancel_beta", -1 / (2 * np.pi * self.qubit_anharmonicities[target_index])
+        )
+        cancel_pulse = param["cancel_amplitude"] * np.exp(1j * param["cancel_phase"])
+        cancel_pulse += param.get("rotary_amplitude", 0.0)
         cr_waveform = qx.pulse.FlatTop(
             duration=param["duration"],
             amplitude=2 * np.pi * param["cr_amplitude"],
             tau=param["ramptime"],
             phase=param["cr_phase"] + 0.25 * np.pi,
-            beta=cr_beta,
+            beta=effective_cr_beta,
         )
         cancel_waveform = qx.pulse.FlatTop(
             duration=param["duration"],
-            amplitude=2 * np.pi * param["cancel_amplitude"],
+            amplitude=2 * np.pi * abs(cancel_pulse),
             tau=param["ramptime"],
-            phase=param["cancel_phase"],
-            beta=-1 / (2 * np.pi * self.qubit_anharmonicities[target_index]),
+            phase=float(np.angle(cancel_pulse)),
+            beta=effective_cancel_beta,
         )
         channels = [
             qx.PulseChannel(
@@ -2082,6 +2130,8 @@ class FakeExperiment:
         with qx.PulseSchedule(channels) as cr:
             cr.add(f"{control_qubit}-{target_qubit}", cr_waveform)
             cr.add(target_qubit, cancel_waveform)
+        if echo is False:
+            return cr
         with qx.PulseSchedule(channels) as ecr:
             ecr.call(cr)
             ecr.barrier()
@@ -4444,13 +4494,19 @@ class FakeExperiment:
         self.cx_duration = self.rzx90_duration + self.hpi_duration
         return self._result(data={"cr_param": param})
 
-    def _lightweight_zx90(self, control_qubit: str, target_qubit: str) -> Any:
+    def _lightweight_zx90(
+        self,
+        control_qubit: str,
+        target_qubit: str,
+        *,
+        parameters: Mapping[str, Any] | None = None,
+    ) -> Any:
         import qubex as qx
 
         label = f"{control_qubit}-{target_qubit}"
         if label not in self.cr_params:
             self._lightweight_cr_params(control_qubit, target_qubit)
-        param = self.cr_params[label]
+        param = dict(parameters or self.cr_params[label])
         with qx.PulseSchedule([control_qubit, label, target_qubit]) as schedule:
             schedule.add(
                 label,

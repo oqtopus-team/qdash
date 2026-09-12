@@ -52,13 +52,30 @@ class CreateZX90(QubexTask):
             qid_role="control",
             unit="a.u.",
         ),
-        "control_drag_hpi_length": InputParameterSpec.required_database(
-            parameter_name="drag_hpi_length",
+        "control_drag_hpi_duration": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_duration",
+            parameter_aliases=("drag_hpi_length",),
             qid_role="control",
             unit="ns",
         ),
         "control_drag_hpi_beta": InputParameterSpec.required_database(
             parameter_name="drag_hpi_beta",
+            qid_role="control",
+            unit="a.u.",
+        ),
+        "control_drag_pi_amplitude": InputParameterSpec.required_database(
+            parameter_name="drag_pi_amplitude",
+            qid_role="control",
+            unit="a.u.",
+        ),
+        "control_drag_pi_duration": InputParameterSpec.required_database(
+            parameter_name="drag_pi_duration",
+            parameter_aliases=("drag_pi_length",),
+            qid_role="control",
+            unit="ns",
+        ),
+        "control_drag_pi_beta": InputParameterSpec.required_database(
+            parameter_name="drag_pi_beta",
             qid_role="control",
             unit="a.u.",
         ),
@@ -271,9 +288,11 @@ class CreateZX90(QubexTask):
         label = "-".join(
             [exp.get_qubit_label(int(q)) for q in qid.split("-")]
         )  # e.g., "0-1" → "Q00-Q01"
+        x180 = {control: exp.drag_pi_pulse[control]}
         raw_result = exp.calibrate_zx90(
             control,
             target,
+            x180=x180,
             n_shots=self.run_parameters["shots"].get_value(),
             shot_interval=self.run_parameters["interval"].get_value(),
         )
@@ -297,7 +316,20 @@ class CreateZX90(QubexTask):
             "fig": raw_result["fig"],
         }
 
-        zx90 = exp.zx90(control_qubit=control, target_qubit=target)
+        zx90 = exp.zx90(
+            control_qubit=control,
+            target_qubit=target,
+            x180=x180,
+            cr_duration=float(fit_result["duration"]),
+            cr_ramptime=float(fit_result["ramptime"]),
+            cr_amplitude=float(fit_result["cr_amplitude"]),
+            cr_phase=float(fit_result["cr_phase"]),
+            cr_beta=float(fit_result["cr_beta"]),
+            cancel_amplitude=float(fit_result["cancel_amplitude"]),
+            cancel_phase=float(fit_result["cancel_phase"]),
+            cancel_beta=float(fit_result["cancel_beta"]),
+            rotary_amplitude=float(fit_result["rotary_amplitude"]),
+        )
         result["zx90_gate_time"] = zx90.duration
 
         self.save_calibration(backend)

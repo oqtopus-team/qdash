@@ -79,6 +79,8 @@ def bringup(
 
     default_run_parameters: dict[str, Any] = {
         "interval": {"value": 150 * 1024, "value_type": "int"},
+    }
+    task_run_parameters: dict[str, dict[str, Any]] = {
         # resonator_assignment_order lists the four qid offsets within each MUX
         # in increasing resonator-frequency order. The default is [3, 0, 2, 1].
         # For 16Q, override it with [0, 3, 1, 2] because the order is
@@ -125,5 +127,6 @@ def bringup(
         tags=tags,
         project_id=project_id,
         default_run_parameters=default_run_parameters,
+        task_run_parameters=task_run_parameters,
     )
     return cal.run(targets, steps=steps)

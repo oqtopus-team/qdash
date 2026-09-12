@@ -164,13 +164,13 @@ class QubexTask(BaseTask):
                     },
                 )
 
-            pi = self._resolved_input_values((f"{prefix}pi_amplitude", f"{prefix}pi_length"))
+            pi = self._resolved_input_values((f"{prefix}pi_amplitude", f"{prefix}pi_duration"))
             if pi is not None:
                 exp.calib_note.update_pi_param(
                     label,
                     {
                         "target": label,
-                        "duration": pi[f"{prefix}pi_length"],
+                        "duration": pi[f"{prefix}pi_duration"],
                         "amplitude": pi[f"{prefix}pi_amplitude"],
                         "tau": PI_RAMPTIME,
                     },
@@ -180,7 +180,7 @@ class QubexTask(BaseTask):
                 drag = self._resolved_input_values(
                     (
                         f"{prefix}{pulse_type}_amplitude",
-                        f"{prefix}{pulse_type}_length",
+                        f"{prefix}{pulse_type}_duration",
                         f"{prefix}{pulse_type}_beta",
                     )
                 )
@@ -190,11 +190,29 @@ class QubexTask(BaseTask):
                     label,
                     {
                         "target": label,
-                        "duration": drag[f"{prefix}{pulse_type}_length"],
+                        "duration": drag[f"{prefix}{pulse_type}_duration"],
                         "amplitude": drag[f"{prefix}{pulse_type}_amplitude"],
                         "beta": drag[f"{prefix}{pulse_type}_beta"],
                     },
                 )
+
+    def _resolved_zx90_kwargs(self) -> dict[str, float]:
+        """Return the resolved CR parameters accepted directly by Qubex ``zx90``."""
+        names = (
+            "cr_duration",
+            "cr_ramptime",
+            "cr_amplitude",
+            "cr_phase",
+            "cr_beta",
+            "cancel_amplitude",
+            "cancel_phase",
+            "cancel_beta",
+            "rotary_amplitude",
+        )
+        values = self._resolved_input_values(names)
+        if values is None:
+            raise ValueError(f"{self.name} does not declare the inputs required to build ZX90")
+        return values
 
     def _restore_cr_context(self, backend: "QubexBackend", qid: str) -> None:
         """Restore CR parameters consumed implicitly by Qubex two-qubit methods."""
@@ -366,11 +384,20 @@ class QubexTask(BaseTask):
             # Get the ordered list of data sources for this role
             sources = role_data_sources.get(qid_role, role_data_sources.get("", []))
 
-            # Search sources in order for the lookup key
+            lookup_keys: tuple[str, ...] = (lookup_key,)
+            if isinstance(declaration, InputParameterSpec):
+                lookup_keys += declaration.parameter_aliases
+
+            # Search sources in order, preferring the canonical key within each source.
             db_value = None
+            value_found = False
             for source in sources:
-                if lookup_key in source:
-                    db_value = source[lookup_key]
+                for candidate_key in lookup_keys:
+                    if candidate_key in source:
+                        db_value = source[candidate_key]
+                        value_found = True
+                        break
+                if value_found:
                     break
 
             if db_value is not None:

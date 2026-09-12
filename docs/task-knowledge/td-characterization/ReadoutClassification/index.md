@@ -49,7 +49,7 @@ Average readout fidelity should be high with low asymmetry between |0‚ü© and |1‚
 
 - qubit_frequency: Loaded from DB
 - drag_hpi_amplitude: Loaded from DB
-- drag_hpi_length: Loaded from DB
+- drag_hpi_duration: Loaded from DB
 - drag_hpi_beta: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB

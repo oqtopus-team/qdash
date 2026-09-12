@@ -51,7 +51,7 @@ Contrast should remain high over many repetitions; per-gate error rate extracted
 
 - qubit_frequency: Loaded from DB
 - pi_amplitude: Loaded from DB
-- pi_length: Loaded from DB
+- pi_duration: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
 - readout_duration: Readout pulse duration (ns)

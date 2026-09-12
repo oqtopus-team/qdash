@@ -103,8 +103,10 @@ def coherence_limit(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        default_run_parameters={
-            "drag_hpi_duration": {"value": 16, "value_type": "int"},
+        task_run_parameters={
+            "Check1QGateCoherenceLimit": {
+                "drag_hpi_duration": {"value": 16, "value_type": "int"},
+            },
         },
     )
     return cal.run(targets, steps=steps)

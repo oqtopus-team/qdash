@@ -844,6 +844,67 @@ class TestSnapshotOverrides:
         mock_state_manager.put_input_parameters.assert_called_once()
         mock_state_manager.put_run_parameters.assert_called_once()
 
+    def test_apply_snapshot_overrides_normalizes_legacy_parameter_alias(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        class AliasedTask(MockTask):
+            input_spec = {
+                "control_drag_pi_duration": InputParameterSpec.required_database(
+                    parameter_name="drag_pi_duration",
+                    parameter_aliases=("drag_pi_length",),
+                    qid_role="control",
+                )
+            }
+
+        mock_snapshot_loader.has_snapshot_source = True
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {"control_drag_pi_length": {"value": 32, "unit": "ns"}},
+            {},
+        )
+
+        task = AliasedTask()
+        executor_with_snapshot._apply_snapshot_overrides(task, "Task", "coupling", "0-1")
+
+        assert set(task.input_parameters) == {"control_drag_pi_duration"}
+        assert task.input_parameters["control_drag_pi_duration"].value == 32
+
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {
+                "control_drag_pi_duration": {"value": 48, "unit": "ns"},
+                "control_drag_pi_length": {"value": 32, "unit": "ns"},
+            },
+            {},
+        )
+        canonical_task = AliasedTask()
+        executor_with_snapshot._apply_snapshot_overrides(canonical_task, "Task", "coupling", "0-1")
+
+        assert set(canonical_task.input_parameters) == {"control_drag_pi_duration"}
+        assert canonical_task.input_parameters["control_drag_pi_duration"].value == 48
+
+    def test_incompatible_snapshot_prompts_fresh_calibration(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        class ExpandedTask(MockTask):
+            input_spec = {
+                "existing": InputParameterSpec.required_database(),
+                "new_dependency": InputParameterSpec.required_database(),
+            }
+
+        mock_snapshot_loader.has_snapshot_source = True
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {"existing": {"value": 1.0}},
+            {},
+        )
+
+        with pytest.raises(ValueError, match="run a fresh calibration instead"):
+            executor_with_snapshot._apply_snapshot_overrides(
+                ExpandedTask(), "ExpandedTask", "qubit", "0"
+            )
+
     def test_apply_snapshot_overrides_missing_snapshot(
         self,
         executor_with_snapshot: TaskExecutor,

@@ -54,6 +54,8 @@ T2_echo should satisfy T2_echo ≤ 2\*T1. Compare with T2\* (Ramsey) to quantify
 - qubit_frequency: Loaded from DB
 - hpi_amplitude: Loaded from DB
 - hpi_duration: Loaded from DB
+- pi_amplitude: Loaded from DB
+- pi_duration: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
 - readout_duration: Readout pulse duration (ns)

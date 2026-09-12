@@ -368,6 +368,7 @@ class TaskFileService:
                     "source",
                     "required",
                     "parameter_name",
+                    "parameter_aliases",
                     "qid_role",
                     "greater_than",
                     "less_than",

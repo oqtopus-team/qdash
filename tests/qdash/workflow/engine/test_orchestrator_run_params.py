@@ -1,10 +1,15 @@
 """Tests for default_run_parameters injection in CalibOrchestrator."""
 
-from typing import Any
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, cast
 
 # Import fake tasks to trigger registration in BaseTask.registry
 import qdash.workflow.calibtasks.fake  # noqa: F401
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
+from qdash.workflow.engine.orchestrator import CalibOrchestrator
+
+if TYPE_CHECKING:
+    from qdash.workflow.engine.config import CalibConfig
 
 # FakeCheckRabi registers as "CheckRabi" with backend "fake"
 TASK_NAME = "CheckRabi"
@@ -121,6 +126,44 @@ class TestDefaultRunParameterInjection:
         assert task.run_parameters["shots"].value == 2048
         assert "bad_param" not in task.run_parameters
         assert "another_bad" not in task.run_parameters
+
+
+class TestTaskRunParameterInjection:
+    """Test task-specific parameters separately from shared defaults."""
+
+    def test_task_run_parameters_have_explicit_precedence(self) -> None:
+        config = cast(
+            "CalibConfig",
+            SimpleNamespace(
+                backend_name=BACKEND,
+                default_run_parameters={
+                    "shots": {"value": 4096, "value_type": "int"},
+                    "shared_only": {"value": 7, "value_type": "int"},
+                    TASK_NAME: {
+                        "shots": {"value": 2048, "value_type": "int"},
+                        "time_range": {"value": (0, 601, 12), "value_type": "range"},
+                        "legacy_only": {"value": 8, "value_type": "int"},
+                    },
+                },
+                task_run_parameters={
+                    TASK_NAME: {
+                        "shots": {"value": 1024, "value_type": "int"},
+                        "time_range": {"value": (0, 501, 10), "value_type": "range"},
+                    }
+                },
+            ),
+        )
+        orchestrator = CalibOrchestrator(config)
+
+        task = orchestrator._create_task_instance(
+            TASK_NAME,
+            {TASK_NAME: {"run_parameters": {"shots": {"value": 512, "value_type": "int"}}}},
+        )
+
+        assert task.run_parameters["shots"].value == 512
+        assert task.run_parameters["time_range"].value == (0, 501, 10)
+        assert task.run_parameters["legacy_only"].value == 8
+        assert task.run_parameters["shared_only"].value == 7
 
 
 class TestBaseTaskSetRunParameters:

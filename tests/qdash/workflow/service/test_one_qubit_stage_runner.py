@@ -14,6 +14,7 @@ def _service() -> CalibService:
             backend_name="qubex",
             project_id="project-1",
             default_run_parameters={"interval": {"value": 1024}},
+            task_run_parameters={"CreateHPIPulse": {"hpi_duration": {"value": 52}}},
             tags=["tag-1"],
             note={"kind": "test"},
         ),
@@ -69,6 +70,9 @@ def test_execute_scheduled_mux_schedule_uses_parent_session_config(
 
     assert calls[0]["mux_groups"] == [["0"]]
     assert calls[0]["session_config"]["execution_id"] == "exec-1"
+    assert calls[0]["session_config"]["task_run_parameters"] == {
+        "CreateHPIPulse": {"hpi_duration": {"value": 52}}
+    }
     assert calls[1]["mux_groups"] == [["8"]]
     assert result == {
         "Box_A": {"0": {"CheckResonatorSpectroscopy": {"ok": True}, "status": "success"}},
