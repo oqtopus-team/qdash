@@ -60,6 +60,41 @@ class TestLoadParametersFromDbQubitTask:
         assert param is not None
         assert param.value == 5.2
 
+    def test_input_parameter_alias_resolves_legacy_database_key(self) -> None:
+        class AliasedInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "pi_duration": InputParameterSpec.required_database(
+                    parameter_aliases=("pi_length",),
+                )
+            }
+
+        task = AliasedInputTask()
+        task._populate_parameters(
+            {
+                "": [
+                    {"pi_length": {"value": 32, "unit": "ns"}},
+                    {"pi_duration": {"value": 48, "unit": "ns"}},
+                ]
+            }
+        )
+
+        assert task.input_parameters["pi_duration"].value == 32
+        assert task.input_parameters["pi_duration"].unit == "ns"
+
+        canonical_task = AliasedInputTask()
+        canonical_task._populate_parameters(
+            {
+                "": [
+                    {
+                        "pi_duration": {"value": 48, "unit": "ns"},
+                        "pi_length": {"value": 32, "unit": "ns"},
+                    }
+                ]
+            }
+        )
+
+        assert canonical_task.input_parameters["pi_duration"].value == 48
+
     def test_qubit_task_falls_back_to_dict_key_when_no_parameter_name(self):
         """When parameter_name is empty, dict key is used as lookup."""
         task = ConcreteQubexTask()
@@ -444,6 +479,35 @@ class TestRestoreCalibrationContext:
         assert label == "Q00"
         assert pulse["amplitude"] == 0.12
         assert pulse["duration"] == 32
+
+    @pytest.mark.parametrize(
+        ("pulse_type", "duration"),
+        [("pi", 40), ("drag_hpi", 20), ("drag_pi", 28)],
+    )
+    def test_restores_other_pulses_from_duration_inputs(
+        self,
+        pulse_type: str,
+        duration: int,
+    ) -> None:
+        task = ConcreteQubexTask()
+        task.input_parameters = {
+            f"{pulse_type}_amplitude": ParameterModel(value=0.12),
+            f"{pulse_type}_duration": ParameterModel(value=duration),
+        }
+        if pulse_type.startswith("drag_"):
+            task.input_parameters[f"{pulse_type}_beta"] = ParameterModel(value=0.25)
+        exp = MagicMock()
+        backend = MagicMock()
+        backend.get_instance.return_value = exp
+
+        task._restore_qubit_pulse_context(backend, "0")
+
+        update = getattr(exp.calib_note, f"update_{pulse_type}_param")
+        update.assert_called_once()
+        _, pulse = update.call_args.args
+        assert pulse["duration"] == duration
+        if pulse_type.startswith("drag_"):
+            assert pulse["beta"] == 0.25
 
     def test_restores_two_qubit_pulses_using_each_qubit_id(self) -> None:
         task = ConcreteQubexTask()

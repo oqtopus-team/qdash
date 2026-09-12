@@ -63,7 +63,7 @@ class CreateHPIPulse(QubexTask):
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "hpi_amplitude": OutputParameterSpec(unit="", description="HPI pulse amplitude"),
         "hpi_duration": OutputParameterSpec(
-            default=HPI_DURATION, unit="ns", description="HPI pulse duration"
+            default=None, unit="ns", description="HPI pulse duration"
         ),
     }
 
@@ -86,6 +86,9 @@ class CreateHPIPulse(QubexTask):
         label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
         self.output_parameters["hpi_amplitude"].value = result.data[label].calib_value
+        self.output_parameters["hpi_duration"].value = self.run_parameters[
+            "hpi_duration"
+        ].get_value()
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         validation_error = finite_value_error(

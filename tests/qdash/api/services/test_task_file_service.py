@@ -250,6 +250,8 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
         "qubit_frequency",
         "hpi_amplitude",
         "hpi_duration",
+        "pi_amplitude",
+        "pi_duration",
         "readout_amplitude",
         "readout_frequency",
         "readout_duration",
@@ -259,6 +261,7 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
         "user_override": "allowed",
         "default_value": None,
     }
+    assert task.input_parameters["pi_duration"]["parameter_aliases"] == ["pi_length"]
     assert task.input_parameters["readout_duration"]["unit"] == "ns"
 
 

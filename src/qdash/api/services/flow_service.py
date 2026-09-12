@@ -588,6 +588,7 @@ class FlowService:
         execution_name: str | None = None,
         backend_name: str | None = None,
         default_run_parameters: dict[str, Any] | None = None,
+        task_run_parameters: dict[str, dict[str, Any]] | None = None,
     ) -> ExecuteFlowResponse:
         """Execute a single task via the system single-task-executor deployment.
 
@@ -614,6 +615,10 @@ class FlowService:
             QDash execution display name. Defaults to the manual re-execution label.
         persist_output_parameters : bool
             Whether task outputs update authoritative QDash calibration state.
+        default_run_parameters : dict[str, Any] | None
+            Shared fallback run parameters retained for compatibility.
+        task_run_parameters : dict[str, dict[str, Any]] | None
+            Explicit run parameters keyed by task name.
 
         Returns
         -------
@@ -651,6 +656,7 @@ class FlowService:
             "reconfigure": reconfigure,
             "backend_name": backend_name,
             "default_run_parameters": default_run_parameters,
+            "task_run_parameters": task_run_parameters,
         }
 
         logger.info(

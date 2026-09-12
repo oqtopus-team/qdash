@@ -33,8 +33,11 @@ ZX90 fidelity should meet targets; both control states should produce correct co
 
 - control_qubit_frequency: (control qubit) (GHz)
 - control_drag_hpi_amplitude: (control qubit) (a.u.)
-- control_drag_hpi_length: (control qubit) (ns)
+- control_drag_hpi_duration: (control qubit) (ns)
 - control_drag_hpi_beta: (control qubit) (a.u.)
+- control_drag_pi_amplitude: (control qubit) (a.u.)
+- control_drag_pi_duration: (control qubit) (ns)
+- control_drag_pi_beta: (control qubit) (a.u.)
 - control_readout_frequency: (control qubit) (GHz)
 - control_readout_amplitude: (control qubit) (a.u.)
 - control_readout_duration: (control qubit) (ns)
@@ -42,13 +45,17 @@ ZX90 fidelity should meet targets; both control states should produce correct co
 - target_readout_frequency: (target qubit) (GHz)
 - target_readout_amplitude: (target qubit) (a.u.)
 - target_readout_duration: (target qubit) (ns)
+- cr_duration: (coupling qubit) (ns)
 - cr_amplitude: (control qubit) (a.u.)
 - cr_phase: (control qubit) (a.u.)
+- cr_beta: (control qubit) (a.u.)
 - cancel_amplitude: (target qubit) (a.u.)
 - cancel_phase: (target qubit) (a.u.)
 - cancel_beta: (target qubit) (a.u.)
 - rotary_amplitude: (control qubit) (a.u.)
 - zx_rotation_rate: (coupling qubit) (a.u.)
+- cr_ramptime: (coupling qubit) (ns)
+- zx90_gate_time: (coupling qubit) (ns)
 
 ## Output parameters
 

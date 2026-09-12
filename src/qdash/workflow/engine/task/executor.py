@@ -832,7 +832,11 @@ class TaskExecutor:
         Replaces the task's input_parameters and run_parameters with values
         from the snapshot, and updates state_manager accordingly.
         """
-        from qdash.datamodel.task import InputParameterModel, RunParameterModel
+        from qdash.datamodel.task import (
+            InputParameterModel,
+            InputParameterSpec,
+            RunParameterModel,
+        )
 
         assert self._snapshot_loader is not None
         snapshot = self._snapshot_loader.get_snapshot(task_name, qid)
@@ -849,14 +853,27 @@ class TaskExecutor:
             return
 
         snap_input, snap_run = snapshot
+        declarations = getattr(task.__class__, "input_spec", {})
+        normalized_input = dict(snap_input)
+        for param_name, declaration in declarations.items():
+            if not isinstance(declaration, InputParameterSpec):
+                continue
+            lookup_key = declaration.parameter_name or param_name
+            prefix = param_name[: -len(lookup_key)] if param_name.endswith(lookup_key) else ""
+            for alias in declaration.parameter_aliases:
+                alias_key = f"{prefix}{alias}"
+                if param_name not in normalized_input and alias_key in snap_input:
+                    normalized_input[param_name] = snap_input[alias_key]
+                normalized_input.pop(alias_key, None)
+        snap_input = normalized_input
         if self._snapshot_loader.requires_snapshot(task_name):
-            declarations = getattr(task.__class__, "input_spec", {})
             missing_inputs = set(declarations) - set(snap_input)
             if missing_inputs:
                 missing = ", ".join(sorted(missing_inputs))
                 raise ValueError(
-                    f"Snapshot inputs for task '{task_name}' and qid '{qid}' "
-                    f"are incomplete; missing: {missing}"
+                    f"Snapshot inputs for task '{task_name}' and qid '{qid}' are incompatible "
+                    f"with the current task definition; run a fresh calibration instead. "
+                    f"Missing inputs: {missing}"
                 )
         logger.info(
             "Applying snapshot overrides for task=%s, qid=%s (input_params=%d, run_params=%d)",

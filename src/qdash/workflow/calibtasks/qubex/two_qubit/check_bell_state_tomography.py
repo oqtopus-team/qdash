@@ -53,13 +53,30 @@ class CheckBellStateTomography(QubexTask):
             qid_role="control",
             unit="a.u.",
         ),
-        "control_drag_hpi_length": InputParameterSpec.required_database(
-            parameter_name="drag_hpi_length",
+        "control_drag_hpi_duration": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_duration",
+            parameter_aliases=("drag_hpi_length",),
             qid_role="control",
             unit="ns",
         ),
         "control_drag_hpi_beta": InputParameterSpec.required_database(
             parameter_name="drag_hpi_beta",
+            qid_role="control",
+            unit="a.u.",
+        ),
+        "control_drag_pi_amplitude": InputParameterSpec.required_database(
+            parameter_name="drag_pi_amplitude",
+            qid_role="control",
+            unit="a.u.",
+        ),
+        "control_drag_pi_duration": InputParameterSpec.required_database(
+            parameter_name="drag_pi_duration",
+            parameter_aliases=("drag_pi_length",),
+            qid_role="control",
+            unit="ns",
+        ),
+        "control_drag_pi_beta": InputParameterSpec.required_database(
+            parameter_name="drag_pi_beta",
             qid_role="control",
             unit="a.u.",
         ),
@@ -87,6 +104,22 @@ class CheckBellStateTomography(QubexTask):
             parameter_name="qubit_frequency",
             qid_role="target",
             unit="GHz",
+        ),
+        "target_drag_hpi_amplitude": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_amplitude",
+            qid_role="target",
+            unit="a.u.",
+        ),
+        "target_drag_hpi_duration": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_duration",
+            parameter_aliases=("drag_hpi_length",),
+            qid_role="target",
+            unit="ns",
+        ),
+        "target_drag_hpi_beta": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_beta",
+            qid_role="target",
+            unit="a.u.",
         ),
         "target_readout_frequency": InputParameterSpec.database_or_default(
             default=0,
@@ -265,9 +298,12 @@ class CheckBellStateTomography(QubexTask):
         control, target = (
             exp.get_qubit_label(int(q)) for q in qid.split("-")
         )  # e.g., "0-1" → "Q00","Q01"
+        x180 = {control: exp.drag_pi_pulse[control]}
+        zx90 = exp.zx90(control, target, x180=x180, **self._resolved_zx90_kwargs())
         result = exp.bell_state_tomography(
             control,
             target,
+            zx90=zx90,
             n_shots=self.run_parameters["shots"].get_value(),
             shot_interval=self.run_parameters["interval"].get_value(),
         )

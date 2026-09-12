@@ -285,6 +285,7 @@ class CalibService:
         project_id: str | None = None,
         skip_execution: bool = False,
         default_run_parameters: dict[str, Any] | None = None,
+        task_run_parameters: dict[str, dict[str, Any]] | None = None,
         source_execution_id: str | None = None,
         parameter_overrides: dict[str, dict[str, Any]] | None = None,
         source_task_id: str | None = None,
@@ -335,6 +336,8 @@ class CalibService:
             skip_execution: Internal option for isolated workers borrowing an existing
                 Execution. Pipelines automatically create one Execution per calibration
                 step, including when older templates pass this option. Default: False.
+            default_run_parameters: Shared fallback run parameters applied to all tasks.
+            task_run_parameters: Explicit run parameters keyed by task name.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
@@ -351,6 +354,7 @@ class CalibService:
         self.use_lock = use_lock
         self.skip_execution = skip_execution
         self.default_run_parameters = default_run_parameters or {}
+        self.task_run_parameters = task_run_parameters or {}
         self._lock_acquired = False
         self._lock_execution_id: str | None = None
         self._reserved_scope = resource_scope
@@ -404,9 +408,10 @@ class CalibService:
         if not self.default_run_parameters and self.flow_name:
             self._load_default_run_parameters()
         logger.debug(
-            "CalibService.__init__ flow_name=%s default_run_parameters=%s",
+            "CalibService.__init__ flow_name=%s default_run_parameters=%s task_run_parameters=%s",
             self.flow_name,
             self.default_run_parameters,
+            self.task_run_parameters,
         )
 
         # Session state
@@ -621,7 +626,11 @@ class CalibService:
             self.note = note
 
             # Create CalibConfig
-            logger.debug("CalibConfig default_run_parameters=%s", self.default_run_parameters)
+            logger.debug(
+                "CalibConfig default_run_parameters=%s task_run_parameters=%s",
+                self.default_run_parameters,
+                self.task_run_parameters,
+            )
             config = CalibConfig(
                 username=self.username,
                 chip_id=self.chip_id,
@@ -636,6 +645,7 @@ class CalibService:
                 enable_github_pull=self._enable_github_pull,
                 skip_execution=self.skip_execution,
                 default_run_parameters=self.default_run_parameters,
+                task_run_parameters=self.task_run_parameters,
                 force_update_params=self._force_update_params,
                 persist_output_parameters=self._persist_output_parameters,
             )

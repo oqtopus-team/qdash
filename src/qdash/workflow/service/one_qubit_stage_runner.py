@@ -33,6 +33,7 @@ class OneQubitStageRunner:
             "muxes": None,
             "execution_id": execution_id,
             "default_run_parameters": self.cal_service.default_run_parameters,
+            "task_run_parameters": self.cal_service.task_run_parameters,
             "tags": self.cal_service.tags,
             "flow_name": flow_name,
             "note": self.cal_service.note,
