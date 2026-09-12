@@ -7,9 +7,11 @@ import pytest
 from fastapi import HTTPException
 
 from qdash.api.routers.task import quick_run_task
+from qdash.api.routers.task_result import re_execute_task_result
 from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task import QuickRunTaskRequest
 from qdash.api.schemas.task_file import ListTaskInfoResponse, TaskInfo
+from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 
 def _project_context() -> SimpleNamespace:
@@ -33,10 +35,10 @@ def _task_info() -> TaskInfo:
         file_path="fake/fake_check_rabi.py",
         input_parameters={
             "qubit_frequency": {"user_override": "allowed", "value_type": "float"},
-            "readout_duration": {"user_override": "forbidden", "value_type": "float"},
         },
         run_parameters={
             "shots": {"value_type": "int"},
+            "readout_duration": {"value_type": "float"},
             "frequency_range": {"value_type": "np.arange"},
             "resonator_assignment_order": {"value_type": "list"},
         },
@@ -85,6 +87,37 @@ async def test_catalog_run_source_is_provenance_only(
         assert sent["task_run_parameters"] == {"CheckRabi": {}}
         assert sent["parameter_overrides"] == {"input": {}}
         assert sent["tags"] == ["calibration"]
+
+
+@pytest.mark.asyncio
+async def test_quick_run_passes_readout_duration_to_task_and_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
+    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: True)
+    execute = AsyncMock()
+
+    await quick_run_task(
+        task_name="CheckRabi",
+        body=QuickRunTaskRequest(
+            chip_id="chip-1",
+            qid="0",
+            backend_name="fake",
+            run_parameter_overrides={"readout_duration": 2048},
+        ),
+        ctx=_project_context(),  # type: ignore[arg-type]
+        flow_service=SimpleNamespace(  # type: ignore[arg-type]
+            execute_single_task_from_snapshot=execute
+        ),
+        task_service=SimpleNamespace(),  # type: ignore[arg-type]
+        task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
+    )
+
+    sent = execute.await_args_list[0].kwargs
+    assert sent["default_run_parameters"] == {
+        "readout_duration": {"value": 2048, "value_type": "float"}
+    }
+    assert sent["task_run_parameters"] == {"CheckRabi": {"readout_duration": {"value": 2048}}}
 
 
 @pytest.mark.asyncio
@@ -167,7 +200,7 @@ async def test_quick_run_task_resolves_and_validates_default_backend(
                 backend_name="fake",
                 input_parameter_overrides={"readout_duration": 1024},
             ),
-            "input parameters do not allow overrides: readout_duration",
+            "unknown input parameters: readout_duration",
         ),
         (
             QuickRunTaskRequest(
@@ -220,3 +253,40 @@ async def test_quick_run_task_rejects_invalid_overrides(
 
     assert exc_info.value.status_code == 400
     flow_service.execute_single_task_from_snapshot.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("override", "expected"), [(None, 2048), (1024, 1024)])
+async def test_re_execute_passes_snapshot_or_override_duration_to_session(
+    monkeypatch: pytest.MonkeyPatch,
+    override: int | None,
+    expected: int,
+) -> None:
+    doc = SimpleNamespace(
+        username="alice",
+        name="CheckRabi",
+        qid="0",
+        chip_id="chip-1",
+        execution_id="exec-1",
+        tags=["calibration"],
+        run_parameters={"readout_duration": {"value": 2048}},
+    )
+    query = SimpleNamespace(run=lambda: doc)
+    monkeypatch.setattr(TaskResultHistoryDocument, "find_one", lambda *_args: query)
+    execute = AsyncMock()
+    parameter_overrides = {"run": {"readout_duration": override}} if override is not None else None
+
+    await re_execute_task_result(
+        task_id="task-1",
+        ctx=_project_context(),  # type: ignore[arg-type]
+        service=SimpleNamespace(),  # type: ignore[arg-type]
+        flow_service=SimpleNamespace(  # type: ignore[arg-type]
+            execute_single_task_from_snapshot=execute
+        ),
+        parameter_overrides=parameter_overrides,
+    )
+
+    sent = execute.await_args_list[0].kwargs
+    assert sent["default_run_parameters"] == {
+        "readout_duration": {"value": expected, "value_type": "float"}
+    }

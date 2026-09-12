@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import numpy as np
 
+from qdash.workflow.engine.backend.fake import FakeBackend
 from qdash.workflow.engine.backend.fake_qubex.simulation import FakeExperiment
 
 
@@ -125,3 +128,25 @@ def test_fake_zx90_accepts_explicit_cr_parameters_and_x180(monkeypatch) -> None:
 
     assert schedule.duration == 100.0
     assert exp._resolve_zx90_x180("Q00", {"Q00": x180}) is x180
+
+
+def test_fake_backend_passes_readout_duration_to_experiment(monkeypatch) -> None:
+    experiment = MagicMock()
+    factory = MagicMock(return_value=experiment)
+    monkeypatch.setattr(
+        "qdash.workflow.engine.backend.fake_qubex.FakeExperiment",
+        factory,
+    )
+    backend = FakeBackend(
+        {
+            "task_type": "qubit",
+            "qids": ["0"],
+            "chip_id": "chip-1",
+            "readout_duration": 2048.0,
+        }
+    )
+
+    backend.connect()
+
+    assert factory.call_args.kwargs["readout_duration"] == 2048.0
+    experiment.connect.assert_called_once_with()

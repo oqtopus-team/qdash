@@ -78,6 +78,7 @@ def check_waveform(
         tags=tags,
         project_id=project_id,
         default_run_parameters={
+            "readout_duration": {"value": 2048, "value_type": "int"},
             "interval": {"value": 150 * 1024, "value_type": "int"},
         },
     )

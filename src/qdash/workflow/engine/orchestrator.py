@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from prefect import get_run_logger
 
+from qdash.datamodel.task import RunParameterModel
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.task.context import TaskContext
@@ -238,6 +240,17 @@ class CalibOrchestrator:
 
         if config.configuration_mode is not None:
             session_config["configuration_mode"] = config.configuration_mode
+
+        readout_duration = config.default_run_parameters.get("readout_duration")
+        if isinstance(readout_duration, dict) and (
+            "value" in readout_duration or "value_type" in readout_duration
+        ):
+            value = RunParameterModel.model_validate(readout_duration).get_value()
+            if value is not None:
+                numeric_value = float(value)
+                if not math.isfinite(numeric_value) or numeric_value <= 0:
+                    raise ValueError("readout_duration must be finite and positive")
+                session_config["readout_duration"] = numeric_value
 
         backend = create_backend(
             backend=config.backend_name,

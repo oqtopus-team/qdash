@@ -53,7 +53,6 @@ Exponential fit should have high R²; T1 should be stable across repeated measur
 - hpi_duration: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
@@ -61,6 +60,7 @@ Exponential fit should have high R²; T1 should be stable across repeated measur
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - time_range: Time range for T1 time (ns)
 - shots: Number of shots for T1 time
 - interval: Time interval for T1 time (ns)

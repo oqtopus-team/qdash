@@ -109,6 +109,7 @@ class QubexBackend(BaseBackend):
                 config_dir=self._config.get("config_dir", str(qubex_paths.config_dir(chip_id))),
                 params_dir=self._config.get("params_dir", str(qubex_paths.params_dir(chip_id))),
                 classifier_dir=classifier_dir,
+                readout_duration=self._config.get("readout_duration"),
                 calib_note_path=self._config.get(
                     "note_path", str(qubex_paths.default_calib_note_path)
                 ),

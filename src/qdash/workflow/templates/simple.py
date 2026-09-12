@@ -126,6 +126,7 @@ def simple_calibration(
             },
         },
         default_run_parameters={
+            "readout_duration": {"value": 2048, "value_type": "int"},
             "interval": {"value": 150 * 1024, "value_type": "int"},
         },
     )

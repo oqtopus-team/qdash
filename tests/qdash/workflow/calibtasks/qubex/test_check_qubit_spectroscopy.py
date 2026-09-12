@@ -138,6 +138,8 @@ def test_run_parameters_only_expose_measurement_settings() -> None:
         "frequency_range",
         "power_range",
         "simultaneous_drive",
+        "shots",
+        "interval",
     }
 
 
@@ -159,6 +161,8 @@ def test_measurement_settings_are_forwarded_to_qubex(
     task = CheckQubitSpectroscopy()
     task.run_parameters = copy.deepcopy(task.run_parameters)
     task.run_parameters["power_range"].value = (-40.0, -19.0, 10.0)
+    task.run_parameters["shots"].value = 321
+    task.run_parameters["interval"].value = 654.0
     task.input_parameters["readout_frequency"].value = 6.0
     task.input_parameters["readout_amplitude"].value = 0.04
     backend = cast("QubexBackend", object())
@@ -180,6 +184,8 @@ def test_measurement_settings_are_forwarded_to_qubex(
 
     assert exp.qubit_spectroscopy.call_count == (2 if batch else 1)
     for call in exp.qubit_spectroscopy.call_args_list:
+        assert call.kwargs["n_shots"] == 321
+        assert call.kwargs["shot_interval"] == 654.0
         assert call.kwargs["simultaneous_drive"] is (
             True if simultaneous_drive is None else simultaneous_drive
         )

@@ -39,6 +39,14 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _parameter_value(parameters: dict[str, Any], name: str) -> Any:
+    """Return a persisted or override parameter value."""
+    value = parameters.get(name)
+    if isinstance(value, dict):
+        return value.get("value")
+    return getattr(value, "value", value)
+
+
 @router.get(
     "/task-results",
     summary="List task results",
@@ -663,6 +671,22 @@ async def re_execute_task_result(
             detail="You can only re-execute your own task results",
         )
 
+    run_overrides = (parameter_overrides or {}).get("run", {})
+    if "readout_duration" in run_overrides:
+        readout_duration = _parameter_value(run_overrides, "readout_duration")
+    else:
+        readout_duration = _parameter_value(doc.run_parameters, "readout_duration")
+    default_run_parameters = (
+        {
+            "readout_duration": {
+                "value": readout_duration,
+                "value_type": "float",
+            }
+        }
+        if readout_duration is not None
+        else None
+    )
+
     return await flow_service.execute_single_task_from_snapshot(
         task_name=doc.name,
         qid=doc.qid,
@@ -673,6 +697,7 @@ async def re_execute_task_result(
         tags=doc.tags,
         source_task_id=task_id,
         parameter_overrides=parameter_overrides,
+        default_run_parameters=default_run_parameters,
         update_params=update_params,
         reconfigure=reconfigure,
     )

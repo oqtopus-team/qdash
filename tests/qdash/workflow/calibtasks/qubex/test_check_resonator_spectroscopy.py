@@ -407,6 +407,7 @@ def test_run_parameters_only_expose_measurement_and_assignment_settings() -> Non
         "frequency_range",
         "power_range",
         "shots",
+        "interval",
         "resonator_assignment_order",
     }
 
@@ -428,6 +429,22 @@ def test_invalid_assignment_order_is_rejected_before_hardware(
             task.run(MagicMock(), "0")
 
     get_experiment.assert_not_called()
+
+
+def test_measurement_settings_are_forwarded_to_qubex(monkeypatch) -> None:
+    task = CheckResonatorSpectroscopy()
+    task.run_parameters["shots"].value = 321
+    task.run_parameters["interval"].value = 654.0
+    exp = MagicMock()
+    monkeypatch.setattr(task, "get_experiment", lambda _backend: exp)
+    monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
+    monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
+
+    task.run(MagicMock(), "0")
+
+    kwargs = exp.resonator_spectroscopy.call_args.kwargs
+    assert kwargs["n_shots"] == 321
+    assert kwargs["shot_interval"] == 654.0
 
 
 def test_frequency_range_can_be_overridden_per_task() -> None:

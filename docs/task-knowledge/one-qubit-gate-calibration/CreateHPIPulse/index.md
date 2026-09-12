@@ -50,7 +50,6 @@ The π/2 amplitude should be approximately half of the π amplitude; fit quality
 - control_amplitude: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
@@ -59,6 +58,7 @@ The π/2 amplitude should be approximately half of the π amplitude; fit quality
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - hpi_duration: HPI pulse duration (ns)
 - shots: Number of shots for calibration
 - interval: Time interval for calibration (ns)

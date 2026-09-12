@@ -620,14 +620,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "control_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -727,14 +719,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "target_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -767,6 +751,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots",
@@ -876,14 +866,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "control_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -983,14 +965,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "target_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -1023,6 +997,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots",
@@ -1057,13 +1037,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -1071,7 +1044,26 @@
           }
         },
         "name": "CheckChevron",
-        "run_parameters": {},
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Number of shots for adaptive chevron search and final sweeps",
+            "unit": "a.u.",
+            "value": 256,
+            "value_type": "int"
+          }
+        },
         "task_type": "qubit"
       },
       {
@@ -1102,14 +1094,6 @@
             "greater_than": 0,
             "resolution": "database_required",
             "unit": "a.u.",
-            "user_override": "allowed"
-          },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration for reference and Rabi measurements",
-            "greater_than": 0,
-            "resolution": "database_or_default",
-            "unit": "ns",
             "user_override": "allowed"
           },
           "readout_frequency": {
@@ -1149,6 +1133,12 @@
             ],
             "value_type": "np.linspace"
           },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
           "shots": {
             "description": "Number of shots per Rabi drive duration at each readout point",
             "unit": "a.u.",
@@ -1170,7 +1160,7 @@
       },
       {
         "class_name": "CheckControlAmplitude",
-        "description": "Task to estimate the control amplitude.\n\nSweeps the drive frequency around the calibrated qubit frequency\n(``qubit_frequency`` ± ``frequency_span``) and fits a sqrt-Lorentzian\nto scale the drive amplitude so that the resulting Rabi rate matches\n``target_rabi_rate``.",
+        "description": "Task to estimate the control amplitude.\n\nSweeps the drive frequency around the calibrated qubit frequency\n(``qubit_frequency`` ± ``frequency_span``) using the dedicated 1024 ns\nQubex spectroscopy readout pulse and fits a sqrt-Lorentzian\nto scale the drive amplitude so that the resulting Rabi rate matches\n``target_rabi_rate``.",
         "file_path": "cw/check_control_amplitude.py",
         "input_parameters": {
           "coarse_control_amplitude": {
@@ -1283,14 +1273,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "control_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -1342,14 +1324,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "target_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -1366,6 +1340,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots",
@@ -1409,13 +1389,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -1430,10 +1403,22 @@
             "value": 153600.0,
             "value_type": "int"
           },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
           "repetitions": {
             "description": "Number of repetitions for the PI pulse",
             "unit": "a.u.",
             "value": 20,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for pulse verification",
+            "unit": "a.u.",
+            "value": 1024,
             "value_type": "int"
           }
         },
@@ -1472,13 +1457,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -1493,10 +1471,22 @@
             "value": 153600.0,
             "value_type": "int"
           },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
           "repetitions": {
             "description": "Number of repetitions for the PI pulse",
             "unit": "a.u.",
             "value": 20,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for pulse verification",
+            "unit": "a.u.",
+            "value": 1024,
             "value_type": "int"
           }
         },
@@ -1527,13 +1517,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -1548,10 +1531,22 @@
             "value": 153600.0,
             "value_type": "int"
           },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
           "repetitions": {
             "description": "Number of repetitions for the HPI pulse",
             "unit": "a.u.",
             "value": 20,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for pulse verification",
+            "unit": "a.u.",
+            "value": 1024,
             "value_type": "int"
           }
         },
@@ -1589,6 +1584,12 @@
             "value": 153600.0,
             "value_type": "int"
           },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
           "shots": {
             "description": "Number of shots for Rabi oscillation",
             "unit": "a.u.",
@@ -1610,6 +1611,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots for Rabi oscillation",
@@ -1648,13 +1655,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -1669,10 +1669,22 @@
             "value": 153600.0,
             "value_type": "int"
           },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
           "repetitions": {
             "description": "Number of repetitions for the PI pulse",
             "unit": "a.u.",
             "value": 20,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of shots for pulse verification",
+            "unit": "a.u.",
+            "value": 1024,
             "value_type": "int"
           }
         },
@@ -1680,7 +1692,7 @@
       },
       {
         "class_name": "CheckQubitSpectroscopy",
-        "description": "Task to check the qubit frequencies.\n\nThis task performs qubit spectroscopy and estimates the qubit frequency (f01)\nand optionally the f12 transition frequency from the spectroscopy data.",
+        "description": "Task to check the qubit frequencies.\n\nThis task performs qubit spectroscopy with the dedicated 1024 ns Qubex\nreadout pulse and estimates the qubit frequency (f01) and optionally the f12\ntransition frequency from the spectroscopy data.",
         "file_path": "cw/check_qubit_spectroscopy.py",
         "input_parameters": {
           "readout_amplitude": {
@@ -1702,6 +1714,12 @@
             "value": null,
             "value_type": "np.arange"
           },
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 1024.0,
+            "value_type": "float"
+          },
           "power_range": {
             "description": "Power range as [start, stop, step] in dB. The QDash default is [-60, 0, 5] dB. The stop value is exclusive.",
             "unit": "dB",
@@ -1711,6 +1729,12 @@
               5
             ],
             "value_type": "np.arange"
+          },
+          "shots": {
+            "description": "Number of shots for qubit spectroscopy",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
           },
           "simultaneous_drive": {
             "description": "Whether control and readout pulses start together. False starts readout after the control pulse ends.",
@@ -1747,13 +1771,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -1767,6 +1784,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots for Rabi oscillation",
@@ -1812,13 +1835,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -1838,6 +1854,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots for Rabi oscillation",
@@ -1860,7 +1882,7 @@
       },
       {
         "class_name": "CheckResonatorSpectroscopy",
-        "description": "Task to check the resonator spectroscopy.\n\nThis is a MUX-level task that performs spectroscopy on all resonators\nin a MUX simultaneously. The scheduler should execute this task once\nper MUX, and the result will be used by all qubits in that MUX.\n\nNote: task_type remains \"qubit\" for frontend compatibility, but\nis_mux_level=True indicates this task runs once per MUX.",
+        "description": "Task to check the resonator spectroscopy.\n\nThis is a MUX-level task that performs spectroscopy on all resonators\nwith the dedicated 8192 ns Qubex spectroscopy pulse. The scheduler executes it once\nper MUX, and the result will be used by all qubits in that MUX.\n\nNote: task_type remains \"qubit\" for frontend compatibility, but\nis_mux_level=True indicates this task runs once per MUX.",
         "file_path": "cw/check_resonator_spectroscopy.py",
         "input_parameters": {},
         "name": "CheckResonatorSpectroscopy",
@@ -1870,6 +1892,12 @@
             "unit": "GHz",
             "value": null,
             "value_type": "np.arange"
+          },
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 0.0,
+            "value_type": "float"
           },
           "power_range": {
             "description": "Power range as [start, stop, step] in dB. The qubex default is [-60, 5, 5] dB. The stop value is exclusive.",
@@ -1935,13 +1963,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -1955,6 +1976,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots for T1 time",
@@ -2000,13 +2027,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -2026,6 +2046,12 @@
             "unit": "",
             "value": 10,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots for T1 time",
@@ -2084,13 +2110,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -2104,6 +2123,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots for T2 echo time",
@@ -2162,13 +2187,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -2188,6 +2206,12 @@
             "unit": "",
             "value": 10,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots for T2 echo time",
@@ -2353,14 +2377,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "control_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -2433,14 +2449,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "target_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -2473,6 +2481,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "repetitions": {
             "description": "Number of repetitions for the PI pulse",
@@ -2579,13 +2593,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -2605,6 +2612,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots",
@@ -2680,13 +2693,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -2706,6 +2712,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots",
@@ -2781,13 +2793,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -2807,6 +2812,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots for calibration",
@@ -2882,13 +2893,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -2908,6 +2912,12 @@
             "unit": "ns",
             "value": 32,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots for calibration",
@@ -3017,14 +3027,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "control_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -3097,14 +3099,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "target_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -3129,6 +3123,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots",
@@ -3190,13 +3190,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -3216,6 +3209,12 @@
             "unit": "a.u.",
             "value": 10,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots",
@@ -3259,13 +3258,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -3279,6 +3271,12 @@
             "unit": "ns",
             "value": 153600.0,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots",
@@ -3356,13 +3354,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -3382,6 +3373,12 @@
             "unit": "a.u.",
             "value": 10,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots",
@@ -3425,13 +3422,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "readout_duration": {
-            "default_value": 384.0,
-            "description": "Readout pulse duration",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "readout_frequency": {
             "default_value": null,
             "resolution": "database_required",
@@ -3451,6 +3441,12 @@
             "unit": "a.u.",
             "value": 10,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots",
@@ -3560,14 +3556,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "control_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "control",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "control_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -3667,14 +3655,6 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "target_readout_duration": {
-            "default_value": 0,
-            "parameter_name": "readout_duration",
-            "qid_role": "target",
-            "resolution": "database_or_default",
-            "unit": "ns",
-            "user_override": "allowed"
-          },
           "target_readout_frequency": {
             "default_value": 0,
             "parameter_name": "readout_frequency",
@@ -3713,6 +3693,12 @@
             "unit": "a.u.",
             "value": 10,
             "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
           },
           "shots": {
             "description": "Number of shots",

@@ -3,17 +3,21 @@ from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 from qubex.contrib.experiment import estimate_qubit_frequency_from_chevron_adaptive
-from qubex.measurement.measurement_defaults import DEFAULT_READOUT_DURATION
+from qubex.experiment.experiment_constants import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
+    RunParameterSpec,
 )
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 DEFAULT_COARSE_CONTROL_AMPLITUDE = 0.0625
@@ -38,13 +42,22 @@ class CheckChevron(QubexTask):
             unit="a.u.",
             description="Coarse control pulse amplitude",
         ),
-        "readout_duration": InputParameterSpec.database_or_default(
-            default=DEFAULT_READOUT_DURATION,
+    }
+    run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "readout_duration": readout_duration_run_parameter(),
+        "shots": RunParameterSpec(
+            unit="a.u.",
+            value_type="int",
+            default=DEFAULT_SHOTS // 4,
+            description="Number of shots for adaptive chevron search and final sweeps",
+        ),
+        "interval": RunParameterSpec(
             unit="ns",
-            description="Readout pulse duration",
+            value_type="float",
+            default=DEFAULT_INTERVAL,
+            description="Time interval between shots",
         ),
     }
-    run_spec: ClassVar[dict[str, Any]] = {}
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "qubit_frequency": OutputParameterSpec(
             unit="GHz", description="Qubit bare frequency (coarse)"
@@ -142,6 +155,8 @@ class CheckChevron(QubexTask):
             targets=[label],
             frequencies={label: qubit_frequency},
             amplitudes={label: control_amplitude},
+            n_shots=self.run_parameters["shots"].get_value(),
+            shot_interval=self.run_parameters["interval"].get_value(),
             plot=False,
             save_image=False,
         )
