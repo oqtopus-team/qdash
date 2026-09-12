@@ -60,7 +60,6 @@ T2* should satisfy T2* ≤ T2_echo. Fringe frequency should match the intended d
 - hpi_duration: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
@@ -70,6 +69,7 @@ T2* should satisfy T2* ≤ T2_echo. Fringe frequency should match the intended d
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - detuning: Detuning for Ramsey oscillation (GHz)
 - time_range: Time range for Rabi oscillation (ns)
 - shots: Number of shots for Rabi oscillation (a.u.)

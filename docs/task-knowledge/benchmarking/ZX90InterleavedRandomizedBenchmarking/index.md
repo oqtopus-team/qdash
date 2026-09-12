@@ -67,14 +67,12 @@ ZX90 gate error should meet the target; the decay should be well-fitted and the 
 - control_drag_pi_beta: (control qubit) (a.u.)
 - control_readout_frequency: (control qubit) (GHz)
 - control_readout_amplitude: (control qubit) (a.u.)
-- control_readout_duration: (control qubit) (ns)
 - target_qubit_frequency: (target qubit) (GHz)
 - target_drag_hpi_amplitude: (target qubit) (a.u.)
 - target_drag_hpi_duration: (target qubit) (ns)
 - target_drag_hpi_beta: (target qubit) (a.u.)
 - target_readout_frequency: (target qubit) (GHz)
 - target_readout_amplitude: (target qubit) (a.u.)
-- target_readout_duration: (target qubit) (ns)
 - cr_duration: (coupling qubit) (ns)
 - cr_amplitude: (control qubit) (a.u.)
 - cr_phase: (control qubit) (a.u.)
@@ -94,6 +92,7 @@ ZX90 gate error should meet the target; the decay should be well-fitted and the 
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - n_trials: Number of trials (a.u.)
 - shots: Number of shots (a.u.)
 - interval: Time interval (ns)

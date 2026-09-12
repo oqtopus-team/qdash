@@ -3,6 +3,8 @@ import logging
 import math
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from qubex.experiment.experiment_constants import DEFAULT_SHOTS
+
 from qdash.common.visualization.figure_metadata import set_figure_role
 from qdash.datamodel.task import (
     InputParameterSpec,
@@ -25,12 +27,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_QUBIT_SPECTROSCOPY_INTERVAL = 1024.0
+
 
 class CheckQubitSpectroscopy(QubexTask):
     """Task to check the qubit frequencies.
 
-    This task performs qubit spectroscopy and estimates the qubit frequency (f01)
-    and optionally the f12 transition frequency from the spectroscopy data.
+    This task performs qubit spectroscopy with the dedicated 1024 ns Qubex
+    readout pulse and estimates the qubit frequency (f01) and optionally the f12
+    transition frequency from the spectroscopy data.
     """
 
     name: str = "CheckQubitSpectroscopy"
@@ -49,6 +54,18 @@ class CheckQubitSpectroscopy(QubexTask):
                 "Whether control and readout pulses start together. "
                 "False starts readout after the control pulse ends."
             ),
+        ),
+        "shots": RunParameterSpec(
+            unit="a.u.",
+            value_type="int",
+            default=DEFAULT_SHOTS,
+            description="Number of shots for qubit spectroscopy",
+        ),
+        "interval": RunParameterSpec(
+            unit="ns",
+            value_type="float",
+            default=DEFAULT_QUBIT_SPECTROSCOPY_INTERVAL,
+            description="Time interval between shots",
         ),
         "frequency_range": RunParameterSpec(
             unit="GHz",
@@ -255,6 +272,7 @@ class CheckQubitSpectroscopy(QubexTask):
 
     def resolve_run_parameters(self, backend: QubexBackend, qid: str) -> None:
         """Populate the effective device-specific sweep before it is recorded."""
+        super().resolve_run_parameters(backend, qid)
         parameter = self.run_parameters["frequency_range"]
         if parameter.value is not None:
             return
@@ -285,6 +303,8 @@ class CheckQubitSpectroscopy(QubexTask):
                 power_range=self.run_parameters["power_range"].get_value(),
                 readout_amplitude=self._get_readout_amplitude_value(),
                 readout_frequency=readout_freq_param.value,
+                n_shots=self.run_parameters["shots"].get_value(),
+                shot_interval=self.run_parameters["interval"].get_value(),
             )
 
         self.save_calibration(backend)
@@ -309,6 +329,8 @@ class CheckQubitSpectroscopy(QubexTask):
                 frequency_range=frequency_range,
                 power_range=self.run_parameters["power_range"].get_value(),
                 readout_amplitude=readout_amplitude,
+                n_shots=self.run_parameters["shots"].get_value(),
+                shot_interval=self.run_parameters["interval"].get_value(),
             )
             results[label] = result
         self.save_calibration(backend)

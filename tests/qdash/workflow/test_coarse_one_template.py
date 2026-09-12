@@ -106,6 +106,7 @@ def test_coarse_one_forwards_execution_context_and_preserves_task_scan_defaults(
             },
         },
         "default_run_parameters": {
+            "readout_duration": {"value": 2048, "value_type": "int"},
             "interval": {"value": 150 * 1024, "value_type": "int"},
         },
     }

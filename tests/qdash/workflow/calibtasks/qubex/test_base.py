@@ -9,7 +9,10 @@ from qdash.datamodel.task import InputParameterModel as ParameterModel
 from qdash.datamodel.task import InputParameterSpec
 from qdash.datamodel.task import ParameterModel as BaseParameterModel
 from qdash.workflow.calibtasks.base import RunResult
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 
 
 class ConcreteQubexTask(QubexTask):
@@ -23,6 +26,42 @@ class ConcreteQubexTask(QubexTask):
 
     def postprocess(self, backend: Any, qid: str, result: RunResult) -> None:
         pass
+
+
+class ReadoutDurationTask(ConcreteQubexTask):
+    name: str = "ReadoutDurationTask"
+    run_spec = {"readout_duration": readout_duration_run_parameter()}
+
+
+def test_readout_duration_resolves_to_effective_session_value() -> None:
+    task = ReadoutDurationTask()
+    backend = MagicMock()
+    backend.get_instance.return_value.readout_duration = 2048.0
+
+    task.resolve_run_parameters(backend, "0")
+
+    assert task.run_parameters["readout_duration"].value == 2048.0
+
+
+def test_readout_duration_rejects_value_that_differs_from_session() -> None:
+    task = ReadoutDurationTask()
+    task.run_parameters["readout_duration"].value = 1024.0
+    backend = MagicMock()
+    backend.get_instance.return_value.readout_duration = 2048.0
+
+    with pytest.raises(ValueError, match="session-scoped"):
+        task.resolve_run_parameters(backend, "0")
+
+
+def test_readout_duration_is_restored_for_legacy_snapshot() -> None:
+    task = ReadoutDurationTask()
+    task.run_parameters = {}
+    backend = MagicMock()
+    backend.get_instance.return_value.readout_duration = 384.0
+
+    task.resolve_run_parameters(backend, "0")
+
+    assert task.run_parameters["readout_duration"].value == 384.0
 
 
 def _make_backend(project_id: str = "proj1", chip_id: str = "chip1") -> MagicMock:

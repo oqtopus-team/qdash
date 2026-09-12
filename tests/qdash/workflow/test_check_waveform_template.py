@@ -46,6 +46,7 @@ def test_check_waveform_template_sets_default_interval(monkeypatch) -> None:
 
     assert FakeCalibService.last_kwargs is not None
     assert FakeCalibService.last_kwargs["default_run_parameters"] == {
+        "readout_duration": {"value": 2048, "value_type": "int"},
         "interval": {"value": 150 * 1024, "value_type": "int"},
     }
 

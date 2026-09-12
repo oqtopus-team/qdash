@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 import numpy as np
 from numpy.typing import NDArray
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
 from qdash.datamodel.task import (
     InputParameterSpec,
@@ -15,7 +15,10 @@ from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 from qdash.workflow.calibtasks.qubex.validation import (
     DEFAULT_RABI_R2_THRESHOLD,
     finite_value_error,
@@ -86,14 +89,9 @@ class CheckCoarseReadoutParams(QubexTask):
         "readout_amplitude": InputParameterSpec.required_database(
             unit="a.u.", greater_than=0, description="Reference amplitude of the readout sweep"
         ),
-        "readout_duration": InputParameterSpec.database_or_default(
-            default=DEFAULT_READOUT_DURATION,
-            unit="ns",
-            greater_than=0,
-            description="Readout pulse duration for reference and Rabi measurements",
-        ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "readout_duration": readout_duration_run_parameter(),
         "detuning_range": RunParameterSpec(
             unit="GHz",
             value_type="np.linspace",
@@ -197,7 +195,7 @@ class CheckCoarseReadoutParams(QubexTask):
         import qubex
 
         frequencies, amplitudes = self._readout_sweep()
-        readout_duration = self._get_calibration_value("readout_duration")
+        readout_duration = float(self.run_parameters["readout_duration"].get_value())
         if not math.isfinite(readout_duration) or readout_duration <= 0:
             raise ValueError("readout_duration must be finite and positive")
         exp = self.get_experiment(backend)

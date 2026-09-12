@@ -51,9 +51,17 @@ Task construction resolves Run parameters in this order, from highest to lowest 
 4. Shared entries in `CalibConfig.default_run_parameters`
 5. `run_spec` specified on the task class
 
-Use `default_run_parameters` only for shared fallback values such as `interval` and `shots`.
-Use `task_run_parameters` when a template intentionally configures one named task. Nested
-entries in `default_run_parameters` remain readable only for existing flow documents.
+Use `default_run_parameters` only for values intentionally shared by every declaring task.
+A shared value overrides task-specific defaults, including Qubex optimized defaults: qubit
+spectroscopy normally uses a 1024 ns interval and resonator spectroscopy uses 0 ns. Use
+`task_run_parameters` when a template should preserve or configure one named task. Nested entries
+in `default_run_parameters` remain readable only for existing flow documents.
+
+`readout_duration` is session-scoped in Qubex. QDash passes the shared value when constructing the
+Experiment, records the effective value on each task that uses the session readout pulse, and rejects
+a per-task value that differs from the session. Qubex spectroscopy is an intentional exception:
+qubit/control spectroscopy uses its dedicated 1024 ns pulse and resonator spectroscopy uses its
+dedicated 8192 ns pulse, so those tasks do not expose the shared `readout_duration` parameter.
 
 `QubexTask.preprocess()` then resolves each declared Input parameter:
 

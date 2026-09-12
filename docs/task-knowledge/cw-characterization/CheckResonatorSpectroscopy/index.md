@@ -42,11 +42,14 @@ None.
 
 - frequency_range: Frequency range for resonator spectroscopy (GHz)
 - power_range: Power range for resonator spectroscopy (dB)
-- shots: Number of shots for resonator spectroscopy (a.u.)
+- shots: Number of shots for resonator spectroscopy; Qubex default is 1024 (a.u.)
+- interval: Time between shots; Qubex resonator-spectroscopy default is 0 ns
 - num_resonators: Number of resonators to detect (a.u.)
 - high_power_min: Minimum power for high-power peak detection (dB)
 - high_power_max: Maximum power for high-power peak detection (dB)
 - low_power: Power level for low-power peak detection (dB)
+
+The Qubex resonator-spectroscopy sequence intentionally uses its own 8192 ns readout pulse. The shared session `readout_duration` does not change this task.
 
 ## Common failure patterns
 
