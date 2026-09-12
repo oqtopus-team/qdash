@@ -3,7 +3,7 @@ import { formatInTimeZone } from "date-fns-tz";
 const DEFAULT_TIMEZONE = process.env.NEXT_PUBLIC_TIMEZONE || "Asia/Tokyo";
 const ISO_DATETIME_WITHOUT_TIMEZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
 
-function normalizeUtcInput(utcString: string): string {
+export function normalizeUtcInput(utcString: string): string {
   if (ISO_DATETIME_WITHOUT_TIMEZONE.test(utcString)) {
     return `${utcString}Z`;
   }

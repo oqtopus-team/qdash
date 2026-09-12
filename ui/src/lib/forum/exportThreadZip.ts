@@ -2,7 +2,7 @@ import { BlockNoteEditor, type PartialBlock } from "@blocknote/core";
 import { strToU8, zip, type AsyncZippable } from "fflate";
 import { stringify } from "yaml";
 
-import { formatDateTime } from "@/lib/utils/datetime";
+import { formatDateTime, normalizeUtcInput } from "@/lib/utils/datetime";
 import type { ForumPostResponse } from "@/schemas";
 
 export type ForumThreadExport = {
@@ -77,11 +77,9 @@ function targetResourcePath(chipId: string, targetType: string, targetId: string
   return `/dashboard?chip=${encodeURIComponent(chipId)}&type=coupling`;
 }
 
-const BARE_ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
-
 /** Normalizes a possibly timezone-less API timestamp to ISO8601; returns the raw value if it can't be parsed. */
 function toIsoTimestamp(raw: string): string {
-  const normalized = BARE_ISO_DATETIME.test(raw) ? `${raw}Z` : raw;
+  const normalized = normalizeUtcInput(raw);
   const date = new Date(normalized);
   return Number.isNaN(date.getTime()) ? raw : date.toISOString();
 }
@@ -130,8 +128,9 @@ function firstBlockText(node: unknown): string {
 function deriveDescription(blocks: BlockRecord[]): string | undefined {
   const text = firstBlockText(blocks);
   if (!text) return undefined;
-  if (text.length <= DESCRIPTION_MAX_LENGTH) return text;
-  return `${text.slice(0, DESCRIPTION_MAX_LENGTH)}…`;
+  const codePoints = [...text];
+  if (codePoints.length <= DESCRIPTION_MAX_LENGTH) return text;
+  return `${codePoints.slice(0, DESCRIPTION_MAX_LENGTH).join("")}…`;
 }
 
 /** Partial Open Knowledge Format v0.2 front matter; QDash-only fields live under `qdash`. */
@@ -212,21 +211,21 @@ function buildThreadMarkdown(
   return `${sections.join("\n\n")}\n`;
 }
 
-function renderMarkdown(content: string, blocks: BlockRecord[]): string {
+function renderMarkdown(editor: BlockNoteEditor, content: string, blocks: BlockRecord[]): string {
   if (blocks.length === 0) {
     return content;
   }
-  const editor = BlockNoteEditor.create({
-    initialContent: blocks as unknown as PartialBlock[],
-  });
-  return editor.blocksToMarkdownLossy();
+  return editor.blocksToMarkdownLossy(blocks as unknown as PartialBlock[]);
 }
 
 /** Posts written before `content_blocks` only have markdown, so let BlockNote parse it back. */
-function descriptionBlocks(post: ForumPostResponse, blocks: BlockRecord[]): BlockRecord[] {
+function descriptionBlocks(
+  editor: BlockNoteEditor,
+  post: ForumPostResponse,
+  blocks: BlockRecord[],
+): BlockRecord[] {
   if (blocks.length > 0) return blocks;
   if (!post.content.trim()) return [];
-  const editor = BlockNoteEditor.create();
   return editor.tryParseMarkdownToBlocks(post.content) as unknown as BlockRecord[];
 }
 
@@ -259,22 +258,28 @@ function collectAssetRefs(
   }
 }
 
-/** Matches any URL carrying a scheme (`https:`, `blob:`, ...) or a protocol-relative `//host` prefix. */
-const HAS_SCHEME_OR_AUTHORITY = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
+const PROBE_ORIGIN = "https://qdash-export.invalid";
+
+/**
+ * `data:` URLs are decoded locally and only URLs that resolve inside the current origin are
+ * fetched. Anything that can point off-origin (absolute, protocol-relative, blob:, unparsable)
+ * is external and left as-is (CORS, third-party content).
+ */
+function classifyUrl(url: string): "data" | "relative" | "external" {
+  if (url.startsWith("data:")) return "data";
+  try {
+    return new URL(url, PROBE_ORIGIN).origin === PROBE_ORIGIN ? "relative" : "external";
+  } catch {
+    return "external";
+  }
+}
 
 function collectAllAssets(blocksList: BlockRecord[][]): Map<string, CollectedAsset> {
   const assets = new Map<string, CollectedAsset>();
   const register = (url: string, props: BlockRecord) => {
-    let kind: "data" | "relative";
-    if (url.startsWith("data:")) {
-      kind = "data";
-    } else if (HAS_SCHEME_OR_AUTHORITY.test(url)) {
-      // Anything that can point off-origin (absolute, protocol-relative, blob:, ...) is never
-      // fetched (CORS, third-party content); leave as-is.
-      return;
-    } else {
-      kind = "relative";
-    }
+    if (!url.trim()) return;
+    const kind = classifyUrl(url);
+    if (kind === "external") return;
     let asset = assets.get(url);
     if (!asset) {
       asset = { url, kind, refs: [], bytes: null, filename: null, zipPath: null };
@@ -291,7 +296,7 @@ function collectAllAssets(blocksList: BlockRecord[][]): Map<string, CollectedAss
 function extensionForMime(mime: string): string {
   const known = MIME_EXTENSIONS[mime];
   if (known) return known;
-  const subtype = mime.split("/")[1] ?? "";
+  const subtype = (mime.split("/")[1] ?? "").split("+")[0];
   const cleaned = subtype.replace(/[^a-z0-9]/gi, "").toLowerCase();
   return cleaned || "bin";
 }
@@ -305,19 +310,36 @@ function decodeBase64(base64: string): Uint8Array {
   return bytes;
 }
 
-function parseDataUrl(url: string): { mime: string; base64: string } | null {
-  const match = /^data:([^,]*),(.*)$/s.exec(url);
-  if (!match) return null;
-  const [, meta, payload] = match;
-  const mime = meta.replace(/;base64$/, "") || "application/octet-stream";
-  return { mime, base64: payload };
+/** Decodes a `data:` URL payload, honoring extra mime parameters and non-base64 (percent-encoded) payloads. */
+function parseDataUrl(url: string): { mime: string; bytes: Uint8Array } | null {
+  const comma = url.indexOf(",");
+  if (comma === -1) return null;
+  const params = url.slice("data:".length, comma).split(";");
+  const mime = params[0] || "application/octet-stream";
+  const payload = url.slice(comma + 1);
+  try {
+    const bytes = params.slice(1).includes("base64")
+      ? decodeBase64(payload)
+      : new TextEncoder().encode(decodeURIComponent(payload));
+    return { mime, bytes };
+  } catch {
+    return null;
+  }
 }
 
 function basenameFromUrl(url: string): string {
-  const withoutHash = url.split("#")[0];
-  const withoutQuery = withoutHash.split("?")[0];
-  const segments = withoutQuery.split("/").filter(Boolean);
-  const last = segments[segments.length - 1] ?? "asset";
+  let pathname: string;
+  try {
+    pathname = new URL(url, PROBE_ORIGIN).pathname;
+  } catch {
+    pathname = url.split("#")[0].split("?")[0];
+  }
+  let last = pathname.split("/").filter(Boolean).pop() ?? "";
+  try {
+    last = decodeURIComponent(last);
+  } catch {
+    // keep the percent-encoded form; the sanitizer below neutralizes it
+  }
   const sanitized = last.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 48);
   return sanitized || "asset";
 }
@@ -327,7 +349,7 @@ async function resolveAsset(asset: CollectedAsset): Promise<boolean> {
     if (asset.kind === "data") {
       const parsed = parseDataUrl(asset.url);
       if (!parsed) return false;
-      asset.bytes = decodeBase64(parsed.base64);
+      asset.bytes = parsed.bytes;
       asset.filename = `inline.${extensionForMime(parsed.mime)}`;
       return true;
     }
@@ -376,20 +398,19 @@ export async function buildForumThreadZip(
   post: ForumPostResponse,
   replies: ForumPostResponse[],
 ): Promise<ForumThreadExport> {
-  const rootBlocks = cloneBlocks((post.content_blocks as BlockRecord[] | undefined) ?? []);
-  const replyBlocksList = replies.map((reply) =>
-    cloneBlocks((reply.content_blocks as BlockRecord[] | undefined) ?? []),
-  );
+  const rootBlocks = cloneBlocks(post.content_blocks ?? []);
+  const replyBlocksList = replies.map((reply) => cloneBlocks(reply.content_blocks ?? []));
 
   const assets = collectAllAssets([rootBlocks, ...replyBlocksList]);
   await resolveAndRewriteAssets(assets);
 
-  const rootMarkdown = renderMarkdown(post.content, rootBlocks);
+  const editor = BlockNoteEditor.create();
+  const rootMarkdown = renderMarkdown(editor, post.content, rootBlocks);
   const replyMarkdowns = replies.map((reply, index) =>
-    renderMarkdown(reply.content, replyBlocksList[index]),
+    renderMarkdown(editor, reply.content, replyBlocksList[index]),
   );
 
-  const description = deriveDescription(descriptionBlocks(post, rootBlocks));
+  const description = deriveDescription(descriptionBlocks(editor, post, rootBlocks));
   const threadMd = buildThreadMarkdown(post, replies, rootMarkdown, replyMarkdowns, description);
   const rootName = buildRootFolderName(post);
 

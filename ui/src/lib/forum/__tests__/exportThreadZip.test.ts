@@ -459,4 +459,85 @@ describe("buildForumThreadZip", () => {
     expect(JSON.stringify(post.content_blocks)).toBe(before);
     expect(post.content_blocks![0].props).toEqual({ url: "/api/forum/images/keep.png" });
   });
+
+  it("parses data URLs whose mime carries extra parameters", async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const base64 = Buffer.from("PNGBYTES").toString("base64");
+    const post = makePost({
+      number: 20,
+      title: "Charset param",
+      content_blocks: [
+        { type: "image", props: { url: `data:image/png;charset=utf-8;base64,${base64}` } },
+      ],
+    });
+
+    const { blob } = await buildForumThreadZip(post, []);
+    const files = await unzipBlob(blob);
+    const rootName = "forum-0020-charset-param";
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(files[`${rootName}/assets/001-inline.png`]).toBeDefined();
+    expect(strFromU8(files[`${rootName}/assets/001-inline.png`])).toBe("PNGBYTES");
+  });
+
+  it("decodes percent-encoded (non-base64) data URLs", async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const post = makePost({
+      number: 21,
+      title: "Percent encoded",
+      content_blocks: [{ type: "image", props: { url: "data:text/plain,Hello%20World" } }],
+    });
+
+    const { blob } = await buildForumThreadZip(post, []);
+    const files = await unzipBlob(blob);
+    const rootName = "forum-0021-percent-encoded";
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(strFromU8(files[`${rootName}/assets/001-inline.plain`])).toBe("Hello World");
+  });
+
+  it("maps image/svg+xml to a .svg extension", async () => {
+    const base64 = Buffer.from("<svg/>").toString("base64");
+    const post = makePost({
+      number: 22,
+      title: "Svg asset",
+      content_blocks: [{ type: "image", props: { url: `data:image/svg+xml;base64,${base64}` } }],
+    });
+
+    const { blob } = await buildForumThreadZip(post, []);
+    const files = await unzipBlob(blob);
+    const rootName = "forum-0022-svg-asset";
+
+    expect(files[`${rootName}/assets/001-inline.svg`]).toBeDefined();
+    expect(strFromU8(files[`${rootName}/assets/001-inline.svg`])).toBe("<svg/>");
+  });
+
+  it("treats backslash URLs as external and never fetches them", async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const post = makePost({
+      number: 23,
+      title: "Backslash url",
+      content_blocks: [{ type: "image", props: { url: "\\\\example.com\\cat.png" } }],
+    });
+
+    const { blob } = await buildForumThreadZip(post, []);
+    const files = await unzipBlob(blob);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(Object.keys(files).some((path) => path.includes("/assets/"))).toBe(false);
+  });
+
+  it("truncates the description on code point boundaries", async () => {
+    const post = makePost({ number: 24, content: "A" + "🐙".repeat(200) });
+
+    const { blob } = await buildForumThreadZip(post, []);
+    const md = strFromU8((await unzipBlob(blob))["forum-0024/thread.md"]);
+    expect(md).toContain(`description: A${"🐙".repeat(199)}…`);
+  });
 });
