@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime  # noqa: TC003
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
@@ -39,12 +40,59 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _parameter_value(parameters: dict[str, Any], name: str) -> Any:
+def _parameter_value(parameters: dict[str, Any] | None, name: str) -> Any:
     """Return a persisted or override parameter value."""
+    if not parameters:
+        return None
     value = parameters.get(name)
     if isinstance(value, dict):
         return value.get("value")
     return getattr(value, "value", value)
+
+
+def _reexecution_readout_duration(
+    doc: Any,
+    parameter_overrides: dict[str, dict[str, Any]] | None,
+) -> Any:
+    """Resolve the session duration while retaining legacy snapshot compatibility."""
+    run_overrides = (parameter_overrides or {}).get("run", {})
+    if "readout_duration" in run_overrides:
+        return _parameter_value(run_overrides, "readout_duration")
+
+    persisted_duration = _parameter_value(doc.run_parameters, "readout_duration")
+    if persisted_duration is not None:
+        return persisted_duration
+
+    legacy_inputs = doc.input_parameters or {}
+    legacy_duration = _parameter_value(legacy_inputs, "readout_duration")
+    if legacy_duration is not None:
+        return legacy_duration
+
+    role_durations = [
+        value
+        for name in ("control_readout_duration", "target_readout_duration")
+        if (value := _parameter_value(legacy_inputs, name)) is not None
+    ]
+    if not role_durations:
+        return None
+
+    try:
+        numeric_durations = [float(value) for value in role_durations]
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="The legacy snapshot contains an invalid readout duration",
+        ) from exc
+    if any(not math.isclose(duration, numeric_durations[0]) for duration in numeric_durations[1:]):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "The legacy snapshot uses different control and target readout durations. "
+                "It cannot be reproduced with the session-scoped Qubex readout duration; "
+                "run a fresh calibration instead."
+            ),
+        )
+    return role_durations[0]
 
 
 @router.get(
@@ -671,11 +719,7 @@ async def re_execute_task_result(
             detail="You can only re-execute your own task results",
         )
 
-    run_overrides = (parameter_overrides or {}).get("run", {})
-    if "readout_duration" in run_overrides:
-        readout_duration = _parameter_value(run_overrides, "readout_duration")
-    else:
-        readout_duration = _parameter_value(doc.run_parameters, "readout_duration")
+    readout_duration = _reexecution_readout_duration(doc, parameter_overrides)
     default_run_parameters = (
         {
             "readout_duration": {

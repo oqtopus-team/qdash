@@ -269,6 +269,7 @@ async def test_re_execute_passes_snapshot_or_override_duration_to_session(
         chip_id="chip-1",
         execution_id="exec-1",
         tags=["calibration"],
+        input_parameters={"readout_duration": {"value": 4096}},
         run_parameters={"readout_duration": {"value": 2048}},
     )
     query = SimpleNamespace(run=lambda: doc)
@@ -290,3 +291,91 @@ async def test_re_execute_passes_snapshot_or_override_duration_to_session(
     assert sent["default_run_parameters"] == {
         "readout_duration": {"value": expected, "value_type": "float"}
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("input_parameters", "expected"),
+    [
+        ({"readout_duration": {"value": 1536}}, 1536),
+        (
+            {
+                "control_readout_duration": {"value": 3072},
+                "target_readout_duration": {"value": 3072.0},
+            },
+            3072,
+        ),
+    ],
+)
+async def test_re_execute_restores_legacy_snapshot_duration(
+    monkeypatch: pytest.MonkeyPatch,
+    input_parameters: dict[str, object],
+    expected: int,
+) -> None:
+    doc = SimpleNamespace(
+        username="alice",
+        name="CheckRabi",
+        qid="0",
+        chip_id="chip-1",
+        execution_id="exec-1",
+        tags=["calibration"],
+        input_parameters=input_parameters,
+        run_parameters={},
+    )
+    monkeypatch.setattr(
+        TaskResultHistoryDocument,
+        "find_one",
+        lambda *_args: SimpleNamespace(run=lambda: doc),
+    )
+    execute = AsyncMock()
+
+    await re_execute_task_result(
+        task_id="task-1",
+        ctx=_project_context(),  # type: ignore[arg-type]
+        service=SimpleNamespace(),  # type: ignore[arg-type]
+        flow_service=SimpleNamespace(  # type: ignore[arg-type]
+            execute_single_task_from_snapshot=execute
+        ),
+    )
+
+    assert execute.await_args_list[0].kwargs["default_run_parameters"] == {
+        "readout_duration": {"value": expected, "value_type": "float"}
+    }
+
+
+@pytest.mark.asyncio
+async def test_re_execute_rejects_conflicting_legacy_two_qubit_durations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc = SimpleNamespace(
+        username="alice",
+        name="CheckZX90",
+        qid="0-1",
+        chip_id="chip-1",
+        execution_id="exec-1",
+        tags=["calibration"],
+        input_parameters={
+            "control_readout_duration": {"value": 1024},
+            "target_readout_duration": {"value": 2048},
+        },
+        run_parameters={},
+    )
+    monkeypatch.setattr(
+        TaskResultHistoryDocument,
+        "find_one",
+        lambda *_args: SimpleNamespace(run=lambda: doc),
+    )
+    execute = AsyncMock()
+
+    with pytest.raises(HTTPException, match="cannot be reproduced") as exc_info:
+        await re_execute_task_result(
+            task_id="task-1",
+            ctx=_project_context(),  # type: ignore[arg-type]
+            service=SimpleNamespace(),  # type: ignore[arg-type]
+            flow_service=SimpleNamespace(  # type: ignore[arg-type]
+                execute_single_task_from_snapshot=execute
+            ),
+        )
+
+    assert exc_info.value.status_code == 400
+    execute.assert_not_awaited()
