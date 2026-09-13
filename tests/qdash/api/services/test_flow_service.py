@@ -372,8 +372,6 @@ async def test_execute_flow_falls_back_to_flow_run_id_when_execution_not_precrea
     assert response.qdash_ui_url.endswith("/execution")
 
 
-
-
 @pytest.mark.asyncio
 async def test_execute_single_task_supports_quick_run_without_snapshot(
     monkeypatch: pytest.MonkeyPatch,
@@ -635,8 +633,6 @@ async def test_execute_flow_skips_the_claim_when_no_chip_id_can_be_resolved(
     lock_repository.unlock.assert_not_called()
 
 
-
-
 @pytest.mark.asyncio
 async def test_execute_single_task_claims_the_lock(
     monkeypatch: pytest.MonkeyPatch,
@@ -695,10 +691,6 @@ async def test_execute_single_task_claims_the_lock(
         resources=(),
         exclusive=True,
     )
-
-
-
-
 
 
 @pytest.mark.asyncio

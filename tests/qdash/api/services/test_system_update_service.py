@@ -1,7 +1,7 @@
 """Tests for the API proxy to the host updater."""
 
 from datetime import datetime, timezone
-from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock
 
 import httpx
@@ -9,10 +9,16 @@ import pytest
 from fastapi import HTTPException
 
 from qdash.api.services.system_update_service import SystemUpdateService
+from qdash.config import Settings
 
 
-def settings(*, configured: bool = True) -> SimpleNamespace:
-    return SimpleNamespace(
+def settings(*, configured: bool = True) -> Settings:
+    return Settings(
+        env="test",
+        prefect_api_url="http://prefect.test/api",
+        postgres_data_path="",
+        mongo_data_path="",
+        calib_data_path="",
         updater_socket="/run/qdash-updater/updater.sock" if configured else "",
     )
 
@@ -52,7 +58,7 @@ async def test_status_uses_unix_socket_and_validates_payload(
     transport = httpx.MockTransport(handler)
     original_client = httpx.AsyncClient
 
-    def client_factory(*args: object, **kwargs: object) -> httpx.AsyncClient:
+    def client_factory(*args: Any, **kwargs: Any) -> httpx.AsyncClient:
         kwargs["transport"] = transport
         return original_client(*args, **kwargs)
 

@@ -156,8 +156,6 @@ def sample_execution(test_project: ProjectDocument) -> ExecutionHistoryDocument:
     return execution
 
 
-
-
 CANCEL_FLOW_RUN_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
 
@@ -418,8 +416,6 @@ class TestCancelExecution:
             f"/executions/{CANCEL_FLOW_RUN_ID}/cancel",
         )
         assert response.status_code == 401
-
-
 
 
 class TestListExecutions:
