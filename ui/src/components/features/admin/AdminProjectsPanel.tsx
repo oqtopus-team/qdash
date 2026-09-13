@@ -18,15 +18,18 @@ export function AdminProjectsPanel({
   onDeleteProject,
 }: AdminProjectsPanelProps) {
   return (
-    <div className="card bg-base-200 shadow-lg">
-      <div className="card-body">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="card-title">Project Management</h2>
+    <section className="card card-border bg-base-100">
+      <div className="card-body gap-5 p-5 sm:p-6">
+        <div>
+          <h2 className="card-title text-lg">Project management</h2>
+          <p className="mt-1 text-sm text-base-content/60">
+            Review project ownership and manage memberships.
+          </p>
         </div>
 
         <div className="space-y-3 sm:hidden">
           {projects.map((project) => (
-            <div key={project.project_id} className="card bg-base-100 shadow-sm">
+            <div key={project.project_id} className="card card-border bg-base-100">
               <div className="card-body p-4">
                 <div className="flex items-start justify-between">
                   <div>
@@ -68,7 +71,7 @@ export function AdminProjectsPanel({
           ))}
         </div>
 
-        <div className="hidden overflow-x-auto sm:block">
+        <div className="hidden overflow-x-auto rounded-box border border-base-300 sm:block">
           <table className="table table-zebra">
             <thead>
               <tr>
@@ -126,6 +129,6 @@ export function AdminProjectsPanel({
           </table>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

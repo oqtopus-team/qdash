@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowUpCircle, RefreshCw, ServerCog, ShieldCheck } from "lucide-react";
 
 import {
   getGetSystemUpdateStatusQueryKey,
@@ -98,16 +97,13 @@ export function SystemUpdateCard() {
   };
 
   return (
-    <div className="card bg-base-200 shadow-lg">
-      <div className="card-body gap-5">
+    <section className="card card-border bg-base-100">
+      <div className="card-body gap-6 p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="card-title text-xl">
-              <ServerCog className="h-5 w-5" />
-              System Update
-            </h2>
-            <p className="mt-1 text-sm text-base-content/60">
-              Install a release only when its manifest declares automatic migration support.
+            <h2 className="card-title text-lg">System update</h2>
+            <p className="mt-1 max-w-2xl text-sm text-base-content/60">
+              Review the installed and available releases before updating this deployment.
             </p>
           </div>
           <button
@@ -116,8 +112,10 @@ export function SystemUpdateCard() {
             onClick={() => statusQuery.refetch()}
             disabled={statusQuery.isFetching || !!operationId}
           >
-            <RefreshCw className={`h-4 w-4 ${statusQuery.isFetching ? "animate-spin" : ""}`} />
-            Refresh
+            {statusQuery.isFetching ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : null}
+            Check again
           </button>
         </div>
 
@@ -131,21 +129,36 @@ export function SystemUpdateCard() {
           </div>
         ) : updateStatus ? (
           <>
-            <div className="stats stats-vertical bg-base-100 sm:stats-horizontal">
-              <div className="stat">
-                <div className="stat-title">Current release</div>
-                <div className="stat-value text-2xl font-mono">{updateStatus.current_version}</div>
-                <div className="stat-desc font-mono">
-                  {updateStatus.current_commit.slice(0, 12)}
+            <div className="grid overflow-hidden rounded-box border border-base-300 sm:grid-cols-2">
+              <div className="p-4 sm:p-5">
+                <div className="text-xs font-medium uppercase tracking-wide text-base-content/50">
+                  Installed release
+                </div>
+                <div className="mt-2 font-mono text-xl font-semibold">
+                  {updateStatus.current_version}
+                </div>
+                <div className="mt-1 font-mono text-xs text-base-content/50">
+                  Commit {updateStatus.current_commit.slice(0, 12)}
                 </div>
               </div>
-              <div className="stat">
-                <div className="stat-title">Latest stable</div>
-                <div className="stat-value text-2xl font-mono">
+              <div className="border-t border-base-300 bg-base-200/50 p-4 sm:border-t-0 sm:border-l sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-medium uppercase tracking-wide text-base-content/50">
+                    Latest stable
+                  </div>
+                  <span
+                    className={`badge badge-sm ${
+                      updateStatus.update_available ? "badge-info badge-soft" : "badge-ghost"
+                    }`}
+                  >
+                    {updateStatus.update_available ? "Update available" : "Up to date"}
+                  </span>
+                </div>
+                <div className="mt-2 font-mono text-xl font-semibold">
                   {updateStatus.latest_version ?? "Unknown"}
                 </div>
-                <div className="stat-desc">
-                  {updateStatus.update_available ? "Update available" : "No newer release"}
+                <div className="mt-1 text-xs text-base-content/50">
+                  Stable releases approved for automatic migration
                 </div>
               </div>
             </div>
@@ -209,10 +222,10 @@ export function SystemUpdateCard() {
               </div>
             )}
 
-            <div className="card-actions items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm text-base-content/60">
-                <ShieldCheck className="h-4 w-4" />
-                Admin only · application services restart during update
+            <div className="card-actions items-center justify-between gap-4 border-t border-base-300 pt-5">
+              <div className="max-w-xl text-sm text-base-content/60">
+                Application services restart during an update. Running calibrations are checked
+                before it begins.
               </div>
               <button
                 type="button"
@@ -220,7 +233,6 @@ export function SystemUpdateCard() {
                 onClick={() => setConfirmOpen(true)}
                 disabled={!updateStatus.can_update || !!operationId || startMutation.isPending}
               >
-                <ArrowUpCircle className="h-4 w-4" />
                 Update to {updateStatus.latest_version ?? "latest"}
               </button>
             </div>
@@ -248,6 +260,6 @@ export function SystemUpdateCard() {
         onOpenChange={setConfirmOpen}
         pending={startMutation.isPending}
       />
-    </div>
+    </section>
   );
 }

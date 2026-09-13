@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, Info, Search, Upload, UserPlus, X } from "lucide-react";
+import { X } from "lucide-react";
 
 import type {
   UserListItem,
@@ -382,7 +382,7 @@ export function AdminPageContent() {
 
   return (
     <PageContainer>
-      <PageHeader title="Admin Panel" description="Manage users, projects, and system settings" />
+      <PageHeader title="Admin" description="Manage access, projects, and this deployment" />
 
       {bulkFeedback && (
         <div
@@ -408,20 +408,29 @@ export function AdminPageContent() {
       )}
 
       {/* Tabs */}
-      <div className="tabs tabs-boxed mb-4 sm:mb-6 w-full sm:w-fit">
+      <div role="tablist" className="tabs tabs-border mb-5 w-full sm:mb-6 sm:w-fit">
         <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "users"}
           className={`tab ${activeTab === "users" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("users")}
         >
           Users ({usersData?.data?.total || 0})
         </button>
         <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "projects"}
           className={`tab ${activeTab === "projects" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("projects")}
         >
           Projects ({projectsData?.data?.total || 0})
         </button>
         <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "system"}
           className={`tab ${activeTab === "system" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("system")}
         >
@@ -803,7 +812,6 @@ function BulkImportUsersModal({
               className="btn btn-primary"
               onClick={() => downloadBulkImportResult(result)}
             >
-              <Download className="h-4 w-4" />
               Download CSV
             </button>
           ) : (
@@ -816,10 +824,7 @@ function BulkImportUsersModal({
               {isLoading ? (
                 <span className="loading loading-spinner loading-sm"></span>
               ) : (
-                <>
-                  <Upload className="h-4 w-4" />
-                  Import Users
-                </>
+                "Import Users"
               )}
             </button>
           )}
@@ -1098,7 +1103,6 @@ function MembersModal({
                 )}
 
                 <label className="input input-bordered flex items-center gap-2">
-                  <Search size={16} className="text-base-content/50" />
                   <input
                     type="text"
                     className="grow"
@@ -1183,17 +1187,12 @@ function MembersModal({
                     onClick={handleAddMembers}
                     disabled={isBulkAdding || selectedCandidateUsernames.length === 0}
                   >
-                    {isBulkAdding ? (
-                      <span className="loading loading-spinner loading-sm" />
-                    ) : (
-                      <UserPlus size={16} />
-                    )}
+                    {isBulkAdding ? <span className="loading loading-spinner loading-sm" /> : null}
                     Add Selected
                   </button>
                 </div>
 
                 <div className="alert alert-info">
-                  <Info size={16} className="shrink-0" />
                   <span className="text-sm">
                     Viewers can read project data. Editors can also operate workflows, notes, chips,
                     and calibration data.
@@ -1368,7 +1367,6 @@ function AssignUsersToProjectModal({
             <div className="card-body p-4">
               <h4 className="font-medium">Target project</h4>
               <label className="input input-bordered flex items-center gap-2">
-                <Search size={16} className="text-base-content/50" />
                 <input
                   type="text"
                   className="grow"
