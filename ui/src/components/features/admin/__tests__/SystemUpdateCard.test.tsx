@@ -84,6 +84,8 @@ describe("SystemUpdateCard", () => {
 
     render(<SystemUpdateCard />);
 
-    expect(screen.getByText("uv run qdash-updater start")).toBeTruthy();
+    expect(
+      screen.getByText("uv run --isolated --locked --no-dev qdash-updater start"),
+    ).toBeTruthy();
   });
 });

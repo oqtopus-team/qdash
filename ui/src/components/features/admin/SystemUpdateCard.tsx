@@ -160,8 +160,10 @@ export function SystemUpdateCard() {
               <div role="alert" className="alert alert-info alert-soft">
                 <span>
                   The host updater is not running. On the QDash host, run{" "}
-                  <code className="font-mono">uv run qdash-updater start</code>, then restart the
-                  API container.
+                  <code className="font-mono">
+                    uv run --isolated --locked --no-dev qdash-updater start
+                  </code>
+                  , then restart the API container.
                 </span>
               </div>
             )}

@@ -528,23 +528,23 @@ tasks:
   updater:
     dotenv: [.env]
     cmds:
-      - uv run qdash-updater run
+      - uv run --isolated --locked --no-dev qdash-updater run
     desc: Run the host-side QDash updater in the foreground
 
   updater-start:
     dotenv: [.env]
     cmds:
-      - uv run qdash-updater start
+      - uv run --isolated --locked --no-dev qdash-updater start
     desc: Start the host-side QDash updater in the background
 
   updater-stop:
     dotenv: [.env]
     cmds:
-      - uv run qdash-updater stop
+      - uv run --isolated --locked --no-dev qdash-updater stop
     desc: Stop the background QDash updater
 
   updater-status:
     dotenv: [.env]
     cmds:
-      - uv run qdash-updater status
+      - uv run --isolated --locked --no-dev qdash-updater status
     desc: Show whether the host-side QDash updater is running

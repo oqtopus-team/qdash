@@ -52,7 +52,7 @@ Clone QDash in any directory and check out the `main` release branch according t
 tools already used by QDash deployments:
 
 ```bash
-uv run qdash-updater start
+uv run --isolated --locked --no-dev qdash-updater start
 docker compose up -d --build
 ```
 
@@ -65,10 +65,15 @@ log, and operation state under `.tmp/qdash-updater/`. The main Compose file moun
 into the API container. The socket is not reachable over TCP and needs no GitHub or shared bearer
 token. Public QDash repositories fetch stable tags anonymously from the configured Git remote.
 
-Use `uv run qdash-updater status` to check the process and `uv run qdash-updater stop` to stop it.
-`uv run qdash-updater run` runs it in the foreground for troubleshooting. The equivalent Task
-commands are `task updater-status`, `task updater-stop`, and `task updater`. Advanced deployments
-can override `QDASH_UPDATER_REPOSITORY`,
+The `--isolated` option is intentional. It keeps the host updater out of the repository's `.venv`,
+which may have been created inside a devcontainer with a different interpreter or file owner.
+`--locked --no-dev` uses the committed dependency versions without installing development tools.
+
+Use `uv run --isolated --locked --no-dev qdash-updater status` to check the process and
+`uv run --isolated --locked --no-dev qdash-updater stop` to stop it. Replace `status` with `run` to
+run it in the foreground for troubleshooting. The equivalent Task commands are
+`task updater-status`, `task updater-stop`, and `task updater`. Advanced deployments can override
+`QDASH_UPDATER_REPOSITORY`,
 `QDASH_UPDATER_RUNTIME_DIR`, `QDASH_UPDATER_SOCKET`, `QDASH_UPDATER_STATE_PATH`, or
 `QDASH_UPDATER_HEALTH_URL` in `.env`, but these settings are optional.
 

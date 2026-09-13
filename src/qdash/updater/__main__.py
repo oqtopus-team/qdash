@@ -2,9 +2,9 @@
 
 import argparse
 import os
+import shutil
 import signal
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -69,9 +69,20 @@ def _start_daemon(socket_path: Path, pid_path: Path, log_path: Path) -> None:
         socket_path.unlink()
 
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    uv_path = shutil.which("uv")
+    if uv_path is None:
+        raise SystemExit("uv is required to start the QDash updater")
     with log_path.open("ab") as log_file:
-        process = subprocess.Popen(
-            [sys.executable, "-m", "qdash.updater"],
+        process = subprocess.Popen(  # noqa: S603 - executable is resolved from the host PATH
+            [
+                uv_path,
+                "run",
+                "--isolated",
+                "--locked",
+                "--no-dev",
+                "qdash-updater",
+                "run",
+            ],
             stdin=subprocess.DEVNULL,
             stdout=log_file,
             stderr=subprocess.STDOUT,
@@ -81,7 +92,8 @@ def _start_daemon(socket_path: Path, pid_path: Path, log_path: Path) -> None:
 
     for _ in range(50):
         if socket_path.is_socket():
-            print(f"QDash updater started: {process.pid}")
+            server_pid = _read_pid(pid_path) or process.pid
+            print(f"QDash updater started: {server_pid}")
             return
         if process.poll() is not None:
             break
