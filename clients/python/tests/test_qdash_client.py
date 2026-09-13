@@ -1057,8 +1057,6 @@ def test_flow_and_execution_write_helpers_return_models() -> None:
                         "message": "cancelled",
                     },
                 )
-            case ("POST", "/executions/exec-1/re-execute"):
-                return httpx.Response(200, json=execute_payload)
         return httpx.Response(404, json={"detail": "missing"})
 
     client = _build_client(httpx.MockTransport(handler), api_token="api-token")
@@ -1076,7 +1074,6 @@ def test_flow_and_execution_write_helpers_return_models() -> None:
             ScheduleFlowResponse,
         )
         assert isinstance(client.cancel_execution("run-1"), CancelExecutionResponse)
-        assert client.re_execute_execution("exec-1").execution_id == "exec-1"
     finally:
         client.close()
 

@@ -3177,15 +3177,6 @@ class QuickRunTaskRequest(BaseModel):
     update_params: Annotated[bool, Field(title="Update Params")] = False
 
 
-class ReExecuteRequest(BaseModel):
-    """
-    Request model for re-executing an execution from snapshot parameters.
-    """
-
-    flow_name: Annotated[str, Field(title="Flow Name")]
-    parameter_overrides: Annotated[dict[str, Any], Field(title="Parameter Overrides")] = {}
-
-
 class ReExecutionEntry(BaseModel):
     """
     A child task result created by re-execution.

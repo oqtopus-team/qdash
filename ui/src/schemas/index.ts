@@ -627,8 +627,6 @@ export * from './recalibrationRecommendationResponse';
 export * from './recentChangesResponse';
 export * from './recentExecutionsResponse';
 export * from './recommendedTaskResponse';
-export * from './reExecuteRequest';
-export * from './reExecuteRequestParameterOverrides';
 export * from './reExecutionEntry';
 export * from './reExecutionEntryStartAt';
 export * from './removeProjectMemberAdmin200';
