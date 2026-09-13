@@ -2089,80 +2089,6 @@
         }
       }
     },
-    "/executions/{execution_id}/re-execute": {
-      "post": {
-        "tags": [
-          "execution"
-        ],
-        "summary": "Re-execute a flow from snapshot parameters",
-        "description": "Re-execute a flow using snapshot parameters from a previous execution.\n\nParameters\n----------\nexecution_id : str\n    ID of the source execution to snapshot parameters from\nrequest : ReExecuteRequest\n    Re-execution request with flow_name and optional parameter_overrides\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\nflow_service : FlowService\n    Service for flow operations\n\nReturns\n-------\nExecuteFlowResponse\n    Execution result with IDs and URLs",
-        "operationId": "reExecuteFromSnapshot",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "execution_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Execution Id"
-            }
-          },
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReExecuteRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExecuteFlowResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/files/raw-data": {
       "get": {
         "tags": [
@@ -26431,26 +26357,6 @@
         ],
         "title": "QuickRunTaskRequest",
         "description": "Request to execute one task directly from the task catalog."
-      },
-      "ReExecuteRequest": {
-        "properties": {
-          "flow_name": {
-            "type": "string",
-            "title": "Flow Name"
-          },
-          "parameter_overrides": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Parameter Overrides",
-            "default": {}
-          }
-        },
-        "type": "object",
-        "required": [
-          "flow_name"
-        ],
-        "title": "ReExecuteRequest",
-        "description": "Request model for re-executing an execution from snapshot parameters."
       },
       "ReExecutionEntry": {
         "properties": {

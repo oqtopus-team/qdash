@@ -60,7 +60,6 @@ X180 gate error should be low; error should be consistent with X90 error (X180 â
 - drag_pi_beta: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
@@ -69,6 +68,7 @@ X180 gate error should be low; error should be consistent with X90 error (X180 â
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - n_trials: Number of trials (a.u.)
 - shots: Number of shots (a.u.)
 - interval: Time interval (ns)

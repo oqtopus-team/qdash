@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import MagicMock
 
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
@@ -64,3 +65,23 @@ def test_sync_qubit_params_from_db_splits_coupling_qids(monkeypatch) -> None:
         ("46", {"control_amplitude": {"value": 46.0}}),
         ("47", {"control_amplitude": {"value": 47.0}}),
     ]
+
+
+def test_connect_passes_readout_duration_to_experiment(monkeypatch: Any) -> None:
+    experiment = MagicMock()
+    factory = MagicMock(return_value=experiment)
+    monkeypatch.setattr("qubex.Experiment", factory)
+    backend = QubexBackend(
+        {
+            "task_type": "qubit",
+            "qids": ["0"],
+            "chip_id": "chip-1",
+            "classifier_dir": "classifiers",
+            "readout_duration": 2048.0,
+        }
+    )
+
+    backend.connect()
+
+    assert factory.call_args.kwargs["readout_duration"] == 2048.0
+    experiment.connect.assert_called_once_with()

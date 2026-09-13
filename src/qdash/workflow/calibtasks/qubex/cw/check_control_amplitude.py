@@ -30,7 +30,8 @@ class CheckControlAmplitude(QubexTask):
     """Task to estimate the control amplitude.
 
     Sweeps the drive frequency around the calibrated qubit frequency
-    (``qubit_frequency`` ± ``frequency_span``) and fits a sqrt-Lorentzian
+    (``qubit_frequency`` ± ``frequency_span``) using the dedicated 1024 ns
+    Qubex spectroscopy readout pulse and fits a sqrt-Lorentzian
     to scale the drive amplitude so that the resulting Rabi rate matches
     ``target_rabi_rate``.
     """

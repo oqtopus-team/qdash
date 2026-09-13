@@ -176,16 +176,13 @@ def test_coarse_readout_task_is_enabled_with_resolvable_input_metadata() -> None
         "control_amplitude",
         "readout_frequency",
         "readout_amplitude",
-        "readout_duration",
     }
-    duration = task.input_parameters["readout_duration"]["default_value"]
-    assert isinstance(duration, (int, float))
-    assert duration > 0
+    assert task.run_parameters["readout_duration"]["value"] is None
+    assert task.run_parameters["readout_duration"]["unit"] == "ns"
 
 
 def test_list_task_info_resolves_local_and_qubex_constants() -> None:
     from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-    from qubex.measurement.measurement_defaults import DEFAULT_READOUT_DURATION
 
     clear_backend_config_cache()
     task = next(
@@ -193,7 +190,7 @@ def test_list_task_info_resolves_local_and_qubex_constants() -> None:
     )
 
     assert task.input_parameters["control_amplitude"]["default_value"] == 0.0125
-    assert task.input_parameters["readout_duration"]["default_value"] == DEFAULT_READOUT_DURATION
+    assert task.run_parameters["readout_duration"]["value"] is None
     assert task.run_parameters["shots"]["value"] == CALIBRATION_SHOTS
     assert task.run_parameters["interval"]["value"] == 150 * 1024
 
@@ -254,7 +251,6 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
         "pi_duration",
         "readout_amplitude",
         "readout_frequency",
-        "readout_duration",
     }
     assert task.input_parameters["qubit_frequency"] == {
         "resolution": "database_required",
@@ -262,7 +258,7 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
         "default_value": None,
     }
     assert task.input_parameters["pi_duration"]["parameter_aliases"] == ["pi_length"]
-    assert task.input_parameters["readout_duration"]["unit"] == "ns"
+    assert task.run_parameters["readout_duration"]["unit"] == "ns"
 
 
 def test_extract_parameter_metadata_understands_named_spec_constructors() -> None:

@@ -181,6 +181,18 @@ async def quick_run_task(
                 status_code=400, detail="Source task does not match the task and target"
             )
 
+    readout_duration = body.run_parameter_overrides.get("readout_duration")
+    default_run_parameters = (
+        {
+            "readout_duration": {
+                "value": readout_duration,
+                "value_type": "float",
+            }
+        }
+        if readout_duration is not None
+        else None
+    )
+
     return await flow_service.execute_single_task_from_snapshot(
         task_name=task_name,
         qid=body.qid,
@@ -191,6 +203,7 @@ async def quick_run_task(
         username=ctx.user.username,
         project_id=ctx.project_id,
         backend_name=backend_name,
+        default_run_parameters=default_run_parameters,
         parameter_overrides={"input": body.input_parameter_overrides},
         task_run_parameters={
             task_name: {

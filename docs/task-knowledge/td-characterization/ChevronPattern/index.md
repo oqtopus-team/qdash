@@ -49,7 +49,6 @@ Clear fringe visibility with identifiable chevron vertex; vertex position should
 - qubit_frequency: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
@@ -58,6 +57,9 @@ Clear fringe visibility with identifiable chevron vertex; vertex position should
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
+- shots: Number of shots for adaptive search and final sweeps; Qubex default is 256
+- interval: Time between shots; Qubex default is 153600 ns
 - control_amplitude: Control pulse amplitude (a.u.)
 - readout_amplitude_range: Amplitude range for readout sweep (a.u.)
 - snr_threshold: SNR threshold for determining readout amplitude (a.u.)

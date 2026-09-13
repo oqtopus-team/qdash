@@ -53,7 +53,6 @@ Average readout fidelity should be high with low asymmetry between |0‚ü© and |1‚
 - drag_hpi_beta: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
@@ -63,6 +62,7 @@ Average readout fidelity should be high with low asymmetry between |0‚ü© and |1‚
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - shots: Number of shots (a.u.)
 - interval: Time interval (ns)
 

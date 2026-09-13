@@ -54,7 +54,6 @@ Contrast should remain high over many repetitions; per-gate error rate extracted
 - pi_duration: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
@@ -62,6 +61,8 @@ None.
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
+- shots: Number of shots for pulse verification; Qubex default is 1024
 - repetitions: Number of repetitions for the PI pulse (a.u.)
 - interval: Time interval (ns)
 

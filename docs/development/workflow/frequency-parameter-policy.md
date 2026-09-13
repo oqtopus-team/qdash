@@ -102,12 +102,12 @@ Frequency selection alone does not establish that an old optimization remains su
 | `control_amplitude` | Control pulse amplitude for the Rabi measurements | Required database value |
 | `readout_frequency` | Center frequency of the readout scan | Required database value |
 | `readout_amplitude` | Reference amplitude of the readout scan | Required database value |
-| `readout_duration` | Readout pulse duration, including reference measurements | Database value or the declared Qubex default |
 
-All five inputs are recorded for snapshot re-execution. Explicit input overrides define the values for that run; the scan does not independently reload them from Qubex YAML. Drive frequency and amplitude overrides are scoped to the scan and restored on success or failure. The Qubex contrib helper has no readout-duration argument, so a task-local adapter forwards the resolved duration to each underlying Rabi call without replacing methods on the shared Experiment instance.
+All four calibration inputs are recorded for snapshot re-execution. Explicit input overrides define the values for that run; the scan does not independently reload them from Qubex YAML. Drive frequency and amplitude overrides are scoped to the scan and restored on success or failure. The session-scoped `readout_duration` is recorded as a Run parameter. The Qubex contrib helper has no readout-duration argument, so a task-local adapter forwards that value to each underlying Rabi call without replacing methods on the shared Experiment instance.
 
 | Run parameter | Default | Meaning |
 | --- | --- | --- |
+| `readout_duration` | Qubex session value | Readout pulse duration in ns for all underlying Rabi measurements |
 | `detuning_range` | `(-0.015, 0.015, 13)` | Frequency offsets in GHz, as `(start, stop, number of points)` |
 | `readout_amplitude_ratio_range` | `(0.8, 1.2, 5)` | Multipliers of the reference amplitude, as `(start, stop, number of points)` |
 | `time_range` | `(0, 101, 4)` | Rabi drive durations in ns, as `(start, exclusive stop, step)` |

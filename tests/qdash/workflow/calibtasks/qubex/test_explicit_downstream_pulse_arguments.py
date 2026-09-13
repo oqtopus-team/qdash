@@ -8,16 +8,23 @@ from unittest.mock import MagicMock
 import pytest
 
 from qdash.datamodel.task import InputParameterModel
+from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.calibtasks.qubex.benchmark.x180_interleaved_randoized_benchmarking import (
     X180InterleavedRandomizedBenchmarking,
 )
 from qdash.workflow.calibtasks.qubex.benchmark.zx90_interleaved_randoized_benchmarking import (
     ZX90InterleavedRandomizedBenchmarking,
 )
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_hpi_pulse import CheckHPIPulse
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_pi_pulse import CheckPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t2_echo import CheckT2Echo
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t2_echo_average import (
     CheckT2EchoAverage,
 )
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_hpi_pulse import (
+    CheckDRAGHPIPulse,
+)
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_pi_pulse import CheckDRAGPIPulse
 from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state import CheckBellState
 from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state_tomography import (
     CheckBellStateTomography,
@@ -328,3 +335,39 @@ def test_zx90_irb_passes_explicit_zx90_built_with_resolved_x180(
     }
     _assert_control_drag_pi_inputs(task)
     _assert_target_drag_hpi_inputs(task)
+
+
+@pytest.mark.parametrize(
+    ("task_type", "pulse_attribute"),
+    [
+        (CheckHPIPulse, "hpi_pulse"),
+        (CheckPIPulse, "pi_pulse"),
+        (CheckDRAGHPIPulse, "drag_hpi_pulse"),
+        (CheckDRAGPIPulse, "drag_pi_pulse"),
+    ],
+)
+def test_pulse_verification_forwards_shots_and_interval(
+    task_type: type[QubexTask],
+    pulse_attribute: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = task_type()
+    task.run_parameters["shots"].value = 321
+    task.run_parameters["interval"].value = 654.0
+    task.run_parameters["repetitions"].value = 7
+    task.input_parameters["readout_amplitude"] = InputParameterModel(value=0.2)
+    repeat_sequence = MagicMock(return_value=object())
+    exp = SimpleNamespace(
+        params=SimpleNamespace(readout_amplitude={}),
+        get_qubit_label=lambda _qid: "Q01",
+        repeat_sequence=repeat_sequence,
+        **{pulse_attribute: {"Q01": object()}},
+    )
+    monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
+
+    task.run(cast("QubexBackend", _backend_for(exp)), "1")
+
+    kwargs = repeat_sequence.call_args.kwargs
+    assert kwargs["repetitions"] == 7
+    assert kwargs["n_shots"] == 321
+    assert kwargs["shot_interval"] == 654.0

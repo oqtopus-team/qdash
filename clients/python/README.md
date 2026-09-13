@@ -317,7 +317,7 @@ Available write and operational helpers include:
 - Files and git: `save_file_content()`, `validate_file_content()`, `git_pull_config()`,
   `git_push_config()`
 - Flows and executions: `save_flow()`, `execute_flow()`, `schedule_flow()`,
-  `cancel_execution()`, `re_execute_execution()`
+  `cancel_execution()`
 - Task results: `upsert_task_note()`, `delete_task_note()`, `set_task_result_excluded()`,
   `re_execute_task_result()`, `create_task_result_issue()`
 - Issues and knowledge: `update_issue()`, `close_issue()`, `reopen_issue()`,

@@ -4,7 +4,7 @@ import numpy as np
 import numpy.typing as npt
 import plotly.graph_objs as go
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
 from qdash.datamodel.task import (
     InputParameterSpec,
@@ -15,7 +15,10 @@ from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
@@ -37,13 +40,9 @@ class ReadoutClassification(QubexTask):
         "drag_hpi_beta": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
-        "readout_duration": InputParameterSpec.database_or_default(
-            default=DEFAULT_READOUT_DURATION,
-            unit="ns",
-            description="Readout pulse duration",
-        ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "readout_duration": readout_duration_run_parameter(),
         "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
@@ -192,6 +191,7 @@ class ReadoutClassification(QubexTask):
             save_dir=exp.classifier_dir,
             n_shots=self.run_parameters["shots"].get_value(),
             shot_interval=self.run_parameters["interval"].get_value(),
+            readout_duration=self.run_parameters["readout_duration"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

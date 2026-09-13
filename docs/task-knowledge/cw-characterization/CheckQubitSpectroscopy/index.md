@@ -40,6 +40,8 @@ The f_01 peak should be well-resolved with sufficient height. If f_12 is detecte
 
 ## Run parameters
 
+- shots: Number of shots per spectroscopy point; Qubex default is 1024
+- interval: Time between shots; Qubex spectroscopy default is 1024 ns
 - binarize_threshold_sigma_plus: Positive threshold for binarization (in sigma units) (a.u.)
 - binarize_threshold_sigma_minus: Negative threshold for binarization (in sigma units) (a.u.)
 - top_power: Reference power for height and moment calculation (should be > max(ys)) (dB)
@@ -47,6 +49,8 @@ The f_01 peak should be well-resolved with sufficient height. If f_12 is detecte
 - f12_distance_min: Minimum distance from f01 for f12 detection (in GHz) (GHz)
 - f12_distance_max: Maximum distance from f01 for f12 detection (in GHz) (GHz)
 - f12_height_min: Minimum height for f12 peak detection (in dB) (dB)
+
+The Qubex spectroscopy sequence intentionally uses its own 1024 ns readout pulse. The shared session `readout_duration` does not change this task.
 
 ## Common failure patterns
 

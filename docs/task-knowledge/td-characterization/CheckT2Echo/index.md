@@ -58,7 +58,6 @@ T2_echo should satisfy T2_echo ≤ 2\*T1. Compare with T2\* (Ramsey) to quantify
 - pi_duration: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
@@ -66,6 +65,7 @@ T2_echo should satisfy T2_echo ≤ 2\*T1. Compare with T2\* (Ramsey) to quantify
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - time_range: Time range for T2 echo time (ns)
 - shots: Number of shots for T2 echo time
 - interval: Time interval for T2 echo time (ns)

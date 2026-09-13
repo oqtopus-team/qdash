@@ -2,18 +2,68 @@
 
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
+from unittest.mock import MagicMock
+
+import pytest
 
 # Import fake tasks to trigger registration in BaseTask.registry
 import qdash.workflow.calibtasks.fake  # noqa: F401
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
+from qdash.workflow.engine.config import CalibConfig
 from qdash.workflow.engine.orchestrator import CalibOrchestrator
 
 if TYPE_CHECKING:
-    from qdash.workflow.engine.config import CalibConfig
+    from qdash.workflow.engine.task.context import TaskContext
 
 # FakeCheckRabi registers as "CheckRabi" with backend "fake"
 TASK_NAME = "CheckRabi"
 BACKEND = "fake"
+
+
+def test_shared_readout_duration_configures_backend_session(monkeypatch: Any) -> None:
+    config = CalibConfig(
+        username="alice",
+        chip_id="chip-1",
+        qids=["0"],
+        execution_id="exec-1",
+        project_id="project-1",
+        backend_name="fake",
+        default_run_parameters={"readout_duration": {"value": 2048, "value_type": "int"}},
+    )
+    orchestrator = CalibOrchestrator(config)
+    orchestrator._task_context = cast("TaskContext", SimpleNamespace(id="manager-1"))
+    factory = MagicMock(return_value=SimpleNamespace(name="fake"))
+    monkeypatch.setattr("qdash.workflow.engine.orchestrator.create_backend", factory)
+
+    orchestrator._create_backend()
+
+    assert factory.call_args.kwargs["config"]["readout_duration"] == 2048.0
+
+
+@pytest.mark.parametrize("readout_duration", [0, -1, float("nan"), float("inf")])
+def test_invalid_shared_readout_duration_is_rejected_before_backend_creation(
+    monkeypatch: Any, readout_duration: float
+) -> None:
+    config = CalibConfig(
+        username="alice",
+        chip_id="chip-1",
+        qids=["0"],
+        execution_id="exec-1",
+        project_id="project-1",
+        backend_name="fake",
+        default_run_parameters={
+            "readout_duration": {"value": readout_duration, "value_type": "float"}
+        },
+    )
+    orchestrator = CalibOrchestrator(config)
+    orchestrator._task_context = cast("TaskContext", SimpleNamespace(id="manager-1"))
+    factory = MagicMock()
+    monkeypatch.setattr("qdash.workflow.engine.orchestrator.create_backend", factory)
+
+    with pytest.raises(ValueError, match="readout_duration must be finite and positive"):
+        orchestrator._create_backend()
+
+    factory.assert_not_called()
 
 
 class TestDefaultRunParameterInjection:

@@ -58,7 +58,6 @@ Optimal beta should minimize leakage; rotation angle error should be minimal.
 - control_amplitude: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
@@ -68,6 +67,7 @@ Optimal beta should minimize leakage; rotation angle error should be minimal.
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - drag_hpi_duration: HPI pulse duration (ns)
 - shots: Number of shots (a.u.)
 - interval: Time interval (ns)

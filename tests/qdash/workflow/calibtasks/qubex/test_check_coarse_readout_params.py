@@ -35,6 +35,7 @@ def coarse_readout(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     task.input_parameters["control_amplitude"] = InputParameterModel(value=0.03, unit="a.u.")
     task.input_parameters["readout_frequency"] = InputParameterModel(value=6.0, unit="GHz")
     task.input_parameters["readout_amplitude"] = InputParameterModel(value=0.1, unit="a.u.")
+    task.run_parameters["readout_duration"].value = 384.0
     # Qubex flattens a (2 amplitudes, 3 frequencies) scan in amplitude-major order.
     # The selected point is index 4, not the last scan or the point with highest R².
     rabi_results = [
@@ -64,6 +65,7 @@ def coarse_readout(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
 
     experiment = SimpleNamespace(
         params=params,
+        readout_duration=384.0,
         ctx=SimpleNamespace(params=params),
         experiment_system=SimpleNamespace(
             control_params=SimpleNamespace(
@@ -364,7 +366,7 @@ def test_real_qubex_helper_uses_resolved_rabi_inputs_and_restores_context(
     exp = coarse_readout.experiment
     task.input_parameters["qubit_frequency"].value = 5.4
     task.input_parameters["control_amplitude"].value = 0.04
-    task.input_parameters["readout_duration"].value = 2300
+    task.run_parameters["readout_duration"].value = 2300
     exp.ctx.resolve_qubit_label = lambda target: target
     exp.ctx.resonators = {"Q00": SimpleNamespace(label="RQ00", frequency=6.5)}
     observed: list[dict[str, Any]] = []
@@ -410,14 +412,14 @@ def test_real_qubex_helper_uses_resolved_rabi_inputs_and_restores_context(
     assert coarse_readout.qubit.frequency == 5.0
     assert exp.params.control_amplitude == {"Q00": 0.01}
     assert exp.params.readout_amplitude == {"Q00": 0.2}
-    assert task.input_parameters["readout_duration"].value == 2300
+    assert task.run_parameters["readout_duration"].value == 2300
 
 
 @pytest.mark.parametrize("duration", [0, -1, np.nan, np.inf])
 def test_invalid_readout_duration_stops_before_measurement(
     coarse_readout: SimpleNamespace, duration: float
 ) -> None:
-    coarse_readout.task.input_parameters["readout_duration"].value = duration
+    coarse_readout.task.run_parameters["readout_duration"].value = duration
     with pytest.raises(ValueError, match="readout_duration"):
         coarse_readout.task.run(coarse_readout.backend, "0")
     coarse_readout.characterize.assert_not_called()

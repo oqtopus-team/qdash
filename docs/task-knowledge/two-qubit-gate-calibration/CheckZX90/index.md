@@ -40,11 +40,9 @@ ZX90 fidelity should meet targets; both control states should produce correct co
 - control_drag_pi_beta: (control qubit) (a.u.)
 - control_readout_frequency: (control qubit) (GHz)
 - control_readout_amplitude: (control qubit) (a.u.)
-- control_readout_duration: (control qubit) (ns)
 - target_qubit_frequency: (target qubit) (GHz)
 - target_readout_frequency: (target qubit) (GHz)
 - target_readout_amplitude: (target qubit) (a.u.)
-- target_readout_duration: (target qubit) (ns)
 - cr_duration: (coupling qubit) (ns)
 - cr_amplitude: (control qubit) (a.u.)
 - cr_phase: (control qubit) (a.u.)
@@ -63,6 +61,7 @@ None.
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - repetitions: Number of repetitions for the PI pulse (a.u.)
 - shots: Number of shots (a.u.)
 - interval: Time interval (ns)

@@ -32,9 +32,7 @@ from qdash.api.schemas.execution import (
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ListExecutionsResponse,
-    ReExecuteRequest,
 )
-from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.services.artifact_preview_service import preview_netcdf
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.flow_service import FlowService
@@ -353,64 +351,5 @@ async def cancel_execution(
     """
     return await execution_service.cancel_execution(
         flow_run_id=flow_run_id,
-        project_id=ctx.project_id,
-    )
-
-
-@router.post(
-    "/executions/{execution_id}/re-execute",
-    response_model=ExecuteFlowResponse,
-    summary="Re-execute a flow from snapshot parameters",
-    operation_id="reExecuteFromSnapshot",
-)
-async def re_execute_from_snapshot(
-    execution_id: str,
-    request: ReExecuteRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
-    execution_service: Annotated[ExecutionService, Depends(get_execution_service)],
-    flow_service: Annotated[FlowService, Depends(get_flow_service)],
-) -> ExecuteFlowResponse:
-    """Re-execute a flow using snapshot parameters from a previous execution.
-
-    Parameters
-    ----------
-    execution_id : str
-        ID of the source execution to snapshot parameters from
-    request : ReExecuteRequest
-        Re-execution request with flow_name and optional parameter_overrides
-    ctx : ProjectContext
-        Project context with user and project information
-    execution_service : ExecutionService
-        Service for execution operations
-    flow_service : FlowService
-        Service for flow operations
-
-    Returns
-    -------
-    ExecuteFlowResponse
-        Execution result with IDs and URLs
-
-    """
-    # Validate source execution exists
-    metadata = execution_service.get_execution_metadata(ctx.project_id, execution_id)
-    if metadata is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Source execution {execution_id} not found",
-        )
-
-    # Verify the requesting user owns the source execution.
-    flow_owner = metadata["username"]
-    if flow_owner != ctx.user.username:
-        raise HTTPException(
-            status_code=403,
-            detail="You can only re-execute your own executions",
-        )
-
-    return await flow_service.re_execute_from_snapshot(
-        flow_name=request.flow_name,
-        source_execution_id=execution_id,
-        parameter_overrides=request.parameter_overrides,
-        username=flow_owner,
         project_id=ctx.project_id,
     )

@@ -12,7 +12,10 @@ from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -23,6 +26,7 @@ class CheckOptimalReadoutFrequency(QubexTask):
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "readout_duration": readout_duration_run_parameter(),
         "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",

@@ -40,6 +40,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_RESONATOR_SPECTROSCOPY_INTERVAL = 0.0
+
 _guess_sorted_slots_for_partial_mux = guess_sorted_slots_for_partial_mux
 _qid_for_sorted_slot = qid_for_sorted_slot
 _peak_positions_from_assignment_order = peak_positions_from_assignment_order
@@ -49,7 +51,7 @@ class CheckResonatorSpectroscopy(QubexTask):
     """Task to check the resonator spectroscopy.
 
     This is a MUX-level task that performs spectroscopy on all resonators
-    in a MUX simultaneously. The scheduler should execute this task once
+    with the dedicated 8192 ns Qubex spectroscopy pulse. The scheduler executes it once
     per MUX, and the result will be used by all qubits in that MUX.
 
     Note: task_type remains "qubit" for frontend compatibility, but
@@ -85,6 +87,12 @@ class CheckResonatorSpectroscopy(QubexTask):
             value_type="int",
             default=1024,
             description="Number of shots for resonator spectroscopy",
+        ),
+        "interval": RunParameterSpec(
+            unit="ns",
+            value_type="float",
+            default=DEFAULT_RESONATOR_SPECTROSCOPY_INTERVAL,
+            description="Time interval between shots",
         ),
         "resonator_assignment_order": RunParameterSpec(
             unit="",
@@ -368,6 +376,7 @@ class CheckResonatorSpectroscopy(QubexTask):
 
     def resolve_run_parameters(self, backend: QubexBackend, qid: str) -> None:
         """Populate the effective device-specific sweep before it is recorded."""
+        super().resolve_run_parameters(backend, qid)
         parameter = self.run_parameters["frequency_range"]
         if parameter.value is not None:
             return
@@ -388,6 +397,7 @@ class CheckResonatorSpectroscopy(QubexTask):
             frequency_range=frequency_range,
             power_range=self.run_parameters["power_range"].get_value(),
             n_shots=self.run_parameters["shots"].get_value(),
+            shot_interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)
@@ -403,6 +413,7 @@ class CheckResonatorSpectroscopy(QubexTask):
             frequency_range=frequency_range,
             power_range=self.run_parameters["power_range"].get_value(),
             n_shots=self.run_parameters["shots"].get_value(),
+            shot_interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

@@ -7,7 +7,12 @@ from typing import TYPE_CHECKING, Any
 from qubex.experiment.experiment_constants import HPI_RAMPTIME, PI_RAMPTIME
 from qubex.experiment.models.rabi_param import RabiParam
 
-from qdash.datamodel.task import InputParameterModel, InputParameterSpec, ParameterModel
+from qdash.datamodel.task import (
+    InputParameterModel,
+    InputParameterSpec,
+    ParameterModel,
+    RunParameterSpec,
+)
 from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.workflow.calibtasks.base import (
@@ -22,6 +27,16 @@ if TYPE_CHECKING:
     from qdash.workflow.engine.backend.qubex import QubexBackend
 
 logger = logging.getLogger(__name__)
+
+
+def readout_duration_run_parameter() -> RunParameterSpec:
+    """Declare the shared Qubex readout duration for a measurement task."""
+    return RunParameterSpec(
+        unit="ns",
+        value_type="float",
+        default=None,
+        description="Readout pulse duration. Uses the Qubex session default when unset.",
+    )
 
 
 class QubexTask(BaseTask):
@@ -70,6 +85,32 @@ class QubexTask(BaseTask):
             input_parameters=self.input_parameters,
             run_parameters=self.run_parameters,
         )
+
+    def resolve_run_parameters(self, backend: "QubexBackend", qid: str) -> None:
+        """Resolve and verify the session-scoped readout duration."""
+        parameter = self.run_parameters.get("readout_duration")
+        declaration = self.run_spec.get("readout_duration")
+        if parameter is None and declaration is not None:
+            # Snapshots created before readout_duration became a run parameter do not
+            # contain it. Restore the declaration so the effective session value is
+            # still recorded on re-execution.
+            parameter = declaration.create_model()
+            self.run_parameters["readout_duration"] = parameter
+        if parameter is None:
+            return
+        exp = self.get_experiment(backend)
+        session_duration = float(exp.readout_duration)
+        if parameter.value is None:
+            parameter.value = session_duration
+            return
+        requested_duration = float(parameter.get_value())
+        if not math.isfinite(requested_duration) or requested_duration <= 0:
+            raise ValueError("readout_duration must be finite and positive")
+        if not math.isclose(requested_duration, session_duration):
+            raise ValueError(
+                "readout_duration is session-scoped in Qubex; configure it through shared "
+                "default_run_parameters so the task value matches the Qubex session"
+            )
 
     def prepare_run(self, backend: "QubexBackend", qid: str) -> None:
         """Synchronize final effective QDash inputs into the Qubex context."""

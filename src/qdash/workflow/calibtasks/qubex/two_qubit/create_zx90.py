@@ -12,7 +12,10 @@ from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
@@ -24,6 +27,7 @@ class CreateZX90(QubexTask):
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "readout_duration": readout_duration_run_parameter(),
         "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
@@ -91,12 +95,6 @@ class CreateZX90(QubexTask):
             qid_role="control",
             unit="a.u.",
         ),
-        "control_readout_duration": InputParameterSpec.database_or_default(
-            default=0,
-            parameter_name="readout_duration",
-            qid_role="control",
-            unit="ns",
-        ),
         # Target qubit parameters
         "target_qubit_frequency": InputParameterSpec.database_or_default(
             default=0,
@@ -115,12 +113,6 @@ class CreateZX90(QubexTask):
             parameter_name="readout_amplitude",
             qid_role="target",
             unit="a.u.",
-        ),
-        "target_readout_duration": InputParameterSpec.database_or_default(
-            default=0,
-            parameter_name="readout_duration",
-            qid_role="target",
-            unit="ns",
         ),
         # CR parameters (from CheckCrossResonance)
         "cr_duration": InputParameterSpec.required_database(
