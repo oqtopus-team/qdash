@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 STABLE_TAG_PATTERN = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+RELEASE_BRANCH = "main"
 ACTIVE_STATES = {UpdateState.QUEUED, UpdateState.RUNNING, UpdateState.ROLLING_BACK}
 APP_SERVICES = ("api", "ui", "deployment-service", "user-flow-worker")
 
@@ -201,6 +202,7 @@ class UpdaterService:
         try:
             current_commit = self._git("rev-parse", "HEAD").stdout
             current_version = self._exact_current_tag() or current_commit[:12]
+            current_branch = self._current_branch()
             dirty = bool(self._git("status", "--porcelain", "--untracked-files=no").stdout)
             self._git("fetch", self.settings.remote, "--tags", "--prune")
             latest_version = self._latest_stable_tag()
@@ -220,7 +222,9 @@ class UpdaterService:
             and latest_semver > current_semver
         )
 
-        if dirty:
+        if current_branch != RELEASE_BRANCH:
+            blocked_reason = f"QDash must be running from the {RELEASE_BRANCH} branch"
+        elif dirty:
             blocked_reason = "The QDash working tree has tracked changes"
         elif current_semver is None:
             blocked_reason = "QDash is not running from an exact stable release tag"
@@ -273,8 +277,15 @@ class UpdaterService:
         stable_tags = [tag for tag in tags if _stable_version(tag) is not None]
         return max(stable_tags, key=lambda tag: _stable_version(tag) or (0, 0, 0), default=None)
 
+    def _current_branch(self) -> str | None:
+        try:
+            return self._git("symbolic-ref", "--short", "HEAD").stdout
+        except subprocess.SubprocessError:
+            return None
+
     def _latest_stable_tag(self) -> str | None:
-        tags = self._git("tag", "--list", "v*").stdout.splitlines()
+        remote_branch = f"{self.settings.remote}/{RELEASE_BRANCH}"
+        tags = self._git("tag", "--merged", remote_branch, "--list", "v*").stdout.splitlines()
         stable_tags = [tag for tag in tags if _stable_version(tag) is not None]
         return max(stable_tags, key=lambda tag: _stable_version(tag) or (0, 0, 0), default=None)
 
@@ -326,11 +337,11 @@ class UpdaterService:
 
             self._set_operation(
                 operation_id,
-                stage="checkout",
-                message=f"Checking out {operation.target_version}",
+                stage="fast-forward",
+                message=f"Advancing {RELEASE_BRANCH} to {operation.target_version}",
                 progress=40,
             )
-            await asyncio.to_thread(self._git, "checkout", "--detach", operation.target_version)
+            await asyncio.to_thread(self._git, "merge", "--ff-only", operation.target_version)
             await asyncio.to_thread(self._compose, "config", "--quiet")
 
             self._set_operation(
@@ -381,7 +392,7 @@ class UpdaterService:
             progress=95,
         )
         try:
-            await asyncio.to_thread(self._git, "checkout", "--detach", previous_commit)
+            await asyncio.to_thread(self._git, "reset", "--hard", previous_commit)
             result = await asyncio.to_thread(self._compose, "up", "-d", "--build")
             self._append_log(operation_id, result.stdout, result.stderr)
             await asyncio.to_thread(self._wait_for_health)

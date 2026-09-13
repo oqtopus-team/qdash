@@ -12,24 +12,21 @@ restarting the QDash API does not terminate an update.
 Do not run the updater inside the main `compose.yaml`. Updating QDash stops and rebuilds that
 Compose project. The updater must remain alive throughout that process.
 
-## Git checkout requirements
+## Git branch and tag requirements
 
 The installation directory is unrestricted, but the source checkout must meet these conditions:
 
+- The current branch is `main`.
 - `HEAD` is exactly at a stable tag named `vMAJOR.MINOR.PATCH`.
 - The tracked worktree has no local modifications.
 - The configured Git remote, `origin` by default, provides a newer stable tag.
 - The target tag contains a manifest that permits automatic updates.
 
-The updater compares tags using semantic version order. It ignores branches, untagged commits,
-prerelease tags such as `v2.0.0-rc.1`, and tags that do not match the stable version format. It does
-not merge, rebase, or pull the current branch. A successful update checks out the target tag in
-detached-HEAD mode, so local branch pointers are not moved.
-
-A branch whose `HEAD` happens to equal a stable tag can pass the technical check, but operators
-should install in detached-HEAD mode as shown in [Operator Setup](./setup.md#clone-the-repository).
-Use `develop` and feature branches only for development environments where Admin UI updates are
-not required.
+The updater compares tags using semantic version order and considers only stable tags in the
+`origin/main` history. It ignores untagged commits, prerelease tags such as `v2.0.0-rc.1`, and tags
+that do not match the stable version format. A successful update fast-forwards the local `main`
+branch to the selected tag. It never merges a divergent branch or updates `develop` or a feature
+branch.
 
 ## Release safety manifest
 
@@ -50,7 +47,7 @@ The Admin UI will show the release as unavailable for automatic update.
 
 ## Starting QDash
 
-Clone QDash in any directory and check out a stable release tag according to
+Clone QDash in any directory and check out the `main` release branch according to
 [Operator Setup](./setup.md#clone-the-repository). Start the updater and Compose directly with the
 tools already used by QDash deployments:
 
@@ -80,11 +77,11 @@ can override `QDASH_UPDATER_REPOSITORY`,
 The Admin **System** tab shows the current exact release tag, latest stable tag, tracked worktree
 state, and any blocking reason. Starting an update performs these steps:
 
-1. Verify that QDash is on an exact stable tag and its tracked working tree is clean.
+1. Verify that QDash is on `main`, at an exact stable tag, with a clean tracked working tree.
 2. Fetch tags and validate the target release manifest.
 3. Refuse the request if another update or a calibration is running.
 4. Stop the API, UI, deployment service, and user-flow worker.
-5. Check out the target tag in detached-HEAD mode and validate the Compose configuration.
+5. Fast-forward `main` to the target tag and validate the Compose configuration.
 6. Run `docker compose up -d --build`; the Compose-managed idempotent migration must complete.
 7. Wait for the configured API health URL.
 

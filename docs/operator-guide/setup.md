@@ -6,21 +6,18 @@ Install Docker with Docker Compose and `uv` on the host. Go Task is optional for
 
 ## Clone the Repository
 
-Clone the Git repository, fetch its tags, and select a stable release. Replace `vX.Y.Z` with the
-chosen stable tag from the repository's release list:
+Clone the Git repository's release branch. The repository default is `develop`, so select `main`
+explicitly for an installation that will use Admin UI system updates:
 
 ```bash
-git clone https://github.com/oqtopus-team/qdash.git
+git clone --branch main https://github.com/oqtopus-team/qdash.git
 cd qdash
-git fetch --tags
-git tag --list 'v*' --sort=-version:refname
-git checkout --detach vX.Y.Z
 ```
 
-An installation that will use Admin UI system updates must have `HEAD` exactly at a stable
-`vMAJOR.MINOR.PATCH` tag. Do not install from `develop`, a feature branch, a prerelease tag such as
-`v2.0.0-rc.1`, or an untagged commit. The installation directory can be anywhere. See
-[System Updates](./system-updates.md#git-checkout-requirements) for the complete update rules.
+The `main` branch represents the latest stable release and its release commits carry
+`vMAJOR.MINOR.PATCH` tags. Do not use `develop`, a feature branch, or a prerelease tag for an
+updatable installation. The installation directory can be anywhere. See
+[System Updates](./system-updates.md#git-branch-and-tag-requirements) for the complete update rules.
 
 ## Qubex Setup
 
