@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     prefect_port: int = 4200
     api_port: int = 5715
     ui_port: int = 5714
+    # Optional Unix socket for the host-side updater service.
+    updater_socket: str = ""
     # Logging
     log_level: str = "INFO"
     # Timezone

@@ -491,6 +491,7 @@ tasks:
   deploy-local:
     cmds:
       - task: knowledge-pull
+      - task: updater-start
       - docker compose up -d --build
     desc: Deploy the application with Docker Compose in dev mode
 
@@ -500,6 +501,7 @@ tasks:
       ENV: dev-fake
     cmds:
       - task: knowledge-pull
+      - task: updater-start
       - docker compose up -d --build
     desc: Deploy the application locally with the fake QUBEX-compatible backend
 
@@ -517,7 +519,32 @@ tasks:
   deploy:
     cmds:
       - task: knowledge-pull
+      - task: updater-start
       - docker compose --profile tunnel up -d --build
       - sleep 3
       - docker compose restart api
     desc: Deploy the application with Docker Compose
+
+  updater:
+    dotenv: [.env]
+    cmds:
+      - uv run qdash-updater run
+    desc: Run the host-side QDash updater in the foreground
+
+  updater-start:
+    dotenv: [.env]
+    cmds:
+      - uv run qdash-updater start
+    desc: Start the host-side QDash updater in the background
+
+  updater-stop:
+    dotenv: [.env]
+    cmds:
+      - uv run qdash-updater stop
+    desc: Stop the background QDash updater
+
+  updater-status:
+    dotenv: [.env]
+    cmds:
+      - uv run qdash-updater status
+    desc: Show whether the host-side QDash updater is running

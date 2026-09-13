@@ -35,6 +35,7 @@ import {
   DeleteUserDialog,
 } from "@/components/features/admin/AdminConfirmDialogs";
 import { AdminProjectsPanel } from "@/components/features/admin/AdminProjectsPanel";
+import { SystemUpdateCard } from "@/components/features/admin/SystemUpdateCard";
 import { AdminUsersPanel } from "@/components/features/admin/AdminUsersPanel";
 import { CreateUserModal } from "@/components/features/admin/CreateUserModal";
 import { EditUserModal } from "@/components/features/admin/EditUserModal";
@@ -472,7 +473,12 @@ export function AdminPageContent() {
       )}
 
       {/* System Tab */}
-      {activeTab === "system" && <SettingsCard />}
+      {activeTab === "system" && (
+        <div className="space-y-6">
+          <SystemUpdateCard />
+          <SettingsCard />
+        </div>
+      )}
 
       {/* Edit Modal */}
       {isEditModalOpen && selectedUser && (

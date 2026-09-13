@@ -38,6 +38,9 @@ import type {
   QdashApiSchemasAdminMemberListResponse,
   QdashApiSchemasAdminProjectListResponse,
   RemoveProjectMemberAdmin200,
+  StartSystemUpdateRequest,
+  SystemUpdateOperationResponse,
+  SystemUpdateStatusResponse,
   UpdateUserRequest,
   UserDetailResponse,
   UserListResponse
@@ -64,6 +67,257 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+/**
+ * Return current/latest release information for system administrators.
+ * @summary Get QDash system update status
+ */
+export const getSystemUpdateStatus = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<SystemUpdateStatusResponse>(
+      {url: `/admin/system-updates/status`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetSystemUpdateStatusQueryKey = () => {
+    return [
+    `/admin/system-updates/status`
+    ] as const;
+    }
+
+
+export const getGetSystemUpdateStatusQueryOptions = <TData = Awaited<ReturnType<typeof getSystemUpdateStatus>>, TError = void>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSystemUpdateStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSystemUpdateStatus>>> = ({ signal }) => getSystemUpdateStatus(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSystemUpdateStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getSystemUpdateStatus>>>
+export type GetSystemUpdateStatusQueryError = void
+
+
+export function useGetSystemUpdateStatus<TData = Awaited<ReturnType<typeof getSystemUpdateStatus>>, TError = void>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateStatus>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSystemUpdateStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getSystemUpdateStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSystemUpdateStatus<TData = Awaited<ReturnType<typeof getSystemUpdateStatus>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateStatus>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSystemUpdateStatus>>,
+          TError,
+          Awaited<ReturnType<typeof getSystemUpdateStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSystemUpdateStatus<TData = Awaited<ReturnType<typeof getSystemUpdateStatus>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get QDash system update status
+ */
+
+export function useGetSystemUpdateStatus<TData = Awaited<ReturnType<typeof getSystemUpdateStatus>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSystemUpdateStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Start the latest safe stable update when no calibration is running.
+ * @summary Start a QDash system update
+ */
+export const startSystemUpdate = (
+    startSystemUpdateRequest: StartSystemUpdateRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<SystemUpdateOperationResponse>(
+      {url: `/admin/system-updates`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: startSystemUpdateRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getStartSystemUpdateMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSystemUpdate>>, TError,{data: StartSystemUpdateRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof startSystemUpdate>>, TError,{data: StartSystemUpdateRequest}, TContext> => {
+
+const mutationKey = ['startSystemUpdate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startSystemUpdate>>, {data: StartSystemUpdateRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  startSystemUpdate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartSystemUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof startSystemUpdate>>>
+    export type StartSystemUpdateMutationBody = StartSystemUpdateRequest
+    export type StartSystemUpdateMutationError = void | HTTPValidationError
+
+    /**
+ * @summary Start a QDash system update
+ */
+export const useStartSystemUpdate = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSystemUpdate>>, TError,{data: StartSystemUpdateRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof startSystemUpdate>>,
+        TError,
+        {data: StartSystemUpdateRequest},
+        TContext
+      > => {
+      return useMutation(getStartSystemUpdateMutationOptions(options), queryClient);
+    }
+    /**
+ * Return updater progress after the API becomes available again.
+ * @summary Get QDash system update progress
+ */
+export const getSystemUpdateOperation = (
+    operationId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<SystemUpdateOperationResponse>(
+      {url: `/admin/system-updates/${operationId}`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetSystemUpdateOperationQueryKey = (operationId: string,) => {
+    return [
+    `/admin/system-updates/${operationId}`
+    ] as const;
+    }
+
+
+export const getGetSystemUpdateOperationQueryOptions = <TData = Awaited<ReturnType<typeof getSystemUpdateOperation>>, TError = void | HTTPValidationError>(operationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateOperation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSystemUpdateOperationQueryKey(operationId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSystemUpdateOperation>>> = ({ signal }) => getSystemUpdateOperation(operationId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: operationId !== null && operationId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateOperation>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSystemUpdateOperationQueryResult = NonNullable<Awaited<ReturnType<typeof getSystemUpdateOperation>>>
+export type GetSystemUpdateOperationQueryError = void | HTTPValidationError
+
+
+export function useGetSystemUpdateOperation<TData = Awaited<ReturnType<typeof getSystemUpdateOperation>>, TError = void | HTTPValidationError>(
+ operationId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateOperation>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSystemUpdateOperation>>,
+          TError,
+          Awaited<ReturnType<typeof getSystemUpdateOperation>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSystemUpdateOperation<TData = Awaited<ReturnType<typeof getSystemUpdateOperation>>, TError = void | HTTPValidationError>(
+ operationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateOperation>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSystemUpdateOperation>>,
+          TError,
+          Awaited<ReturnType<typeof getSystemUpdateOperation>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSystemUpdateOperation<TData = Awaited<ReturnType<typeof getSystemUpdateOperation>>, TError = void | HTTPValidationError>(
+ operationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateOperation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get QDash system update progress
+ */
+
+export function useGetSystemUpdateOperation<TData = Awaited<ReturnType<typeof getSystemUpdateOperation>>, TError = void | HTTPValidationError>(
+ operationId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemUpdateOperation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSystemUpdateOperationQueryOptions(operationId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
 
 /**
  * Reload cached YAML configuration (admin only).

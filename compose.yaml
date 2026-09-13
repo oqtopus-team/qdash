@@ -194,6 +194,7 @@ services:
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - ./logs/api:/app/logs
+      - ${QDASH_UPDATER_RUNTIME_DIR:-./.tmp/qdash-updater}:/run/qdash-updater
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
     develop:
@@ -216,6 +217,7 @@ services:
       - PREFECT_API_URL=http://prefect-server:4200/api
       - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
+      - UPDATER_SOCKET=/run/qdash-updater/updater.sock
     networks:
       - custom_net
   ui:

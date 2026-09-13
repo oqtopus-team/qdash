@@ -6,7 +6,12 @@ This page covers common operational commands for a local or lab QDash deployment
 
 ```bash
 # Full Docker Compose stack
-task deploy-local
+uv run qdash-updater start
+docker compose up -d --build
+
+# Updater state or shutdown
+uv run qdash-updater status
+uv run qdash-updater stop
 
 # Host-side API/UI with Docker-backed services
 task dev-local
@@ -20,6 +25,9 @@ task dev-services
 # Restart the API container in the full Docker stack
 task restart-api
 ```
+
+Go Task is optional for operators. When installed, `task deploy-local` wraps the first two startup
+commands and the remaining `task` commands provide development conveniences.
 
 ## Logs
 

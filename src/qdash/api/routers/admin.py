@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, UploadFile, status
 
-from qdash.api.dependencies import get_admin_service
+from qdash.api.dependencies import get_admin_service, get_system_update_service
 from qdash.api.lib.auth import get_admin_user
 from qdash.api.schemas.admin import (
     AddMemberRequest,
@@ -19,7 +19,13 @@ from qdash.api.schemas.admin import (
     UserListResponse,
 )
 from qdash.api.schemas.auth import User
+from qdash.api.schemas.system_update import (
+    StartSystemUpdateRequest,
+    SystemUpdateOperationResponse,
+    SystemUpdateStatusResponse,
+)
 from qdash.api.services.admin_service import AdminService
+from qdash.api.services.system_update_service import SystemUpdateService
 from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.metrics import clear_metrics_config_cache
 from qdash.copilot.config import clear_copilot_config_cache
@@ -30,6 +36,54 @@ router = APIRouter(
     prefix="/admin",
     responses={404: {"description": "Not found"}},
 )
+
+
+@router.get(
+    "/system-updates/status",
+    response_model=SystemUpdateStatusResponse,
+    summary="Get QDash system update status",
+    operation_id="getSystemUpdateStatus",
+)
+async def get_system_update_status(
+    admin: Annotated[User, Depends(get_admin_user)],
+    service: Annotated[SystemUpdateService, Depends(get_system_update_service)],
+) -> SystemUpdateStatusResponse:
+    """Return current/latest release information for system administrators."""
+    logger.debug("Admin %s checking QDash update status", admin.username)
+    return await service.get_status()
+
+
+@router.post(
+    "/system-updates",
+    response_model=SystemUpdateOperationResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Start a QDash system update",
+    operation_id="startSystemUpdate",
+)
+async def start_system_update(
+    request: StartSystemUpdateRequest,
+    admin: Annotated[User, Depends(get_admin_user)],
+    service: Annotated[SystemUpdateService, Depends(get_system_update_service)],
+) -> SystemUpdateOperationResponse:
+    """Start the latest safe stable update when no calibration is running."""
+    logger.warning("Admin %s requested a QDash system update", admin.username)
+    return await service.start_update(request.expected_current_version)
+
+
+@router.get(
+    "/system-updates/{operation_id}",
+    response_model=SystemUpdateOperationResponse,
+    summary="Get QDash system update progress",
+    operation_id="getSystemUpdateOperation",
+)
+async def get_system_update_operation(
+    operation_id: str,
+    admin: Annotated[User, Depends(get_admin_user)],
+    service: Annotated[SystemUpdateService, Depends(get_system_update_service)],
+) -> SystemUpdateOperationResponse:
+    """Return updater progress after the API becomes available again."""
+    logger.debug("Admin %s checking update operation %s", admin.username, operation_id)
+    return await service.get_operation(operation_id)
 
 
 @router.post(

@@ -2,6 +2,7 @@
 
 QDash operators configure the Qubex integration and run the full Docker Compose stack. Host-side
 API and UI processes are documented in [Development Environment Setup](../development/setup.md).
+Install Docker with Docker Compose and `uv` on the host. Go Task is optional for operators.
 
 ## Clone the Repository
 
@@ -115,16 +116,19 @@ When workflow GitHub push is enabled, QDash can commit updated calibration files
 `calibration/calib_note.json` and parameter YAML files back to the config repository after a
 calibration run.
 
-Complete the Qubex config placement or repository setup before starting services with
-`task deploy-local`.
+Complete the Qubex config placement or repository setup before starting services.
 
 ## Full Stack
 
 Start all services:
 
 ```bash
-task deploy-local
+uv run qdash-updater start
+docker compose up -d --build
 ```
+
+If Go Task is installed, `task deploy-local` performs the same startup and also pulls an optional
+external knowledge repository configured by `KNOWLEDGE_REPO_URL`.
 
 Open:
 
@@ -137,7 +141,9 @@ Open:
 Set `TUNNEL_TOKEN` in `.env`, then run:
 
 ```bash
-task deploy
+uv run qdash-updater start
+docker compose --profile tunnel up -d --build
 ```
 
-This starts the Compose stack with the Cloudflare tunnel profile.
+This starts the Compose stack with the Cloudflare tunnel profile. `task deploy` is the equivalent
+Go Task command.
