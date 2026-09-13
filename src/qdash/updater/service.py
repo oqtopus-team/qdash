@@ -23,6 +23,7 @@ from qdash.updater.models import (
     UpdateState,
     UpdateStatus,
 )
+from qdash.updater.runtime import updater_runtime_dir
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class UpdaterSettings:
     def from_env(cls) -> UpdaterSettings:
         """Load updater settings without depending on the QDash API configuration."""
         repository_path = Path(_env_value("QDASH_UPDATER_REPOSITORY", os.getcwd())).resolve()
-        runtime_dir = Path(_env_value("QDASH_UPDATER_RUNTIME_DIR", ".tmp/qdash-updater")).resolve()
+        runtime_dir = updater_runtime_dir()
         state_path = Path(
             _env_value(
                 "QDASH_UPDATER_STATE_PATH",

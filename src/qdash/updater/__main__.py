@@ -10,11 +10,11 @@ from pathlib import Path
 
 import uvicorn
 
+from qdash.updater.runtime import ensure_private_directory, updater_runtime_dir
+
 
 def _runtime_paths() -> tuple[Path, Path, Path]:
-    runtime_dir = Path(
-        os.environ.get("QDASH_UPDATER_RUNTIME_DIR", "").strip() or ".tmp/qdash-updater"
-    ).resolve()
+    runtime_dir = updater_runtime_dir()
     configured_path = os.environ.get("QDASH_UPDATER_SOCKET", "").strip()
     socket_path = (
         Path(configured_path).resolve() if configured_path else runtime_dir / "updater.sock"
@@ -24,12 +24,12 @@ def _runtime_paths() -> tuple[Path, Path, Path]:
 
 def _run_server(socket_path: Path, pid_path: Path) -> None:
     """Run the server and expose its process ID for task-based lifecycle management."""
-    socket_path.parent.mkdir(parents=True, exist_ok=True)
+    ensure_private_directory(socket_path.parent)
     if socket_path.exists():
         if not socket_path.is_socket():
             raise RuntimeError(f"Updater socket path is not a socket: {socket_path}")
         socket_path.unlink()
-    pid_path.parent.mkdir(parents=True, exist_ok=True)
+    ensure_private_directory(pid_path.parent)
     pid_path.write_text(str(os.getpid()), encoding="utf-8")
     try:
         uvicorn.run("qdash.updater.app:app", uds=str(socket_path))
@@ -68,7 +68,7 @@ def _start_daemon(socket_path: Path, pid_path: Path, log_path: Path) -> None:
             raise SystemExit(f"Updater socket path exists and is not a socket: {socket_path}")
         socket_path.unlink()
 
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    ensure_private_directory(log_path.parent)
     uv_path = shutil.which("uv")
     if uv_path is None:
         raise SystemExit("uv is required to start the QDash updater")

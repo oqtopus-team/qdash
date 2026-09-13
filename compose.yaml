@@ -194,7 +194,7 @@ services:
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - ./logs/api:/app/logs
-      - ${QDASH_UPDATER_RUNTIME_DIR:-./.tmp/qdash-updater}:/run/qdash-updater
+      - ${QDASH_UPDATER_RUNTIME_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/qdash/updater}:/run/qdash-updater
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
     develop:

@@ -61,9 +61,12 @@ Go Task is optional. When it is installed, `task deploy`, `task deploy-local`, a
 No updater configuration or system service installation is required.
 
 The updater uses the current repository as the installation directory and stores its socket, PID,
-log, and operation state under `.tmp/qdash-updater/`. The main Compose file mounts that directory
-into the API container. The socket is not reachable over TCP and needs no GitHub or shared bearer
-token. Public QDash repositories fetch stable tags anonymously from the configured Git remote.
+log, and operation state under `${XDG_STATE_HOME}/qdash/updater/`, or
+`~/.local/state/qdash/updater/` when `XDG_STATE_HOME` is unset. The main Compose file mounts that
+directory into the API container. Keeping runtime files outside the checkout prevents ownership
+conflicts when the same checkout is used from both the host and a devcontainer. The socket is not
+reachable over TCP and needs no GitHub or shared bearer token. Public QDash repositories fetch
+stable tags anonymously from the configured Git remote.
 
 The `--isolated` option is intentional. It keeps the host updater out of the repository's `.venv`,
 which may have been created inside a devcontainer with a different interpreter or file owner.
