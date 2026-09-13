@@ -12,6 +12,25 @@ restarting the QDash API does not terminate an update.
 Do not run the updater inside the main `compose.yaml`. Updating QDash stops and rebuilds that
 Compose project. The updater must remain alive throughout that process.
 
+## Git checkout requirements
+
+The installation directory is unrestricted, but the source checkout must meet these conditions:
+
+- `HEAD` is exactly at a stable tag named `vMAJOR.MINOR.PATCH`.
+- The tracked worktree has no local modifications.
+- The configured Git remote, `origin` by default, provides a newer stable tag.
+- The target tag contains a manifest that permits automatic updates.
+
+The updater compares tags using semantic version order. It ignores branches, untagged commits,
+prerelease tags such as `v2.0.0-rc.1`, and tags that do not match the stable version format. It does
+not merge, rebase, or pull the current branch. A successful update checks out the target tag in
+detached-HEAD mode, so local branch pointers are not moved.
+
+A branch whose `HEAD` happens to equal a stable tag can pass the technical check, but operators
+should install in detached-HEAD mode as shown in [Operator Setup](./setup.md#clone-the-repository).
+Use `develop` and feature branches only for development environments where Admin UI updates are
+not required.
+
 ## Release safety manifest
 
 Automatic updates are allowed only when the target stable tag contains `update-manifest.json` with
@@ -31,8 +50,9 @@ The Admin UI will show the release as unavailable for automatic update.
 
 ## Starting QDash
 
-Clone QDash in any directory. Start the updater and Compose directly with the tools already used by
-QDash deployments:
+Clone QDash in any directory and check out a stable release tag according to
+[Operator Setup](./setup.md#clone-the-repository). Start the updater and Compose directly with the
+tools already used by QDash deployments:
 
 ```bash
 uv run qdash-updater start
@@ -57,8 +77,8 @@ can override `QDASH_UPDATER_REPOSITORY`,
 
 ## Update behavior
 
-The Admin **System** tab shows the current exact release tag, latest stable tag, working-tree state,
-and any blocking reason. Starting an update performs these steps:
+The Admin **System** tab shows the current exact release tag, latest stable tag, tracked worktree
+state, and any blocking reason. Starting an update performs these steps:
 
 1. Verify that QDash is on an exact stable tag and its tracked working tree is clean.
 2. Fetch tags and validate the target release manifest.
