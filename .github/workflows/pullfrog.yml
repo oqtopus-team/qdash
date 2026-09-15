@@ -23,7 +23,7 @@ jobs:
     env:
       OPENAI_COMPATIBLE_BASE_URL: ${{ secrets.OPENAI_COMPATIBLE_BASE_URL }}
       OPENAI_COMPATIBLE_API_KEY: ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}
-      OPENAI_COMPATIBLE_MODEL: qwen3.8-27b
+      OPENAI_COMPATIBLE_MODEL: ${{ secrets.OPENAI_COMPATIBLE_MODEL }}
       OPENAI_COMPATIBLE_CONTEXT: "131072"
       OPENAI_COMPATIBLE_MAX_OUTPUT: "32768"
     steps:
@@ -31,6 +31,16 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.0"
+
+      - name: Install UI dependencies
+        working-directory: ./ui
+        run: bun install --frozen-lockfile
+        continue-on-error: true
 
       - name: Run agent
         uses: pullfrog/pullfrog@1ab92a2eb5c2268dcd803ac8bfb0984375e210ab
