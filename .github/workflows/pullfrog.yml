@@ -39,7 +39,7 @@ jobs:
 
       - name: Install UI dependencies
         working-directory: ./ui
-        run: bun install
+        run: bun install --frozen-lockfile
         continue-on-error: true
 
       - name: Run agent
