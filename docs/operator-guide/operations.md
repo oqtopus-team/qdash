@@ -6,12 +6,12 @@ This page covers common operational commands for a local or lab QDash deployment
 
 ```bash
 # Full Docker Compose stack
-uv run --isolated --locked --no-dev qdash-updater start
+uv run --env-file .env --isolated --locked --no-dev qdash-updater start
 docker compose up -d --build
 
 # Updater state or shutdown
-uv run --isolated --locked --no-dev qdash-updater status
-uv run --isolated --locked --no-dev qdash-updater stop
+uv run --env-file .env --isolated --locked --no-dev qdash-updater status
+uv run --env-file .env --isolated --locked --no-dev qdash-updater stop
 
 # Host-side API/UI with Docker-backed services
 task dev-local

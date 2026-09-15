@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   enabled: true,
   mutate: vi.fn(),
   refetch: vi.fn(),
+  refetchOperation: vi.fn(),
+  operationError: false,
   invalidateQueries: vi.fn(),
   status: {
     enabled: true,
@@ -38,7 +40,8 @@ vi.mock("@/client/admin/admin", () => ({
   }),
   useGetSystemUpdateOperation: () => ({
     data: undefined,
-    isError: false,
+    isError: mocks.operationError,
+    refetch: mocks.refetchOperation,
   }),
   useStartSystemUpdate: () => ({
     mutate: mocks.mutate,
@@ -58,6 +61,7 @@ describe("SystemUpdateCard", () => {
     vi.clearAllMocks();
     window.localStorage.clear();
     mocks.enabled = true;
+    mocks.operationError = false;
   });
 
   it("shows current and latest stable releases", () => {
@@ -85,7 +89,18 @@ describe("SystemUpdateCard", () => {
     render(<SystemUpdateCard />);
 
     expect(
-      screen.getByText("uv run --isolated --locked --no-dev qdash-updater start"),
+      screen.getByText("uv run --env-file .env --isolated --locked --no-dev qdash-updater start"),
     ).toBeTruthy();
+  });
+
+  it("lets an admin dismiss an unavailable saved operation", () => {
+    window.localStorage.setItem("qdash-system-update-operation", "missing-operation");
+    mocks.operationError = true;
+
+    render(<SystemUpdateCard />);
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    expect(window.localStorage.getItem("qdash-system-update-operation")).toBeNull();
+    expect(screen.getByRole("button", { name: "Update to v1.9.13" })).toBeEnabled();
   });
 });

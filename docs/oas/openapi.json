@@ -342,6 +342,9 @@
           },
           "404": {
             "description": "Not found"
+          },
+          "503": {
+            "description": "Host updater unavailable"
           }
         },
         "security": [
@@ -382,6 +385,12 @@
           },
           "404": {
             "description": "Not found"
+          },
+          "409": {
+            "description": "Calibration or system update in progress"
+          },
+          "503": {
+            "description": "Host updater unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -438,6 +447,9 @@
           },
           "404": {
             "description": "Not found"
+          },
+          "503": {
+            "description": "Host updater unavailable"
           },
           "422": {
             "description": "Validation Error",

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -21,7 +22,7 @@ class UpdateState(StrEnum):
 class UpdateManifest(BaseModel):
     """Release-owned declaration that unattended source updates are supported."""
 
-    schema_version: int = 1
+    schema_version: Literal[1] = 1
     automatic_update: bool = False
     migration_mode: str = "manual"
     notes: str = ""
@@ -47,6 +48,7 @@ class StartUpdateRequest(BaseModel):
     """Request to install the latest stable release."""
 
     expected_current_version: str | None = None
+    operation_id: str | None = None
 
 
 class UpdateOperation(BaseModel):
@@ -62,4 +64,5 @@ class UpdateOperation(BaseModel):
     started_at: datetime
     updated_at: datetime
     completed_at: datetime | None = None
+    previous_commit: str | None = None
     log_tail: list[str] = Field(default_factory=list)

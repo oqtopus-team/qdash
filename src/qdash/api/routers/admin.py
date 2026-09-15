@@ -43,6 +43,7 @@ router = APIRouter(
     response_model=SystemUpdateStatusResponse,
     summary="Get QDash system update status",
     operation_id="getSystemUpdateStatus",
+    responses={503: {"description": "Host updater unavailable"}},
 )
 async def get_system_update_status(
     admin: Annotated[User, Depends(get_admin_user)],
@@ -59,6 +60,10 @@ async def get_system_update_status(
     status_code=status.HTTP_202_ACCEPTED,
     summary="Start a QDash system update",
     operation_id="startSystemUpdate",
+    responses={
+        409: {"description": "Calibration or system update in progress"},
+        503: {"description": "Host updater unavailable"},
+    },
 )
 async def start_system_update(
     request: StartSystemUpdateRequest,
@@ -75,6 +80,7 @@ async def start_system_update(
     response_model=SystemUpdateOperationResponse,
     summary="Get QDash system update progress",
     operation_id="getSystemUpdateOperation",
+    responses={503: {"description": "Host updater unavailable"}},
 )
 async def get_system_update_operation(
     operation_id: str,

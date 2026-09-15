@@ -61,6 +61,8 @@ class UpdaterSettings:
     state_path: Path = Path("/var/lib/qdash-updater/state.json")
     health_url: str = "http://127.0.0.1:5715/docs"
     command_timeout_seconds: int = 1800
+    status_fetch_timeout_seconds: int = 30
+    status_fetch_interval_seconds: int = 60
     health_timeout_seconds: int = 180
 
     @classmethod
@@ -85,6 +87,12 @@ class UpdaterSettings:
             ),
             command_timeout_seconds=int(
                 _env_value("QDASH_UPDATER_COMMAND_TIMEOUT_SECONDS", "1800")
+            ),
+            status_fetch_timeout_seconds=int(
+                _env_value("QDASH_UPDATER_STATUS_FETCH_TIMEOUT_SECONDS", "30")
+            ),
+            status_fetch_interval_seconds=int(
+                _env_value("QDASH_UPDATER_STATUS_FETCH_INTERVAL_SECONDS", "60")
             ),
             health_timeout_seconds=int(_env_value("QDASH_UPDATER_HEALTH_TIMEOUT_SECONDS", "180")),
         )
@@ -138,20 +146,48 @@ class UpdaterService:
         self.settings = settings
         self._runner = runner or SubprocessCommandRunner(settings.repository_path)
         self._lock = asyncio.Lock()
+        self._status_lock = asyncio.Lock()
+        self._last_status_fetch_at: float | None = None
         self._operation = self._load_operation()
         self._background_tasks: set[asyncio.Task[None]] = set()
 
     async def get_status(self) -> UpdateStatus:
         """Refresh tags and report whether the latest stable release is installable."""
-        return await asyncio.to_thread(self._inspect_status)
+        return await self._get_status()
 
-    async def start_update(self, expected_current_version: str | None) -> UpdateOperation:
+    async def recover_interrupted_update(self) -> None:
+        """Restore the previous revision when the updater stopped during deployment."""
+        async with self._lock:
+            operation = self._operation
+            if operation is None or operation.state not in ACTIVE_STATES:
+                return
+            if operation.previous_commit:
+                await self._rollback(
+                    operation.operation_id,
+                    operation.previous_commit,
+                    RuntimeError("Updater restarted before the operation completed"),
+                )
+                return
+            self._set_operation(
+                operation.operation_id,
+                state=UpdateState.FAILED,
+                stage="interrupted",
+                message="Updater restarted before deployment began",
+                progress=100,
+                completed=True,
+            )
+
+    async def start_update(
+        self,
+        expected_current_version: str | None,
+        operation_id: str | None = None,
+    ) -> UpdateOperation:
         """Queue an update after an atomic in-process concurrency check."""
         async with self._lock:
             if self._operation is not None and self._operation.state in ACTIVE_STATES:
                 raise UpdateBlockedError("Another system update is already running")
 
-            status = await asyncio.to_thread(self._inspect_status)
+            status = await self._get_status()
             if expected_current_version and expected_current_version != status.current_version:
                 raise UpdateBlockedError(
                     "Current version changed; refresh update status before retrying"
@@ -160,7 +196,7 @@ class UpdaterService:
                 raise UpdateBlockedError(status.blocked_reason or "No update is available")
 
             operation = UpdateOperation(
-                operation_id=str(uuid4()),
+                operation_id=operation_id or str(uuid4()),
                 state=UpdateState.QUEUED,
                 source_version=status.current_version,
                 target_version=status.latest_version,
@@ -176,6 +212,11 @@ class UpdaterService:
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
             return operation.model_copy(deep=True)
+
+    async def _get_status(self) -> UpdateStatus:
+        """Serialize status inspection so polling cannot fan out Git fetches."""
+        async with self._status_lock:
+            return await asyncio.to_thread(self._inspect_status)
 
     def get_operation(self, operation_id: str) -> UpdateOperation | None:
         """Return the current persisted operation when its identifier matches."""
@@ -205,7 +246,16 @@ class UpdaterService:
             current_version = self._exact_current_tag() or current_commit[:12]
             current_branch = self._current_branch()
             dirty = bool(self._git("status", "--porcelain", "--untracked-files=no").stdout)
-            self._git("fetch", self.settings.remote, "--tags", "--prune")
+            now = time.monotonic()
+            if (
+                self._last_status_fetch_at is None
+                or now - self._last_status_fetch_at >= self.settings.status_fetch_interval_seconds
+            ):
+                self._runner.run(
+                    ("git", "fetch", self.settings.remote, "--tags", "--prune"),
+                    timeout=self.settings.status_fetch_timeout_seconds,
+                )
+                self._last_status_fetch_at = now
             latest_version = self._latest_stable_tag()
         except (subprocess.SubprocessError, OSError) as exc:
             return self._blocked_status(
@@ -307,7 +357,7 @@ class UpdaterService:
                 message="Validating target release",
                 progress=10,
             )
-            status = await asyncio.to_thread(self._inspect_status)
+            status = await self._get_status()
             operation = self.get_operation(operation_id)
             if operation is None:
                 raise RuntimeError("Update operation state was lost")
@@ -333,6 +383,7 @@ class UpdaterService:
                 stage="stopping",
                 message="Stopping QDash application services",
                 progress=25,
+                previous_commit=previous_commit,
             )
             await asyncio.to_thread(self._compose, "stop", *APP_SERVICES)
 
@@ -443,6 +494,7 @@ class UpdaterService:
         stage: str,
         message: str,
         progress: int,
+        previous_commit: str | None = None,
         completed: bool = False,
     ) -> None:
         if self._operation is None or self._operation.operation_id != operation_id:
@@ -451,6 +503,8 @@ class UpdaterService:
         self._operation.stage = stage
         self._operation.message = message
         self._operation.progress = progress
+        if previous_commit is not None:
+            self._operation.previous_commit = previous_commit
         self._operation.updated_at = _now()
         if completed:
             self._operation.completed_at = _now()
@@ -482,11 +536,4 @@ class UpdaterService:
         except (OSError, ValueError):
             logger.warning("Ignoring invalid updater state file at %s", path, exc_info=True)
             return None
-        if operation.state in ACTIVE_STATES:
-            operation.state = UpdateState.FAILED
-            operation.stage = "interrupted"
-            operation.message = "Updater restarted before the operation completed"
-            operation.progress = 100
-            operation.updated_at = _now()
-            operation.completed_at = _now()
         return operation

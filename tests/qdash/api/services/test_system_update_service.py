@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -75,11 +75,9 @@ async def test_status_uses_unix_socket_and_validates_payload(
 async def test_start_update_refuses_active_calibration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    query = MagicMock()
-    query.count.return_value = 1
     monkeypatch.setattr(
-        "qdash.api.services.system_update_service.ExecutionLockDocument.find",
-        lambda *args, **kwargs: query,
+        "qdash.api.services.system_update_service.ExecutionLockDocument.try_reserve_maintenance",
+        lambda operation_id: False,
     )
 
     with pytest.raises(HTTPException) as exc_info:
@@ -87,3 +85,28 @@ async def test_start_update_refuses_active_calibration(
 
     assert exc_info.value.status_code == 409
     assert "calibration is running" in str(exc_info.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_start_update_releases_reservation_when_updater_rejects_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = SystemUpdateService(settings())
+    request = AsyncMock(side_effect=HTTPException(status_code=409, detail="blocked"))
+    release = MagicMock()
+    monkeypatch.setattr(service, "_request", request)
+    monkeypatch.setattr(
+        "qdash.api.services.system_update_service.ExecutionLockDocument.try_reserve_maintenance",
+        lambda operation_id: True,
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.system_update_service.ExecutionLockDocument.release_maintenance",
+        release,
+    )
+
+    with pytest.raises(HTTPException, match="409"):
+        await service.start_update("v1.0.0")
+
+    assert request.await_args is not None
+    operation_id = request.await_args.kwargs["json"]["operation_id"]
+    release.assert_called_once_with(operation_id)

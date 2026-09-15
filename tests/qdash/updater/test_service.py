@@ -1,11 +1,12 @@
 """Tests for the host-side system updater."""
 
 from collections.abc import Sequence
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
-from qdash.updater.models import UpdateState
+from qdash.updater.models import UpdateOperation, UpdateState
 from qdash.updater.service import (
     CommandResult,
     UpdateBlockedError,
@@ -23,11 +24,12 @@ class FakeCommandRunner:
         self.dirty = dirty
         self.branch = branch
         self.commands: list[tuple[str, ...]] = []
+        self.command_timeouts: list[tuple[tuple[str, ...], int]] = []
 
     def run(self, args: Sequence[str], *, timeout: int) -> CommandResult:
-        del timeout
         command = tuple(args)
         self.commands.append(command)
+        self.command_timeouts.append((command, timeout))
         if command == ("git", "rev-parse", "HEAD"):
             return CommandResult(self.current_commit, "")
         if command == ("git", "tag", "--points-at", "HEAD"):
@@ -49,6 +51,10 @@ class FakeCommandRunner:
             self.current_tag = "v1.1.0"
             self.current_commit = "b" * 40
             return CommandResult("", "")
+        if command[:3] == ("git", "reset", "--hard"):
+            self.current_commit = command[3]
+            self.current_tag = "v1.0.0"
+            return CommandResult("", "")
         if command[:2] == ("docker", "compose"):
             return CommandResult("compose ok", "")
         raise AssertionError(f"Unexpected command: {command}")
@@ -56,7 +62,7 @@ class FakeCommandRunner:
 
 def make_service(tmp_path: Path, runner: FakeCommandRunner) -> UpdaterService:
     repository = tmp_path / "repo"
-    (repository / ".git").mkdir(parents=True)
+    (repository / ".git").mkdir(parents=True, exist_ok=True)
     return UpdaterService(
         UpdaterSettings(
             repository_path=repository,
@@ -78,6 +84,43 @@ async def test_status_selects_latest_stable_manifest_release(tmp_path: Path) -> 
     assert status.update_available is True
     assert status.can_update is True
     assert status.blocked_reason is None
+
+
+@pytest.mark.asyncio
+async def test_status_throttles_remote_fetches(tmp_path: Path) -> None:
+    runner = FakeCommandRunner()
+    service = make_service(tmp_path, runner)
+
+    await service.get_status()
+    await service.get_status()
+
+    assert runner.commands.count(("git", "fetch", "origin", "--tags", "--prune")) == 1
+    assert (
+        ("git", "fetch", "origin", "--tags", "--prune"),
+        service.settings.status_fetch_timeout_seconds,
+    ) in runner.command_timeouts
+
+
+@pytest.mark.asyncio
+async def test_status_rejects_unknown_manifest_schema_version(tmp_path: Path) -> None:
+    runner = FakeCommandRunner()
+    service = make_service(tmp_path, runner)
+    original_run = runner.run
+
+    def run_with_unknown_schema(args: Sequence[str], *, timeout: int) -> CommandResult:
+        if tuple(args) == ("git", "show", "v1.1.0:update-manifest.json"):
+            return CommandResult(
+                '{"schema_version":2,"automatic_update":true,"migration_mode":"compose"}',
+                "",
+            )
+        return original_run(args, timeout=timeout)
+
+    runner.run = run_with_unknown_schema  # type: ignore[method-assign]
+
+    status = await service.get_status()
+
+    assert status.can_update is False
+    assert status.blocked_reason == "The target release does not declare automatic update support"
 
 
 @pytest.mark.asyncio
@@ -137,3 +180,36 @@ async def test_update_rejects_stale_current_version(tmp_path: Path) -> None:
 
     with pytest.raises(UpdateBlockedError, match="Current version changed"):
         await service.start_update("v0.9.0")
+
+
+@pytest.mark.asyncio
+async def test_recovery_rolls_back_an_interrupted_deployment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner = FakeCommandRunner()
+    service = make_service(tmp_path, runner)
+    operation = UpdateOperation(
+        operation_id="update-1",
+        state=UpdateState.RUNNING,
+        source_version="v1.0.0",
+        target_version="v1.1.0",
+        stage="deploying",
+        message="Deploying",
+        progress=60,
+        started_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+        previous_commit="a" * 40,
+    )
+    service._operation = operation
+    service._persist_operation()
+    recovered = make_service(tmp_path, runner)
+    monkeypatch.setattr(recovered, "_wait_for_health", lambda: None)
+
+    await recovered.recover_interrupted_update()
+
+    completed = recovered.get_operation("update-1")
+    assert completed is not None
+    assert completed.state == UpdateState.ROLLED_BACK
+    assert ("git", "reset", "--hard", "a" * 40) in runner.commands
+    assert ("docker", "compose", "up", "-d", "--build") in runner.commands

@@ -443,7 +443,8 @@ tasks:
       - bun run lint
       - bun run fmt:check
       - bun run knip
-      - bun audit
+      # Bun <1.4 cannot read the current lockfile format, even when other UI commands succeed.
+      - bunx bun@1.4.0 audit
 
   ci-ui-build:
     desc: Build UI for production

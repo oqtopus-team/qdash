@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 import httpx
 from fastapi import HTTPException, status
 
 from qdash.api.schemas.system_update import (
     SystemUpdateOperationResponse,
+    SystemUpdateState,
     SystemUpdateStatusResponse,
 )
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
@@ -23,6 +26,7 @@ class SystemUpdateService:
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
+        self._background_tasks: set[asyncio.Task[None]] = set()
 
     async def get_status(self) -> SystemUpdateStatusResponse:
         """Return updater status or an explicit disabled response."""
@@ -35,7 +39,9 @@ class SystemUpdateService:
                 checked_at=datetime.now(timezone.utc),
             )
         payload = await self._request("GET", "/status")
-        return SystemUpdateStatusResponse.model_validate(payload)
+        response = SystemUpdateStatusResponse.model_validate(payload)
+        self._release_terminal_reservation(response.operation_id, response.operation_state)
+        return response
 
     async def start_update(
         self,
@@ -47,17 +53,35 @@ class SystemUpdateService:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="The host updater is not configured",
             )
-        if ExecutionLockDocument.find({"locked": True}).count() > 0:
+        operation_id = str(uuid4())
+        if not ExecutionLockDocument.try_reserve_maintenance(operation_id):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="A calibration is running; wait for it to finish before updating QDash",
             )
-        payload = await self._request(
-            "POST",
-            "/updates",
-            json={"expected_current_version": expected_current_version},
-        )
-        return SystemUpdateOperationResponse.model_validate(payload)
+        try:
+            payload = await self._request(
+                "POST",
+                "/updates",
+                json={
+                    "expected_current_version": expected_current_version,
+                    "operation_id": operation_id,
+                },
+            )
+            response = SystemUpdateOperationResponse.model_validate(payload)
+            if response.operation_id != operation_id:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="The host updater returned an unexpected operation ID",
+                )
+        except Exception:
+            ExecutionLockDocument.release_maintenance(operation_id)
+            raise
+
+        task = asyncio.create_task(self._watch_operation(operation_id))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return response
 
     async def get_operation(self, operation_id: str) -> SystemUpdateOperationResponse:
         """Return updater-owned progress across QDash API restarts."""
@@ -67,7 +91,50 @@ class SystemUpdateService:
                 detail="The host updater is not configured",
             )
         payload = await self._request("GET", f"/updates/{operation_id}")
-        return SystemUpdateOperationResponse.model_validate(payload)
+        response = SystemUpdateOperationResponse.model_validate(payload)
+        self._release_terminal_reservation(response.operation_id, response.state)
+        return response
+
+    async def reconcile_maintenance(self) -> None:
+        """Resume watching a reservation left across an API container restart."""
+        operation_id = ExecutionLockDocument.maintenance_operation_id()
+        if operation_id is None or not self._is_configured:
+            return
+        await self._watch_operation(operation_id)
+
+    async def _watch_operation(self, operation_id: str) -> None:
+        """Release maintenance once the host updater reaches a terminal state."""
+        while True:
+            try:
+                payload = await self._request("GET", f"/updates/{operation_id}")
+                response = SystemUpdateOperationResponse.model_validate(payload)
+            except HTTPException as exc:
+                if exc.status_code == status.HTTP_404_NOT_FOUND:
+                    ExecutionLockDocument.release_maintenance(operation_id)
+                    return
+                await asyncio.sleep(2)
+                continue
+            if response.state not in {
+                SystemUpdateState.QUEUED,
+                SystemUpdateState.RUNNING,
+                SystemUpdateState.ROLLING_BACK,
+            }:
+                ExecutionLockDocument.release_maintenance(operation_id)
+                return
+            await asyncio.sleep(2)
+
+    @staticmethod
+    def _release_terminal_reservation(
+        operation_id: str | None,
+        state: SystemUpdateState,
+    ) -> None:
+        """Release a matching reservation reported in a terminal response."""
+        if operation_id and state not in {
+            SystemUpdateState.QUEUED,
+            SystemUpdateState.RUNNING,
+            SystemUpdateState.ROLLING_BACK,
+        }:
+            ExecutionLockDocument.release_maintenance(operation_id)
 
     @property
     def _is_configured(self) -> bool:

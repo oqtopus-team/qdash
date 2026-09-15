@@ -1,12 +1,30 @@
 """FastAPI application for the privileged host-side updater."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, status
 
 from qdash.updater.models import StartUpdateRequest, UpdateOperation, UpdateStatus
 from qdash.updater.service import UpdateBlockedError, UpdaterService, UpdaterSettings
 
-app = FastAPI(title="QDash Updater", docs_url=None, redoc_url=None, openapi_url=None)
 service = UpdaterService(UpdaterSettings.from_env())
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Recover an interrupted deployment before accepting updater requests."""
+    await service.recover_interrupted_update()
+    yield
+
+
+app = FastAPI(
+    title="QDash Updater",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+    lifespan=lifespan,
+)
 
 
 @app.get("/health")
@@ -29,7 +47,7 @@ async def get_status() -> UpdateStatus:
 async def start_update(request: StartUpdateRequest) -> UpdateOperation:
     """Queue installation of the latest safe stable release."""
     try:
-        return await service.start_update(request.expected_current_version)
+        return await service.start_update(request.expected_current_version, request.operation_id)
     except UpdateBlockedError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 

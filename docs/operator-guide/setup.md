@@ -131,7 +131,7 @@ Complete the Qubex config placement or repository setup before starting services
 Start all services:
 
 ```bash
-uv run --isolated --locked --no-dev qdash-updater start
+uv run --env-file .env --isolated --locked --no-dev qdash-updater start
 docker compose up -d --build
 ```
 
@@ -149,7 +149,7 @@ Open:
 Set `TUNNEL_TOKEN` in `.env`, then run:
 
 ```bash
-uv run --isolated --locked --no-dev qdash-updater start
+uv run --env-file .env --isolated --locked --no-dev qdash-updater start
 docker compose --profile tunnel up -d --build
 ```
 

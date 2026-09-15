@@ -45,8 +45,9 @@ export function SystemUpdateCard() {
   const operationQuery = useGetSystemUpdateOperation(operationId ?? "", {
     query: {
       enabled: !!operationId,
-      retry: true,
+      retry: 2,
       refetchInterval: (query) => {
+        if (query.state.status === "error") return false;
         const state = query.state.data?.data.state;
         return state === undefined || ACTIVE_STATES.includes(state) ? 2_000 : false;
       },
@@ -174,7 +175,7 @@ export function SystemUpdateCard() {
                 <span>
                   The host updater is not running. On the QDash host, run{" "}
                   <code className="font-mono">
-                    uv run --isolated --locked --no-dev qdash-updater start
+                    uv run --env-file .env --isolated --locked --no-dev qdash-updater start
                   </code>
                   , then restart the API container.
                 </span>
@@ -219,6 +220,33 @@ export function SystemUpdateCard() {
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {operationId && operationQuery.isError && (
+              <div role="alert" className="alert alert-error alert-soft">
+                <div className="flex-1">
+                  <div className="font-medium">Update progress is unavailable</div>
+                  <div className="mt-1 text-sm">
+                    The saved operation may no longer exist, or the host updater may be offline.
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => operationQuery.refetch()}
+                  >
+                    Retry
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={handleDismissOperation}
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
             )}
 

@@ -52,7 +52,7 @@ Clone QDash in any directory and check out the `main` release branch according t
 tools already used by QDash deployments:
 
 ```bash
-uv run --isolated --locked --no-dev qdash-updater start
+uv run --env-file .env --isolated --locked --no-dev qdash-updater start
 docker compose up -d --build
 ```
 
@@ -72,9 +72,9 @@ The `--isolated` option is intentional. It keeps the host updater out of the rep
 which may have been created inside a devcontainer with a different interpreter or file owner.
 `--locked --no-dev` uses the committed dependency versions without installing development tools.
 
-Use `uv run --isolated --locked --no-dev qdash-updater status` to check the process and
-`uv run --isolated --locked --no-dev qdash-updater stop` to stop it. Replace `status` with `run` to
-run it in the foreground for troubleshooting. The equivalent Task commands are
+Use `uv run --env-file .env --isolated --locked --no-dev qdash-updater status` to check the process
+and `uv run --env-file .env --isolated --locked --no-dev qdash-updater stop` to stop it. Replace
+`status` with `run` to run it in the foreground for troubleshooting. The equivalent Task commands are
 `task updater-status`, `task updater-stop`, and `task updater`. Advanced deployments can override
 `QDASH_UPDATER_REPOSITORY`,
 `QDASH_UPDATER_RUNTIME_DIR`, `QDASH_UPDATER_SOCKET`, `QDASH_UPDATER_STATE_PATH`, or
