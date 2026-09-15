@@ -54,6 +54,7 @@ import {
 import { ForumLabelPicker } from "./ForumLabelSelector";
 import { type ForumBlockSnapshotGetter, type ForumMentionCandidate } from "./ForumBlockEditor";
 import { ForumPostContent } from "./ForumPostContent";
+import { ForumThreadDownloadButton } from "./ForumThreadDownloadButton";
 
 const ForumBlockEditor = dynamic(
   () => import("./ForumBlockEditor").then((m) => ({ default: m.ForumBlockEditor })),
@@ -727,6 +728,9 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 </TooltipTrigger>
                 <TooltipContent>Edit title</TooltipContent>
               </Tooltip>
+            )}
+            {!editingTitle && (
+              <ForumThreadDownloadButton post={post} replies={replies} disabled={repliesLoading} />
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
