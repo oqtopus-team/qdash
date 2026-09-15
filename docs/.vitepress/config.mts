@@ -94,6 +94,7 @@ export default withMermaid(
             { text: "Overview", link: "/operator-guide/" },
             { text: "Setup", link: "/operator-guide/setup" },
             { text: "Operations", link: "/operator-guide/operations" },
+            { text: "System Updates", link: "/operator-guide/system-updates" },
             { text: "Workflows", link: "/operator-guide/workflows" },
             {
               text: "Authentication",

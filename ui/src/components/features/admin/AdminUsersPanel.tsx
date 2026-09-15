@@ -1,7 +1,5 @@
 "use client";
 
-import { FolderPlus, Plus, Search, Trash2, Upload, UserPlus } from "lucide-react";
-
 import type { UserListItem } from "@/schemas";
 
 type UserRoleFilter = "all" | "admin" | "user";
@@ -86,25 +84,27 @@ export function AdminUsersPanel({
   onDeleteUser,
 }: AdminUsersPanelProps) {
   return (
-    <div className="card bg-base-200 shadow-lg">
-      <div className="card-body">
-        <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-          <h2 className="card-title">User Management</h2>
+    <section className="card card-border bg-base-100">
+      <div className="card-body gap-5 p-5 sm:p-6">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+          <div>
+            <h2 className="card-title text-lg">User management</h2>
+            <p className="mt-1 text-sm text-base-content/60">
+              Create accounts, manage access, and assign projects.
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2">
             <button className="btn btn-outline btn-sm" onClick={onOpenBulkImport}>
-              <Upload className="h-4 w-4" />
               Bulk Import
             </button>
             <button className="btn btn-primary btn-sm" onClick={onOpenCreateUser}>
-              <Plus className="h-4 w-4" />
               Create User
             </button>
           </div>
         </div>
 
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <label className="input input-bordered flex w-full items-center gap-2 sm:min-w-[16rem] sm:flex-1">
-            <Search size={16} className="text-base-content/50" />
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <label className="input input-bordered flex w-full items-center sm:min-w-[16rem] sm:flex-1">
             <input
               type="text"
               className="grow"
@@ -140,7 +140,7 @@ export function AdminUsersPanel({
         </div>
 
         {selectedUsers.length > 0 && (
-          <div className="alert alert-info mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="alert alert-info flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="font-medium">{selectedUsers.length} selected</span>
               <span className="text-sm opacity-80">
@@ -149,11 +149,10 @@ export function AdminUsersPanel({
             </div>
             <div className="flex flex-wrap gap-2">
               <button
-                className="btn btn-sm btn-error"
+                className="btn btn-sm btn-error btn-outline"
                 onClick={() => onSetBulkDeleteTargets(selectedUsers)}
                 disabled={bulkAction !== null}
               >
-                <Trash2 size={16} />
                 Delete Selected
               </button>
               <button
@@ -163,9 +162,7 @@ export function AdminUsersPanel({
               >
                 {bulkAction === "create-project" ? (
                   <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <FolderPlus size={16} />
-                )}
+                ) : null}
                 Create Default Projects
               </button>
               <button
@@ -173,7 +170,6 @@ export function AdminUsersPanel({
                 onClick={onOpenAssignProject}
                 disabled={bulkAction !== null}
               >
-                <UserPlus size={16} />
                 Assign To Project
               </button>
               <button className="btn btn-sm btn-ghost" onClick={onClearSelection}>
@@ -196,7 +192,7 @@ export function AdminUsersPanel({
           </label>
 
           {filteredUsers.map((userItem) => (
-            <div key={userItem.username} className="card bg-base-100 shadow-sm">
+            <div key={userItem.username} className="card card-border bg-base-100">
               <div className="card-body p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
@@ -260,7 +256,7 @@ export function AdminUsersPanel({
           )}
         </div>
 
-        <div className="hidden overflow-x-auto sm:block">
+        <div className="hidden overflow-x-auto rounded-box border border-base-300 sm:block">
           <table className="table table-zebra">
             <thead>
               <tr>
@@ -357,6 +353,6 @@ export function AdminUsersPanel({
           </table>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

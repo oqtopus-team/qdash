@@ -8,6 +8,8 @@ from pymongo.errors import DuplicateKeyError
 from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
 
+SYSTEM_MAINTENANCE_PROJECT_ID = "__qdash_system_maintenance__"
+
 
 class ExecutionLockClaim(BaseModel):
     """One execution's hardware-resource claim."""
@@ -95,6 +97,57 @@ class ExecutionLockDocument(Document):
         without claims remain project-wide until their owner releases them.
         A conflicting upsert is rejected by the unique project index.
         """
+        if project_id == SYSTEM_MAINTENANCE_PROJECT_ID:
+            return cls._try_lock_claim(
+                project_id,
+                execution_id,
+                chip_id,
+                resources,
+                exclusive,
+            )
+
+        gate_owner = execution_id or f"project:{project_id}"
+        gate_claim_already_held = cls._has_claim(
+            SYSTEM_MAINTENANCE_PROJECT_ID,
+            gate_owner,
+        )
+        if not cls._try_lock_claim(
+            SYSTEM_MAINTENANCE_PROJECT_ID,
+            gate_owner,
+            resources=(gate_owner,),
+            exclusive=False,
+        ):
+            return False
+        if cls._try_lock_claim(project_id, execution_id, chip_id, resources, exclusive):
+            return True
+        if not gate_claim_already_held:
+            cls._unlock_claim(SYSTEM_MAINTENANCE_PROJECT_ID, gate_owner)
+        return False
+
+    @classmethod
+    def _has_claim(cls, project_id: str, execution_id: str) -> bool:
+        """Return whether an execution already owns a claim in one lock document."""
+        return (
+            cls.find_one(
+                {
+                    "project_id": project_id,
+                    "locked": True,
+                    "claims": {"$elemMatch": {"execution_id": execution_id}},
+                }
+            ).run()
+            is not None
+        )
+
+    @classmethod
+    def _try_lock_claim(
+        cls,
+        project_id: str,
+        execution_id: str | None,
+        chip_id: str = "",
+        resources: tuple[str, ...] = (),
+        exclusive: bool = True,
+    ) -> bool:
+        """Apply one atomic claim without recursively acquiring the system gate."""
         collection = cls.get_motor_collection()
         timestamp = now()
         if execution_id is not None:
@@ -169,6 +222,14 @@ class ExecutionLockDocument(Document):
     @classmethod
     def unlock(cls, project_id: str, execution_id: str | None = None) -> None:
         """Release one execution claim, or every claim for legacy callers."""
+        cls._unlock_claim(project_id, execution_id)
+        if project_id != SYSTEM_MAINTENANCE_PROJECT_ID:
+            gate_owner = execution_id or f"project:{project_id}"
+            cls._unlock_claim(SYSTEM_MAINTENANCE_PROJECT_ID, gate_owner)
+
+    @classmethod
+    def _unlock_claim(cls, project_id: str, execution_id: str | None = None) -> None:
+        """Release one claim without recursively changing the system gate."""
         collection = cls.get_motor_collection()
         if execution_id is None:
             collection.update_one(
@@ -194,6 +255,61 @@ class ExecutionLockDocument(Document):
                         {"claims": {"$exists": False}},
                         {"claims": {"$size": 0}},
                     ],
+                },
+                {"$set": {"locked": False, "execution_id": None}},
+            )
+
+    @classmethod
+    def try_reserve_maintenance(cls, operation_id: str) -> bool:
+        """Atomically reserve the system only when no calibration claim exists."""
+        return cls._try_lock_claim(
+            SYSTEM_MAINTENANCE_PROJECT_ID,
+            f"update:{operation_id}",
+            exclusive=True,
+        )
+
+    @classmethod
+    def release_maintenance(cls, operation_id: str) -> None:
+        """Release the exclusive system update reservation."""
+        cls._unlock_claim(SYSTEM_MAINTENANCE_PROJECT_ID, f"update:{operation_id}")
+
+    @classmethod
+    def maintenance_active(cls) -> bool:
+        """Return whether an exclusive system update reservation is active."""
+        return cls.maintenance_operation_id() is not None
+
+    @classmethod
+    def maintenance_operation_id(cls) -> str | None:
+        """Return the operation ID holding the exclusive maintenance reservation."""
+        document = cls.find_one(
+            {
+                "project_id": SYSTEM_MAINTENANCE_PROJECT_ID,
+                "locked": True,
+                "claims": {"$elemMatch": {"exclusive": True}},
+            }
+        ).run()
+        if document is None:
+            return None
+        for claim in document.claims:
+            if claim.exclusive and claim.execution_id and claim.execution_id.startswith("update:"):
+                return claim.execution_id.removeprefix("update:")
+        return None
+
+    @classmethod
+    def release_execution_gate_claims(cls, execution_ids: list[str]) -> None:
+        """Release system-gate claims after bulk execution finalization."""
+        if not execution_ids:
+            return
+        collection = cls.get_motor_collection()
+        result = collection.update_one(
+            {"project_id": SYSTEM_MAINTENANCE_PROJECT_ID},
+            {"$pull": {"claims": {"execution_id": {"$in": execution_ids}}}},
+        )
+        if result.modified_count:
+            collection.update_one(
+                {
+                    "project_id": SYSTEM_MAINTENANCE_PROJECT_ID,
+                    "claims": {"$size": 0},
                 },
                 {"$set": {"locked": False, "execution_id": None}},
             )

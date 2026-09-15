@@ -321,6 +321,149 @@
         ]
       }
     },
+    "/admin/system-updates/status": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get QDash system update status",
+        "description": "Return current/latest release information for system administrators.",
+        "operationId": "getSystemUpdateStatus",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemUpdateStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "503": {
+            "description": "Host updater unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/admin/system-updates": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Start a QDash system update",
+        "description": "Start the latest safe stable update when no calibration is running.",
+        "operationId": "startSystemUpdate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSystemUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemUpdateOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Calibration or system update in progress"
+          },
+          "503": {
+            "description": "Host updater unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/admin/system-updates/{operation_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get QDash system update progress",
+        "description": "Return updater progress after the API becomes available again.",
+        "operationId": "getSystemUpdateOperation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Operation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemUpdateOperationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "503": {
+            "description": "Host updater unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/config/reload": {
       "post": {
         "tags": [
@@ -27399,6 +27542,24 @@
         "title": "SettingsResponse",
         "description": "Settings for the QDash application."
       },
+      "StartSystemUpdateRequest": {
+        "properties": {
+          "expected_current_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Current Version"
+          }
+        },
+        "type": "object",
+        "title": "StartSystemUpdateRequest",
+        "description": "Start request guarded against stale status screens."
+      },
       "SubmitAgentActionRequest": {
         "properties": {
           "idempotency_key": {
@@ -27483,6 +27644,178 @@
         ],
         "title": "SystemRole",
         "description": "System-level role for a user.\n\nADMIN: Full system access, can manage all users and projects.\nUSER: Regular user."
+      },
+      "SystemUpdateOperationResponse": {
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "title": "Operation Id"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SystemUpdateState"
+          },
+          "source_version": {
+            "type": "string",
+            "title": "Source Version"
+          },
+          "target_version": {
+            "type": "string",
+            "title": "Target Version"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "progress": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "log_tail": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Log Tail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operation_id",
+          "state",
+          "source_version",
+          "target_version",
+          "stage",
+          "message",
+          "progress",
+          "started_at",
+          "updated_at"
+        ],
+        "title": "SystemUpdateOperationResponse",
+        "description": "Progress for one updater-owned operation."
+      },
+      "SystemUpdateState": {
+        "type": "string",
+        "enum": [
+          "idle",
+          "queued",
+          "running",
+          "rolling_back",
+          "succeeded",
+          "failed",
+          "rolled_back"
+        ],
+        "title": "SystemUpdateState",
+        "description": "Lifecycle state returned by the host updater."
+      },
+      "SystemUpdateStatusResponse": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "current_version": {
+            "type": "string",
+            "title": "Current Version"
+          },
+          "current_commit": {
+            "type": "string",
+            "title": "Current Commit"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "update_available": {
+            "type": "boolean",
+            "title": "Update Available",
+            "default": false
+          },
+          "can_update": {
+            "type": "boolean",
+            "title": "Can Update",
+            "default": false
+          },
+          "dirty": {
+            "type": "boolean",
+            "title": "Dirty",
+            "default": false
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
+          "operation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Id"
+          },
+          "operation_state": {
+            "$ref": "#/components/schemas/SystemUpdateState",
+            "default": "idle"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "current_version",
+          "current_commit",
+          "checked_at"
+        ],
+        "title": "SystemUpdateStatusResponse",
+        "description": "Current installation and latest stable release status."
       },
       "Tag": {
         "properties": {

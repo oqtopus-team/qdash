@@ -181,6 +181,7 @@ def finalize_executions_by_flow_run_id(
                     context,
                     project_id,
                 )
+            ExecutionLockDocument.release_execution_gate_claims(lock_owner_ids)
         except Exception:
             logger.warning("Failed to release execution lock", exc_info=True)
 

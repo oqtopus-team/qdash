@@ -1,8 +1,9 @@
 """Database session management with dependency injection support."""
 
+import asyncio
 import os
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Any
 
 from bunnet import init_bunnet
@@ -186,5 +187,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging()
     init_db()
     create_initial_admin()
-    yield
-    close_db()
+    from qdash.api.dependencies import get_system_update_service
+
+    reconciliation_task = asyncio.create_task(get_system_update_service().reconcile_maintenance())
+    try:
+        yield
+    finally:
+        reconciliation_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await reconciliation_task
+        close_db()

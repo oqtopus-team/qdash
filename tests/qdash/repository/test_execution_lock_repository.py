@@ -131,6 +131,31 @@ def test_try_lock_is_scoped_to_the_project(init_db: object) -> None:
     assert repo.try_lock(project_id="proj-2", execution_id="exec-2") is True
 
 
+def test_maintenance_reservation_is_atomic_with_execution_claims(init_db: object) -> None:
+    """Maintenance and calibration claims exclude each other on one system gate."""
+    repo = MongoExecutionLockRepository()
+    assert repo.try_lock(PROJECT_ID, "exec-1", "chip-1", ("mux:0",), False)
+    assert not ExecutionLockDocument.try_reserve_maintenance("update-1")
+
+    repo.unlock(PROJECT_ID, "exec-1")
+    assert ExecutionLockDocument.try_reserve_maintenance("update-1")
+    assert not repo.try_lock("proj-2", "exec-2", "chip-2", ("mux:0",), False)
+    assert repo.has_conflict("proj-2", MagicMock())
+
+    ExecutionLockDocument.release_maintenance("update-1")
+    assert repo.try_lock("proj-2", "exec-2", "chip-2", ("mux:0",), False)
+
+
+def test_failed_scope_expansion_keeps_existing_system_gate_claim(init_db: object) -> None:
+    repo = MongoExecutionLockRepository()
+    assert repo.try_lock(PROJECT_ID, "A", "chip-1", ("mux:0",), False)
+    assert repo.try_lock(PROJECT_ID, "B", "chip-1", ("mux:1",), False)
+
+    assert not repo.try_lock(PROJECT_ID, "A", "chip-1", ("mux:0", "mux:1"), False)
+
+    assert not ExecutionLockDocument.try_reserve_maintenance("update-1")
+
+
 def test_non_conflicting_resource_claims_run_concurrently(init_db: object) -> None:
     repo = MongoExecutionLockRepository()
 

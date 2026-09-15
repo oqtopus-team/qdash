@@ -40,20 +40,23 @@ The recommended way to develop is using the DevContainer:
 docker compose -f compose.devcontainer.yaml up -d
 ```
 
-The DevContainer can start without a local `.env`; Docker Compose uses `.env` when present.
-When starting it with Docker Compose directly on Linux, pass the host UID and GID so files
-generated in the mounted workspace remain writable from both the host and the container:
+The DevContainer can start without a local `.env`; Docker Compose uses `.env` when present. The
+checked-in VS Code configuration runs its remote session as `root` for compatibility with the
+privileged development tooling. Docker Compose direct sessions also use `root` by default.
+
+On Linux, use the included `vscode` user when files created in the checkout must remain writable
+from both the host and the container. Build it with the host UID and GID:
 
 ```shell
 LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose -f compose.devcontainer.yaml up -d --build
 ```
 
-VS Code's Dev Containers extension also aligns the remote user's UID with the host by using
-`updateRemoteUserUID`.
 The container mounts `/var/run/docker.sock` so devcontainer users can run the local Docker
-Compose tasks from inside the workspace. User-level tools installed under `/home/vscode/.local`
-and Claude Code configuration under `/home/vscode/.claude` are persisted in Docker volumes, so
-they survive container rebuilds.
+Compose tasks from inside the workspace. In the default VS Code session, tools under
+`/root/.local` and agent configuration under `/root/.claude` and `/root/.codex` are persisted in
+Docker volumes, so they survive container rebuilds. Host-side deployment commands keep their
+Python environment and updater runtime state outside the checkout, so they do not reuse
+root-owned DevContainer artifacts.
 
 Then attach to the container using VS Code's DevContainer extension or:
 

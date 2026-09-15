@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "automatic_update": true,
+  "migration_mode": "compose",
+  "notes": "This release runs its required idempotent migration through Docker Compose."
+}
