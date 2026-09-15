@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, HPI_DURATION
-from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
 from qdash.datamodel.task import (
     InputParameterSpec,
@@ -13,7 +13,10 @@ from qdash.workflow.calibtasks.base import (
     PreProcessResult,
     RunResult,
 )
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 from qdash.workflow.calibtasks.qubex.validation import finite_value_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
@@ -37,13 +40,9 @@ class CreateHPIPulse(QubexTask):
         "rabi_reference_phase": InputParameterSpec.required_database(),
         "rabi_r2": InputParameterSpec.required_database(),
         "maximum_rabi_frequency": InputParameterSpec.required_database(),
-        "readout_duration": InputParameterSpec.database_or_default(
-            default=DEFAULT_READOUT_DURATION,
-            unit="ns",
-            description="Readout pulse duration",
-        ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "readout_duration": readout_duration_run_parameter(),
         "hpi_duration": RunParameterSpec(
             unit="ns", value_type="int", default=HPI_DURATION, description="HPI pulse duration"
         ),
@@ -63,7 +62,7 @@ class CreateHPIPulse(QubexTask):
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "hpi_amplitude": OutputParameterSpec(unit="", description="HPI pulse amplitude"),
         "hpi_duration": OutputParameterSpec(
-            default=HPI_DURATION, unit="ns", description="HPI pulse duration"
+            default=None, unit="ns", description="HPI pulse duration"
         ),
     }
 
@@ -86,6 +85,9 @@ class CreateHPIPulse(QubexTask):
         label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
         self.output_parameters["hpi_amplitude"].value = result.data[label].calib_value
+        self.output_parameters["hpi_duration"].value = self.run_parameters[
+            "hpi_duration"
+        ].get_value()
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         validation_error = finite_value_error(

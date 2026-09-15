@@ -457,120 +457,6 @@ class FlowService:
             message=f"Flow '{name}' execution started successfully",
         )
 
-    async def re_execute_from_snapshot(
-        self,
-        flow_name: str,
-        source_execution_id: str,
-        parameter_overrides: dict[str, Any],
-        username: str,
-        project_id: str,
-    ) -> ExecuteFlowResponse:
-        """Re-execute a flow using snapshot parameters from a previous execution.
-
-        Parameters
-        ----------
-        flow_name : str
-            Name of the flow to execute.
-        source_execution_id : str
-            Execution ID to load snapshot parameters from.
-        parameter_overrides : dict[str, Any]
-            Additional parameter overrides.
-        username : str
-            The username.
-        project_id : str
-            The project ID.
-
-        Returns
-        -------
-        ExecuteFlowResponse
-            Execution result with IDs and URLs.
-
-        """
-        settings = get_settings()
-
-        flow = self._flow_repo.find_by_project_and_name(project_id, flow_name)
-        if not flow:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Flow '{flow_name}' not found in project '{project_id}'",
-            )
-
-        if not flow.deployment_id:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Flow '{flow_name}' has no deployment."
-                    " Please re-save the flow to register a deployment."
-                ),
-            )
-
-        parameters: dict[str, Any] = {
-            **flow.default_parameters,
-            **parameter_overrides,
-            "username": username,
-            "flow_name": flow_name,
-            "project_id": project_id,
-            "source_execution_id": source_execution_id,
-        }
-        if "tags" not in parameters and flow.tags:
-            parameters["tags"] = flow.tags
-
-        logger.info(
-            f"Re-executing flow '{flow_name}' from snapshot {source_execution_id} "
-            f"(deployment={flow.deployment_id}) with parameters: {parameters}"
-        )
-
-        chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
-        claimed_execution_id = self._claim_execution_lock(
-            project_id=project_id,
-            username=username,
-            chip_id=chip_id,
-            parameters=parameters,
-            workflow=True,
-        )
-
-        try:
-            async with get_client() as client:
-                deployment_id = cast("UUID", flow.deployment_id)
-                flow_run = await client.create_flow_run_from_deployment(
-                    deployment_id=deployment_id,
-                    parameters=parameters,
-                )
-
-                flow_run_id = str(flow_run.id)
-                flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
-                )
-
-                logger.info(f"Re-execution flow run created: {flow_run_id}")
-        except Exception as e:
-            self._release_execution_lock(project_id, claimed_execution_id)
-            logger.error(f"Failed to re-execute flow: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to re-execute flow: {e}")
-
-        qdash_execution_id = self._create_scheduled_execution(
-            project_id=project_id,
-            username=username,
-            chip_id=chip_id,
-            name=flow_name,
-            flow_run_id=flow_run_id,
-            execution_id=claimed_execution_id,
-            tags=parameters.get("tags") or flow.tags,
-        )
-        if qdash_execution_id is None:
-            self._release_execution_lock(project_id, claimed_execution_id)
-        qdash_ui_url = self._build_qdash_ui_url(settings.ui_port, chip_id, qdash_execution_id)
-
-        return ExecuteFlowResponse(
-            execution_id=qdash_execution_id or flow_run_id,
-            flow_run_id=flow_run_id,
-            flow_run_url=flow_run_url,
-            qdash_ui_url=qdash_ui_url,
-            message=(
-                f"Flow '{flow_name}' re-execution started from snapshot {source_execution_id}"
-            ),
-        )
-
     async def execute_single_task_from_snapshot(
         self,
         task_name: str,
@@ -588,6 +474,7 @@ class FlowService:
         execution_name: str | None = None,
         backend_name: str | None = None,
         default_run_parameters: dict[str, Any] | None = None,
+        task_run_parameters: dict[str, dict[str, Any]] | None = None,
     ) -> ExecuteFlowResponse:
         """Execute a single task via the system single-task-executor deployment.
 
@@ -614,6 +501,10 @@ class FlowService:
             QDash execution display name. Defaults to the manual re-execution label.
         persist_output_parameters : bool
             Whether task outputs update authoritative QDash calibration state.
+        default_run_parameters : dict[str, Any] | None
+            Shared fallback run parameters retained for compatibility.
+        task_run_parameters : dict[str, dict[str, Any]] | None
+            Explicit run parameters keyed by task name.
 
         Returns
         -------
@@ -651,6 +542,7 @@ class FlowService:
             "reconfigure": reconfigure,
             "backend_name": backend_name,
             "default_run_parameters": default_run_parameters,
+            "task_run_parameters": task_run_parameters,
         }
 
         logger.info(

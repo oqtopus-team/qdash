@@ -30,7 +30,6 @@ import type {
   Detail,
   DownloadArtifactByPathParams,
   DownloadArtifactsAsArchiveParams,
-  ExecuteFlowResponse,
   ExecutionAvailabilityRequest,
   ExecutionAvailabilityResponse,
   ExecutionLockStatusResponse,
@@ -39,8 +38,7 @@ import type {
   HTTPValidationError,
   ListExecutionsParams,
   ListExecutionsResponse,
-  PreviewArtifactByPathParams,
-  ReExecuteRequest
+  PreviewArtifactByPathParams
 } from '../../schemas';
 
 import { customInstance } from '../../lib/api/custom-instance';
@@ -933,88 +931,4 @@ export const useCancelExecution = <TError = HTTPValidationError,
         TContext
       > => {
       return useMutation(getCancelExecutionMutationOptions(options), queryClient);
-    }
-    /**
- * Re-execute a flow using snapshot parameters from a previous execution.
- *
- * Parameters
- * ----------
- * execution_id : str
- *     ID of the source execution to snapshot parameters from
- * request : ReExecuteRequest
- *     Re-execution request with flow_name and optional parameter_overrides
- * ctx : ProjectContext
- *     Project context with user and project information
- * execution_service : ExecutionService
- *     Service for execution operations
- * flow_service : FlowService
- *     Service for flow operations
- *
- * Returns
- * -------
- * ExecuteFlowResponse
- *     Execution result with IDs and URLs
- * @summary Re-execute a flow from snapshot parameters
- */
-export const reExecuteFromSnapshot = (
-    executionId: string,
-    reExecuteRequest: ReExecuteRequest,
- options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
-) => {
-
-
-      return customInstance<ExecuteFlowResponse>(
-      {url: `/executions/${executionId}/re-execute`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: reExecuteRequest, signal
-    },
-      options);
-    }
-
-
-
-
-export const getReExecuteFromSnapshotMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reExecuteFromSnapshot>>, TError,{executionId: string;data: ReExecuteRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof reExecuteFromSnapshot>>, TError,{executionId: string;data: ReExecuteRequest}, TContext> => {
-
-const mutationKey = ['reExecuteFromSnapshot'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reExecuteFromSnapshot>>, {executionId: string;data: ReExecuteRequest}> = (props) => {
-          const {executionId,data} = props ?? {};
-
-          return  reExecuteFromSnapshot(executionId,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type ReExecuteFromSnapshotMutationResult = NonNullable<Awaited<ReturnType<typeof reExecuteFromSnapshot>>>
-    export type ReExecuteFromSnapshotMutationBody = ReExecuteRequest
-    export type ReExecuteFromSnapshotMutationError = HTTPValidationError
-
-    /**
- * @summary Re-execute a flow from snapshot parameters
- */
-export const useReExecuteFromSnapshot = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reExecuteFromSnapshot>>, TError,{executionId: string;data: ReExecuteRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
-        TError,
-        {executionId: string;data: ReExecuteRequest},
-        TContext
-      > => {
-      return useMutation(getReExecuteFromSnapshotMutationOptions(options), queryClient);
     }

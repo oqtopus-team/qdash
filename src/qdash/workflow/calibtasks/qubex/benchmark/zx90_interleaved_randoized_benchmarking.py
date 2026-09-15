@@ -12,7 +12,10 @@ from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -23,6 +26,7 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
     task_type: str = "coupling"
     timeout: int = 60 * 30  # 30 minutes
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "readout_duration": readout_duration_run_parameter(),
         "n_trials": RunParameterSpec(
             unit="a.u.",
             value_type="int",
@@ -57,13 +61,30 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
             qid_role="control",
             unit="a.u.",
         ),
-        "control_drag_hpi_length": InputParameterSpec.required_database(
-            parameter_name="drag_hpi_length",
+        "control_drag_hpi_duration": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_duration",
+            parameter_aliases=("drag_hpi_length",),
             qid_role="control",
             unit="ns",
         ),
         "control_drag_hpi_beta": InputParameterSpec.required_database(
             parameter_name="drag_hpi_beta",
+            qid_role="control",
+            unit="a.u.",
+        ),
+        "control_drag_pi_amplitude": InputParameterSpec.required_database(
+            parameter_name="drag_pi_amplitude",
+            qid_role="control",
+            unit="a.u.",
+        ),
+        "control_drag_pi_duration": InputParameterSpec.required_database(
+            parameter_name="drag_pi_duration",
+            parameter_aliases=("drag_pi_length",),
+            qid_role="control",
+            unit="ns",
+        ),
+        "control_drag_pi_beta": InputParameterSpec.required_database(
+            parameter_name="drag_pi_beta",
             qid_role="control",
             unit="a.u.",
         ),
@@ -79,18 +100,28 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
             qid_role="control",
             unit="a.u.",
         ),
-        "control_readout_duration": InputParameterSpec.database_or_default(
-            default=0,
-            parameter_name="readout_duration",
-            qid_role="control",
-            unit="ns",
-        ),
         # Target qubit parameters
         "target_qubit_frequency": InputParameterSpec.database_or_default(
             default=0,
             parameter_name="qubit_frequency",
             qid_role="target",
             unit="GHz",
+        ),
+        "target_drag_hpi_amplitude": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_amplitude",
+            qid_role="target",
+            unit="a.u.",
+        ),
+        "target_drag_hpi_duration": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_duration",
+            parameter_aliases=("drag_hpi_length",),
+            qid_role="target",
+            unit="ns",
+        ),
+        "target_drag_hpi_beta": InputParameterSpec.required_database(
+            parameter_name="drag_hpi_beta",
+            qid_role="target",
+            unit="a.u.",
         ),
         "target_readout_frequency": InputParameterSpec.database_or_default(
             default=0,
@@ -103,12 +134,6 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
             parameter_name="readout_amplitude",
             qid_role="target",
             unit="a.u.",
-        ),
-        "target_readout_duration": InputParameterSpec.database_or_default(
-            default=0,
-            parameter_name="readout_duration",
-            qid_role="target",
-            unit="ns",
         ),
         # CR parameters (from previous calibration)
         "cr_duration": InputParameterSpec.required_database(
@@ -194,12 +219,20 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
-        label = "-".join(
-            [exp.get_qubit_label(int(q)) for q in qid.split("-")]
-        )  # e.g., "0-1" → "Q00-Q01"
+        control, target = (exp.get_qubit_label(int(q)) for q in qid.split("-"))
+        label = f"{control}-{target}"
+        x90 = {
+            control: exp.drag_hpi_pulse[control],
+            target: exp.drag_hpi_pulse[target],
+        }
+        x180 = {control: exp.drag_pi_pulse[control]}
+        zx90 = {label: exp.zx90(control, target, x180=x180, **self._resolved_zx90_kwargs())}
         result = exp.interleaved_randomized_benchmarking(
             targets=label,
             interleaved_clifford="ZX90",
+            interleaved_waveform=zx90,
+            zx90=zx90,
+            x90=x90,
             n_trials=self.run_parameters["n_trials"].get_value(),
             save_image=False,
             n_shots=self.run_parameters["shots"].get_value(),

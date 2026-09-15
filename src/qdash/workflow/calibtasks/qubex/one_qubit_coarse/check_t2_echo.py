@@ -3,7 +3,6 @@ from typing import ClassVar
 import numpy as np
 from qubex.measurement.measurement_defaults import (
     DEFAULT_INTERVAL,
-    DEFAULT_READOUT_DURATION,
     DEFAULT_SHOTS,
 )
 
@@ -16,7 +15,10 @@ from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -29,15 +31,13 @@ class CheckT2Echo(QubexTask):
         "qubit_frequency": InputParameterSpec.required_database(),
         "hpi_amplitude": InputParameterSpec.required_database(),
         "hpi_duration": InputParameterSpec.required_database(),
+        "pi_amplitude": InputParameterSpec.required_database(),
+        "pi_duration": InputParameterSpec.required_database(parameter_aliases=("pi_length",)),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
-        "readout_duration": InputParameterSpec.database_or_default(
-            default=DEFAULT_READOUT_DURATION,
-            unit="ns",
-            description="Readout pulse duration",
-        ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "readout_duration": readout_duration_run_parameter(),
         "time_range": RunParameterSpec(
             unit="ns",
             value_type="np.logspace",
@@ -85,6 +85,7 @@ class CheckT2Echo(QubexTask):
             result = exp.t2_experiment(
                 labels,
                 time_range=self.run_parameters["time_range"].get_value(),
+                pi_cpmg=exp.pi_pulse[labels[0]].shifted(np.pi / 2),
                 n_shots=self.run_parameters["shots"].get_value(),
                 shot_interval=self.run_parameters["interval"].get_value(),
                 save_image=False,

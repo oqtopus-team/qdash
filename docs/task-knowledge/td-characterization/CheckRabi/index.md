@@ -52,7 +52,6 @@ Rabi amplitude should be high; frequency should be consistent with calibrated dr
 - control_amplitude: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
@@ -69,6 +68,7 @@ Rabi amplitude should be high; frequency should be consistent with calibrated dr
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - time_range: Time range for Rabi oscillation (ns)
 - shots: Number of shots for Rabi oscillation (a.u.)
 - interval: Time interval for Rabi oscillation (ns)

@@ -41,9 +41,11 @@ from qdash.api.services.provenance_service import ProvenanceService
 from qdash.api.services.reanalysis_service import ReanalysisService
 from qdash.api.services.seed_import_service import SeedImportService
 from qdash.api.services.slack_notification_service import SlackNotificationService
+from qdash.api.services.system_update_service import SystemUpdateService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
+from qdash.config import get_settings
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.repository import (
     MongoChipRepository,
@@ -370,6 +372,12 @@ def get_copilot_runtime() -> CopilotRuntime:
 def get_admin_service() -> AdminService:
     """Get the admin service instance."""
     return AdminService()
+
+
+@cached_dependency_provider
+def get_system_update_service() -> SystemUpdateService:
+    """Get the administrator-facing system update proxy."""
+    return SystemUpdateService(get_settings())
 
 
 @cached_dependency_provider

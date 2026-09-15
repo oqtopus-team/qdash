@@ -160,7 +160,7 @@ def test_single_task_executor_accepts_quick_run_parameters(monkeypatch, source_t
         project_id="project-1",
         backend_name="fake",
         source_task_id=source_task_id,
-        default_run_parameters=defaults,
+        task_run_parameters=defaults,
         persist_output_parameters=False,
         update_params=False,
     )
@@ -169,5 +169,5 @@ def test_single_task_executor_accepts_quick_run_parameters(monkeypatch, source_t
     assert captured["kwargs"]["source_task_id"] == source_task_id
     assert captured["kwargs"]["snapshot_exempt_tasks"] == {"CheckRabi"}
     assert captured["kwargs"]["backend_name"] == "fake"
-    assert captured["kwargs"]["default_run_parameters"] == defaults
+    assert captured["kwargs"]["task_run_parameters"] == defaults
     assert captured["kwargs"]["persist_output_parameters"] is False

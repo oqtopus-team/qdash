@@ -9,11 +9,9 @@ from qdash.api.schemas.flow import ExecuteFlowRequest
 from qdash.api.services import flow_service
 from qdash.api.services.flow_service import FlowService
 from qdash.common.config.path_resolver import (
-    execution_calib_data_dir,
     resolve_workflow_path,
     to_container_user_flow_path,
 )
-from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 
 
 @pytest.mark.asyncio
@@ -375,125 +373,6 @@ async def test_execute_flow_falls_back_to_flow_run_id_when_execution_not_precrea
 
 
 @pytest.mark.asyncio
-async def test_re_execute_from_snapshot_returns_qdash_execution_details(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """re_execute_from_snapshot returns the QDash execution id, flow-run id, and URLs."""
-    captured_calls: list[dict[str, object]] = []
-
-    def _stub(self: FlowService, **kwargs: object) -> str:
-        """Record the scheduled-execution kwargs and return a fake execution id."""
-        captured_calls.append(kwargs)
-        return "exec-1"
-
-    monkeypatch.setattr(FlowService, "_create_scheduled_execution", _stub)
-    monkeypatch.setattr(
-        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-5")
-    )
-
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="snapshot-chip")
-
-    response = await FlowService(flow_repository=flow_repo).re_execute_from_snapshot(
-        flow_name="my-flow",
-        source_execution_id="source-exec-1",
-        parameter_overrides={},
-        username="operator",
-        project_id="project-1",
-    )
-
-    assert captured_calls[0]["chip_id"] == "snapshot-chip"
-    assert response.execution_id == "exec-1"
-    assert response.flow_run_id == "flow-run-5"
-    assert "flow-run-5" in response.flow_run_url
-    assert response.qdash_ui_url.endswith("/execution/snapshot-chip/exec-1")
-
-
-def test_create_scheduled_execution_returns_none_when_chip_id_empty() -> None:
-    """_create_scheduled_execution returns None when chip_id is empty."""
-    service = FlowService(flow_repository=MagicMock())
-
-    result = service._create_scheduled_execution(
-        project_id="project-1",
-        username="operator",
-        chip_id="",
-        name="my-flow",
-        flow_run_id="flow-run-1",
-    )
-
-    assert result is None
-
-
-def test_create_scheduled_execution_swallows_exceptions(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """_create_scheduled_execution returns None when an internal call raises."""
-
-    def _boom(*_args: object, **_kwargs: object) -> str:
-        """Raise a RuntimeError to simulate an internal failure."""
-        raise RuntimeError("boom")
-
-    monkeypatch.setattr(flow_service, "generate_execution_id", _boom)
-
-    service = FlowService(flow_repository=MagicMock())
-
-    result = service._create_scheduled_execution(
-        project_id="project-1",
-        username="operator",
-        chip_id="chip-1",
-        name="my-flow",
-        flow_run_id="flow-run-1",
-    )
-
-    assert result is None
-
-
-@pytest.mark.parametrize(
-    ("chip_id", "execution_id", "expected_suffix"),
-    [
-        ("chip-1", "exec-1", "/execution/chip-1/exec-1"),
-        ("chip-1", None, "/execution/chip-1"),
-        (None, "exec-1", "/execution"),
-    ],
-)
-def test_build_qdash_ui_url_branches(
-    chip_id: str | None,
-    execution_id: str | None,
-    expected_suffix: str,
-) -> None:
-    """_build_qdash_ui_url covers the chip+execution, chip-only, and no-chip branches."""
-    url = FlowService._build_qdash_ui_url(8000, chip_id, execution_id)
-
-    assert url == f"http://localhost:8000{expected_suffix}"
-
-
-def test_create_scheduled_execution_persists_execution_history(init_db: object) -> None:
-    """_create_scheduled_execution persists a scheduled execution history document."""
-    service = FlowService(flow_repository=MagicMock())
-
-    execution_id = service._create_scheduled_execution(
-        project_id="project-1",
-        username="operator",
-        chip_id="chip-1",
-        name="my-flow",
-        flow_run_id="flow-run-1",
-        tags=["tag-a"],
-    )
-
-    assert execution_id is not None
-
-    doc = ExecutionHistoryDocument.find_one(
-        {"project_id": "project-1", "execution_id": execution_id}
-    ).run()
-
-    assert doc is not None
-    assert doc.status == "scheduled"
-    assert doc.note["flow_run_id"] == "flow-run-1"
-    assert doc.start_at is not None
-    assert doc.calib_data_path == str(execution_calib_data_dir("operator", execution_id))
-
-
-@pytest.mark.asyncio
 async def test_execute_single_task_supports_quick_run_without_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -528,7 +407,7 @@ async def test_execute_single_task_supports_quick_run_without_snapshot(
         project_id="project-1",
         execution_name="quick-run:CheckRabi",
         backend_name="fake",
-        default_run_parameters=defaults,
+        task_run_parameters=defaults,
         persist_output_parameters=False,
         update_params=False,
     )
@@ -536,7 +415,7 @@ async def test_execute_single_task_supports_quick_run_without_snapshot(
     parameters = captured_parameters[0]
     assert parameters["source_execution_id"] is None
     assert parameters["backend_name"] == "fake"
-    assert parameters["default_run_parameters"] == defaults
+    assert parameters["task_run_parameters"] == defaults
     assert parameters["persist_output_parameters"] is False
 
 
@@ -755,46 +634,6 @@ async def test_execute_flow_skips_the_claim_when_no_chip_id_can_be_resolved(
 
 
 @pytest.mark.asyncio
-async def test_re_execute_from_snapshot_claims_the_lock(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Snapshot re-execution claims the lock with its own pre-minted execution ID."""
-    monkeypatch.setattr(
-        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-006"
-    )
-    monkeypatch.setattr(
-        FlowService, "_create_scheduled_execution", lambda self, **kw: kw["execution_id"]
-    )
-    monkeypatch.setattr(
-        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-6")
-    )
-
-    lock_repository = _make_lock_repo()
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
-
-    response = await FlowService(
-        flow_repository=flow_repo,
-        execution_lock_repository=lock_repository,
-    ).re_execute_from_snapshot(
-        flow_name="my-flow",
-        source_execution_id="exec-1",
-        parameter_overrides={},
-        username="operator",
-        project_id="project-1",
-    )
-
-    assert response.execution_id == "20240101-006"
-    lock_repository.try_lock.assert_called_once_with(
-        project_id="project-1",
-        execution_id="20240101-006",
-        chip_id="chip-1",
-        resources=(),
-        exclusive=True,
-    )
-
-
-@pytest.mark.asyncio
 async def test_execute_single_task_claims_the_lock(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -851,88 +690,6 @@ async def test_execute_single_task_claims_the_lock(
         chip_id="chip-1",
         resources=(),
         exclusive=True,
-    )
-
-
-@pytest.mark.asyncio
-async def test_re_execute_from_snapshot_releases_the_lock_when_the_flow_run_cannot_be_created(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A re-execution dispatch failure must not leave the project locked."""
-    monkeypatch.setattr(
-        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-009"
-    )
-
-    class _FailingClientContext:
-        """Fake async context manager whose client always fails."""
-
-        async def __aenter__(self) -> SimpleNamespace:
-            """Return a client that raises on flow run creation."""
-
-            async def _raise(**_kwargs: object) -> None:
-                raise RuntimeError("prefect is down")
-
-            return SimpleNamespace(create_flow_run_from_deployment=_raise)
-
-        async def __aexit__(self, *_args: object) -> None:
-            """Do nothing on context exit."""
-            return
-
-    monkeypatch.setattr(flow_service, "get_client", _FailingClientContext)
-
-    lock_repository = _make_lock_repo()
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
-
-    with pytest.raises(HTTPException) as exc_info:
-        await FlowService(
-            flow_repository=flow_repo,
-            execution_lock_repository=lock_repository,
-        ).re_execute_from_snapshot(
-            flow_name="my-flow",
-            source_execution_id="exec-1",
-            parameter_overrides={},
-            username="operator",
-            project_id="project-1",
-        )
-
-    assert exc_info.value.status_code == 500
-    lock_repository.unlock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-009"
-    )
-
-
-@pytest.mark.asyncio
-async def test_re_execute_from_snapshot_releases_the_lock_when_the_scheduled_row_cannot_be_saved(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Without a scheduled row the re-executed flow cannot adopt the lock, so it is released."""
-    monkeypatch.setattr(
-        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-010"
-    )
-    monkeypatch.setattr(FlowService, "_create_scheduled_execution", lambda self, **_kwargs: None)
-    monkeypatch.setattr(
-        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-8")
-    )
-
-    lock_repository = _make_lock_repo()
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
-
-    response = await FlowService(
-        flow_repository=flow_repo,
-        execution_lock_repository=lock_repository,
-    ).re_execute_from_snapshot(
-        flow_name="my-flow",
-        source_execution_id="exec-1",
-        parameter_overrides={},
-        username="operator",
-        project_id="project-1",
-    )
-
-    assert response.execution_id == "flow-run-8"
-    lock_repository.unlock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-010"
     )
 
 

@@ -244,7 +244,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
               className="btn btn-sm btn-primary gap-1 ml-auto"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Re-execute
+              Run again
             </button>
           )}
         </div>

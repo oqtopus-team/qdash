@@ -60,10 +60,9 @@ def test_fast_full_calibration_uses_shortened_one_qubit_steps(monkeypatch) -> No
     assert "CheckT2EchoAverage" not in one_qubit_fine_tune.tasks
     assert "Check1QGateCoherenceLimit" not in one_qubit_fine_tune.tasks
 
-    # Making the default tasks visible in the template must preserve their order.
-    from qdash.workflow.service.tasks import FULL_2Q_TASKS
-
-    assert steps[6].tasks == FULL_2Q_TASKS
+    # The fast template keeps its explicit order while omitting the expensive coherence task.
+    assert steps[6].tasks == fast_full_module.FAST_2Q_TASKS
+    assert "Check2QGateCoherenceLimit" not in steps[6].tasks
 
 
 def test_fast_full_calibration_requires_explicit_mux_ids(monkeypatch) -> None:

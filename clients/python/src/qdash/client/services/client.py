@@ -1094,10 +1094,6 @@ class QDashClient:
         response = self._request("POST", f"/executions/{flow_run_id}/cancel", json={})
         return self._validate_model_payload(CancelExecutionResponse, response.data)
 
-    def re_execute_execution(self, execution_id: str) -> ExecuteFlowResponse:
-        response = self._request("POST", f"/executions/{execution_id}/re-execute", json={})
-        return self._validate_model_payload(ExecuteFlowResponse, response.data)
-
     def upsert_task_note(self, task_id: str, *, content: str) -> NoteModel:
         response = self._request(
             "PUT",

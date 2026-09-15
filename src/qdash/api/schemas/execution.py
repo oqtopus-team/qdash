@@ -174,13 +174,6 @@ class ExecutionResponseDetail(BaseModel):
         return format_elapsed_time(v) if v else None
 
 
-class ReExecuteRequest(BaseModel):
-    """Request model for re-executing an execution from snapshot parameters."""
-
-    flow_name: str
-    parameter_overrides: dict[str, Any] = {}
-
-
 class CancelExecutionResponse(BaseModel):
     """Response model for cancelling an execution."""
 

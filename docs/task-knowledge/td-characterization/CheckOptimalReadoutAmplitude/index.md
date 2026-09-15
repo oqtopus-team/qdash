@@ -38,6 +38,7 @@ None.
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - amplitude_range: Readout amplitude range (a.u.)
 - shots: Number of shots for Rabi oscillation (a.u.)
 - interval: Time interval for Rabi oscillation (ns)

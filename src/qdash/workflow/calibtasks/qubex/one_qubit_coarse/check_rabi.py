@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 import plotly.graph_objects as go
 from qubex.analysis import IQPlotter
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
 from qdash.datamodel.task import (
     InputParameterSpec,
@@ -16,7 +16,10 @@ from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 from qdash.workflow.calibtasks.qubex.validation import DEFAULT_RABI_R2_THRESHOLD
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
@@ -154,13 +157,9 @@ class CheckRabi(QubexTask):
             unit="a.u.",
             description="Readout amplitude",
         ),
-        "readout_duration": InputParameterSpec.database_or_default(
-            default=DEFAULT_READOUT_DURATION,
-            unit="ns",
-            description="Readout pulse duration",
-        ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "readout_duration": readout_duration_run_parameter(),
         "time_range": RunParameterSpec(
             unit="ns",
             value_type="range",

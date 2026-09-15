@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from prefect import get_run_logger
 
+from qdash.datamodel.task import RunParameterModel
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.task.context import TaskContext
@@ -239,6 +241,17 @@ class CalibOrchestrator:
         if config.configuration_mode is not None:
             session_config["configuration_mode"] = config.configuration_mode
 
+        readout_duration = config.default_run_parameters.get("readout_duration")
+        if isinstance(readout_duration, dict) and (
+            "value" in readout_duration or "value_type" in readout_duration
+        ):
+            value = RunParameterModel.model_validate(readout_duration).get_value()
+            if value is not None:
+                numeric_value = float(value)
+                if not math.isfinite(numeric_value) or numeric_value <= 0:
+                    raise ValueError("readout_duration must be finite and positive")
+                session_config["readout_duration"] = numeric_value
+
         backend = create_backend(
             backend=config.backend_name,
             config=session_config,
@@ -421,26 +434,25 @@ class CalibOrchestrator:
         if task_name not in task_details:
             task_details[task_name] = {}
 
-        # Inject default_run_parameters into task if configured and not already overridden per-task
+        # Inject task-specific settings and shared defaults unless explicitly overridden.
         logger.debug(
-            "_create_task_instance(%s) default_run_parameters=%s",
+            "_create_task_instance(%s) default_run_parameters=%s task_run_parameters=%s",
             task_name,
             self.config.default_run_parameters,
+            self.config.task_run_parameters,
         )
-        if self.config.default_run_parameters:
+        if self.config.default_run_parameters or self.config.task_run_parameters:
             task_params = task_details[task_name]
             if "run_parameters" not in task_params:
                 task_params["run_parameters"] = {}
 
-            # Split entries into flat defaults and per-task overrides.
-            # A flat entry is a RunParameter-like dict (contains "value" or "value_type").
-            # A nested entry is keyed by task name and maps to {param_name: RunParameter dict}.
+            # Nested defaults are retained for compatibility with existing flow documents.
             flat_defaults: dict[str, dict[str, Any]] = {}
-            per_task_overrides: dict[str, Any] = {}
+            legacy_task_defaults: dict[str, Any] = {}
             for key, data in self.config.default_run_parameters.items():
                 if not isinstance(data, dict):
                     logger.warning(
-                        "Skipping invalid default_run_parameter '%s': expected dict, got %s",
+                        "Skipping invalid default_run_parameter %r: expected dict, got %s",
                         key,
                         type(data).__name__,
                     )
@@ -448,16 +460,21 @@ class CalibOrchestrator:
                 if "value" in data or "value_type" in data:
                     flat_defaults[key] = data
                 else:
-                    per_task_overrides[key] = data
+                    legacy_task_defaults[key] = data
 
-            # Apply per-task overrides first so they take precedence over flat defaults.
-            # Precedence: explicit task_details > per-task overrides > flat defaults > task class defaults.
-            task_overrides = per_task_overrides.get(task_name)
-            if isinstance(task_overrides, dict):
+            # Precedence: explicit task_details > task_run_parameters > legacy nested defaults
+            # > shared defaults > task class defaults.
+            scoped_parameters = (
+                self.config.task_run_parameters.get(task_name),
+                legacy_task_defaults.get(task_name),
+            )
+            for task_overrides in scoped_parameters:
+                if not isinstance(task_overrides, dict):
+                    continue
                 for param_name, param_data in task_overrides.items():
                     if not isinstance(param_data, dict):
                         logger.warning(
-                            "Skipping invalid per-task override '%s.%s': expected dict, got %s",
+                            "Skipping invalid task run parameter %r.%r: expected dict, got %s",
                             task_name,
                             param_name,
                             type(param_data).__name__,
@@ -466,18 +483,17 @@ class CalibOrchestrator:
                     if param_name not in task_params["run_parameters"]:
                         task_params["run_parameters"][param_name] = param_data
                         logger.debug(
-                            "Injected per-task run parameter '%s' into task '%s': %s",
+                            "Injected task run parameter %r into task %r: %s",
                             param_name,
                             task_name,
                             param_data,
                         )
 
-            # Then apply flat defaults to any remaining unset parameters.
             for param_name, param_data in flat_defaults.items():
                 if param_name not in task_params["run_parameters"]:
                     task_params["run_parameters"][param_name] = param_data
                     logger.debug(
-                        "Injected flat default run parameter '%s' into task '%s': %s",
+                        "Injected shared default run parameter %r into task %r: %s",
                         param_name,
                         task_name,
                         param_data,

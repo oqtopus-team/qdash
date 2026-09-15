@@ -1049,6 +1049,9 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
         lock_repo=env.lock,
         counter_repo=FakeExecutionCounterRepository(2),
         default_run_parameters={"interval": {"value": 1024, "value_type": "int"}},
+        task_run_parameters={
+            "CheckCrossResonance": {"shots": {"value": 2048, "value_type": "int"}}
+        },
     )
     session.run(
         QubitTargets(["0", "1"]),
@@ -1066,6 +1069,7 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
     assert all(
         config["default_run_parameters"] == session.default_run_parameters for config in configs
     )
+    assert all(config["task_run_parameters"] == session.task_run_parameters for config in configs)
     assert [record.status for record in env.records] == ["completed", "completed"]
     assert env.lock.locked is False
 

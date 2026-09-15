@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from qubex.measurement.measurement_defaults import (
     DEFAULT_INTERVAL,
-    DEFAULT_READOUT_DURATION,
     DEFAULT_SHOTS,
 )
 
@@ -19,7 +18,10 @@ from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -40,14 +42,10 @@ class CheckT1Average(QubexTask):
         "hpi_duration": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
-        "readout_duration": InputParameterSpec.database_or_default(
-            default=DEFAULT_READOUT_DURATION,
-            unit="ns",
-            description="Readout pulse duration",
-        ),
     }
 
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "readout_duration": readout_duration_run_parameter(),
         "time_range": RunParameterSpec(
             unit="ns",
             value_type="np.logspace",

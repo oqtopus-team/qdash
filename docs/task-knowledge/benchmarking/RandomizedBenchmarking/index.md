@@ -53,11 +53,10 @@ Error per Clifford should be low; decay should be well-fitted by single exponent
 
 - qubit_frequency: Loaded from DB
 - drag_hpi_amplitude: Loaded from DB
-- drag_hpi_length: Loaded from DB
+- drag_hpi_duration: Loaded from DB
 - drag_hpi_beta: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
@@ -66,6 +65,7 @@ Error per Clifford should be low; decay should be well-fitted by single exponent
 
 ## Run parameters
 
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
 - n_trials: Number of trials (a.u.)
 - shots: Number of shots (a.u.)
 - interval: Time interval (ns)

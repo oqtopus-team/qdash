@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type ReExecuteRequestParameterOverrides = { [key: string]: unknown };
+export type StartSystemUpdateRequestExpectedCurrentVersion = string | null;

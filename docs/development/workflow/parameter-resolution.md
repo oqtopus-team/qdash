@@ -46,9 +46,22 @@ For coupling tasks, `InputParameterSpec.parameter_name` selects the database key
 Task construction resolves Run parameters in this order, from highest to lowest precedence:
 
 1. Explicit `task_details[task_name].run_parameters`
-2. Per-task entries in `CalibConfig.default_run_parameters`
-3. Flat entries in `CalibConfig.default_run_parameters`
-4. `run_spec` specified on the task class
+2. Task-specific entries in `CalibConfig.task_run_parameters`
+3. Legacy per-task entries in `CalibConfig.default_run_parameters`
+4. Shared entries in `CalibConfig.default_run_parameters`
+5. `run_spec` specified on the task class
+
+Use `default_run_parameters` only for values intentionally shared by every declaring task.
+A shared value overrides task-specific defaults, including Qubex optimized defaults: qubit
+spectroscopy normally uses a 1024 ns interval and resonator spectroscopy uses 0 ns. Use
+`task_run_parameters` when a template should preserve or configure one named task. Nested entries
+in `default_run_parameters` remain readable only for existing flow documents.
+
+`readout_duration` is session-scoped in Qubex. QDash passes the shared value when constructing the
+Experiment, records the effective value on each task that uses the session readout pulse, and rejects
+a per-task value that differs from the session. Qubex spectroscopy is an intentional exception:
+qubit/control spectroscopy uses its dedicated 1024 ns pulse and resonator spectroscopy uses its
+dedicated 8192 ns pulse, so those tasks do not expose the shared `readout_duration` parameter.
 
 `QubexTask.preprocess()` then resolves each declared Input parameter:
 
@@ -87,7 +100,6 @@ The operation itself determines the baseline; no additional source selector is n
 | Normal workflow | Current DB, following task input specs | Task/workflow specs | Enabled |
 | Tasks quick run | Current DB, following task input specs | Task specs and submitted overrides | Disabled |
 | Task re-execution | Source task snapshot | Source task snapshot | Existing re-execution setting |
-| Full execution re-execution | Source execution snapshot | Source execution snapshot | Existing workflow setting |
 
 This gives `re-execution` one stable meaning: reproduce the recorded execution conditions, optionally with explicit parameter overrides. Running the same task against current calibration state is a new Tasks quick run, not a re-execution mode.
 
@@ -134,8 +146,6 @@ flowchart LR
 ### Re-execution behavior
 
 For a single-task re-execution, `CalibService` passes `source_task_id` to `SnapshotParameterLoader`, which loads that exact task result. `task_name` and `qid` then validate that the selected history record matches the requested task. This avoids resolving an already identified task indirectly through its execution.
-
-For a full workflow re-execution, no single task ID identifies every source task. In that case the loader uses `source_execution_id`, indexes task history by `(task_name, qid)`, and returns the last recorded entry for duplicate keys because records are read in ascending start time.
 
 `TaskExecutor` applies parameters in this sequence:
 
@@ -189,13 +199,7 @@ Numeric constraints such as `greater_than` and `less_than` belong to `InputParam
 
 Concrete task `preprocess()` and `run()` methods must treat Input and Run parameters as read-only. They must not repair an invalid value, replace it with a default, or otherwise change the effective parameter collections. A missing database value may select the specified default only when the input spec uses `database_or_default()`; a present but invalid database, snapshot, or override value fails execution.
 
-For a single-task re-execution, a missing `source_task_id`, a mismatch between the selected result and the requested task, or incomplete declared snapshot inputs causes execution to fail instead of silently changing its baseline. For full workflow re-execution, a missing `(task_name, qid)` entry has the same behavior. Execution-wide snapshot loading is bounded by `DEFAULT_SNAPSHOT_LIMIT`.
-
-### Full execution re-execution
-
-`POST /executions/{execution_id}/re-execute` starts the saved flow deployment with `source_execution_id`. Its `parameter_overrides` field overrides top-level Prefect flow parameters; it is not automatically interpreted as task-level `{input, run}` data. A flow that exposes task-level overrides must accept them and pass the structured value to `CalibService(parameter_overrides=...)`.
-
-The re-execution UI should state that previous execution values are the baseline and allow explicit overrides. It should not offer current database values as another re-execution mode; that operation belongs on the Tasks page as a new run.
+For a single-task re-execution, a missing `source_task_id`, a mismatch between the selected result and the requested task, or incomplete declared snapshot inputs causes execution to fail instead of silently changing its baseline.
 
 ### Single-task result re-execution
 
@@ -212,15 +216,16 @@ The re-execution UI should state that previous execution values are the baseline
 
 The source task ID both selects the recorded parameter snapshot and links the child result to its parent. The source execution ID remains execution context; it is not used to re-identify the single source task.
 
-The task-result re-execution modal should show the snapshot value as the baseline. Edited fields are user overrides and take precedence. The UI should distinguish the original snapshot value from the final submitted value rather than replacing the baseline in place.
+This endpoint is available for API clients that require exact snapshot re-execution. The Tasks UI instead offers **Run again**, which uses the current task definition and prefills compatible values from the selected historical result.
 
 ## Tasks page quick run
 
 `POST /tasks/{task_name}/execute` also uses `single-task-executor`, but sets `source_execution_id` to `None`.
 
 - `input_parameter_overrides` becomes `parameter_overrides.input`.
-- `run_parameter_overrides` becomes a per-task `default_run_parameters` entry.
+- `run_parameter_overrides` becomes an entry in `task_run_parameters` for the selected task.
 - A `SnapshotParameterLoader` is still created when Input overrides exist so they can be reapplied after preprocessing.
+- When `source_task_id` is supplied by **Run again**, it records provenance without restoring the source snapshot; the submitted form values and current task definition remain authoritative.
 - With no Input override, Qubex preprocessing loads current database values normally.
 
 The Tasks page **Reload** action is client-side preparation only. It reads the selected qubit or coupling record and fills the form. The server treats every non-empty submitted field as an explicit override; it does not distinguish a typed value from a value inserted by Reload.

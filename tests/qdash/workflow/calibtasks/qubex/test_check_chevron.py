@@ -110,6 +110,8 @@ def test_check_chevron_run_uses_adaptive_helper(monkeypatch) -> None:
     assert captured["targets"] == ["Q00"]
     assert captured["frequencies"] == {"Q00": 4.25}
     assert captured["amplitudes"] == {"Q00": 0.07}
+    assert captured["n_shots"] == 256
+    assert captured["shot_interval"] == 153600.0
     assert exp.modified_frequency_calls == [{"Q00": 4.25, "RQ00": 6.1}]
     assert captured["plot"] is False
     assert captured["save_image"] is False

@@ -338,7 +338,21 @@ class TaskFileService:
                 continue
 
             metadata: dict[str, object] = {}
-            if isinstance(value_node.func, ast.Attribute):
+            if (
+                isinstance(value_node.func, ast.Name)
+                and value_node.func.id == "readout_duration_run_parameter"
+            ):
+                metadata.update(
+                    {
+                        "unit": "ns",
+                        "value_type": "float",
+                        "default_value": None,
+                        "description": (
+                            "Readout pulse duration. Uses the Qubex session default when unset."
+                        ),
+                    }
+                )
+            elif isinstance(value_node.func, ast.Attribute):
                 factory_metadata: dict[str, dict[str, object]] = {
                     "required_database": {
                         "resolution": "database_required",
@@ -368,6 +382,7 @@ class TaskFileService:
                     "source",
                     "required",
                     "parameter_name",
+                    "parameter_aliases",
                     "qid_role",
                     "greater_than",
                     "less_than",

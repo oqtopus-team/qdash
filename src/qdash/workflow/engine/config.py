@@ -26,6 +26,7 @@ class CalibConfig:
         project_id: Project ID for multi-tenancy
         enable_github_pull: Whether to pull config from GitHub
         enable_provenance_tracking: Whether to track data provenance for lineage
+        task_run_parameters: Explicit run parameters keyed by task name
     """
 
     username: str
@@ -48,7 +49,8 @@ class CalibConfig:
     )
     default_run_parameters: dict[str, Any] = field(
         default_factory=dict
-    )  # Default run parameters for all tasks (e.g., {"interval": {"value": "300 * 1024", "value_type": "int"}})
+    )  # Shared fallback run parameters for all tasks.
+    task_run_parameters: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     # Derived paths (computed after initialization)
     calib_data_path: str = field(default="", init=False)

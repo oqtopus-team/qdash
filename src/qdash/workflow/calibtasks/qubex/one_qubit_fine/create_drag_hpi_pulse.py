@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, ClassVar
 if TYPE_CHECKING:
     import plotly.graph_objs as go
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, DRAG_HPI_DURATION
-from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
 from qdash.datamodel.task import (
     InputParameterSpec,
@@ -14,7 +14,10 @@ from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
-from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+)
 from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
@@ -38,18 +41,14 @@ class CreateDRAGHPIPulse(QubexTask):
         "rabi_reference_phase": InputParameterSpec.required_database(),
         "rabi_r2": InputParameterSpec.required_database(),
         "maximum_rabi_frequency": InputParameterSpec.required_database(),
-        "readout_duration": InputParameterSpec.database_or_default(
-            default=DEFAULT_READOUT_DURATION,
-            unit="ns",
-            description="Readout pulse duration",
-        ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
+        "readout_duration": readout_duration_run_parameter(),
         "drag_hpi_duration": RunParameterSpec(
             unit="ns",
             value_type="int",
             default=DRAG_HPI_DURATION,
-            description="HPI pulse length",
+            description="HPI pulse duration",
         ),
         "shots": RunParameterSpec(
             unit="a.u.",
@@ -69,8 +68,8 @@ class CreateDRAGHPIPulse(QubexTask):
         "drag_hpi_amplitude": OutputParameterSpec(
             unit="a.u.", description="DRAG HPI pulse amplitude"
         ),
-        "drag_hpi_length": OutputParameterSpec(
-            default=DRAG_HPI_DURATION, unit="ns", description="DRAG HPI pulse length"
+        "drag_hpi_duration": OutputParameterSpec(
+            default=None, unit="ns", description="DRAG HPI pulse duration"
         ),
     }
 
@@ -82,6 +81,9 @@ class CreateDRAGHPIPulse(QubexTask):
         result = run_result.raw_result
         self.output_parameters["drag_hpi_beta"].value = result["beta"][label]
         self.output_parameters["drag_hpi_amplitude"].value = result["amplitude"][label]["amplitude"]
+        self.output_parameters["drag_hpi_duration"].value = self.run_parameters[
+            "drag_hpi_duration"
+        ].get_value()
         output_parameters = self.attach_execution_id(execution_id)
         figures: list[go.Figure] = [result["amplitude"][label]["fig"]]
         validation_error = first_validation_error(

@@ -53,6 +53,7 @@ def single_task_executor(
     reconfigure: bool = False,
     backend_name: str | None = None,
     default_run_parameters: dict[str, Any] | None = None,
+    task_run_parameters: dict[str, dict[str, Any]] | None = None,
 ) -> Any:
     """Execute a single calibration task.
 
@@ -70,6 +71,8 @@ def single_task_executor(
         flow_name: Flow name for display (auto-injected)
         tags: Tags for categorization
         source_task_id: Task result ID that triggered this re-execution
+        default_run_parameters: Shared fallback run parameters for compatibility.
+        task_run_parameters: Explicit run parameters keyed by task name.
 
     Returns:
         Task execution result dictionary
@@ -92,7 +95,9 @@ def single_task_executor(
     )
 
     snapshot_exempt_tasks = {"Configure"} if reconfigure else set()
-    if source_execution_id is None and default_run_parameters is not None:
+    if source_execution_id is None and (
+        default_run_parameters is not None or task_run_parameters is not None
+    ):
         # Catalog runs can keep a source result for provenance without restoring its parameters.
         snapshot_exempt_tasks.add(task_name)
 
@@ -106,6 +111,7 @@ def single_task_executor(
         project_id=project_id,
         backend_name=backend_name,
         default_run_parameters=default_run_parameters,
+        task_run_parameters=task_run_parameters,
         enable_github_pull=github_enabled,
         enable_github=push_config.enabled,
         github_push_config=push_config,

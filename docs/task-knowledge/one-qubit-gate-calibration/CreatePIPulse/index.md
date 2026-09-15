@@ -50,16 +50,16 @@ Fit quality should be high; the amplitude should be in the linear drive regime. 
 - control_amplitude: Loaded from DB
 - readout_amplitude: Loaded from DB
 - readout_frequency: Loaded from DB
-- readout_duration: Readout pulse duration (ns)
 
 ## Output parameters
 
 - pi_amplitude: PI pulse amplitude
-- pi_length: PI pulse length (ns)
+- pi_duration: PI pulse duration (ns)
 
 ## Run parameters
 
-- pi_duration: PI pulse length (ns)
+- readout_duration: Session-scoped readout pulse duration used by Qubex measurements (ns)
+- pi_duration: PI pulse duration (ns)
 - shots: Number of shots for calibration
 - interval: Time interval for calibration (ns)
 
