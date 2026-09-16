@@ -10,7 +10,10 @@ from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-from qdash.repository.execution_finalizer import finalize_executions_by_flow_run_id
+from qdash.repository.execution_finalizer import (
+    finalize_executions_by_flow_run_id,
+    mark_executions_cancelling_by_flow_run_id,
+)
 
 PROJECT_ID = "proj-1"
 FLOW_RUN_ID = "flow-run-1"
@@ -452,3 +455,131 @@ def test_finalizer_releases_original_owner_after_step_ids_change(init_db) -> Non
     doc = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
     assert doc is not None
     assert [c.execution_id for c in doc.claims] == ["other"]
+
+
+def test_mark_cancelling_marks_running_and_scheduled_executions(init_db) -> None:
+    """Both a running and a scheduled execution are marked cancelling."""
+    _make_execution(status="running", execution_id="exec-running")
+    _make_execution(status="scheduled", execution_id="exec-scheduled")
+
+    marked = mark_executions_cancelling_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+    )
+
+    assert marked == 2
+    running = _reload_execution(execution_id="exec-running")
+    scheduled = _reload_execution(execution_id="exec-scheduled")
+    assert running is not None
+    assert running.status == "cancelling"
+    assert scheduled is not None
+    assert scheduled.status == "cancelling"
+
+
+def test_mark_cancelling_ignores_execution_from_different_project(init_db) -> None:
+    """An execution with the same flow_run_id in a different project is untouched."""
+    _make_execution(status="running", project_id="other-project")
+
+    marked = mark_executions_cancelling_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+    )
+
+    assert marked == 0
+    execution = _reload_execution(project_id="other-project")
+    assert execution is not None
+    assert execution.status == "running"
+
+
+def test_mark_cancelling_ignores_execution_with_different_flow_run_id(init_db) -> None:
+    """An execution with a different flow_run_id is untouched."""
+    _make_execution(status="running", flow_run_id="other-flow-run")
+
+    marked = mark_executions_cancelling_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+    )
+
+    assert marked == 0
+    execution = _reload_execution()
+    assert execution is not None
+    assert execution.status == "running"
+
+
+def test_mark_cancelling_ignores_already_terminal_execution(init_db) -> None:
+    """A completed execution is not in the default from_statuses and is left alone."""
+    _make_execution(status="completed")
+
+    marked = mark_executions_cancelling_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+    )
+
+    assert marked == 0
+    execution = _reload_execution()
+    assert execution is not None
+    assert execution.status == "completed"
+
+
+def test_mark_cancelling_does_not_set_end_at(init_db) -> None:
+    """Marking an execution cancelling is a non-terminal transition; end_at stays unset."""
+    _make_execution(status="running")
+
+    mark_executions_cancelling_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+    )
+
+    execution = _reload_execution()
+    assert execution is not None
+    assert execution.status == "cancelling"
+    assert execution.end_at is None
+
+
+def test_mark_cancelling_does_not_touch_task_statuses(init_db) -> None:
+    """Marking an execution cancelling leaves its tasks untouched."""
+    _make_execution(status="running")
+    _make_task(status="running", task_id="task-running")
+
+    mark_executions_cancelling_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+    )
+
+    task = _reload_task("task-running")
+    assert task is not None
+    assert task.status == "running"
+
+
+def test_mark_cancelling_does_not_release_lock(init_db) -> None:
+    """Marking an execution cancelling leaves the execution lock in place."""
+    _make_execution(status="running", execution_id="exec-1")
+    ExecutionLockDocument(project_id=PROJECT_ID, locked=True, execution_id="exec-1").save()
+
+    mark_executions_cancelling_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+    )
+
+    lock = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert lock is not None
+    assert lock.locked is True
+    assert lock.execution_id == "exec-1"
+
+
+def test_finalize_closes_cancelling_execution_as_cancelled(init_db) -> None:
+    """A cancelling execution is closed as cancelled once Prefect's terminal state lands."""
+    _make_execution(status="cancelling")
+
+    closed = finalize_executions_by_flow_run_id(
+        project_id=PROJECT_ID,
+        flow_run_id=FLOW_RUN_ID,
+        status="cancelled",
+        message="Execution was cancelled",
+    )
+
+    assert closed == ["exec-1"]
+    execution = _reload_execution()
+    assert execution is not None
+    assert execution.status == "cancelled"
+    assert execution.end_at is not None
