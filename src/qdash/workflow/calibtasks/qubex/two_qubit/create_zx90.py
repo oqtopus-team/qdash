@@ -25,7 +25,6 @@ class CreateZX90(QubexTask):
 
     name: str = "CreateZX90"
     task_type: str = "coupling"
-    timeout: int = 60 * 25  # 25 minutes
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
         "shots": RunParameterSpec(

@@ -34,7 +34,6 @@ class CheckT2EchoAverage(QubexTask):
 
     name: str = "CheckT2EchoAverage"
     task_type: str = "qubit"
-    timeout: int = 60 * 240  # 4 hours
 
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "qubit_frequency": InputParameterSpec.required_database(),

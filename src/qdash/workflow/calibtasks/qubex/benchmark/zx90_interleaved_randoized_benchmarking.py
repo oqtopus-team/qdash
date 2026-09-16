@@ -24,7 +24,6 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
 
     name: str = "ZX90InterleavedRandomizedBenchmarking"
     task_type: str = "coupling"
-    timeout: int = 60 * 30  # 30 minutes
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
         "n_trials": RunParameterSpec(

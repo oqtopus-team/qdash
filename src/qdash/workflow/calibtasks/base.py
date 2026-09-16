@@ -45,7 +45,7 @@ class BaseTask(ABC):
     # Calibration output declarations
     output_spec: ClassVar[Mapping[str, OutputParameterSpec]] = {}
     r2_threshold: float = 0.7
-    timeout = 60 * 60  # Default timeout of 1 hour
+    timeout = 60 * 120  # Default timeout of 2 hours
     backend = "qubex"
     registry: ClassVar[dict[str, dict[str, type["BaseTask"]]]] = {}
 

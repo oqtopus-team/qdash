@@ -38,7 +38,6 @@ class CheckControlAmplitude(QubexTask):
 
     name: str = "CheckControlAmplitude"
     task_type: str = "qubit"
-    timeout: int = 60 * 60
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # Coarse f01 from CheckQubitSpectroscopy (5 MHz grid). The sqrt-Lorentzian
         # fit refines this to sub-MHz precision and writes back coarse_qubit_frequency.
