@@ -33,6 +33,16 @@ class ReadoutDurationTask(ConcreteQubexTask):
     run_spec = {"readout_duration": readout_duration_run_parameter()}
 
 
+def test_all_qubex_tasks_use_two_hour_timeout() -> None:
+    unexpected_timeouts = {
+        name: task_class.timeout
+        for name, task_class in QubexTask.registry["qubex"].items()
+        if task_class.timeout != 60 * 120
+    }
+
+    assert unexpected_timeouts == {}
+
+
 def test_readout_duration_resolves_to_effective_session_value() -> None:
     task = ReadoutDurationTask()
     backend = MagicMock()

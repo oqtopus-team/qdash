@@ -26,7 +26,6 @@ class CheckBellStateTomography(QubexTask):
 
     name: str = "CheckBellStateTomography"
     task_type: str = "coupling"
-    timeout: int = 60 * 25  # 25 minutes
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
         "shots": RunParameterSpec(
