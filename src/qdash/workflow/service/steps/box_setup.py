@@ -63,12 +63,18 @@ class ConfigureAll(CalibrationStep):
             if owns_session:
                 service.finish_calibration()
         except BaseException as e:
-            from qdash.workflow.service.calib_service import _is_cancellation
+            from qdash.workflow.service.calib_service import (
+                _is_cancellation,
+                _is_external_termination,
+            )
 
             if owns_session:
                 if _is_cancellation(e):
                     logger.info(f"[{self.name}] Cancelled")
                     service.cancel_calibration()
+                elif _is_external_termination(e):
+                    logger.info(f"[{self.name}] Interrupted by a termination signal")
+                    service.abandon_calibration()
                 else:
                     logger.error(f"[{self.name}] Failed: {e}")
                     service.fail_calibration(str(e))

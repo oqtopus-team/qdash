@@ -139,11 +139,17 @@ def parallel_retry_calibration(
         return results
 
     except BaseException as e:
-        from qdash.workflow.service.calib_service import _is_cancellation
+        from qdash.workflow.service.calib_service import (
+            _is_cancellation,
+            _is_external_termination,
+        )
 
         if _is_cancellation(e):
             logger.info("Calibration was cancelled")
             cal.cancel_calibration()
+        elif _is_external_termination(e):
+            logger.info("Calibration interrupted by a termination signal")
+            cal.abandon_calibration()
         else:
             logger.error(f"Calibration failed: {e}")
             cal.fail_calibration(str(e))
