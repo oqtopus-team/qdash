@@ -41,11 +41,12 @@ docker compose -f compose.devcontainer.yaml up -d
 ```
 
 The DevContainer can start without a local `.env`; Docker Compose uses `.env` when present. The
-checked-in VS Code configuration runs its remote session as `root` for compatibility with the
-privileged development tooling. Docker Compose direct sessions also use `root` by default.
+checked-in VS Code configuration runs its remote session as the `vscode` user so files created in
+the checkout remain writable from the host. Docker Compose direct sessions can still use `root`
+when needed.
 
-On Linux, use the included `vscode` user when files created in the checkout must remain writable
-from both the host and the container. Build it with the host UID and GID:
+On Linux, build the `vscode` user with the host UID and GID so files created in the checkout
+remain writable from both the host and the container:
 
 ```shell
 LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose -f compose.devcontainer.yaml up -d --build
@@ -53,9 +54,11 @@ LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose -f compose.devcontainer.yam
 
 The container mounts `/var/run/docker.sock` so devcontainer users can run the local Docker
 Compose tasks from inside the workspace. In the default VS Code session, tools under
-`/root/.local` and agent configuration under `/root/.claude` and `/root/.codex` are persisted in
-Docker volumes, so they survive container rebuilds. Host-side deployment commands keep their
-Python environment and updater runtime state outside the checkout, so they do not reuse
+`/home/vscode/.local` and agent configuration under `/home/vscode/.claude` and
+`/home/vscode/.codex` are persisted in Docker volumes, so they survive container rebuilds.
+Codex itself is installed under `/opt/codex`, which remains writable by the `vscode` user for
+CLI updates without being hidden by the persisted `.local` volume. Host-side deployment commands
+keep their Python environment and updater runtime state outside the checkout, so they do not reuse
 root-owned DevContainer artifacts.
 
 Then attach to the container using VS Code's DevContainer extension or:
