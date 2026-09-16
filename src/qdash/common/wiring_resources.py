@@ -8,11 +8,15 @@ def mux_module_resources(entry: dict[str, Any]) -> set[str]:
 
     Channels on the same module conflict. Keep readout and control namespaces
     separate to preserve the scheduler's existing conflict rules.
+    Prefer ':' as the channel separator so module names can contain hyphens;
+    retain the legacy first-hyphen separator when ':' is absent.
     """
     resources: set[str] = set()
     read_out = entry.get("read_out")
     if read_out:
-        resources.add(f"module:read_out:{read_out.split('-')[0]}")
+        separator = ":" if ":" in read_out else "-"
+        resources.add(f"module:read_out:{read_out.split(separator, 1)[0]}")
     for ctrl in entry.get("ctrl", []):
-        resources.add(f"module:ctrl:{ctrl.split('-')[0]}")
+        separator = ":" if ":" in ctrl else "-"
+        resources.add(f"module:ctrl:{ctrl.split(separator, 1)[0]}")
     return resources
