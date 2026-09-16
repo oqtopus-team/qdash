@@ -99,6 +99,43 @@ def test_module_conflicts_match_cr_scheduler(wiring_file: Path, grouped: bool) -
             )
 
 
+@pytest.mark.parametrize("shared_resource", ["read_out", "ctrl"])
+def test_colon_modules_preserve_parallelism_and_shared_conflicts(
+    wiring_file: Path, shared_resource: str
+) -> None:
+    from qdash.workflow.engine.scheduler.cr_utils import (
+        build_mux_conflict_map,
+        build_qubit_to_mux_map,
+        group_cr_pairs_by_conflict,
+    )
+
+    entries = [
+        {"mux": 0, "ctrl": ["control-box-a:0"], "read_out": "readout-box-a:0"},
+        {"mux": 1, "ctrl": ["control-box-b:0"], "read_out": "readout-box-b:0"},
+        {
+            "mux": 2,
+            "ctrl": ["control-box-a:1" if shared_resource == "ctrl" else "control-box-c:0"],
+            "read_out": "readout-box-a:1" if shared_resource == "read_out" else "readout-box-c:0",
+        },
+    ]
+    wiring_file.write_text(yaml.safe_dump({"chip-1": entries}))
+    conflicts = build_mux_conflict_map(entries)
+    assert conflicts == {0: {2}, 2: {0}}
+
+    groups = group_cr_pairs_by_conflict(
+        ["0-1", "4-5", "8-9"], build_qubit_to_mux_map(entries), conflicts, max_parallel_ops=10
+    )
+    assert len(groups) == 2
+    assert sorted(len(group) for group in groups) == [1, 2]
+    assert not any("0-1" in group and "8-9" in group for group in groups)
+
+    scopes = [resolve_execution_resource_scope("chip-1", {"mux_ids": [i]}) for i in range(3)]
+    assert all(not scope.exclusive for scope in scopes)
+    assert not scopes_conflict(scopes[0], scopes[1])
+    assert scopes_conflict(scopes[0], scopes[2])
+    assert not scopes_conflict(scopes[1], scopes[2])
+
+
 def test_shared_box_b_module_is_locked_across_one_qubit_groups(wiring_file: Path) -> None:
     from qdash.workflow.engine.scheduler.one_qubit_scheduler import OneQubitScheduler
 
