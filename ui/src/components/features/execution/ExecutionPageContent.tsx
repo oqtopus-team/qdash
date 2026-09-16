@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { isExecutionCancellable, isExecutionInProgress } from "@/lib/executionStatus";
 import { formatDate, formatDateTime } from "@/lib/utils/datetime";
 
 import { ExecutionDurationBreakdown } from "./ExecutionDurationBreakdown";
@@ -64,6 +65,7 @@ function getStatusBadgeClass(status: string) {
       return "badge-success";
     case "scheduled":
     case "pending":
+    case "cancelling":
       return "badge-warning";
     case "failed":
       return "badge-error";
@@ -243,9 +245,7 @@ export function ExecutionPageContent() {
   const statusSummary = useMemo(
     () => ({
       total: cardData.length,
-      running: cardData.filter((execution) =>
-        ["running", "scheduled", "pending"].includes(execution.status),
-      ).length,
+      running: cardData.filter((execution) => isExecutionInProgress(execution.status)).length,
       failed: cardData.filter((execution) => execution.status === "failed").length,
       completed: cardData.filter((execution) => execution.status === "completed").length,
     }),
@@ -341,6 +341,7 @@ export function ExecutionPageContent() {
       case "completed":
         return "border-l-4 border-l-success";
       case "scheduled":
+      case "cancelling":
         return "border-l-4 border-l-warning";
       case "failed":
         return "border-l-4 border-l-error";
@@ -490,7 +491,7 @@ export function ExecutionPageContent() {
                       {execution.name}
                     </h3>
                     <span
-                      className={`badge badge-sm flex-shrink-0 ${getStatusBadgeClass(execution.status)} ${execution.status === "running" ? "status-pulse" : ""}`}
+                      className={`badge badge-sm flex-shrink-0 ${getStatusBadgeClass(execution.status)} ${execution.status === "running" || execution.status === "cancelling" ? "status-pulse" : ""}`}
                     >
                       {getStatusLabel(execution.status)}
                     </span>
@@ -595,10 +596,7 @@ export function ExecutionPageContent() {
                     | string
                     | undefined;
                   const isCancellable =
-                    !!detailFlowRunId &&
-                    (selectedExec?.status === "running" ||
-                      selectedExec?.status === "scheduled" ||
-                      selectedExec?.status === "pending");
+                    !!detailFlowRunId && isExecutionCancellable(selectedExec?.status);
                   return (
                     isCancellable && (
                       <button

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 
+import { isExecutionInProgress } from "@/lib/executionStatus";
+
 type TaskProgress = {
   current: number;
   total: number | null;
@@ -79,7 +81,7 @@ export function ExecutionTaskProgress({ status, note }: ExecutionTaskProgressPro
     return () => window.clearInterval(timer);
   }, [progress?.etaSeconds, progress?.overallEtaSeconds, status]);
 
-  if (!["running", "scheduled", "pending"].includes(status ?? "")) return null;
+  if (!isExecutionInProgress(status)) return null;
 
   if (status !== "running" || progress === null) {
     return (

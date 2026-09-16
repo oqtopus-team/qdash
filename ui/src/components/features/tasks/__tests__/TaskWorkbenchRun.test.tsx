@@ -496,6 +496,7 @@ describe("TaskWorkbench run availability", () => {
     ["scheduled", "Starting…", true],
     ["pending", "Starting…", true],
     ["running", "Running…", true],
+    ["cancelling", "Cancelling…", true],
     ["completed", "Run task", false],
     ["failed", "Run task", false],
     ["cancelled", "Run task", false],

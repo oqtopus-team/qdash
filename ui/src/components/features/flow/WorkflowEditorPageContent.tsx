@@ -71,6 +71,7 @@ import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "reac
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { isExecutionTerminal } from "@/lib/executionStatus";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 // Monaco Editor is only available on client side
@@ -164,7 +165,7 @@ export function WorkflowEditorPageContent() {
       enabled: Boolean(lastExecutionId),
       refetchInterval: (query) => {
         const status = (query.state.data?.data as ExecutionResponseDetail | undefined)?.status;
-        return status && ["completed", "failed", "cancelled"].includes(status) ? false : 2000;
+        return isExecutionTerminal(status) ? false : 2000;
       },
       refetchIntervalInBackground: true,
     },
@@ -266,7 +267,11 @@ export function WorkflowEditorPageContent() {
         ? "Starting this flow…"
         : availability.disabledReason;
 
-  const canCancel = !!lastFlowRunId && !!lockStatus?.data.lock;
+  const canCancel =
+    !!lastFlowRunId &&
+    !!lockStatus?.data.lock &&
+    latestExecution?.status !== "cancelling" &&
+    !isExecutionTerminal(latestExecution?.status);
   const executeErrorDetail = (
     executeMutation.error as { response?: { data?: { detail?: unknown } } } | null
   )?.response?.data?.detail;
@@ -1309,6 +1314,10 @@ export function WorkflowEditorPageContent() {
                   ) : latestExecution?.status === "completed" ? (
                     <div>
                       <span className="text-success">[done]</span> Execution completed.
+                    </div>
+                  ) : latestExecution?.status === "cancelling" ? (
+                    <div>
+                      <span className="text-warning">[cancelling]</span> Cancelling execution...
                     </div>
                   ) : lockStatus?.data.lock ? (
                     <div>
