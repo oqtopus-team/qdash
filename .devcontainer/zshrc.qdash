@@ -19,6 +19,9 @@ autoload -Uz compinit colors vcs_info up-line-or-beginning-search down-line-or-b
 colors
 compinit -d "${HOME}/.zcompdump"
 
+setopt PROMPT_SUBST
+PROMPT='%F{green}%n@%m%f %F{blue}%1~%f %# '
+
 zstyle ':completion:*' menu select
 zstyle ':completion:*' group-name ''
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}' 'r:|[._-]=* r:|=*'
@@ -45,8 +48,11 @@ alias l='ls -CF'
 [ -r /opt/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] \
   && source /opt/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
-if [ -r /workspace/qdash/.devcontainer/p10k.zsh ] && [ -r /opt/powerlevel10k/powerlevel10k.zsh-theme ]; then
-  source /workspace/qdash/.devcontainer/p10k.zsh
+qdash_p10k_config=/workspace/qdash/.devcontainer/p10k.zsh
+[ -r "${qdash_p10k_config}" ] || qdash_p10k_config=/opt/qdash-devcontainer/p10k.zsh
+
+if [ -r "${qdash_p10k_config}" ] && [ -r /opt/powerlevel10k/powerlevel10k.zsh-theme ]; then
+  source "${qdash_p10k_config}"
   source /opt/powerlevel10k/powerlevel10k.zsh-theme
 else
   zstyle ':vcs_info:*' enable git

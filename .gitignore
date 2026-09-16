@@ -201,8 +201,7 @@ prefect.db-wal
 .next
 next-env.d.ts
 # tailwind.config.js
-postgres_data/*
-!postgres_data/.gitkeep
+postgres_data/
 mongo_data/*
 !mongo_data/.gitkeep
 !mongo_data/data/

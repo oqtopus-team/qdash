@@ -18,7 +18,7 @@
 **/htmlcov
 .venv
 .DS_Store
-logs
-calib_data
-mongo_data
-postgres_data
+logs/
+calib_data/
+mongo_data/
+postgres_data/

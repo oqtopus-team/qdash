@@ -140,12 +140,18 @@ ARG CODEX_VERSION
 RUN echo "umask 022" >> /etc/profile && \
     echo "umask 022" >> /etc/bash.bashrc
 
-ENV HOME=/root
-ENV PATH="/root/.local/bin:${PATH}"
+ENV HOME=/home/vscode
+ENV NPM_CONFIG_PREFIX=/opt/codex
+ENV PATH="/opt/codex/bin:/home/vscode/.local/bin:${PATH}"
 
-# Install OpenAI Codex CLI
+# Install OpenAI Codex CLI into a writable prefix that is not hidden by the
+# persisted /home/vscode/.local volume.
+RUN mkdir -p /opt/codex /home/vscode/.local /home/vscode/.npm \
+    && chown -R vscode:vscode /opt/codex /home/vscode/.local /home/vscode/.npm
+USER vscode
 RUN npm install -g "@openai/codex@${CODEX_VERSION}" && \
     codex --version
+USER root
 
 # Configure Zsh.
 ENV SHELL=/bin/zsh
@@ -155,29 +161,41 @@ RUN git clone --depth=1 https://github.com/romkatv/powerlevel10k.git /opt/powerl
     && git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions.git /opt/zsh-autosuggestions \
     && git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git /opt/zsh-syntax-highlighting
 
+COPY ./zshrc.qdash /opt/qdash-devcontainer/zshrc.qdash
+COPY ./p10k.zsh /opt/qdash-devcontainer/p10k.zsh
+
 # Setup workspace and cache directories.
 RUN mkdir -p \
         /workspace/qdash/ui \
         /commandhistory \
-        /root/.cache/pip \
-        /root/.cache/uv \
-        /root/.claude \
-        /root/.codex \
-        /root/.vscode-server/extensions \
+        /home/vscode/.cache/pip \
+        /home/vscode/.cache/uv \
+        /home/vscode/.claude \
+        /home/vscode/.codex \
+        /home/vscode/.vscode-server/extensions \
     && touch /workspace/qdash/ui/.bunfig.toml \
-    && touch /root/.bashrc /root/.zshrc \
-    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> /root/.bashrc \
-    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> /root/.zshrc \
-    && echo 'export HISTFILE=/commandhistory/.zsh_history' >> /root/.zshrc \
-    && echo 'setopt APPEND_HISTORY' >> /root/.zshrc \
-    && echo 'setopt HIST_IGNORE_DUPS' >> /root/.zshrc \
-    && printf '\n# >>> qdash managed zsh >>>\n[ -f /workspace/qdash/.devcontainer/zshrc.qdash ] && source /workspace/qdash/.devcontainer/zshrc.qdash\n# <<< qdash managed zsh <<<\n' >> /root/.zshrc \
-    && chsh -s /bin/zsh root
+    && touch /home/vscode/.bashrc /home/vscode/.zshrc \
+    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/vscode/.bashrc \
+    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/vscode/.zshrc \
+    && printf '\n# >>> qdash managed zsh >>>\nif [ -f /workspace/qdash/.devcontainer/zshrc.qdash ]; then\n  source /workspace/qdash/.devcontainer/zshrc.qdash\nelif [ -f /opt/qdash-devcontainer/zshrc.qdash ]; then\n  source /opt/qdash-devcontainer/zshrc.qdash\nfi\n# <<< qdash managed zsh <<<\n' >> /home/vscode/.zshrc \
+    && chown -R vscode:vscode \
+        /commandhistory \
+        /home/vscode/.cache \
+        /home/vscode/.claude \
+        /home/vscode/.codex \
+        /home/vscode/.local \
+        /home/vscode/.npm \
+        /home/vscode/.vscode-server \
+        /home/vscode/.bashrc \
+        /home/vscode/.zshrc \
+        /opt/codex \
+        /opt/qdash-devcontainer \
+    && chsh -s /bin/zsh vscode
 
-COPY ./.devcontainer/update-docker-socket-group.sh /usr/local/bin/update-docker-socket-group
-COPY ./.devcontainer/start-container.sh /usr/local/bin/start-container
-COPY ./.devcontainer/post-create.sh /usr/local/bin/qdash-post-create
-COPY ./.devcontainer/post-start.sh /usr/local/bin/qdash-post-start
+COPY ./update-docker-socket-group.sh /usr/local/bin/update-docker-socket-group
+COPY ./start-container.sh /usr/local/bin/start-container
+COPY ./post-create.sh /usr/local/bin/qdash-post-create
+COPY ./post-start.sh /usr/local/bin/qdash-post-start
 RUN chmod 0755 \
         /usr/local/bin/update-docker-socket-group \
         /usr/local/bin/start-container \
