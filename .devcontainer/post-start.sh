@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir -p /root/.codex /root/.local
-mkdir -p /root/.cache/pip /root/.cache/uv /workspace/qdash/ui/node_modules
-chmod -R u+rwX \
-  /root/.codex \
-  /root/.local \
-  /root/.cache/pip \
-  /root/.cache/uv \
+sudo mkdir -p \
+  "${HOME}/.codex" \
+  "${HOME}/.local" \
+  "${HOME}/.cache/pip" \
+  "${HOME}/.cache/uv" \
+  /commandhistory \
   /workspace/qdash/ui/node_modules
-
-git config --global --get-all safe.directory | grep -Fxq /workspace/qdash \
-  || git config --global --add safe.directory /workspace/qdash
+sudo chown -R "$(id -u):$(id -g)" \
+  "${HOME}/.codex" \
+  "${HOME}/.local" \
+  "${HOME}/.cache" \
+  /commandhistory \
+  /workspace/qdash/ui/node_modules
 
 touch ~/.bashrc ~/.zshrc
 
@@ -31,7 +33,11 @@ awk '
 cat <<'EOF' >> "${tmp_zshrc}"
 
 # >>> qdash managed zsh >>>
-[ -f /workspace/qdash/.devcontainer/zshrc.qdash ] && source /workspace/qdash/.devcontainer/zshrc.qdash
+if [ -f /workspace/qdash/.devcontainer/zshrc.qdash ]; then
+  source /workspace/qdash/.devcontainer/zshrc.qdash
+elif [ -f /opt/qdash-devcontainer/zshrc.qdash ]; then
+  source /opt/qdash-devcontainer/zshrc.qdash
+fi
 # <<< qdash managed zsh <<<
 EOF
 

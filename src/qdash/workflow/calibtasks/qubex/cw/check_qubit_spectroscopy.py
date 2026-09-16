@@ -40,7 +40,6 @@ class CheckQubitSpectroscopy(QubexTask):
 
     name: str = "CheckQubitSpectroscopy"
     task_type: str = "qubit"
-    timeout: int = 60 * 120
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "readout_frequency": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),

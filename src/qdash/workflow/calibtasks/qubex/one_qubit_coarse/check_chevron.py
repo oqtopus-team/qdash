@@ -30,7 +30,6 @@ class CheckChevron(QubexTask):
 
     name: str = "CheckChevron"
     task_type: str = "qubit"
-    timeout: int = 60 * 240
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "coarse_qubit_frequency": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),

@@ -24,7 +24,6 @@ class X180InterleavedRandomizedBenchmarking(QubexTask):
 
     name: str = "X180InterleavedRandomizedBenchmarking"
     task_type: str = "qubit"
-    timeout: int = 60 * 30
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "qubit_frequency": InputParameterSpec.required_database(),
         "drag_hpi_amplitude": InputParameterSpec.required_database(),
