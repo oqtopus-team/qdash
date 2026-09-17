@@ -65,7 +65,6 @@ function getStatusBadgeClass(status: string) {
       return "badge-success";
     case "scheduled":
     case "pending":
-    case "cancelling":
       return "badge-warning";
     case "failed":
       return "badge-error";
@@ -341,11 +340,11 @@ export function ExecutionPageContent() {
       case "completed":
         return "border-l-4 border-l-success";
       case "scheduled":
-      case "cancelling":
         return "border-l-4 border-l-warning";
       case "failed":
         return "border-l-4 border-l-error";
       case "cancelled":
+      case "cancelling":
         return "border-l-4 border-l-neutral";
       default:
         return "border-l-4 border-l-base-300";

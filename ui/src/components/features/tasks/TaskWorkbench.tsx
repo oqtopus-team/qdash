@@ -31,8 +31,7 @@ interface TaskWorkbenchProps {
 function badgeClass(status?: string | null) {
   if (status === "completed") return "badge-success";
   if (status === "failed") return "badge-error";
-  if (status === "cancelled") return "badge-neutral";
-  if (status === "cancelling") return "badge-warning";
+  if (status === "cancelled" || status === "cancelling") return "badge-neutral";
   if (status === "running") return "badge-info";
   return "badge-warning";
 }
