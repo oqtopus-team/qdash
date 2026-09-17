@@ -521,6 +521,34 @@ def test_mark_cancelling_ignores_already_terminal_execution(init_db) -> None:
     assert execution.status == "completed"
 
 
+def test_mark_cancelling_skips_execution_that_becomes_terminal_before_update(init_db) -> None:
+    """A run that reaches a terminal status between the scan and the update is left alone."""
+    _make_execution(status="running")
+    original_find = ExecutionHistoryDocument.find
+    find_calls = 0
+
+    def racing_find(query):
+        nonlocal find_calls
+        find_calls += 1
+        if find_calls == 2:
+            ExecutionHistoryDocument.get_motor_collection().update_one(
+                {"project_id": PROJECT_ID, "execution_id": "exec-1"},
+                {"$set": {"status": "completed"}},
+            )
+        return original_find(query)
+
+    with patch.object(ExecutionHistoryDocument, "find", side_effect=racing_find):
+        marked = mark_executions_cancelling_by_flow_run_id(
+            project_id=PROJECT_ID,
+            flow_run_id=FLOW_RUN_ID,
+        )
+
+    assert marked == 0
+    execution = _reload_execution()
+    assert execution is not None
+    assert execution.status == "completed"
+
+
 def test_mark_cancelling_does_not_set_end_at(init_db) -> None:
     """Marking an execution cancelling is a non-terminal transition; end_at stays unset."""
     _make_execution(status="running")

@@ -5,6 +5,18 @@ from typing import Any
 import pytest
 
 
+class CancelledRun(Exception):
+    """Stand-in for prefect.exceptions.CancelledRun, which is matched by class name."""
+
+
+class ExternalSignal(BaseException):
+    """Stand-in for prefect.exceptions.ExternalSignal."""
+
+
+class TerminationSignal(ExternalSignal):
+    """Stand-in for prefect.exceptions.TerminationSignal."""
+
+
 @pytest.mark.parametrize("persist", [False, True])
 @pytest.mark.parametrize("enabled", [False, True])
 @pytest.mark.parametrize("force", [False, True])
@@ -171,3 +183,37 @@ def test_single_task_executor_accepts_quick_run_parameters(monkeypatch, source_t
     assert captured["kwargs"]["backend_name"] == "fake"
     assert captured["kwargs"]["task_run_parameters"] == defaults
     assert captured["kwargs"]["persist_output_parameters"] is False
+
+
+@pytest.mark.parametrize(
+    ("exc", "handler"),
+    [
+        (RuntimeError("boom"), "fail_calibration"),
+        (CancelledRun("cancelled"), "cancel_calibration"),
+        (TerminationSignal("SIGTERM"), "abandon_calibration"),
+    ],
+)
+def test_single_task_executor_routes_aborts_to_one_handler(monkeypatch, exc, handler):
+    """Each kind of abort reaches exactly one terminal handler."""
+    from unittest.mock import MagicMock
+
+    from qdash.workflow.service.single_task_flow import single_task_executor
+
+    service = MagicMock()
+    service.return_value.execute_task.side_effect = exc
+    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
+
+    with pytest.raises(type(exc)):
+        single_task_executor(
+            username="alice",
+            chip_id="chip-1",
+            qid="0",
+            task_name="CheckRabi",
+        )
+
+    cal = service.return_value
+    for name in ("fail_calibration", "cancel_calibration", "abandon_calibration"):
+        if name == handler:
+            getattr(cal, name).assert_called_once()
+        else:
+            getattr(cal, name).assert_not_called()
