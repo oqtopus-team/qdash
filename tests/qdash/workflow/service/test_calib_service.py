@@ -1393,59 +1393,64 @@ def _build_abort_handling_session(mock_lock_repo, mock_user_repo) -> CalibServic
     )
 
 
+def _mock_terminal_handlers(
+    session: CalibService, monkeypatch: pytest.MonkeyPatch
+) -> tuple[MagicMock, MagicMock, MagicMock]:
+    """Replace the three terminal handlers so the abort branch can be observed."""
+    fail, cancel, abandon = MagicMock(), MagicMock(), MagicMock()
+    monkeypatch.setattr(session, "fail_calibration", fail)
+    monkeypatch.setattr(session, "cancel_calibration", cancel)
+    monkeypatch.setattr(session, "abandon_calibration", abandon)
+    return fail, cancel, abandon
+
+
 class TestRunPipelineAbortHandling:
     """Test that _run_pipeline routes aborts to the correct terminal handler."""
 
     def test_unrelated_exception_calls_fail_calibration(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
     ):
         """A plain RuntimeError routes to fail_calibration only."""
         session = _build_abort_handling_session(mock_lock_repo, mock_user_repo)
-        session.fail_calibration = MagicMock()
-        session.cancel_calibration = MagicMock()
-        session.abandon_calibration = MagicMock()
+        fail, cancel, abandon = _mock_terminal_handlers(session, monkeypatch)
         exc = RuntimeError("boom")
 
         with pytest.raises(RuntimeError):
             session._run_pipeline(QubitTargets(["0"]), [RaisingStep(exc=exc)])
 
-        session.fail_calibration.assert_called_once()
-        session.cancel_calibration.assert_not_called()
-        session.abandon_calibration.assert_not_called()
+        fail.assert_called_once()
+        cancel.assert_not_called()
+        abandon.assert_not_called()
 
     def test_cancelled_run_calls_cancel_calibration(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
     ):
         """A CancelledRun routes to cancel_calibration only."""
         session = _build_abort_handling_session(mock_lock_repo, mock_user_repo)
-        session.fail_calibration = MagicMock()
-        session.cancel_calibration = MagicMock()
-        session.abandon_calibration = MagicMock()
+        fail, cancel, abandon = _mock_terminal_handlers(session, monkeypatch)
         exc = CancelledRun("cancelled")
 
         with pytest.raises(CancelledRun):
             session._run_pipeline(QubitTargets(["0"]), [RaisingStep(exc=exc)])
 
-        session.cancel_calibration.assert_called_once()
-        session.fail_calibration.assert_not_called()
-        session.abandon_calibration.assert_not_called()
+        cancel.assert_called_once()
+        fail.assert_not_called()
+        abandon.assert_not_called()
 
     def test_termination_signal_calls_abandon_calibration(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
     ):
         """A TerminationSignal routes to abandon_calibration only."""
         session = _build_abort_handling_session(mock_lock_repo, mock_user_repo)
-        session.fail_calibration = MagicMock()
-        session.cancel_calibration = MagicMock()
-        session.abandon_calibration = MagicMock()
+        fail, cancel, abandon = _mock_terminal_handlers(session, monkeypatch)
         exc = TerminationSignal("SIGTERM")
 
         with pytest.raises(TerminationSignal):
             session._run_pipeline(QubitTargets(["0"]), [RaisingStep(exc=exc)])
 
-        session.abandon_calibration.assert_called_once()
-        session.fail_calibration.assert_not_called()
-        session.cancel_calibration.assert_not_called()
+        abandon.assert_called_once()
+        fail.assert_not_called()
+        cancel.assert_not_called()
 
     def test_abandon_calibration_releases_lock_without_closing_execution(
         self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
@@ -1455,10 +1460,13 @@ class TestRunPipelineAbortHandling:
         session._lock_acquired = True
         session._lock_repo = mock_lock_repo
         session.use_lock = True
-        session.execution_service = MockExecutionService()
+        execution_service = MagicMock()
+        session.execution_service = execution_service
 
         session.abandon_calibration()
 
         assert session._lock_acquired is False
         assert session._initialized is False
-        assert session.execution_service.completed is False
+        execution_service.complete.assert_not_called()
+        execution_service.fail.assert_not_called()
+        execution_service.cancel.assert_not_called()
