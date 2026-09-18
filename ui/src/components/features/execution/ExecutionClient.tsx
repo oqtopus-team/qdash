@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Calendar, Clock, Download, StopCircle, UserRound } from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
+import { isExecutionCancellable } from "@/lib/executionStatus";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
 import { ExecutionDAG } from "./ExecutionDAG";
@@ -99,11 +100,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
 
   const flowRunId = execution?.note?.flow_run_id as string | undefined;
 
-  const isCancellable =
-    !!flowRunId &&
-    (execution?.status === "running" ||
-      execution?.status === "scheduled" ||
-      execution?.status === "pending");
+  const isCancellable = !!flowRunId && isExecutionCancellable(execution?.status);
 
   const handleCancel = () => {
     if (!flowRunId) return;

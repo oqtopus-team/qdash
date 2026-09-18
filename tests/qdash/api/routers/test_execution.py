@@ -333,6 +333,95 @@ class TestCancelExecution:
         assert data["execution_id"] == CANCEL_FLOW_RUN_ID
         assert data["status"] == "cancelling"
 
+    def test_cancel_success_marks_execution_cancelling(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        """A successful cancellation marks the matching execution cancelling in Mongo."""
+        execution = ExecutionHistoryDocument(
+            project_id="test_project",
+            execution_id="exec-cancel",
+            name="test_flow",
+            status="running",
+            chip_id="chip-1",
+            username="test_user",
+            tags=["test"],
+            note={"flow_run_id": CANCEL_FLOW_RUN_ID},
+            calib_data_path="/tmp/calib",
+            message="running",
+            system_info=SystemInfoModel(),
+            start_at=datetime.now(tz=timezone.utc),
+        )
+        execution.insert()
+
+        mock_state = MagicMock()
+        mock_state.type.value = "RUNNING"
+
+        mock_flow_run = MagicMock()
+        mock_flow_run.state = mock_state
+        mock_flow_run.parameters = {"project_id": "test_project"}
+
+        mock_client = MagicMock()
+        mock_client.read_flow_run = AsyncMock(return_value=mock_flow_run)
+        mock_client.set_flow_run_state = AsyncMock(return_value=None)
+
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
+        async_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("qdash.api.services.execution_service.get_client", return_value=async_cm):
+            response = test_client.post(
+                f"/executions/{CANCEL_FLOW_RUN_ID}/cancel",
+                headers=auth_headers,
+            )
+
+        assert response.status_code == 200
+        reloaded = ExecutionHistoryDocument.find_one(
+            {"project_id": "test_project", "execution_id": "exec-cancel"}
+        ).run()
+        assert reloaded is not None
+        assert reloaded.status == "cancelling"
+
+    def test_cancel_success_returns_200_when_marking_cancelling_fails(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        """Prefect already accepted the cancellation, so a failed cancelling write still returns 200."""
+        mock_state = MagicMock()
+        mock_state.type.value = "RUNNING"
+
+        mock_flow_run = MagicMock()
+        mock_flow_run.state = mock_state
+        mock_flow_run.parameters = {"project_id": "test_project"}
+
+        mock_client = MagicMock()
+        mock_client.read_flow_run = AsyncMock(return_value=mock_flow_run)
+        mock_client.set_flow_run_state = AsyncMock(return_value=None)
+
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
+        async_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("qdash.api.services.execution_service.get_client", return_value=async_cm),
+            patch(
+                "qdash.api.services.execution_service.mark_executions_cancelling_by_flow_run_id",
+                side_effect=RuntimeError("boom"),
+            ),
+        ):
+            response = test_client.post(
+                f"/executions/{CANCEL_FLOW_RUN_ID}/cancel",
+                headers=auth_headers,
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "cancelling"
+
     def test_cancel_invalid_uuid_returns_400(
         self,
         test_client: TestClient,

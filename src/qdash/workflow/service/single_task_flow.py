@@ -134,12 +134,19 @@ def single_task_executor(
         logger.info(f"Single-task executor completed: {task_name} / {qid}")
         return result
     except BaseException as e:
-        from qdash.workflow.service.calib_service import _is_cancellation
+        from qdash.workflow.service.calib_service import (
+            _is_cancellation,
+            _is_external_termination,
+        )
 
         if _is_cancellation(e):
             logger.info("Single-task executor was cancelled")
             with contextlib.suppress(Exception):
                 cal.cancel_calibration()
+        elif _is_external_termination(e):
+            logger.info("Single-task executor interrupted by a termination signal")
+            with contextlib.suppress(Exception):
+                cal.abandon_calibration()
         else:
             logger.error(f"Single-task executor failed: {e}")
             with contextlib.suppress(Exception):

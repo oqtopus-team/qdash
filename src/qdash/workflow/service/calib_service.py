@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterator, Sequence
 
     from qdash.repository.protocols import (
         ExecutionCounterRepository,
@@ -66,14 +66,62 @@ from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 logger = logging.getLogger(__name__)
 
 
-def _is_cancellation(exc: BaseException) -> bool:
-    """Check if an exception represents a Prefect cancellation.
+_CANCELLATION_EXC_NAMES = frozenset({"CancelledRun", "CancelledError"})
+_EXTERNAL_TERMINATION_EXC_NAMES = frozenset({"TerminationSignal", "ExternalSignal"})
 
-    Prefect 3 raises ``prefect.exceptions.CancelledRun`` (a ``BaseException``
-    subclass) when a flow run is cancelled.  We check by class name to avoid
-    a hard import dependency on prefect in non-workflow contexts.
+
+def _iter_exception_chain(exc: BaseException) -> Iterator[BaseException]:
+    """Yield the exception, its ``__cause__`` chain, and any group members.
+
+    ``__context__`` is deliberately not followed: a genuine failure raised while
+    a cancellation is being handled would otherwise be reported as a cancellation.
     """
-    return any(cls.__name__ in ("CancelledRun", "CancelledError") for cls in type(exc).__mro__)
+    seen: set[int] = set()
+    pending: list[BaseException] = [exc]
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        yield current
+        if current.__cause__ is not None:
+            pending.append(current.__cause__)
+        pending.extend(getattr(current, "exceptions", ()) or ())
+
+
+def _matches_exception_name(exc: BaseException, names: frozenset[str]) -> bool:
+    """Check the exception chain against a set of class names.
+
+    Matching by name avoids a hard import dependency on prefect in non-workflow
+    contexts.
+    """
+    return any(
+        cls.__name__ in names
+        for member in _iter_exception_chain(exc)
+        for cls in type(member).__mro__
+    )
+
+
+def _is_cancellation(exc: BaseException) -> bool:
+    """Check if an exception represents a cancelled run result.
+
+    Prefect builds ``prefect.exceptions.CancelledRun`` when the result of an
+    already cancelled run is retrieved. It is not what a running flow receives
+    when the run is cancelled, see :func:`_is_external_termination`.
+    """
+    return _matches_exception_name(exc, _CANCELLATION_EXC_NAMES)
+
+
+def _is_external_termination(exc: BaseException) -> bool:
+    """Check if the flow process was interrupted by a signal.
+
+    Prefect installs a SIGTERM handler that raises ``TerminationSignal`` inside
+    user code, and it raises the same exception for a runner-driven cancel and
+    for a plain SIGTERM. The flow process cannot tell those apart, but the flow
+    run's terminal state can, so callers should leave the execution open and let
+    ``on_flow_cancellation`` / ``on_flow_crashed`` close it.
+    """
+    return _matches_exception_name(exc, _EXTERNAL_TERMINATION_EXC_NAMES)
 
 
 def _run_terminal_hook(
@@ -1344,6 +1392,17 @@ class CalibService:
             self._release_lock_if_acquired()
             self._initialized = False
 
+    def abandon_calibration(self) -> None:
+        """Release resources without recording a terminal status.
+
+        Called when the flow process is interrupted by a signal. Whether the run
+        was cancelled or killed is only known from the flow run's terminal state,
+        so the execution is left open for ``on_flow_cancellation`` /
+        ``on_flow_crashed``, or the API reconciliation, to close.
+        """
+        self._release_lock_if_acquired()
+        self._initialized = False
+
     # =========================================================================
     # High-level API Methods
     # =========================================================================
@@ -1475,8 +1534,6 @@ class CalibService:
             logger.info("Pipeline completed successfully")
 
         except BaseException as exc:
-            # Distinguish cancellation from failure.
-            # Prefect 3 raises CancelledRun (subclass of BaseException) on cancel.
             with contextlib.suppress(Exception):
                 logger.error(
                     "Pipeline aborted by %s (cause=%s, context=%s, group=%s)",
@@ -1485,11 +1542,18 @@ class CalibService:
                     type(exc.__context__).__name__ if exc.__context__ else None,
                     [type(sub).__name__ for sub in getattr(exc, "exceptions", [])] or None,
                 )
-                if active_step and _is_cancellation(exc):
-                    logger.info("Execution was cancelled")
-                    self.cancel_calibration()
-                elif active_step:
-                    self.fail_calibration()
+                if active_step:
+                    if _is_cancellation(exc):
+                        logger.info("Execution was cancelled")
+                        self.cancel_calibration()
+                    elif _is_external_termination(exc):
+                        logger.info(
+                            "Pipeline interrupted by a termination signal; "
+                            "leaving the execution for the flow run hooks to close"
+                        )
+                        self.abandon_calibration()
+                    else:
+                        self.fail_calibration()
             raise
         finally:
             self.flow_name = pipeline_flow_name
