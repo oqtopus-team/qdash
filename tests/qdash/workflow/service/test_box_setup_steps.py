@@ -49,3 +49,26 @@ def test_configure_all_routes_aborts_to_one_handler(monkeypatch, exc, handler) -
             getattr(service, name).assert_called_once()
         else:
             getattr(service, name).assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("exc", "handler"),
+    [
+        (RuntimeError("boom"), "fail_calibration"),
+        (CancelledRun("cancelled"), "cancel_calibration"),
+        (TerminationSignal("SIGTERM"), "abandon_calibration"),
+    ],
+)
+def test_configure_all_keeps_the_abort_when_cleanup_fails(monkeypatch, exc, handler) -> None:
+    """A handler that raises must not replace the abort that triggered it."""
+    monkeypatch.setattr("qdash.workflow.service.steps.box_setup.get_run_logger", MagicMock)
+    service = MagicMock()
+    service._initialized = False
+    service.execute_task.side_effect = exc
+    getattr(service, handler).side_effect = RuntimeError("releasing the lock failed")
+
+    step = ConfigureAll(mux_ids=[1])
+    with pytest.raises(type(exc)) as raised:
+        step.execute(cast("CalibService", service), MuxTargets([1]), StepContext())
+
+    assert raised.value is exc

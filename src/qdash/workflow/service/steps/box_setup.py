@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -71,13 +72,16 @@ class ConfigureAll(CalibrationStep):
             if owns_session:
                 if _is_cancellation(e):
                     logger.info(f"[{self.name}] Cancelled")
-                    service.cancel_calibration()
+                    with contextlib.suppress(Exception):
+                        service.cancel_calibration()
                 elif _is_external_termination(e):
                     logger.info(f"[{self.name}] Interrupted by a termination signal")
-                    service.abandon_calibration()
+                    with contextlib.suppress(Exception):
+                        service.abandon_calibration()
                 else:
                     logger.error(f"[{self.name}] Failed: {e}")
-                    service.fail_calibration(str(e))
+                    with contextlib.suppress(Exception):
+                        service.fail_calibration(str(e))
             raise
 
         logger.info(f"[{self.name}] Completed")

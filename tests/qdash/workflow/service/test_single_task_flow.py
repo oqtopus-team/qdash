@@ -217,3 +217,33 @@ def test_single_task_executor_routes_aborts_to_one_handler(monkeypatch, exc, han
             getattr(cal, name).assert_called_once()
         else:
             getattr(cal, name).assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("exc", "handler"),
+    [
+        (RuntimeError("boom"), "fail_calibration"),
+        (CancelledRun("cancelled"), "cancel_calibration"),
+        (TerminationSignal("SIGTERM"), "abandon_calibration"),
+    ],
+)
+def test_single_task_executor_keeps_the_abort_when_cleanup_fails(monkeypatch, exc, handler):
+    """A handler that raises must not replace the abort that triggered it."""
+    from unittest.mock import MagicMock
+
+    from qdash.workflow.service.single_task_flow import single_task_executor
+
+    service = MagicMock()
+    service.return_value.execute_task.side_effect = exc
+    getattr(service.return_value, handler).side_effect = RuntimeError("releasing the lock failed")
+    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
+
+    with pytest.raises(type(exc)) as raised:
+        single_task_executor(
+            username="alice",
+            chip_id="chip-1",
+            qid="0",
+            task_name="CheckRabi",
+        )
+
+    assert raised.value is exc

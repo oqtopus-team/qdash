@@ -24,6 +24,7 @@ Example:
     )
 """
 
+import contextlib
 from typing import Any
 
 from prefect import flow, get_run_logger
@@ -146,11 +147,14 @@ def parallel_retry_calibration(
 
         if _is_cancellation(e):
             logger.info("Calibration was cancelled")
-            cal.cancel_calibration()
+            with contextlib.suppress(Exception):
+                cal.cancel_calibration()
         elif _is_external_termination(e):
             logger.info("Calibration interrupted by a termination signal")
-            cal.abandon_calibration()
+            with contextlib.suppress(Exception):
+                cal.abandon_calibration()
         else:
             logger.error(f"Calibration failed: {e}")
-            cal.fail_calibration(str(e))
+            with contextlib.suppress(Exception):
+                cal.fail_calibration(str(e))
         raise
