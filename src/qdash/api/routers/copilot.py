@@ -41,6 +41,7 @@ from qdash.copilot.contracts import (
     AnalysisResponse,
     AnalyzeRequest,
     ChatRequest,
+    SandboxPythonRequest,
 )
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.datamodel.task_knowledge import get_task_knowledge
@@ -296,6 +297,22 @@ async def analyze_task_result_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post("/sandbox/python", include_in_schema=False)
+async def run_sandboxed_python(
+    request: SandboxPythonRequest,
+    _current_user: Annotated[User, Depends(get_current_active_user)],
+) -> dict[str, Any]:
+    """Run analysis code in the Copilot Python sandbox.
+
+    Exposes the same sandbox the LiteLLM agent uses as ``execute_python_analysis``
+    so the Pi Agent Runtime can offer Python without running code itself.
+    """
+    from qdash.copilot.tooling import execute_python_analysis
+
+    result = await execute_python_analysis(request.code)
+    return dict(result)
 
 
 @router.post("/chat/stream", include_in_schema=False)

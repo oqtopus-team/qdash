@@ -11,6 +11,7 @@ import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 
 import { resolveQDashApiToken } from "./auth.ts";
 import { chartTool } from "./chart-tool.ts";
+import { pythonTool } from "./python-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { buildEntries } from "./entries.ts";
 import { EXCLUDED_TOOL_NAMES } from "./excluded-tools.ts";
@@ -96,7 +97,7 @@ export class SharedRuntime {
 
   /** Names of the tools the agent will actually see. Logged once at startup. */
   listToolNames(): string[] {
-    const names = new Set<string>([chartTool.name]);
+    const names = new Set<string>([chartTool.name, pythonTool.name]);
     for (const extension of this.loader.getExtensions().extensions) {
       for (const name of extension.tools?.keys() ?? []) names.add(name);
     }
@@ -128,7 +129,7 @@ export class SharedRuntime {
       ...(request.thinkingLevel ? { thinkingLevel: request.thinkingLevel } : {}),
       noTools: "builtin",
       excludeTools: EXCLUDED_TOOL_NAMES,
-      customTools: [chartTool],
+      customTools: [chartTool, pythonTool],
       sessionManager: SessionManager.inMemory(
         WORK_DIR,
         { id: request.sessionId },

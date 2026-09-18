@@ -188,6 +188,12 @@ class ChatRequest(BaseModel):
     )
 
 
+class SandboxPythonRequest(BaseModel):
+    """Request body for POST /copilot/sandbox/python."""
+
+    code: str = Field(description="Python source to run in the sandbox")
+
+
 def _rebuild_models() -> None:
     from qdash.copilot.config import ModelConfig as _RuntimeModelConfig
 

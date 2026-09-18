@@ -16,6 +16,7 @@ export function buildSystemPrompt(responseLanguage: string, thinkingLanguage: st
     "- When data is missing or a tool fails, say so plainly instead of guessing.",
     "- Prefer a short direct answer over an exhaustive report. Expand only when asked.",
     "- Use `render_chart` when a plot communicates better than text.",
+    "- Use `run_python` for arithmetic, statistics, and fitting rather than computing in your head. It is sandboxed, so paste the data you need into the code.",
     `- Reason internally in ${thinkingLanguage}. Always write your reply to the user in ${responseLanguage}.`,
   ].join("\n");
 }
