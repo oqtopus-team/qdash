@@ -1,6 +1,14 @@
 # Copilot Chat Configuration
 # Settings for the side-panel general chat experience.
 
+# Backend serving the chat page.
+#   pi:      Pi Agent Runtime service (agent-runtime/)
+#   litellm: in-process agent (src/qdash/copilot/agent.py)
+# Task result analysis and AI review always use the litellm path.
+# Under the pi backend only `provider` and `name` of the models below are used;
+# endpoint wiring lives in agent-runtime/models.json.
+chat_backend: pi
+
 # Selectable models for general chat (UI shows a dropdown). The first entry is
 # the default. The configured model in config.yaml is also offered as a fallback.
 chat_models:
@@ -62,11 +70,11 @@ chat_models:
   #   disable_thinking_instruction: true
   #   max_output_tokens: 2048
 
-  # - provider: bedrock
-  #   name: jp.anthropic.claude-sonnet-4-6
-  #   api_style: responses
-  #   temperature: 0.7
-  #   max_output_tokens: 4096
+  - provider: bedrock
+    name: jp.anthropic.claude-sonnet-4-6
+    api_style: responses
+    temperature: 0.7
+    max_output_tokens: 4096
 
 
 # System prompt for the AI assistant

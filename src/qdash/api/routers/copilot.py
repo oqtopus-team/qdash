@@ -32,6 +32,7 @@ from qdash.api.schemas.copilot_chat_session import (
     ListCopilotChatSessionsResponse,
     UpdateCopilotChatSessionRequest,
 )
+from qdash.api.services import pi_chat_service
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
@@ -300,6 +301,7 @@ async def analyze_task_result_stream(
 @router.post("/chat/stream", include_in_schema=False)
 async def chat_stream(
     request: ChatRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
     copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
 ) -> StreamingResponse:
     """SSE streaming generic chat endpoint.
@@ -313,6 +315,15 @@ async def chat_stream(
             yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
             return
         chat_config = _config_with_chat_model(config, request)
+
+        if config.chat_backend == "pi":
+            async for event in pi_chat_service.stream(
+                request,
+                chat_config,
+                username=current_user.username,
+            ):
+                yield event
+            return
 
         # Load config and resolve default chip_id
         yield sse_event("status", {"step": "load_config", "message": "設定を読み込み中..."})

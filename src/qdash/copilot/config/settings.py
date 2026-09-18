@@ -92,6 +92,9 @@ class CopilotConfig(BaseModel):
     # Optional list of selectable models for general chat. The first entry is
     # used as the default. When unset, the configured `model` above is used.
     chat_models: list[ModelConfig] = Field(default_factory=list)
+    # Backend serving the chat page: "pi" (Pi Agent Runtime) or "litellm"
+    # (in-process). Task analysis and AI review always use the LiteLLM path.
+    chat_backend: str = "litellm"
     evaluation_metrics: EvaluationMetrics = Field(default_factory=EvaluationMetrics)
     scoring: dict[str, ScoringThreshold] = Field(default_factory=dict)
     system_prompt: str = ""

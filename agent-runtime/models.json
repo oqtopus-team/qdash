@@ -1,0 +1,29 @@
+{
+  "providers": {
+    "ollama": {
+      "baseUrl": "$OLLAMA_BASE_URL",
+      "api": "openai-completions",
+      "apiKey": "$OLLAMA_API_KEY",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        { "id": "gemma4:31b", "contextWindow": 131072, "maxTokens": 4096 },
+        { "id": "nvidia/Gemma-4-31B-IT-NVFP4", "contextWindow": 131072, "maxTokens": 4096 }
+      ]
+    },
+    "vllm": {
+      "baseUrl": "$VLLM_BASE_URL",
+      "api": "openai-completions",
+      "apiKey": "$VLLM_API_KEY",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        { "id": "Gemma-4-31B-IT-NVFP4", "contextWindow": 131072, "maxTokens": 4096 }
+      ]
+    }
+  }
+}

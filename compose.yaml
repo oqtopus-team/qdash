@@ -218,6 +218,42 @@ services:
       - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
       - UPDATER_SOCKET=/run/qdash-updater/updater.sock
+      - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
+    networks:
+      - custom_net
+  agent-runtime:
+    # Pi Agent Runtime backing the Copilot chat page when
+    # config/copilot/chat.yaml sets chat_backend: pi.
+    build:
+      context: .
+      dockerfile: ./agent-runtime/Dockerfile
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./agent-runtime/src:/app/src
+      - ./config:/app/config # Read for copilot language settings only
+    environment:
+      - PORT=${AGENT_RUNTIME_PORT:-8002}
+      - PI_CODING_AGENT_DIR=/app/.pi-agent
+      - CHAT_TIMEOUT_MS=${AGENT_RUNTIME_TIMEOUT_MS:-180000}
+      # pi-qdash reaches QDash with this. The runtime logs in as the QDash
+      # administrator at startup unless QDASH_API_TOKEN is already set, so no
+      # token has to be provisioned by hand. Write tools and raw GET access are
+      # excluded from the agent to keep that privilege read-only and scoped.
+      - QDASH_BASE_URL=http://api:${API_PORT:-5715}
+      # Pi hides models whose provider has no credential, even when the server
+      # ignores it. Keep a placeholder for keyless local endpoints.
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-ollama}
+      - VLLM_API_KEY=${VLLM_API_KEY:-vllm}
+      # Node's fetch ignores HTTP(S)_PROXY unless this is set, so LLM calls hang
+      # behind a proxy. Internal service names must then bypass that proxy.
+      - NODE_USE_ENV_PROXY=1
+      - NO_PROXY=${NO_PROXY:-localhost,127.0.0.1},api,agent-runtime
+      - no_proxy=${NO_PROXY:-localhost,127.0.0.1},api,agent-runtime
+    depends_on:
+      api:
+        condition: service_started
     networks:
       - custom_net
   ui:

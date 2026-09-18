@@ -164,6 +164,13 @@ class ChatRequest(BaseModel):
     """Request body for POST /copilot/chat/stream."""
 
     message: str = Field(description="User question / message")
+    session_id: str | None = Field(
+        default=None,
+        description=(
+            "Chat session identifier. Required by the Pi chat backend, which "
+            "restores conversation state from the persisted session."
+        ),
+    )
     chip_id: str | None = None
     qid: str | None = None
     conversation_history: list[dict[str, str]] = Field(

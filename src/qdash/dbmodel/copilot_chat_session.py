@@ -33,6 +33,13 @@ class CopilotChatSessionDocument(Document):
         description="Optional chat context (e.g. chip_id/qid scope)",
     )
     messages: list[CopilotChatMessage] = Field(default_factory=list)
+    agent_messages: list[dict[str, Any]] | None = Field(
+        default=None,
+        description=(
+            "Pi AgentMessage list backing the Pi chat backend. None means the "
+            "conversation was created by the LiteLLM backend."
+        ),
+    )
     created_at: datetime = Field(default_factory=now)
     updated_at: datetime = Field(default_factory=now)
 
