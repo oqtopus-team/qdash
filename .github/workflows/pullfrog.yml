@@ -46,3 +46,4 @@ jobs:
         uses: pullfrog/pullfrog@1ab92a2eb5c2268dcd803ac8bfb0984375e210ab
         with:
           prompt: ${{ inputs.prompt }}
+          timeout: 1h30m
