@@ -468,7 +468,7 @@ export function CopilotChatPage() {
               <Cpu className="w-3.5 h-3.5 text-base-content/40" />
               <span className="sr-only">Chat model</span>
               <select
-                className="select select-bordered select-xs w-44 text-xs truncate appearance-auto"
+                className="select select-bordered select-xs w-44 text-xs"
                 value={selectedModel.key}
                 onChange={(event) => handleModelChange(event.target.value)}
                 disabled={isLoading}

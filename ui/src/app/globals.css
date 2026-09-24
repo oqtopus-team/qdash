@@ -234,6 +234,17 @@ a.card:hover {
     background-color 0.2s ease;
 }
 
+/*
+ * Opt out of Chrome's customizable select (`appearance: base-select`, which
+ * daisyUI enables). It renders the selected label in a browser-generated box
+ * that ignores the ellipsis daisyUI sets on `.select`, so a long label runs
+ * under the arrow instead of being truncated.
+ */
+.select,
+.select select {
+  appearance: none;
+}
+
 .input:hover,
 .select:hover,
 .textarea:hover {
