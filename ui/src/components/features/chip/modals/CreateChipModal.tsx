@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCreateChip, getListChipsQueryKey } from "@/client/chip/chip";
 import { useListTopologies } from "@/client/topology/topology";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 
 interface TopologyItem {
   id: string;
@@ -185,6 +186,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
                 aria-describedby={errors.topologyId ? "topology-error" : undefined}
                 {...register("topologyId")}
               >
+                <SelectedLabel />
                 {groupedTopologies.map(([size, topos]) => (
                   <optgroup key={size} label={`${size} Qubits`}>
                     {topos.map((t) => (

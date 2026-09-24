@@ -21,6 +21,7 @@ import {
   listTaskFileBackends,
   listTaskInfo,
 } from "@/client/task-file/task-file";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useToast } from "@/components/ui/Toast";
 
@@ -178,6 +179,7 @@ function TasksCatalog({ sourceTask }: { sourceTask?: TaskResultResponse }) {
           className="select select-sm select-bordered"
           aria-label="Task backend"
         >
+          <SelectedLabel />
           {backendsData?.backends.map((backend: TaskFileBackend) => (
             <option key={backend.name} value={backend.name}>
               {backend.name}

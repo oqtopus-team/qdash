@@ -11,6 +11,7 @@ import {
   useUpdateCooldown,
 } from "@/client/cooldown/cooldown";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { formatDate, toIsoSeconds } from "@/lib/utils/datetime";
 
@@ -289,6 +290,7 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
                     value={chipToAdd}
                     onChange={(e) => setChipToAdd(e.target.value)}
                   >
+                    <SelectedLabel />
                     <option value="">Load chip…</option>
                     {availableChips.map((c) => (
                       <option key={c} value={c}>

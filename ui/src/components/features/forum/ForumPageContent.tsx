@@ -42,6 +42,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
@@ -566,6 +567,7 @@ function ForumThreadPreviewSidebar({
                         disabled={updateMutation.isPending}
                         onChange={(event) => updateMetadata({ category: event.target.value })}
                       >
+                        <SelectedLabel />
                         {categories.map((item) => (
                           <option key={item.id} value={item.id}>
                             {item.label}
@@ -590,6 +592,7 @@ function ForumThreadPreviewSidebar({
                           saveTargetMetadata(nextChipId, targetDraftType, targetDraftId);
                         }}
                       >
+                        <SelectedLabel />
                         <option value="">Select chip</option>
                         {chips.map((chip) => (
                           <option key={chip.chip_id} value={chip.chip_id}>
@@ -649,6 +652,7 @@ function ForumThreadPreviewSidebar({
                         onChange={(event) => saveCooldownMetadata(event.target.value)}
                         disabled={!targetDraftChipId || updateMutation.isPending}
                       >
+                        <SelectedLabel />
                         <option value="">No cooldown</option>
                         {cooldowns.map((cooldown) => (
                           <option key={cooldown.cooldown_id} value={cooldown.cooldown_id}>
@@ -677,6 +681,7 @@ function ForumThreadPreviewSidebar({
                         onChange={(event) => saveAssigneeMetadata(event.target.value)}
                         disabled={updateMutation.isPending}
                       >
+                        <SelectedLabel />
                         <option value="">Unassigned</option>
                         {members.map((member) => (
                           <option key={member.username} value={member.username}>
@@ -1055,6 +1060,7 @@ export function ForumPageContent() {
               value={category}
               onChange={(event) => setCategoryFilter(event.target.value as CategoryFilter)}
             >
+              <SelectedLabel />
               <option value="all">All categories</option>
               {categories.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -1085,6 +1091,7 @@ export function ForumPageContent() {
               value={cooldownFilter}
               onChange={(event) => setCooldownFilterValue(event.target.value)}
             >
+              <SelectedLabel />
               <option value="all">All cool-downs</option>
               {cooldowns.map((cooldown) => (
                 <option key={cooldown.cooldown_id} value={cooldown.cooldown_id}>
