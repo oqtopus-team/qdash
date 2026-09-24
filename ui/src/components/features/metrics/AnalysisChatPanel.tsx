@@ -29,6 +29,7 @@ import { useAnalysisChatContext, type ChatSession } from "@/contexts/AnalysisCha
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
 import {
   buildAnalysisModelOptions,
@@ -512,6 +513,7 @@ export function AnalysisChatPanel({ context, onClose }: AnalysisChatPanelProps) 
                 onChange={(event) => handleModelChange(event.target.value)}
                 disabled={isLoading}
               >
+                <SelectedLabel />
                 {modelOptions.map((option) => (
                   <option key={option.key} value={option.key}>
                     {option.label}

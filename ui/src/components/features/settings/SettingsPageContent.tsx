@@ -9,6 +9,7 @@ import { AppearanceSettingsPanel } from "@/components/features/settings/Appearan
 import { PasswordChangeCard } from "@/components/features/settings/PasswordChangeCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
@@ -72,6 +73,7 @@ function CopilotSettingsPanel() {
                 onChange={(event) => handleModelChange(event.target.value)}
                 disabled={isLoading}
               >
+                <SelectedLabel />
                 {modelOptions.map((option) => (
                   <option key={option.key} value={option.key}>
                     {option.label}

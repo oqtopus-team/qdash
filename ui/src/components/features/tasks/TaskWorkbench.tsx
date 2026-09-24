@@ -14,6 +14,7 @@ import { getGetExecutionLockStatusQueryKey, useGetExecution } from "@/client/exe
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { useToast } from "@/components/ui/Toast";
 import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
@@ -356,6 +357,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                     disabled={Boolean(sourceTask)}
                     onChange={(event) => setChipIdQuery(event.target.value)}
                   >
+                    <SelectedLabel />
                     <option value="" disabled>
                       Select a chip
                     </option>

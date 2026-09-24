@@ -3,6 +3,7 @@
 import { Bot, X } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import type { ModelOverride } from "@/lib/copilotModels";
 
 interface ModelOption {
@@ -86,6 +87,7 @@ export function AiReviewConfirmModal({
               onChange={(event) => onModelChange(event.target.value)}
               disabled={isSubmitting}
             >
+              <SelectedLabel />
               {modelOptions.map((option) => (
                 <option key={option.key} value={option.key}>
                   {option.label}

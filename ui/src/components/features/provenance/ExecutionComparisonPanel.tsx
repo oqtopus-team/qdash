@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { GitCompare, Plus, Minus, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 
 import { useCompareExecutions, useGetRecentExecutions } from "@/client/provenance/provenance";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 export function ExecutionComparisonPanel() {
@@ -121,6 +122,7 @@ export function ExecutionComparisonPanel() {
                     setIsComparing(false);
                   }}
                 >
+                  <SelectedLabel />
                   <option value="" disabled>
                     Select execution...
                   </option>
@@ -148,6 +150,7 @@ export function ExecutionComparisonPanel() {
                     setIsComparing(false);
                   }}
                 >
+                  <SelectedLabel />
                   <option value="" disabled>
                     Select execution...
                   </option>

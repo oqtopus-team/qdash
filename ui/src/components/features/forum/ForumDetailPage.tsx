@@ -33,6 +33,7 @@ import {
   useUpdateForumPost,
 } from "@/client/forum/forum";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -882,6 +883,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 disabled={updateMutation.isPending}
                 onChange={(event) => updateRootMetadata({ category: event.target.value })}
               >
+                <SelectedLabel />
                 {categories.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.label}
@@ -921,6 +923,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                     saveTargetMetadata(nextChipId, targetDraftType, targetDraftId);
                   }}
                 >
+                  <SelectedLabel />
                   <option value="">Select chip</option>
                   {chips.map((chip) => (
                     <option key={chip.chip_id} value={chip.chip_id}>
@@ -1046,6 +1049,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                   onChange={(event) => saveCooldownMetadata(event.target.value)}
                   disabled={!targetDraftChipId || updateMutation.isPending}
                 >
+                  <SelectedLabel />
                   <option value="">No cooldown</option>
                   {cooldowns.map((cooldown) => (
                     <option key={cooldown.cooldown_id} value={cooldown.cooldown_id}>
@@ -1086,6 +1090,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 onChange={(event) => saveAssigneeMetadata(event.target.value)}
                 disabled={updateMutation.isPending}
               >
+                <SelectedLabel />
                 <option value="">Unassigned</option>
                 {members.map((member) => (
                   <option key={member.username} value={member.username}>
