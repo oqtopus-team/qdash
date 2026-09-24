@@ -248,8 +248,6 @@ export function WorkflowEditorPageContent() {
     mutation: {
       onSuccess: () => {
         toast.success("Cancellation requested successfully");
-        setLastExecutionId(null);
-        setLastFlowRunId(null);
       },
       onError: (error: unknown) => {
         const detail =

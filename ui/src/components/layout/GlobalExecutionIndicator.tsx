@@ -69,11 +69,12 @@ export function GlobalExecutionIndicator() {
   if (!lockStatus?.lock) return null;
 
   const label = hasActiveMetadata ? lockStatus.name || "Calibration" : "Calibration starting";
+  const statusLabel = status === "cancelling" ? "Cancelling" : "Running";
   const content = (
     <>
       <span className="loading loading-spinner loading-xs" aria-hidden="true" />
       <span className="hidden max-w-48 truncate sm:inline">{label}</span>
-      <span className="text-xs opacity-60">Running</span>
+      <span className="text-xs opacity-60">{statusLabel}</span>
       {executionHref && hasActiveMetadata && <ExternalLink size={13} aria-hidden="true" />}
     </>
   );

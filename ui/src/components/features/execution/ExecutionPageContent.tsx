@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowUpRight,
@@ -28,6 +29,8 @@ import {
   useListExecutions,
   useGetExecution,
   useCancelExecution,
+  getListExecutionsQueryKey,
+  getGetExecutionQueryKey,
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
@@ -113,6 +116,8 @@ function PaginationControls({
  * Execution history page listing workflow runs with task results and cancellation controls
  */
 export function ExecutionPageContent() {
+  const queryClient = useQueryClient();
+
   // URL state management
   const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
 
@@ -316,6 +321,12 @@ export function ExecutionPageContent() {
       { flowRunId },
       {
         onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListExecutionsQueryKey() });
+          if (selectedExecutionId) {
+            queryClient.invalidateQueries({
+              queryKey: getGetExecutionQueryKey(selectedExecutionId),
+            });
+          }
           toast.success("Cancellation requested successfully");
           setShowCancelConfirm(false);
         },
