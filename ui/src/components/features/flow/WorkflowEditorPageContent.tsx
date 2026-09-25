@@ -268,9 +268,6 @@ export function WorkflowEditorPageContent() {
     !!lockStatus?.data.lock &&
     latestExecution?.status !== "cancelling" &&
     !isExecutionTerminal(latestExecution?.status);
-  const executeErrorDetail = (
-    executeMutation.error as { response?: { data?: { detail?: unknown } } } | null
-  )?.response?.data?.detail;
   const executeErrorMessage = getApiErrorMessage(executeMutation.error, "Unknown error");
   useEffect(() => {
     if (data?.data) {
