@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDate, formatDateTime } from "@/lib/utils/datetime";
 
 import { ExecutionDurationBreakdown } from "./ExecutionDurationBreakdown";
@@ -31,7 +32,6 @@ import {
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
-import { getCancelErrorMessage } from "@/components/features/execution/getCancelErrorMessage";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -321,7 +321,7 @@ export function ExecutionPageContent() {
           setShowCancelConfirm(false);
         },
         onError: (error) => {
-          toast.error(getCancelErrorMessage(error));
+          toast.error(getApiErrorMessage(error, "Failed to cancel execution"));
           setShowCancelConfirm(false);
         },
       },
