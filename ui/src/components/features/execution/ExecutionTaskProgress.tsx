@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 
+import { isExecutionInProgress } from "@/lib/executionStatus";
+
 type TaskProgress = {
   current: number;
   total: number | null;
@@ -79,9 +81,19 @@ export function ExecutionTaskProgress({ status, note }: ExecutionTaskProgressPro
     return () => window.clearInterval(timer);
   }, [progress?.etaSeconds, progress?.overallEtaSeconds, status]);
 
-  if (!["running", "scheduled", "pending"].includes(status ?? "")) return null;
+  if (!isExecutionInProgress(status)) return null;
 
   if (status !== "running" || progress === null) {
+    const primaryText =
+      status === "cancelling"
+        ? "Cancelling execution"
+        : status === "running"
+          ? "Preparing measurement"
+          : "Waiting to start";
+    const secondaryText =
+      status === "cancelling"
+        ? "Waiting for the run to stop."
+        : "Measurement progress will appear when available.";
     return (
       <div
         className="mt-3 flex items-center gap-3 rounded-lg bg-base-200/60 p-3"
@@ -93,12 +105,8 @@ export function ExecutionTaskProgress({ status, note }: ExecutionTaskProgressPro
           aria-hidden="true"
         />
         <div className="min-w-0">
-          <p className="text-sm font-medium">
-            {status === "running" ? "Preparing measurement" : "Waiting to start"}
-          </p>
-          <p className="text-xs text-base-content/60">
-            Measurement progress will appear when available.
-          </p>
+          <p className="text-sm font-medium">{primaryText}</p>
+          <p className="text-xs text-base-content/60">{secondaryText}</p>
         </div>
       </div>
     );

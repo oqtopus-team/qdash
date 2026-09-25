@@ -19,6 +19,7 @@ __all__ = [
 
 SCHDULED = "scheduled"
 RUNNING = "running"
+CANCELLING = "cancelling"
 COMPLETED = "completed"
 FAILED = "failed"
 PENDING = "pending"
@@ -30,6 +31,7 @@ class ExecutionStatusModel(str, Enum):
 
     SCHEDULED = SCHDULED
     RUNNING = RUNNING
+    CANCELLING = CANCELLING
     COMPLETED = COMPLETED
     FAILED = FAILED
     CANCELLED = CANCELLED
