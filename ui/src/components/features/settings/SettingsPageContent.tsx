@@ -28,6 +28,7 @@ import {
 import type { MemberResponse, ProjectRole } from "@/schemas";
 import { getGetCurrentUserQueryKey, useUpdateCurrentUserProfile } from "@/client/auth/auth";
 import { AVATAR_PRESETS, UserAvatar } from "@/components/ui/UserAvatar";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 type Tab = "appearance" | "project" | "copilot" | "account" | "api";
 
@@ -37,11 +38,6 @@ function roleBadgeClass(role: ProjectRole) {
   if (role === "owner") return "badge-secondary";
   if (role === "editor") return "badge-primary";
   return "badge-ghost";
-}
-
-function mutationErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return "Failed to update project members";
 }
 
 function CopilotSettingsPanel() {
@@ -247,7 +243,10 @@ function ProjectMembersPanel() {
   const memberError =
     localError ||
     (inviteMutation.error || updateMutation.error || removeMutation.error
-      ? mutationErrorMessage(inviteMutation.error || updateMutation.error || removeMutation.error)
+      ? getApiErrorMessage(
+          inviteMutation.error || updateMutation.error || removeMutation.error,
+          "Failed to update project members",
+        )
       : null);
 
   const refreshMembers = () => {

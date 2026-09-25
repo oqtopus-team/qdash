@@ -15,6 +15,7 @@ import {
   useUpdateChip,
 } from "@/client/chip/chip";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 interface ChipManageModalProps {
@@ -277,7 +278,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
               </div>
               {deleteChip.error && (
                 <div className="text-xs text-error mt-1">
-                  {extractErrorMessage(deleteChip.error)}
+                  {getApiErrorMessage(deleteChip.error, "Failed to delete chip.")}
                 </div>
               )}
             </div>
@@ -295,23 +296,4 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </div>
   );
-}
-
-function extractErrorMessage(err: unknown): string {
-  if (
-    err &&
-    typeof err === "object" &&
-    "response" in err &&
-    err.response &&
-    typeof err.response === "object" &&
-    "data" in err.response
-  ) {
-    const data = (err.response as { data?: unknown }).data;
-    if (data && typeof data === "object" && "detail" in data) {
-      const detail = (data as { detail?: unknown }).detail;
-      if (typeof detail === "string") return detail;
-    }
-  }
-  if (err instanceof Error) return err.message;
-  return "Failed to delete chip.";
 }
