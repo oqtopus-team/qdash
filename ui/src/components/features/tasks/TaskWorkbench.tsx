@@ -18,6 +18,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 import { isExecutionInProgress, isExecutionTerminal } from "@/lib/executionStatus";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
 import { parseTaskParameter } from "@/lib/utils/task-parameters";
 import { buildTaskPrefill } from "./task-prefill";
@@ -218,9 +219,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
       setSubmittedTargetQuery(requestedTarget);
       toast.success(`${task.name} started`);
     } catch (error: unknown) {
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
-        ?.detail;
-      toast.error(detail ?? (error instanceof Error ? error.message : "Failed to start task"));
+      toast.error(getApiErrorMessage(error, "Failed to start task"));
     } finally {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() }),
@@ -292,12 +291,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
         toast.error("No current input parameter values were found for this target");
       }
     } catch (error: unknown) {
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
-        ?.detail;
-      toast.error(
-        detail ??
-          (error instanceof Error ? error.message : "Failed to load current input parameters"),
-      );
+      toast.error(getApiErrorMessage(error, "Failed to load current input parameters"));
     } finally {
       await availabilityCheck;
       setIsReloadingInputs(false);

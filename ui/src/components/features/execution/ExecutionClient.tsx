@@ -7,6 +7,7 @@ import { ArrowLeft, Calendar, Clock, Download, StopCircle, UserRound } from "luc
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
 import { isExecutionCancellable } from "@/lib/executionStatus";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
 import { ExecutionDAG } from "./ExecutionDAG";
@@ -15,7 +16,6 @@ import type { ExecutionResponseDetail } from "@/schemas";
 
 import { useGetExecution, useCancelExecution } from "@/client/execution/execution";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
-import { getCancelErrorMessage } from "@/components/features/execution/getCancelErrorMessage";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
@@ -112,7 +112,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           setShowCancelConfirm(false);
         },
         onError: (error) => {
-          toast.error(getCancelErrorMessage(error));
+          toast.error(getApiErrorMessage(error, "Failed to cancel execution"));
           setShowCancelConfirm(false);
         },
       },

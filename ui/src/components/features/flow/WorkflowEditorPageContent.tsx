@@ -72,6 +72,7 @@ import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteC
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { isExecutionTerminal } from "@/lib/executionStatus";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 // Monaco Editor is only available on client side
@@ -250,10 +251,7 @@ export function WorkflowEditorPageContent() {
         toast.success("Cancellation requested successfully");
       },
       onError: (error: unknown) => {
-        const detail =
-          (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-          "Failed to cancel execution";
-        toast.error(detail);
+        toast.error(getApiErrorMessage(error, "Failed to cancel execution"));
       },
     },
   });
@@ -273,10 +271,7 @@ export function WorkflowEditorPageContent() {
   const executeErrorDetail = (
     executeMutation.error as { response?: { data?: { detail?: unknown } } } | null
   )?.response?.data?.detail;
-  const executeErrorMessage =
-    (typeof executeErrorDetail === "string" ? executeErrorDetail : undefined) ||
-    (executeMutation.error as Error | null)?.message ||
-    "Unknown error";
+  const executeErrorMessage = getApiErrorMessage(executeMutation.error, "Unknown error");
   useEffect(() => {
     if (data?.data) {
       const flow = data.data;
