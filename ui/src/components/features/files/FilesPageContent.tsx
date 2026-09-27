@@ -43,6 +43,7 @@ import { PierreFileTree } from "@/components/ui/PierreFileTree";
 import { FileDiffReviewDialog } from "@/components/ui/FileDiffReviewDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -158,7 +159,7 @@ export function FilesPageContent() {
       refetchGitStatus();
     },
     onError: (error: Error) => {
-      toast.error(`Failed to save file: ${error.message}`);
+      toast.error(`Failed to save file: ${getApiErrorMessage(error, "Unknown error")}`);
     },
   });
 
@@ -174,7 +175,7 @@ export function FilesPageContent() {
       refetchGitStatus();
     },
     onError: (error: Error) => {
-      toast.error(`Git pull failed: ${error.message}`);
+      toast.error(`Git pull failed: ${getApiErrorMessage(error, "Unknown error")}`);
     },
   });
 
@@ -201,7 +202,7 @@ export function FilesPageContent() {
       refetchGitStatus();
     },
     onError: (error: Error) => {
-      toast.error(`Git push failed: ${error.message}`);
+      toast.error(`Git push failed: ${getApiErrorMessage(error, "Unknown error")}`);
     },
   });
 
@@ -228,7 +229,7 @@ export function FilesPageContent() {
       toast.success(`Imported ${data.imported_count} parameters to QDash`);
     },
     onError: (error: Error) => {
-      toast.error(`Import failed: ${error.message}`);
+      toast.error(`Import failed: ${getApiErrorMessage(error, "Unknown error")}`);
     },
   });
 
