@@ -13,7 +13,7 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-DEFAULT_OPEN_STATUSES: tuple[str, ...] = ("running", "scheduled")
+DEFAULT_OPEN_STATUSES: tuple[str, ...] = ("running", "scheduled", "cancelling")
 OPEN_TASK_STATUSES: tuple[str, ...] = ("running", "scheduled", "pending")
 
 
@@ -186,3 +186,80 @@ def finalize_executions_by_flow_run_id(
             logger.warning("Failed to release execution lock", exc_info=True)
 
     return closed_execution_ids
+
+
+def mark_executions_cancelling_by_flow_run_id(
+    *,
+    project_id: str,
+    flow_run_id: str,
+    from_statuses: Sequence[str] = ("running", "scheduled"),
+    logger: logging.Logger | None = None,
+) -> int:
+    """Find executions with the given flow_run_id in note and mark them cancelling.
+
+    This is a non-terminal transition: unlike finalization, it does not set
+    ``end_at``, touch task statuses, or release the execution lock. A
+    cancelling execution still owns its resources until Prefect's terminal
+    state is reconciled.
+
+    Args:
+        project_id: Project ID the executions belong to
+        flow_run_id: Prefect flow run ID stored in ``note.flow_run_id``
+        from_statuses: Execution statuses eligible to be marked cancelling
+        logger: Logger to use. Defaults to a module-level logger.
+
+    Returns:
+        Number of executions marked cancelling.
+
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    executions = ExecutionHistoryDocument.find(
+        {
+            "project_id": project_id,
+            "note.flow_run_id": flow_run_id,
+        }
+    ).run()
+
+    if not executions:
+        logger.info(
+            "mark_cancelling: no matching executions for flow_run_id=%s",
+            flow_run_id,
+        )
+        return 0
+
+    marked_count = 0
+
+    for execution in executions:
+        if execution.status not in from_statuses:
+            continue
+        execution_id = execution.execution_id
+
+        result = (
+            ExecutionHistoryDocument.find(
+                {
+                    "project_id": project_id,
+                    "execution_id": execution_id,
+                    "note.flow_run_id": flow_run_id,
+                    "status": {"$in": list(from_statuses)},
+                }
+            )
+            .update_many({"$set": {"status": "cancelling"}})
+            .run()
+        )
+        if not result or result.modified_count == 0:
+            logger.info(
+                "mark_cancelling: execution %s changed before marking; leaving it untouched",
+                execution_id,
+            )
+            continue
+
+        logger.info(
+            "mark_cancelling: marked execution %s as cancelling (flow_run_id=%s)",
+            execution_id,
+            flow_run_id,
+        )
+        marked_count += 1
+
+    return marked_count

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { useToast } from "@/components/ui/Toast";
 
 import type { SaveFlowRequest, FlowTemplate, SaveFlowResponse } from "@/schemas";
@@ -298,6 +299,7 @@ export default function NewFlowPage() {
                   }}
                   disabled={isTemplatesLoading}
                 >
+                  <SelectedLabel />
                   <option value="">Select a template...</option>
                   {templateOptions.map((option) => (
                     <option key={option.value} value={option.value}>

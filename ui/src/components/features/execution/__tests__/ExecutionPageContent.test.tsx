@@ -8,6 +8,16 @@ let loadingNextPage = false;
 const mockCancelMutate = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
+const mockInvalidateQueries = vi.fn();
+
+vi.mock("@tanstack/react-query", async () => {
+  const actual =
+    await vi.importActual<typeof import("@tanstack/react-query")>("@tanstack/react-query");
+  return {
+    ...actual,
+    useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
+  };
+});
 
 vi.mock("@/client/chip/chip", () => ({
   useListChips: () => ({
@@ -73,6 +83,8 @@ vi.mock("@/client/execution/execution", () => ({
     isSuccess: false,
     error: null,
   }),
+  getListExecutionsQueryKey: () => ["/executions"],
+  getGetExecutionQueryKey: (executionId: string) => [`/executions/${executionId}`],
 }));
 
 vi.mock("@/hooks/useDateNavigation", () => ({
@@ -347,6 +359,27 @@ describe("ExecutionPageContent cancel confirmation", () => {
 
     expect(mockToastSuccess).toHaveBeenCalledWith("Cancellation requested successfully");
     expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("invalidates the execution list and detail queries after a successful cancellation", () => {
+    mockCancelMutate.mockImplementation((_vars, { onSuccess }) => onSuccess());
+    render(<ExecutionPageContent />);
+
+    openSidebarAndClickCancel();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Execution" }));
+
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["/executions"] });
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["/executions/exec-1"] });
+  });
+
+  it("does not invalidate any query when the cancellation request fails", () => {
+    mockCancelMutate.mockImplementation((_vars, { onError }) => onError({}));
+    render(<ExecutionPageContent />);
+
+    openSidebarAndClickCancel();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Execution" }));
+
+    expect(mockInvalidateQueries).not.toHaveBeenCalled();
   });
 
   it("shows an error toast with the server detail when cancellation fails", () => {

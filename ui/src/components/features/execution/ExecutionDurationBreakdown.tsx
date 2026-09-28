@@ -11,6 +11,7 @@ import Link from "next/link";
 import { getExecution, getGetExecutionQueryKey } from "@/client/execution/execution";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { isExecutionInProgress } from "@/lib/executionStatus";
 import type { ExecutionResponseDetail, ExecutionResponseSummary, Task } from "@/schemas";
 
 interface ExecutionDurationBreakdownProps {
@@ -153,12 +154,7 @@ export function ExecutionDurationBreakdown({
       queryFn: ({ signal }) => getExecution(execution.execution_id, undefined, signal),
       enabled: !!execution.execution_id,
       staleTime: 30_000,
-      refetchInterval:
-        execution.status === "running" ||
-        execution.status === "pending" ||
-        execution.status === "scheduled"
-          ? 5000
-          : false,
+      refetchInterval: isExecutionInProgress(execution.status) ? 5000 : false,
     })),
   });
 

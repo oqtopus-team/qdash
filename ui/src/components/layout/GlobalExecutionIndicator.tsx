@@ -7,9 +7,7 @@ import { Activity, ExternalLink } from "lucide-react";
 
 import { useGetExecutionLockStatus } from "@/client/execution/execution";
 import { useToast } from "@/components/ui/Toast";
-
-const ACTIVE_STATUSES = new Set(["scheduled", "pending", "running"]);
-const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
+import { isExecutionInProgress, isExecutionTerminal } from "@/lib/executionStatus";
 
 interface ExecutionStatusSnapshot {
   executionId: string;
@@ -31,7 +29,7 @@ export function GlobalExecutionIndicator() {
   const executionId = lockStatus?.execution_id ?? "";
   const chipId = lockStatus?.chip_id ?? "";
   const status = lockStatus?.status ?? "";
-  const hasActiveMetadata = Boolean(executionId && ACTIVE_STATUSES.has(status));
+  const hasActiveMetadata = Boolean(executionId && isExecutionInProgress(status));
   const executionHref =
     executionId && chipId
       ? `/execution/${encodeURIComponent(chipId)}/${encodeURIComponent(executionId)}`
@@ -49,8 +47,8 @@ export function GlobalExecutionIndicator() {
     const previous = previousStatus.current;
     if (
       previous?.executionId === executionId &&
-      ACTIVE_STATUSES.has(previous.status) &&
-      TERMINAL_STATUSES.has(status)
+      isExecutionInProgress(previous.status) &&
+      isExecutionTerminal(status)
     ) {
       const message = lockStatus?.name || "Calibration execution";
       const options = executionHref
@@ -71,11 +69,12 @@ export function GlobalExecutionIndicator() {
   if (!lockStatus?.lock) return null;
 
   const label = hasActiveMetadata ? lockStatus.name || "Calibration" : "Calibration starting";
+  const statusLabel = status === "cancelling" ? "Cancelling" : "Running";
   const content = (
     <>
       <span className="loading loading-spinner loading-xs" aria-hidden="true" />
       <span className="hidden max-w-48 truncate sm:inline">{label}</span>
-      <span className="text-xs opacity-60">Running</span>
+      <span className="text-xs opacity-60">{statusLabel}</span>
       {executionHref && hasActiveMetadata && <ExternalLink size={13} aria-hidden="true" />}
     </>
   );
