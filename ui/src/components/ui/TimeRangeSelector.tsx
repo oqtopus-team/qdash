@@ -13,6 +13,25 @@ interface TimeRangeSelectorProps {
   collapsible?: boolean;
 }
 
+const QUICK_RANGE_DAYS = [1, 7, 30] as const;
+
+function parseDateTimeLocalMinutes(value: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const [, year, month, day, hour, minute] = match;
+  return (
+    Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)) / 60000
+  );
+}
+
+function getActiveQuickRangeDays(startDate: string, endDate: string): number | null {
+  const startMinutes = parseDateTimeLocalMinutes(startDate);
+  const endMinutes = parseDateTimeLocalMinutes(endDate);
+  if (startMinutes === null || endMinutes === null) return null;
+  const diffMinutes = endMinutes - startMinutes;
+  return QUICK_RANGE_DAYS.find((days) => diffMinutes === days * 24 * 60) ?? null;
+}
+
 export function TimeRangeSelector({
   startDate,
   endDate,
@@ -29,7 +48,10 @@ export function TimeRangeSelector({
   // display timezone, double-applying the offset (+9h for JST). See issue #1107.
   const [localStart, setLocalStart] = useState(startDate);
   const [localEnd, setLocalEnd] = useState(endDate);
-  const [showCustomRange, setShowCustomRange] = useState(!collapsible);
+  const activeQuickRangeDays = getActiveQuickRangeDays(startDate, endDate);
+  const [showCustomRange, setShowCustomRange] = useState(
+    !collapsible || activeQuickRangeDays === null,
+  );
 
   useEffect(() => {
     setLocalStart(startDate);
@@ -44,36 +66,22 @@ export function TimeRangeSelector({
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm font-medium">Time Range</span>
         <div className="join">
-          <button
-            type="button"
-            className="join-item btn btn-sm"
-            onClick={() => {
-              onQuickRange(1);
-              if (collapsible) setShowCustomRange(false);
-            }}
-          >
-            1D
-          </button>
-          <button
-            type="button"
-            className="join-item btn btn-sm"
-            onClick={() => {
-              onQuickRange(7);
-              if (collapsible) setShowCustomRange(false);
-            }}
-          >
-            7D
-          </button>
-          <button
-            type="button"
-            className="join-item btn btn-sm"
-            onClick={() => {
-              onQuickRange(30);
-              if (collapsible) setShowCustomRange(false);
-            }}
-          >
-            30D
-          </button>
+          {QUICK_RANGE_DAYS.map((days) => (
+            <button
+              key={days}
+              type="button"
+              aria-pressed={activeQuickRangeDays === days}
+              className={`join-item btn btn-sm ${
+                activeQuickRangeDays === days ? "btn-primary" : ""
+              }`}
+              onClick={() => {
+                onQuickRange(days);
+                if (collapsible) setShowCustomRange(false);
+              }}
+            >
+              {days}D
+            </button>
+          ))}
         </div>
         {collapsible && (
           <button

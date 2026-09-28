@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArrowRightLeft, ChevronDown } from "lucide-react";
 
@@ -149,7 +149,9 @@ export function DashboardPageContent() {
   const { projectId } = useProject();
   const { selectedChip, selectionMode, setSelectedChip, setSelectionMode } = useMetricsUrlState();
 
-  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } = useRangeModeUrlState();
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange, hasUrlRange } =
+    useRangeModeUrlState();
+  const honorUrlRangeRef = useRef(hasUrlRange);
 
   const {
     qubitMetrics,
@@ -222,6 +224,14 @@ export function DashboardPageContent() {
   useEffect(() => {
     if (hasInitializedCooldownSelection) return;
     if (!currentCooldownId || !activeCooldown) return;
+    if (honorUrlRangeRef.current) {
+      honorUrlRangeRef.current = false;
+      if (startDate === dateToDateTimeLocal(new Date(activeCooldown.started_at))) {
+        setSelectedCooldownId(currentCooldownId);
+      }
+      setHasInitializedCooldownSelection(true);
+      return;
+    }
     setSelectedCooldownId(currentCooldownId);
     setStartDate(dateToDateTimeLocal(new Date(activeCooldown.started_at)));
     setEndDate(
@@ -234,6 +244,7 @@ export function DashboardPageContent() {
     hasInitializedCooldownSelection,
     setEndDate,
     setStartDate,
+    startDate,
   ]);
 
   const { queryParams, canFetch } = useMetricsQueryParams({
@@ -549,6 +560,7 @@ export function DashboardPageContent() {
                     onChipSelect={(chipId) => {
                       setSelectedCooldownId(null);
                       setHasInitializedCooldownSelection(false);
+                      honorUrlRangeRef.current = false;
                       setSelectedChip(chipId);
                     }}
                   />
@@ -560,6 +572,7 @@ export function DashboardPageContent() {
                   <CooldownSelector
                     chipId={selectedChip}
                     selectedCooldownId={selectedCooldownId}
+                    autoPickActive={false}
                     onPick={(cd) => {
                       setSelectedCooldownId(cd.cooldown_id);
                       setHasInitializedCooldownSelection(true);

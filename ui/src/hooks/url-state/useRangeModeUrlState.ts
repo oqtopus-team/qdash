@@ -10,6 +10,7 @@ interface UseRangeModeUrlStateResult {
   setStartDate: (date: string) => void;
   setEndDate: (date: string) => void;
   setQuickRange: (days: number) => void;
+  hasUrlRange: boolean;
 }
 
 export function useRangeModeUrlState(): UseRangeModeUrlStateResult {
@@ -55,5 +56,6 @@ export function useRangeModeUrlState(): UseRangeModeUrlStateResult {
     setStartDate,
     setEndDate,
     setQuickRange,
+    hasUrlRange: startDate !== null && endDate !== null,
   };
 }
