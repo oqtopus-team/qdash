@@ -71,6 +71,7 @@ import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "reac
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
 
@@ -165,7 +166,7 @@ export function WorkflowEditorPageContent() {
       enabled: Boolean(lastExecutionId),
       refetchInterval: (query) => {
         const status = (query.state.data?.data as ExecutionResponseDetail | undefined)?.status;
-        return status && ["completed", "failed", "cancelled"].includes(status) ? false : 2000;
+        return isExecutionTerminal(status) ? false : 2000;
       },
       refetchIntervalInBackground: true,
     },
@@ -248,8 +249,6 @@ export function WorkflowEditorPageContent() {
     mutation: {
       onSuccess: () => {
         toast.success("Cancellation requested successfully");
-        setLastExecutionId(null);
-        setLastFlowRunId(null);
       },
       onError: (error: unknown) => {
         toast.error(getApiErrorMessage(error, "Failed to cancel execution"));
@@ -264,7 +263,11 @@ export function WorkflowEditorPageContent() {
         ? "Starting this flow…"
         : availability.disabledReason;
 
-  const canCancel = !!lastFlowRunId && !!lockStatus?.data.lock;
+  const canCancel =
+    !!lastFlowRunId &&
+    !!lockStatus?.data.lock &&
+    latestExecution?.status !== "cancelling" &&
+    !isExecutionTerminal(latestExecution?.status);
   const executeErrorMessage = getApiErrorMessage(executeMutation.error, "Unknown error");
   useEffect(() => {
     if (data?.data) {
@@ -1301,6 +1304,10 @@ export function WorkflowEditorPageContent() {
                   ) : latestExecution?.status === "completed" ? (
                     <div>
                       <span className="text-success">[done]</span> Execution completed.
+                    </div>
+                  ) : latestExecution?.status === "cancelling" ? (
+                    <div>
+                      <span className="text-warning">[cancelling]</span> Cancelling execution...
                     </div>
                   ) : lockStatus?.data.lock ? (
                     <div>
