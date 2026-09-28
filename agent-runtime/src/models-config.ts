@@ -35,6 +35,7 @@ interface ModelEntry {
   id: string;
   contextWindow: number;
   maxTokens: number;
+  input: ("text" | "image")[];
   samplingParams?: Record<string, unknown>;
 }
 
@@ -133,6 +134,11 @@ export function buildModelsConfig(
       id: name,
       contextWindow: asNumber(model.num_ctx) ?? DEFAULT_CONTEXT_WINDOW,
       maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
+      // Pi treats an unstated `input` as text-only and then silently drops
+      // image content while building the request. AI review exists to read
+      // figures, so the verdict would come back as "no figures attached"
+      // without any error anywhere.
+      input: ["text", "image"],
       ...(sampling ? { samplingParams: sampling } : {}),
     });
   }

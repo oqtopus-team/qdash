@@ -56,9 +56,10 @@ chat_models:
 
   # - provider: vllm
   #   name: Gemma-4-31B-IT-NVFP4
-  #   api_style: responses
+  #   api_style: completion
   #   base_url: env:VLLM_BASE_URL
   #   api_key_env: VLLM_API_KEY
+  #   num_ctx: 16384
   #   temperature: 1.0
   #   top_p: 0.95
   #   top_k: 64

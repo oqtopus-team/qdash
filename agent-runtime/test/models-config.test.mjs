@@ -65,6 +65,7 @@ test("a model with base_url becomes a provider definition", () => {
         id: "gemma4:31b",
         contextWindow: 131072,
         maxTokens: 4096,
+        input: ["text", "image"],
         samplingParams: { temperature: 1, top_p: 0.95, top_k: 64 },
       },
     ],
@@ -110,6 +111,15 @@ test("keep_alive rides along in samplingParams so ollama keeps the VLM resident"
     top_k: 64,
     keep_alive: "30m",
   });
+});
+
+test("locally hosted models are declared image-capable", () => {
+  // Pi defaults an unstated `input` to text-only and then drops image content
+  // while building the request, so AI review would silently lose its figures.
+  const { providers } = buildModelsConfig(YAML, REVIEW_YAML, env);
+  for (const model of providers.ollama.models) {
+    assert.deepEqual(model.input, ["text", "image"]);
+  }
 });
 
 test("a model declared in both files keeps the chat definition", () => {
