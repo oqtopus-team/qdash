@@ -40,9 +40,16 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
     refetchInterval: 10000, // Refresh every 10 seconds
   });
 
-  const schedules =
-    (schedulesData?.data && "schedules" in schedulesData.data && schedulesData.data.schedules) ||
-    [];
+  const schedules = [
+    ...((schedulesData?.data &&
+      "schedules" in schedulesData.data &&
+      schedulesData.data.schedules) ||
+      []),
+  ].sort((a, b) => {
+    const aTime = a.next_run ? new Date(a.next_run).getTime() : Number.MIN_SAFE_INTEGER;
+    const bTime = b.next_run ? new Date(b.next_run).getTime() : Number.MIN_SAFE_INTEGER;
+    return aTime - bTime;
+  });
 
   // Create schedule mutation
   const createScheduleMutation = useMutation({
