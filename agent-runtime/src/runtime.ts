@@ -15,12 +15,14 @@ import { pythonTool } from "./python-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { buildEntries } from "./entries.ts";
 import { EXCLUDED_TOOL_NAMES } from "./excluded-tools.ts";
+import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
 import { buildSystemPrompt } from "./prompt.ts";
 
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
 const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
 const COPILOT_CONFIG_PATH =
   process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
+const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
 const HTTP_IDLE_TIMEOUT_MS = Number(process.env.HTTP_IDLE_TIMEOUT_MS ?? 300_000);
 
 /**
@@ -42,13 +44,6 @@ function installProxyAwareDispatcher(): void {
     }),
   );
 }
-
-/**
- * QDash's chat config names providers the way LiteLLM does; pi uses its own ids.
- * Without this, enabling a Bedrock model in chat.yaml silently falls back to the
- * default model.
- */
-const PROVIDER_ALIASES: Record<string, string> = { bedrock: "amazon-bedrock" };
 
 /** Thinking level requested per model in QDash's chat config. */
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
@@ -87,8 +82,9 @@ export class SharedRuntime {
     });
     await loader.reload();
 
+    const modelsPath = writeModelsConfig(CHAT_CONFIG_PATH, join(AGENT_DIR, "models.json"));
     const modelRuntime = await ModelRuntime.create({
-      modelsPath: join(AGENT_DIR, "models.json"),
+      modelsPath,
       authPath: join(AGENT_DIR, "auth.json"),
     });
 

@@ -232,7 +232,7 @@ services:
       - .env
     volumes:
       - ./agent-runtime/src:/app/src
-      - ./config:/app/config # Read for copilot language settings only
+      - ./config:/app/config # Read for copilot language and model settings only
     environment:
       - PORT=${AGENT_RUNTIME_PORT:-8002}
       - PI_CODING_AGENT_DIR=/app/.pi-agent

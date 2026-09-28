@@ -13,8 +13,8 @@ const FALLBACK: LanguageConfig = { responseLanguage: "en", thinkingLanguage: "en
 /**
  * Read `response_language` / `thinking_language` from config/copilot/config.yaml.
  *
- * Only the language keys are used here. Model selection is wired through
- * models.json instead, see adr/0004.
+ * Only the language keys are used here. Model wiring comes from chat.yaml via
+ * models-config.ts, see adr/0004.
  */
 export function loadLanguageConfig(path: string): LanguageConfig {
   try {
