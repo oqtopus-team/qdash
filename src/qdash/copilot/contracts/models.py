@@ -142,6 +142,13 @@ class AnalyzeRequest(BaseModel):
     execution_id: str
     task_id: str
     message: str = Field(description="User question / message")
+    session_id: str | None = Field(
+        default=None,
+        description=(
+            "Analysis session identifier. Required by the Pi backend, which "
+            "restores conversation state from the persisted session."
+        ),
+    )
     image_base64: str | None = Field(
         default=None,
         description="Base64-encoded result figure (for multimodal analysis)",

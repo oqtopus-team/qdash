@@ -48,7 +48,8 @@ def tool_label(name: str) -> str:
     return name.removeprefix("qdash_").replace("_", " ").capitalize() or name
 
 
-def _thinking_level(config: CopilotConfig) -> str | None:
+def thinking_level(config: CopilotConfig) -> str | None:
+    """Map the configured model's reasoning effort onto a Pi thinking level."""
     effort = config.model.reasoning_effort
     return _THINKING_LEVELS.get(effort.lower()) if effort else None
 
@@ -99,7 +100,7 @@ def _request_payload(
         "message": request.message,
         "messages": agent_messages,
         "model": {"provider": config.model.provider, "name": config.model.name},
-        "thinking_level": _thinking_level(config),
+        "thinking_level": thinking_level(config),
     }
 
 
@@ -123,6 +124,22 @@ async def stream(
     def on_done(messages: list[dict[str, Any]]) -> None:
         save_agent_messages(username, str(request.session_id), messages)
 
+    async for event in stream_payload(payload, on_done=on_done, step="run_chat"):
+        yield event
+
+
+async def stream_payload(
+    payload: dict[str, Any],
+    *,
+    on_done: Callable[[list[dict[str, Any]]], None],
+    step: str,
+    extra_result: dict[str, Any] | None = None,
+) -> AsyncGenerator[str, None]:
+    """POST one turn to the runtime and re-emit its NDJSON as SSE.
+
+    Shared by chat and analysis: the two differ only in how the payload is built
+    and what they attach to the final result.
+    """
     try:
         async with (
             # trust_env=False: the runtime is an internal service, so an ambient
@@ -132,31 +149,49 @@ async def stream(
         ):
             if response.status_code != httpx.codes.OK:
                 await response.aread()
-                detail = (
-                    "Another request is already running for this conversation"
-                    if response.status_code == httpx.codes.CONFLICT
-                    else f"Agent runtime returned HTTP {response.status_code}"
-                )
-                yield sse_event("error", {"step": "run_chat", "detail": detail})
+                detail = _status_detail(response)
+                yield sse_event("error", {"step": step, "detail": detail})
                 return
 
-            async for event in translate(response.aiter_lines(), on_done=on_done):
+            async for event in translate(
+                response.aiter_lines(),
+                on_done=on_done,
+                extra_result=extra_result,
+                step=step,
+            ):
                 yield event
     except httpx.HTTPError as exc:
         logger.exception("Pi agent runtime request failed")
-        yield sse_event("error", {"step": "run_chat", "detail": f"Agent runtime error: {exc}"})
+        yield sse_event("error", {"step": step, "detail": f"Agent runtime error: {exc}"})
+
+
+def _status_detail(response: httpx.Response) -> str:
+    """Explain a non-200 from the runtime."""
+    if response.status_code == httpx.codes.CONFLICT:
+        return "Another request is already running for this conversation"
+    if response.status_code == httpx.codes.BAD_REQUEST:
+        # The runtime rejects models missing from chat.yaml / review.yaml.
+        # See .agents/sessions/2026-09-28-analyze-sidebar-pi-agent/adr/0004-*.md
+        try:
+            return str(response.json().get("error", response.text))
+        except ValueError:
+            return response.text
+    return f"Agent runtime returned HTTP {response.status_code}"
 
 
 async def translate(
     lines: AsyncIterable[str],
     *,
     on_done: Callable[[list[dict[str, Any]]], None],
+    extra_result: dict[str, Any] | None = None,
+    step: str = "run_chat",
 ) -> AsyncGenerator[str, None]:
     """Turn a runtime NDJSON stream into QDash SSE events.
 
     ``on_done`` receives the final Pi conversation state so the caller can
-    persist it. Kept free of HTTP and database access so it can be tested on
-    plain strings.
+    persist it. ``extra_result`` is merged into the final ``result`` event,
+    which analysis uses to carry ``images_sent``. Kept free of HTTP and database
+    access so it can be tested on plain strings.
     """
     charts: list[dict[str, Any]] = []
     completed_tools: list[str] = []
@@ -188,18 +223,28 @@ async def translate(
         elif kind == "error":
             yield sse_event(
                 "error",
-                {"step": "run_chat", "detail": event.get("message", "Agent failed")},
+                {"step": step, "detail": event.get("message", "Agent failed")},
             )
             return
         elif kind == "done":
             on_done(event.get("messages", []))
+            result = build_blocks_result(event.get("text", ""), charts)
+            # No text and no chart means the turn produced nothing renderable.
+            # Local models do this when they emit a malformed tool call, and a
+            # silent empty reply is indistinguishable from the UI hanging.
+            if not result["blocks"]:
+                yield sse_event(
+                    "error",
+                    {"step": step, "detail": "The model returned an empty response"},
+                )
+                return
             yield sse_event("status", {"step": "complete", "message": "Done"})
-            yield sse_event("result", build_blocks_result(event.get("text", ""), charts))
+            yield sse_event("result", {**result, **(extra_result or {})})
             return
 
     yield sse_event(
         "error",
-        {"step": "run_chat", "detail": "Agent runtime closed the stream without a result"},
+        {"step": step, "detail": "Agent runtime closed the stream without a result"},
     )
 
 

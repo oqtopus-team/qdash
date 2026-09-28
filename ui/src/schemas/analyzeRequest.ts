@@ -8,6 +8,7 @@
 import type { AnalyzeRequestConversationHistoryItem } from './analyzeRequestConversationHistoryItem';
 import type { AnalyzeRequestImageBase64 } from './analyzeRequestImageBase64';
 import type { AnalyzeRequestModelOverride } from './analyzeRequestModelOverride';
+import type { AnalyzeRequestSessionId } from './analyzeRequestSessionId';
 
 /**
  * Request body for POST /copilot/analyze.
@@ -21,6 +22,8 @@ export interface AnalyzeRequest {
   task_id: string;
   /** User question / message */
   message: string;
+  /** Analysis session identifier. Required by the Pi backend, which restores conversation state from the persisted session. */
+  session_id?: AnalyzeRequestSessionId;
   /** Base64-encoded result figure (for multimodal analysis) */
   image_base64?: AnalyzeRequestImageBase64;
   /** Previous conversation messages [{role, content}, ...] */

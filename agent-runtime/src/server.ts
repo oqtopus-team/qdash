@@ -10,18 +10,33 @@ const TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 180_000);
 const REVIEW_TIMEOUT_MS = Number(process.env.REVIEW_TIMEOUT_MS ?? 300_000);
 const REVIEW_CONCURRENCY = Number(process.env.REVIEW_CONCURRENCY ?? 2);
 
+interface ImageBody {
+  data: string;
+  mimeType: string;
+}
+
 interface ChatBody {
   conversation_id?: string;
   message?: string;
   messages?: unknown[];
   model?: { provider?: string; name?: string };
   thinking_level?: SessionRequest["thinkingLevel"];
+  images?: ImageBody[];
 }
 
 interface ReviewBody {
   prompt?: string;
-  images?: { data: string; mimeType: string }[];
+  images?: ImageBody[];
   model?: { provider?: string; name?: string };
+}
+
+/** Pi's prompt() image attachments, from the wire shape both endpoints use. */
+function toImageContent(images: ImageBody[] | undefined) {
+  return (images ?? []).map((image) => ({
+    type: "image" as const,
+    data: image.data,
+    mimeType: image.mimeType,
+  }));
 }
 
 /** Conversations with a prompt in flight. Guards the stored history from concurrent writes. */
@@ -80,11 +95,17 @@ async function handleReview(req: IncomingMessage, res: ServerResponse): Promise<
 
   const release = await acquireReviewSlot();
   try {
-    const { session } = await runtime.createReviewSession({
-      sessionId: randomUUID(),
-      provider: body.model?.provider,
-      modelName: body.model?.name,
-    });
+    let session;
+    try {
+      ({ session } = await runtime.createReviewSession({
+        sessionId: randomUUID(),
+        provider: body.model?.provider,
+        modelName: body.model?.name,
+      }));
+    } catch (error) {
+      sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+      return;
+    }
 
     let review: unknown;
     const unsubscribe = session.subscribe((event) => {
@@ -96,18 +117,12 @@ async function handleReview(req: IncomingMessage, res: ServerResponse): Promise<
     const timeout = setTimeout(() => void session.abort(), REVIEW_TIMEOUT_MS);
 
     try {
-      await session.prompt(body.prompt, {
-        images: (body.images ?? []).map((image) => ({
-          type: "image" as const,
-          data: image.data,
-          mimeType: image.mimeType,
-        })),
-      });
+      await session.prompt(body.prompt, { images: toImageContent(body.images) });
       if (review) {
         sendJson(res, 200, { review });
       } else {
         sendJson(res, 200, {
-          error: "submit_review was not called",
+          error: session.state.errorMessage ?? "submit_review was not called",
           text: session.getLastAssistantText() ?? "",
         });
       }
@@ -135,6 +150,23 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   }
   running.add(conversationId);
 
+  // Created before writeHead: unknown models throw here, and once NDJSON starts
+  // flowing an HTTP status can no longer be set.
+  let session;
+  try {
+    ({ session } = await runtime.createSession({
+      sessionId: conversationId,
+      messages: body.messages ?? [],
+      provider: body.model?.provider,
+      modelName: body.model?.name,
+      thinkingLevel: body.thinking_level,
+    }));
+  } catch (error) {
+    running.delete(conversationId);
+    sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+    return;
+  }
+
   res.writeHead(200, {
     "Content-Type": "application/x-ndjson",
     "Cache-Control": "no-cache",
@@ -144,26 +176,21 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     res.write(encodeLine(event));
   };
 
-  const { session } = await runtime.createSession({
-    sessionId: conversationId,
-    messages: body.messages ?? [],
-    provider: body.model?.provider,
-    modelName: body.model?.name,
-    thinkingLevel: body.thinking_level,
-  });
-
   const timeout = setTimeout(() => void session.abort(), TIMEOUT_MS);
   const unsubscribe = session.subscribe((event) => {
     for (const line of toNdjsonEvents(event as never)) write(line);
   });
 
   try {
-    await session.prompt(body.message);
-    write({
-      type: "done",
-      text: session.getLastAssistantText() ?? "",
-      messages: session.messages,
-    });
+    await session.prompt(body.message, { images: toImageContent(body.images) });
+    const text = session.getLastAssistantText() ?? "";
+    // A failed turn resolves normally with an empty assistant message, so
+    // without this the caller renders a blank reply and no error anywhere.
+    if (!text && session.state.errorMessage) {
+      write({ type: "error", message: session.state.errorMessage });
+    } else {
+      write({ type: "done", text, messages: session.messages });
+    }
   } catch (error) {
     write({ type: "error", message: error instanceof Error ? error.message : String(error) });
   } finally {

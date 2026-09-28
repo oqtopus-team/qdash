@@ -80,6 +80,26 @@ class TestTranslate:
         assert [blocks[0]["chart"], blocks[1]["chart"]] == [first, second]
 
     @pytest.mark.asyncio
+    async def test_empty_turn_becomes_an_error_instead_of_a_blank_reply(self) -> None:
+        events, saved = await _collect({"type": "done", "text": "", "messages": []})
+
+        assert events == [
+            ("error", {"step": "run_chat", "detail": "The model returned an empty response"})
+        ]
+        # The turn still happened, so the conversation state is still written.
+        assert saved == [[]]
+
+    @pytest.mark.asyncio
+    async def test_a_chart_alone_is_a_real_answer(self) -> None:
+        chart = {"data": [{"y": [1]}], "layout": {}}
+        events, _ = await _collect(
+            {"type": "chart", "chart": chart},
+            {"type": "done", "text": "", "messages": []},
+        )
+
+        assert events[-1][0] == "result"
+
+    @pytest.mark.asyncio
     async def test_error_line_stops_the_stream(self) -> None:
         events, saved = await _collect(
             {"type": "error", "message": "model exploded"},

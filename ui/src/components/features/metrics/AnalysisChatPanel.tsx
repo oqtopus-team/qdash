@@ -399,6 +399,7 @@ export function AnalysisChatPanel({ context, onClose }: AnalysisChatPanelProps) 
     {
       initialMessages,
       modelOverride,
+      sessionId: activeSessionId,
       onMessagesChange: (msgs) => {
         if (!activeSessionId) return;
         if (effectiveContext) {

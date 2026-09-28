@@ -113,14 +113,20 @@ export class SharedRuntime {
     return new SharedRuntime(loader, reviewLoader, modelRuntime);
   }
 
-  /** Resolve a QDash provider/model pair against pi's catalog. */
+  /**
+   * Resolve a QDash provider/model pair against pi's catalog.
+   *
+   * Throws rather than falling back: answering with a different model than the
+   * caller asked for is invisible in the result and makes the recorded model a
+   * lie. See .agents/sessions/2026-09-28-analyze-sidebar-pi-agent/adr/0004-*.md
+   */
   private resolveModel(provider: string | undefined, modelName: string | undefined) {
-    const providerId = provider ? (PROVIDER_ALIASES[provider] ?? provider) : undefined;
-    const model =
-      providerId && modelName ? this.modelRuntime.getModel(providerId, modelName) : undefined;
-    if (providerId && modelName && !model) {
-      console.warn(
-        `[agent-runtime] unknown model ${providerId}/${modelName}, falling back to default`,
+    if (!provider || !modelName) return undefined;
+    const providerId = PROVIDER_ALIASES[provider] ?? provider;
+    const model = this.modelRuntime.getModel(providerId, modelName);
+    if (!model) {
+      throw new Error(
+        `unknown model ${providerId}/${modelName}: not declared in chat.yaml or review.yaml`,
       );
     }
     return model;

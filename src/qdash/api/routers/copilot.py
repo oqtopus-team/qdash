@@ -32,7 +32,7 @@ from qdash.api.schemas.copilot_chat_session import (
     ListCopilotChatSessionsResponse,
     UpdateCopilotChatSessionRequest,
 )
-from qdash.api.services import pi_chat_service
+from qdash.api.services import pi_analysis_service, pi_chat_service
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
@@ -43,6 +43,8 @@ from qdash.copilot.contracts import (
     ChatRequest,
     SandboxPythonRequest,
 )
+from qdash.copilot.prompts.analysis import build_language_instruction
+from qdash.copilot.review import select_analysis_model
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
@@ -195,6 +197,7 @@ async def analyze_task_result(
 @router.post("/analyze/stream", include_in_schema=False)
 async def analyze_task_result_stream(
     request: AnalyzeRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
     copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
 ) -> StreamingResponse:
     """SSE streaming version of analyze_task_result.
@@ -239,8 +242,34 @@ async def analyze_task_result_stream(
             yield sse_event("status", {"step": "load_images", "message": img_msg})
             await asyncio.sleep(0)
 
+        images_sent = CopilotRuntime.build_images_sent_metadata(
+            ctx.image_base64,
+            ctx.figure_paths,
+            ctx.expected_images,
+            request.task_name,
+            ctx.experiment_images,
+        )
+
         # Run analysis with tool progress streaming
         yield sse_event("status", {"step": "run_analysis", "message": "AIが分析中..."})
+
+        if config.copilot_backend == "pi":
+            # The Pi runtime owns the model selection, so the analysis model has
+            # to be resolved into `config.model` before the payload is built.
+            pi_config = analysis_config.model_copy(
+                update={"model": select_analysis_model(analysis_config)}
+            )
+            async for event in pi_analysis_service.stream(
+                request,
+                pi_config,
+                ctx,
+                username=current_user.username,
+                language_instruction=build_language_instruction(pi_config),
+                images_sent=images_sent,
+            ):
+                yield event
+            return
+
         tool_executors = copilot_runtime.build_tool_executors()
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
@@ -279,14 +308,7 @@ async def analyze_task_result_stream(
             yield sse_event("error", {"step": "run_analysis", "detail": f"Analysis failed: {e}"})
             return
 
-        # Inject images_sent metadata
-        result["images_sent"] = CopilotRuntime.build_images_sent_metadata(
-            ctx.image_base64,
-            ctx.figure_paths,
-            ctx.expected_images,
-            request.task_name,
-            ctx.experiment_images,
-        )
+        result["images_sent"] = images_sent
 
         # Complete
         yield sse_event("status", {"step": "complete", "message": "分析完了"})
