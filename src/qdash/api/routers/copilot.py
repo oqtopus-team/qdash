@@ -333,7 +333,7 @@ async def chat_stream(
             return
         chat_config = _config_with_chat_model(config, request)
 
-        if config.chat_backend == "pi":
+        if config.copilot_backend == "pi":
             async for event in pi_chat_service.stream(
                 request,
                 chat_config,

@@ -1,13 +1,9 @@
 # Copilot Chat Configuration
 # Settings for the side-panel general chat experience.
 
-# Backend serving the chat page.
-#   pi:      Pi Agent Runtime service (agent-runtime/)
-#   litellm: in-process agent (src/qdash/copilot/agent.py)
-# Task result analysis and AI review always use the litellm path.
+# The backend serving this page is `copilot_backend` in config.yaml.
 # Both backends read the models below. The pi backend generates pi's models.json
 # from them at startup; `temperature`/`top_p`/`top_k` do not reach Bedrock there.
-chat_backend: litellm
 
 # Selectable models for general chat (UI shows a dropdown). The first entry is
 # the default. The configured model in config.yaml is also offered as a fallback.
