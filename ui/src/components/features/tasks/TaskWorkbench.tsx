@@ -14,9 +14,12 @@ import { getGetExecutionLockStatusQueryKey, useGetExecution } from "@/client/exe
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { useToast } from "@/components/ui/Toast";
 import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
+import { isExecutionInProgress, isExecutionTerminal } from "@/lib/executionStatus";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
 import { parseTaskParameter } from "@/lib/utils/task-parameters";
 import { buildTaskPrefill } from "./task-prefill";
@@ -30,7 +33,7 @@ interface TaskWorkbenchProps {
 function badgeClass(status?: string | null) {
   if (status === "completed") return "badge-success";
   if (status === "failed") return "badge-error";
-  if (status === "cancelled") return "badge-neutral";
+  if (status === "cancelled" || status === "cancelling") return "badge-neutral";
   if (status === "running") return "badge-info";
   return "badge-warning";
 }
@@ -116,9 +119,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
       enabled: executionId.length > 0,
       refetchInterval: (query) => {
         const status = (query.state.data?.data as ExecutionResponseDetail | undefined)?.status;
-        return status === "completed" || status === "failed" || status === "cancelled"
-          ? false
-          : 2000;
+        return isExecutionTerminal(status) ? false : 2000;
       },
       refetchIntervalInBackground: true,
     },
@@ -129,8 +130,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   const execution = executionResponse?.data as ExecutionResponseDetail | undefined;
   const isExecutionActive =
     isStarting ||
-    (executionId.length > 0 &&
-      (!execution || ["running", "scheduled", "pending"].includes(execution.status)));
+    (executionId.length > 0 && (!execution || isExecutionInProgress(execution.status)));
   const runDisabledReason = (() => {
     if (!task.enabled) return `This task is not enabled for the ${backend} backend.`;
     if (isStarting) return "Starting this task…";
@@ -148,11 +148,13 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     availability.isConflict && runDisabledReason === availability.disabledReason;
   const isRunInProgress = isExecutionActive && (!executionError || isExecutionPendingCreation);
   const runLabel =
-    isStarting || (isRunInProgress && execution?.status !== "running")
-      ? "Starting…"
-      : isRunInProgress
-        ? "Running…"
-        : "Run task";
+    execution?.status === "cancelling"
+      ? "Cancelling…"
+      : isStarting || (isRunInProgress && execution?.status !== "running")
+        ? "Starting…"
+        : isRunInProgress
+          ? "Running…"
+          : "Run task";
   const resultTasks = useMemo(
     () =>
       (execution?.task ?? []).filter(
@@ -218,9 +220,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
       setSubmittedTargetQuery(requestedTarget);
       toast.success(`${task.name} started`);
     } catch (error: unknown) {
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
-        ?.detail;
-      toast.error(detail ?? (error instanceof Error ? error.message : "Failed to start task"));
+      toast.error(getApiErrorMessage(error, "Failed to start task"));
     } finally {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() }),
@@ -292,12 +292,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
         toast.error("No current input parameter values were found for this target");
       }
     } catch (error: unknown) {
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
-        ?.detail;
-      toast.error(
-        detail ??
-          (error instanceof Error ? error.message : "Failed to load current input parameters"),
-      );
+      toast.error(getApiErrorMessage(error, "Failed to load current input parameters"));
     } finally {
       await availabilityCheck;
       setIsReloadingInputs(false);
@@ -356,6 +351,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                     disabled={Boolean(sourceTask)}
                     onChange={(event) => setChipIdQuery(event.target.value)}
                   >
+                    <SelectedLabel />
                     <option value="" disabled>
                       Select a chip
                     </option>
@@ -595,9 +591,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                     </div>
                   </div>
 
-                  {(execution.status === "running" ||
-                    execution.status === "scheduled" ||
-                    execution.status === "pending") && (
+                  {isExecutionInProgress(execution.status) && (
                     <ExecutionTaskProgress
                       status={resultTask?.status ?? execution.status}
                       note={resultTask?.note}

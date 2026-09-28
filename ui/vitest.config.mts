@@ -9,5 +9,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
+    // Node 25+ enables Web Storage by default, which shadows jsdom's localStorage.
+    execArgv: ["--no-experimental-webstorage"],
   },
 });

@@ -14,6 +14,7 @@ import { getGetChipQubitQueryKey, useGetChipQubit } from "@/client/chip/chip";
 import { getGetTaskResultQueryKey } from "@/client/task/task";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { PlotlyRenderer } from "@/components/charts/PlotlyRenderer";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 const PARAMETER_UNITS: Record<string, string> = {
   readout_frequency: "GHz",
@@ -314,7 +315,7 @@ export function SpectroscopyManualCorrection({
         </div>
         {mutation.isError && (
           <div className="alert alert-error mt-3 text-sm">
-            Correction failed: {errorMessage(mutation.error)}
+            Correction failed: {getApiErrorMessage(mutation.error, "Unknown error")}
           </div>
         )}
         <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -494,10 +495,4 @@ function formatCoordinate(value: number): string {
 function parseFinite(value: string | undefined): number | null {
   const parsed = Number(value);
   return value?.trim() && Number.isFinite(parsed) ? parsed : null;
-}
-function errorMessage(error: unknown): string {
-  return (
-    (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-    (error instanceof Error ? error.message : "Unknown error")
-  );
 }

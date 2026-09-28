@@ -9,16 +9,12 @@ import {
   useStartSystemUpdate,
 } from "@/client/admin/admin";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { useQueryClient } from "@tanstack/react-query";
 import type { SystemUpdateState } from "@/schemas";
 
 const OPERATION_STORAGE_KEY = "qdash-system-update-operation";
 const ACTIVE_STATES: SystemUpdateState[] = ["queued", "running", "rolling_back"];
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return "The system updater could not be reached.";
-}
 
 function stateBadgeClass(state: SystemUpdateState): string {
   if (state === "succeeded") return "badge-success";
@@ -126,7 +122,9 @@ export function SystemUpdateCard() {
           </div>
         ) : statusQuery.isError ? (
           <div role="alert" className="alert alert-error alert-soft">
-            <span>{errorMessage(statusQuery.error)}</span>
+            <span>
+              {getApiErrorMessage(statusQuery.error, "The system updater could not be reached.")}
+            </span>
           </div>
         ) : updateStatus ? (
           <>
@@ -267,7 +265,12 @@ export function SystemUpdateCard() {
 
             {startMutation.isError && (
               <div role="alert" className="alert alert-error alert-soft">
-                <span>{errorMessage(startMutation.error)}</span>
+                <span>
+                  {getApiErrorMessage(
+                    startMutation.error,
+                    "The system updater could not be reached.",
+                  )}
+                </span>
               </div>
             )}
           </>

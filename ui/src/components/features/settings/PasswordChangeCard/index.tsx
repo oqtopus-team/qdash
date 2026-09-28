@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { getGetCurrentUserQueryKey, useChangePassword } from "@/client/auth/auth";
 import { useToast } from "@/components/ui/Toast";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 const passwordChangeSchema = z
   .object({
@@ -102,11 +103,12 @@ export function PasswordChangeCard() {
         queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() });
       },
       onError: (error: unknown) => {
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "Failed to change password. Please check your current password.";
-        toast.error(errorMessage);
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Failed to change password. Please check your current password.",
+          ),
+        );
       },
     },
   });

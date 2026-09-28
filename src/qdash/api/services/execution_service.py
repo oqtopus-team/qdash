@@ -27,7 +27,10 @@ from qdash.api.schemas.execution import (
 from qdash.common.utils.datetime import now, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionStatusModel
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-from qdash.repository.execution_finalizer import finalize_executions_by_flow_run_id
+from qdash.repository.execution_finalizer import (
+    finalize_executions_by_flow_run_id,
+    mark_executions_cancelling_by_flow_run_id,
+)
 
 if TYPE_CHECKING:
     from qdash.dbmodel.execution_history import ExecutionHistoryDocument
@@ -36,7 +39,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_OPEN_EXECUTION_STATUSES = ("running", "scheduled")
+_OPEN_EXECUTION_STATUSES = ("running", "scheduled", "cancelling")
 _RECONCILE_TIMEOUT_SECONDS = 5.0
 
 
@@ -65,6 +68,9 @@ _COMPLETED_STATE_OUTCOMES: dict[str, _ReconcileOutcome] = {
         close_tasks=False,
     ),
     "running": _ReconcileOutcome(
+        "failed", "Flow run completed but the execution was never closed", close_tasks=True
+    ),
+    "cancelling": _ReconcileOutcome(
         "failed", "Flow run completed but the execution was never closed", close_tasks=True
     ),
 }
@@ -376,6 +382,18 @@ class ExecutionService:
                     f"Cancellation requested for flow run {flow_run_id} "
                     f"(was in state: {current_state})"
                 )
+
+                try:
+                    mark_executions_cancelling_by_flow_run_id(
+                        project_id=project_id,
+                        flow_run_id=flow_run_id,
+                    )
+                except Exception:
+                    logger.warning(
+                        "Failed to mark execution cancelling for flow run %s",
+                        flow_run_id,
+                        exc_info=True,
+                    )
 
                 return CancelExecutionResponse(
                     execution_id=flow_run_id,

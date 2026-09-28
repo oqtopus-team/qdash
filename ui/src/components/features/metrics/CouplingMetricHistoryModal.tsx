@@ -35,6 +35,7 @@ import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 interface CouplingMetricHistoryModalProps {
   chipId: string;
@@ -242,7 +243,7 @@ export function CouplingMetricHistoryModal({
         });
         setTimeout(() => setSaveMessage(null), 5000);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to save parameters";
+        const message = getApiErrorMessage(err, "Failed to save parameters");
         setSaveMessage({ type: "error", text: message });
       }
     },

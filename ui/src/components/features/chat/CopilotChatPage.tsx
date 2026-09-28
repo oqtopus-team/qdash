@@ -25,6 +25,7 @@ import { useCopilotChat, type CopilotMessage, type CopilotSession } from "@/hook
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
 import {
@@ -468,11 +469,12 @@ export function CopilotChatPage() {
               <Cpu className="w-3.5 h-3.5 text-base-content/40" />
               <span className="sr-only">Chat model</span>
               <select
-                className="select select-bordered select-xs w-44 text-xs truncate appearance-auto"
+                className="select select-bordered select-xs w-44 text-xs"
                 value={selectedModel.key}
                 onChange={(event) => handleModelChange(event.target.value)}
                 disabled={isLoading}
               >
+                <SelectedLabel />
                 {modelOptions.map((option) => (
                   <option key={option.key} value={option.key}>
                     {option.label}
