@@ -170,10 +170,20 @@ function readFileIfPresent(path: string): string | undefined {
   }
 }
 
-/** `env:NAME` reads the environment; anything else is a literal URL. */
+/**
+ * `env:NAME` reads the environment; anything else is a literal URL.
+ *
+ * The `/v1` suffix is added when missing, mirroring
+ * `normalize_openai_compatible_base_url` on the Python side. LiteLLM appends it
+ * for OpenAI-compatible endpoints, so QDash's OLLAMA_BASE_URL is conventionally
+ * written without it; pi hands the value straight to the OpenAI SDK, which
+ * appends only `/chat/completions` and would otherwise 404.
+ */
 function resolveBaseUrl(setting: string, env: NodeJS.ProcessEnv): string | undefined {
-  if (!setting.startsWith("env:")) return setting;
-  return env[setting.slice(4)] || undefined;
+  const raw = setting.startsWith("env:") ? env[setting.slice(4)] : setting;
+  if (!raw) return undefined;
+  const trimmed = raw.replace(/\/+$/, "");
+  return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
 }
 
 /** Only the /v1/responses style has its own pi api; everything else is completions. */

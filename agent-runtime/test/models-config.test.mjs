@@ -92,6 +92,23 @@ test("an unresolvable base_url drops the model instead of writing a literal", ()
   assert.equal(providers.ollama, undefined);
 });
 
+test("a base_url without /v1 gets one", () => {
+  // QDash writes OLLAMA_BASE_URL without /v1 because LiteLLM appends it. Pi
+  // hands the value to the OpenAI SDK, which only appends /chat/completions,
+  // so an unnormalized base URL 404s on every request.
+  const { providers } = buildModelsConfig(YAML, undefined, {
+    OLLAMA_BASE_URL: "http://ollama:11434",
+  });
+  assert.equal(providers.ollama.baseUrl, "http://ollama:11434/v1");
+});
+
+test("a base_url that already ends in /v1 is left alone", () => {
+  const { providers } = buildModelsConfig(YAML, undefined, {
+    OLLAMA_BASE_URL: "http://ollama:11434/v1/",
+  });
+  assert.equal(providers.ollama.baseUrl, "http://ollama:11434/v1");
+});
+
 test("review models are merged into the same providers as chat models", () => {
   const { providers } = buildModelsConfig(YAML, REVIEW_YAML, env);
   assert.deepEqual(
