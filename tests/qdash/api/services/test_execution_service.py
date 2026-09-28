@@ -263,6 +263,30 @@ def test_list_executions_closes_running_execution_on_cancelled_flow_run(
     assert task.status == "cancelled"
 
 
+def test_list_executions_closes_cancelling_execution_on_cancelled_flow_run(
+    monkeypatch: Any, init_db: Any
+) -> None:
+    """A cancelling execution with a CANCELLED flow run is closed and its running task cancels."""
+    flow_run_id = str(uuid4())
+    _make_execution(execution_id="exec-1", status="cancelling", note={"flow_run_id": flow_run_id})
+    _make_task(task_id="task-1", execution_id="exec-1", status="running")
+
+    call_count: list[dict[str, Any]] = []
+    client = _FakeSyncClient([_make_run(flow_run_id, "CANCELLED")])
+    monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
+
+    executions = _list_executions_after_reconciliation()
+
+    assert executions[0].status == "cancelled"
+    reloaded = _reload_execution("exec-1")
+    assert reloaded is not None
+    assert reloaded.status == "cancelled"
+
+    task = _reload_task("task-1")
+    assert task is not None
+    assert task.status == "cancelled"
+
+
 def test_list_executions_completes_scheduled_execution_without_closing_its_tasks(
     monkeypatch: Any, init_db: Any
 ) -> None:
@@ -293,6 +317,30 @@ def test_list_executions_fails_running_execution_on_completed_flow_run(
     """A running execution whose flow run COMPLETED is marked failed along with its task."""
     flow_run_id = str(uuid4())
     _make_execution(execution_id="exec-1", status="running", note={"flow_run_id": flow_run_id})
+    _make_task(task_id="task-1", execution_id="exec-1", status="running")
+
+    call_count: list[dict[str, Any]] = []
+    client = _FakeSyncClient([_make_run(flow_run_id, "COMPLETED")])
+    monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, call_count))
+
+    executions = _list_executions_after_reconciliation()
+
+    assert executions[0].status == "failed"
+    reloaded = _reload_execution("exec-1")
+    assert reloaded is not None
+    assert reloaded.status == "failed"
+
+    task = _reload_task("task-1")
+    assert task is not None
+    assert task.status == "failed"
+
+
+def test_list_executions_fails_cancelling_execution_on_completed_flow_run(
+    monkeypatch: Any, init_db: Any
+) -> None:
+    """A cancelling execution whose flow run COMPLETED is marked failed along with its task."""
+    flow_run_id = str(uuid4())
+    _make_execution(execution_id="exec-1", status="cancelling", note={"flow_run_id": flow_run_id})
     _make_task(task_id="task-1", execution_id="exec-1", status="running")
 
     call_count: list[dict[str, Any]] = []
