@@ -11,6 +11,7 @@ import { useCreateChip, getListChipsQueryKey } from "@/client/chip/chip";
 import { useListTopologies } from "@/client/topology/topology";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 import { SelectedLabel } from "@/components/ui/SelectedLabel";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 interface TopologyItem {
   id: string;
@@ -106,10 +107,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
         onClose();
       },
       onError: (err: Error) => {
-        const axiosErr = err as Error & {
-          response?: { data?: { detail?: string } };
-        };
-        setServerError(axiosErr.response?.data?.detail || "Failed to create chip");
+        setServerError(getApiErrorMessage(err, "Failed to create chip"));
       },
     },
   });

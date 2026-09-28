@@ -23,10 +23,9 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useProject } from "@/contexts/ProjectContext";
 import { useNotificationActions, useNotifications } from "@/hooks/useNotifications";
+import { isExecutionInProgress } from "@/lib/executionStatus";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { NotificationResponse } from "@/schemas";
-
-const ACTIVE_STATUSES = new Set(["scheduled", "pending", "running"]);
 
 interface SectionHeadingProps {
   title: string;
@@ -217,7 +216,7 @@ export function HomePageContent() {
   );
 
   const lock = lockResponse?.data;
-  const isRunning = Boolean(lock?.lock && lock.status && ACTIVE_STATUSES.has(lock.status));
+  const isRunning = Boolean(lock?.lock && lock.status && isExecutionInProgress(lock.status));
   const executionHref =
     lock?.chip_id && lock.execution_id
       ? `/execution/${encodeURIComponent(lock.chip_id)}/${encodeURIComponent(lock.execution_id)}`

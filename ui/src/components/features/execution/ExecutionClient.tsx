@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Calendar, Clock, Download, StopCircle, UserRound } from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
+import { isExecutionCancellable } from "@/lib/executionStatus";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
 import { ExecutionDAG } from "./ExecutionDAG";
@@ -14,7 +16,6 @@ import type { ExecutionResponseDetail } from "@/schemas";
 
 import { useGetExecution, useCancelExecution } from "@/client/execution/execution";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
-import { getCancelErrorMessage } from "@/components/features/execution/getCancelErrorMessage";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
@@ -99,11 +100,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
 
   const flowRunId = execution?.note?.flow_run_id as string | undefined;
 
-  const isCancellable =
-    !!flowRunId &&
-    (execution?.status === "running" ||
-      execution?.status === "scheduled" ||
-      execution?.status === "pending");
+  const isCancellable = !!flowRunId && isExecutionCancellable(execution?.status);
 
   const handleCancel = () => {
     if (!flowRunId) return;
@@ -115,7 +112,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           setShowCancelConfirm(false);
         },
         onError: (error) => {
-          toast.error(getCancelErrorMessage(error));
+          toast.error(getApiErrorMessage(error, "Failed to cancel execution"));
           setShowCancelConfirm(false);
         },
       },

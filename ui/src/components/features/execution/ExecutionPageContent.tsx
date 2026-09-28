@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowUpRight,
@@ -16,6 +17,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { isExecutionCancellable, isExecutionInProgress } from "@/lib/executionStatus";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDate, formatDateTime } from "@/lib/utils/datetime";
 
 import { ExecutionDurationBreakdown } from "./ExecutionDurationBreakdown";
@@ -27,11 +30,12 @@ import {
   useListExecutions,
   useGetExecution,
   useCancelExecution,
+  getListExecutionsQueryKey,
+  getGetExecutionQueryKey,
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
-import { getCancelErrorMessage } from "@/components/features/execution/getCancelErrorMessage";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -112,6 +116,8 @@ function PaginationControls({
  * Execution history page listing workflow runs with task results and cancellation controls
  */
 export function ExecutionPageContent() {
+  const queryClient = useQueryClient();
+
   // URL state management
   const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
 
@@ -243,9 +249,7 @@ export function ExecutionPageContent() {
   const statusSummary = useMemo(
     () => ({
       total: cardData.length,
-      running: cardData.filter((execution) =>
-        ["running", "scheduled", "pending"].includes(execution.status),
-      ).length,
+      running: cardData.filter((execution) => isExecutionInProgress(execution.status)).length,
       failed: cardData.filter((execution) => execution.status === "failed").length,
       completed: cardData.filter((execution) => execution.status === "completed").length,
     }),
@@ -317,11 +321,17 @@ export function ExecutionPageContent() {
       { flowRunId },
       {
         onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListExecutionsQueryKey() });
+          if (selectedExecutionId) {
+            queryClient.invalidateQueries({
+              queryKey: getGetExecutionQueryKey(selectedExecutionId),
+            });
+          }
           toast.success("Cancellation requested successfully");
           setShowCancelConfirm(false);
         },
         onError: (error) => {
-          toast.error(getCancelErrorMessage(error));
+          toast.error(getApiErrorMessage(error, "Failed to cancel execution"));
           setShowCancelConfirm(false);
         },
       },
@@ -345,6 +355,7 @@ export function ExecutionPageContent() {
       case "failed":
         return "border-l-4 border-l-error";
       case "cancelled":
+      case "cancelling":
         return "border-l-4 border-l-neutral";
       default:
         return "border-l-4 border-l-base-300";
@@ -490,7 +501,7 @@ export function ExecutionPageContent() {
                       {execution.name}
                     </h3>
                     <span
-                      className={`badge badge-sm flex-shrink-0 ${getStatusBadgeClass(execution.status)} ${execution.status === "running" ? "status-pulse" : ""}`}
+                      className={`badge badge-sm flex-shrink-0 ${getStatusBadgeClass(execution.status)} ${execution.status === "running" || execution.status === "cancelling" ? "status-pulse" : ""}`}
                     >
                       {getStatusLabel(execution.status)}
                     </span>
@@ -595,10 +606,7 @@ export function ExecutionPageContent() {
                     | string
                     | undefined;
                   const isCancellable =
-                    !!detailFlowRunId &&
-                    (selectedExec?.status === "running" ||
-                      selectedExec?.status === "scheduled" ||
-                      selectedExec?.status === "pending");
+                    !!detailFlowRunId && isExecutionCancellable(selectedExec?.status);
                   return (
                     isCancellable && (
                       <button
