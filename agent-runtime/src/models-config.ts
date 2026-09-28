@@ -3,10 +3,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { parse } from "yaml";
 
 /**
- * Build pi's models.json from QDash's chat.yaml.
+ * Build pi's models.json from QDash's chat.yaml and review.yaml.
  *
- * chat.yaml is the single place model wiring is declared; this module is the
- * only translation into pi's schema. See adr/0004.
+ * Those two files are the single place model wiring is declared; this module is
+ * the only translation into pi's schema. See adr/0004 of the chat session and
+ * adr/0001 of 2026-09-28-ai-review-pi-agent.
  */
 
 /** QDash's chat config names providers the way LiteLLM does; pi uses its own ids. */
@@ -27,18 +28,19 @@ interface ChatModel {
   temperature?: unknown;
   top_p?: unknown;
   top_k?: unknown;
+  keep_alive?: unknown;
 }
 
 interface ModelEntry {
   id: string;
   contextWindow: number;
   maxTokens: number;
-  samplingParams?: Record<string, number>;
+  samplingParams?: Record<string, unknown>;
 }
 
 interface ModelOverride {
   maxTokens?: number;
-  samplingParams?: Record<string, number>;
+  samplingParams?: Record<string, unknown>;
 }
 
 interface ProviderEntry {
@@ -54,20 +56,38 @@ export interface ModelsConfig {
   providers: Record<string, ProviderEntry>;
 }
 
+/** Read one model list out of a YAML document, tolerating a missing key. */
+function readModels(yaml: string | undefined, key: string): ChatModel[] {
+  if (!yaml) return [];
+  const raw = parse(yaml) as Record<string, unknown> | null;
+  const list = raw?.[key];
+  return Array.isArray(list) ? (list as ChatModel[]) : [];
+}
+
 /**
- * Translate chat.yaml's `chat_models` into a models.json object.
+ * Translate chat.yaml's `chat_models` and review.yaml's `analysis_models` into a
+ * models.json object.
  *
  * Models with a `base_url` describe an endpoint pi has no catalog for
  * (ollama, vllm, gateways), so they become full provider definitions. Models
  * without one are served by pi's bundled catalog (openai, bedrock); only their
  * sampling parameters are layered on via `modelOverrides`.
+ *
+ * Chat and review routinely name the same provider and sometimes the same
+ * model, so entries are merged rather than appended blindly.
  */
-export function buildModelsConfig(chatYaml: string, env: NodeJS.ProcessEnv): ModelsConfig {
-  const raw = parse(chatYaml) as { chat_models?: unknown } | null;
-  const chatModels = Array.isArray(raw?.chat_models) ? (raw.chat_models as ChatModel[]) : [];
+export function buildModelsConfig(
+  chatYaml: string,
+  reviewYaml: string | undefined,
+  env: NodeJS.ProcessEnv,
+): ModelsConfig {
+  const models = [
+    ...readModels(chatYaml, "chat_models"),
+    ...readModels(reviewYaml, "analysis_models"),
+  ];
   const providers: Record<string, ProviderEntry> = {};
 
-  for (const model of chatModels) {
+  for (const model of models) {
     const name = asString(model.name);
     const rawProvider = asString(model.provider);
     if (!name || !rawProvider) continue;
@@ -81,6 +101,7 @@ export function buildModelsConfig(chatYaml: string, env: NodeJS.ProcessEnv): Mod
       if (!sampling && maxTokens === undefined) continue;
       const entry = (providers[providerId] ??= {});
       const overrides = (entry.modelOverrides ??= {});
+      if (overrides[name]) continue;
       overrides[name] = {
         ...(maxTokens === undefined ? {} : { maxTokens }),
         ...(sampling ? { samplingParams: sampling } : {}),
@@ -106,7 +127,9 @@ export function buildModelsConfig(chatYaml: string, env: NodeJS.ProcessEnv): Mod
       compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
       models: [],
     });
-    (entry.models ??= []).push({
+    const models_ = (entry.models ??= []);
+    if (models_.some((existing) => existing.id === name)) continue;
+    models_.push({
       id: name,
       contextWindow: asNumber(model.num_ctx) ?? DEFAULT_CONTEXT_WINDOW,
       maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
@@ -118,10 +141,27 @@ export function buildModelsConfig(chatYaml: string, env: NodeJS.ProcessEnv): Mod
 }
 
 /** Generate models.json next to the agent dir and return its path. */
-export function writeModelsConfig(chatConfigPath: string, outPath: string): string {
-  const config = buildModelsConfig(readFileSync(chatConfigPath, "utf8"), process.env);
+export function writeModelsConfig(
+  chatConfigPath: string,
+  reviewConfigPath: string,
+  outPath: string,
+): string {
+  const config = buildModelsConfig(
+    readFileSync(chatConfigPath, "utf8"),
+    readFileIfPresent(reviewConfigPath),
+    process.env,
+  );
   writeFileSync(outPath, `${JSON.stringify(config, null, 2)}\n`);
   return outPath;
+}
+
+function readFileIfPresent(path: string): string | undefined {
+  try {
+    return readFileSync(path, "utf8");
+  } catch (error) {
+    console.warn(`[agent-runtime] could not read ${path}, ignoring:`, error);
+    return undefined;
+  }
 }
 
 /** `env:NAME` reads the environment; anything else is a literal URL. */
@@ -135,14 +175,22 @@ function apiFromStyle(style: string | undefined): string {
   return style === "responses" ? "openai-responses" : "openai-completions";
 }
 
-function samplingParams(model: ChatModel): Record<string, number> | undefined {
-  const params: Record<string, number> = {};
+/**
+ * Sampling parameters pi merges into the request body verbatim.
+ *
+ * `keep_alive` is not a sampling parameter, but ollama reads it from the same
+ * body and it keeps the local VLM resident between reviews, so it rides along.
+ */
+function samplingParams(model: ChatModel): Record<string, unknown> | undefined {
+  const params: Record<string, unknown> = {};
   const temperature = asNumber(model.temperature);
   const topP = asNumber(model.top_p);
   const topK = asNumber(model.top_k);
+  const keepAlive = asString(model.keep_alive);
   if (temperature !== undefined) params.temperature = temperature;
   if (topP !== undefined) params.top_p = topP;
   if (topK !== undefined) params.top_k = topK;
+  if (keepAlive !== undefined) params.keep_alive = keepAlive;
   return Object.keys(params).length > 0 ? params : undefined;
 }
 

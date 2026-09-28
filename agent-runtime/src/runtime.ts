@@ -16,13 +16,15 @@ import { loadLanguageConfig } from "./config.ts";
 import { buildEntries } from "./entries.ts";
 import { EXCLUDED_TOOL_NAMES } from "./excluded-tools.ts";
 import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
-import { buildSystemPrompt } from "./prompt.ts";
+import { buildReviewSystemPrompt, buildSystemPrompt } from "./prompt.ts";
+import { submitReviewTool } from "./review-tool.ts";
 
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
 const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
 const COPILOT_CONFIG_PATH =
   process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
 const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
+const REVIEW_CONFIG_PATH = process.env.REVIEW_CONFIG_PATH ?? "/app/config/copilot/review.yaml";
 const HTTP_IDLE_TIMEOUT_MS = Number(process.env.HTTP_IDLE_TIMEOUT_MS ?? 300_000);
 
 /**
@@ -56,6 +58,12 @@ export interface SessionRequest {
   thinkingLevel?: ThinkingLevel;
 }
 
+export interface ReviewSessionRequest {
+  sessionId: string;
+  provider?: string;
+  modelName?: string;
+}
+
 /**
  * Process-wide resources shared by every conversation.
  *
@@ -65,6 +73,7 @@ export interface SessionRequest {
 export class SharedRuntime {
   private constructor(
     private readonly loader: DefaultResourceLoader,
+    private readonly reviewLoader: DefaultResourceLoader,
     private readonly modelRuntime: ModelRuntime,
   ) {}
 
@@ -82,13 +91,39 @@ export class SharedRuntime {
     });
     await loader.reload();
 
-    const modelsPath = writeModelsConfig(CHAT_CONFIG_PATH, join(AGENT_DIR, "models.json"));
+    // A second loader, because the system prompt is fixed at loader construction
+    // and createAgentSession has no per-session override.
+    const reviewLoader = new DefaultResourceLoader({
+      cwd: WORK_DIR,
+      agentDir: AGENT_DIR,
+      systemPromptOverride: () => buildReviewSystemPrompt(responseLanguage),
+    });
+    await reviewLoader.reload();
+
+    const modelsPath = writeModelsConfig(
+      CHAT_CONFIG_PATH,
+      REVIEW_CONFIG_PATH,
+      join(AGENT_DIR, "models.json"),
+    );
     const modelRuntime = await ModelRuntime.create({
       modelsPath,
       authPath: join(AGENT_DIR, "auth.json"),
     });
 
-    return new SharedRuntime(loader, modelRuntime);
+    return new SharedRuntime(loader, reviewLoader, modelRuntime);
+  }
+
+  /** Resolve a QDash provider/model pair against pi's catalog. */
+  private resolveModel(provider: string | undefined, modelName: string | undefined) {
+    const providerId = provider ? (PROVIDER_ALIASES[provider] ?? provider) : undefined;
+    const model =
+      providerId && modelName ? this.modelRuntime.getModel(providerId, modelName) : undefined;
+    if (providerId && modelName && !model) {
+      console.warn(
+        `[agent-runtime] unknown model ${providerId}/${modelName}, falling back to default`,
+      );
+    }
+    return model;
   }
 
   /** Names of the tools the agent will actually see. Logged once at startup. */
@@ -101,20 +136,36 @@ export class SharedRuntime {
     return [...names].sort();
   }
 
+  /**
+   * Create a session for one AI review.
+   *
+   * No stored history, no QDash tools: the prompt carries the whole context and
+   * `submit_review` is the only way out.
+   * See .agents/sessions/2026-09-28-ai-review-pi-agent/adr/0001-*.md
+   */
+  async createReviewSession(request: ReviewSessionRequest): Promise<CreateAgentSessionResult> {
+    const model = this.resolveModel(request.provider, request.modelName);
+
+    return createAgentSession({
+      cwd: WORK_DIR,
+      agentDir: AGENT_DIR,
+      resourceLoader: this.reviewLoader,
+      modelRuntime: this.modelRuntime,
+      ...(model ? { model } : {}),
+      noTools: "all",
+      tools: [submitReviewTool.name],
+      customTools: [submitReviewTool],
+      sessionManager: SessionManager.inMemory(
+        WORK_DIR,
+        { id: request.sessionId },
+        buildEntries(WORK_DIR, request.sessionId, []) as never,
+      ),
+    });
+  }
+
   /** Create a throwaway session seeded with the stored conversation. */
   async createSession(request: SessionRequest): Promise<CreateAgentSessionResult> {
-    const provider = request.provider
-      ? (PROVIDER_ALIASES[request.provider] ?? request.provider)
-      : undefined;
-    const model =
-      provider && request.modelName
-        ? this.modelRuntime.getModel(provider, request.modelName)
-        : undefined;
-    if (provider && request.modelName && !model) {
-      console.warn(
-        `[agent-runtime] unknown model ${provider}/${request.modelName}, falling back to default`,
-      );
-    }
+    const model = this.resolveModel(request.provider, request.modelName);
 
     return createAgentSession({
       cwd: WORK_DIR,

@@ -164,6 +164,10 @@ services:
       - PREFECT_LOGGING_SETTINGS_PATH=/app/config/app/logging/prefect.yaml
       - PYTHONPATH=/app:/app/qdash:/app/qdash/workflow:/app/qdash/dbmodel
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
+      # Automatic AI review posts here when copilot_backend is pi.
+      - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
+      - NO_PROXY=${NO_PROXY:-localhost,127.0.0.1},api,agent-runtime
+      - no_proxy=${NO_PROXY:-localhost,127.0.0.1},api,agent-runtime
     networks:
       - custom_net
   api:
@@ -222,8 +226,8 @@ services:
     networks:
       - custom_net
   agent-runtime:
-    # Pi Agent Runtime backing the Copilot chat page when
-    # config/copilot/chat.yaml sets chat_backend: pi.
+    # Pi Agent Runtime backing the Copilot chat page and automatic AI review
+    # when config/copilot/config.yaml sets copilot_backend: pi.
     build:
       context: .
       dockerfile: ./agent-runtime/Dockerfile
@@ -237,6 +241,10 @@ services:
       - PORT=${AGENT_RUNTIME_PORT:-8002}
       - PI_CODING_AGENT_DIR=/app/.pi-agent
       - CHAT_TIMEOUT_MS=${AGENT_RUNTIME_TIMEOUT_MS:-180000}
+      # Reviews arrive from two Python thread pools that do not know about each
+      # other and all land on one local VLM, so the cap lives here.
+      - REVIEW_CONCURRENCY=${AGENT_RUNTIME_REVIEW_CONCURRENCY:-2}
+      - REVIEW_TIMEOUT_MS=${AGENT_RUNTIME_REVIEW_TIMEOUT_MS:-300000}
       # pi-qdash reaches QDash with this. The runtime logs in as the QDash
       # administrator at startup unless QDASH_API_TOKEN is already set, so no
       # token has to be provisioned by hand. Write tools and raw GET access are

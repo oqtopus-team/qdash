@@ -172,7 +172,8 @@ def build_analysis_system_prompt(options: AnalysisPromptOptions) -> str:
         parts.append("\n".join(img_instructions))
 
     parts.append(context.task_knowledge_prompt)
-    parts.append(AI_REVIEW_INSTRUCTION)
+    if options.include_ai_review_instruction:
+        parts.append(AI_REVIEW_INSTRUCTION)
 
     scoring_section = _build_scoring_threshold_section(options.scoring)
     if scoring_section:
