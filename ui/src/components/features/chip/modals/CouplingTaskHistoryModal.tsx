@@ -31,6 +31,7 @@ import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 const PlotlyRenderer = dynamic(
   () => import("@/components/charts/PlotlyRenderer").then((mod) => mod.PlotlyRenderer),
@@ -91,7 +92,7 @@ export function CouplingTaskHistoryModal({
         });
         setTimeout(() => setSaveMessage(null), 5000);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to save";
+        const message = getApiErrorMessage(err, "Failed to save");
         setSaveMessage({ type: "error", text: message });
       }
     },
