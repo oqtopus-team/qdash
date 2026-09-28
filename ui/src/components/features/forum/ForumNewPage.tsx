@@ -14,6 +14,7 @@ import {
   useListForumCategories,
 } from "@/client/forum/forum";
 import { useListProjectMembers } from "@/client/projects/projects";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
@@ -266,6 +267,7 @@ export function ForumNewPage() {
               value={category}
               onChange={(event) => setCategory(event.target.value)}
             >
+              <SelectedLabel />
               {categories.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.label}
@@ -288,6 +290,7 @@ export function ForumNewPage() {
                   setCooldownDraftId("");
                 }}
               >
+                <SelectedLabel />
                 <option value="">Select chip</option>
                 {chips.map((chip) => (
                   <option key={chip.chip_id} value={chip.chip_id}>
@@ -340,6 +343,7 @@ export function ForumNewPage() {
               onChange={(event) => setCooldownDraftId(event.target.value)}
               disabled={!targetDraftChipId}
             >
+              <SelectedLabel />
               <option value="">No cooldown</option>
               {cooldowns.map((cooldown) => (
                 <option key={cooldown.cooldown_id} value={cooldown.cooldown_id}>
@@ -365,6 +369,7 @@ export function ForumNewPage() {
               value={assigneeUsername}
               onChange={(event) => setAssigneeUsername(event.target.value)}
             >
+              <SelectedLabel />
               <option value="">Unassigned</option>
               {members.map((member) => (
                 <option key={member.username} value={member.username}>
