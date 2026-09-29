@@ -77,6 +77,9 @@ function SectionShell({
   );
 }
 
+/**
+ * Dashboard section summarizing schedules across all flows, ordered by next run time.
+ */
 export function FlowSchedulesSection() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["flow-schedules"],

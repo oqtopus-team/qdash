@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { sortSchedulesByNextRun } from "@/lib/utils/flowSchedules";
 
+/** Sorts the schedules and returns their flow names in the resulting order. */
+function sortedFlowNames(schedules: Parameters<typeof sortSchedulesByNextRun>[0]): string[] {
+  return sortSchedulesByNextRun(schedules).map((schedule) => schedule.flow_name);
+}
+
 describe("sortSchedulesByNextRun", () => {
   it("sorts schedules by next_run ascending", () => {
     const schedules = [
@@ -10,11 +15,7 @@ describe("sortSchedulesByNextRun", () => {
       { flow_name: "flow-c", next_run: "2026-03-01T00:00:00Z" },
     ] as const;
 
-    expect(sortSchedulesByNextRun(schedules).map((schedule) => schedule.flow_name)).toEqual([
-      "flow-a",
-      "flow-c",
-      "flow-b",
-    ]);
+    expect(sortedFlowNames(schedules)).toEqual(["flow-a", "flow-c", "flow-b"]);
   });
 
   it("sorts schedules with no next_run last", () => {
@@ -24,11 +25,7 @@ describe("sortSchedulesByNextRun", () => {
       { flow_name: "flow-a", next_run: "2026-01-01T00:00:00Z" },
     ] as const;
 
-    expect(sortSchedulesByNextRun(schedules).map((schedule) => schedule.flow_name)).toEqual([
-      "flow-a",
-      "flow-b",
-      "flow-no-run",
-    ]);
+    expect(sortedFlowNames(schedules)).toEqual(["flow-a", "flow-b", "flow-no-run"]);
   });
 
   it("breaks ties by flow_name when next_run is equal", () => {
@@ -38,11 +35,7 @@ describe("sortSchedulesByNextRun", () => {
       { flow_name: "flow-b", next_run: "2026-01-01T00:00:00Z" },
     ] as const;
 
-    expect(sortSchedulesByNextRun(schedules).map((schedule) => schedule.flow_name)).toEqual([
-      "flow-a",
-      "flow-b",
-      "flow-c",
-    ]);
+    expect(sortedFlowNames(schedules)).toEqual(["flow-a", "flow-b", "flow-c"]);
   });
 
   it("breaks ties by flow_name when next_run is missing for all", () => {
@@ -52,11 +45,7 @@ describe("sortSchedulesByNextRun", () => {
       { flow_name: "flow-b", next_run: null },
     ] as const;
 
-    expect(sortSchedulesByNextRun(schedules).map((schedule) => schedule.flow_name)).toEqual([
-      "flow-a",
-      "flow-b",
-      "flow-c",
-    ]);
+    expect(sortedFlowNames(schedules)).toEqual(["flow-a", "flow-b", "flow-c"]);
   });
 
   it("does not mutate the input array", () => {

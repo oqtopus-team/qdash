@@ -25,6 +25,9 @@ interface FlowSchedulePanelProps {
   flowName: string;
 }
 
+/**
+ * Schedule panel for a single flow: create cron or one-time schedules and list them by next run time.
+ */
 export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
   const queryClient = useQueryClient();
   const toast = useToast();
