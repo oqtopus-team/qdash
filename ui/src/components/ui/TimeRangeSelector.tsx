@@ -17,6 +17,7 @@ interface TimeRangeSelectorProps {
 
 const QUICK_RANGE_DAYS = [1, 7, 30] as const;
 
+/** Returns the quick range (1, 7, or 30 days) that exactly matches the span, or null. */
 function getActiveQuickRangeDays(startDate: string, endDate: string): number | null {
   const start = dateTimeLocalToDate(startDate);
   const end = dateTimeLocalToDate(endDate);
@@ -25,6 +26,10 @@ function getActiveQuickRangeDays(startDate: string, endDate: string): number | n
   return QUICK_RANGE_DAYS.find((days) => diffMinutes === days * 24 * 60) ?? null;
 }
 
+/**
+ * Time range picker with 1D / 7D / 30D quick ranges and custom From / To inputs.
+ * The quick range matching the current span is highlighted.
+ */
 export function TimeRangeSelector({
   startDate,
   endDate,

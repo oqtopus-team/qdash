@@ -13,6 +13,10 @@ interface UseRangeModeUrlStateResult {
   hasUrlRange: boolean;
 }
 
+/**
+ * Syncs the start / end time range with the `start` and `end` URL params, defaulting to the last 7 days.
+ * `hasUrlRange` is true only when both URL params are valid datetime-local values.
+ */
 export function useRangeModeUrlState(): UseRangeModeUrlStateResult {
   const [startDate, setStartDateState] = useQueryState("start", parseAsString);
   const [endDate, setEndDateState] = useQueryState("end", parseAsString);
