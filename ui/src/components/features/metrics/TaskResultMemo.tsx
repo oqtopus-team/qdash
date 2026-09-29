@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 
 import { Pencil, Save, StickyNote, Trash2, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { isAxiosError } from "axios";
 
 import {
   getGetChipNotesSummaryQueryKey,
@@ -14,6 +13,7 @@ import {
   useUpsertTaskNote,
 } from "@/client/note/note";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 interface TaskResultMemoProps {
@@ -147,7 +147,10 @@ export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskRe
             </div>
             {(upsertMutation.error || deleteMutation.error) && (
               <div className="text-xs text-error mt-1">
-                {extractErrorMessage(upsertMutation.error ?? deleteMutation.error)}
+                {getApiErrorMessage(
+                  upsertMutation.error ?? deleteMutation.error,
+                  "Failed to save note.",
+                )}
               </div>
             )}
           </>
@@ -174,13 +177,4 @@ function stripAiGeneratedNoteSections(content: string): string {
     "i",
   );
   return content.replace(aiGeneratedNotePattern, "").trim();
-}
-
-function extractErrorMessage(err: unknown): string {
-  if (isAxiosError(err)) {
-    const detail = err.response?.data?.detail;
-    if (typeof detail === "string") return detail;
-  }
-  if (err instanceof Error) return err.message;
-  return "Failed to save note.";
 }

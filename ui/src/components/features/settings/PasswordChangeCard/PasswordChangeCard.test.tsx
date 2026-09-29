@@ -5,6 +5,7 @@ import { PasswordChangeCard } from "@/components/features/settings/PasswordChang
 
 const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
+  mutationOptions: undefined as { mutation?: { onError?: (error: unknown) => void } } | undefined,
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
@@ -14,7 +15,10 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("@/client/auth/auth", () => ({
   getGetCurrentUserQueryKey: () => ["current-user"],
-  useChangePassword: () => ({ mutate: mocks.mutate, isPending: false }),
+  useChangePassword: (options: typeof mocks.mutationOptions) => {
+    mocks.mutationOptions = options;
+    return { mutate: mocks.mutate, isPending: false };
+  },
 }));
 
 vi.mock("@/components/ui/Toast", () => ({ useToast: () => mocks.toast }));
@@ -60,5 +64,17 @@ describe("PasswordChangeCard", () => {
         data: { current_password: "current", new_password: "next-password" },
       }),
     );
+  });
+
+  it("shows the server detail when the password change fails", () => {
+    render(<PasswordChangeCard />);
+
+    mocks.mutationOptions?.mutation?.onError?.(
+      Object.assign(new Error("Request failed with status code 400"), {
+        response: { data: { detail: "Current password is incorrect" } },
+      }),
+    );
+
+    expect(mocks.toast.error).toHaveBeenCalledWith("Current password is incorrect");
   });
 });

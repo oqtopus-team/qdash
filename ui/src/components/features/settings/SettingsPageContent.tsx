@@ -9,6 +9,7 @@ import { AppearanceSettingsPanel } from "@/components/features/settings/Appearan
 import { PasswordChangeCard } from "@/components/features/settings/PasswordChangeCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
@@ -28,6 +29,7 @@ import {
 import type { MemberResponse, ProjectRole } from "@/schemas";
 import { getGetCurrentUserQueryKey, useUpdateCurrentUserProfile } from "@/client/auth/auth";
 import { AVATAR_PRESETS, UserAvatar } from "@/components/ui/UserAvatar";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 type Tab = "appearance" | "project" | "copilot" | "account" | "api";
 
@@ -37,11 +39,6 @@ function roleBadgeClass(role: ProjectRole) {
   if (role === "owner") return "badge-secondary";
   if (role === "editor") return "badge-primary";
   return "badge-ghost";
-}
-
-function mutationErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return "Failed to update project members";
 }
 
 function CopilotSettingsPanel() {
@@ -72,6 +69,7 @@ function CopilotSettingsPanel() {
                 onChange={(event) => handleModelChange(event.target.value)}
                 disabled={isLoading}
               >
+                <SelectedLabel />
                 {modelOptions.map((option) => (
                   <option key={option.key} value={option.key}>
                     {option.label}
@@ -247,7 +245,10 @@ function ProjectMembersPanel() {
   const memberError =
     localError ||
     (inviteMutation.error || updateMutation.error || removeMutation.error
-      ? mutationErrorMessage(inviteMutation.error || updateMutation.error || removeMutation.error)
+      ? getApiErrorMessage(
+          inviteMutation.error || updateMutation.error || removeMutation.error,
+          "Failed to update project members",
+        )
       : null);
 
   const refreshMembers = () => {

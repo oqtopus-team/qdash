@@ -31,6 +31,7 @@ import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { AnalysisChatPanel } from "@/components/features/metrics/AnalysisChatPanel";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 interface TaskHistoryModalProps {
   chipId: string;
@@ -110,7 +111,7 @@ export function TaskHistoryModal({
         });
         setTimeout(() => setSaveMessage(null), 5000);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to save";
+        const message = getApiErrorMessage(err, "Failed to save");
         setSaveMessage({ type: "error", text: message });
       }
     },

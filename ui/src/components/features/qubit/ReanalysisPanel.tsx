@@ -15,6 +15,7 @@ import {
   useReanalyzeQubitSpectroscopy,
   useReanalyzeResonatorSpectroscopy,
 } from "@/client/chip/chip";
+import { SelectedLabel } from "@/components/ui/SelectedLabel";
 
 // Plotly references `window` at import time, so we can't SSR it. Load lazily on the client.
 const Plot = dynamic(() => import("@/components/charts/Plot"), { ssr: false });
@@ -483,6 +484,7 @@ function SelectField({ label, value, options, onChange }: SelectFieldProps) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
+        <SelectedLabel />
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}

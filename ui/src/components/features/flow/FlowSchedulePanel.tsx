@@ -8,6 +8,7 @@ import { Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
 
 import type { ScheduleFlowRequest, FlowScheduleSummary } from "@/schemas";
@@ -54,7 +55,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       setScheduledTime("");
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create schedule: ${error.message}`);
+      toast.error(`Failed to create schedule: ${getApiErrorMessage(error, "Unknown error")}`);
     },
   });
 
@@ -68,7 +69,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       setScheduleToDeleteId(null);
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete schedule: ${error.message}`);
+      toast.error(`Failed to delete schedule: ${getApiErrorMessage(error, "Unknown error")}`);
     },
   });
 
@@ -82,7 +83,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       toast.success("Schedule updated successfully!");
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update schedule: ${error.message}`);
+      toast.error(`Failed to update schedule: ${getApiErrorMessage(error, "Unknown error")}`);
     },
   });
 

@@ -4,6 +4,23 @@ import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 import { downloadMetricsPdf } from "@/client/metrics/metrics";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
+
+/**
+ * With `responseType: "blob"`, error bodies also arrive as a Blob, so parse the
+ * JSON body back into `response.data` before reading its `detail`.
+ */
+export async function parseBlobErrorBody(error: unknown): Promise<unknown> {
+  const response = (error as { response?: { data?: unknown } } | null)?.response;
+  if (response?.data instanceof Blob) {
+    try {
+      response.data = JSON.parse(await response.data.text());
+    } catch {
+      // Keep the original error when the body is not JSON.
+    }
+  }
+  return error;
+}
 
 interface MetricsPdfDownloadButtonProps {
   chipId: string;
@@ -64,7 +81,7 @@ export function MetricsPdfDownloadButton({
       document.body.removeChild(a);
     } catch (err) {
       console.error("PDF download failed:", err);
-      setError(err instanceof Error ? err.message : "Download failed");
+      setError(getApiErrorMessage(await parseBlobErrorBody(err), "Download failed"));
     } finally {
       setIsDownloading(false);
     }

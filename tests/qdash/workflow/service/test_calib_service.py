@@ -5,7 +5,7 @@ These tests verify the CalibService API and helper functions for custom calibrat
 
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -14,6 +14,8 @@ import pytest
 
 from qdash.workflow.service.calib_service import (
     CalibService,
+    _is_cancellation,
+    _is_external_termination,
     finish_calibration,
     get_session,
     init_calibration,
@@ -46,6 +48,9 @@ class MockExecutionService:
         return self
 
     def fail(self, error_message=""):
+        return self
+
+    def cancel(self):
         return self
 
     def reload(self):
@@ -233,6 +238,34 @@ class BoomStep(Step):
     def execute(self, service: Any, targets: Any, ctx: Any) -> Any:
         """Raise a RuntimeError to simulate a step failing mid-pipeline."""
         raise RuntimeError("boom")
+
+
+@dataclass
+class RaisingStep(Step):
+    """Step that raises a caller-supplied exception, to exercise abort classification."""
+
+    exc: BaseException = field(default_factory=lambda: RuntimeError("boom"))
+
+    @property
+    def name(self) -> str:
+        """Return a fixed step name for identification."""
+        return "raising"
+
+    def execute(self, service: Any, targets: Any, ctx: Any) -> Any:
+        """Raise the exception supplied at construction time."""
+        raise self.exc
+
+
+class CancelledRun(Exception):
+    """Stand-in for prefect.exceptions.CancelledRun, which is matched by class name."""
+
+
+class ExternalSignal(BaseException):
+    """Stand-in for prefect.exceptions.ExternalSignal."""
+
+
+class TerminationSignal(ExternalSignal):
+    """Stand-in for prefect.exceptions.TerminationSignal."""
 
 
 @pytest.fixture(autouse=True)
@@ -1274,3 +1307,166 @@ def test_pipeline_keeps_supplied_reservation_owner(pipeline_execution_env, monke
     assert pipeline_execution_env.lock.unlock_calls == ["exec-reserved"]
     with pytest.raises(RuntimeError, match="No hardware reservation"):
         session.execute_task("CheckRabi", "0")
+
+
+class TestAbortClassification:
+    """Test _is_cancellation and _is_external_termination exception matching."""
+
+    def test_bare_cancelled_run_is_a_cancellation(self):
+        """A bare CancelledRun is a cancellation and not an external termination."""
+        exc = CancelledRun("cancelled")
+        assert _is_cancellation(exc) is True
+        assert _is_external_termination(exc) is False
+
+    def test_bare_termination_signal_is_an_external_termination(self):
+        """A bare TerminationSignal is an external termination and not a cancellation."""
+        exc = TerminationSignal("SIGTERM")
+        assert _is_external_termination(exc) is True
+        assert _is_cancellation(exc) is False
+
+    def test_unrelated_exception_is_neither(self):
+        """A plain RuntimeError is neither a cancellation nor an external termination."""
+        exc = RuntimeError("boom")
+        assert _is_cancellation(exc) is False
+        assert _is_external_termination(exc) is False
+
+    def test_cancelled_run_as_cause_is_recognised(self):
+        """A CancelledRun attached as __cause__ of a RuntimeError is still a cancellation."""
+        try:
+            try:
+                raise CancelledRun("cancelled")
+            except CancelledRun as cause:
+                raise RuntimeError("wrapped") from cause
+        except RuntimeError as exc:
+            assert _is_cancellation(exc) is True
+
+    def test_cancelled_run_nested_in_exception_group_is_recognised(self):
+        """A CancelledRun nested in an ExceptionGroup alongside a ValueError is still recognised."""
+        group = ExceptionGroup(  # noqa: F821 (3.11 builtin; ruff targets py310)
+            "multiple errors", [CancelledRun("cancelled"), ValueError("other")]
+        )
+        assert _is_cancellation(group) is True
+
+    def test_termination_signal_as_cause_is_recognised(self):
+        """A TerminationSignal attached as __cause__ is an external termination.
+
+        This matches Prefect's async path, which raises
+        ``TerminationSignal(...) from exc``.
+        """
+        try:
+            try:
+                raise RuntimeError("original")
+            except RuntimeError as cause:
+                raise TerminationSignal("SIGTERM") from cause
+        except TerminationSignal as exc:
+            assert _is_external_termination(exc) is True
+
+    def test_context_is_not_followed(self):
+        """__context__ is not followed: a real failure while handling a cancellation is not mistaken for one."""
+        try:
+            try:
+                raise CancelledRun("cancelled")
+            except CancelledRun:
+                raise RuntimeError("real failure") from None
+        except RuntimeError as exc:
+            assert exc.__context__ is not None
+            assert _is_cancellation(exc) is False
+
+    def test_self_referencing_cause_does_not_hang(self):
+        """A self-referencing __cause__ does not hang the exception chain walk."""
+        exc = RuntimeError("boom")
+        exc.__cause__ = exc
+        assert _is_cancellation(exc) is False
+        assert _is_external_termination(exc) is False
+
+
+def _build_abort_handling_session(mock_lock_repo, mock_user_repo) -> CalibService:
+    """Build a CalibService the same way TestRunPipelineFailureLogging does."""
+    return CalibService(
+        username="test_user",
+        execution_id="20240101-001",
+        chip_id="chip_1",
+        qids=["0"],
+        project_id="test_project",
+        lock_repo=mock_lock_repo,
+        user_repo=mock_user_repo,
+    )
+
+
+def _mock_terminal_handlers(
+    session: CalibService, monkeypatch: pytest.MonkeyPatch
+) -> tuple[MagicMock, MagicMock, MagicMock]:
+    """Replace the three terminal handlers so the abort branch can be observed."""
+    fail, cancel, abandon = MagicMock(), MagicMock(), MagicMock()
+    monkeypatch.setattr(session, "fail_calibration", fail)
+    monkeypatch.setattr(session, "cancel_calibration", cancel)
+    monkeypatch.setattr(session, "abandon_calibration", abandon)
+    return fail, cancel, abandon
+
+
+class TestRunPipelineAbortHandling:
+    """Test that _run_pipeline routes aborts to the correct terminal handler."""
+
+    def test_unrelated_exception_calls_fail_calibration(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
+    ):
+        """A plain RuntimeError routes to fail_calibration only."""
+        session = _build_abort_handling_session(mock_lock_repo, mock_user_repo)
+        fail, cancel, abandon = _mock_terminal_handlers(session, monkeypatch)
+        exc = RuntimeError("boom")
+
+        with pytest.raises(RuntimeError):
+            session._run_pipeline(QubitTargets(["0"]), [RaisingStep(exc=exc)])
+
+        fail.assert_called_once()
+        cancel.assert_not_called()
+        abandon.assert_not_called()
+
+    def test_cancelled_run_calls_cancel_calibration(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
+    ):
+        """A CancelledRun routes to cancel_calibration only."""
+        session = _build_abort_handling_session(mock_lock_repo, mock_user_repo)
+        fail, cancel, abandon = _mock_terminal_handlers(session, monkeypatch)
+        exc = CancelledRun("cancelled")
+
+        with pytest.raises(CancelledRun):
+            session._run_pipeline(QubitTargets(["0"]), [RaisingStep(exc=exc)])
+
+        cancel.assert_called_once()
+        fail.assert_not_called()
+        abandon.assert_not_called()
+
+    def test_termination_signal_calls_abandon_calibration(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
+    ):
+        """A TerminationSignal routes to abandon_calibration only."""
+        session = _build_abort_handling_session(mock_lock_repo, mock_user_repo)
+        fail, cancel, abandon = _mock_terminal_handlers(session, monkeypatch)
+        exc = TerminationSignal("SIGTERM")
+
+        with pytest.raises(TerminationSignal):
+            session._run_pipeline(QubitTargets(["0"]), [RaisingStep(exc=exc)])
+
+        abandon.assert_called_once()
+        fail.assert_not_called()
+        cancel.assert_not_called()
+
+    def test_abandon_calibration_releases_lock_without_closing_execution(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+    ):
+        """abandon_calibration releases the lock and resets state without a terminal write."""
+        session = _build_abort_handling_session(mock_lock_repo, mock_user_repo)
+        session._lock_acquired = True
+        session._lock_repo = mock_lock_repo
+        session.use_lock = True
+        execution_service = MagicMock()
+        session.execution_service = execution_service
+
+        session.abandon_calibration()
+
+        assert session._lock_acquired is False
+        assert session._initialized is False
+        execution_service.complete.assert_not_called()
+        execution_service.fail.assert_not_called()
+        execution_service.cancel.assert_not_called()

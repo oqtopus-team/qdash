@@ -201,6 +201,14 @@ describe("ExecutionTaskProgress", () => {
     },
   );
 
+  it("shows a cancellation message instead of the startup message while cancelling", () => {
+    render(<ExecutionTaskProgress status="cancelling" />);
+    expect(screen.getByText("Cancelling execution")).toBeTruthy();
+    expect(screen.getByText("Waiting for the run to stop.")).toBeTruthy();
+    expect(screen.queryByText("Waiting to start")).toBeNull();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
   it("shows the measured count without inventing a percentage when the total is unknown", () => {
     render(
       <ExecutionTaskProgress
