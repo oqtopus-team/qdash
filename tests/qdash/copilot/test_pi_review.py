@@ -59,7 +59,9 @@ def _bundle(output_parameters: dict[str, Any] | None = None) -> AnalysisContextR
 
 class TestRenderReviewMarkdown:
     def test_matches_the_format_the_dashboard_parses(self) -> None:
-        markdown = pi_review.render_review_markdown(pi_review.ReviewVerdict(**_VERDICT))
+        markdown = pi_review.render_review_markdown(
+            pi_review.ReviewVerdict.model_validate(_VERDICT)
+        )
 
         assert markdown.splitlines() == [
             "**AI review**",
@@ -75,14 +77,16 @@ class TestRenderReviewMarkdown:
         ]
 
     def test_empty_free_text_fields_become_none(self) -> None:
-        verdict = pi_review.ReviewVerdict(**{**_VERDICT, "optional_note": ""})
+        verdict = pi_review.ReviewVerdict.model_validate({**_VERDICT, "optional_note": ""})
 
         assert "- Optional note: none" in pi_review.render_review_markdown(verdict)
 
     def test_fields_are_readable_by_the_dashboard_regex(self) -> None:
         from qdash.api.services.task_result_service import _ai_review_field
 
-        markdown = pi_review.render_review_markdown(pi_review.ReviewVerdict(**_VERDICT))
+        markdown = pi_review.render_review_markdown(
+            pi_review.ReviewVerdict.model_validate(_VERDICT)
+        )
 
         assert _ai_review_field(markdown, "Decision") == "PASS_WITH_NOTE"
         assert _ai_review_field(markdown, "Human label suggestion") == "CORRECT"
@@ -128,7 +132,7 @@ class TestBuildReviewPrompt:
 
 class TestRunReview:
     def test_returns_the_verdict_from_the_runtime(self) -> None:
-        with patch.object(pi_review.httpx, "Client") as client:
+        with patch("qdash.copilot.pi_review.httpx.Client") as client:
             post = client.return_value.__enter__.return_value.post
             post.return_value = httpx.Response(200, json={"review": _VERDICT})
 
@@ -145,7 +149,7 @@ class TestRunReview:
         assert len(payload["images"]) == 2
 
     def test_a_missing_verdict_raises_instead_of_saving_a_note(self) -> None:
-        with patch.object(pi_review.httpx, "Client") as client:
+        with patch("qdash.copilot.pi_review.httpx.Client") as client:
             client.return_value.__enter__.return_value.post.return_value = httpx.Response(
                 200,
                 json={"error": "submit_review was not called", "text": "I think it looks fine."},
@@ -160,7 +164,7 @@ class TestRunReview:
                 )
 
     def test_a_runtime_error_status_raises(self) -> None:
-        with patch.object(pi_review.httpx, "Client") as client:
+        with patch("qdash.copilot.pi_review.httpx.Client") as client:
             client.return_value.__enter__.return_value.post.return_value = httpx.Response(503)
 
             with pytest.raises(RuntimeError, match="HTTP 503"):
@@ -177,7 +181,7 @@ class TestBackendBranch:
         with patch.object(
             pi_review,
             "run_review",
-            return_value=pi_review.ReviewVerdict(**_VERDICT),
+            return_value=pi_review.ReviewVerdict.model_validate(_VERDICT),
         ) as run:
             markdown = render_ai_review_markdown(
                 task_name="CheckQubitSpectroscopy",

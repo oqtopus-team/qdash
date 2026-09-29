@@ -24,8 +24,10 @@ def _parse(sse: str) -> tuple[str, dict[str, Any]]:
     return name.removeprefix("event: "), json.loads(data.removeprefix("data: "))
 
 
-async def _collect(*events: dict[str, Any]) -> tuple[list[tuple[str, dict]], list]:
-    saved: list = []
+async def _collect(
+    *events: dict[str, Any],
+) -> tuple[list[tuple[str, dict[str, Any]]], list[Any]]:
+    saved: list[Any] = []
     out = [_parse(sse) async for sse in translate(_lines(*events), on_done=saved.append)]
     return out, saved
 
