@@ -17,6 +17,7 @@ chat_models:
     # Optional. LiteLLM forwards this when set.
     api_key_env: OLLAMA_API_KEY
     keep_alive: 30m
+    num_ctx: 16384
     temperature: 1.0
     top_p: 0.95
     top_k: 64
@@ -29,6 +30,7 @@ chat_models:
     base_url: env:OLLAMA_BASE_URL
     api_key_env: OLLAMA_API_KEY
     keep_alive: 30m
+    num_ctx: 16384
     temperature: 1.0
     top_p: 0.95
     top_k: 64
