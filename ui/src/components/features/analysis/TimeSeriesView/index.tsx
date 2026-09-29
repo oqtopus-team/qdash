@@ -308,7 +308,6 @@ export function TimeSeriesView() {
       type: "scatter" as const,
       mode: "lines+markers" as const,
       name: `${currentMetricConfig?.title || selectedParameter} Q${qid}`,
-      legendgroup: "primary",
       yaxis: "y",
       line: { shape: "linear" as const, width: 2 },
       marker: { size: 8, symbol: "circle" },
@@ -408,7 +407,6 @@ export function TimeSeriesView() {
       type: "scatter" as const,
       mode: "lines+markers" as const,
       name: `${secondaryMetricConfig?.title || secondaryParameter} Q${qid}`,
-      legendgroup: "secondary",
       yaxis: "y2",
       line: {
         shape: "linear" as const,
