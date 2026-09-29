@@ -171,7 +171,6 @@ def _status_detail(response: httpx.Response) -> str:
         return "Another request is already running for this conversation"
     if response.status_code == httpx.codes.BAD_REQUEST:
         # The runtime rejects models missing from chat.yaml / review.yaml.
-        # See .agents/sessions/2026-09-28-analyze-sidebar-pi-agent/adr/0004-*.md
         try:
             return str(response.json().get("error", response.text))
         except ValueError:

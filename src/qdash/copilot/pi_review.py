@@ -4,8 +4,6 @@ The runtime has no way to constrain assistant text to a schema, so the verdict
 comes back as `submit_review` tool arguments. Rendering those into the stored
 markdown note stays here, byte-for-byte compatible with the LiteLLM path, so the
 dashboard and UI regexes keep working.
-
-See .agents/sessions/2026-09-28-ai-review-pi-agent/adr/0002-*.md
 """
 
 from __future__ import annotations
@@ -133,7 +131,6 @@ def run_review(
 
     Raises on any failure. The caller already records failures on the task
     result; falling back to LiteLLM here would make the recorded model a lie.
-    See .agents/sessions/2026-09-28-ai-review-pi-agent/adr/0003-*.md
     """
     payload = {
         "prompt": build_review_prompt(bundle=bundle, config=config, user_message=user_message),

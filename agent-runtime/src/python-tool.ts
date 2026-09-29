@@ -7,7 +7,6 @@ import { Type } from "typebox";
  * The runtime never executes the code itself: it forwards to the API, where the
  * existing sandbox applies AST validation, a module allowlist, restricted
  * builtins, and bubblewrap isolation.
- * See .agent/sessions/2026-09-18-copilot-pi-agent-runtime/adr/0006-*.md
  */
 const ALLOWED_MODULES =
   "numpy, pandas, scipy, scipy.stats, scipy.optimize, scipy.signal, scipy.interpolate, plotly, plotly.graph_objects, plotly.express, plotly.subplots, math, statistics, json, datetime, collections, io";

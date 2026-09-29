@@ -2,7 +2,6 @@
  * Pi session events -> NDJSON lines.
  *
  * Pure functions only, so they can be tested without a running agent.
- * See .agent/sessions/2026-09-18-copilot-pi-agent-runtime/adr/0005-*.md
  */
 
 export type NdjsonEvent =

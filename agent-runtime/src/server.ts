@@ -47,7 +47,6 @@ const running = new Set<string>();
  *
  * Reviews arrive from two Python thread pools that do not know about each other,
  * and they all land on one local VLM. Callers wait instead of being rejected.
- * See .agents/sessions/2026-09-28-ai-review-pi-agent/adr/0004-*.md
  */
 const reviewQueue: (() => void)[] = [];
 let reviewsInFlight = 0;

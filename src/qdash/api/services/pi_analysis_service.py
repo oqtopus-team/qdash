@@ -4,9 +4,6 @@ Analysis sits between chat and review: it is a continuing conversation with
 tools, like chat, but its first turn carries figures and a pre-built context,
 like review. Only that first turn differs, so this module builds the opening
 message and then hands off to the chat bridge.
-
-See .agents/sessions/2026-09-28-analyze-sidebar-pi-agent/adr/0001-*.md and
-adr/0003-*.md
 """
 
 from __future__ import annotations

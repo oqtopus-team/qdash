@@ -3,7 +3,6 @@
  *
  * QDash owns the conversation, so every request starts from an in-memory
  * SessionManager seeded with the previous turns.
- * See .agent/sessions/2026-09-18-copilot-pi-agent-runtime/adr/0002-*.md
  */
 
 let counter = 0;

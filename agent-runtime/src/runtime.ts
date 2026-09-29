@@ -118,7 +118,7 @@ export class SharedRuntime {
    *
    * Throws rather than falling back: answering with a different model than the
    * caller asked for is invisible in the result and makes the recorded model a
-   * lie. See .agents/sessions/2026-09-28-analyze-sidebar-pi-agent/adr/0004-*.md
+   * lie.
    */
   private resolveModel(provider: string | undefined, modelName: string | undefined) {
     if (!provider || !modelName) return undefined;
@@ -147,7 +147,6 @@ export class SharedRuntime {
    *
    * No stored history, no QDash tools: the prompt carries the whole context and
    * `submit_review` is the only way out.
-   * See .agents/sessions/2026-09-28-ai-review-pi-agent/adr/0001-*.md
    */
   async createReviewSession(request: ReviewSessionRequest): Promise<CreateAgentSessionResult> {
     const model = this.resolveModel(request.provider, request.modelName);

@@ -1,7 +1,6 @@
 /**
  * pi-qdash tools the chat agent must not see.
  *
- * See .agent/sessions/2026-09-18-copilot-pi-agent-runtime/adr/0003-*.md
  */
 
 /**

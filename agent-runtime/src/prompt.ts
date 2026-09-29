@@ -27,7 +27,6 @@ export function buildSystemPrompt(responseLanguage: string, thinkingLanguage: st
  * Deliberately free of review criteria: what counts as PASS or REVIEW comes from
  * review.yaml's `ai_review_message` and the task knowledge, both sent by Python
  * as the prompt body. Only the shape of the interaction lives here.
- * See .agents/sessions/2026-09-28-ai-review-pi-agent/adr/0001-*.md
  */
 export function buildReviewSystemPrompt(responseLanguage: string): string {
   return [

@@ -24,7 +24,6 @@ function stringEnum<const T extends string[]>(values: T, description: string) {
  *
  * The fields mirror the markdown block QDash stores, one for one. Rendering
  * stays in Python so the saved note keeps its existing format.
- * See .agents/sessions/2026-09-28-ai-review-pi-agent/adr/0002-*.md
  */
 export const submitReviewTool = defineTool({
   name: "submit_review",
