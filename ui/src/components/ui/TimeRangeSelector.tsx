@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import { CalendarRange, ChevronDown } from "lucide-react";
 
+import { dateTimeLocalToDate } from "@/lib/utils/datetime";
+
 interface TimeRangeSelectorProps {
   startDate: string;
   endDate: string;
@@ -15,20 +17,11 @@ interface TimeRangeSelectorProps {
 
 const QUICK_RANGE_DAYS = [1, 7, 30] as const;
 
-function parseDateTimeLocalMinutes(value: string): number | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
-  if (!match) return null;
-  const [, year, month, day, hour, minute] = match;
-  return (
-    Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)) / 60000
-  );
-}
-
 function getActiveQuickRangeDays(startDate: string, endDate: string): number | null {
-  const startMinutes = parseDateTimeLocalMinutes(startDate);
-  const endMinutes = parseDateTimeLocalMinutes(endDate);
-  if (startMinutes === null || endMinutes === null) return null;
-  const diffMinutes = endMinutes - startMinutes;
+  const start = dateTimeLocalToDate(startDate);
+  const end = dateTimeLocalToDate(endDate);
+  if (start === null || end === null) return null;
+  const diffMinutes = (end.getTime() - start.getTime()) / 60000;
   return QUICK_RANGE_DAYS.find((days) => diffMinutes === days * 24 * 60) ?? null;
 }
 

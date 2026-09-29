@@ -87,4 +87,16 @@ describe("TimeRangeSelector", () => {
       );
     });
   });
+
+  it("highlights no quick range button when the start date is a calendar overflow", () => {
+    render(
+      <TimeRangeSelector {...props} startDate="2026-02-30T00:00" endDate="2026-03-03T00:00" />,
+    );
+
+    ["1D", "7D", "30D"].forEach((label) => {
+      expect(screen.getByRole("button", { name: label }).getAttribute("aria-pressed")).toBe(
+        "false",
+      );
+    });
+  });
 });

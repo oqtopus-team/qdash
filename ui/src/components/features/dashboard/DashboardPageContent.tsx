@@ -226,7 +226,11 @@ export function DashboardPageContent() {
     if (!currentCooldownId || !activeCooldown) return;
     if (honorUrlRangeRef.current) {
       honorUrlRangeRef.current = false;
-      if (startDate === dateToDateTimeLocal(new Date(activeCooldown.started_at))) {
+      const matchesStart = startDate === dateToDateTimeLocal(new Date(activeCooldown.started_at));
+      const matchesRange = activeCooldown.ended_at
+        ? matchesStart && endDate === dateToDateTimeLocal(new Date(activeCooldown.ended_at))
+        : matchesStart;
+      if (matchesRange) {
         setSelectedCooldownId(currentCooldownId);
       }
       setHasInitializedCooldownSelection(true);
@@ -241,6 +245,7 @@ export function DashboardPageContent() {
   }, [
     activeCooldown,
     currentCooldownId,
+    endDate,
     hasInitializedCooldownSelection,
     setEndDate,
     setStartDate,

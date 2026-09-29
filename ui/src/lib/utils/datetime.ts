@@ -1,7 +1,8 @@
-import { formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 const DEFAULT_TIMEZONE = process.env.NEXT_PUBLIC_TIMEZONE || "Asia/Tokyo";
 const ISO_DATETIME_WITHOUT_TIMEZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
+const DATETIME_LOCAL_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 
 export function normalizeUtcInput(utcString: string): string {
   if (ISO_DATETIME_WITHOUT_TIMEZONE.test(utcString)) {
@@ -16,6 +17,38 @@ function parseUtcDate(utcString: string): Date {
 
 export function dateToDateTimeLocal(date: Date, timezone: string = DEFAULT_TIMEZONE): string {
   return formatInTimeZone(date, timezone, "yyyy-MM-dd'T'HH:mm");
+}
+
+/**
+ * Parse a `datetime-local` input value (wall-clock time in `timezone`) into the
+ * real instant it represents.
+ *
+ * @param value - A string in `yyyy-MM-ddTHH:mm` format
+ * @param timezone - The timezone the wall-clock value is expressed in (default: "Asia/Tokyo")
+ * @returns The corresponding `Date`, or `null` if `value` is malformed or names a
+ * calendar date/time that does not exist (e.g. "2026-02-30T00:00" or hour 24)
+ */
+export function dateTimeLocalToDate(
+  value: string,
+  timezone: string = DEFAULT_TIMEZONE,
+): Date | null {
+  const match = DATETIME_LOCAL_PATTERN.exec(value);
+  if (!match) return null;
+  const [, yearStr, monthStr, dayStr, hourStr, minuteStr] = match;
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const hour = Number(hourStr);
+  const minute = Number(minuteStr);
+  const calendarCheck = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const isValid =
+    calendarCheck.getUTCFullYear() === year &&
+    calendarCheck.getUTCMonth() === month - 1 &&
+    calendarCheck.getUTCDate() === day &&
+    calendarCheck.getUTCHours() === hour &&
+    calendarCheck.getUTCMinutes() === minute;
+  if (!isValid) return null;
+  return fromZonedTime(value, timezone);
 }
 
 export function dateToDateInput(date: Date, timezone: string = DEFAULT_TIMEZONE): string {

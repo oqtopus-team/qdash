@@ -14,6 +14,7 @@ const mockForumPosts = vi.hoisted(() => vi.fn<() => unknown[]>(() => []));
 const mockCurrentCooldownId = vi.hoisted(() => vi.fn<() => string | null>(() => null));
 const mockCooldowns = vi.hoisted(() => vi.fn<() => unknown[]>(() => []));
 const mockListForumPosts = vi.hoisted(() => vi.fn());
+const mockGetChipNotesSummary = vi.hoisted(() => vi.fn());
 
 vi.mock("@/client/chip/chip", () => ({
   useListChips: () => ({
@@ -74,15 +75,18 @@ vi.mock("@/client/metrics/metrics", () => ({
 }));
 
 vi.mock("@/client/note/note", () => ({
-  useGetChipNotesSummary: () => ({
-    data: {
+  useGetChipNotesSummary: (chipId: unknown, params: unknown, options: unknown) => {
+    mockGetChipNotesSummary(chipId, params, options);
+    return {
       data: {
-        qubits: [],
-        couplings: [],
-        task_notes: [],
+        data: {
+          qubits: [],
+          couplings: [],
+          task_notes: [],
+        },
       },
-    },
-  }),
+    };
+  },
 }));
 
 vi.mock("@/client/projects/projects", () => ({
@@ -356,6 +360,38 @@ describe("DashboardPageContent", () => {
         "cd-active",
       );
     });
+    expect(mockSetStartDate).not.toHaveBeenCalled();
+    expect(mockSetEndDate).not.toHaveBeenCalled();
+  });
+
+  it("does not select an ended cooldown when the URL start matches but the end does not", async () => {
+    mockHasUrlRange.mockReturnValue(true);
+    mockCurrentCooldownId.mockReturnValue("cd-ended");
+    mockCooldowns.mockReturnValue([
+      {
+        cooldown_id: "cd-ended",
+        started_at: toIsoSeconds("2026-06-01T00:00"),
+        ended_at: toIsoSeconds("2026-06-05T00:00"),
+      },
+    ]);
+
+    render(<DashboardPageContent />);
+
+    await waitFor(() => {
+      expect(mockGetChipNotesSummary).toHaveBeenCalled();
+    });
+
+    expect(screen.getByText("CooldownSelector").getAttribute("data-selected-cooldown-id")).toBe(
+      "null",
+    );
+    expect(mockGetChipNotesSummary).toHaveBeenLastCalledWith(
+      "chip-1",
+      expect.objectContaining({
+        start_at: "2026-06-01T00:00:00Z",
+        end_at: "2026-06-08T00:00:00Z",
+      }),
+      expect.anything(),
+    );
     expect(mockSetStartDate).not.toHaveBeenCalled();
     expect(mockSetEndDate).not.toHaveBeenCalled();
   });
