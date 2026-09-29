@@ -4,10 +4,9 @@
 
 enabled: true
 
-# Backend serving the chat page and automatic AI review.
+# Backend serving the chat page, automatic AI review, and the analysis sidebar.
 #   pi:      Pi Agent Runtime service (agent-runtime/)
 #   litellm: in-process agent (src/qdash/copilot/agent.py)
-# The side-panel analyze endpoint is still LiteLLM-only and ignores this.
 copilot_backend: pi
 
 # Language configuration
