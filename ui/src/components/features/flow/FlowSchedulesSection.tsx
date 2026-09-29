@@ -10,6 +10,7 @@ import type { FlowScheduleSummary } from "@/schemas";
 import { listAllFlowSchedules } from "@/client/flow/flow";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime } from "@/lib/utils/datetime";
+import { sortSchedulesByNextRun } from "@/lib/utils/flowSchedules";
 
 function formatScheduleType(schedule: FlowScheduleSummary) {
   return schedule.schedule_type === "cron" ? "Recurring" : "One-time";
@@ -121,12 +122,7 @@ export function FlowSchedulesSection() {
   const activeCount = schedules.filter((schedule) => schedule.active).length;
   const recurringCount = schedules.filter((schedule) => schedule.schedule_type === "cron").length;
 
-  const sortedSchedules = [...schedules].sort((a, b) => {
-    const aTime = a.next_run ? new Date(a.next_run).getTime() : Number.MAX_SAFE_INTEGER;
-    const bTime = b.next_run ? new Date(b.next_run).getTime() : Number.MAX_SAFE_INTEGER;
-    if (aTime !== bTime) return aTime - bTime;
-    return a.flow_name.localeCompare(b.flow_name);
-  });
+  const sortedSchedules = sortSchedulesByNextRun(schedules);
 
   return (
     <SectionShell

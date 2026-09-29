@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
+import { sortSchedulesByNextRun } from "@/lib/utils/flowSchedules";
 
 import type { ScheduleFlowRequest, FlowScheduleSummary } from "@/schemas";
 
@@ -40,16 +41,10 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
     refetchInterval: 10000, // Refresh every 10 seconds
   });
 
-  const schedules = [
-    ...((schedulesData?.data &&
-      "schedules" in schedulesData.data &&
-      schedulesData.data.schedules) ||
-      []),
-  ].sort((a, b) => {
-    const aTime = a.next_run ? new Date(a.next_run).getTime() : Number.MIN_SAFE_INTEGER;
-    const bTime = b.next_run ? new Date(b.next_run).getTime() : Number.MIN_SAFE_INTEGER;
-    return aTime - bTime;
-  });
+  const schedules = sortSchedulesByNextRun(
+    (schedulesData?.data && "schedules" in schedulesData.data && schedulesData.data.schedules) ||
+      [],
+  );
 
   // Create schedule mutation
   const createScheduleMutation = useMutation({
