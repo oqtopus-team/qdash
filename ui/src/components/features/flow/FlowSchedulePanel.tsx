@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
+import { sortSchedulesByNextRun } from "@/lib/utils/flowSchedules";
 
 import type { ScheduleFlowRequest, FlowScheduleSummary } from "@/schemas";
 
@@ -24,6 +25,9 @@ interface FlowSchedulePanelProps {
   flowName: string;
 }
 
+/**
+ * Schedule panel for a single flow: create cron or one-time schedules and list them by next run time.
+ */
 export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -40,9 +44,10 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
     refetchInterval: 10000, // Refresh every 10 seconds
   });
 
-  const schedules =
+  const schedules = sortSchedulesByNextRun(
     (schedulesData?.data && "schedules" in schedulesData.data && schedulesData.data.schedules) ||
-    [];
+      [],
+  );
 
   // Create schedule mutation
   const createScheduleMutation = useMutation({
