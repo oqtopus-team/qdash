@@ -104,7 +104,9 @@ def test_coherence_check_requires_explicit_targets() -> None:
 
 
 def test_coherence_check_is_listed_as_a_template() -> None:
-    metadata_path = Path(coherence_check_module.__file__).with_name("templates.json")
+    module_file = coherence_check_module.__file__
+    assert module_file is not None
+    metadata_path = Path(module_file).with_name("templates.json")
     templates = json.loads(metadata_path.read_text())
 
     assert any(

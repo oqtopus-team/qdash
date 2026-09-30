@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
-from qdash.datamodel.task import CalibDataModel, TaskStatusModel
+from qdash.datamodel.task import CalibDataModel, ParameterModel, TaskStatusModel
 from qdash.workflow.engine.orchestrator import CalibOrchestrator
 
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ def test_merge_and_extract_batch_results_includes_failed_task_status() -> None:
 def test_measurement_only_batch_does_not_update_workflow_calibration_state() -> None:
     orchestrator = object.__new__(CalibOrchestrator)
     orchestrator._last_executed_task_id_by_qid = {}
-    original = {"qubit_frequency": {"value": 5.0}}
+    original = {"qubit_frequency": ParameterModel(value=5.0)}
     orchestrator._task_context = cast(
         "TaskContext",
         SimpleNamespace(
@@ -85,12 +85,13 @@ def test_measurement_only_batch_does_not_update_workflow_calibration_state() -> 
         status=TaskStatusModel.COMPLETED,
         message="Completed",
     )
-    measured = {"qubit_frequency": {"value": 5.1}}
+    measured = {"qubit_frequency": ParameterModel(value=5.1)}
+    measured_output = {"qubit_frequency": {"value": 5.1}}
     executed_context = SimpleNamespace(
         calib_data=CalibDataModel(qubit={"0": measured}, coupling={}),
         get_task=lambda **_kwargs: task,
         state=SimpleNamespace(
-            get_output_parameter_by_task_name=lambda *_args, **_kwargs: measured.copy()
+            get_output_parameter_by_task_name=lambda *_args, **_kwargs: measured_output.copy()
         ),
     )
 
