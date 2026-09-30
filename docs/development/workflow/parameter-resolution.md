@@ -3,6 +3,8 @@
 The workflow engine resolves task inputs, experiment configuration, snapshots, user overrides, and output persistence at different lifecycle stages.
 
 The [Frequency Parameter Policy](./frequency-parameter-policy.md) specifies the agreed design for exploration and calibrated frequencies, derived drive frequencies, YAML export, and update UX. Its implementation gaps are tracked separately from the current lifecycle described here.
+[Calibration Data Lifecycle](./calibration-data-lifecycle.md) shows how accepted calibration
+values, task history, active workflow state, and Qubex parameter files differ.
 
 ## Parameter model contracts
 
