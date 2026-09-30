@@ -377,7 +377,8 @@ class CalibOrchestrator:
         Args:
             task_name: Name of the task (e.g., 'CheckRabi')
             qid: Qubit ID to calibrate
-            task_details: Optional task configuration
+            task_details: Optional call-level task configuration. Its
+                ``update_calibration_parameters`` value overrides the service setting.
             upstream_id: Optional upstream task_id for dependency tracking
 
         Returns:
@@ -391,13 +392,26 @@ class CalibOrchestrator:
         self._ensure_task_in_workflow(task_name, task_type, qid)
 
         # Step 3: Prepare execution context
-        exec_context = self._prepare_execution_context(qid, upstream_id)
+        update_calibration_parameters = self._should_update_calibration_parameters(
+            task_name, task_details
+        )
+        exec_context = self._prepare_execution_context(
+            qid,
+            upstream_id,
+            persist_output_parameters=update_calibration_parameters,
+        )
 
         # Step 4: Execute via Prefect
         executed_context = self._run_prefect_task(task_instance, exec_context, qid)
 
         # Step 5: Merge results and return
-        return self._merge_and_extract_results(executed_context, task_name, task_type, qid)
+        return self._merge_and_extract_results(
+            executed_context,
+            task_name,
+            task_type,
+            qid,
+            update_calibration_parameters=update_calibration_parameters,
+        )
 
     def run_task_batch(
         self,
@@ -406,7 +420,12 @@ class CalibOrchestrator:
         task_details: dict[str, Any] | None = None,
         upstream_id: str | None = None,
     ) -> dict[str, dict[str, Any]]:
-        """Run one calibration task for a batch of qubits."""
+        """Run one calibration task for a batch of qubits.
+
+        ``update_calibration_parameters`` in the service's task settings controls whether
+        validated outputs replace current calibration parameters. A call-level value in
+        ``task_details`` takes precedence.
+        """
         if not qids:
             return {}
 
@@ -416,10 +435,23 @@ class CalibOrchestrator:
         for qid in qids:
             self._ensure_task_in_workflow(task_name, task_type, qid)
 
-        exec_context = self._prepare_batch_execution_context(qids, upstream_id)
+        update_calibration_parameters = self._should_update_calibration_parameters(
+            task_name, task_details
+        )
+        exec_context = self._prepare_batch_execution_context(
+            qids,
+            upstream_id,
+            persist_output_parameters=update_calibration_parameters,
+        )
         executed_context = self._run_prefect_batch_task(task_instance, exec_context, qids)
 
-        return self._merge_and_extract_batch_results(executed_context, task_name, task_type, qids)
+        return self._merge_and_extract_batch_results(
+            executed_context,
+            task_name,
+            task_type,
+            qids,
+            update_calibration_parameters=update_calibration_parameters,
+        )
 
     def _create_task_instance(
         self,
@@ -472,6 +504,8 @@ class CalibOrchestrator:
                 if not isinstance(task_overrides, dict):
                     continue
                 for param_name, param_data in task_overrides.items():
+                    if param_name == "update_calibration_parameters":
+                        continue
                     if not isinstance(param_data, dict):
                         logger.warning(
                             "Skipping invalid task run parameter %r.%r: expected dict, got %s",
@@ -506,10 +540,37 @@ class CalibOrchestrator:
         )
         return task_instances[task_name]
 
+    def _should_update_calibration_parameters(
+        self,
+        task_name: str,
+        task_details: dict[str, Any] | None,
+    ) -> bool:
+        """Return whether one task should update the current calibration parameters."""
+        task_config = (task_details or {}).get(task_name, {})
+        if not isinstance(task_config, dict):
+            raise ValueError(f"Task details for {task_name} must be a mapping")
+
+        task_run_parameters = self.config.task_run_parameters.get(task_name, {})
+        if not isinstance(task_run_parameters, dict):
+            raise ValueError(f"Task run parameters for {task_name} must be a mapping")
+
+        value = task_config.get(
+            "update_calibration_parameters",
+            task_run_parameters.get(
+                "update_calibration_parameters",
+                self.config.persist_output_parameters,
+            ),
+        )
+        if not isinstance(value, bool):
+            raise ValueError(f"update_calibration_parameters for {task_name} must be a boolean")
+        return value
+
     def _prepare_execution_context(
         self,
         qid: str,
         upstream_id: str | None,
+        *,
+        persist_output_parameters: bool,
     ) -> TaskContext:
         """Prepare a TaskContext for task execution."""
         from copy import deepcopy
@@ -528,7 +589,7 @@ class CalibOrchestrator:
             snapshot_loader=self._snapshot_loader,
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
-            persist_output_parameters=config.persist_output_parameters,
+            persist_output_parameters=persist_output_parameters,
         )
 
         # Copy relevant calibration data
@@ -558,6 +619,8 @@ class CalibOrchestrator:
         self,
         qids: list[str],
         upstream_id: str | None,
+        *,
+        persist_output_parameters: bool,
     ) -> TaskContext:
         """Prepare a TaskContext for batch task execution."""
         from copy import deepcopy
@@ -574,7 +637,7 @@ class CalibOrchestrator:
             snapshot_loader=self._snapshot_loader,
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
-            persist_output_parameters=config.persist_output_parameters,
+            persist_output_parameters=persist_output_parameters,
         )
 
         relevant_qids: list[str] = []
@@ -662,11 +725,13 @@ class CalibOrchestrator:
         task_name: str,
         task_type: str,
         qid: str,
+        *,
+        update_calibration_parameters: bool = True,
     ) -> dict[str, Any]:
         """Merge execution results back to main context and extract output."""
-        # Merge calibration data
-        self.task_context.state.calib_data.qubit.update(executed_context.calib_data.qubit)
-        self.task_context.state.calib_data.coupling.update(executed_context.calib_data.coupling)
+        if update_calibration_parameters:
+            self.task_context.state.calib_data.qubit.update(executed_context.calib_data.qubit)
+            self.task_context.state.calib_data.coupling.update(executed_context.calib_data.coupling)
         # Track task_id for upstream dependency
         executed_task = executed_context.get_task(task_name=task_name, task_type=task_type, qid=qid)
         self._last_executed_task_id_by_qid[qid] = executed_task.task_id
@@ -685,10 +750,13 @@ class CalibOrchestrator:
         task_name: str,
         task_type: str,
         qids: list[str],
+        *,
+        update_calibration_parameters: bool = True,
     ) -> dict[str, dict[str, Any]]:
         """Merge batch execution results back to main context and extract outputs."""
-        self.task_context.state.calib_data.qubit.update(executed_context.calib_data.qubit)
-        self.task_context.state.calib_data.coupling.update(executed_context.calib_data.coupling)
+        if update_calibration_parameters:
+            self.task_context.state.calib_data.qubit.update(executed_context.calib_data.qubit)
+            self.task_context.state.calib_data.coupling.update(executed_context.calib_data.coupling)
 
         results: dict[str, dict[str, Any]] = {}
         for qid in qids:

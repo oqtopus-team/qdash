@@ -25,9 +25,25 @@ describe("ParametersTable", () => {
     expect(screen.getByText("New")).toBeTruthy();
     expect(screen.getByText("5.987000")).toBeTruthy();
     expect(screen.getByText("6.123000")).toBeTruthy();
+    expect(screen.getByText("Calibration DB updated")).toBeTruthy();
   });
 
-  it("keeps the standard value column for results that did not update the database", () => {
+  it("labels a result that was recorded without updating the database", () => {
+    render(
+      <ParametersTable
+        title="Output Parameters"
+        parameters={{
+          readout_frequency: { value: 6.123, unit: "GHz", database_updated: false },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Value")).toBeTruthy();
+    expect(screen.queryByText("Previous")).toBeNull();
+    expect(screen.getByText("Measurement only")).toBeTruthy();
+  });
+
+  it("labels a legacy result without update metadata as unknown", () => {
     render(
       <ParametersTable
         title="Output Parameters"
@@ -35,7 +51,6 @@ describe("ParametersTable", () => {
       />,
     );
 
-    expect(screen.getByText("Value")).toBeTruthy();
-    expect(screen.queryByText("Previous")).toBeNull();
+    expect(screen.getByText("Update status unknown")).toBeTruthy();
   });
 });

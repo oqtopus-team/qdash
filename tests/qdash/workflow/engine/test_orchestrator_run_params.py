@@ -215,6 +215,224 @@ class TestTaskRunParameterInjection:
         assert task.run_parameters["legacy_only"].value == 8
         assert task.run_parameters["shared_only"].value == 7
 
+    def test_update_policy_is_not_injected_as_a_run_parameter(self) -> None:
+        config = cast(
+            "CalibConfig",
+            SimpleNamespace(
+                backend_name=BACKEND,
+                default_run_parameters={},
+                task_run_parameters={
+                    TASK_NAME: {
+                        "shots": {"value": 1024, "value_type": "int"},
+                        "update_calibration_parameters": False,
+                    }
+                },
+            ),
+        )
+        orchestrator = CalibOrchestrator(config)
+
+        task = orchestrator._create_task_instance(TASK_NAME, None)
+
+        assert task.run_parameters["shots"].value == 1024
+        assert "update_calibration_parameters" not in task.run_parameters
+
+
+class TestTaskCalibrationParameterUpdates:
+    """Test task-level calibration parameter update policy."""
+
+    def test_workflow_defaults_to_persisting_task_outputs(self) -> None:
+        config = CalibConfig(
+            username="alice",
+            chip_id="chip-1",
+            qids=["0"],
+            execution_id="exec-1",
+            project_id="project-1",
+            backend_name=BACKEND,
+        )
+        orchestrator = CalibOrchestrator(config)
+
+        assert orchestrator._should_update_calibration_parameters(TASK_NAME, None) is True
+
+    def test_task_details_can_disable_calibration_parameter_updates(self) -> None:
+        config = CalibConfig(
+            username="alice",
+            chip_id="chip-1",
+            qids=["0"],
+            execution_id="exec-1",
+            project_id="project-1",
+            backend_name=BACKEND,
+        )
+        orchestrator = CalibOrchestrator(config)
+
+        update_parameters = orchestrator._should_update_calibration_parameters(
+            TASK_NAME,
+            {TASK_NAME: {"update_calibration_parameters": False}},
+        )
+
+        assert update_parameters is False
+
+    def test_task_run_parameters_can_disable_calibration_parameter_updates(self) -> None:
+        config = CalibConfig(
+            username="alice",
+            chip_id="chip-1",
+            qids=["0"],
+            execution_id="exec-1",
+            project_id="project-1",
+            backend_name=BACKEND,
+            task_run_parameters={
+                TASK_NAME: {"update_calibration_parameters": False},
+            },
+        )
+        orchestrator = CalibOrchestrator(config)
+
+        assert orchestrator._should_update_calibration_parameters(TASK_NAME, None) is False
+
+    def test_task_details_override_task_run_parameter_policy(self) -> None:
+        config = CalibConfig(
+            username="alice",
+            chip_id="chip-1",
+            qids=["0"],
+            execution_id="exec-1",
+            project_id="project-1",
+            backend_name=BACKEND,
+            task_run_parameters={
+                TASK_NAME: {"update_calibration_parameters": False},
+            },
+        )
+        orchestrator = CalibOrchestrator(config)
+
+        update_parameters = orchestrator._should_update_calibration_parameters(
+            TASK_NAME,
+            {TASK_NAME: {"update_calibration_parameters": True}},
+        )
+
+        assert update_parameters is True
+
+    def test_task_details_override_measurement_only_session_default(self) -> None:
+        config = CalibConfig(
+            username="alice",
+            chip_id="chip-1",
+            qids=["0"],
+            execution_id="exec-1",
+            project_id="project-1",
+            backend_name=BACKEND,
+            persist_output_parameters=False,
+        )
+        orchestrator = CalibOrchestrator(config)
+
+        update_parameters = orchestrator._should_update_calibration_parameters(
+            TASK_NAME,
+            {TASK_NAME: {"update_calibration_parameters": True}},
+        )
+
+        assert update_parameters is True
+
+    def test_calibration_parameter_update_setting_requires_boolean(self) -> None:
+        config = CalibConfig(
+            username="alice",
+            chip_id="chip-1",
+            qids=["0"],
+            execution_id="exec-1",
+            project_id="project-1",
+            backend_name=BACKEND,
+        )
+        orchestrator = CalibOrchestrator(config)
+
+        with pytest.raises(ValueError, match="must be a boolean"):
+            orchestrator._should_update_calibration_parameters(
+                TASK_NAME,
+                {TASK_NAME: {"update_calibration_parameters": "false"}},
+            )
+
+    def test_run_task_passes_task_output_persistence_to_context(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        config = CalibConfig(
+            username="alice",
+            chip_id="chip-1",
+            qids=["0"],
+            execution_id="exec-1",
+            project_id="project-1",
+            backend_name=BACKEND,
+            task_run_parameters={
+                TASK_NAME: {"update_calibration_parameters": False},
+            },
+        )
+        orchestrator = CalibOrchestrator(config)
+        task = SimpleNamespace(get_task_type=lambda: "qubit")
+        execution_context = SimpleNamespace()
+        executed_context = SimpleNamespace()
+        create_task = MagicMock(return_value=task)
+        ensure_task = MagicMock()
+        prepare_context = MagicMock(return_value=execution_context)
+        run_task = MagicMock(return_value=executed_context)
+        merge_results = MagicMock(return_value={})
+        monkeypatch.setattr(orchestrator, "_create_task_instance", create_task)
+        monkeypatch.setattr(orchestrator, "_ensure_task_in_workflow", ensure_task)
+        monkeypatch.setattr(orchestrator, "_prepare_execution_context", prepare_context)
+        monkeypatch.setattr(orchestrator, "_run_prefect_task", run_task)
+        monkeypatch.setattr(orchestrator, "_merge_and_extract_results", merge_results)
+
+        orchestrator.run_task(TASK_NAME, "0")
+
+        prepare_context.assert_called_once_with(
+            "0",
+            None,
+            persist_output_parameters=False,
+        )
+        merge_results.assert_called_once_with(
+            executed_context,
+            TASK_NAME,
+            "qubit",
+            "0",
+            update_calibration_parameters=False,
+        )
+
+    def test_run_task_batch_passes_task_output_persistence_to_context(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        config = CalibConfig(
+            username="alice",
+            chip_id="chip-1",
+            qids=["0", "1"],
+            execution_id="exec-1",
+            project_id="project-1",
+            backend_name=BACKEND,
+        )
+        orchestrator = CalibOrchestrator(config)
+        task = SimpleNamespace(get_task_type=lambda: "qubit")
+        execution_context = SimpleNamespace()
+        executed_context = SimpleNamespace()
+        create_task = MagicMock(return_value=task)
+        ensure_task = MagicMock()
+        prepare_context = MagicMock(return_value=execution_context)
+        run_task = MagicMock(return_value=executed_context)
+        merge_results = MagicMock(return_value={})
+        monkeypatch.setattr(orchestrator, "_create_task_instance", create_task)
+        monkeypatch.setattr(orchestrator, "_ensure_task_in_workflow", ensure_task)
+        monkeypatch.setattr(orchestrator, "_prepare_batch_execution_context", prepare_context)
+        monkeypatch.setattr(orchestrator, "_run_prefect_batch_task", run_task)
+        monkeypatch.setattr(orchestrator, "_merge_and_extract_batch_results", merge_results)
+
+        orchestrator.run_task_batch(
+            TASK_NAME,
+            ["0", "1"],
+            {TASK_NAME: {"update_calibration_parameters": False}},
+        )
+
+        prepare_context.assert_called_once_with(
+            ["0", "1"],
+            None,
+            persist_output_parameters=False,
+        )
+        merge_results.assert_called_once_with(
+            executed_context,
+            TASK_NAME,
+            "qubit",
+            ["0", "1"],
+            update_calibration_parameters=False,
+        )
+
 
 class TestBaseTaskSetRunParameters:
     """Test BaseTask._set_run_parameters validation."""
