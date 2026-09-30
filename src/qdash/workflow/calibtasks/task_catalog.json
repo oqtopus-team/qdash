@@ -522,6 +522,59 @@
         "task_type": "coupling"
       },
       {
+        "class_name": "CheckAdaptiveChevron",
+        "description": "Adaptive chevron task for coarse qubit-frequency estimation.",
+        "file_path": "one_qubit_coarse/check_adaptive_chevron.py",
+        "input_parameters": {
+          "coarse_control_amplitude": {
+            "default_value": 0.0625,
+            "description": "Coarse control pulse amplitude",
+            "greater_than_or_equal": 0.0001,
+            "less_than_or_equal": 1.0,
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "coarse_qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckAdaptiveChevron",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Number of shots for adaptive chevron search and final sweeps",
+            "unit": "a.u.",
+            "value": 256,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckBellState",
         "description": "Task to check the bell state.",
         "file_path": "two_qubit/check_bell_state.py",
@@ -1015,19 +1068,19 @@
       },
       {
         "class_name": "CheckChevron",
-        "description": "Adaptive chevron task for coarse qubit-frequency estimation.",
+        "description": "Measure one fixed-grid Chevron pattern and estimate the qubit frequency.",
         "file_path": "one_qubit_coarse/check_chevron.py",
         "input_parameters": {
-          "coarse_control_amplitude": {
+          "control_amplitude": {
             "default_value": 0.0625,
-            "description": "Coarse control pulse amplitude",
+            "description": "Control pulse amplitude",
             "greater_than_or_equal": 0.0001,
             "less_than_or_equal": 1.0,
             "resolution": "database_or_default",
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "coarse_qubit_frequency": {
+          "qubit_frequency": {
             "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
@@ -1045,6 +1098,16 @@
         },
         "name": "CheckChevron",
         "run_parameters": {
+          "detuning_range": {
+            "description": "Drive-frequency detuning sweep around qubit_frequency",
+            "unit": "GHz",
+            "value": [
+              -0.05,
+              0.05,
+              51
+            ],
+            "value_type": "np.linspace"
+          },
           "interval": {
             "description": "Time interval between shots",
             "unit": "ns",
@@ -1058,10 +1121,20 @@
             "value_type": "float"
           },
           "shots": {
-            "description": "Number of shots for adaptive chevron search and final sweeps",
+            "description": "Number of shots per Chevron sweep point",
             "unit": "a.u.",
-            "value": 256,
+            "value": 1024,
             "value_type": "int"
+          },
+          "time_range": {
+            "description": "Control-pulse duration sweep",
+            "unit": "ns",
+            "value": [
+              0,
+              401,
+              8
+            ],
+            "value_type": "range"
           }
         },
         "task_type": "qubit"

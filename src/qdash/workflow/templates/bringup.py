@@ -28,7 +28,7 @@ BRINGUP_TASKS: list[str] = [
     "CheckResonatorSpectroscopy",
     "CheckQubitSpectroscopy",
     "CheckControlAmplitude",
-    "CheckChevron",
+    "CheckAdaptiveChevron",
 ]
 
 
@@ -95,7 +95,7 @@ def bringup(
         "CheckControlAmplitude": {
             "shots": {"value": 8192, "value_type": "int"},
         },
-        "CheckChevron": {
+        "CheckAdaptiveChevron": {
             "shots": {"value": 256, "value_type": "int"},
         },
         # resonator_assignment_order lists the four qid offsets within each MUX

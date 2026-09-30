@@ -27,6 +27,7 @@ backends:
     # Tasks available for this backend (shown in UI and available for workflows)
     tasks:
       One Qubit:
+        - CheckAdaptiveChevron
         - CheckChevron
         - CheckOptimalReadoutAmplitude
         - CheckOptimalReadoutFrequency
