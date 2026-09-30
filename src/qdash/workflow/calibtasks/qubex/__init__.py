@@ -30,6 +30,9 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
 )
 from qdash.workflow.calibtasks.qubex.cw.check_waveform import CheckWaveform
 from qdash.workflow.calibtasks.qubex.measurement.readout_classification import ReadoutClassification
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_adaptive_chevron import (
+    CheckAdaptiveChevron,
+)
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_chevron import CheckChevron
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_coarse_readout_params import (
     CheckCoarseReadoutParams,
@@ -67,6 +70,7 @@ from qdash.workflow.calibtasks.qubex.two_qubit.create_zx90 import CreateZX90
 __all__ = [
     "Check1QGateCoherenceLimit",
     "Check2QGateCoherenceLimit",
+    "CheckAdaptiveChevron",
     "CheckBellState",
     "CheckBellStateTomography",
     "CheckChevron",

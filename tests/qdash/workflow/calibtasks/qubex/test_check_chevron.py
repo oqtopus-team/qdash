@@ -1,11 +1,14 @@
+"""Tests for the fixed-grid CheckChevron task."""
+
 from contextlib import nullcontext
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
+import numpy as np
 import plotly.graph_objects as go
 import pytest
 
-from qdash.datamodel.task import InputParameterModel as ParameterModel
+from qdash.datamodel.task import InputParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_chevron import CheckChevron
 
@@ -15,27 +18,11 @@ else:
     QubexBackend = Any
 
 
-@pytest.mark.parametrize("value", [1e-4, 0.07, 1.0])
-def test_chevron_control_amplitude_accepts_inclusive_bounds(value: float) -> None:
-    CheckChevron.input_spec["coarse_control_amplitude"].validate_effective_value(
-        "coarse_control_amplitude", value
-    )
-
-
-@pytest.mark.parametrize(
-    "value", [0.000099, 1.000001, float("nan"), float("inf"), None, True, "0.5"]
-)
-def test_chevron_control_amplitude_rejects_invalid_values(value: Any) -> None:
-    with pytest.raises(ValueError, match="coarse_control_amplitude"):
-        CheckChevron.input_spec["coarse_control_amplitude"].validate_effective_value(
-            "coarse_control_amplitude", value
-        )
-
-
 class _DummyExperiment:
     def __init__(self) -> None:
         self.params = SimpleNamespace(readout_amplitude={"Q00": 0.0})
         self.modified_frequency_calls: list[dict[str, float]] = []
+        self.chevron_kwargs: dict[str, Any] = {}
 
     def get_qubit_label(self, qid: int) -> str:
         assert qid == 0
@@ -45,134 +32,95 @@ class _DummyExperiment:
         self.modified_frequency_calls.append(frequencies)
         return nullcontext()
 
-
-def test_check_chevron_run_uses_adaptive_helper(monkeypatch) -> None:
-    task = CheckChevron()
-    task.input_parameters["coarse_qubit_frequency"] = ParameterModel(value=4.25, unit="GHz")
-    task.input_parameters["readout_frequency"] = ParameterModel(value=6.1, unit="GHz")
-    task.input_parameters["readout_amplitude"] = ParameterModel(value=0.031, unit="a.u.")
-    task.input_parameters["coarse_control_amplitude"] = ParameterModel(value=0.07, unit="a.u.")
-
-    exp = _DummyExperiment()
-    captured: dict[str, object] = {}
-
-    def fake_get_experiment(_backend):
-        return exp
-
-    def fake_save_calibration(_backend):
-        return None
-
-    def fake_estimate_qubit_frequency_from_chevron_adaptive(**kwargs):
-        captured.update(kwargs)
+    def chevron_pattern(self, **kwargs: Any) -> Any:
+        self.chevron_kwargs = kwargs
         return SimpleNamespace(
             data={
                 "resonant_frequencies": {"Q00": 4.321},
-                "target_amplitudes": {"Q00": 0.086},
-                "peak_background_rms_ratios": {"Q00": 8.5},
-                "results": {
-                    "Q00": {
-                        "omega_q": 4.321,
-                        "omega_rabi": 0.011,
-                        "peak_background_rms_ratio": 8.5,
-                        "frequency_used": 4.25,
-                        "amplitude_used": 0.082,
-                    }
-                },
-                "search_results": {
-                    "Q00": {
-                        "omega_q": 4.3,
-                        "omega_rabi": 0.0105,
-                        "peak_background_rms_ratio": 7.0,
-                        "frequency_used": 4.25,
-                        "amplitude_used": 0.07,
-                    }
-                },
+                "rabi_fit_r2": {"Q00": np.array([0.91, 0.89, 0.87])},
             },
-            figures={
-                "Q00_search_measurement": go.Figure(),
-                "Q00_search_transform": go.Figure(),
-                "Q00_measurement": go.Figure(),
-                "Q00_transform": go.Figure(),
-            },
+            figures={"Q00": go.Figure()},
         )
 
-    monkeypatch.setattr(task, "get_experiment", fake_get_experiment)
-    monkeypatch.setattr(task, "save_calibration", fake_save_calibration)
-    monkeypatch.setattr(
-        "qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_chevron."
-        "estimate_qubit_frequency_from_chevron_adaptive",
-        fake_estimate_qubit_frequency_from_chevron_adaptive,
-    )
+
+def _configured_task() -> CheckChevron:
+    task = CheckChevron()
+    task.input_parameters["qubit_frequency"] = InputParameterModel(value=4.25, unit="GHz")
+    task.input_parameters["readout_frequency"] = InputParameterModel(value=6.1, unit="GHz")
+    task.input_parameters["readout_amplitude"] = InputParameterModel(value=0.031, unit="a.u.")
+    task.input_parameters["control_amplitude"] = InputParameterModel(value=0.07, unit="a.u.")
+    return task
+
+
+def test_check_chevron_run_executes_one_fixed_grid_sweep(monkeypatch) -> None:
+    task = _configured_task()
+    experiment = _DummyExperiment()
+    monkeypatch.setattr(task, "get_experiment", lambda _backend: experiment)
+    monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
 
     result = task.run(backend=cast("QubexBackend", object()), qid="0")
 
-    assert captured["exp"] is exp
-    assert captured["targets"] == ["Q00"]
-    assert captured["frequencies"] == {"Q00": 4.25}
-    assert captured["amplitudes"] == {"Q00": 0.07}
-    assert captured["n_shots"] == 256
-    assert captured["shot_interval"] == 153600.0
-    assert exp.modified_frequency_calls == [{"Q00": 4.25, "RQ00": 6.1}]
-    assert captured["plot"] is False
-    assert captured["save_image"] is False
-    assert result.raw_result["resonant_frequencies"]["Q00"] == 4.321
-    assert result.raw_result["control_amplitude_used"] == 0.086
-    assert result.raw_result["readout_amplitude_used"] == 0.031
+    assert result.raw_result.data["resonant_frequencies"]["Q00"] == 4.321
+    assert result.r2 == pytest.approx({"0": 0.89})
+    assert experiment.modified_frequency_calls == [{"Q00": 4.25, "RQ00": 6.1}]
+    assert experiment.params.readout_amplitude["Q00"] == 0.031
+    assert experiment.chevron_kwargs["targets"] == ["Q00"]
+    assert experiment.chevron_kwargs["frequencies"] == {"Q00": 4.25}
+    assert experiment.chevron_kwargs["amplitudes"] == {"Q00": 0.07}
+    np.testing.assert_allclose(
+        experiment.chevron_kwargs["detuning_range"], np.linspace(-0.05, 0.05, 51)
+    )
+    assert list(experiment.chevron_kwargs["time_range"]) == list(range(0, 401, 8))
+    assert experiment.chevron_kwargs["n_shots"] == 1024
+    assert experiment.chevron_kwargs["shot_interval"] == 153600.0
+    assert experiment.chevron_kwargs["plot"] is False
+    assert experiment.chevron_kwargs["save_image"] is False
 
 
-def test_check_chevron_postprocess_handles_adaptive_search_figures(monkeypatch) -> None:
-    task = CheckChevron()
-    task.input_parameters["readout_amplitude"] = ParameterModel(value=0.031, unit="a.u.")
-
-    monkeypatch.setattr(task, "get_experiment", lambda _backend: object())
+def test_check_chevron_postprocess_extracts_frequency_and_figures(monkeypatch) -> None:
+    task = _configured_task()
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
-
-    run_result = RunResult(
-        raw_result={
-            "resonant_frequencies": {"Q00": 4.321},
-            "control_amplitude_used": 0.082,
-            "readout_amplitude_used": 0.031,
-            "figures": {
-                "Q00_measurement": go.Figure(),
-                "Q00_transform": go.Figure(),
-                "Q00_search_measurement": go.Figure(),
-                "Q00_search_transform": go.Figure(),
-            },
-        }
+    raw_result = SimpleNamespace(
+        data={"resonant_frequencies": {"Q00": 4.321}},
+        figures={"Q00": go.Figure()},
     )
 
     result = task.postprocess(
         backend=cast("QubexBackend", object()),
         execution_id="exec-1",
-        run_result=run_result,
+        run_result=RunResult(raw_result=raw_result),
         qid="0",
     )
 
     assert result.output_parameters["qubit_frequency"].value == 4.321
-    assert result.output_parameters["control_amplitude"].value == 0.082
-    assert "readout_amplitude" not in result.output_parameters
-    assert len(result.figures) == 5
+    assert result.output_parameters["qubit_frequency"].execution_id == "exec-1"
+    assert len(result.figures) == 2
+    assert result.validation_error is None
 
 
-def test_check_chevron_extracts_legacy_adaptive_amplitude() -> None:
-    task = CheckChevron()
-
-    result = task._control_amplitude_from_result(
-        {"amplitudes_used": {"Q00": 0.082}},
-        "Q00",
-        fallback=0.07,
-    )
-
-    assert result == 0.082
-
-
-def test_check_chevron_run_requires_db_readout_amplitude(monkeypatch) -> None:
-    task = CheckChevron()
-    task.input_parameters["coarse_qubit_frequency"] = ParameterModel(value=4.25, unit="GHz")
-    task.input_parameters["readout_frequency"] = ParameterModel(value=6.1, unit="GHz")
-    task.input_parameters["readout_amplitude"] = ParameterModel(value=None)
-
+def test_check_chevron_requires_calibrated_qubit_frequency(monkeypatch) -> None:
+    task = _configured_task()
+    task.input_parameters["qubit_frequency"] = InputParameterModel(value=None)
     monkeypatch.setattr(task, "get_experiment", lambda _backend: _DummyExperiment())
 
-    with pytest.raises(ValueError, match="readout_amplitude input parameter is required"):
+    with pytest.raises(ValueError, match="qubit_frequency input parameter is required"):
         task.run(backend=cast("QubexBackend", object()), qid="0")
+
+
+def test_check_chevron_r2_ignores_non_finite_fits() -> None:
+    result = SimpleNamespace(data={"rabi_fit_r2": {"Q00": np.array([0.92, np.nan, np.inf, 0.88])}})
+
+    assert CheckChevron._mean_rabi_fit_r2(result, "Q00") == pytest.approx(0.9)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {},
+        {"rabi_fit_r2": {}},
+        {"rabi_fit_r2": {"Q00": np.array([])}},
+        {"rabi_fit_r2": {"Q00": np.array([np.nan, np.inf])}},
+    ],
+)
+def test_check_chevron_r2_is_missing_without_finite_fits(data: dict[str, Any]) -> None:
+    assert CheckChevron._mean_rabi_fit_r2(SimpleNamespace(data=data), "Q00") is None

@@ -1,54 +1,56 @@
 from collections.abc import Mapping
-from typing import Any, ClassVar
+from typing import ClassVar
 
+import numpy as np
 import plotly.graph_objects as go
-from qubex.contrib.experiment import estimate_qubit_frequency_from_chevron_adaptive
 from qubex.experiment.experiment_constants import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
-from qdash.datamodel.task import (
-    InputParameterSpec,
-    OutputParameterSpec,
-    RunParameterSpec,
-)
-from qdash.workflow.calibtasks.base import (
-    PostProcessResult,
-    RunResult,
-)
-from qdash.workflow.calibtasks.qubex.base import (
-    QubexTask,
-    readout_duration_run_parameter,
-)
+from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
+from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
-DEFAULT_COARSE_CONTROL_AMPLITUDE = 0.0625
+DEFAULT_CONTROL_AMPLITUDE = 0.0625
 CONTROL_AMPLITUDE_MIN = 1e-4
 CONTROL_AMPLITUDE_MAX = 1.0
 
 
 class CheckChevron(QubexTask):
-    """Adaptive chevron task for coarse qubit-frequency estimation."""
+    """Measure one fixed-grid Chevron pattern and estimate the qubit frequency."""
 
     name: str = "CheckChevron"
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
-        "coarse_qubit_frequency": InputParameterSpec.required_database(),
+        "qubit_frequency": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
-        "coarse_control_amplitude": InputParameterSpec.database_or_default(
-            default=DEFAULT_COARSE_CONTROL_AMPLITUDE,
+        "control_amplitude": InputParameterSpec.database_or_default(
+            default=DEFAULT_CONTROL_AMPLITUDE,
             greater_than_or_equal=CONTROL_AMPLITUDE_MIN,
             less_than_or_equal=CONTROL_AMPLITUDE_MAX,
             unit="a.u.",
-            description="Coarse control pulse amplitude",
+            description="Control pulse amplitude",
         ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
+        "detuning_range": RunParameterSpec(
+            unit="GHz",
+            value_type="np.linspace",
+            default=(-0.05, 0.05, 51),
+            description="Drive-frequency detuning sweep around qubit_frequency",
+        ),
+        "time_range": RunParameterSpec(
+            unit="ns",
+            value_type="range",
+            default=(0, 401, 8),
+            description="Control-pulse duration sweep",
+        ),
         "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            default=DEFAULT_SHOTS // 4,
-            description="Number of shots for adaptive chevron search and final sweeps",
+            default=DEFAULT_SHOTS,
+            description="Number of shots per Chevron sweep point",
         ),
         "interval": RunParameterSpec(
             unit="ns",
@@ -59,192 +61,117 @@ class CheckChevron(QubexTask):
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "qubit_frequency": OutputParameterSpec(
-            unit="GHz", description="Qubit bare frequency (coarse)"
-        ),
-        "control_amplitude": OutputParameterSpec(
-            unit="a.u.", description="Control pulse amplitude estimated by adaptive chevron"
+            unit="GHz", description="Qubit bare frequency estimated from the Chevron fit"
         ),
     }
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
-
-        resonant_freq = result["resonant_frequencies"][label]
-        self.output_parameters["qubit_frequency"].value = resonant_freq
-        self.output_parameters["control_amplitude"].value = result.get(
-            "control_amplitude_used", DEFAULT_COARSE_CONTROL_AMPLITUDE
-        )
-        output_parameters = self.attach_execution_id(execution_id)
-
-        figures = self._build_figures(result, label, resonant_freq)
-        if resonant_freq < 2.5:
-            error_msg = f"Qubit frequency too low for qid={qid}: {resonant_freq:.6f} GHz < 2.5 GHz"
-            print(f"[ERROR] {error_msg}")
-            return PostProcessResult(
-                output_parameters=output_parameters,
-                figures=figures,
-                validation_error=error_msg,
+        data = getattr(result, "data", result)
+        if not isinstance(data, Mapping):
+            raise TypeError(
+                f"chevron_pattern returned unsupported data type: {type(data).__name__}"
             )
 
-        return PostProcessResult(output_parameters=output_parameters, figures=figures)
+        resonant_frequencies = data.get("resonant_frequencies")
+        if not isinstance(resonant_frequencies, Mapping) or label not in resonant_frequencies:
+            raise ValueError(f"CheckChevron produced no resonant frequency for {label}")
+        resonant_frequency = float(resonant_frequencies[label])
+        self.output_parameters["qubit_frequency"].value = resonant_frequency
+        output_parameters = self.attach_execution_id(execution_id)
+
+        figures_map = getattr(result, "figures", None)
+        base_figure = figures_map.get(label) if isinstance(figures_map, Mapping) else None
+        figures: list[go.Figure] = []
+        if base_figure is not None:
+            figures.append(base_figure)
+            marked_figure = go.Figure(base_figure)
+            marked_figure.add_vline(
+                x=resonant_frequency,
+                line_width=1,
+                line_color="red",
+                line_dash="dash",
+                annotation_text=f"f = {resonant_frequency:.6f} GHz",
+                annotation_position="top",
+                annotation_font_color="red",
+            )
+            figures.append(marked_figure)
+
+        validation_error = None
+        if resonant_frequency < 2.5:
+            validation_error = (
+                f"Qubit frequency too low for qid={qid}: {resonant_frequency:.6f} GHz < 2.5 GHz"
+            )
+            print(f"[ERROR] {validation_error}")
+
+        return PostProcessResult(
+            output_parameters=output_parameters,
+            figures=figures,
+            validation_error=validation_error,
+        )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
         label = exp.get_qubit_label(int(qid))
 
-        readout_frequency = self.input_parameters["readout_frequency"]
-        qubit_frequency = self.input_parameters["coarse_qubit_frequency"]
-        readout_amplitude = self.input_parameters["readout_amplitude"]
-        assert readout_frequency is not None
-        assert qubit_frequency is not None
-        if qubit_frequency.value is None:
-            raise ValueError("coarse_qubit_frequency input parameter is required")
-        if readout_frequency.value is None:
-            raise ValueError("readout_frequency input parameter is required")
-        if readout_amplitude is None or readout_amplitude.value is None:
-            raise ValueError("readout_amplitude input parameter is required")
-        qubit_freq = float(qubit_frequency.value)
-        readout_freq = float(readout_frequency.value)
-        readout_amp = float(readout_amplitude.value)
-
-        control_amplitude = self.input_parameters["coarse_control_amplitude"].value
-        if control_amplitude is None:
-            raise ValueError("coarse_control_amplitude input parameter is required")
-        ctrl_amp_value = float(control_amplitude)
+        qubit_frequency = self._required_input_value("qubit_frequency")
+        readout_frequency = self._required_input_value("readout_frequency")
+        readout_amplitude = self._required_input_value("readout_amplitude")
+        control_amplitude = self._required_input_value("control_amplitude")
 
         print(
             f"[run] CheckChevron params for {label}: "
-            f"coarse_control_amplitude={ctrl_amp_value}, "
-            f"coarse_qubit_frequency={qubit_freq}, "
-            f"readout_amplitude={readout_amp}, "
-            f"readout_frequency={readout_freq}"
+            f"control_amplitude={control_amplitude}, "
+            f"qubit_frequency={qubit_frequency}, "
+            f"readout_amplitude={readout_amplitude}, "
+            f"readout_frequency={readout_frequency}"
         )
 
-        exp.params.readout_amplitude[label] = readout_amp
+        exp.params.readout_amplitude[label] = readout_amplitude
         with self._modified_qubit_readout_frequencies(
             exp,
             qubit_label=label,
-            frequency_overrides={label: qubit_freq, "R" + label: readout_freq},
+            frequency_overrides={label: qubit_frequency, "R" + label: readout_frequency},
         ):
-            result = self._run_adaptive_chevron(
-                exp=exp,
-                label=label,
-                qubit_frequency=qubit_freq,
-                control_amplitude=float(ctrl_amp_value),
+            result = exp.chevron_pattern(
+                targets=[label],
+                frequencies={label: qubit_frequency},
+                amplitudes={label: control_amplitude},
+                detuning_range=self.run_parameters["detuning_range"].get_value(),
+                time_range=self.run_parameters["time_range"].get_value(),
+                n_shots=self.run_parameters["shots"].get_value(),
+                shot_interval=self.run_parameters["interval"].get_value(),
+                plot=False,
+                save_image=False,
             )
 
         self.save_calibration(backend)
-        result["readout_amplitude_used"] = readout_amp
-        return RunResult(raw_result=result)
+        return RunResult(raw_result=result, r2={qid: self._mean_rabi_fit_r2(result, label)})
 
-    def _run_adaptive_chevron(
-        self,
-        *,
-        exp: Any,
-        label: str,
-        qubit_frequency: float,
-        control_amplitude: float,
-    ) -> dict[str, Any]:
-        adaptive_result = estimate_qubit_frequency_from_chevron_adaptive(
-            exp=exp,
-            targets=[label],
-            frequencies={label: qubit_frequency},
-            amplitudes={label: control_amplitude},
-            n_shots=self.run_parameters["shots"].get_value(),
-            shot_interval=self.run_parameters["interval"].get_value(),
-            plot=False,
-            save_image=False,
-        )
-        result_data = self._adaptive_result_data(adaptive_result)
-        result_data["control_amplitude_used"] = self._control_amplitude_from_result(
-            result_data, label, control_amplitude
-        )
-        result_data["figures"] = getattr(adaptive_result, "figures", {})
-        return result_data
-
-    def _adaptive_result_data(self, adaptive_result: Any) -> dict[str, Any]:
-        data = getattr(adaptive_result, "data", adaptive_result)
+    @staticmethod
+    def _mean_rabi_fit_r2(result: object, label: str) -> float | None:
+        data = getattr(result, "data", result)
         if not isinstance(data, Mapping):
-            raise TypeError(
-                "estimate_qubit_frequency_from_chevron_adaptive returned "
-                f"unsupported data type: {type(data).__name__}"
-            )
-        return dict(data)
+            return None
 
-    def _control_amplitude_from_result(
-        self, result: Mapping[str, Any], label: str, fallback: float
-    ) -> float:
-        for key in ("target_amplitudes", "amplitudes_used"):
-            values = result.get(key)
-            if isinstance(values, Mapping) and label in values:
-                return float(values[label])
+        r2_by_target = data.get("rabi_fit_r2")
+        if not isinstance(r2_by_target, Mapping) or label not in r2_by_target:
+            return None
 
-        results = result.get("results")
-        if isinstance(results, Mapping):
-            per_target = results.get(label)
-            if isinstance(per_target, Mapping) and "amplitude_used" in per_target:
-                return float(per_target["amplitude_used"])
+        r2_values = np.asarray(r2_by_target[label], dtype=float).reshape(-1)
+        finite_r2_values = r2_values[np.isfinite(r2_values)]
+        if finite_r2_values.size == 0:
+            return None
+        return float(np.mean(finite_r2_values))
 
-        return fallback
-
-    def _build_figures(
-        self, result: Mapping[str, Any], label: str, resonant_freq: float
-    ) -> list[go.Figure]:
-        figures_map = result.get("figures")
-        if isinstance(figures_map, Mapping):
-            preferred_keys = [
-                f"{label}_measurement",
-                f"{label}_transform",
-                f"{label}_search_measurement",
-                f"{label}_search_transform",
-                f"{label}_rough_measurement",
-                f"{label}_rough_transform",
-            ]
-            figures: list[go.Figure] = []
-            ordered_keys = preferred_keys + [
-                key for key in figures_map if isinstance(key, str) and key not in preferred_keys
-            ]
-            for key in ordered_keys:
-                figure = figures_map.get(key)
-                if figure is None:
-                    continue
-                figures.append(figure)
-                if key == f"{label}_measurement":
-                    marked_fig = go.Figure(figure)
-                    marked_fig.add_vline(
-                        x=resonant_freq,
-                        line_width=1,
-                        line_color="red",
-                        line_dash="dash",
-                        annotation_text=f"f = {resonant_freq:.6f} GHz",
-                        annotation_position="top",
-                        annotation_font_color="red",
-                    )
-                    figures.append(marked_fig)
-            if figures:
-                return figures
-
-        fig_dict = result.get("fig")
-        if isinstance(fig_dict, Mapping):
-            base_fig = fig_dict.get(label)
-            if base_fig is not None:
-                marked_fig = go.Figure(base_fig)
-                marked_fig.add_vline(
-                    x=resonant_freq,
-                    line_width=1,
-                    line_color="red",
-                    line_dash="dash",
-                    annotation_text=f"f = {resonant_freq:.6f} GHz",
-                    annotation_position="top",
-                    annotation_font_color="red",
-                )
-                return [base_fig, marked_fig]
-
-        return []
+    def _required_input_value(self, name: str) -> float:
+        parameter = self.input_parameters[name]
+        if parameter is None or parameter.value is None:
+            raise ValueError(f"{name} input parameter is required")
+        return float(parameter.value)
 
     def batch_run(self, backend: QubexBackend, qids: list[str]) -> RunResult:
         raise NotImplementedError(f"{self.name} does not support batch execution")
