@@ -3,81 +3,70 @@
 QDash separates measured task outputs from the accepted calibration state used by later
 executions and hardware configuration.
 
-## Data stores and responsibilities
+## The four places called parameters
 
-"The database" is not one undifferentiated store. Each collection or runtime store has a distinct
-responsibility.
+Start with the question being answered. Only one store is the authoritative current calibration.
 
-| Store | Role | Primary consumers | Authoritative current calibration |
-| --- | --- | --- | --- |
-| Workflow `CalibDataModel` | In-memory calibration state for the active workflow | Downstream workflow tasks | No; execution-scoped |
-| `task_result_history` | Durable measurement and task execution history | Task Result views, Metrics, snapshot re-execution, provenance | No |
-| `qubit.data` / `coupling.data` | Latest accepted calibration parameters | Input resolution, chip views, later executions | Yes |
-| `execution_history` | Execution lifecycle, ownership, status, tags, and timing | Execution views and operations | No |
-| Calibration note | Qubex experiment note captured during execution | Workflow diagnostics and exported note data | No |
-| Figure and raw-data files | Large task artifacts stored outside MongoDB documents | Task Result and analysis views | No |
-| Qubex parameter files | Hardware-facing parameter representation synchronized from accepted outputs | Qubex experiments and external tooling | Derived from accepted state |
+| Question | Place | Lifetime |
+| --- | --- | --- |
+| What did this task measure? | `task_result_history.output_parameters` | Historical record |
+| What value is accepted now? | `qubit.data` or `coupling.data` | Current calibration in MongoDB |
+| What should the next task in this workflow use? | Workflow `CalibDataModel` | Current workflow only |
+| What is exported for Qubex to use? | Qubex parameter files | Derived hardware configuration |
 
-`task_result_history` answers "what did this task measure?" The qubit and coupling collections
-answer "what calibration value is currently accepted?" A successful task result can exist without
-replacing the accepted value.
+The first two are different MongoDB records. Workflow state is in memory, and Qubex parameter
+files are outside MongoDB.
 
-## Write path
+## Where one task output goes
 
-The task executor validates output before `BackendSaver` applies it. Task history is written after
-the persistence decision, so its output metadata records whether the accepted calibration database
-was updated.
-
-```mermaid
-flowchart TD
-    A[Calibration task] --> B[Output parameters and artifacts]
-    B --> C{Validation passed?}
-    C -->|No| D[Clear rejected output parameters]
-    D --> E[Keep status, message, quality metrics, figures, and raw data]
-    E --> H[TaskResultHistoryDocument]
-
-    C -->|Yes| P{Update calibration parameters?}
-    P -->|No| M[Mark database_updated false]
-    M --> H
-    P -->|Yes| Q[Update QubitDocument or CouplingDocument]
-    Q --> U[Mark database_updated true and retain previous_database_value]
-    U --> H
-    Q --> W[Merge output into active workflow calibration state]
-    Q --> Y[Update mapped Qubex parameter files]
-```
-
-The Qubex parameter update happens after the MongoDB calibration update. `database_updated` only
-reports the `qubit.data` or `coupling.data` write; it does not prove that every mapped Qubex file was
-updated. A Qubex synchronization failure is logged separately and does not revert the MongoDB
-write.
-
-## Read path
-
-Consumers select a store based on whether they need the current accepted state or historical
-evidence.
+Every task creates or updates its Task Result record. Applying an output additionally changes the
+current calibration DB and the active workflow state. Measurement-only output stops at history, so
+it remains visible without changing later inputs.
 
 ```mermaid
 flowchart LR
-    Q[(qubit.data)] --> I[Task input resolution]
-    C[(coupling.data)] --> I
-    Q --> V[Chip and current-value views]
-    C --> V
-    Q --> Y[Qubex parameter synchronization]
-    C --> Y
+    T[Task produces output] --> V{Output valid?}
 
-    T[(task_result_history)] --> R[Task Result views]
-    T --> M[Metrics and time series]
-    T --> S[Snapshot re-execution]
-    T --> P[Provenance]
+    V -->|No| H[(Task result history)]
+    V -->|Yes| A{Apply to calibration?}
 
-    E[(execution_history)] --> X[Execution status and topology views]
-    A[(artifact files)] --> R
+    A -->|No: measurement only| H
+    A -->|Yes| H
+    A -->|Yes| C[(Current calibration DB<br/>qubit.data / coupling.data)]
+    A -->|Yes| W[Active workflow state<br/>CalibDataModel]
+    C --> Y[Qubex parameter files]
+
+    H --> R[Task Result / Metrics]
+    C --> F[Inputs for a future execution]
+    W --> N[Inputs for the next task<br/>in the same workflow]
 ```
 
-Normal task input resolution starts from the current accepted qubit or coupling data according to
-the task's `InputParameterSpec`. Snapshot re-execution instead restores effective Input and Run
-parameters from task history. Metrics also reads task history, so a measurement-only result remains
-visible without becoming a current calibration value.
+Rejected output parameters are cleared before history aggregation. The diagnostic Task Result still
+retains status, message, quality metrics, figures, and raw-data paths.
+
+## Coherence Check example
+
+Assume the accepted `qubit_frequency` is 5.000 GHz and `CheckChevron` measures 5.010 GHz. In the
+`coherence_check` template, Chevron is measurement-only.
+
+```mermaid
+sequenceDiagram
+    participant DB as Current calibration DB
+    participant Flow as Workflow state
+    participant Chevron as CheckChevron
+    participant History as Task result history
+    participant Rabi as CheckRabi
+
+    DB->>Flow: Load accepted frequency 5.000 GHz
+    Flow->>Chevron: Use 5.000 GHz as input
+    Chevron->>History: Record measured 5.010 GHz<br/>database_updated = false
+    Note over DB,Flow: Accepted and active value remain 5.000 GHz
+    Flow->>Rabi: Use 5.000 GHz
+```
+
+The Task Result modal and Metrics can show the 5.010 GHz measurement. `CheckRabi` still receives
+5.000 GHz, and a later workflow also starts from 5.000 GHz. If Chevron were applied, both the
+current calibration DB and workflow state would become 5.010 GHz before Rabi runs.
 
 ## Output outcomes
 
@@ -95,6 +84,8 @@ Task Result UI maps the output metadata to these labels:
 
 The field name describes the current implementation. Its scope is specifically the authoritative
 calibration value in MongoDB, not task-history persistence, Git commits, or Qubex file updates.
+The MongoDB write occurs before Qubex synchronization, and a file synchronization failure does not
+roll the MongoDB value back.
 
 ## Persistence controls
 
