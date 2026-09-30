@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  dateTimeLocalToDate,
   dateToDateInput,
   dateToDateKey,
   dateToDateTimeLocal,
@@ -91,5 +92,36 @@ describe("dateToDateTimeLocal", () => {
     expect(dateToDateTimeLocal(new Date("2024-06-15T03:30:00.000Z"), "Asia/Tokyo")).toBe(
       "2024-06-15T12:30",
     );
+  });
+});
+
+describe("dateTimeLocalToDate", () => {
+  it("parses a valid datetime-local value in the given timezone", () => {
+    const result = dateTimeLocalToDate("2024-06-15T12:30", "Asia/Tokyo");
+    expect(result?.toISOString()).toBe("2024-06-15T03:30:00.000Z");
+  });
+
+  it("returns null for a malformed value", () => {
+    expect(dateTimeLocalToDate("2024-06-15", "Asia/Tokyo")).toBeNull();
+    expect(dateTimeLocalToDate("2024-06-15T12:30:00", "Asia/Tokyo")).toBeNull();
+    expect(dateTimeLocalToDate("not-a-date", "Asia/Tokyo")).toBeNull();
+    expect(dateTimeLocalToDate("", "Asia/Tokyo")).toBeNull();
+  });
+
+  it("returns null for a calendar date that does not exist", () => {
+    expect(dateTimeLocalToDate("2026-02-30T00:00", "Asia/Tokyo")).toBeNull();
+  });
+
+  it("returns null for an out-of-range hour", () => {
+    expect(dateTimeLocalToDate("2026-02-20T24:00", "Asia/Tokyo")).toBeNull();
+  });
+
+  it("computes real elapsed time across a DST transition in America/New_York", () => {
+    const start = dateTimeLocalToDate("2026-03-07T12:00", "America/New_York");
+    const end = dateTimeLocalToDate("2026-03-08T12:00", "America/New_York");
+    expect(start).not.toBeNull();
+    expect(end).not.toBeNull();
+    const diffHours = (end!.getTime() - start!.getTime()) / (60 * 60 * 1000);
+    expect(diffHours).toBe(23);
   });
 });
