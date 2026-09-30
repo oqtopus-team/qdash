@@ -97,6 +97,9 @@ def bringup(
         },
         "CheckAdaptiveChevron": {
             "shots": {"value": 256, "value_type": "int"},
+            # Set to False to keep the result as measurement history without
+            # updating the current calibration parameters.
+            # "update_calibration_parameters": False,
         },
         # resonator_assignment_order lists the four qid offsets within each MUX
         # in increasing resonator-frequency order. The default is [3, 0, 2, 1].

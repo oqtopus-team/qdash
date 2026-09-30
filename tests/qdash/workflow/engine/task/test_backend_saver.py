@@ -65,7 +65,8 @@ def test_save_qubex_stages_outputs_when_persistence_is_disabled() -> None:
         "drive_amplitude": ParameterModel(value=0.12, unit="a.u."),
     }
     state_manager = MagicMock()
-    state_manager.get_task.return_value = SimpleNamespace(output_parameters=output_parameters)
+    task_model = SimpleNamespace(output_parameters=output_parameters)
+    state_manager.get_task.return_value = task_model
     execution_service = cast(
         "ExecutionService",
         SimpleNamespace(
@@ -106,6 +107,41 @@ def test_save_qubex_stages_outputs_when_persistence_is_disabled() -> None:
     qubit_repo_cls.return_value.update_calib_data.assert_not_called()
     coupling_repo_cls.return_value.update_calib_data.assert_not_called()
     updater.update.assert_not_called()
+    assert task_model.output_parameters["drive_amplitude"]["value"] == 0.12
+    assert task_model.output_parameters["drive_amplitude"]["database_updated"] is False
+
+
+def test_save_mux_qid_marks_outputs_when_persistence_is_disabled() -> None:
+    output_parameters = {
+        "readout_frequency": ParameterModel(value=6.123, unit="GHz"),
+    }
+    task_model = SimpleNamespace(output_parameters=output_parameters)
+    state_manager = MagicMock()
+    state_manager.get_task.return_value = task_model
+    execution_service = cast(
+        "ExecutionService",
+        SimpleNamespace(chip_id="chip-1", project_id="proj-1"),
+    )
+    task = MagicMock()
+    task.get_name.return_value = "CheckResonatorSpectroscopy"
+    task.get_task_type.return_value = "qubit"
+    backend = MagicMock()
+
+    saver = BackendSaver(
+        state_manager=state_manager,
+        username="alice",
+        calib_dir="/tmp/calib",
+        task_manager_id="tm-1",
+        persist_output_parameters=False,
+    )
+
+    with patch("qdash.repository.MongoQubitCalibrationRepository") as repo_cls:
+        saver.save_mux_qid(task, execution_service, "1", backend)
+
+    repo_cls.return_value.update_calib_data.assert_not_called()
+    backend.update.assert_not_called()
+    assert task_model.output_parameters["readout_frequency"]["value"] == 6.123
+    assert task_model.output_parameters["readout_frequency"]["database_updated"] is False
 
 
 def test_save_qubex_records_previous_database_value_for_persisted_output() -> None:

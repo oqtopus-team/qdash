@@ -21,6 +21,58 @@ interface ParametersTableProps {
   overrides?: Record<string, ParameterOverride>;
 }
 
+type DatabaseUpdateStatus = "updated" | "not-updated" | "partial" | "unknown";
+
+function getDatabaseUpdateStatus(parameters: Record<string, unknown>): DatabaseUpdateStatus {
+  const flags = Object.values(parameters).flatMap((value) => {
+    if (typeof value !== "object" || value === null || !("database_updated" in value)) return [];
+    const flag = (value as Record<string, unknown>).database_updated;
+    return typeof flag === "boolean" ? [flag] : [];
+  });
+
+  if (flags.length === 0) return "unknown";
+  if (flags.every(Boolean)) return "updated";
+  if (flags.every((flag) => !flag)) return "not-updated";
+  return "partial";
+}
+
+export function CalibrationUpdateStatusBadge({
+  parameters,
+}: {
+  parameters: Record<string, unknown>;
+}) {
+  const status = getDatabaseUpdateStatus(parameters);
+  if (status === "updated") {
+    return (
+      <span className="badge badge-sm badge-success" title="Output applied to calibration values">
+        Calibration DB updated
+      </span>
+    );
+  }
+  if (status === "not-updated") {
+    return (
+      <span
+        className="badge badge-sm badge-info badge-soft"
+        title="Output recorded as measurement history without updating calibration values"
+      >
+        Measurement only
+      </span>
+    );
+  }
+  if (status === "partial") {
+    return (
+      <span className="badge badge-sm badge-warning" title="Only some outputs updated the database">
+        Partially updated
+      </span>
+    );
+  }
+  return (
+    <span className="badge badge-sm badge-ghost" title="Legacy result without update metadata">
+      Update status unknown
+    </span>
+  );
+}
+
 function formatValue(v: unknown): string {
   if (typeof v === "number") return v.toFixed(6);
   if (typeof v === "object") return JSON.stringify(v);
@@ -96,6 +148,9 @@ export function ParametersTable({
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold">{title}</span>
           <span className="badge badge-xs badge-ghost">{entries.length}</span>
+          {title === "Output Parameters" && (
+            <CalibrationUpdateStatusBadge parameters={parameters} />
+          )}
         </div>
         {editable && onSave && (
           <div className="flex items-center gap-1">
