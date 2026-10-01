@@ -15,6 +15,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
     readout_duration_run_parameter,
+    required_rabi_normalization_inputs,
 )
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
@@ -25,6 +26,8 @@ class CheckPIPulse(QubexTask):
     name: str = "CheckPIPulse"
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        # RabiParam normalizes measured IQ values; its readout duration is validated.
+        **required_rabi_normalization_inputs(),
         "qubit_frequency": InputParameterSpec.required_database(),
         "pi_amplitude": InputParameterSpec.required_database(),
         "pi_duration": InputParameterSpec.required_database(parameter_aliases=("pi_length",)),

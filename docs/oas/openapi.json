@@ -24325,6 +24325,16 @@
                           "type": "string",
                           "title": "Task Id",
                           "default": ""
+                        },
+                        "ui_group": {
+                          "type": "string",
+                          "title": "Ui Group",
+                          "default": ""
+                        },
+                        "ui_group_collapsed": {
+                          "type": "boolean",
+                          "title": "Ui Group Collapsed",
+                          "default": false
                         }
                       },
                       "additionalProperties": true,
@@ -24896,6 +24906,16 @@
                           "type": "string",
                           "title": "Task Id",
                           "default": ""
+                        },
+                        "ui_group": {
+                          "type": "string",
+                          "title": "Ui Group",
+                          "default": ""
+                        },
+                        "ui_group_collapsed": {
+                          "type": "boolean",
+                          "title": "Ui Group Collapsed",
+                          "default": false
                         }
                       },
                       "additionalProperties": true,
@@ -28012,6 +28032,16 @@
                           "type": "string",
                           "title": "Task Id",
                           "default": ""
+                        },
+                        "ui_group": {
+                          "type": "string",
+                          "title": "Ui Group",
+                          "default": ""
+                        },
+                        "ui_group_collapsed": {
+                          "type": "boolean",
+                          "title": "Ui Group Collapsed",
+                          "default": false
                         }
                       },
                       "additionalProperties": true,
@@ -28862,6 +28892,16 @@
                           "type": "string",
                           "title": "Task Id",
                           "default": ""
+                        },
+                        "ui_group": {
+                          "type": "string",
+                          "title": "Ui Group",
+                          "default": ""
+                        },
+                        "ui_group_collapsed": {
+                          "type": "boolean",
+                          "title": "Ui Group Collapsed",
+                          "default": false
                         }
                       },
                       "additionalProperties": true,
@@ -29542,6 +29582,16 @@
                       "type": "string",
                       "title": "Task Id",
                       "default": ""
+                    },
+                    "ui_group": {
+                      "type": "string",
+                      "title": "Ui Group",
+                      "default": ""
+                    },
+                    "ui_group_collapsed": {
+                      "type": "boolean",
+                      "title": "Ui Group Collapsed",
+                      "default": false
                     }
                   },
                   "additionalProperties": true,

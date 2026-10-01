@@ -6,7 +6,10 @@ import pytest
 
 from qdash.api.dependencies import get_task_file_service
 from qdash.api.services.chip.service import _get_task_names_cached, get_task_names
-from qdash.api.services.task_file_service import TaskFileService
+from qdash.api.services.task_file_service import (
+    RABI_NORMALIZATION_INPUT_UNITS,
+    TaskFileService,
+)
 from qdash.common.config.backend import clear_cache as clear_backend_config_cache
 
 
@@ -178,7 +181,7 @@ def test_coarse_readout_task_is_enabled_with_resolvable_input_metadata() -> None
         "readout_frequency",
         "readout_amplitude",
     }
-    assert task.run_parameters["readout_duration"]["value"] is None
+    assert task.run_parameters["readout_duration"]["value"] == 1024
     assert task.run_parameters["readout_duration"]["unit"] == "ns"
 
 
@@ -191,13 +194,23 @@ def test_list_task_info_resolves_local_and_qubex_constants() -> None:
     )
 
     assert task.input_parameters["control_amplitude"]["default_value"] == 0.0125
-    assert task.run_parameters["readout_duration"]["value"] is None
+    assert task.run_parameters["readout_duration"]["value"] == 1024
     assert task.run_parameters["shots"]["value"] == CALIBRATION_SHOTS
     assert task.run_parameters["interval"]["value"] == 150 * 1024
 
     check_t1 = next(
         task for task in TaskFileService().list_task_info("qubex").tasks if task.name == "CheckT1"
     )
+    assert check_t1.input_parameters["rabi_amplitude"] == {
+        "resolution": "database_required",
+        "user_override": "allowed",
+        "default_value": None,
+        "parameter_name": "rabi_amplitude",
+        "qid_role": "self",
+        "unit": "a.u.",
+        "ui_group": "Rabi normalization",
+        "ui_group_collapsed": True,
+    }
     assert check_t1.run_parameters["time_range"]["value"] == [
         2.0,
         pytest.approx(5.698970004336019),
@@ -252,7 +265,7 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
         "pi_duration",
         "readout_amplitude",
         "readout_frequency",
-    }
+    } | set(RABI_NORMALIZATION_INPUT_UNITS)
     assert task.input_parameters["qubit_frequency"] == {
         "resolution": "database_required",
         "user_override": "allowed",
@@ -260,6 +273,28 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
     }
     assert task.input_parameters["pi_duration"]["parameter_aliases"] == ["pi_length"]
     assert task.run_parameters["readout_duration"]["unit"] == "ns"
+    assert task.run_parameters["readout_duration"]["value"] == 1024
+
+
+def test_cross_resonance_catalog_groups_control_and_target_rabi_inputs() -> None:
+    task = next(
+        task
+        for task in TaskFileService().list_task_info("qubex").tasks
+        if task.name == "CheckCrossResonance"
+    )
+    rabi_input_names = {
+        f"{prefix}{name}"
+        for prefix in ("control_", "target_")
+        for name in RABI_NORMALIZATION_INPUT_UNITS
+    }
+
+    assert rabi_input_names <= set(task.input_parameters)
+    assert {task.input_parameters[name]["ui_group"] for name in rabi_input_names} == {
+        "Rabi normalization"
+    }
+    assert all(
+        task.input_parameters[name]["ui_group_collapsed"] is True for name in rabi_input_names
+    )
 
 
 def test_extract_parameter_metadata_understands_named_spec_constructors() -> None:
@@ -300,4 +335,40 @@ def test_extract_parameter_metadata_understands_named_spec_constructors() -> Non
             "greater_than_or_equal": 0.0001,
             "less_than_or_equal": 1.0,
         },
+    }
+
+
+def test_extract_parameter_metadata_expands_rabi_normalization_inputs() -> None:
+    node = ast.parse(
+        """{
+            **required_rabi_normalization_inputs(),
+            **required_rabi_normalization_inputs(prefix="control_", qid_role="control"),
+        }""",
+        mode="eval",
+    ).body
+
+    parameters = TaskFileService._extract_parameter_metadata(node)
+
+    assert set(parameters) == set(RABI_NORMALIZATION_INPUT_UNITS) | {
+        f"control_{name}" for name in RABI_NORMALIZATION_INPUT_UNITS
+    }
+    assert parameters["rabi_amplitude"] == {
+        "resolution": "database_required",
+        "user_override": "allowed",
+        "default_value": None,
+        "parameter_name": "rabi_amplitude",
+        "qid_role": "self",
+        "unit": "a.u.",
+        "ui_group": "Rabi normalization",
+        "ui_group_collapsed": True,
+    }
+    assert parameters["control_rabi_angle"] == {
+        "resolution": "database_required",
+        "user_override": "allowed",
+        "default_value": None,
+        "parameter_name": "rabi_angle",
+        "qid_role": "control",
+        "unit": "degree",
+        "ui_group": "Rabi normalization",
+        "ui_group_collapsed": True,
     }

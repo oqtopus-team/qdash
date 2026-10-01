@@ -3,6 +3,8 @@
 import { useState, useCallback, useMemo } from "react";
 import { Pencil, Save, X } from "lucide-react";
 
+import { getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
+
 /** Manual override info for a parameter. */
 export interface ParameterOverride {
   /** The current (overridden) value in DB */
@@ -14,6 +16,7 @@ export interface ParameterOverride {
 interface ParametersTableProps {
   title: string;
   parameters: Record<string, unknown>;
+  parameterDefinitions?: Record<string, unknown>;
   editable?: boolean;
   onSave?: (params: Record<string, unknown>) => void;
   isSaving?: boolean;
@@ -83,12 +86,31 @@ function formatValue(v: unknown): string {
 export function ParametersTable({
   title,
   parameters,
+  parameterDefinitions,
   editable = false,
   onSave,
   isSaving = false,
   overrides,
 }: ParametersTableProps) {
   const entries = useMemo(() => Object.entries(parameters), [parameters]);
+  const { regularEntries, parameterGroups } = useMemo(() => {
+    const regular: [string, unknown][] = [];
+    const groups = new Map<string, { collapsed: boolean; entries: [string, unknown][] }>();
+    for (const entry of entries) {
+      const group = getTaskParameterUiGroup(parameterDefinitions?.[entry[0]] ?? entry[1]);
+      if (!group) {
+        regular.push(entry);
+        continue;
+      }
+      const existing = groups.get(group.name);
+      if (existing) {
+        existing.entries.push(entry);
+      } else {
+        groups.set(group.name, { collapsed: group.collapsed, entries: [entry] });
+      }
+    }
+    return { regularEntries: regular, parameterGroups: [...groups.entries()] };
+  }, [entries, parameterDefinitions]);
   const showsDatabaseComparison = useMemo(
     () =>
       entries.some(
@@ -140,6 +162,87 @@ export function ParametersTable({
     setIsEditing(false);
   }, [onSave, entries, editedValues]);
 
+  const renderTable = (tableEntries: [string, unknown][]) => (
+    <table className="table table-zebra table-xs w-full">
+      <thead>
+        <tr>
+          <th className="text-xs">Parameter</th>
+          {showsDatabaseComparison && <th className="text-xs">Previous</th>}
+          <th className="text-xs">{showsDatabaseComparison ? "New" : "Value"}</th>
+          <th className="text-xs">Unit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {tableEntries.map(([key, val]) => {
+          const paramValue =
+            typeof val === "object" && val !== null && "value" in val
+              ? (val as Record<string, unknown>)
+              : { value: val };
+          const override = overrides?.[key];
+          return (
+            <tr key={key}>
+              <td className="font-medium text-xs">
+                {key}
+                {override && (
+                  <span
+                    className="ml-1 badge badge-xs badge-warning"
+                    title={
+                      override.editedAt
+                        ? `Manually edited at ${override.editedAt}`
+                        : "Manually edited"
+                    }
+                  >
+                    edited
+                  </span>
+                )}
+              </td>
+              {showsDatabaseComparison && (
+                <td className="font-mono text-xs bg-error/10 text-error">
+                  <span className="line-through">
+                    {paramValue.database_updated === true
+                      ? formatValue(paramValue.previous_database_value)
+                      : "-"}
+                  </span>
+                </td>
+              )}
+              <td
+                className={`font-mono text-xs ${
+                  showsDatabaseComparison ? "bg-success/10 text-success font-semibold" : ""
+                }`}
+              >
+                {isEditing ? (
+                  <input
+                    type="text"
+                    className="input input-xs input-bordered w-full max-w-[140px] font-mono"
+                    value={editedValues[key] ?? ""}
+                    onChange={(e) =>
+                      setEditedValues((prev) => ({
+                        ...prev,
+                        [key]: e.target.value,
+                      }))
+                    }
+                  />
+                ) : override ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="line-through text-base-content/40">
+                      {formatValue(paramValue.value)}
+                    </span>
+                    <span className="text-warning font-semibold">
+                      {formatValue(override.currentValue)}
+                    </span>
+                  </span>
+                ) : (
+                  formatValue(paramValue.value)
+                )}
+              </td>
+              <td className="text-xs">{String(paramValue.unit ?? "-")}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+
   if (entries.length === 0) return null;
 
   return (
@@ -190,84 +293,22 @@ export function ParametersTable({
           </div>
         )}
       </div>
-      <table className="table table-zebra table-xs w-full">
-        <thead>
-          <tr>
-            <th className="text-xs">Parameter</th>
-            {showsDatabaseComparison && <th className="text-xs">Previous</th>}
-            <th className="text-xs">{showsDatabaseComparison ? "New" : "Value"}</th>
-            <th className="text-xs">Unit</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map(([key, val]) => {
-            const paramValue =
-              typeof val === "object" && val !== null && "value" in val
-                ? (val as Record<string, unknown>)
-                : { value: val };
-            const override = overrides?.[key];
-            return (
-              <tr key={key}>
-                <td className="font-medium text-xs">
-                  {key}
-                  {override && (
-                    <span
-                      className="ml-1 badge badge-xs badge-warning"
-                      title={
-                        override.editedAt
-                          ? `Manually edited at ${override.editedAt}`
-                          : "Manually edited"
-                      }
-                    >
-                      edited
-                    </span>
-                  )}
-                </td>
-                {showsDatabaseComparison && (
-                  <td className="font-mono text-xs bg-error/10 text-error">
-                    <span className="line-through">
-                      {paramValue.database_updated === true
-                        ? formatValue(paramValue.previous_database_value)
-                        : "-"}
-                    </span>
-                  </td>
-                )}
-                <td
-                  className={`font-mono text-xs ${
-                    showsDatabaseComparison ? "bg-success/10 text-success font-semibold" : ""
-                  }`}
-                >
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      className="input input-xs input-bordered w-full max-w-[140px] font-mono"
-                      value={editedValues[key] ?? ""}
-                      onChange={(e) =>
-                        setEditedValues((prev) => ({
-                          ...prev,
-                          [key]: e.target.value,
-                        }))
-                      }
-                    />
-                  ) : override ? (
-                    <span className="flex items-center gap-1.5">
-                      <span className="line-through text-base-content/40">
-                        {formatValue(paramValue.value)}
-                      </span>
-                      <span className="text-warning font-semibold">
-                        {formatValue(override.currentValue)}
-                      </span>
-                    </span>
-                  ) : (
-                    formatValue(paramValue.value)
-                  )}
-                </td>
-                <td className="text-xs">{String(paramValue.unit ?? "-")}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      {regularEntries.length > 0 && renderTable(regularEntries)}
+      {parameterGroups.map(([groupName, group]) => (
+        <details
+          key={groupName}
+          className="collapse collapse-arrow rounded-none border-t border-base-300 bg-base-100"
+          open={!group.collapsed}
+        >
+          <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-semibold">
+            <span className="flex items-center gap-2">
+              {groupName}
+              <span className="badge badge-xs badge-ghost">{group.entries.length}</span>
+            </span>
+          </summary>
+          <div className="collapse-content px-0 pb-0">{renderTable(group.entries)}</div>
+        </details>
+      ))}
     </div>
   );
 }

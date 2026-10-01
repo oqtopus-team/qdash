@@ -40,6 +40,27 @@ def test_shared_readout_duration_configures_backend_session(monkeypatch: Any) ->
     assert factory.call_args.kwargs["config"]["readout_duration"] == 2048.0
 
 
+def test_coupling_qid_configures_coupling_backend_session(monkeypatch: Any) -> None:
+    config = CalibConfig(
+        username="alice",
+        chip_id="chip-1",
+        qids=["32-33"],
+        execution_id="exec-1",
+        project_id="project-1",
+        backend_name="fake",
+    )
+    orchestrator = CalibOrchestrator(config)
+    orchestrator._task_context = cast("TaskContext", SimpleNamespace(id="manager-1"))
+    factory = MagicMock(return_value=SimpleNamespace(name="fake"))
+    monkeypatch.setattr("qdash.workflow.engine.orchestrator.create_backend", factory)
+
+    orchestrator._create_backend()
+
+    backend_config = factory.call_args.kwargs["config"]
+    assert backend_config["task_type"] == "coupling"
+    assert backend_config["qids"] == ["32-33"]
+
+
 @pytest.mark.parametrize("readout_duration", [0, -1, float("nan"), float("inf")])
 def test_invalid_shared_readout_duration_is_rejected_before_backend_creation(
     monkeypatch: Any, readout_duration: float

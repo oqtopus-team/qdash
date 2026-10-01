@@ -181,6 +181,12 @@ def full_calibration(
             "CreateDRAGPIPulse": {
                 "drag_pi_duration": {"value": 24, "value_type": "int"},
             },
+            # Per-task overrides — uncomment to tune the CR parameter search.
+            # "CheckCrossResonance": {
+            #     "adiabatic_safe_factor": {"value": 0.65, "value_type": "float"},
+            #     "max_amplitude": {"value": 0.85, "value_type": "float"},
+            #     "max_time_range": {"value": 8192, "value_type": "int"},
+            # },
             # Per-task overrides — uncomment to extend coherence sweep ranges.
             # "CheckT1": {
             #     "time_range": {
@@ -196,7 +202,7 @@ def full_calibration(
             # },
         },
         default_run_parameters={
-            "readout_duration": {"value": 2048, "value_type": "int"},
+            "readout_duration": {"value": 1024, "value_type": "int"},
             "interval": {"value": 150 * 1024, "value_type": "int"},
         },
     )

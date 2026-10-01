@@ -21,7 +21,7 @@ import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 import { isExecutionInProgress, isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
-import { parseTaskParameter } from "@/lib/utils/task-parameters";
+import { getTaskParameterUiGroup, parseTaskParameter } from "@/lib/utils/task-parameters";
 import { buildTaskPrefill } from "./task-prefill";
 
 interface TaskWorkbenchProps {
@@ -299,6 +299,56 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     }
   };
 
+  const inputParameterEntries = Object.entries(task.input_parameters ?? {});
+  const regularInputParameterEntries: typeof inputParameterEntries = [];
+  const groupedInputParameterEntries = new Map<
+    string,
+    { collapsed: boolean; entries: typeof inputParameterEntries }
+  >();
+  for (const entry of inputParameterEntries) {
+    const group = getTaskParameterUiGroup(entry[1]);
+    if (!group) {
+      regularInputParameterEntries.push(entry);
+      continue;
+    }
+    const existing = groupedInputParameterEntries.get(group.name);
+    if (existing) {
+      existing.entries.push(entry);
+    } else {
+      groupedInputParameterEntries.set(group.name, {
+        collapsed: group.collapsed,
+        entries: [entry],
+      });
+    }
+  }
+  const renderInputParameterField = ([name, parameter]: (typeof inputParameterEntries)[number]) => (
+    <label key={name} className="form-control min-w-0">
+      <span className="label-text mb-1 flex min-w-0 items-start justify-between gap-2">
+        <span className="min-w-0 break-words">{name}</span>
+        <span className="max-w-[45%] shrink-0 break-all text-right text-base-content/40">
+          {String(parameter.unit ?? "")}
+        </span>
+      </span>
+      <input
+        className="input input-sm input-bordered font-mono"
+        value={inputValues[name] ?? ""}
+        disabled={parameter.user_override === "forbidden"}
+        onChange={(event) =>
+          setInputValues((current) => ({
+            ...current,
+            [name]: event.target.value,
+          }))
+        }
+        placeholder="Use current value"
+      />
+      {Boolean(parameter.description) && (
+        <span className="mt-1 break-words text-xs text-base-content/45">
+          {String(parameter.description)}
+        </span>
+      )}
+    </label>
+  );
+
   return (
     <div className="h-full overflow-y-auto bg-base-200 p-3 sm:p-4">
       <div className="w-full space-y-4">
@@ -401,33 +451,30 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                       Reload
                     </button>
                   </div>
-                  <div className="grid max-h-64 gap-3 overflow-y-auto rounded-lg border border-base-300 p-3">
-                    {Object.entries(task.input_parameters ?? {}).map(([name, parameter]) => (
-                      <label key={name} className="form-control min-w-0">
-                        <span className="label-text mb-1 flex min-w-0 items-start justify-between gap-2">
-                          <span className="min-w-0 break-words">{name}</span>
-                          <span className="max-w-[45%] shrink-0 break-all text-right text-base-content/40">
-                            {String(parameter.unit ?? "")}
+                  <div className="max-h-64 space-y-3 overflow-y-auto rounded-lg border border-base-300 p-3">
+                    <div className="grid gap-3">
+                      {regularInputParameterEntries.map(renderInputParameterField)}
+                    </div>
+                    {[...groupedInputParameterEntries.entries()].map(([groupName, group]) => (
+                      <details
+                        key={groupName}
+                        className="collapse collapse-arrow rounded-lg border border-base-300 bg-base-100"
+                        open={!group.collapsed}
+                      >
+                        <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-semibold">
+                          <span className="flex items-center gap-2">
+                            {groupName}
+                            <span className="badge badge-xs badge-ghost">
+                              {group.entries.length}
+                            </span>
                           </span>
-                        </span>
-                        <input
-                          className="input input-sm input-bordered font-mono"
-                          value={inputValues[name] ?? ""}
-                          disabled={parameter.user_override === "forbidden"}
-                          onChange={(event) =>
-                            setInputValues((current) => ({
-                              ...current,
-                              [name]: event.target.value,
-                            }))
-                          }
-                          placeholder="Use current value"
-                        />
-                        {Boolean(parameter.description) && (
-                          <span className="mt-1 break-words text-xs text-base-content/45">
-                            {String(parameter.description)}
-                          </span>
-                        )}
-                      </label>
+                        </summary>
+                        <div className="collapse-content px-3 pb-3">
+                          <div className="grid gap-3 pt-1">
+                            {group.entries.map(renderInputParameterField)}
+                          </div>
+                        </div>
+                      </details>
                     ))}
                   </div>
                 </div>
@@ -627,6 +674,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                       <ParametersTable
                         title="Input Parameters"
                         parameters={resultTask.input_parameters}
+                        parameterDefinitions={task.input_parameters}
                       />
                     )}
                   {resultTask?.output_parameters &&

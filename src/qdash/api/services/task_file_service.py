@@ -29,6 +29,7 @@ from qdash.common.config.backend import (
     get_tasks,
     load_backend_config,
 )
+from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
 from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.path_resolver import resolve_calibtasks_base_path
 
@@ -37,8 +38,20 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-TASK_METADATA_CACHE_VERSION = 3
+TASK_METADATA_CACHE_VERSION = 4
 TASK_CATALOG_FILENAME = "task_catalog.json"
+RABI_NORMALIZATION_INPUT_UNITS = {
+    "control_amplitude": "a.u.",
+    "rabi_amplitude": "a.u.",
+    "rabi_phase": "a.u.",
+    "rabi_offset": "a.u.",
+    "rabi_angle": "degree",
+    "rabi_noise": "a.u.",
+    "rabi_distance": "a.u.",
+    "rabi_reference_phase": "a.u.",
+    "rabi_r2": "",
+    "maximum_rabi_frequency": "MHz/a.u.",
+}
 
 
 class TaskFileService:
@@ -327,6 +340,9 @@ class TaskFileService:
 
         parameters: dict[str, dict[str, object]] = {}
         for key_node, value_node in zip(node.keys, node.values, strict=True):
+            if key_node is None:
+                parameters.update(TaskFileService._extract_rabi_normalization_inputs(value_node))
+                continue
             if not isinstance(key_node, ast.Constant) or not isinstance(key_node.value, str):
                 continue
             if isinstance(value_node, ast.Constant) and value_node.value is None:
@@ -346,10 +362,8 @@ class TaskFileService:
                     {
                         "unit": "ns",
                         "value_type": "float",
-                        "default_value": None,
-                        "description": (
-                            "Readout pulse duration. Uses the Qubex session default when unset."
-                        ),
+                        "default_value": DEFAULT_READOUT_DURATION,
+                        "description": "Readout pulse duration shared by the Qubex calibration session.",
                     }
                 )
             elif isinstance(value_node.func, ast.Attribute):
@@ -388,6 +402,8 @@ class TaskFileService:
                     "less_than",
                     "greater_than_or_equal",
                     "less_than_or_equal",
+                    "ui_group",
+                    "ui_group_collapsed",
                 }:
                     continue
                 try:
@@ -399,6 +415,45 @@ class TaskFileService:
                         )
             parameters[key_node.value] = metadata
         return parameters
+
+    @staticmethod
+    def _extract_rabi_normalization_inputs(
+        node: ast.expr,
+    ) -> dict[str, dict[str, object]]:
+        """Expand the known Rabi input helper without importing workflow code."""
+        if (
+            not isinstance(node, ast.Call)
+            or not isinstance(node.func, ast.Name)
+            or node.func.id != "required_rabi_normalization_inputs"
+            or node.args
+        ):
+            return {}
+
+        options: dict[str, str] = {"prefix": "", "qid_role": "self"}
+        for keyword in node.keywords:
+            if keyword.arg not in options:
+                return {}
+            try:
+                value = ast.literal_eval(keyword.value)
+            except (ValueError, TypeError):
+                return {}
+            if not isinstance(value, str):
+                return {}
+            options[keyword.arg] = value
+
+        return {
+            f"{options['prefix']}{name}": {
+                "resolution": "database_required",
+                "user_override": "allowed",
+                "default_value": None,
+                "parameter_name": name,
+                "qid_role": options["qid_role"],
+                "unit": unit,
+                "ui_group": "Rabi normalization",
+                "ui_group_collapsed": True,
+            }
+            for name, unit in RABI_NORMALIZATION_INPUT_UNITS.items()
+        }
 
     @staticmethod
     def _evaluate_parameter_expression(node: ast.expr, namespace: dict[str, object]) -> object:
