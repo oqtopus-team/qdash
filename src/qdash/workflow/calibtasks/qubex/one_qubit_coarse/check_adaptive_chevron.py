@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import plotly.graph_objects as go
 from qubex.contrib.experiment import estimate_qubit_frequency_from_chevron_adaptive
@@ -18,9 +18,10 @@ from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
     readout_duration_run_parameter,
 )
+from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
-DEFAULT_COARSE_CONTROL_AMPLITUDE = 0.0625
+DEFAULT_MINIMUM_PEAK_BACKGROUND_RMS_RATIO = 5.0
 CONTROL_AMPLITUDE_MIN = 1e-4
 CONTROL_AMPLITUDE_MAX = 1.0
 
@@ -34,8 +35,7 @@ class CheckAdaptiveChevron(QubexTask):
         "coarse_qubit_frequency": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
-        "coarse_control_amplitude": InputParameterSpec.database_or_default(
-            default=DEFAULT_COARSE_CONTROL_AMPLITUDE,
+        "coarse_control_amplitude": InputParameterSpec.required_database(
             greater_than_or_equal=CONTROL_AMPLITUDE_MIN,
             less_than_or_equal=CONTROL_AMPLITUDE_MAX,
             unit="a.u.",
@@ -56,6 +56,12 @@ class CheckAdaptiveChevron(QubexTask):
             default=DEFAULT_INTERVAL,
             description="Time interval between shots",
         ),
+        "minimum_peak_background_rms_ratio": RunParameterSpec(
+            unit="a.u.",
+            value_type="float",
+            default=DEFAULT_MINIMUM_PEAK_BACKGROUND_RMS_RATIO,
+            description=("Minimum final peak/background RMS ratio required to accept the result"),
+        ),
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "qubit_frequency": OutputParameterSpec(
@@ -74,23 +80,61 @@ class CheckAdaptiveChevron(QubexTask):
         result = run_result.raw_result
 
         resonant_freq = result["resonant_frequencies"][label]
+        target_amplitude = self._target_control_amplitude(result, label)
+        target_amplitude_error = finite_value_error(
+            target_amplitude,
+            f"CheckAdaptiveChevron target control amplitude for {label}",
+        )
         self.output_parameters["qubit_frequency"].value = resonant_freq
-        self.output_parameters["control_amplitude"].value = result.get(
-            "control_amplitude_used", DEFAULT_COARSE_CONTROL_AMPLITUDE
+        self.output_parameters["control_amplitude"].value = (
+            float(cast("int | float | str", target_amplitude))
+            if target_amplitude_error is None
+            else None
         )
         output_parameters = self.attach_execution_id(execution_id)
 
         figures = self._build_figures(result, label, resonant_freq)
-        if resonant_freq < 2.5:
-            error_msg = f"Qubit frequency too low for qid={qid}: {resonant_freq:.6f} GHz < 2.5 GHz"
-            print(f"[ERROR] {error_msg}")
-            return PostProcessResult(
-                output_parameters=output_parameters,
-                figures=figures,
-                validation_error=error_msg,
-            )
+        validation_error = self._validation_error(
+            result, label, qid, resonant_freq, target_amplitude_error
+        )
+        if validation_error is not None:
+            print(f"[ERROR] {validation_error}")
+        return PostProcessResult(
+            output_parameters=output_parameters,
+            figures=figures,
+            validation_error=validation_error,
+        )
 
-        return PostProcessResult(output_parameters=output_parameters, figures=figures)
+    def _validation_error(
+        self,
+        result: Mapping[str, Any],
+        label: str,
+        qid: str,
+        resonant_freq: float,
+        target_amplitude_error: str | None,
+    ) -> str | None:
+        if resonant_freq < 2.5:
+            return f"Qubit frequency too low for qid={qid}: {resonant_freq:.6f} GHz < 2.5 GHz"
+
+        threshold = self.run_parameters["minimum_peak_background_rms_ratio"].value
+        ratios = result.get("peak_background_rms_ratios")
+        ratio = ratios.get(label) if isinstance(ratios, Mapping) else None
+        threshold_error = finite_value_error(
+            threshold,
+            "minimum_peak_background_rms_ratio",
+            minimum=0.0,
+        )
+        return first_validation_error(
+            threshold_error,
+            finite_value_error(
+                ratio,
+                f"CheckAdaptiveChevron peak/background RMS ratio for {label}",
+                minimum=(
+                    float(cast("int | float | str", threshold)) if threshold_error is None else None
+                ),
+            ),
+            target_amplitude_error,
+        )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
@@ -160,9 +204,6 @@ class CheckAdaptiveChevron(QubexTask):
             save_image=False,
         )
         result_data = self._adaptive_result_data(adaptive_result)
-        result_data["control_amplitude_used"] = self._control_amplitude_from_result(
-            result_data, label, control_amplitude
-        )
         result_data["figures"] = getattr(adaptive_result, "figures", {})
         return result_data
 
@@ -175,21 +216,12 @@ class CheckAdaptiveChevron(QubexTask):
             )
         return dict(data)
 
-    def _control_amplitude_from_result(
-        self, result: Mapping[str, Any], label: str, fallback: float
-    ) -> float:
-        for key in ("target_amplitudes", "amplitudes_used"):
-            values = result.get(key)
-            if isinstance(values, Mapping) and label in values:
-                return float(values[label])
-
-        results = result.get("results")
-        if isinstance(results, Mapping):
-            per_target = results.get(label)
-            if isinstance(per_target, Mapping) and "amplitude_used" in per_target:
-                return float(per_target["amplitude_used"])
-
-        return fallback
+    @staticmethod
+    def _target_control_amplitude(result: Mapping[str, Any], label: str) -> Any:
+        target_amplitudes = result.get("target_amplitudes")
+        if not isinstance(target_amplitudes, Mapping):
+            return None
+        return target_amplitudes.get(label)
 
     def _build_figures(
         self, result: Mapping[str, Any], label: str, resonant_freq: float

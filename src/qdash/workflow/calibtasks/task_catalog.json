@@ -527,11 +527,11 @@
         "file_path": "one_qubit_coarse/check_adaptive_chevron.py",
         "input_parameters": {
           "coarse_control_amplitude": {
-            "default_value": 0.0625,
+            "default_value": null,
             "description": "Coarse control pulse amplitude",
             "greater_than_or_equal": 0.0001,
             "less_than_or_equal": 1.0,
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
@@ -557,6 +557,12 @@
             "description": "Time interval between shots",
             "unit": "ns",
             "value": 153600.0,
+            "value_type": "float"
+          },
+          "minimum_peak_background_rms_ratio": {
+            "description": "Minimum final peak/background RMS ratio required to accept the result",
+            "unit": "a.u.",
+            "value": 5.0,
             "value_type": "float"
           },
           "readout_duration": {
