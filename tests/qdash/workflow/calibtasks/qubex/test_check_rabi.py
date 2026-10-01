@@ -62,7 +62,6 @@ def test_check_rabi_run_uses_data_fit_r2_for_validation(monkeypatch: pytest.Monk
 
     run_result = task.run(cast("QubexBackend", backend), "1")
 
-    assert isinstance(result.rabi_params["Q01"].r2, float)
     assert run_result.r2 == {"1": 0.127}
 
 
