@@ -2,11 +2,12 @@ import logging
 import math
 from collections.abc import Generator, Mapping
 from contextlib import ExitStack, contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from qubex.experiment.experiment_constants import HPI_RAMPTIME, PI_RAMPTIME
 from qubex.experiment.models.rabi_param import RabiParam
 
+from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
 from qdash.datamodel.task import (
     InputParameterModel,
     InputParameterSpec,
@@ -15,6 +16,7 @@ from qdash.datamodel.task import (
 )
 from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.qubit import MongoQubitCalibrationRepository
+from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
 from qdash.workflow.calibtasks.base import (
     BaseTask,
     PreProcessResult,
@@ -28,15 +30,46 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+RABI_CONTEXT_PARAMETER_UNITS = {
+    "control_amplitude": "a.u.",
+    "rabi_amplitude": "a.u.",
+    "rabi_phase": "a.u.",
+    "rabi_offset": "a.u.",
+    "rabi_angle": "degree",
+    "rabi_noise": "a.u.",
+    "rabi_distance": "a.u.",
+    "rabi_reference_phase": "a.u.",
+    "rabi_r2": "",
+    "maximum_rabi_frequency": "MHz/a.u.",
+}
+
 
 def readout_duration_run_parameter() -> RunParameterSpec:
     """Declare the shared Qubex readout duration for a measurement task."""
     return RunParameterSpec(
         unit="ns",
         value_type="float",
-        default=None,
-        description="Readout pulse duration. Uses the Qubex session default when unset.",
+        default=DEFAULT_READOUT_DURATION,
+        description="Readout pulse duration shared by the Qubex calibration session.",
     )
+
+
+def required_rabi_normalization_inputs(
+    *,
+    prefix: str = "",
+    qid_role: Literal["self", "control", "target", "coupling"] = "self",
+) -> dict[str, InputParameterSpec]:
+    """Declare the persisted Rabi parameters required for signal normalization."""
+    return {
+        f"{prefix}{name}": InputParameterSpec.required_database(
+            parameter_name=name,
+            qid_role=qid_role,
+            unit=unit,
+            ui_group="Rabi normalization",
+            ui_group_collapsed=True,
+        )
+        for name, unit in RABI_CONTEXT_PARAMETER_UNITS.items()
+    }
 
 
 class QubexTask(BaseTask):
@@ -136,41 +169,120 @@ class QubexTask(BaseTask):
 
     def _restore_rabi_context(self, backend: "QubexBackend", qid: str) -> None:
         """Restore Qubex Rabi context from successful QDash calibration inputs."""
-        names = (
-            "control_amplitude",
-            "rabi_amplitude",
-            "rabi_phase",
-            "rabi_offset",
-            "rabi_angle",
-            "rabi_noise",
-            "rabi_distance",
-            "rabi_reference_phase",
-            "rabi_r2",
-            "maximum_rabi_frequency",
-        )
-        values = self._resolved_input_values(names)
-        if values is None:
-            return
-        rabi_r2 = values["rabi_r2"]
-        if not math.isfinite(rabi_r2) or rabi_r2 < 0.6:
-            raise ValueError(
-                f"{self.name} requires finite rabi_r2 greater than or equal to 0.6; got {rabi_r2}"
+        suffixes = tuple(RABI_CONTEXT_PARAMETER_UNITS)
+        if "-" in qid:
+            control_qid, target_qid = qid.split("-", maxsplit=1)
+            role_qids = {
+                "control_": control_qid,
+                "target_": target_qid,
+            }
+        else:
+            role_qids = {"": qid}
+
+        rabi_params: dict[str, RabiParam] = {}
+        for prefix, role_qid in role_qids.items():
+            names = tuple(f"{prefix}{suffix}" for suffix in suffixes)
+            values = self._resolved_input_values(names)
+            if values is None:
+                continue
+            label = self.get_qubit_label(backend, role_qid)
+            rabi_r2 = values[f"{prefix}rabi_r2"]
+            if not math.isfinite(rabi_r2) or rabi_r2 < 0.6:
+                raise ValueError(
+                    f"{self.name} requires finite {prefix}rabi_r2 greater than or equal to "
+                    f"0.6; got {rabi_r2}"
+                )
+            self._validate_rabi_readout_duration(backend, prefix, role_qid, names)
+            rabi_params[label] = RabiParam(
+                target=label,
+                amplitude=values[f"{prefix}rabi_amplitude"],
+                frequency=(
+                    values[f"{prefix}maximum_rabi_frequency"]
+                    * values[f"{prefix}control_amplitude"]
+                    / 1000
+                ),
+                phase=values[f"{prefix}rabi_phase"],
+                offset=values[f"{prefix}rabi_offset"],
+                noise=values[f"{prefix}rabi_noise"],
+                angle=values[f"{prefix}rabi_angle"],
+                distance=values[f"{prefix}rabi_distance"],
+                r2=rabi_r2,
+                reference_phase=values[f"{prefix}rabi_reference_phase"],
             )
-        exp = self.get_experiment(backend)
-        label = self.get_qubit_label(backend, qid)
-        rabi_param = RabiParam(
-            target=label,
-            amplitude=values["rabi_amplitude"],
-            frequency=(values["maximum_rabi_frequency"] * values["control_amplitude"] / 1000),
-            phase=values["rabi_phase"],
-            offset=values["rabi_offset"],
-            noise=values["rabi_noise"],
-            angle=values["rabi_angle"],
-            distance=values["rabi_distance"],
-            r2=rabi_r2,
-            reference_phase=values["rabi_reference_phase"],
+        if rabi_params:
+            exp = self.get_experiment(backend)
+            exp.store_rabi_params(rabi_params)
+
+    @staticmethod
+    def _parameter_value(parameters: Mapping[str, Any], name: str) -> Any:
+        """Return a persisted parameter value from either a model or a dictionary."""
+        parameter = parameters.get(name)
+        if isinstance(parameter, Mapping):
+            return parameter.get("value")
+        return getattr(parameter, "value", parameter)
+
+    def _validate_rabi_readout_duration(
+        self,
+        backend: "QubexBackend",
+        prefix: str,
+        role_qid: str,
+        names: tuple[str, ...],
+    ) -> None:
+        """Verify that restored Rabi parameters match the active readout duration."""
+        control_amplitude_name = f"{prefix}control_amplitude"
+        source_task_ids = {
+            parameter.task_id
+            for name in names
+            if name != control_amplitude_name
+            if (parameter := self.input_parameters[name]).task_id
+        }
+        if not source_task_ids:
+            raise ValueError(
+                f"{self.name} cannot validate {prefix}Rabi parameters for qid {role_qid}: "
+                "the source task ID was not recorded. Run CheckRabi under the current "
+                "readout conditions before retrying."
+            )
+        if len(source_task_ids) != 1:
+            raise ValueError(
+                f"{self.name} received {prefix}Rabi parameters from multiple source tasks: "
+                + ", ".join(sorted(source_task_ids))
+            )
+
+        project_id = backend.config.get("project_id")
+        if not project_id:
+            raise ValueError(
+                f"{self.name} cannot validate {prefix}Rabi readout duration without project_id"
+            )
+        source_task_id = next(iter(source_task_ids))
+        source_tasks = MongoTaskResultHistoryRepository().find(
+            {"project_id": project_id, "task_id": source_task_id},
+            limit=1,
         )
-        exp.store_rabi_params({label: rabi_param})
+        if not source_tasks:
+            raise ValueError(
+                f"{self.name} cannot find source Rabi task {source_task_id} for qid {role_qid}"
+            )
+        source_task = source_tasks[0]
+        source_duration = self._parameter_value(source_task.run_parameters, "readout_duration")
+        if source_duration is None:
+            source_duration = self._parameter_value(
+                source_task.input_parameters, "readout_duration"
+            )
+        if source_duration is None:
+            raise ValueError(
+                f"{self.name} cannot validate Rabi parameters from task {source_task_id}: "
+                "the source readout_duration was not recorded"
+            )
+
+        source_duration_value = float(source_duration)
+        current_duration = float(self.get_experiment(backend).readout_duration)
+        if not math.isclose(source_duration_value, current_duration):
+            raise ValueError(
+                f"{self.name} cannot use {prefix}Rabi parameters for qid {role_qid}: "
+                f"source readout_duration is {source_duration_value:g} ns, but the current "
+                f"Qubex session uses {current_duration:g} ns. Run CheckRabi under the current "
+                "readout conditions before retrying."
+            )
 
     def _restore_qubit_pulse_context(self, backend: "QubexBackend", qid: str) -> None:
         """Restore pulse parameters consumed implicitly by Qubex experiment methods."""
@@ -451,6 +563,11 @@ class QubexTask(BaseTask):
                             value_type=declaration.value_type,
                             unit=db_value.get("unit", declaration.unit),
                             description=db_value.get("description", declaration.description),
+                            ui_group=declaration.ui_group,
+                            ui_group_collapsed=declaration.ui_group_collapsed,
+                            calibrated_at=db_value.get("calibrated_at", param.calibrated_at),
+                            execution_id=db_value.get("execution_id", ""),
+                            task_id=db_value.get("task_id", ""),
                         )
                     elif declaration is None:
                         # Create ParameterModel entirely from DB
@@ -463,6 +580,15 @@ class QubexTask(BaseTask):
                         # Update existing ParameterModel with DB value
                         if "value" in db_value:
                             param.value = db_value["value"]
+                        for metadata_name in (
+                            "unit",
+                            "description",
+                            "calibrated_at",
+                            "execution_id",
+                            "task_id",
+                        ):
+                            if metadata_name in db_value:
+                                setattr(param, metadata_name, db_value[metadata_name])
             elif isinstance(declaration, InputParameterSpec):
                 if declaration.resolution == "database_required":
                     raise ValueError(

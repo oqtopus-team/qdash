@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ParametersTable } from "../ParametersTable";
@@ -52,5 +52,29 @@ describe("ParametersTable", () => {
     );
 
     expect(screen.getByText("Update status unknown")).toBeTruthy();
+  });
+
+  it("collapses parameter groups declared by persisted UI metadata", () => {
+    render(
+      <ParametersTable
+        title="Input Parameters"
+        parameters={{
+          qubit_frequency: { value: 5.1, unit: "GHz" },
+          normalization_reference: { value: 0.25, unit: "a.u." },
+        }}
+        parameterDefinitions={{
+          normalization_reference: {
+            ui_group: "Normalization context",
+            ui_group_collapsed: true,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("qubit_frequency")).toBeTruthy();
+    const group = screen.getByText("Normalization context").closest("details");
+    expect(group).not.toBeNull();
+    expect(group).not.toHaveAttribute("open");
+    expect(within(group as HTMLElement).getByText("normalization_reference")).toBeTruthy();
   });
 });

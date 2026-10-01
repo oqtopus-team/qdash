@@ -10,6 +10,7 @@ from qdash.datamodel.task import InputParameterSpec
 from qdash.datamodel.task import ParameterModel as BaseParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.base import (
+    RABI_CONTEXT_PARAMETER_UNITS,
     QubexTask,
     readout_duration_run_parameter,
 )
@@ -43,21 +44,64 @@ def test_all_qubex_tasks_use_two_hour_timeout() -> None:
     assert unexpected_timeouts == {}
 
 
+@pytest.mark.parametrize(
+    ("task_name", "role_prefixes"),
+    [
+        ("CreateHPIPulse", {"": "self"}),
+        ("CreatePIPulse", {"": "self"}),
+        ("CreateDRAGHPIPulse", {"": "self"}),
+        ("CreateDRAGPIPulse", {"": "self"}),
+        ("CheckHPIPulse", {"": "self"}),
+        ("CheckPIPulse", {"": "self"}),
+        ("CheckDRAGHPIPulse", {"": "self"}),
+        ("CheckDRAGPIPulse", {"": "self"}),
+        ("CheckT1", {"": "self"}),
+        ("CheckT1Average", {"": "self"}),
+        ("CheckT2Echo", {"": "self"}),
+        ("CheckT2EchoAverage", {"": "self"}),
+        ("CheckRamsey", {"": "self"}),
+        ("RandomizedBenchmarking", {"": "self"}),
+        ("X90InterleavedRandomizedBenchmarking", {"": "self"}),
+        ("X180InterleavedRandomizedBenchmarking", {"": "self"}),
+        ("CheckCrossResonance", {"control_": "control", "target_": "target"}),
+        ("CreateZX90", {"control_": "control", "target_": "target"}),
+        ("CheckZX90", {"control_": "control", "target_": "target"}),
+        (
+            "ZX90InterleavedRandomizedBenchmarking",
+            {"control_": "control", "target_": "target"},
+        ),
+    ],
+)
+def test_rabi_dependent_tasks_declare_normalization_context(
+    task_name: str, role_prefixes: dict[str, str]
+) -> None:
+    task_class = QubexTask.registry["qubex"][task_name]
+    assert "readout_duration" in task_class.run_spec
+
+    for prefix, role in role_prefixes.items():
+        for parameter_name, unit in RABI_CONTEXT_PARAMETER_UNITS.items():
+            spec = task_class.input_spec[f"{prefix}{parameter_name}"]
+            assert spec.parameter_name == parameter_name
+            assert spec.qid_role == role
+            assert spec.unit == unit
+            assert spec.resolution == "database_required"
+
+
 def test_readout_duration_resolves_to_effective_session_value() -> None:
     task = ReadoutDurationTask()
     backend = MagicMock()
-    backend.get_instance.return_value.readout_duration = 2048.0
+    backend.get_instance.return_value.readout_duration = 1024.0
 
     task.resolve_run_parameters(backend, "0")
 
-    assert task.run_parameters["readout_duration"].value == 2048.0
+    assert task.run_parameters["readout_duration"].value == 1024.0
 
 
 def test_readout_duration_rejects_value_that_differs_from_session() -> None:
     task = ReadoutDurationTask()
-    task.run_parameters["readout_duration"].value = 1024.0
+    task.run_parameters["readout_duration"].value = 2048.0
     backend = MagicMock()
-    backend.get_instance.return_value.readout_duration = 2048.0
+    backend.get_instance.return_value.readout_duration = 1024.0
 
     with pytest.raises(ValueError, match="session-scoped"):
         task.resolve_run_parameters(backend, "0")
@@ -67,11 +111,11 @@ def test_readout_duration_is_restored_for_legacy_snapshot() -> None:
     task = ReadoutDurationTask()
     task.run_parameters = {}
     backend = MagicMock()
-    backend.get_instance.return_value.readout_duration = 384.0
+    backend.get_instance.return_value.readout_duration = 1024.0
 
     task.resolve_run_parameters(backend, "0")
 
-    assert task.run_parameters["readout_duration"].value == 384.0
+    assert task.run_parameters["readout_duration"].value == 1024.0
 
 
 def _make_backend(project_id: str = "proj1", chip_id: str = "chip1") -> MagicMock:
@@ -95,7 +139,13 @@ class TestLoadParametersFromDbQubitTask:
         }
 
         qubit_data = {
-            "qubit_frequency": {"value": 5.2, "unit": "GHz", "description": "Qubit freq"},
+            "qubit_frequency": {
+                "value": 5.2,
+                "unit": "GHz",
+                "description": "Qubit freq",
+                "execution_id": "execution-1",
+                "task_id": "task-1",
+            },
         }
 
         backend = _make_backend()
@@ -108,6 +158,8 @@ class TestLoadParametersFromDbQubitTask:
         param = task.input_parameters["control_qubit_frequency"]
         assert param is not None
         assert param.value == 5.2
+        assert param.execution_id == "execution-1"
+        assert param.task_id == "task-1"
 
     def test_input_parameter_alias_resolves_legacy_database_key(self) -> None:
         class AliasedInputTask(ConcreteQubexTask):
@@ -203,6 +255,28 @@ class TestLoadParametersFromDbQubitTask:
             task._load_parameters_from_db(_make_backend(), "0")
 
         assert task.input_parameters["amplitude"].value == 0.25
+
+    def test_database_resolution_preserves_input_ui_group_metadata(self):
+        class GroupedInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "reference": InputParameterSpec.required_database(
+                    ui_group="Normalization",
+                    ui_group_collapsed=True,
+                )
+            }
+
+        task = GroupedInputTask()
+        with patch(
+            "qdash.workflow.calibtasks.qubex.base.MongoQubitCalibrationRepository"
+        ) as mock_repo:
+            mock_repo.return_value.get_calibration_data.return_value = {
+                "reference": {"value": 0.25}
+            }
+            task._load_parameters_from_db(_make_backend(), "0")
+
+        parameter = task.input_parameters["reference"]
+        assert parameter.ui_group == "Normalization"
+        assert parameter.ui_group_collapsed is True
 
     def test_default_only_ignores_database_value(self):
         class FixedInputTask(ConcreteQubexTask):

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from prefect import get_run_logger
 
-from qdash.datamodel.task import RunParameterModel
+from qdash.datamodel.task import RunParameterModel, TaskTypes
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.task.context import TaskContext
@@ -224,9 +224,12 @@ class CalibOrchestrator:
 
         # Build note_path using task_context.id
         note_path = f"{config.calib_data_path}/calib_note/{self._task_context.id}.json"
+        task_type = (
+            TaskTypes.COUPLING if any("-" in qid for qid in config.qids) else TaskTypes.QUBIT
+        )
 
         session_config: dict[str, Any] = {
-            "task_type": "qubit",
+            "task_type": task_type,
             "username": config.username,
             "qids": config.qids,
             "note_path": note_path,
