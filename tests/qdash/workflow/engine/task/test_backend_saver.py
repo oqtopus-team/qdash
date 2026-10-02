@@ -11,6 +11,7 @@ from qdash.workflow.engine.task.backend_saver import BackendSaver
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.execution.service import ExecutionService
+    from qdash.workflow.engine.task.types import TaskProtocol
 
 
 def test_save_mux_qid_syncs_backend_params_for_distributed_outputs() -> None:
@@ -291,7 +292,13 @@ def test_save_qubex_publishes_measurement_and_operational_frequency() -> None:
             "qubit_frequency": {"value": 5.1},
             "control_frequency": {"value": 5.0},
         }
-        saver.save(FrequencyTask(), execution_service, "1", backend, success=True)
+        saver.save(
+            cast("TaskProtocol", FrequencyTask()),
+            execution_service,
+            "1",
+            backend,
+            success=True,
+        )
 
     persisted = qubit_repo_cls.return_value.update_calib_data.call_args.kwargs["output_parameters"]
     assert set(persisted) == {"qubit_frequency", "control_frequency"}
