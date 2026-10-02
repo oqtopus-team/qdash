@@ -7,7 +7,6 @@ import {
   createAgentSession,
   type CreateAgentSessionResult,
 } from "@earendil-works/pi-coding-agent";
-import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 
 import { resolveQDashApiToken } from "./auth.ts";
 import { chartTool } from "./chart-tool.ts";
@@ -25,27 +24,6 @@ const COPILOT_CONFIG_PATH =
   process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
 const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
 const REVIEW_CONFIG_PATH = process.env.REVIEW_CONFIG_PATH ?? "/app/config/copilot/review.yaml";
-const HTTP_IDLE_TIMEOUT_MS = Number(process.env.HTTP_IDLE_TIMEOUT_MS ?? 300_000);
-
-/**
- * Restore proxy support after importing pi.
- *
- * Pi replaces globalThis.fetch with npm undici's, which drops Node's built-in
- * NODE_USE_ENV_PROXY handling. Pi's CLI reinstalls a proxy-aware dispatcher at
- * startup, but the SDK does not, so behind a proxy every LLM call fails with
- * UND_ERR_CONNECT_TIMEOUT. HTTP(S)_PROXY and NO_PROXY are read from the
- * environment.
- */
-function installProxyAwareDispatcher(): void {
-  setGlobalDispatcher(
-    new EnvHttpProxyAgent({
-      allowH2: false,
-      proxyTunnel: true,
-      bodyTimeout: HTTP_IDLE_TIMEOUT_MS,
-      headersTimeout: HTTP_IDLE_TIMEOUT_MS,
-    }),
-  );
-}
 
 /** Thinking level requested per model in QDash's chat config. */
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
@@ -78,8 +56,6 @@ export class SharedRuntime {
   ) {}
 
   static async create(): Promise<SharedRuntime> {
-    installProxyAwareDispatcher();
-    // Must follow the dispatcher install so the QDash origin bypasses any proxy.
     await resolveQDashApiToken();
 
     const { responseLanguage, thinkingLanguage } = loadLanguageConfig(COPILOT_CONFIG_PATH);

@@ -254,9 +254,8 @@ services:
       # ignores it. Keep a placeholder for keyless local endpoints.
       - OLLAMA_API_KEY=${OLLAMA_API_KEY:-ollama}
       - VLLM_API_KEY=${VLLM_API_KEY:-vllm}
-      # Node's fetch ignores HTTP(S)_PROXY unless this is set, so LLM calls hang
-      # behind a proxy. Internal service names must then bypass that proxy.
-      - NODE_USE_ENV_PROXY=1
+      # Bun's fetch reads HTTP(S)_PROXY on its own; internal service names must
+      # bypass that proxy.
       - NO_PROXY=${NO_PROXY:-localhost,127.0.0.1},api,agent-runtime
       - no_proxy=${NO_PROXY:-localhost,127.0.0.1},api,agent-runtime
     depends_on:
