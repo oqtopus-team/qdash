@@ -13,7 +13,10 @@ import { BlockNoteView } from "@blocknote/mantine";
 
 import { DARK_THEMES, type ThemeName } from "@/constants/themes";
 import { blockNoteSchema } from "@/lib/blocknote/codeBlock";
-import { useCodeBlockLanguageDetection, withDetectedCodeLanguages } from "@/lib/blocknote/codeBlockLanguage";
+import {
+  useCodeBlockLanguageDetection,
+  withDetectedCodeLanguages,
+} from "@/lib/blocknote/codeBlockLanguage";
 import { uploadInlineFile } from "@/lib/blocknote/inlineFileUpload";
 
 // Reuse the cryo BlockNote theme (scoped to the `.wiring-blocknote` wrapper).

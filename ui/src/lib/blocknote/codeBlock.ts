@@ -6,6 +6,8 @@ import {
   type CodeBlockOptions,
 } from "@blocknote/core";
 
+import { withCodeBlockCopyButton } from "./codeBlockCopyButton";
+
 const supportedLanguages: NonNullable<CodeBlockOptions["supportedLanguages"]> = {
   text: codeBlockOptions.supportedLanguages.text,
   python: codeBlockOptions.supportedLanguages.python,
@@ -24,10 +26,12 @@ const supportedLanguages: NonNullable<CodeBlockOptions["supportedLanguages"]> = 
 export const blockNoteSchema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
-    codeBlock: createCodeBlockSpec({
-      ...codeBlockOptions,
-      defaultLanguage: "text",
-      supportedLanguages,
-    }),
+    codeBlock: withCodeBlockCopyButton(
+      createCodeBlockSpec({
+        ...codeBlockOptions,
+        defaultLanguage: "text",
+        supportedLanguages,
+      }),
+    ),
   },
 });

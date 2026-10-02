@@ -39,7 +39,7 @@ const HLJS_TO_BLOCKNOTE_LANGUAGE: Record<string, string> = {
   yaml: "yaml",
 };
 
-const MIN_RELEVANCE = 5;
+const MIN_RELEVANCE = 2;
 
 function detectJson(trimmed: string): boolean {
   if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return false;
@@ -59,5 +59,6 @@ export function detectCodeLanguage(code: string): string | null {
 
   const result = hljs.highlightAuto(trimmed, HLJS_LANGUAGE_SUBSET);
   if (!result.language || result.relevance < MIN_RELEVANCE) return null;
+  if (result.relevance <= (result.secondBest?.relevance ?? 0)) return null;
   return HLJS_TO_BLOCKNOTE_LANGUAGE[result.language] ?? null;
 }

@@ -85,4 +85,25 @@ function summarize(chip: ChipSummary): string {
       detectCodeLanguage("This is just a plain English sentence describing something."),
     ).toBeNull();
   });
+
+  it("detects a short python snippet that clearly beats the runner-up", () => {
+    expect(detectCodeLanguage('import request\n\nprint("hello")')).toBe("python");
+  });
+
+  it("returns null when the top two languages tie", () => {
+    expect(detectCodeLanguage('print("hello")')).toBeNull();
+    expect(detectCodeLanguage("import numpy as np")).toBeNull();
+  });
+
+  it("returns null for two unrelated words", () => {
+    expect(detectCodeLanguage("hello world")).toBeNull();
+  });
+
+  it("returns null for a note-like sentence with low relevance", () => {
+    expect(detectCodeLanguage("This is a note about calibration results.")).toBeNull();
+  });
+
+  it("detects a short bash snippet as shellscript", () => {
+    expect(detectCodeLanguage("ls -la\ncd /tmp")).toBe("shellscript");
+  });
 });

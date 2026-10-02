@@ -16,7 +16,7 @@ function inlineText(node: unknown): string {
 }
 
 function isAutoLanguage(language: unknown): boolean {
-  return language === undefined || language === "text";
+  return !language || language === "text";
 }
 
 function detectBlockLanguage(block: BlockRecord): string | null {
@@ -44,40 +44,57 @@ export function withDetectedCodeLanguages(blocks: BlockRecord[]): BlockRecord[] 
   return blocks.map(withDetectedLanguage);
 }
 
-/** Walks `blocks` recursively and returns the detected language for each auto code block. */
-export function collectCodeLanguageUpdates(
-  blocks: BlockRecord[],
-): { id: string; language: string }[] {
-  const updates: { id: string; language: string }[] = [];
+type BlockChangeRecord = {
+  type: "insert" | "delete" | "update" | "move";
+  block: BlockRecord;
+  prevBlock?: BlockRecord;
+};
 
-  const visit = (block: BlockRecord) => {
-    const detected = detectBlockLanguage(block);
-    if (detected) {
-      updates.push({ id: block.id as string, language: detected });
-    }
-    const children = block.children;
-    if (Array.isArray(children)) {
-      (children as BlockRecord[]).forEach(visit);
-    }
-  };
+/** Returns the ids of code blocks inserted, or updated with changed text, by `changes`. */
+export function changedCodeBlockIds(changes: BlockChangeRecord[]): string[] {
+  const ids: string[] = [];
 
-  blocks.forEach(visit);
-  return updates;
+  for (const change of changes) {
+    if (change.block.type !== "codeBlock") continue;
+
+    if (change.type === "insert") {
+      ids.push(change.block.id as string);
+    } else if (change.type === "update" && change.prevBlock) {
+      if (inlineText(change.block.content) !== inlineText(change.prevBlock.content)) {
+        ids.push(change.block.id as string);
+      }
+    }
+  }
+
+  return ids;
 }
 
 const DETECTION_DEBOUNCE_MS = 500;
 
-/** Detects and applies languages for auto code blocks as the editor's content changes. */
+/** Detects and applies languages for auto code blocks whose text content changes. */
 export function useCodeBlockLanguageDetection(editor: QDashEditor): void {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const pendingIds = new Set<string>();
 
-    const unsubscribe = editor.onChange(() => {
+    const unsubscribe = editor.onChange((_editor, context) => {
+      const changedIds = changedCodeBlockIds(
+        context.getChanges() as unknown as BlockChangeRecord[],
+      );
+      if (changedIds.length === 0) return;
+      for (const id of changedIds) pendingIds.add(id);
+
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        const updates = collectCodeLanguageUpdates(editor.document as unknown as BlockRecord[]);
-        for (const { id, language } of updates) {
-          editor.updateBlock(id, { type: "codeBlock", props: { language } });
+        const ids = [...pendingIds];
+        pendingIds.clear();
+        for (const id of ids) {
+          const block = editor.getBlock(id) as BlockRecord | undefined;
+          if (!block) continue;
+          const detected = detectBlockLanguage(block);
+          if (detected) {
+            editor.updateBlock(id, { type: "codeBlock", props: { language: detected } });
+          }
         }
       }, DETECTION_DEBOUNCE_MS);
     });

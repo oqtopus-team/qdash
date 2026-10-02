@@ -8,7 +8,10 @@ import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 
 import { blockNoteSchema } from "@/lib/blocknote/codeBlock";
-import { useCodeBlockLanguageDetection, withDetectedCodeLanguages } from "@/lib/blocknote/codeBlockLanguage";
+import {
+  useCodeBlockLanguageDetection,
+  withDetectedCodeLanguages,
+} from "@/lib/blocknote/codeBlockLanguage";
 import { uploadInlineFile } from "@/lib/blocknote/inlineFileUpload";
 
 import "./blocknote-theme.css";

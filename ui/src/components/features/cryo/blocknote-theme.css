@@ -150,6 +150,7 @@
 
 /* Code block: dark, syntax-highlighted look in both light and dark themes */
 .wiring-blocknote .bn-block-content[data-content-type="codeBlock"] {
+  position: relative;
   background-color: #24292e;
   color: #e1e4e8;
   border: 1px solid #1b1f23;
@@ -160,7 +161,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.85rem;
   line-height: 1.6;
-  padding: 1rem 1.25rem;
+  padding: 1rem 2.5rem 1rem 1.25rem;
   overflow-x: auto;
 }
 
@@ -169,6 +170,45 @@
   color: #e1e4e8;
   border: none !important;
   font-size: 0.75rem;
+}
+
+.wiring-blocknote .bn-block-content[data-content-type="codeBlock"] .bn-code-block-copy-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.375rem;
+  background-color: color-mix(in oklch, #e1e4e8 10%, transparent);
+  color: color-mix(in oklch, #e1e4e8 70%, transparent);
+  cursor: pointer;
+  opacity: 0.6;
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.wiring-blocknote .bn-block-content[data-content-type="codeBlock"] .bn-code-block-copy-button:hover,
+.wiring-blocknote
+  .bn-block-content[data-content-type="codeBlock"]
+  .bn-code-block-copy-button:focus-visible {
+  opacity: 1;
+  background-color: color-mix(in oklch, #e1e4e8 18%, transparent);
+  color: #e1e4e8;
+}
+
+.wiring-blocknote
+  .bn-block-content[data-content-type="codeBlock"]
+  .bn-code-block-copy-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
 }
 
 /* Image block: drop shadow + bordered, looks like a real attachment */
