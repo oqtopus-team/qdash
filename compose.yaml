@@ -166,8 +166,6 @@ services:
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
       # Automatic AI review posts here when copilot_backend is pi.
       - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
-      - NO_PROXY=${NO_PROXY:-localhost,127.0.0.1},api,agent-runtime
-      - no_proxy=${NO_PROXY:-localhost,127.0.0.1},api,agent-runtime
     networks:
       - custom_net
   api:
@@ -254,10 +252,8 @@ services:
       # ignores it. Keep a placeholder for keyless local endpoints.
       - OLLAMA_API_KEY=${OLLAMA_API_KEY:-ollama}
       - VLLM_API_KEY=${VLLM_API_KEY:-vllm}
-      # Bun's fetch reads HTTP(S)_PROXY on its own; internal service names must
-      # bypass that proxy.
-      - NO_PROXY=${NO_PROXY:-localhost,127.0.0.1},api,agent-runtime
-      - no_proxy=${NO_PROXY:-localhost,127.0.0.1},api,agent-runtime
+      # Bun's fetch reads HTTP(S)_PROXY on its own. NO_PROXY comes from .env via
+      # env_file; redeclaring it here would let an ambient shell value win.
     depends_on:
       api:
         condition: service_started
