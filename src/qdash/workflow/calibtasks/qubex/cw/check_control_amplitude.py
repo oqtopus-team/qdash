@@ -42,7 +42,9 @@ class CheckControlAmplitude(QubexTask):
         # Coarse f01 from CheckQubitSpectroscopy (5 MHz grid). The sqrt-Lorentzian
         # fit refines this to sub-MHz precision and writes back coarse_qubit_frequency.
         "coarse_qubit_frequency": InputParameterSpec.required_database(),
-        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
         "readout_amplitude": InputParameterSpec.required_database(),
         # Seed drive amplitude. Comes from CheckQubitSpectroscopy and is the
         # threshold amplitude where f01 first appears in the spectroscopy heatmap

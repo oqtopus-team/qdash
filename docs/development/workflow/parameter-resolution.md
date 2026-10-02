@@ -23,7 +23,8 @@ Every calibration input spec explicitly states its resolution and override polic
 
 ```python
 input_spec = {
-    "qubit_frequency": InputParameterSpec.required_database(
+    "control_frequency": InputParameterSpec.required_database(
+        fallback_parameter_names=("qubit_frequency",),
         unit="GHz",
     ),
     "readout_amplitude": InputParameterSpec.database_or_default(
@@ -41,7 +42,7 @@ input_spec = {
 
 The constructors default to allowing user overrides; pass `user_override="forbidden"` when a task must prohibit them. A permitted user override has higher precedence than the selected baseline. The constructor's `default` is spec-time fallback data; the effective runtime value is stored separately in `input_parameters` as an `InputParameterModel`.
 
-For coupling tasks, `InputParameterSpec.parameter_name` selects the database key and `InputParameterSpec.qid_role` selects `control`, `target`, or `coupling` data. Qubit tasks read from the selected qubit record.
+For coupling tasks, `InputParameterSpec.parameter_name` selects the database key and `InputParameterSpec.qid_role` selects `control`, `target`, or `coupling` data. Qubit tasks read from the selected qubit record. `parameter_aliases` lists legacy names with identical semantics. `fallback_parameter_names` lists lower-priority parameters with different semantics, such as resolving `control_frequency` from `qubit_frequency` only when the operational value is absent.
 
 ## Normal workflow execution
 

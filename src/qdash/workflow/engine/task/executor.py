@@ -860,11 +860,20 @@ class TaskExecutor:
                 continue
             lookup_key = declaration.parameter_name or param_name
             prefix = param_name[: -len(lookup_key)] if param_name.endswith(lookup_key) else ""
-            for alias in declaration.parameter_aliases:
-                alias_key = f"{prefix}{alias}"
-                if param_name not in normalized_input and alias_key in snap_input:
-                    normalized_input[param_name] = snap_input[alias_key]
-                normalized_input.pop(alias_key, None)
+            compatible_names = (
+                *declaration.parameter_aliases,
+                *declaration.fallback_parameter_names,
+            )
+            for compatible_name in compatible_names:
+                compatible_key = f"{prefix}{compatible_name}"
+                if param_name not in normalized_input and compatible_key in snap_input:
+                    compatible_value = snap_input[compatible_key]
+                    if isinstance(compatible_value, dict):
+                        compatible_value = dict(compatible_value)
+                        if not compatible_value.get("parameter_name"):
+                            compatible_value["parameter_name"] = compatible_name
+                    normalized_input[param_name] = compatible_value
+                normalized_input.pop(compatible_key, None)
         snap_input = normalized_input
         if self._snapshot_loader.requires_snapshot(task_name):
             missing_inputs = set(declarations) - set(snap_input)

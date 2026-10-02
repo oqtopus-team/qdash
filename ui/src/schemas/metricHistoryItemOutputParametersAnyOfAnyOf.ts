@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { MetricHistoryItemOutputParametersAnyOfAnyOfCalibratedAt } from './metricHistoryItemOutputParametersAnyOfAnyOfCalibratedAt';
+import type { MetricHistoryItemOutputParametersAnyOfAnyOfDatabaseUpdatesItem } from './metricHistoryItemOutputParametersAnyOfAnyOfDatabaseUpdatesItem';
 import type { MetricHistoryItemOutputParametersAnyOfAnyOfSource } from './metricHistoryItemOutputParametersAnyOfAnyOfSource';
 
 /**
@@ -26,5 +27,6 @@ export type MetricHistoryItemOutputParametersAnyOfAnyOf = {
   task_id?: string;
   previous_database_value?: unknown;
   database_updated?: boolean;
+  database_updates?: MetricHistoryItemOutputParametersAnyOfAnyOfDatabaseUpdatesItem[];
   [key: string]: unknown;
  };

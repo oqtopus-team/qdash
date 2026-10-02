@@ -41,7 +41,9 @@ class CheckQubitSpectroscopy(QubexTask):
     name: str = "CheckQubitSpectroscopy"
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
-        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
         "readout_amplitude": InputParameterSpec.required_database(),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {

@@ -21,6 +21,7 @@ from qdash.api.schemas.calibration import (
     SeedImportResultItem,
     SeedImportSource,
 )
+from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.paths import QUBEX_CONFIG_BASE
 from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
@@ -37,11 +38,32 @@ logger = logging.getLogger(__name__)
 
 # Default seed parameters that are commonly imported
 DEFAULT_SEED_PARAMETERS = [
-    "qubit_frequency",
-    "readout_amplitude",
-    "readout_frequency",
     "control_amplitude",
+    "readout_amplitude",
+    "control_frequency",
+    "readout_frequency",
 ]
+
+
+def _load_importable_parameter_names() -> set[str] | None:
+    """Load the optional seed-import YAML allowlist as parameter names."""
+    workflow_settings = ConfigLoader.load_workflow()
+    if not isinstance(workflow_settings, dict):
+        return None
+    seed_import_settings = workflow_settings.get("seed_import", {})
+    if not isinstance(seed_import_settings, dict):
+        raise ValueError("workflow.seed_import must be a mapping")
+    value = seed_import_settings.get("params_file_names")
+    if value is None:
+        return None
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError("workflow.seed_import.params_file_names must be a list of strings")
+    invalid_names = [item for item in value if re.fullmatch(r"[a-zA-Z0-9_-]+\.yaml", item) is None]
+    if invalid_names:
+        raise ValueError(
+            "workflow.seed_import.params_file_names must contain plain .yaml file names"
+        )
+    return {pathlib.Path(file_name).stem for file_name in value}
 
 
 class SeedImportService:
@@ -65,6 +87,16 @@ class SeedImportService:
         self._param_version_repo = param_version_repo or MongoParameterVersionRepository()
         self._relation_repo = relation_repo or MongoProvenanceRelationRepository()
         self._user_repository = user_repository or MongoUserRepository()
+        self._importable_parameters = _load_importable_parameter_names()
+
+    def _validate_importable_parameters(self, parameters: set[str]) -> None:
+        """Reject parameters outside the configured seed-import allowlist."""
+        importable_parameters = getattr(self, "_importable_parameters", None)
+        if importable_parameters is None:
+            return
+        disallowed = sorted(parameters - importable_parameters)
+        if disallowed:
+            raise ValueError("Parameters are not allowed for seed import: " + ", ".join(disallowed))
 
     def _params_dir(self, chip_id: str) -> pathlib.Path:
         """Get the params directory for a chip.
@@ -149,6 +181,7 @@ class SeedImportService:
         """
         params_dir = self._params_dir(request.chip_id)
         parameters = request.parameters or DEFAULT_SEED_PARAMETERS
+        self._validate_importable_parameters(set(parameters))
         results: list[SeedImportResultItem] = []
         imported_count = 0
         skipped_count = 0
@@ -299,6 +332,7 @@ class SeedImportService:
         """
         if not request.manual_data:
             raise ValueError("manual_data is required for MANUAL source")
+        self._validate_importable_parameters(set(request.manual_data))
 
         results: list[SeedImportResultItem] = []
         imported_count = 0
@@ -603,10 +637,13 @@ class SeedImportService:
         if not params_dir.exists():
             return []
 
+        importable_parameters = getattr(self, "_importable_parameters", None)
         return [
             p.stem
             for p in params_dir.glob("*.yaml")
-            if not p.name.endswith(".lock") and p.stem not in ("params", "props")
+            if not p.name.endswith(".lock")
+            and p.stem not in ("params", "props")
+            and (importable_parameters is None or p.stem in importable_parameters)
         ]
 
     def compare_seed_values(

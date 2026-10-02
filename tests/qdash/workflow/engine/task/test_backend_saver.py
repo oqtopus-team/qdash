@@ -2,7 +2,11 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock, patch
 
-from qdash.datamodel.task import ParameterModel
+from qdash.datamodel.task import (
+    OutputParameterSpec,
+    OutputPublishTarget,
+    ParameterModel,
+)
 from qdash.workflow.engine.task.backend_saver import BackendSaver
 
 if TYPE_CHECKING:
@@ -229,3 +233,86 @@ def test_save_qubex_records_previous_database_value_for_coupling() -> None:
     coupling_repo_cls.return_value.get_calibration_data_for_update.assert_called_once_with(
         username="alice", project_id="proj-1", chip_id="chip-1", qid="0-1"
     )
+
+
+def test_save_qubex_publishes_measurement_and_operational_frequency() -> None:
+    class FrequencyTask:
+        backend = "qubex"
+        output_spec = {
+            "qubit_frequency": OutputParameterSpec(
+                unit="GHz",
+                publish_targets=(
+                    OutputPublishTarget(parameter_name="qubit_frequency", role="measurement"),
+                    OutputPublishTarget(parameter_name="control_frequency", role="operational"),
+                ),
+            )
+        }
+
+        @staticmethod
+        def get_name() -> str:
+            return "CheckChevron"
+
+        @staticmethod
+        def get_task_type() -> str:
+            return "qubit"
+
+        @staticmethod
+        def is_qubit_task() -> bool:
+            return True
+
+        @staticmethod
+        def is_coupling_task() -> bool:
+            return False
+
+    output_parameters = {
+        "qubit_frequency": ParameterModel(value=5.2, unit="GHz"),
+    }
+    task_model = SimpleNamespace(output_parameters=output_parameters)
+    state_manager = MagicMock()
+    state_manager.get_task.return_value = task_model
+    execution_service = cast(
+        "ExecutionService",
+        SimpleNamespace(execution_id="exec-1", chip_id="chip-1", project_id="proj-1"),
+    )
+    backend = MagicMock()
+    backend.name = "qubex"
+    updater = MagicMock()
+    saver = BackendSaver(state_manager, "alice", "/tmp/calib", "tm-1")
+
+    with (
+        patch("qdash.repository.MongoQubitCalibrationRepository") as qubit_repo_cls,
+        patch("qdash.repository.MongoCouplingCalibrationRepository"),
+        patch(
+            "qdash.workflow.engine.task.backend_saver.get_params_updater",
+            return_value=updater,
+        ),
+    ):
+        qubit_repo_cls.return_value.get_calibration_data_for_update.return_value = {
+            "qubit_frequency": {"value": 5.1},
+            "control_frequency": {"value": 5.0},
+        }
+        saver.save(FrequencyTask(), execution_service, "1", backend, success=True)
+
+    persisted = qubit_repo_cls.return_value.update_calib_data.call_args.kwargs["output_parameters"]
+    assert set(persisted) == {"qubit_frequency", "control_frequency"}
+    assert persisted["qubit_frequency"]["value"] == 5.2
+    assert persisted["control_frequency"]["value"] == 5.2
+    updater.update.assert_called_once_with("1", persisted)
+
+    updates = task_model.output_parameters["qubit_frequency"]["database_updates"]
+    assert updates == [
+        {
+            "parameter_name": "qubit_frequency",
+            "role": "measurement",
+            "previous_value": 5.1,
+            "updated_value": 5.2,
+            "updated": True,
+        },
+        {
+            "parameter_name": "control_frequency",
+            "role": "operational",
+            "previous_value": 5.0,
+            "updated_value": 5.2,
+            "updated": True,
+        },
+    ]

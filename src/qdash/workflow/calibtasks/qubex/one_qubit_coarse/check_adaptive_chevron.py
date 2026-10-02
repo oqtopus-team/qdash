@@ -8,6 +8,7 @@ from qubex.experiment.experiment_constants import DEFAULT_INTERVAL, DEFAULT_SHOT
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
+    OutputPublishTarget,
     RunParameterSpec,
 )
 from qdash.workflow.calibtasks.base import (
@@ -33,7 +34,9 @@ class CheckAdaptiveChevron(QubexTask):
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "coarse_qubit_frequency": InputParameterSpec.required_database(),
-        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
         "readout_amplitude": InputParameterSpec.required_database(),
         "coarse_control_amplitude": InputParameterSpec.required_database(
             greater_than_or_equal=CONTROL_AMPLITUDE_MIN,
@@ -65,7 +68,12 @@ class CheckAdaptiveChevron(QubexTask):
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "qubit_frequency": OutputParameterSpec(
-            unit="GHz", description="Qubit bare frequency (coarse)"
+            unit="GHz",
+            description="Qubit bare frequency (coarse)",
+            publish_targets=(
+                OutputPublishTarget(parameter_name="qubit_frequency", role="measurement"),
+                OutputPublishTarget(parameter_name="control_frequency", role="operational"),
+            ),
         ),
         "control_amplitude": OutputParameterSpec(
             unit="a.u.", description="Control pulse amplitude estimated by adaptive chevron"

@@ -547,6 +547,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -665,7 +668,10 @@
           },
           "control_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -681,6 +687,9 @@
           },
           "control_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
@@ -764,7 +773,10 @@
           },
           "target_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -780,6 +792,9 @@
           },
           "target_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
@@ -911,7 +926,10 @@
           },
           "control_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -927,6 +945,9 @@
           },
           "control_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
@@ -1010,7 +1031,10 @@
           },
           "target_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -1026,6 +1050,9 @@
           },
           "target_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
@@ -1086,8 +1113,11 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "qubit_frequency": {
+          "control_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -1098,6 +1128,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -1105,7 +1138,7 @@
         "name": "CheckChevron",
         "run_parameters": {
           "detuning_range": {
-            "description": "Drive-frequency detuning sweep around qubit_frequency",
+            "description": "Drive-frequency detuning sweep around control_frequency",
             "unit": "GHz",
             "value": [
               -0.05,
@@ -1159,9 +1192,12 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "qubit_frequency": {
+          "control_frequency": {
             "default_value": null,
             "description": "Qubit drive frequency for the Rabi sweep",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
             "greater_than": 0,
             "resolution": "database_required",
             "unit": "GHz",
@@ -1178,6 +1214,9 @@
           "readout_frequency": {
             "default_value": null,
             "description": "Center frequency of the readout sweep",
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "greater_than": 0,
             "resolution": "database_required",
             "unit": "GHz",
@@ -1259,6 +1298,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -1358,7 +1400,10 @@
           },
           "control_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -1454,6 +1499,9 @@
           },
           "control_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
@@ -1509,7 +1557,10 @@
           },
           "target_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -1605,6 +1656,9 @@
           },
           "target_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
@@ -1668,6 +1722,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "drag_hpi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -1694,11 +1756,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -1788,6 +1845,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -1836,6 +1896,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "drag_pi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -1862,11 +1930,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -1956,6 +2019,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -2004,6 +2070,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "hpi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -2022,11 +2096,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -2116,6 +2185,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -2239,6 +2311,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "maximum_rabi_frequency": {
             "default_value": null,
             "parameter_name": "maximum_rabi_frequency",
@@ -2259,11 +2339,6 @@
             "parameter_aliases": [
               "pi_length"
             ],
-            "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -2354,6 +2429,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -2399,6 +2477,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -2456,8 +2537,11 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
-          "qubit_frequency": {
+          "control_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -2470,6 +2554,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -2522,6 +2609,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "hpi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -2540,11 +2635,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -2634,6 +2724,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -2750,6 +2843,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "hpi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -2768,11 +2869,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -2862,6 +2958,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -2914,6 +3013,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "hpi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -2932,11 +3039,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -3026,6 +3128,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -3084,6 +3189,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "hpi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -3114,11 +3227,6 @@
             "parameter_aliases": [
               "pi_length"
             ],
-            "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -3209,6 +3317,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -3261,6 +3372,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "hpi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -3291,11 +3410,6 @@
             "parameter_aliases": [
               "pi_length"
             ],
-            "resolution": "database_required",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
             "resolution": "database_required",
             "user_override": "allowed"
           },
@@ -3386,6 +3500,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -3580,7 +3697,10 @@
           },
           "control_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -3676,6 +3796,9 @@
           },
           "control_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
@@ -3752,7 +3875,10 @@
           },
           "target_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -3848,6 +3974,9 @@
           },
           "target_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
@@ -3940,6 +4069,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "maximum_rabi_frequency": {
             "default_value": null,
             "parameter_name": "maximum_rabi_frequency",
@@ -3948,11 +4085,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -4042,6 +4174,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -4090,6 +4225,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "maximum_rabi_frequency": {
             "default_value": null,
             "parameter_name": "maximum_rabi_frequency",
@@ -4098,11 +4241,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -4192,6 +4330,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -4240,6 +4381,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "maximum_rabi_frequency": {
             "default_value": null,
             "parameter_name": "maximum_rabi_frequency",
@@ -4248,11 +4397,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -4342,6 +4486,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -4390,6 +4537,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "maximum_rabi_frequency": {
             "default_value": null,
             "parameter_name": "maximum_rabi_frequency",
@@ -4398,11 +4553,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -4492,6 +4642,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -4630,7 +4783,10 @@
           },
           "control_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -4726,6 +4882,9 @@
           },
           "control_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
@@ -4802,7 +4961,10 @@
           },
           "target_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -4898,6 +5060,9 @@
           },
           "target_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
@@ -4969,6 +5134,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "drag_hpi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -4995,11 +5168,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -5089,6 +5257,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -5127,6 +5298,14 @@
         "description": "Task to classify the readout.",
         "file_path": "measurement/readout_classification.py",
         "input_parameters": {
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "drag_hpi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -5145,11 +5324,6 @@
             "resolution": "database_required",
             "user_override": "allowed"
           },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
-            "user_override": "allowed"
-          },
           "readout_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -5157,6 +5331,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -5215,6 +5392,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "drag_hpi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -5259,11 +5444,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -5353,6 +5533,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -5401,6 +5584,14 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
           "drag_hpi_amplitude": {
             "default_value": null,
             "resolution": "database_required",
@@ -5427,11 +5618,6 @@
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -5521,6 +5707,9 @@
           },
           "readout_frequency": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "resolution": "database_required",
             "user_override": "allowed"
           }
@@ -5659,7 +5848,10 @@
           },
           "control_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -5755,6 +5947,9 @@
           },
           "control_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_or_default",
@@ -5858,7 +6053,10 @@
           },
           "target_qubit_frequency": {
             "default_value": 0,
-            "parameter_name": "qubit_frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",
             "unit": "GHz",
@@ -5954,6 +6152,9 @@
           },
           "target_readout_frequency": {
             "default_value": 0,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_or_default",

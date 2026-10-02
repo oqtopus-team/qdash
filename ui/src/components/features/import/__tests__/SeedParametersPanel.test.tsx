@@ -54,6 +54,12 @@ vi.mock("@/client/calibration/calibration", () => ({
                 qdash_value: null,
                 status: "new",
               },
+              "4": {
+                yaml_qid: "Q04",
+                yaml_value: 5.4,
+                qdash_value: null,
+                status: "new",
+              },
             },
           },
         },
@@ -126,6 +132,10 @@ afterEach(() => {
   refetchQubits.mockClear();
 });
 
+function openImportView() {
+  fireEvent.click(screen.getByRole("tab", { name: "Import from YAML" }));
+}
+
 describe("SeedParametersPanel", () => {
   it("selects the latest active chip by default", async () => {
     render(<SeedParametersPanel />);
@@ -145,13 +155,31 @@ describe("SeedParametersPanel", () => {
     expect(screen.getByText("coherence_time")).toBeTruthy();
     fireEvent.click(screen.getByText("coherence_time"));
     expect(screen.getByText("42.0000")).toBeTruthy();
-    expect(screen.getByText("Current")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Edit coherence_time for qubit 0" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Import from YAML/ })).toBeNull();
+  });
+
+  it("separates read-only database values from importable YAML parameters", () => {
+    render(<SeedParametersPanel />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose chip" }));
+    expect(screen.getByText("coherence_time")).toBeTruthy();
+    fireEvent.click(screen.getByText("readout_frequency"));
+    expect(screen.queryByText("Q04")).toBeNull();
+
+    openImportView();
+
+    expect(screen.queryByText("coherence_time")).toBeNull();
+    fireEvent.click(screen.getByText("readout_frequency"));
+    expect(screen.getByText("Q04")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Import from YAML/ })).toBeTruthy();
   });
 
   it("shows enough precision to explain a diff status", () => {
     render(<SeedParametersPanel />);
 
     fireEvent.click(screen.getByRole("button", { name: "Choose chip" }));
+    openImportView();
     fireEvent.click(screen.getByText("readout_frequency"));
 
     expect(screen.getByText("5.123456100")).toBeTruthy();
@@ -162,6 +190,7 @@ describe("SeedParametersPanel", () => {
     render(<SeedParametersPanel />);
 
     fireEvent.click(screen.getByRole("button", { name: "Choose chip" }));
+    openImportView();
     fireEvent.click(screen.getByText("readout_frequency"));
 
     const row = screen.getByText("Q03").closest("tr");
@@ -174,6 +203,7 @@ describe("SeedParametersPanel", () => {
     render(<SeedParametersPanel />);
 
     fireEvent.click(screen.getByRole("button", { name: "Choose chip" }));
+    openImportView();
     fireEvent.click(screen.getByText("readout_frequency"));
     expect(screen.getByText("Q00")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Edit readout_frequency for qubit 0" }));
@@ -196,6 +226,7 @@ describe("SeedParametersPanel", () => {
     render(<SeedParametersPanel />);
 
     fireEvent.click(screen.getByRole("button", { name: "Choose chip" }));
+    openImportView();
     fireEvent.change(screen.getByLabelText("Show"), { target: { value: "all" } });
     fireEvent.click(screen.getByText("readout_frequency"));
     fireEvent.click(screen.getByRole("button", { name: "Edit readout_frequency for qubit 1" }));
@@ -225,14 +256,15 @@ describe("SeedParametersPanel", () => {
     render(<SeedParametersPanel />);
 
     fireEvent.click(screen.getByRole("button", { name: "Choose chip" }));
+    openImportView();
     fireEvent.pointerDown(screen.getByRole("button", { name: /Import from YAML/ }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Review all YAML changes (2)" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Review all YAML changes (3)" }));
 
     expect(screen.getByText("Review calibration updates")).toBeTruthy();
     expect(screen.getByText("5.00000")).toBeTruthy();
     expect(screen.getByText(/5.10000 GHz/)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Apply 2 values" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply 3 values" }));
 
     expect(mutate).toHaveBeenCalledWith(
       {
@@ -243,6 +275,7 @@ describe("SeedParametersPanel", () => {
             readout_frequency: {
               "0": { value: 5.1, unit: "GHz" },
               "2": { value: 5.1234561, unit: "GHz" },
+              "4": { value: 5.4, unit: "GHz" },
             },
           },
         },
@@ -260,6 +293,7 @@ describe("SeedParametersPanel", () => {
     render(<SeedParametersPanel />);
 
     fireEvent.click(screen.getByRole("button", { name: "Choose chip" }));
+    openImportView();
     fireEvent.click(screen.getByText("readout_frequency"));
     fireEvent.click(screen.getByRole("button", { name: "Edit readout_frequency for qubit 0" }));
     fireEvent.change(
