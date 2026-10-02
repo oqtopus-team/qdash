@@ -1,8 +1,9 @@
+import { useEffect } from "react";
+
 import { blockNoteSchema } from "./codeBlock";
 import { detectCodeLanguage } from "./detectCodeLanguage";
 
 type QDashEditor = (typeof blockNoteSchema)["BlockNoteEditor"];
-type QDashBlock = (typeof blockNoteSchema)["Block"];
 
 type BlockRecord = Record<string, unknown>;
 
@@ -14,37 +15,15 @@ function inlineText(node: unknown): string {
   return inlineText(obj.content);
 }
 
-function isEmptyCodeBlock(block: QDashBlock): boolean {
-  return block.type === "codeBlock" && inlineText(block.content).trim() === "";
+function isAutoLanguage(language: unknown): boolean {
+  return language === undefined || language === "text";
 }
 
-/** Sets the language of an empty code block from the pasted text. */
-export function codeBlockPasteHandler({
-  event,
-  editor,
-  defaultPasteHandler,
-}: {
-  event: ClipboardEvent;
-  editor: QDashEditor;
-  defaultPasteHandler: (context?: {
-    prioritizeMarkdownOverHTML?: boolean;
-    plainTextAsMarkdown?: boolean;
-  }) => boolean | undefined;
-}): boolean | undefined {
-  const { block } = editor.getTextCursorPosition();
-  const wasEmptyCodeBlock = isEmptyCodeBlock(block);
-
-  const handled = defaultPasteHandler();
-
-  if (wasEmptyCodeBlock) {
-    const text = event.clipboardData?.getData("text/plain");
-    const language = text ? detectCodeLanguage(text) : null;
-    if (language) {
-      editor.updateBlock(block.id, { type: "codeBlock", props: { language } });
-    }
-  }
-
-  return handled;
+function detectBlockLanguage(block: BlockRecord): string | null {
+  if (block.type !== "codeBlock") return null;
+  const props = (block.props ?? {}) as BlockRecord;
+  if (!isAutoLanguage(props.language)) return null;
+  return detectCodeLanguage(inlineText(block.content));
 }
 
 function withDetectedLanguage(block: BlockRecord): BlockRecord {
@@ -53,19 +32,59 @@ function withDetectedLanguage(block: BlockRecord): BlockRecord {
     ? { ...block, children: withDetectedCodeLanguages(children as BlockRecord[]) }
     : { ...block };
 
-  if (next.type !== "codeBlock") return next;
-
-  const props = (next.props ?? {}) as BlockRecord;
-  const language = props.language;
-  if (language !== undefined && language !== "text") return next;
-
-  const detected = detectCodeLanguage(inlineText(next.content));
+  const detected = detectBlockLanguage(next);
   if (!detected) return next;
 
+  const props = (next.props ?? {}) as BlockRecord;
   return { ...next, props: { ...props, language: detected } };
 }
 
 /** Returns a copy of `blocks` with languages detected for plain-text code blocks. */
 export function withDetectedCodeLanguages(blocks: BlockRecord[]): BlockRecord[] {
   return blocks.map(withDetectedLanguage);
+}
+
+/** Walks `blocks` recursively and returns the detected language for each auto code block. */
+export function collectCodeLanguageUpdates(
+  blocks: BlockRecord[],
+): { id: string; language: string }[] {
+  const updates: { id: string; language: string }[] = [];
+
+  const visit = (block: BlockRecord) => {
+    const detected = detectBlockLanguage(block);
+    if (detected) {
+      updates.push({ id: block.id as string, language: detected });
+    }
+    const children = block.children;
+    if (Array.isArray(children)) {
+      (children as BlockRecord[]).forEach(visit);
+    }
+  };
+
+  blocks.forEach(visit);
+  return updates;
+}
+
+const DETECTION_DEBOUNCE_MS = 500;
+
+/** Detects and applies languages for auto code blocks as the editor's content changes. */
+export function useCodeBlockLanguageDetection(editor: QDashEditor): void {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const unsubscribe = editor.onChange(() => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const updates = collectCodeLanguageUpdates(editor.document as unknown as BlockRecord[]);
+        for (const { id, language } of updates) {
+          editor.updateBlock(id, { type: "codeBlock", props: { language } });
+        }
+      }, DETECTION_DEBOUNCE_MS);
+    });
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [editor]);
 }

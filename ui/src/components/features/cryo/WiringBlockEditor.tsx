@@ -8,7 +8,7 @@ import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 
 import { blockNoteSchema } from "@/lib/blocknote/codeBlock";
-import { codeBlockPasteHandler, withDetectedCodeLanguages } from "@/lib/blocknote/codeBlockLanguage";
+import { useCodeBlockLanguageDetection, withDetectedCodeLanguages } from "@/lib/blocknote/codeBlockLanguage";
 import { uploadInlineFile } from "@/lib/blocknote/inlineFileUpload";
 
 import "./blocknote-theme.css";
@@ -43,8 +43,8 @@ export function WiringBlockEditor({
         : undefined,
     // Inline base64 upload — keeps everything in the cool-down document.
     uploadFile: uploadInlineFile,
-    pasteHandler: codeBlockPasteHandler,
   });
+  useCodeBlockLanguageDetection(editor);
 
   // First-time migration: if no blocks but legacy markdown exists, import it.
   useEffect(() => {

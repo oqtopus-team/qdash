@@ -26,7 +26,7 @@ export const blockNoteSchema = BlockNoteSchema.create({
     ...defaultBlockSpecs,
     codeBlock: createCodeBlockSpec({
       ...codeBlockOptions,
-      defaultLanguage: "python",
+      defaultLanguage: "text",
       supportedLanguages,
     }),
   },

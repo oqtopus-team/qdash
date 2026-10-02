@@ -13,7 +13,7 @@ import { BlockNoteView } from "@blocknote/mantine";
 
 import { DARK_THEMES, type ThemeName } from "@/constants/themes";
 import { blockNoteSchema } from "@/lib/blocknote/codeBlock";
-import { codeBlockPasteHandler, withDetectedCodeLanguages } from "@/lib/blocknote/codeBlockLanguage";
+import { useCodeBlockLanguageDetection, withDetectedCodeLanguages } from "@/lib/blocknote/codeBlockLanguage";
 import { uploadInlineFile } from "@/lib/blocknote/inlineFileUpload";
 
 // Reuse the cryo BlockNote theme (scoped to the `.wiring-blocknote` wrapper).
@@ -138,8 +138,8 @@ export function ForumBlockEditor({
     // file are inlined as base64 data URLs, matching the cool-down editor.
     uploadFile: (file: File) =>
       file.type.startsWith("image/") ? onImageUpload(file) : uploadInlineFile(file),
-    pasteHandler: codeBlockPasteHandler,
   });
+  useCodeBlockLanguageDetection(editor);
   const getMentionItems = useCallback(
     async (query: string): Promise<DefaultReactSuggestionItem[]> =>
       filterForumMentionCandidates(mentionCandidates, query).map((candidate) => ({
