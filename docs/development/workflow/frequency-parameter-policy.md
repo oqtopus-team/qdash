@@ -22,25 +22,45 @@ treated as sweep knobs. `control_frequency` and `readout_frequency` are operatio
 be changed independently. A calibration can publish one measured result to both roles when that
 result should immediately become the operating value.
 
-## Task update targets
+## Task frequency matrix
 
-Task update targets are fixed and have the same meaning in standalone runs and workflows. Publication requires both enabled output persistence and successful validation.
+Task input precedence and update targets are fixed and have the same meaning in standalone runs
+and workflows. In the tables, “fallback” means that the second parameter is read only when the
+first is absent. Publication requires enabled output persistence and successful validation.
 
-| Experiment | Frequency output to publish | Effect |
-| --- | --- | --- |
-| Qubit Spectroscopy, including 2D and 1D frequency estimation | `coarse_qubit_frequency`, `control_frequency` | Update the exploration estimate and use it as the control-drive seed |
-| CheckControlAmplitude, when its frequency fit succeeds | `coarse_qubit_frequency`, `control_frequency` | Refine both the exploration estimate and control-drive seed |
-| Chevron | `qubit_frequency`, `control_frequency` | Record the measurement and use it as the control drive |
-| Ramsey | `qubit_frequency`, `control_frequency` | Record the measurement and use it as the control drive |
-| Resonator Spectroscopy | `resonator_frequency`, `readout_frequency` | Record the measurement and use it as the initial readout drive |
-| CKP, for its resonator-frequency estimate | `resonator_frequency` | Update the measured resonator frequency |
-| Optimal Readout Frequency | `readout_frequency` | Update only the operational readout drive |
+### Qubit and control frequency
 
-The spectroscopy rows describe measurement methods, not a requirement to introduce a task class for each method. The CKP mapping assumes that the relevant output estimates the resonator frequency; its concrete task and output contract require verification before implementation.
+| Task or task family | Drive-frequency input | Frequency result | Published database parameters |
+| --- | --- | --- | --- |
+| `CheckQubitSpectroscopy` | Qubex spectroscopy sweep range; no calibrated control-frequency input | Coarse f01 estimate | `coarse_qubit_frequency`, `control_frequency` |
+| `CheckControlAmplitude` | `control_frequency`; fallback: `coarse_qubit_frequency` | Refined coarse f01 estimate | `coarse_qubit_frequency`, `control_frequency` |
+| `CheckAdaptiveChevron` | `control_frequency`; fallback: `coarse_qubit_frequency` | Measured qubit frequency | `qubit_frequency`, `control_frequency` |
+| `CheckChevron` | `control_frequency`; fallback: `qubit_frequency` | Measured qubit frequency | `qubit_frequency`, `control_frequency` |
+| `CheckRamsey` | `control_frequency`; fallback: `qubit_frequency` | Measured qubit frequency | `qubit_frequency`, `control_frequency` |
+| Other ordinary one- and two-qubit tasks | `control_frequency`; fallback: `qubit_frequency` | No frequency result | None |
+
+Qubit Spectroscopy and CheckControlAmplitude treat their estimates as exploration measurements,
+so they do not update `qubit_frequency`. They publish the estimate to `control_frequency` so the
+next bringup task consumes the value measured in the current workflow instead of a stale operating
+value. Adaptive Chevron, fixed-grid Chevron, and Ramsey produce a physical qubit-frequency result
+and also make it the next operating control frequency.
+
+### Resonator and readout frequency
+
+| Task or task family | Readout-frequency input | Frequency result | Published database parameters |
+| --- | --- | --- | --- |
+| `CheckResonatorSpectroscopy` | Qubex spectroscopy sweep range; no calibrated readout-frequency input | Measured resonator frequency | `resonator_frequency`, `readout_frequency` |
+| `CheckCoarseReadoutParams` | `readout_frequency`; fallback: `resonator_frequency` | Selected operational readout frequency | `readout_frequency` |
+| Other ordinary measurement and gate tasks | `readout_frequency`; fallback: `resonator_frequency` | No frequency result | None |
 
 `CheckCoarseReadoutParams` selects `readout_frequency` by maximizing the Rabi IQ response range
-across readout frequencies and amplitudes. This updates the operating value without replacing
-`resonator_frequency`.
+across readout frequencies and amplitudes. It does not replace `resonator_frequency`.
+Resonator Spectroscopy deliberately publishes its measured resonance to both parameters, so a
+subsequent readout optimization starts from the newly measured device state.
+
+CKP is intended to update `resonator_frequency` only when its concrete task output is confirmed to
+represent a physical resonator-frequency estimate. This mapping is policy, not an implemented task
+contract in the current Qubex task set.
 
 Update targets are specified per output, not by classifying the entire task as exploration or calibration. Amplitude and other outputs retain their own declared destinations. In particular, Resonator Spectroscopy also produces `readout_amplitude`; maintaining the readout frequency does not imply that every readout setting remains unchanged.
 
@@ -72,7 +92,10 @@ semantic fallback; `parameter_aliases` remains reserved for legacy names that me
 The resolved input records the database parameter name that supplied the value, so provenance and
 snapshot re-execution retain the distinction.
 
-Do not automatically copy or fall back from `coarse_qubit_frequency` into `qubit_frequency` or the default control drive frequency. Exploration and Chevron tasks explicitly consume the exploration value where required. Experiments investigating the resonator explicitly consume `resonator_frequency` for their measurement needs; this is separate from resolving a default readout drive frequency.
+Do not copy `coarse_qubit_frequency` into `qubit_frequency`. Bringup tasks may publish a coarse
+estimate to `control_frequency`, and legacy snapshots or databases may supply it through the
+explicit coarse fallback shown in the task matrix. Ordinary post-bringup tasks do not use the
+coarse fallback.
 
 Permitted per-execution overrides remain explicit inputs. An arbitrary drive override does not
 become a measured qubit or resonator frequency. Record the actual resolved drive frequencies,
@@ -91,7 +114,11 @@ Bringup uses the normal task destinations rather than a separate calibration-sta
 
 Validated outputs are published as the workflow progresses when persistence is enabled. A failure in a later task does not roll back earlier accepted outputs. Report the outputs already updated and the tasks that did not complete. Failed outputs must not become the normal inputs of downstream tasks.
 
-An initial bringup can reach Chevron without an existing `qubit_frequency`, using its explicit exploration inputs. Repeating only Qubit Spectroscopy on a calibrated device updates the exploration value while retaining the calibrated value. Repeating bringup can replace the calibrated value when Chevron succeeds; the start screen identifies bringup as a recalibration operation.
+An initial bringup can reach Adaptive Chevron without an existing `qubit_frequency`, using the
+operational seed published by the preceding exploration tasks. Repeating only Qubit Spectroscopy
+retains `qubit_frequency` but replaces `control_frequency` with the new coarse estimate. Repeating
+bringup can replace both values when Adaptive Chevron succeeds; the start screen identifies
+bringup as a recalibration operation.
 
 ### Readout transitions
 
@@ -184,7 +211,7 @@ Keep measurement-only execution as the initial selection for Tasks quick runs. A
 
 Show the update destinations and their current source task near the execution action. For spectroscopy that publishes exploration results, use explanatory text such as:
 
-> Updates the exploration frequency (`coarse_qubit_frequency`). The calibrated qubit frequency is retained; its current source is Chevron.
+> Updates the exploration frequency (`coarse_qubit_frequency`) and uses it as the new `control_frequency`. The measured `qubit_frequency` is retained.
 
 For Chevron replacing a Ramsey calibration:
 
