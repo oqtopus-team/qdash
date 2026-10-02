@@ -22,6 +22,9 @@ RUN mkdir -p $PI_CODING_AGENT_DIR \
 RUN bunx @earendil-works/pi-coding-agent install npm:@oqtopus-team/pi-qdash
 
 COPY agent-runtime/src ./src
-RUN mkdir -p $AGENT_WORK_DIR
+# The agent dir and workspace are written at runtime (models.json, agent files),
+# so hand /app to the unprivileged user the base image ships before dropping root.
+RUN mkdir -p $AGENT_WORK_DIR && chown -R bun:bun /app
+USER bun
 
 CMD ["bun", "src/server.ts"]
