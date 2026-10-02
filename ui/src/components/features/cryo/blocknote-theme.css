@@ -148,11 +148,27 @@
   opacity: 1;
 }
 
-/* Code block: monospace + subtle inset background */
-.wiring-blocknote pre {
-  background-color: color-mix(in oklch, var(--color-base-200) 70%, transparent) !important;
-  border: 1px solid var(--color-base-300) !important;
-  border-radius: 0.5rem !important;
+/* Code block: dark, syntax-highlighted look in both light and dark themes */
+.wiring-blocknote .bn-block-content[data-content-type="codeBlock"] {
+  background-color: #24292e;
+  color: #e1e4e8;
+  border: 1px solid #1b1f23;
+  border-radius: 0.5rem;
+}
+
+.wiring-blocknote .bn-block-content[data-content-type="codeBlock"] pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+}
+
+.wiring-blocknote .bn-block-content[data-content-type="codeBlock"] select {
+  background-color: #24292e !important;
+  color: #e1e4e8;
+  border: none !important;
+  font-size: 0.75rem;
 }
 
 /* Image block: drop shadow + bordered, looks like a real attachment */
