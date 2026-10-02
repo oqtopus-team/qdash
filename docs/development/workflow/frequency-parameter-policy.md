@@ -28,8 +28,8 @@ Task update targets are fixed and have the same meaning in standalone runs and w
 
 | Experiment | Frequency output to publish | Effect |
 | --- | --- | --- |
-| Qubit Spectroscopy, including 2D and 1D frequency estimation | `coarse_qubit_frequency` | Update the exploration estimate |
-| CheckControlAmplitude, when its frequency fit succeeds | `coarse_qubit_frequency` | Refine the exploration estimate |
+| Qubit Spectroscopy, including 2D and 1D frequency estimation | `coarse_qubit_frequency`, `control_frequency` | Update the exploration estimate and use it as the control-drive seed |
+| CheckControlAmplitude, when its frequency fit succeeds | `coarse_qubit_frequency`, `control_frequency` | Refine both the exploration estimate and control-drive seed |
 | Chevron | `qubit_frequency`, `control_frequency` | Record the measurement and use it as the control drive |
 | Ramsey | `qubit_frequency`, `control_frequency` | Record the measurement and use it as the control drive |
 | Resonator Spectroscopy | `resonator_frequency`, `readout_frequency` | Record the measurement and use it as the initial readout drive |
@@ -84,9 +84,9 @@ Snapshot re-execution uses the recorded effective inputs and permitted overrides
 
 Bringup uses the normal task destinations rather than a separate calibration-stage reset or an all-workflow publication checkpoint:
 
-1. Qubit Spectroscopy updates `coarse_qubit_frequency` after validation.
-2. CheckControlAmplitude consumes and refines the exploration parameters.
-3. Chevron consumes the exploration parameters and publishes `qubit_frequency` after validation.
+1. Qubit Spectroscopy updates `coarse_qubit_frequency` and seeds `control_frequency` after validation.
+2. CheckControlAmplitude consumes `control_frequency`, falling back to the legacy `coarse_qubit_frequency`, and refines both values.
+3. Adaptive Chevron consumes `control_frequency`, falling back to the legacy `coarse_qubit_frequency`, and publishes `qubit_frequency` plus `control_frequency` after validation.
 4. Subsequent calibration tasks consume the updated calibrated values.
 
 Validated outputs are published as the workflow progresses when persistence is enabled. A failure in a later task does not roll back earlier accepted outputs. Report the outputs already updated and the tasks that did not complete. Failed outputs must not become the normal inputs of downstream tasks.
