@@ -34,7 +34,7 @@ class BringUp(CalibrationStep):
     - CheckResonatorSpectroscopy (MUX-level): Estimates readout_frequency
     - CheckQubitSpectroscopy: Estimates coarse_qubit_frequency, anharmonicity, coarse_control_amplitude
     - CheckControlAmplitude: Refines coarse_control_amplitude via sqrt-Lorentzian fit
-    - CheckChevron: Adaptive chevron with rough/fine search for qubit_frequency
+    - CheckAdaptiveChevron: Adaptive rough/fine search for qubit_frequency
     - CheckRabi: Refines control_amplitude (Rabi-rate-derived)
 
     Hardware reconfiguration is intentionally kept outside bring-up so intermediate
@@ -226,7 +226,7 @@ class BringUp(CalibrationStep):
         qubit_result = raw.get("CheckQubitSpectroscopy", {})
         if qubit_result and not qubit_result.get("skipped", False):
             # Coarse qubit frequency (f01) — proper qubit_frequency comes from
-            # CheckChevron's adaptive chevron fit.
+            # CheckAdaptiveChevron's adaptive chevron fit.
             qubit_freq_param = qubit_result.get("coarse_qubit_frequency")
             if (value := normalize_metric_value(qubit_freq_param)) is not None:
                 metrics["coarse_qubit_frequency"] = value
@@ -236,9 +236,8 @@ class BringUp(CalibrationStep):
             if (value := normalize_metric_value(anharm_param)) is not None:
                 metrics["anharmonicity"] = value
 
-        # Proper qubit frequency from CheckChevron. Keep CheckCoarseChevron as
-        # a fallback so older persisted results still render metrics.
-        chevron_result = raw.get("CheckChevron", {}) or raw.get("CheckCoarseChevron", {})
+        # Proper qubit frequency from the adaptive Chevron search.
+        chevron_result = raw.get("CheckAdaptiveChevron", {})
         if chevron_result and not chevron_result.get("skipped", False):
             qubit_freq_param = chevron_result.get("qubit_frequency")
             if (value := normalize_metric_value(qubit_freq_param)) is not None:

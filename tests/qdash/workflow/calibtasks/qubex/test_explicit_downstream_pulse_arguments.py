@@ -34,6 +34,7 @@ from qdash.workflow.calibtasks.qubex.two_qubit.check_cross_resonance import (
 )
 from qdash.workflow.calibtasks.qubex.two_qubit.check_zx90 import CheckZX90
 from qdash.workflow.calibtasks.qubex.two_qubit.create_zx90 import CreateZX90
+from qdash.workflow.engine.progress import ProgressPlan
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.qubex import QubexBackend
@@ -134,6 +135,11 @@ def test_check_cross_resonance_passes_control_and_target_x90_explicitly(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task = CheckCrossResonance()
+    task.run_parameters["adiabatic_safe_factor"].value = 0.7
+    task.run_parameters["max_amplitude"].value = 0.8
+    task.run_parameters["max_time_range"].value = 4096
+    task.input_parameters["control_readout_amplitude"].value = 0.2
+    task.input_parameters["target_readout_amplitude"].value = 0.3
     control_x90 = object()
     target_x90 = object()
     raw_result = MagicMock()
@@ -153,6 +159,7 @@ def test_check_cross_resonance_passes_control_and_target_x90_explicitly(
         "ramptime": 16.0,
     }
     exp = SimpleNamespace(
+        params=SimpleNamespace(readout_amplitude={}),
         drag_hpi_pulse={"Q00": control_x90, "Q01": target_x90},
         get_qubit_label=lambda qid: f"Q0{qid}",
         obtain_cr_params=obtain_cr_params,
@@ -166,8 +173,230 @@ def test_check_cross_resonance_passes_control_and_target_x90_explicitly(
         "Q00": control_x90,
         "Q01": target_x90,
     }
+    assert obtain_cr_params.call_args.kwargs["adiabatic_safe_factor"] == 0.7
+    assert obtain_cr_params.call_args.kwargs["max_amplitude"] == 0.8
+    assert obtain_cr_params.call_args.kwargs["max_time_range"] == 4096
+    assert exp.params.readout_amplitude == {"Q00": 0.2, "Q01": 0.3}
     for role in ("control", "target"):
         assert task.input_spec[f"{role}_drag_hpi_duration"].resolution == "database_required"
+
+
+def test_check_cross_resonance_run_parameter_defaults_match_qubex() -> None:
+    task = CheckCrossResonance()
+
+    assert task.run_parameters["adiabatic_safe_factor"].get_value() == 0.75
+    assert task.run_parameters["max_amplitude"].get_value() == 1.0
+    assert task.run_parameters["max_time_range"].get_value() == 4096
+    assert task.get_progress_plan() == ProgressPlan(4, 8)
+
+
+def test_check_cross_resonance_restores_control_and_target_rabi_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = CheckCrossResonance()
+    rabi_values = {
+        "control_amplitude": 0.025,
+        "rabi_amplitude": 0.45,
+        "rabi_phase": 0.1,
+        "rabi_offset": 0.2,
+        "rabi_angle": 1.2,
+        "rabi_noise": 0.01,
+        "rabi_distance": 0.9,
+        "rabi_reference_phase": 0.3,
+        "rabi_r2": 0.98,
+        "maximum_rabi_frequency": 800.0,
+    }
+    for role in ("control", "target"):
+        for name, value in rabi_values.items():
+            parameter = task.input_parameters[f"{role}_{name}"]
+            parameter.value = value
+            parameter.task_id = (
+                f"control-amplitude-{role}" if name == "control_amplitude" else f"rabi-{role}"
+            )
+
+    source_task = SimpleNamespace(
+        run_parameters={"readout_duration": {"value": 1024}},
+        input_parameters={},
+    )
+    repository = MagicMock()
+    repository.find.return_value = [source_task]
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.base.MongoTaskResultHistoryRepository",
+        MagicMock(return_value=repository),
+    )
+
+    store_rabi_params = MagicMock()
+    exp = SimpleNamespace(
+        readout_duration=1024,
+        get_qubit_label=lambda qid: f"Q0{qid}",
+        store_rabi_params=store_rabi_params,
+    )
+    backend = SimpleNamespace(
+        config={"project_id": "project-1"},
+        get_instance=lambda: exp,
+    )
+
+    task._restore_rabi_context(cast("QubexBackend", backend), "0-1")
+
+    restored = store_rabi_params.call_args.args[0]
+    assert set(restored) == {"Q00", "Q01"}
+    for rabi_param in restored.values():
+        assert rabi_param.frequency == pytest.approx(0.02)
+        assert rabi_param.amplitude == pytest.approx(0.45)
+        assert rabi_param.offset == pytest.approx(0.2)
+        assert rabi_param.angle == pytest.approx(1.2)
+        assert rabi_param.r2 == pytest.approx(0.98)
+
+
+def test_check_cross_resonance_rejects_rabi_without_source_context() -> None:
+    task = CheckCrossResonance()
+    rabi_values = {
+        "control_amplitude": 0.025,
+        "rabi_amplitude": 0.45,
+        "rabi_phase": 0.1,
+        "rabi_offset": 0.2,
+        "rabi_angle": 1.2,
+        "rabi_noise": 0.01,
+        "rabi_distance": 0.9,
+        "rabi_reference_phase": 0.3,
+        "rabi_r2": 0.98,
+        "maximum_rabi_frequency": 800.0,
+    }
+    for role in ("control", "target"):
+        for name, value in rabi_values.items():
+            task.input_parameters[f"{role}_{name}"].value = value
+
+    exp = SimpleNamespace(
+        readout_duration=1024,
+        get_qubit_label=lambda qid: f"Q0{qid}",
+        store_rabi_params=MagicMock(),
+    )
+
+    with pytest.raises(ValueError, match="source task ID was not recorded"):
+        task._restore_rabi_context(cast("QubexBackend", _backend_for(exp)), "0-1")
+
+    exp.store_rabi_params.assert_not_called()
+
+
+def test_check_cross_resonance_rejects_rabi_from_different_readout_duration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = CheckCrossResonance()
+    rabi_values = {
+        "control_amplitude": 0.025,
+        "rabi_amplitude": 0.45,
+        "rabi_phase": 0.1,
+        "rabi_offset": 0.2,
+        "rabi_angle": 1.2,
+        "rabi_noise": 0.01,
+        "rabi_distance": 0.9,
+        "rabi_reference_phase": 0.3,
+        "rabi_r2": 0.98,
+        "maximum_rabi_frequency": 800.0,
+    }
+    for role in ("control", "target"):
+        for name, value in rabi_values.items():
+            parameter = task.input_parameters[f"{role}_{name}"]
+            parameter.value = value
+            parameter.task_id = f"rabi-{role}"
+
+    source_task = SimpleNamespace(
+        run_parameters={"readout_duration": {"value": 2048}},
+        input_parameters={},
+    )
+    repository = MagicMock()
+    repository.find.return_value = [source_task]
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.base.MongoTaskResultHistoryRepository",
+        MagicMock(return_value=repository),
+    )
+    exp = SimpleNamespace(
+        readout_duration=1024,
+        get_qubit_label=lambda qid: f"Q0{qid}",
+        store_rabi_params=MagicMock(),
+    )
+    backend = SimpleNamespace(
+        config={"project_id": "project-1"},
+        get_instance=lambda: exp,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=r"source readout_duration is 2048 ns.*current Qubex session uses 1024 ns",
+    ):
+        task._restore_rabi_context(cast("QubexBackend", backend), "0-1")
+
+    exp.store_rabi_params.assert_not_called()
+
+
+def test_check_cross_resonance_accepts_matching_rabi_readout_duration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = CheckCrossResonance()
+    rabi_values = {
+        "control_amplitude": 0.025,
+        "rabi_amplitude": 0.45,
+        "rabi_phase": 0.1,
+        "rabi_offset": 0.2,
+        "rabi_angle": 1.2,
+        "rabi_noise": 0.01,
+        "rabi_distance": 0.9,
+        "rabi_reference_phase": 0.3,
+        "rabi_r2": 0.98,
+        "maximum_rabi_frequency": 800.0,
+    }
+    for role in ("control", "target"):
+        for name, value in rabi_values.items():
+            parameter = task.input_parameters[f"{role}_{name}"]
+            parameter.value = value
+            parameter.task_id = f"rabi-{role}"
+
+    source_task = SimpleNamespace(
+        run_parameters={"readout_duration": {"value": 1024}},
+        input_parameters={},
+    )
+    repository = MagicMock()
+    repository.find.return_value = [source_task]
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.base.MongoTaskResultHistoryRepository",
+        MagicMock(return_value=repository),
+    )
+    store_rabi_params = MagicMock()
+    exp = SimpleNamespace(
+        readout_duration=1024,
+        get_qubit_label=lambda qid: f"Q0{qid}",
+        store_rabi_params=store_rabi_params,
+    )
+    backend = SimpleNamespace(
+        config={"project_id": "project-1"},
+        get_instance=lambda: exp,
+    )
+
+    task._restore_rabi_context(cast("QubexBackend", backend), "0-1")
+
+    store_rabi_params.assert_called_once()
+
+
+def test_check_cross_resonance_requires_control_and_target_rabi_inputs() -> None:
+    rabi_names = {
+        "control_amplitude",
+        "rabi_amplitude",
+        "rabi_phase",
+        "rabi_offset",
+        "rabi_angle",
+        "rabi_noise",
+        "rabi_distance",
+        "rabi_reference_phase",
+        "rabi_r2",
+        "maximum_rabi_frequency",
+    }
+
+    for role in ("control", "target"):
+        for name in rabi_names:
+            spec = CheckCrossResonance.input_spec[f"{role}_{name}"]
+            assert spec.parameter_name == name
+            assert spec.qid_role == role
+            assert spec.resolution == "database_required"
 
 
 def test_create_zx90_uses_calibrated_cr_values_and_resolved_control_x180(

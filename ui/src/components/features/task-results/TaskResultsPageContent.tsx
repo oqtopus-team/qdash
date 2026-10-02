@@ -34,6 +34,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
 import { formatDateTime } from "@/lib/utils/datetime";
+import { getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
 import type {
   ExecutionResponseSummary,
   ListTaskResultsParams,
@@ -288,44 +289,80 @@ function compactParameterValue(value: unknown): string {
 function ParameterPreview({
   title,
   parameters,
+  parameterDefinitions,
   maxItems = 6,
 }: {
   title: string;
   parameters: Record<string, unknown> | undefined;
+  parameterDefinitions?: Record<string, unknown>;
   maxItems?: number;
 }) {
   const allEntries = Object.entries(parameters ?? {});
-  const entries = allEntries.slice(0, maxItems);
-  if (entries.length === 0) return null;
+  const regularEntries: [string, unknown][] = [];
+  const parameterGroups = new Map<string, { collapsed: boolean; entries: [string, unknown][] }>();
+  for (const entry of allEntries) {
+    const group = getTaskParameterUiGroup(parameterDefinitions?.[entry[0]] ?? entry[1]);
+    if (!group) {
+      regularEntries.push(entry);
+      continue;
+    }
+    const existing = parameterGroups.get(group.name);
+    if (existing) {
+      existing.entries.push(entry);
+    } else {
+      parameterGroups.set(group.name, { collapsed: group.collapsed, entries: [entry] });
+    }
+  }
+  const entries = regularEntries.slice(0, maxItems);
+  if (allEntries.length === 0) return null;
+
+  const renderEntries = (items: [string, unknown][]) => (
+    <dl className="divide-y divide-base-200">
+      {items.map(([key, value]) => {
+        const formattedValue = compactParameterValue(value);
+        return (
+          <div
+            key={key}
+            className="grid grid-cols-[minmax(120px,0.8fr)_1fr] gap-3 px-3 py-2 text-xs"
+          >
+            <dt className="truncate font-mono text-base-content/55" title={key}>
+              {key}
+            </dt>
+            <dd className="truncate font-mono text-base-content/80" title={formattedValue}>
+              {formattedValue}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
 
   return (
     <div className="rounded-lg border border-base-300">
       <div className="border-b border-base-300 px-3 py-2 text-xs font-semibold text-base-content/70">
         {title}
       </div>
-      <dl className="divide-y divide-base-200">
-        {entries.map(([key, value]) => {
-          const formattedValue = compactParameterValue(value);
-          return (
-            <div
-              key={key}
-              className="grid grid-cols-[minmax(120px,0.8fr)_1fr] gap-3 px-3 py-2 text-xs"
-            >
-              <dt className="truncate font-mono text-base-content/55" title={key}>
-                {key}
-              </dt>
-              <dd className="truncate font-mono text-base-content/80" title={formattedValue}>
-                {formattedValue}
-              </dd>
-            </div>
-          );
-        })}
-      </dl>
-      {allEntries.length > maxItems && (
+      {renderEntries(entries)}
+      {regularEntries.length > maxItems && (
         <div className="border-t border-base-300 px-3 py-2 text-xs text-base-content/45">
-          +{allEntries.length - maxItems} more on full page
+          +{regularEntries.length - maxItems} more on full page
         </div>
       )}
+      {[...parameterGroups.entries()].map(([groupName, group]) => (
+        <details
+          key={groupName}
+          className="collapse collapse-arrow rounded-none border-t border-base-300 bg-base-100"
+          open={!group.collapsed}
+        >
+          <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-semibold">
+            <span className="flex items-center gap-2">
+              {groupName}
+              <span className="badge badge-xs badge-ghost">{group.entries.length}</span>
+            </span>
+          </summary>
+          <div className="collapse-content px-0 pb-0">{renderEntries(group.entries)}</div>
+        </details>
+      ))}
     </div>
   );
 }
@@ -339,9 +376,11 @@ function ParameterPreview({
 function TaskResultPreviewSidebar({
   taskId,
   onClose,
+  tasks,
 }: {
   taskId: string | null;
   onClose: () => void;
+  tasks: TaskInfo[];
 }) {
   const {
     data: response,
@@ -360,6 +399,7 @@ function TaskResultPreviewSidebar({
     },
   });
   const taskResult = response?.data;
+  const taskDefinition = tasks.find((task) => task.name === taskResult?.task_name);
   const isOpen = !!taskId;
   const figures = taskResult && Array.isArray(taskResult.figure_path) ? taskResult.figure_path : [];
   const jsonFigures =
@@ -512,6 +552,7 @@ function TaskResultPreviewSidebar({
               <ParameterPreview
                 title="Input Parameters"
                 parameters={taskResult.input_parameters as Record<string, unknown> | undefined}
+                parameterDefinitions={taskDefinition?.input_parameters}
                 maxItems={4}
               />
             </div>
@@ -848,7 +889,11 @@ export function TaskResultsPageContent() {
           )}
         </>
       )}
-      <TaskResultPreviewSidebar taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} />
+      <TaskResultPreviewSidebar
+        taskId={selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
+        tasks={tasks}
+      />
     </PageContainer>
   );
 }

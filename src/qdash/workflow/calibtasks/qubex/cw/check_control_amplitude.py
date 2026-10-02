@@ -110,7 +110,7 @@ class CheckControlAmplitude(QubexTask):
             description=(
                 "Refined f01 estimate from the bounded sqrt-Lorentzian fit "
                 "(better than the spectroscopy 5 MHz grid, but still NOT a "
-                "calibrated qubit_frequency — that comes from CheckChevron's "
+                "calibrated qubit_frequency — that comes from CheckAdaptiveChevron's "
                 "Rabi-detuning fit)."
             ),
         ),

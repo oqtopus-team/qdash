@@ -122,7 +122,10 @@ class BackendSaver:
         task_model = self._state_manager.get_task(task_name, task_type, qid)
         output_parameters = dict(task_model.output_parameters)
 
-        if not output_parameters or not self._persist_output_parameters:
+        if not output_parameters:
+            return
+        if not self._persist_output_parameters:
+            self._mark_database_not_updated(task_model, output_parameters)
             return
 
         from qdash.repository import MongoQubitCalibrationRepository
@@ -198,6 +201,7 @@ class BackendSaver:
                 "Staging output parameters for %s without calibration/backend write-back",
                 task_name,
             )
+            self._mark_database_not_updated(task_model, output_parameters)
             return
 
         # Save to the authoritative calibration database only when persistence is enabled.
@@ -294,6 +298,25 @@ class BackendSaver:
             compared_parameters[name] = current
 
         task_model.output_parameters = compared_parameters
+
+    @staticmethod
+    def _mark_database_not_updated(
+        task_model: Any,
+        output_parameters: dict[str, Any],
+    ) -> None:
+        """Mark history-facing outputs as measured but not written to the database."""
+        staged_parameters: dict[str, TaskResultOutputParameter] = {}
+        for name, parameter in output_parameters.items():
+            if hasattr(parameter, "model_dump"):
+                current = parameter.model_dump()
+            elif isinstance(parameter, dict):
+                current = deepcopy(parameter)
+            else:
+                current = {"value": deepcopy(parameter)}
+            current["database_updated"] = False
+            staged_parameters[name] = current
+
+        task_model.output_parameters = staged_parameters
 
     def _get_previous_calibration_data(
         self,

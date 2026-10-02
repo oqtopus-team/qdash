@@ -11,6 +11,7 @@ from qdash.datamodel.task import (
     QubitTaskModel,
     RunParameterModel,
     RunParameterSpec,
+    validate_task_result_input_parameters,
 )
 
 
@@ -61,16 +62,36 @@ def test_calibration_input_rejects_inverted_numeric_bounds() -> None:
 
 
 def test_parameter_specs_create_matching_runtime_models() -> None:
-    input_model = InputParameterSpec.default_only(default=1.0, unit="GHz").create_model()
+    input_model = InputParameterSpec.default_only(
+        default=1.0,
+        unit="GHz",
+        ui_group="Normalization",
+        ui_group_collapsed=True,
+    ).create_model()
     run_model = RunParameterSpec(default=1024, value_type="int").create_model()
     output_model = OutputParameterSpec(default=0.5, unit="a.u.").create_model()
 
     assert isinstance(input_model, InputParameterModel)
     assert input_model.value == 1.0
+    assert input_model.ui_group == "Normalization"
+    assert input_model.ui_group_collapsed is True
     assert isinstance(run_model, RunParameterModel)
     assert run_model.value == 1024
     assert isinstance(output_model, OutputParameterModel)
     assert output_model.value == 0.5
+
+
+def test_input_ui_group_metadata_is_preserved_for_task_results() -> None:
+    parameter = InputParameterSpec.required_database(
+        ui_group="Normalization",
+        ui_group_collapsed=True,
+    ).create_model()
+    parameter.value = 0.25
+
+    persisted = validate_task_result_input_parameters({"reference": parameter})
+
+    assert persisted["reference"]["ui_group"] == "Normalization"
+    assert persisted["reference"]["ui_group_collapsed"] is True
 
 
 @pytest.mark.parametrize("value_type", ["np.linspace", "np.logspace", "np.arange", "range"])

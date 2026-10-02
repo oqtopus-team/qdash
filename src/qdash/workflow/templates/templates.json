@@ -16,6 +16,14 @@
     "function_name": "check_waveform"
   },
   {
+    "id": "coherence_check",
+    "name": "Coherence Check",
+    "description": "Apply the current configuration, record a coarse Chevron without updating calibration parameters, then run Rabi, T1, T2Echo, and Ramsey checks for explicitly selected MUXes or qubits.",
+    "category": "production",
+    "filename": "coherence_check.py",
+    "function_name": "coherence_check"
+  },
+  {
     "id": "simple",
     "name": "Simple Calibration",
     "description": "Basic calibration for learning and simple tasks. Requires explicit mux_ids or qids, with customizable tasks and execution modes.",

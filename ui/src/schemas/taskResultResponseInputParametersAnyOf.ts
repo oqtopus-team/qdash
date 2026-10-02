@@ -24,5 +24,7 @@ export type TaskResultResponseInputParametersAnyOf = {
   calibrated_at?: TaskResultResponseInputParametersAnyOfCalibratedAt;
   execution_id?: string;
   task_id?: string;
+  ui_group?: string;
+  ui_group_collapsed?: boolean;
   [key: string]: unknown;
  };

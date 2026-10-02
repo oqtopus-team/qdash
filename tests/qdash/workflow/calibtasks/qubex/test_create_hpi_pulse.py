@@ -2,6 +2,7 @@
 
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
+from unittest.mock import MagicMock
 
 import plotly.graph_objects as go
 import pytest
@@ -48,18 +49,19 @@ RABI_DEPENDENCIES = set(RABI_INPUTS) - {
 def _configured_task() -> CreateHPIPulse:
     task = CreateHPIPulse()
     for name, value in RABI_INPUTS.items():
-        task.input_parameters[name] = InputParameterModel(value=value)
+        task.input_parameters[name] = InputParameterModel(value=value, task_id="rabi-task")
     return task
 
 
 def _backend_for(exp: object) -> SimpleNamespace:
-    return SimpleNamespace(get_instance=lambda: exp)
+    return SimpleNamespace(config={"project_id": "project-1"}, get_instance=lambda: exp)
 
 
 class RecordingExperiment:
     def __init__(self, initial_rabi_context: object) -> None:
         self.rabi_context: object = initial_rabi_context
         self.context_at_calibration: Any = None
+        self.readout_duration = 1024
         self.params = SimpleNamespace(readout_amplitude={}, control_amplitude={})
 
     def get_qubit_label(self, _qid: int) -> str:
@@ -89,6 +91,16 @@ class PulseCalibrationData:
 def test_run_restores_same_rabi_context_for_same_and_split_sessions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    source_task = SimpleNamespace(
+        run_parameters={"readout_duration": {"value": 1024}},
+        input_parameters={},
+    )
+    repository = MagicMock()
+    repository.find.return_value = [source_task]
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.base.MongoTaskResultHistoryRepository",
+        MagicMock(return_value=repository),
+    )
     contexts = []
     for initial_context in ({"Q01": "same-session-value"}, {}):
         task = _configured_task()

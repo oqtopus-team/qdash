@@ -28,7 +28,7 @@ BRINGUP_TASKS: list[str] = [
     "CheckResonatorSpectroscopy",
     "CheckQubitSpectroscopy",
     "CheckControlAmplitude",
-    "CheckChevron",
+    "CheckAdaptiveChevron",
 ]
 
 
@@ -78,7 +78,7 @@ def bringup(
     targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
 
     default_run_parameters: dict[str, Any] = {
-        "readout_duration": {"value": 2048, "value_type": "int"},
+        "readout_duration": {"value": 1024, "value_type": "int"},
         "interval": {"value": 150 * 1024, "value_type": "int"},
     }
     task_run_parameters: dict[str, dict[str, Any]] = {
@@ -95,8 +95,11 @@ def bringup(
         "CheckControlAmplitude": {
             "shots": {"value": 8192, "value_type": "int"},
         },
-        "CheckChevron": {
+        "CheckAdaptiveChevron": {
             "shots": {"value": 256, "value_type": "int"},
+            # Set to False to keep the result as measurement history without
+            # updating the current calibration parameters.
+            # "update_calibration_parameters": False,
         },
         # resonator_assignment_order lists the four qid offsets within each MUX
         # in increasing resonator-frequency order. The default is [3, 0, 2, 1].

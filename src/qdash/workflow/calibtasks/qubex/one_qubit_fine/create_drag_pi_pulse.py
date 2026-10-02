@@ -17,6 +17,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
     readout_duration_run_parameter,
+    required_rabi_normalization_inputs,
 )
 from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
@@ -28,19 +29,11 @@ class CreateDRAGPIPulse(QubexTask):
     name: str = "CreateDRAGPIPulse"
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        # RabiParam calibrates the pulse and normalizes IQ; validate its readout context.
+        **required_rabi_normalization_inputs(),
         "qubit_frequency": InputParameterSpec.required_database(),
-        "control_amplitude": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
         "readout_frequency": InputParameterSpec.required_database(),
-        "rabi_amplitude": InputParameterSpec.required_database(),
-        "rabi_phase": InputParameterSpec.required_database(),
-        "rabi_offset": InputParameterSpec.required_database(),
-        "rabi_angle": InputParameterSpec.required_database(),
-        "rabi_noise": InputParameterSpec.required_database(),
-        "rabi_distance": InputParameterSpec.required_database(),
-        "rabi_reference_phase": InputParameterSpec.required_database(),
-        "rabi_r2": InputParameterSpec.required_database(),
-        "maximum_rabi_frequency": InputParameterSpec.required_database(),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),

@@ -37,18 +37,39 @@ Run migrations with:
 
     python -m qdash.dbmodel.migration migrate-forum-status          # dry-run
     python -m qdash.dbmodel.migration migrate-forum-status --execute  # execute
+
+    python -m qdash.dbmodel.migration run          # dry-run all pending migrations
+    python -m qdash.dbmodel.migration run --execute  # execute all pending migrations
 """
 
 import logging
 import os
+from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from pymongo import MongoClient
+from pymongo import ASCENDING, MongoClient, ReturnDocument
+from pymongo.database import Database
+from pymongo.errors import DuplicateKeyError
 
 logger = logging.getLogger(__name__)
 
 # Constants for migration safety
 BATCH_SIZE = 1000  # Process documents in batches for memory efficiency
+MIGRATION_LOCK_LEASE = timedelta(minutes=30)
+RENAME_CHECK_CHEVRON_MIGRATION_ID = "rename-check-chevron-to-adaptive-v1"
+
+_CHECK_CHEVRON_HISTORY_FIELDS: tuple[tuple[str, str], ...] = (
+    ("task_result_history", "name"),
+    ("parameter_versions", "task_name"),
+    ("provenance_activities", "task_name"),
+    ("issue_knowledge", "task_name"),
+    ("note_event", "extra.task_name"),
+    ("agent_candidate_commits", "task_name"),
+    ("agent_actions", "task_name"),
+)
+
+DatabaseMigration = Callable[[Database[Any], bool], dict[str, Any]]
 
 USER_ID_FIELD_MIGRATIONS = {
     "project": [("owner_username", "owner_user_id")],
@@ -1463,11 +1484,171 @@ def migrate_remove_coupling_from_qubit(dry_run: bool = True) -> dict[str, Any]:
     return stats
 
 
+def migrate_rename_check_chevron(database: Database[Any], dry_run: bool = True) -> dict[str, Any]:
+    """Rename historical adaptive CheckChevron references without touching the task catalog."""
+    stats: dict[str, Any] = {"collections": {}, "matched": 0, "updated": 0}
+    for collection_name, field_name in _CHECK_CHEVRON_HISTORY_FIELDS:
+        collection = database[collection_name]
+        query = {field_name: "CheckChevron"}
+        matched = collection.count_documents(query)
+        updated = 0
+        if not dry_run and matched:
+            result = collection.update_many(
+                query,
+                {"$set": {field_name: "CheckAdaptiveChevron"}},
+            )
+            updated = result.modified_count
+        stats["collections"][collection_name] = {
+            "field": field_name,
+            "matched": matched,
+            "updated": updated,
+        }
+        stats["matched"] += matched
+        stats["updated"] += updated
+    return stats
+
+
+def _ensure_migration_ledger_index(database: Database[Any]) -> None:
+    """Ensure each versioned migration has exactly one ledger entry."""
+    database["migration_ledger"].create_index(
+        [("migration_id", ASCENDING)],
+        name="migration_id_unique_idx",
+        unique=True,
+    )
+
+
+def _run_versioned_migration(
+    database: Database[Any],
+    *,
+    migration_id: str,
+    migration: DatabaseMigration,
+    dry_run: bool,
+) -> dict[str, Any]:
+    """Run one idempotent migration with completion tracking and a lease lock."""
+    _ensure_migration_ledger_index(database)
+    ledger = database["migration_ledger"]
+    if ledger.find_one({"migration_id": migration_id, "status": "completed"}):
+        return {"migration_id": migration_id, "already_completed": True}
+
+    if dry_run:
+        return {
+            "migration_id": migration_id,
+            "already_completed": False,
+            "stats": migration(database, True),
+        }
+
+    lock = database["migration_lock"]
+    started_at = datetime.now(timezone.utc)
+    try:
+        lock.find_one_and_update(
+            {
+                "_id": migration_id,
+                "$or": [
+                    {"acquired_at": {"$lt": started_at - MIGRATION_LOCK_LEASE}},
+                    {"acquired_at": {"$exists": False}},
+                ],
+            },
+            {"$set": {"acquired_at": started_at}},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+    except DuplicateKeyError as exc:
+        raise MigrationError(f"Migration {migration_id} is already running") from exc
+
+    ledger.update_one(
+        {"migration_id": migration_id},
+        {
+            "$set": {
+                "status": "running",
+                "started_at": started_at,
+            },
+            "$unset": {"failed_at": "", "error": ""},
+        },
+        upsert=True,
+    )
+    try:
+        stats = migration(database, False)
+        completed_at = datetime.now(timezone.utc)
+        ledger.update_one(
+            {"migration_id": migration_id},
+            {
+                "$set": {
+                    "status": "completed",
+                    "completed_at": completed_at,
+                    "stats": stats,
+                }
+            },
+        )
+        return {
+            "migration_id": migration_id,
+            "already_completed": False,
+            "stats": stats,
+        }
+    except Exception as exc:
+        ledger.update_one(
+            {"migration_id": migration_id},
+            {
+                "$set": {
+                    "status": "failed",
+                    "failed_at": datetime.now(timezone.utc),
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+            },
+        )
+        raise
+    finally:
+        lock.delete_one({"_id": migration_id})
+
+
+DATABASE_MIGRATIONS: tuple[tuple[str, DatabaseMigration], ...] = (
+    (RENAME_CHECK_CHEVRON_MIGRATION_ID, migrate_rename_check_chevron),
+)
+
+
+def run_pending_database_migrations(database: Database[Any], *, dry_run: bool) -> dict[str, Any]:
+    """Run registered database migrations in their declared order."""
+    return {
+        migration_id: _run_versioned_migration(
+            database,
+            migration_id=migration_id,
+            migration=migration,
+            dry_run=dry_run,
+        )
+        for migration_id, migration in DATABASE_MIGRATIONS
+    }
+
+
+def run_pending_migrations_from_environment(
+    *, dry_run: bool, allow_missing_artifacts: bool = False
+) -> dict[str, Any]:
+    """Run the existing calibration migration and all registered migrations."""
+    from qdash.dbmodel.project_calibration_migration import run_from_environment
+
+    stats = {
+        "project_scoped_calibration": run_from_environment(
+            dry_run=dry_run,
+            allow_missing_artifacts=allow_missing_artifacts,
+        )
+    }
+    client = _get_mongo_client()
+    try:
+        database = client[os.getenv("MONGO_DB_NAME", "qdash")]
+        stats["database_migrations"] = run_pending_database_migrations(
+            database,
+            dry_run=dry_run,
+        )
+    finally:
+        client.close()
+    return stats
+
+
 def _get_mongo_client() -> MongoClient[Any]:
     """Get MongoDB client for migration."""
+    host = os.getenv("MONGO_HOST", "mongo")
+    port = 27017 if host == "mongo" else int(os.getenv("MONGO_PORT", "27017"))
     return MongoClient(
-        os.getenv("MONGO_HOST", "mongo"),
-        port=27017,
+        host,
+        port=port,
         username=os.getenv("MONGO_INITDB_ROOT_USERNAME"),
         password=os.getenv("MONGO_INITDB_ROOT_PASSWORD"),
     )
@@ -1603,6 +1784,21 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Database migrations")
     subparsers = parser.add_subparsers(dest="command", help="Migration commands")
+
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Run all pending versioned migrations in order",
+    )
+    run_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migrations (default is dry-run)",
+    )
+    run_parser.add_argument(
+        "--allow-missing-artifacts",
+        action="store_true",
+        help="Mark missing legacy calibration artifacts as reviewed",
+    )
 
     # fix-invalid-fidelity migration
     fix_fidelity_parser = subparsers.add_parser(
@@ -1768,7 +1964,13 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.command == "fix-invalid-fidelity":
+    if args.command == "run":
+        stats = run_pending_migrations_from_environment(
+            dry_run=not args.execute,
+            allow_missing_artifacts=args.allow_missing_artifacts,
+        )
+        logger.info(f"Migration run complete: {stats}")
+    elif args.command == "fix-invalid-fidelity":
         from qdash.dbmodel.initialize import initialize
 
         initialize()

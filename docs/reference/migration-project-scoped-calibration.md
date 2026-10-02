@@ -11,8 +11,10 @@ calibration state.
 ## Deployment behavior
 
 `docker compose up` starts the one-shot `calibration-migration` service after MongoDB becomes
-healthy. Other QDash services start only when the migration exits successfully. The migration is
-idempotent and records completion as `project-scoped-calibration-v1` in `migration_ledger`.
+healthy. The service runs all pending versioned migrations in their declared order. Other QDash
+services start only when the migration exits successfully. Each migration is idempotent and records
+completion in `migration_ledger`; the project-scoped migration uses
+`project-scoped-calibration-v1`.
 Artifact migration is recorded separately as
 `project-scoped-calibration-artifacts-date-layout-v2`, preventing legacy files from being
 reconsidered after shared classifier files receive newer updates.
@@ -26,11 +28,16 @@ To inspect an installation without changing it, run:
 
 ```bash
 docker compose run --rm calibration-migration \
-  python -m qdash.dbmodel.migration project-scoped-calibration
+  python -m qdash.dbmodel.migration run
 ```
 
 Normal `task deploy` and `task deploy-local` runs execute the migration automatically with
 `--execute`.
+
+The `migration_ledger` collection has one entry per migration ID and records its status,
+timestamps, and result counts. A leased entry in `migration_lock` prevents two deployments from
+executing the same migration concurrently. Failed migrations remain retryable; successfully
+completed migrations are skipped on later deployments.
 
 ## Duplicate handling
 
