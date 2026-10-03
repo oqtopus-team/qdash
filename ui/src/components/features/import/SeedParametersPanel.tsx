@@ -14,6 +14,8 @@ import {
   Search,
   Pencil,
   RotateCcw,
+  FileInput,
+  LockKeyhole,
 } from "lucide-react";
 
 import { ChipSelector } from "@/components/selectors/ChipSelector";
@@ -128,6 +130,7 @@ function parseImportValue(raw: string): number | string | null {
 
 export function SeedParametersPanel() {
   const [selectedChip, setSelectedChip] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"database" | "import">("database");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"changes" | "all" | QubitData["status"]>("all");
   const [expandedParams, setExpandedParams] = useState<Set<string>>(new Set());
@@ -175,6 +178,7 @@ export function SeedParametersPanel() {
     data: qubitsResponse,
     isLoading: isLoadingQubits,
     isError: isQubitListError,
+    isRefetching: isRefetchingQubits,
     refetch: refetchQubits,
   } = useListChipQubits(
     selectedChip,
@@ -186,14 +190,35 @@ export function SeedParametersPanel() {
   const qubitList = qubitsResponse?.data as QubitListData | undefined;
 
   const data = useMemo<CompareData | undefined>(() => {
-    if (!comparison && !qubitList) return undefined;
-    const parameters: Record<string, ParameterData> = structuredClone(comparison?.parameters ?? {});
+    if (!qubitList) return undefined;
+    const parameters: Record<string, ParameterData> = {};
 
     qubitList?.qubits.forEach((qubit) => {
       Object.entries(qubit.data ?? {}).forEach(([parameterName, raw]) => {
         const current = calibrationValue(raw);
         if (!current) return;
         const parameter = (parameters[parameterName] ??= { unit: current.unit, qubits: {} });
+        if (!parameter.unit && current.unit) parameter.unit = current.unit;
+        parameter.qubits[qubit.qid] = {
+          yaml_value: null,
+          qdash_value: current.value,
+          status: "same",
+        };
+      });
+    });
+
+    return { chip_id: selectedChip, parameters };
+  }, [qubitList, selectedChip]);
+
+  const importParameters = useMemo(() => {
+    const parameters: Record<string, ParameterData> = structuredClone(comparison?.parameters ?? {});
+
+    qubitList?.qubits.forEach((qubit) => {
+      Object.entries(qubit.data ?? {}).forEach(([parameterName, raw]) => {
+        const parameter = parameters[parameterName];
+        if (!parameter) return;
+        const current = calibrationValue(raw);
+        if (!current) return;
         if (!parameter.unit && current.unit) parameter.unit = current.unit;
         const existing = parameter.qubits[qubit.qid];
         const status =
@@ -211,21 +236,21 @@ export function SeedParametersPanel() {
       });
     });
 
-    return { chip_id: selectedChip, parameters };
-  }, [comparison, qubitList, selectedChip]);
+    return parameters;
+  }, [comparison, qubitList]);
 
   // Import mutation
   const importMutation = useImportSeedParameters();
 
   // Get counts for display
   const counts = useMemo(() => {
-    if (!data?.parameters) return { new: 0, different: 0, same: 0, total: 0 };
+    if (!data) return { new: 0, different: 0, same: 0, total: 0 };
 
     let newCount = 0;
     let diffCount = 0;
     let sameCount = 0;
 
-    Object.values(data.parameters).forEach((param) => {
+    Object.values(importParameters).forEach((param) => {
       Object.values(param.qubits).forEach((qubit) => {
         if (qubit.status === "new") newCount++;
         else if (qubit.status === "different") diffCount++;
@@ -239,7 +264,7 @@ export function SeedParametersPanel() {
       same: sameCount,
       total: newCount + diffCount + sameCount,
     };
-  }, [data]);
+  }, [data, importParameters]);
 
   // Toggle parameter expansion
   const toggleParam = useCallback((paramName: string) => {
@@ -338,12 +363,14 @@ export function SeedParametersPanel() {
   const visibleParameters = useMemo(() => {
     if (!data?.parameters) return [];
     const normalizedQuery = searchQuery.trim().toLowerCase();
+    const parameters = viewMode === "import" ? importParameters : data.parameters;
 
-    return Object.entries(data.parameters)
+    return Object.entries(parameters)
       .filter(([paramName]) => paramName.toLowerCase().includes(normalizedQuery))
       .map(([paramName, paramData]) => {
         const qubits = Object.fromEntries(
           Object.entries(paramData.qubits).filter(([qid, qubit]) => {
+            if (viewMode === "database") return true;
             if (statusFilter === "all") return true;
             if (statusFilter === "changes") {
               return qubit.status !== "same" || editedValues[paramName]?.[qid] !== undefined;
@@ -354,7 +381,7 @@ export function SeedParametersPanel() {
         return [paramName, { ...paramData, qubits }] as const;
       })
       .filter(([, paramData]) => Object.keys(paramData.qubits).length > 0);
-  }, [data, editedValues, searchQuery, statusFilter]);
+  }, [data, editedValues, importParameters, searchQuery, statusFilter, viewMode]);
 
   const handleChipSelect = useCallback((chipId: string) => {
     setSelectedChip(chipId);
@@ -367,11 +394,29 @@ export function SeedParametersPanel() {
     setStatusFilter("all");
   }, []);
 
+  const handleViewChange = useCallback((mode: "database" | "import") => {
+    setViewMode(mode);
+    setExpandedParams(new Set());
+    setSelectedQubits({});
+    setEditedValues({});
+    setEditingCell(null);
+    setEditingDraft("");
+    setSearchQuery("");
+    setStatusFilter("all");
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    if (viewMode === "database") {
+      await refetchQubits();
+      return;
+    }
+    await Promise.all([refetch(), refetchQubits()]);
+  }, [refetch, refetchQubits, viewMode]);
+
   const collectImportEntries = useCallback(
     (mode: "all" | "selected") => {
       const entries: ImportEntry[] = [];
-      if (!data) return entries;
-      Object.entries(data.parameters).forEach(([paramName, paramData]) => {
+      Object.entries(importParameters).forEach(([paramName, paramData]) => {
         Object.entries(paramData.qubits).forEach(([qid, qubitData]) => {
           const editedRaw = editedValues[paramName]?.[qid];
           const edited = editedRaw !== undefined;
@@ -395,7 +440,7 @@ export function SeedParametersPanel() {
       });
       return entries;
     },
-    [data, editedValues, selectedQubits],
+    [editedValues, importParameters, selectedQubits],
   );
 
   // Execute import (called after confirmation or directly if no overwrites)
@@ -462,58 +507,127 @@ export function SeedParametersPanel() {
     setConfirmDialog({ open: false, mode: "all", entries: [] });
   }, []);
 
+  const viewParameterCount =
+    viewMode === "import"
+      ? Object.keys(importParameters).length
+      : Object.keys(data?.parameters ?? {}).length;
+  const viewIsLoading = isLoadingQubits || (viewMode === "import" && isLoading);
+  const viewIsError = isQubitListError || (viewMode === "import" && isError);
+  const viewIsRefreshing = isRefetchingQubits || (viewMode === "import" && isRefetching);
+
   return (
-    <div className="card bg-base-200">
-      <div className="card-body p-4 sm:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="card-title text-base sm:text-lg gap-2">
-            <Database className="h-4 w-4 sm:h-5 sm:w-5" />
-            Current calibration values
-          </h3>
+    <div className="card card-border bg-base-100 shadow-sm">
+      <div className="card-body gap-5 p-4 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-box bg-primary/10 p-2 text-primary">
+              <Database className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <h3 className="card-title text-base sm:text-lg">Calibration data</h3>
+              <p className="text-xs text-base-content/60">
+                Inspect current values or review operational settings from YAML.
+              </p>
+            </div>
+          </div>
           {selectedChip && (
             <button
-              className="btn btn-sm btn-ghost gap-1"
-              onClick={() => refetch()}
-              disabled={isRefetching}
+              type="button"
+              className="btn btn-sm btn-ghost gap-2 self-start sm:self-auto"
+              onClick={() => void handleRefresh()}
+              disabled={viewIsRefreshing}
             >
-              <RefreshCw className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 ${viewIsRefreshing ? "animate-spin" : ""}`} />
               Refresh
             </button>
           )}
         </div>
 
-        <p className="text-sm text-base-content/70 mb-4">
-          Latest values stored in QDash. YAML values appear as proposed updates when available.
-        </p>
-
-        {/* Chip Selection */}
-        <div className="form-control mb-4">
-          <label className="label">
-            <span className="label-text">Target Chip</span>
-          </label>
-          <ChipSelector selectedChip={selectedChip} onChipSelect={handleChipSelect} />
+        <div
+          role="tablist"
+          aria-label="Calibration data view"
+          className="tabs tabs-border w-full sm:w-fit"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === "database"}
+            className={`tab gap-2 ${viewMode === "database" ? "tab-active" : ""}`}
+            onClick={() => handleViewChange("database")}
+          >
+            <Database className="h-4 w-4" aria-hidden="true" />
+            Calibration database
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === "import"}
+            className={`tab gap-2 ${viewMode === "import" ? "tab-active" : ""}`}
+            onClick={() => handleViewChange("import")}
+          >
+            <FileInput className="h-4 w-4" aria-hidden="true" />
+            Import from YAML
+          </button>
         </div>
 
+        <div className="rounded-box border border-base-300 bg-base-200/50 p-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-sm font-medium">
+                {viewMode === "database" ? "Latest database values" : "Operational YAML import"}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-base-content/60">
+                {viewMode === "database"
+                  ? "Read-only view of the latest calibration values stored in QDash."
+                  : "Compare YAML candidates with QDash, edit proposed values, and review changes before applying them."}
+              </p>
+            </div>
+            <div className="form-control w-full lg:max-w-sm">
+              <label className="label pt-0">
+                <span className="label-text text-xs font-medium">Target chip</span>
+              </label>
+              <ChipSelector selectedChip={selectedChip} onChipSelect={handleChipSelect} />
+            </div>
+          </div>
+        </div>
+
+        {viewMode === "import" && (
+          <div className="alert alert-info alert-soft" role="note">
+            <LockKeyhole className="h-5 w-5" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-medium">Measured frequencies are protected</p>
+              <p className="text-xs">
+                qubit_frequency and resonator_frequency are updated by calibration experiments, not
+                by YAML import.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Loading State */}
-        {(isLoading || isLoadingQubits) && selectedChip && (
+        {viewIsLoading && selectedChip && (
           <div className="flex justify-center py-8">
             <span className="loading loading-spinner loading-md"></span>
           </div>
         )}
 
-        {(isError || isQubitListError) && selectedChip && (
+        {viewIsError && selectedChip && (
           <div className="alert alert-error mb-4" role="alert">
             <AlertCircle className="h-5 w-5" />
             <span className="flex-1">Failed to load calibration values for {selectedChip}.</span>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={() => refetch()}>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              onClick={() => void handleRefresh()}
+            >
               Retry
             </button>
           </div>
         )}
 
         {/* Summary Stats */}
-        {data && counts.total > 0 && (
-          <div className="flex gap-2 mb-4 flex-wrap">
+        {viewMode === "import" && data && counts.total > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
             <div className="badge badge-success gap-1">
               <span className="font-medium">{counts.new}</span> New
             </div>
@@ -533,7 +647,7 @@ export function SeedParametersPanel() {
         )}
 
         {/* Import Success */}
-        {importMutation.isSuccess && (
+        {viewMode === "import" && importMutation.isSuccess && (
           <div className="alert alert-success mb-4">
             <Check className="h-5 w-5" />
             <span>
@@ -543,15 +657,15 @@ export function SeedParametersPanel() {
         )}
 
         {/* Import Error */}
-        {importMutation.isError && (
+        {viewMode === "import" && importMutation.isError && (
           <div className="alert alert-error mb-4">
             <AlertCircle className="h-5 w-5" />
             <span>Update failed: {String(importMutation.error)}</span>
           </div>
         )}
 
-        {data && counts.total > 0 && (
-          <div className="flex flex-col gap-3 rounded-xl border border-base-300 bg-base-100 p-3 sm:flex-row sm:items-center sm:justify-between">
+        {data && viewParameterCount > 0 && (
+          <div className="flex flex-col gap-3 rounded-box border border-base-300 bg-base-100 p-3 sm:flex-row sm:items-center sm:justify-between">
             <label className="input input-sm input-bordered flex w-full items-center gap-2 sm:max-w-xs">
               <Search className="h-4 w-4 text-base-content/40" aria-hidden="true" />
               <input
@@ -563,74 +677,78 @@ export function SeedParametersPanel() {
                 aria-label="Find a parameter"
               />
             </label>
-            <div className="flex items-center gap-2">
-              <label htmlFor="seed-status-filter" className="text-xs text-base-content/60">
-                Show
-              </label>
-              <select
-                id="seed-status-filter"
-                className="select select-sm select-bordered"
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as "changes" | "all" | QubitData["status"])
-                }
-              >
-                <option value="changes">Changes only</option>
-                <option value="new">New only</option>
-                <option value="different">Different only</option>
-                <option value="same">Same only</option>
-                <option value="all">All values</option>
-              </select>
-            </div>
+            {viewMode === "import" && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="seed-status-filter" className="text-xs text-base-content/60">
+                  Show
+                </label>
+                <select
+                  id="seed-status-filter"
+                  className="select select-sm select-bordered"
+                  value={statusFilter}
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as "changes" | "all" | QubitData["status"])
+                  }
+                >
+                  <option value="changes">Changes only</option>
+                  <option value="new">New only</option>
+                  <option value="different">Different only</option>
+                  <option value="same">Same only</option>
+                  <option value="all">All values</option>
+                </select>
+              </div>
+            )}
           </div>
         )}
 
-        {data && (counts.new > 0 || counts.different > 0 || editedCount > 0) && (
-          <div className="sticky top-16 z-20 flex items-center justify-between gap-3 rounded-xl border border-base-300 bg-base-100/95 p-3 shadow-sm backdrop-blur">
-            <div className="text-xs text-base-content/60">
-              <span className="font-semibold text-base-content">
-                {visibleParameters.length} parameters shown
-              </span>
-              {selectedCount > 0 && <span> · {selectedCount} values selected</span>}
-              {editedCount > 0 && <span> · {editedCount} manually edited</span>}
+        {viewMode === "import" &&
+          data &&
+          (counts.new > 0 || counts.different > 0 || editedCount > 0) && (
+            <div className="sticky top-16 z-20 flex flex-col gap-3 rounded-box border border-base-300 bg-base-100/95 p-3 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-base-content/60">
+                <span className="font-semibold text-base-content">
+                  {visibleParameters.length} parameters shown
+                </span>
+                {selectedCount > 0 && <span> · {selectedCount} values selected</span>}
+                {editedCount > 0 && <span> · {editedCount} manually edited</span>}
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="btn btn-primary btn-sm gap-2">
+                    {importMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <Database className="h-4 w-4" />
+                        Import from YAML
+                        <ChevronDown className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuItem
+                    onSelect={() => requestImport("all")}
+                    disabled={importMutation.isPending}
+                  >
+                    Review all YAML changes ({collectImportEntries("all").length})
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => requestImport("selected")}
+                    disabled={importMutation.isPending || selectedCount === 0}
+                  >
+                    Review selected changes ({selectedCount})
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="btn btn-primary btn-sm gap-2">
-                  {importMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Importing...
-                    </>
-                  ) : (
-                    <>
-                      <Database className="h-4 w-4" />
-                      Import from YAML
-                      <ChevronDown className="h-4 w-4" />
-                    </>
-                  )}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuItem
-                  onSelect={() => requestImport("all")}
-                  disabled={importMutation.isPending}
-                >
-                  Review all YAML changes ({collectImportEntries("all").length})
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => requestImport("selected")}
-                  disabled={importMutation.isPending || selectedCount === 0}
-                >
-                  Review selected changes ({selectedCount})
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
+          )}
 
         {/* Parameters List */}
-        {data && Object.keys(data.parameters).length > 0 && visibleParameters.length > 0 && (
+        {data && viewParameterCount > 0 && visibleParameters.length > 0 && (
           <div className="space-y-2">
             {visibleParameters.map(([paramName, paramData]) => {
               const isExpanded = expandedParams.has(paramName);
@@ -645,13 +763,18 @@ export function SeedParametersPanel() {
               ).length;
 
               return (
-                <div key={paramName} className="border border-base-300 rounded">
+                <div
+                  key={paramName}
+                  className="overflow-hidden rounded-box border border-base-300 bg-base-100"
+                >
                   {/* Parameter Header */}
-                  <div
-                    className="flex items-center justify-between p-2 bg-base-100 cursor-pointer hover:bg-base-200"
+                  <button
+                    type="button"
+                    className="flex w-full flex-col gap-2 p-3 text-left transition-colors hover:bg-base-200 sm:flex-row sm:items-center sm:justify-between"
                     onClick={() => toggleParam(paramName)}
+                    aria-expanded={isExpanded}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
                       {isExpanded ? (
                         <ChevronDown className="h-4 w-4" />
                       ) : (
@@ -663,74 +786,101 @@ export function SeedParametersPanel() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {paramCounts.new > 0 && (
-                        <span className="badge badge-success badge-sm">{paramCounts.new} new</span>
-                      )}
-                      {paramCounts.different > 0 && (
-                        <span className="badge badge-warning badge-sm">
-                          {paramCounts.different} different
-                        </span>
-                      )}
-                      {paramSelected.size > 0 && (
-                        <span className="badge badge-primary badge-sm">
-                          {paramSelected.size} selected
-                        </span>
-                      )}
-                      {Object.keys(parameterEdits).length > 0 && (
-                        <span className="badge badge-info badge-sm">
-                          {Object.keys(parameterEdits).length} edited
-                        </span>
+                      {viewMode === "import" && (
+                        <>
+                          {paramCounts.new > 0 && (
+                            <span className="badge badge-success badge-sm">
+                              {paramCounts.new} new
+                            </span>
+                          )}
+                          {paramCounts.different > 0 && (
+                            <span className="badge badge-warning badge-sm">
+                              {paramCounts.different} different
+                            </span>
+                          )}
+                          {paramSelected.size > 0 && (
+                            <span className="badge badge-primary badge-sm">
+                              {paramSelected.size} selected
+                            </span>
+                          )}
+                          {Object.keys(parameterEdits).length > 0 && (
+                            <span className="badge badge-info badge-sm">
+                              {Object.keys(parameterEdits).length} edited
+                            </span>
+                          )}
+                        </>
                       )}
                       <span className="text-xs text-base-content/60">
                         {Object.keys(paramData.qubits).length} qubits
                       </span>
                     </div>
-                  </div>
+                  </button>
 
                   {/* Qubit Table */}
                   {isExpanded && (
-                    <div className="p-2 border-t border-base-300">
+                    <div className="border-t border-base-300 bg-base-100 p-3">
                       {/* Quick Actions */}
-                      <div className="flex gap-2 mb-2">
-                        <button
-                          className="btn btn-xs btn-ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            selectAllInParam(paramName, paramData);
-                          }}
-                          disabled={selectableCount === 0}
-                        >
-                          Select All ({selectableCount})
-                        </button>
-                        <button
-                          className="btn btn-xs btn-ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            clearParamSelection(paramName);
-                          }}
-                          disabled={paramSelected.size === 0}
-                        >
-                          Clear
-                        </button>
-                      </div>
+                      {viewMode === "import" && (
+                        <div className="mb-3 flex gap-2">
+                          <button
+                            className="btn btn-xs btn-ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              selectAllInParam(paramName, paramData);
+                            }}
+                            disabled={selectableCount === 0}
+                          >
+                            Select All ({selectableCount})
+                          </button>
+                          <button
+                            className="btn btn-xs btn-ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              clearParamSelection(paramName);
+                            }}
+                            disabled={paramSelected.size === 0}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      )}
 
-                      <div className="overflow-x-auto">
-                        <table className="table table-xs">
+                      <div className="overflow-x-auto rounded-box border border-base-300">
+                        <table className="table table-xs table-zebra">
                           <thead>
                             <tr>
-                              <th className="w-8"></th>
                               <th>Qubit</th>
-                              <th>YAML</th>
                               <th>Current QDash</th>
-                              <th>Proposed</th>
-                              <th>Status</th>
-                              <th className="w-12">
-                                <span className="sr-only">Edit</span>
-                              </th>
+                              {viewMode === "import" && (
+                                <>
+                                  <th className="w-8">
+                                    <span className="sr-only">Select</span>
+                                  </th>
+                                  <th>YAML</th>
+                                  <th>Proposed</th>
+                                  <th>Status</th>
+                                  <th className="w-12">
+                                    <span className="sr-only">Edit</span>
+                                  </th>
+                                </>
+                              )}
                             </tr>
                           </thead>
                           <tbody>
                             {Object.entries(paramData.qubits).map(([qid, qubitData]) => {
+                              if (viewMode === "database") {
+                                return (
+                                  <tr key={qid}>
+                                    <td className="font-mono">{qid}</td>
+                                    <td className="font-mono text-xs font-medium">
+                                      <span title={String(qubitData.qdash_value ?? "-")}>
+                                        {formatComparisonValue(qubitData.qdash_value, false)}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              }
+
                               const cellKey = `${paramName}:${qid}`;
                               const editedRaw = parameterEdits[qid];
                               const isEdited = editedRaw !== undefined;
@@ -755,6 +905,23 @@ export function SeedParametersPanel() {
                                   }
                                 >
                                   <td>
+                                    <span className="font-mono">{qid}</span>
+                                    {qubitData.yaml_qid && qubitData.yaml_qid !== qid && (
+                                      <span className="ml-2 text-xs text-base-content/50">
+                                        YAML:{" "}
+                                        <span className="font-mono">{qubitData.yaml_qid}</span>
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="font-mono text-xs font-medium">
+                                    <span title={String(qubitData.qdash_value ?? "-")}>
+                                      {formatComparisonValue(
+                                        qubitData.qdash_value,
+                                        qubitData.status === "different",
+                                      )}
+                                    </span>
+                                  </td>
+                                  <td>
                                     <input
                                       type="checkbox"
                                       className="checkbox checkbox-xs"
@@ -764,27 +931,10 @@ export function SeedParametersPanel() {
                                       onChange={() => toggleQubit(paramName, qid)}
                                     />
                                   </td>
-                                  <td>
-                                    <span className="font-mono">{qid}</span>
-                                    {qubitData.yaml_qid && qubitData.yaml_qid !== qid && (
-                                      <span className="ml-2 text-xs text-base-content/50">
-                                        YAML:{" "}
-                                        <span className="font-mono">{qubitData.yaml_qid}</span>
-                                      </span>
-                                    )}
-                                  </td>
                                   <td className="font-mono text-xs text-base-content/60">
                                     <span title={String(qubitData.yaml_value ?? "-")}>
                                       {formatComparisonValue(
                                         qubitData.yaml_value,
-                                        qubitData.status === "different",
-                                      )}
-                                    </span>
-                                  </td>
-                                  <td className="font-mono text-xs font-medium">
-                                    <span title={String(qubitData.qdash_value ?? "-")}>
-                                      {formatComparisonValue(
-                                        qubitData.qdash_value,
                                         qubitData.status === "different",
                                       )}
                                     </span>
@@ -912,7 +1062,7 @@ export function SeedParametersPanel() {
           </div>
         )}
 
-        {data && Object.keys(data.parameters).length > 0 && visibleParameters.length === 0 && (
+        {data && viewParameterCount > 0 && visibleParameters.length === 0 && (
           <div className="rounded-xl border border-dashed border-base-300 py-10 text-center">
             <Search className="mx-auto mb-2 h-8 w-8 text-base-content/25" aria-hidden="true" />
             <p className="text-sm font-medium">No parameters match this view</p>
@@ -923,10 +1073,18 @@ export function SeedParametersPanel() {
         )}
 
         {/* Empty State */}
-        {data && Object.keys(data.parameters).length === 0 && (
+        {data && viewParameterCount === 0 && (
           <div className="text-center py-8 text-base-content/60">
-            <Database className="h-12 w-12 mx-auto mb-2 opacity-30" />
-            <p>No calibration parameters found for this chip.</p>
+            {viewMode === "database" ? (
+              <Database className="h-12 w-12 mx-auto mb-2 opacity-30" />
+            ) : (
+              <FileInput className="h-12 w-12 mx-auto mb-2 opacity-30" />
+            )}
+            <p>
+              {viewMode === "database"
+                ? "No calibration parameters found for this chip."
+                : "No permitted YAML parameter files were found for this chip."}
+            </p>
           </div>
         )}
 

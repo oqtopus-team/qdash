@@ -43,6 +43,46 @@ describe("ParametersTable", () => {
     expect(screen.getByText("Measurement only")).toBeTruthy();
   });
 
+  it("shows measurement and operational publish targets for one output", () => {
+    render(
+      <ParametersTable
+        title="Output Parameters"
+        parameters={{
+          qubit_frequency: {
+            value: 5.2,
+            unit: "GHz",
+            previous_database_value: 5.1,
+            database_updated: true,
+            database_updates: [
+              {
+                parameter_name: "qubit_frequency",
+                role: "measurement",
+                previous_value: 5.1,
+                updated_value: 5.2,
+                updated: true,
+              },
+              {
+                parameter_name: "control_frequency",
+                role: "operational",
+                previous_value: 5.0,
+                updated_value: 5.2,
+                updated: true,
+              },
+            ],
+          },
+        }}
+      />,
+    );
+
+    const updates = screen.getByRole("list", {
+      name: "Database updates for qubit_frequency",
+    });
+    expect(within(updates).getByText("measurement")).toBeTruthy();
+    expect(within(updates).getByText("operational")).toBeTruthy();
+    expect(within(updates).getByText("control_frequency")).toBeTruthy();
+    expect(within(updates).getByText("5.000000 → 5.200000")).toBeTruthy();
+  });
+
   it("labels a legacy result without update metadata as unknown", () => {
     render(
       <ParametersTable

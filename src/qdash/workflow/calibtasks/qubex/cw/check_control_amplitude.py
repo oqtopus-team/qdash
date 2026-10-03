@@ -9,6 +9,7 @@ from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
+    OutputPublishTarget,
     RunParameterSpec,
 )
 from qdash.workflow.calibtasks.base import (
@@ -29,8 +30,8 @@ MAX_COARSE_CONTROL_AMPLITUDE = 1.0
 class CheckControlAmplitude(QubexTask):
     """Task to estimate the control amplitude.
 
-    Sweeps the drive frequency around the calibrated qubit frequency
-    (``qubit_frequency`` ± ``frequency_span``) using the dedicated 1024 ns
+    Sweeps the drive frequency around the operational control frequency
+    (``control_frequency`` ± ``frequency_span``) using the dedicated 1024 ns
     Qubex spectroscopy readout pulse and fits a sqrt-Lorentzian
     to scale the drive amplitude so that the resulting Rabi rate matches
     ``target_rabi_rate``.
@@ -40,9 +41,14 @@ class CheckControlAmplitude(QubexTask):
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # Coarse f01 from CheckQubitSpectroscopy (5 MHz grid). The sqrt-Lorentzian
-        # fit refines this to sub-MHz precision and writes back coarse_qubit_frequency.
-        "coarse_qubit_frequency": InputParameterSpec.required_database(),
-        "readout_frequency": InputParameterSpec.required_database(),
+        # fit refines this to sub-MHz precision. New workflows pass it through
+        # control_frequency; coarse_qubit_frequency remains a legacy fallback.
+        "control_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("coarse_qubit_frequency",)
+        ),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
         "readout_amplitude": InputParameterSpec.required_database(),
         # Seed drive amplitude. Comes from CheckQubitSpectroscopy and is the
         # threshold amplitude where f01 first appears in the spectroscopy heatmap
@@ -63,7 +69,7 @@ class CheckControlAmplitude(QubexTask):
             unit="GHz",
             value_type="float",
             default=0.15,
-            description="Half-span around qubit_frequency for the sweep (±span, default ±150 MHz)",
+            description="Half-span around control_frequency for the sweep (±span, default ±150 MHz)",
         ),
         "frequency_step": RunParameterSpec(
             unit="GHz",
@@ -113,6 +119,10 @@ class CheckControlAmplitude(QubexTask):
                 "calibrated qubit_frequency — that comes from CheckAdaptiveChevron's "
                 "Rabi-detuning fit)."
             ),
+            publish_targets=(
+                OutputPublishTarget(parameter_name="coarse_qubit_frequency", role="measurement"),
+                OutputPublishTarget(parameter_name="control_frequency", role="operational"),
+            ),
         ),
     }
 
@@ -145,10 +155,10 @@ class CheckControlAmplitude(QubexTask):
             if coarse_input_param is not None and coarse_input_param.value is not None
             else None
         )
-        coarse_frequency_param = self.input_parameters["coarse_qubit_frequency"]
+        control_frequency_param = self.input_parameters["control_frequency"]
         coarse_frequency = (
-            float(coarse_frequency_param.value)
-            if coarse_frequency_param is not None and coarse_frequency_param.value is not None
+            float(control_frequency_param.value)
+            if control_frequency_param is not None and control_frequency_param.value is not None
             else None
         )
         if estimated_amplitude is not None:
@@ -210,25 +220,25 @@ class CheckControlAmplitude(QubexTask):
         label = self.get_qubit_label(backend, qid)
         resonator_label = self.get_resonator_label(backend, qid)
 
-        qubit_freq_param = self.input_parameters["coarse_qubit_frequency"]
+        control_frequency_param = self.input_parameters["control_frequency"]
         readout_freq_param = self.input_parameters["readout_frequency"]
         seed_amp_param = self.input_parameters["coarse_control_amplitude"]
-        if qubit_freq_param is None or qubit_freq_param.value is None:
-            raise ValueError("coarse_qubit_frequency input parameter is required")
+        if control_frequency_param is None or control_frequency_param.value is None:
+            raise ValueError("control_frequency input parameter is required")
         if readout_freq_param is None or readout_freq_param.value is None:
             raise ValueError("readout_frequency input parameter is required")
         if seed_amp_param is None or seed_amp_param.value is None:
             raise ValueError("coarse_control_amplitude input parameter is required")
 
-        qubit_frequency = float(qubit_freq_param.value)
+        control_frequency = float(control_frequency_param.value)
         readout_frequency = float(readout_freq_param.value)
         readout_amplitude = self._get_readout_amplitude_value()
         coarse_control_amplitude = float(seed_amp_param.value)
-        frequency_range = self._build_frequency_range(qubit_frequency)
+        frequency_range = self._build_frequency_range(control_frequency)
 
         print(
             f"[run] CheckControlAmplitude params for {label}: "
-            f"qubit_frequency={qubit_frequency:.6f} GHz, "
+            f"control_frequency={control_frequency:.6f} GHz, "
             f"sweep=[{frequency_range[0]:.6f}, {frequency_range[-1]:.6f}] GHz "
             f"({len(frequency_range)} points), "
             f"coarse_control_amplitude={coarse_control_amplitude:.6f}, "
@@ -247,7 +257,7 @@ class CheckControlAmplitude(QubexTask):
             exp,
             qubit_label=label,
             resonator_label=resonator_label,
-            frequency_overrides={label: qubit_frequency, resonator_label: readout_frequency},
+            frequency_overrides={label: control_frequency, resonator_label: readout_frequency},
         ):
             result = exp.measure_qubit_resonance(
                 label,

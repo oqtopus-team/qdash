@@ -14,6 +14,17 @@ else:
     QubexBackend = Any
 
 
+def test_control_amplitude_uses_operational_frequency_with_legacy_fallback() -> None:
+    frequency_spec = CheckControlAmplitude.input_spec["control_frequency"]
+
+    assert frequency_spec.fallback_parameter_names == ("coarse_qubit_frequency",)
+    publish_targets = CheckControlAmplitude.output_spec["coarse_qubit_frequency"].publish_targets
+    assert [(target.parameter_name, target.role) for target in publish_targets] == [
+        ("coarse_qubit_frequency", "measurement"),
+        ("control_frequency", "operational"),
+    ]
+
+
 def test_check_control_amplitude_floors_output_to_coarse_input(monkeypatch) -> None:
     task = CheckControlAmplitude()
     task.input_parameters["coarse_control_amplitude"] = ParameterModel(value=0.02, unit="a.u.")
@@ -99,7 +110,7 @@ def test_check_control_amplitude_propagates_spectroscopy_coarse_values_when_fit_
     monkeypatch,
 ) -> None:
     task = CheckControlAmplitude()
-    task.input_parameters["coarse_qubit_frequency"] = ParameterModel(value=4.25, unit="GHz")
+    task.input_parameters["control_frequency"] = ParameterModel(value=4.25, unit="GHz")
     task.input_parameters["coarse_control_amplitude"] = ParameterModel(value=0.02, unit="a.u.")
 
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
@@ -123,7 +134,7 @@ def test_check_control_amplitude_run_uses_coarse_control_amplitude_without_extra
     simultaneous_drive,
 ) -> None:
     task = CheckControlAmplitude()
-    task.input_parameters["coarse_qubit_frequency"] = ParameterModel(value=4.25, unit="GHz")
+    task.input_parameters["control_frequency"] = ParameterModel(value=4.25, unit="GHz")
     task.input_parameters["readout_frequency"] = ParameterModel(value=6.1, unit="GHz")
     task.input_parameters["readout_amplitude"] = ParameterModel(value=0.031, unit="a.u.")
     task.input_parameters["coarse_control_amplitude"] = ParameterModel(value=0.07, unit="a.u.")

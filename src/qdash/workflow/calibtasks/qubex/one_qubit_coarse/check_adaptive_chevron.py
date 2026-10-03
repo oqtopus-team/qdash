@@ -8,6 +8,7 @@ from qubex.experiment.experiment_constants import DEFAULT_INTERVAL, DEFAULT_SHOT
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
+    OutputPublishTarget,
     RunParameterSpec,
 )
 from qdash.workflow.calibtasks.base import (
@@ -32,8 +33,12 @@ class CheckAdaptiveChevron(QubexTask):
     name: str = "CheckAdaptiveChevron"
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
-        "coarse_qubit_frequency": InputParameterSpec.required_database(),
-        "readout_frequency": InputParameterSpec.required_database(),
+        "control_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("coarse_qubit_frequency",)
+        ),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
         "readout_amplitude": InputParameterSpec.required_database(),
         "coarse_control_amplitude": InputParameterSpec.required_database(
             greater_than_or_equal=CONTROL_AMPLITUDE_MIN,
@@ -65,7 +70,12 @@ class CheckAdaptiveChevron(QubexTask):
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "qubit_frequency": OutputParameterSpec(
-            unit="GHz", description="Qubit bare frequency (coarse)"
+            unit="GHz",
+            description="Qubit bare frequency (coarse)",
+            publish_targets=(
+                OutputPublishTarget(parameter_name="qubit_frequency", role="measurement"),
+                OutputPublishTarget(parameter_name="control_frequency", role="operational"),
+            ),
         ),
         "control_amplitude": OutputParameterSpec(
             unit="a.u.", description="Control pulse amplitude estimated by adaptive chevron"
@@ -141,17 +151,17 @@ class CheckAdaptiveChevron(QubexTask):
         label = exp.get_qubit_label(int(qid))
 
         readout_frequency = self.input_parameters["readout_frequency"]
-        qubit_frequency = self.input_parameters["coarse_qubit_frequency"]
+        control_frequency = self.input_parameters["control_frequency"]
         readout_amplitude = self.input_parameters["readout_amplitude"]
         assert readout_frequency is not None
-        assert qubit_frequency is not None
-        if qubit_frequency.value is None:
-            raise ValueError("coarse_qubit_frequency input parameter is required")
+        assert control_frequency is not None
+        if control_frequency.value is None:
+            raise ValueError("control_frequency input parameter is required")
         if readout_frequency.value is None:
             raise ValueError("readout_frequency input parameter is required")
         if readout_amplitude is None or readout_amplitude.value is None:
             raise ValueError("readout_amplitude input parameter is required")
-        qubit_freq = float(qubit_frequency.value)
+        control_freq = float(control_frequency.value)
         readout_freq = float(readout_frequency.value)
         readout_amp = float(readout_amplitude.value)
 
@@ -163,7 +173,7 @@ class CheckAdaptiveChevron(QubexTask):
         print(
             f"[run] CheckAdaptiveChevron params for {label}: "
             f"coarse_control_amplitude={ctrl_amp_value}, "
-            f"coarse_qubit_frequency={qubit_freq}, "
+            f"control_frequency={control_freq}, "
             f"readout_amplitude={readout_amp}, "
             f"readout_frequency={readout_freq}"
         )
@@ -172,12 +182,12 @@ class CheckAdaptiveChevron(QubexTask):
         with self._modified_qubit_readout_frequencies(
             exp,
             qubit_label=label,
-            frequency_overrides={label: qubit_freq, "R" + label: readout_freq},
+            frequency_overrides={label: control_freq, "R" + label: readout_freq},
         ):
             result = self._run_adaptive_chevron(
                 exp=exp,
                 label=label,
-                qubit_frequency=qubit_freq,
+                qubit_frequency=control_freq,
                 control_amplitude=float(ctrl_amp_value),
             )
 

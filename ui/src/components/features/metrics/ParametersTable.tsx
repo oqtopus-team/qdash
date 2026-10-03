@@ -26,8 +26,33 @@ interface ParametersTableProps {
 
 type DatabaseUpdateStatus = "updated" | "not-updated" | "partial" | "unknown";
 
+interface DatabaseUpdate {
+  parameter_name: string;
+  role: "measurement" | "operational";
+  previous_value?: unknown;
+  updated_value?: unknown;
+  updated: boolean;
+}
+
+function getDatabaseUpdates(value: unknown): DatabaseUpdate[] {
+  if (typeof value !== "object" || value === null || !("database_updates" in value)) return [];
+  const updates = (value as Record<string, unknown>).database_updates;
+  if (!Array.isArray(updates)) return [];
+  return updates.filter(
+    (update): update is DatabaseUpdate =>
+      typeof update === "object" &&
+      update !== null &&
+      typeof (update as Record<string, unknown>).parameter_name === "string" &&
+      ((update as Record<string, unknown>).role === "measurement" ||
+        (update as Record<string, unknown>).role === "operational") &&
+      typeof (update as Record<string, unknown>).updated === "boolean",
+  );
+}
+
 function getDatabaseUpdateStatus(parameters: Record<string, unknown>): DatabaseUpdateStatus {
   const flags = Object.values(parameters).flatMap((value) => {
+    const updates = getDatabaseUpdates(value);
+    if (updates.length > 0) return updates.map((update) => update.updated);
     if (typeof value !== "object" || value === null || !("database_updated" in value)) return [];
     const flag = (value as Record<string, unknown>).database_updated;
     return typeof flag === "boolean" ? [flag] : [];
@@ -178,6 +203,7 @@ export function ParametersTable({
             typeof val === "object" && val !== null && "value" in val
               ? (val as Record<string, unknown>)
               : { value: val };
+          const databaseUpdates = getDatabaseUpdates(paramValue);
           const override = overrides?.[key];
           return (
             <tr key={key}>
@@ -194,6 +220,32 @@ export function ParametersTable({
                   >
                     edited
                   </span>
+                )}
+                {databaseUpdates.length > 0 && (
+                  <ul className="mt-2 list gap-1" aria-label={`Database updates for ${key}`}>
+                    {databaseUpdates.map((update) => (
+                      <li
+                        key={`${key}:${update.parameter_name}`}
+                        className="list-row min-h-0 grid-cols-[auto_1fr] gap-2 rounded-field bg-base-200 px-2 py-1"
+                      >
+                        <span
+                          className={`badge badge-xs ${
+                            update.role === "measurement" ? "badge-info" : "badge-accent"
+                          }`}
+                        >
+                          {update.role}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="font-mono">{update.parameter_name}</span>
+                          <span className="ml-2 font-mono text-base-content/60">
+                            {update.updated
+                              ? `${formatValue(update.previous_value)} → ${formatValue(update.updated_value)}`
+                              : "not applied"}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </td>
               {showsDatabaseComparison && (
