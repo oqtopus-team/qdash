@@ -70,6 +70,9 @@ class AIReviewEvalRunResult(BaseModel):
 
     run_at: datetime
     mode: SnapshotMode
+    # Snapshots are backend-independent inputs, so the same one can be replayed
+    # on both backends and compared. Only the result records which one ran.
+    backend: str = "litellm"
     source: AIReviewSourceRef
     selected_model: AIReviewModelRef
     user_message: str
@@ -151,11 +154,14 @@ def run_ai_review_snapshot(
     config: CopilotConfig | None = None,
     model_override: ModelConfig | None = None,
     use_snapshot_message: bool = False,
+    backend: str | None = None,
 ) -> AIReviewEvalRunResult:
     """Replay one AI review snapshot through the same renderer as production."""
     config = apply_ai_review_config(config or load_copilot_config())
     if model_override is not None:
         config = config.model_copy(update={"analysis_model": model_override})
+    if backend is not None:
+        config = config.model_copy(update={"copilot_backend": backend})
 
     if mode == "rebuild":
         bundle = build_ai_review_context(
@@ -180,6 +186,7 @@ def run_ai_review_snapshot(
     return AIReviewEvalRunResult(
         run_at=datetime.now(UTC),
         mode=mode,
+        backend=config.copilot_backend,
         source=snapshot.source,
         selected_model=_model_ref(select_analysis_model(config)),
         user_message=user_message,
@@ -236,6 +243,11 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--output-dir", required=True)
     run_parser.add_argument("--use-snapshot-message", action="store_true")
     run_parser.add_argument("--print-markdown", action="store_true")
+    run_parser.add_argument(
+        "--backend",
+        choices=("litellm", "pi"),
+        help="Override copilot_backend for this replay. Defaults to the configured one.",
+    )
     _add_model_override_args(run_parser)
     return parser
 
@@ -307,6 +319,7 @@ def main() -> int:
         config=config,
         model_override=model_override,
         use_snapshot_message=args.use_snapshot_message,
+        backend=args.backend,
     )
     output_dir = write_ai_review_run_artifacts(result, args.output_dir)
     if args.print_markdown:

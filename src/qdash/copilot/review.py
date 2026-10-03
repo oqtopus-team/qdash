@@ -30,6 +30,12 @@ markdown block. Do not put prose before it.
 - Optional note: ...
 """
 
+AI_REVIEW_TOOL_REMINDER = """\
+
+Report your verdict by calling the `submit_review` tool exactly once, as your
+last action. Do not write the verdict as prose.
+"""
+
 
 def select_analysis_model(config: CopilotConfig) -> ModelConfig:
     """Return the effective model used for task-result analysis."""
@@ -55,6 +61,10 @@ def apply_ai_review_config(config: CopilotConfig) -> CopilotConfig:
 
 def build_ai_review_user_message(config: CopilotConfig) -> str:
     """Build the user message sent to the LLM for automatic AI review."""
+    if config.copilot_backend == "pi":
+        # The Pi backend collects the same fields as `submit_review` arguments,
+        # so asking for the markdown block here would only compete with it.
+        return f"{config.analysis.ai_review_message}\n\n{AI_REVIEW_TOOL_REMINDER}"
     return f"{config.analysis.ai_review_message}\n\n{AI_REVIEW_FORMAT_REMINDER}"
 
 
@@ -145,13 +155,28 @@ def render_ai_review_markdown(
     user_message: str | None = None,
 ) -> str:
     """Render markdown for one AI review run."""
+    # Deliberately ahead of the backend split: a safety guard that depended on
+    # which backend is configured would be a guard in name only.
     if forced := forced_ai_review_markdown(task_name, context_bundle.context.output_parameters):
         return forced
+
+    message = user_message or build_ai_review_user_message(config)
+
+    if config.copilot_backend == "pi":
+        from qdash.copilot import pi_review
+
+        verdict = pi_review.run_review(
+            bundle=context_bundle,
+            config=config,
+            model=select_analysis_model(config),
+            user_message=message,
+        )
+        return pi_review.render_review_markdown(verdict)
 
     result = asyncio.run(
         run_analysis(
             context=context_bundle.context,
-            user_message=user_message or build_ai_review_user_message(config),
+            user_message=message,
             config=config,
             image_base64=context_bundle.image_base64,
             expected_images=context_bundle.expected_images,

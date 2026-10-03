@@ -446,6 +446,13 @@ tasks:
       # Bun <1.4 cannot read the current lockfile format, even when other UI commands succeed.
       - bunx bun@1.4.0 audit
 
+  ci-agent-runtime:
+    desc: Run all agent-runtime CI checks
+    dir: agent-runtime
+    cmds:
+      - bun test
+      - bunx tsc --noEmit
+
   ci-ui-build:
     desc: Build UI for production
     dir: ui

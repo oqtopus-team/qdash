@@ -4,6 +4,11 @@
 
 enabled: true
 
+# Backend serving the chat page, automatic AI review, and the analysis sidebar.
+#   pi:      Pi Agent Runtime service (agent-runtime/)
+#   litellm: in-process agent (src/qdash/copilot/agent.py)
+copilot_backend: pi
+
 # Language configuration
 # thinking_language: Language for internal reasoning (en recommended for technical accuracy)
 # response_language: Language for user-facing responses (ja or en)

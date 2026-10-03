@@ -93,6 +93,9 @@ export function useCopilotChat(options?: UseCopilotChatOptions) {
           headers: buildHeaders(),
           body: JSON.stringify({
             message: userMessage,
+            // Required by the Pi backend, which restores conversation state
+            // from the persisted session rather than from the request body.
+            session_id: sessionId,
             conversation_history: currentMessages.map((m) => ({
               role: m.role,
               content: m.content,

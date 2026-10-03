@@ -18065,6 +18065,18 @@
             "title": "Message",
             "description": "User question / message"
           },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Analysis session identifier. Required by the Pi backend, which restores conversation state from the persisted session."
+          },
           "image_base64": {
             "anyOf": [
               {

@@ -14,6 +14,7 @@ analysis_models:
     # Keep the local VLM resident between automatic review requests and avoid
     # repeated cold model loads between short qdash reviews.
     keep_alive: 30m
+    num_ctx: 16384
     # Gemma 4 best-practice sampling for stable local VLM review.
     temperature: 1.0
     top_p: 0.95
@@ -29,6 +30,7 @@ analysis_models:
     base_url: env:OLLAMA_BASE_URL
     api_key_env: OLLAMA_API_KEY
     keep_alive: 30m
+    num_ctx: 16384
     temperature: 1.0
     top_p: 0.95
     top_k: 64
@@ -43,9 +45,12 @@ analysis_models:
 
   # - provider: vllm
   #   name: Gemma-4-31B-IT-NVFP4
-  #   api_style: responses
+  #   # /v1/responses rejects input_image on vLLM 0.21; only chat/completions
+  #   # accepts figures, which AI review depends on.
+  #   api_style: completion
   #   base_url: env:VLLM_BASE_URL
   #   api_key_env: VLLM_API_KEY
+  #   num_ctx: 16384
   #   temperature: 1.0
   #   top_p: 0.95
   #   top_k: 64

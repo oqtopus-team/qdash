@@ -7,8 +7,38 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from qdash.copilot.config import ScoringThreshold
+    from qdash.copilot.config import CopilotConfig, ScoringThreshold
     from qdash.copilot.prompts.models import AnalysisPromptOptions
+
+
+def build_language_instruction(config: CopilotConfig | None) -> str:
+    """Build the response/thinking language instruction for a prompt.
+
+    Lives here rather than in ``agent.py`` so the Pi backend can build a prompt
+    without importing the LiteLLM agent.
+    """
+    if config is None:
+        return "Respond in the same language as the user's message."
+
+    response_lang = config.response_language
+    thinking_lang = config.thinking_language
+    parts: list[str] = []
+
+    if thinking_lang != response_lang and not config.model.disable_thinking_instruction:
+        parts.append(f"Think and reason internally in {thinking_lang} for technical precision.")
+
+    if response_lang == "ja":
+        parts.append(
+            "Always respond in Japanese (日本語). "
+            "Use technical terms in English where appropriate (e.g., T1, T2, fidelity)."
+        )
+    elif response_lang == "en":
+        parts.append("Always respond in English.")
+    else:
+        parts.append(f"Always respond in {response_lang}.")
+
+    return " ".join(parts)
+
 
 ANALYSIS_SYSTEM_PROMPT_BASE = """\
 You are an expert in superconducting qubit calibration.
@@ -172,7 +202,8 @@ def build_analysis_system_prompt(options: AnalysisPromptOptions) -> str:
         parts.append("\n".join(img_instructions))
 
     parts.append(context.task_knowledge_prompt)
-    parts.append(AI_REVIEW_INSTRUCTION)
+    if options.include_ai_review_instruction:
+        parts.append(AI_REVIEW_INSTRUCTION)
 
     scoring_section = _build_scoring_threshold_section(options.scoring)
     if scoring_section:
