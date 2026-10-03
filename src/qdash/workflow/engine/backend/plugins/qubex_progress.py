@@ -37,6 +37,7 @@ _installed = False
 # Keep this explicit so the UI can warn before the first bar completes; once a
 # second bar is observed, the adapter also detects multi-phase work generically.
 _MULTI_PHASE_TASKS = {
+    "CheckAdaptiveChevron",
     "CheckChevron",
     "CheckCrossResonance",
     "CheckRamsey",
@@ -189,6 +190,7 @@ def _progress_description(task_name: str, description: str) -> str:
     if task_name == "CheckResonatorSpectroscopy" and not description:
         return "readout power sweep"
     task_labels = {
+        "CheckAdaptiveChevron": "Adaptive Chevron sweep",
         "CheckChevron": "Chevron sweep",
         "CheckRabi": "Rabi time sweep",
         "CheckCoarseReadoutParams": "Readout parameter search",

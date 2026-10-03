@@ -16,6 +16,6 @@ design context or examples.
 
 - API: [design](../development/api/design.md), [testing](../development/api/testing.md)
 - UI: [architecture](../development/ui/architecture.md), [guidelines](../development/ui/guidelines.md), [testing](../development/ui/testing.md)
-- Workflow: [architecture](../development/workflow/engine-architecture.md), [testing](../development/workflow/testing.md)
+- Workflow: [architecture](../development/workflow/engine-architecture.md), [calibration data lifecycle](../development/workflow/calibration-data-lifecycle.md), [testing](../development/workflow/testing.md)
 - Copilot: [architecture](../development/copilot/architecture.md), [sandbox](../development/copilot/sandbox.md), [streaming](../development/copilot/streaming.md)
 - Repository practices: [development flow](../development/development-flow.md), [docs guidelines](../development/docs-guidelines.md)

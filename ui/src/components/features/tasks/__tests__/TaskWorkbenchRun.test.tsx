@@ -99,6 +99,25 @@ describe("TaskWorkbench run availability", () => {
     raw_data_path: [],
   };
 
+  it("collapses input groups declared by task catalog metadata", () => {
+    renderWorkbench({
+      input_parameters: {
+        qubit_frequency: { value_type: "float" },
+        normalization_reference: {
+          value_type: "float",
+          ui_group: "Normalization context",
+          ui_group_collapsed: true,
+        },
+      },
+    });
+
+    expect(screen.getByRole("textbox", { name: "qubit_frequency" })).toBeTruthy();
+    const group = screen.getByText("Normalization context").closest("details");
+    expect(group).not.toBeNull();
+    expect(group).not.toHaveAttribute("open");
+    expect(screen.getByRole("textbox", { name: "normalization_reference" })).toBeTruthy();
+  });
+
   it("prefills the current form and submits all entered values through the catalog API", async () => {
     renderWorkbench(
       {

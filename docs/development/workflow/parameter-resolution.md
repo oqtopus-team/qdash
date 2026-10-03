@@ -3,6 +3,8 @@
 The workflow engine resolves task inputs, experiment configuration, snapshots, user overrides, and output persistence at different lifecycle stages.
 
 The [Frequency Parameter Policy](./frequency-parameter-policy.md) specifies the agreed design for exploration and calibrated frequencies, derived drive frequencies, YAML export, and update UX. Its implementation gaps are tracked separately from the current lifecycle described here.
+[Calibration Data Lifecycle](./calibration-data-lifecycle.md) shows how accepted calibration
+values, task history, active workflow state, and Qubex parameter files differ.
 
 ## Parameter model contracts
 
@@ -233,6 +235,37 @@ The Tasks page **Reload** action is client-side preparation only. It reads the s
 ## Output persistence
 
 `persist_output_parameters` controls authoritative write-back. When false, task history, execution state, figures, raw data, and in-memory output processing still occur, but `BackendSaver` skips calibration database and backend parameter writes.
+
+Normal workflows apply validated task outputs by default. A workflow template can make one task
+measurement-only by setting `update_calibration_parameters` in that task's
+`task_run_parameters` entry:
+
+```python
+cal = CalibService(
+    username,
+    chip_id,
+    task_run_parameters={
+        "CheckChevron": {
+            "update_calibration_parameters": False,
+        }
+    },
+)
+```
+
+Although it is configured next to that task's Run parameters, the key is an execution policy and
+is not passed to the task or recorded as a Run parameter. A direct `execute_task` call can also put
+the key in the task's `task_details` entry; that call-level value takes precedence over the service
+configuration. When both are omitted, the task inherits the execution-level value: normal
+workflows default to `True`, while Tasks quick runs default to `False`.
+
+A successful measurement-only task keeps its outputs in task history and metrics but does not
+replace current calibration values, update the workflow's in-memory calibration state, or update
+mapped backend files. Its output parameters explicitly record `database_updated: false`, allowing
+Task Result views to label it as measurement-only. Persisted outputs record `database_updated:
+true` with `previous_database_value`, which the UI presents as a Previous/New comparison.
+Validation-rejected outputs are still cleared before history aggregation;
+figures, raw data, quality metrics, and the validation message remain available for diagnosis
+without introducing rejected values into Metrics.
 
 When persistence is enabled:
 

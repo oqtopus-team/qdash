@@ -201,7 +201,7 @@ class TaskExecutor:
             return ProgressPlan(n_runs, n_runs)
         if name in {"CreateDRAGHPIPulse", "CreateDRAGPIPulse"}:
             return ProgressPlan(4, 4)
-        if name == "CheckChevron":
+        if name == "CheckAdaptiveChevron":
             return ProgressPlan(2, 4)
         if name == "CheckCrossResonance":
             return ProgressPlan(4, 8)

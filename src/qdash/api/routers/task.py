@@ -32,6 +32,7 @@ from qdash.common.config.backend import (
     get_default_backend,
     is_task_available,
 )
+from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
 
 router = APIRouter()
 
@@ -181,7 +182,11 @@ async def quick_run_task(
                 status_code=400, detail="Source task does not match the task and target"
             )
 
-    readout_duration = body.run_parameter_overrides.get("readout_duration")
+    readout_duration = (
+        body.run_parameter_overrides.get("readout_duration", DEFAULT_READOUT_DURATION)
+        if "readout_duration" in task.run_parameters
+        else None
+    )
     default_run_parameters = (
         {
             "readout_duration": {

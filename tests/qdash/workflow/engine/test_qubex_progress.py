@@ -51,6 +51,7 @@ def test_capture_qubex_progress_reports_completion() -> None:
 @pytest.mark.parametrize(
     "task_name",
     [
+        "CheckAdaptiveChevron",
         "CheckChevron",
         "CheckCrossResonance",
         "CheckRamsey",
@@ -83,7 +84,7 @@ def test_capture_qubex_progress_includes_phase_count_bounds() -> None:
     events: list[TaskProgress] = []
     with capture_qubex_progress(
         events.append,
-        task_name="CheckChevron",
+        task_name="CheckAdaptiveChevron",
         plan=ProgressPlan(minimum_phases=2, maximum_phases=4),
     ):
         list(_service_tqdm(measurement_service)(range(2), disable=True, file=StringIO()))

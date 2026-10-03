@@ -1,5 +1,20 @@
 const RANGE_VALUE_TYPES = new Set(["np.linspace", "np.logspace", "np.arange", "range"]);
 
+export interface TaskParameterUiGroup {
+  name: string;
+  collapsed: boolean;
+}
+
+export function getTaskParameterUiGroup(parameter: unknown): TaskParameterUiGroup | null {
+  if (typeof parameter !== "object" || parameter === null) return null;
+  const metadata = parameter as Record<string, unknown>;
+  if (typeof metadata.ui_group !== "string" || metadata.ui_group.length === 0) return null;
+  return {
+    name: metadata.ui_group,
+    collapsed: metadata.ui_group_collapsed === true,
+  };
+}
+
 export function formatTaskParameter(value: unknown): string {
   if (value === null || value === undefined) return "";
   return Array.isArray(value) ? JSON.stringify(value) : String(value);

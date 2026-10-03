@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { formatTaskParameter, parseTaskParameter } from "@/lib/utils/task-parameters";
+import {
+  formatTaskParameter,
+  getTaskParameterUiGroup,
+  parseTaskParameter,
+} from "@/lib/utils/task-parameters";
 
 describe("parseTaskParameter", () => {
+  it("reads optional UI grouping metadata without depending on parameter names", () => {
+    expect(
+      getTaskParameterUiGroup({ ui_group: "Normalization", ui_group_collapsed: true }),
+    ).toEqual({ name: "Normalization", collapsed: true });
+    expect(getTaskParameterUiGroup({ ui_group: "" })).toBeNull();
+    expect(getTaskParameterUiGroup(null)).toBeNull();
+  });
+
   it("formats stored arrays as editable JSON", () => {
     expect(formatTaskParameter([3, 0, 2, 1])).toBe("[3,0,2,1]");
   });

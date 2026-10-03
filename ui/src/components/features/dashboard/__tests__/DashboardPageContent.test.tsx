@@ -2,16 +2,19 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardPageContent } from "@/components/features/dashboard/DashboardPageContent";
+import { toIsoSeconds } from "@/lib/utils/datetime";
 
 const mockSetSelectedChip = vi.fn();
 const mockSetSelectionMode = vi.fn();
 const mockSetStartDate = vi.fn();
 const mockSetEndDate = vi.fn();
 const mockSetQuickRange = vi.fn();
+const mockHasUrlRange = vi.hoisted(() => vi.fn<() => boolean>(() => false));
 const mockForumPosts = vi.hoisted(() => vi.fn<() => unknown[]>(() => []));
 const mockCurrentCooldownId = vi.hoisted(() => vi.fn<() => string | null>(() => null));
 const mockCooldowns = vi.hoisted(() => vi.fn<() => unknown[]>(() => []));
 const mockListForumPosts = vi.hoisted(() => vi.fn());
+const mockGetChipNotesSummary = vi.hoisted(() => vi.fn());
 
 vi.mock("@/client/chip/chip", () => ({
   useListChips: () => ({
@@ -72,15 +75,18 @@ vi.mock("@/client/metrics/metrics", () => ({
 }));
 
 vi.mock("@/client/note/note", () => ({
-  useGetChipNotesSummary: () => ({
-    data: {
+  useGetChipNotesSummary: (chipId: unknown, params: unknown, options: unknown) => {
+    mockGetChipNotesSummary(chipId, params, options);
+    return {
       data: {
-        qubits: [],
-        couplings: [],
-        task_notes: [],
+        data: {
+          qubits: [],
+          couplings: [],
+          task_notes: [],
+        },
       },
-    },
-  }),
+    };
+  },
 }));
 
 vi.mock("@/client/projects/projects", () => ({
@@ -141,6 +147,7 @@ vi.mock("@/hooks/useUrlState", () => ({
     setStartDate: mockSetStartDate,
     setEndDate: mockSetEndDate,
     setQuickRange: mockSetQuickRange,
+    hasUrlRange: mockHasUrlRange(),
   }),
 }));
 
@@ -149,7 +156,20 @@ vi.mock("@/components/selectors/ChipSelector", () => ({
 }));
 
 vi.mock("@/components/selectors/CooldownSelector", () => ({
-  CooldownSelector: () => <div>CooldownSelector</div>,
+  CooldownSelector: ({
+    autoPickActive,
+    selectedCooldownId,
+  }: {
+    autoPickActive?: boolean;
+    selectedCooldownId?: string | null;
+  }) => (
+    <div
+      data-auto-pick-active={String(autoPickActive)}
+      data-selected-cooldown-id={String(selectedCooldownId)}
+    >
+      CooldownSelector
+    </div>
+  ),
 }));
 
 vi.mock("@/components/ui/Card", () => ({
@@ -263,6 +283,7 @@ describe("DashboardPageContent", () => {
     mockForumPosts.mockReturnValue([]);
     mockCurrentCooldownId.mockReturnValue(null);
     mockCooldowns.mockReturnValue([]);
+    mockHasUrlRange.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -292,6 +313,87 @@ describe("DashboardPageContent", () => {
         expect.anything(),
       );
     });
+  });
+
+  it("keeps a URL-provided time range instead of the active cooldown's range", async () => {
+    mockHasUrlRange.mockReturnValue(true);
+    mockCurrentCooldownId.mockReturnValue("cd-active");
+    mockCooldowns.mockReturnValue([
+      {
+        cooldown_id: "cd-active",
+        started_at: "2026-06-01T00:00:00Z",
+        ended_at: null,
+      },
+    ]);
+
+    render(<DashboardPageContent />);
+
+    await waitFor(() => {
+      expect(mockListForumPosts).toHaveBeenCalled();
+    });
+
+    expect(mockSetStartDate).not.toHaveBeenCalled();
+    expect(mockSetEndDate).not.toHaveBeenCalled();
+    expect(screen.getByText("CooldownSelector").getAttribute("data-auto-pick-active")).toBe(
+      "false",
+    );
+    expect(screen.getByText("CooldownSelector").getAttribute("data-selected-cooldown-id")).toBe(
+      "null",
+    );
+  });
+
+  it("selects the active cooldown when the URL range starts at its start", async () => {
+    mockHasUrlRange.mockReturnValue(true);
+    mockCurrentCooldownId.mockReturnValue("cd-active");
+    mockCooldowns.mockReturnValue([
+      {
+        cooldown_id: "cd-active",
+        started_at: toIsoSeconds("2026-06-01T00:00"),
+        ended_at: null,
+      },
+    ]);
+
+    render(<DashboardPageContent />);
+
+    await waitFor(() => {
+      expect(screen.getByText("CooldownSelector").getAttribute("data-selected-cooldown-id")).toBe(
+        "cd-active",
+      );
+    });
+    expect(mockSetStartDate).not.toHaveBeenCalled();
+    expect(mockSetEndDate).not.toHaveBeenCalled();
+  });
+
+  it("does not select an ended cooldown when the URL start matches but the end does not", async () => {
+    mockHasUrlRange.mockReturnValue(true);
+    mockCurrentCooldownId.mockReturnValue("cd-ended");
+    mockCooldowns.mockReturnValue([
+      {
+        cooldown_id: "cd-ended",
+        started_at: toIsoSeconds("2026-06-01T00:00"),
+        ended_at: toIsoSeconds("2026-06-05T00:00"),
+      },
+    ]);
+
+    render(<DashboardPageContent />);
+
+    await waitFor(() => {
+      expect(mockGetChipNotesSummary).toHaveBeenCalled();
+    });
+
+    expect(screen.getByText("CooldownSelector").getAttribute("data-selected-cooldown-id")).toBe(
+      "null",
+    );
+    expect(mockGetChipNotesSummary).toHaveBeenLastCalledWith(
+      "chip-1",
+      expect.objectContaining({
+        start_at: "2026-06-01T00:00:00Z",
+        end_at: "2026-06-08T00:00:00Z",
+      }),
+      expect.anything(),
+    );
+    expect(mockSetStartDate).not.toHaveBeenCalled();
+    expect(mockSetEndDate).not.toHaveBeenCalled();
   });
 
   it("maps forum labels to dashboard marker labels", () => {

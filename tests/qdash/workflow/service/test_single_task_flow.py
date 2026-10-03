@@ -111,6 +111,28 @@ def test_single_task_executor_pulls_config_before_reexecute(monkeypatch):
     assert captured["kwargs"]["force_update_params"] is False
 
 
+def test_single_task_executor_preserves_coupling_qid(monkeypatch):
+    """A coupling target remains intact through session initialization and execution."""
+    from unittest.mock import MagicMock
+
+    from qdash.workflow.service.single_task_flow import single_task_executor
+
+    service = MagicMock()
+    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
+    monkeypatch.setattr("qdash.workflow.service.single_task_flow.get_run_logger", MagicMock)
+
+    single_task_executor(
+        username="alice",
+        chip_id="chip-1",
+        qid="32-33",
+        task_name="CheckCrossResonance",
+        backend_name="qubex",
+    )
+
+    assert service.call_args.kwargs["qids"] == ["32-33"]
+    service.return_value.execute_task.assert_called_once_with("CheckCrossResonance", "32-33")
+
+
 def test_single_task_executor_exempts_reconfigure_from_snapshot(monkeypatch):
     from qdash.workflow.service.single_task_flow import single_task_executor
 

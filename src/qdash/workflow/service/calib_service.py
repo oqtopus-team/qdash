@@ -385,7 +385,10 @@ class CalibService:
                 Execution. Pipelines automatically create one Execution per calibration
                 step, including when older templates pass this option. Default: False.
             default_run_parameters: Shared fallback run parameters applied to all tasks.
-            task_run_parameters: Explicit run parameters keyed by task name.
+            task_run_parameters: Explicit task settings keyed by task name. Alongside
+                run parameters, ``update_calibration_parameters`` can be set to ``False``
+                to keep a task's output as measurement history without applying it to
+                the current calibration parameters.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
@@ -783,7 +786,9 @@ class CalibService:
         Args:
             task_name: Name of the task to execute (e.g., 'CheckFreq')
             qid: Qubit ID to calibrate
-            task_details: Optional task-specific configuration parameters
+            task_details: Optional task-specific configuration parameters. Set
+                ``task_details[task_name]["update_calibration_parameters"]`` to ``False``
+                to retain a successful measurement without updating current calibration values.
             upstream_id: Optional explicit upstream task_id for dependency tracking
 
         Returns:

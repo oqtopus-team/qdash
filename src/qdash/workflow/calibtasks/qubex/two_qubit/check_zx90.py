@@ -15,6 +15,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
     readout_duration_run_parameter,
+    required_rabi_normalization_inputs,
 )
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
@@ -48,6 +49,9 @@ class CheckZX90(QubexTask):
 
     # Input parameters from control and target qubits
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        # Control/target RabiParams normalize IQ; validate both readout contexts.
+        **required_rabi_normalization_inputs(prefix="control_", qid_role="control"),
+        **required_rabi_normalization_inputs(prefix="target_", qid_role="target"),
         # Control qubit parameters
         "control_qubit_frequency": InputParameterSpec.database_or_default(
             default=0,

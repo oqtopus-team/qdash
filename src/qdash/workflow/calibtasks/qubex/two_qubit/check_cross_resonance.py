@@ -17,9 +17,11 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
     readout_duration_run_parameter,
+    required_rabi_normalization_inputs,
 )
 from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qdash.workflow.engine.progress import ProgressPlan
 
 
 class CheckCrossResonance(QubexTask):
@@ -40,6 +42,24 @@ class CheckCrossResonance(QubexTask):
             value_type="int",
             default=DEFAULT_INTERVAL,
             description="Time interval",
+        ),
+        "adiabatic_safe_factor": RunParameterSpec(
+            unit="a.u.",
+            value_type="float",
+            default=0.75,
+            description="Safety factor for the adiabatic condition",
+        ),
+        "max_amplitude": RunParameterSpec(
+            unit="a.u.",
+            value_type="float",
+            default=1.0,
+            description="Maximum CR pulse amplitude",
+        ),
+        "max_time_range": RunParameterSpec(
+            unit="ns",
+            value_type="int",
+            default=4096,
+            description="Maximum CR pulse search duration",
         ),
     }
 
@@ -80,6 +100,8 @@ class CheckCrossResonance(QubexTask):
             qid_role="control",
             unit="a.u.",
         ),
+        # Control RabiParam normalizes measured IQ values; its readout duration is validated.
+        **required_rabi_normalization_inputs(prefix="control_", qid_role="control"),
         # Target qubit parameters
         "target_qubit_frequency": InputParameterSpec.database_or_default(
             default=0,
@@ -115,6 +137,8 @@ class CheckCrossResonance(QubexTask):
             qid_role="target",
             unit="a.u.",
         ),
+        # Target RabiParam normalizes measured IQ values; its readout duration is validated.
+        **required_rabi_normalization_inputs(prefix="target_", qid_role="target"),
     }
 
     # Output parameters with qid_role specifying where each is stored
@@ -150,6 +174,10 @@ class CheckCrossResonance(QubexTask):
             qid_role="coupling", unit="ns", description="CR pulse ramp time."
         ),
     }
+
+    def get_progress_plan(self) -> ProgressPlan:
+        """Return the progress range emitted by Qubex CR calibration."""
+        return ProgressPlan(4, 8)
 
     def _plot_coeffs_history(self, coeffs_history: dict[str, Any], label: str) -> go.Figure:
         fig = go.Figure()
@@ -255,6 +283,11 @@ class CheckCrossResonance(QubexTask):
             exp.get_qubit_label(int(q)) for q in qid.split("-")
         )  # e.g., "0-1" → "Q00","Q01"
 
+        for role, qubit in (("control", control), ("target", target)):
+            readout_amplitude = self.input_parameters[f"{role}_readout_amplitude"]
+            if readout_amplitude.value is not None:
+                exp.params.readout_amplitude[qubit] = readout_amplitude.value
+
         x90 = {
             control: exp.drag_hpi_pulse[control],
             target: exp.drag_hpi_pulse[target],
@@ -265,6 +298,9 @@ class CheckCrossResonance(QubexTask):
             x90=x90,
             n_shots=self.run_parameters["shots"].get_value(),
             shot_interval=self.run_parameters["interval"].get_value(),
+            adiabatic_safe_factor=self.run_parameters["adiabatic_safe_factor"].get_value(),
+            max_amplitude=self.run_parameters["max_amplitude"].get_value(),
+            max_time_range=self.run_parameters["max_time_range"].get_value(),
         )
         fit_result = exp.calib_note.get_cr_param(label)
         if fit_result is None:
