@@ -15,6 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       ${{ !endsWith(github.actor, '[bot]') &&
+          (github.event.comment.user || github.event.pull_request.user ||
+            github.event.issue.user).type != 'Bot' &&
+          !contains(format(',{0},', vars.SLACK_NOTIFY_IGNORED_USERS),
+            format(',{0},', github.actor)) &&
           !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
             github.event.comment.author_association ||
             github.event.pull_request.author_association ||
