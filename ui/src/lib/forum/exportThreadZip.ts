@@ -2,6 +2,7 @@ import { BlockNoteEditor, type PartialBlock } from "@blocknote/core";
 import { strToU8, zip, type AsyncZippable } from "fflate";
 import { stringify } from "yaml";
 
+import { blockNoteSchema } from "@/lib/blocknote/codeBlock";
 import { formatDateTime, normalizeUtcInput } from "@/lib/utils/datetime";
 import type { ForumPostResponse } from "@/schemas";
 
@@ -404,7 +405,7 @@ export async function buildForumThreadZip(
   const assets = collectAllAssets([rootBlocks, ...replyBlocksList]);
   await resolveAndRewriteAssets(assets);
 
-  const editor = BlockNoteEditor.create();
+  const editor = BlockNoteEditor.create({ schema: blockNoteSchema });
   const rootMarkdown = renderMarkdown(editor, post.content, rootBlocks);
   const replyMarkdowns = replies.map((reply, index) =>
     renderMarkdown(editor, reply.content, replyBlocksList[index]),

@@ -7,6 +7,11 @@ import "@blocknote/mantine/style.css";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 
+import { blockNoteSchema } from "@/lib/blocknote/codeBlock";
+import {
+  useCodeBlockLanguageDetection,
+  withDetectedCodeLanguages,
+} from "@/lib/blocknote/codeBlockLanguage";
 import { uploadInlineFile } from "@/lib/blocknote/inlineFileUpload";
 
 import "./blocknote-theme.css";
@@ -33,14 +38,16 @@ export function WiringBlockEditor({
   const editor = useCreateBlockNote({
     // Use the full default schema — image, file, video, audio, table,
     // toggle, checklist, code, quote, divider, headings.
+    schema: blockNoteSchema,
     initialContent:
       initialBlocks && initialBlocks.length > 0
         ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (initialBlocks as any)
+          (withDetectedCodeLanguages(initialBlocks) as any)
         : undefined,
     // Inline base64 upload — keeps everything in the cool-down document.
     uploadFile: uploadInlineFile,
   });
+  useCodeBlockLanguageDetection(editor);
 
   // First-time migration: if no blocks but legacy markdown exists, import it.
   useEffect(() => {
