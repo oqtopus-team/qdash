@@ -28,6 +28,7 @@ describe("FilesBulkDownloadButton", () => {
     globalThis.URL.createObjectURL = createObjectURLMock as unknown as typeof URL.createObjectURL;
     globalThis.URL.revokeObjectURL = revokeObjectURLMock as unknown as typeof URL.revokeObjectURL;
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const appendChildSpy = vi.spyOn(document.body, "appendChild");
     const onError = vi.fn();
 
     render(<FilesBulkDownloadButton onError={onError} />);
@@ -39,7 +40,9 @@ describe("FilesBulkDownloadButton", () => {
     await waitFor(() => expect(clickSpy).toHaveBeenCalledOnce());
 
     expect(createObjectURLMock).toHaveBeenCalledOnce();
-    expect(clickSpy.mock.instances[0].download).toBe("qubex-config_20261004.zip");
+    expect((appendChildSpy.mock.calls[0][0] as HTMLAnchorElement).download).toBe(
+      "qubex-config_20261004.zip",
+    );
     expect(revokeObjectURLMock).toHaveBeenCalledWith("blob:config-archive");
     expect(onError).not.toHaveBeenCalled();
   });

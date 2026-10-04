@@ -85,7 +85,7 @@ export function FilesBulkDownloadButton({
       ) : (
         <Download className="h-3.5 w-3.5" aria-hidden="true" />
       )}
-      <span>{isDownloading ? "Downloading..." : "Download all"}</span>
+      <span>{isDownloading ? "Downloading..." : "Download"}</span>
     </button>
   );
 }
