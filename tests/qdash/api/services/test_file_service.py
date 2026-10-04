@@ -113,6 +113,25 @@ def test_download_zip_file_maps_config_parent_to_qubex_config(tmp_path: Path) ->
         shutil.rmtree(Path(response.path).parent, ignore_errors=True)
 
 
+def test_download_zip_file_preserves_tree_for_relative_root(tmp_path: Path) -> None:
+    config_dir = tmp_path / "qubex-config"
+    first_file = config_dir / "64Q" / "config" / "wiring.yaml"
+    second_file = config_dir / "16Qtest" / "config" / "chip.yaml"
+    first_file.parent.mkdir(parents=True)
+    second_file.parent.mkdir(parents=True)
+    first_file.write_text("wiring: test\n", encoding="utf-8")
+    second_file.write_text("chip: test\n", encoding="utf-8")
+
+    response = FileService(config_base_path=config_dir).download_zip_file(".")
+
+    try:
+        with zipfile.ZipFile(response.path) as archive:
+            file_names = sorted(name for name in archive.namelist() if not name.endswith("/"))
+            assert file_names == ["16Qtest/config/chip.yaml", "64Q/config/wiring.yaml"]
+    finally:
+        shutil.rmtree(Path(response.path).parent, ignore_errors=True)
+
+
 def test_download_zip_file_rejects_paths_outside_qubex_config(tmp_path: Path) -> None:
     config_dir = tmp_path / "config" / "qubex-config"
     outside_dir = tmp_path / "outside"

@@ -45,6 +45,8 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
+import { FilesBulkDownloadButton } from "./FilesBulkDownloadButton";
+
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 // Helper to check if file is a params YAML that can be imported
@@ -514,8 +516,14 @@ export function FilesPageContent() {
                 <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
                   EXPLORER
                 </h2>
-                <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
-                  Config Files
+                <div className="mb-2 flex items-center justify-between gap-2 px-3">
+                  <span className="text-xs uppercase tracking-wide text-base-content/50">
+                    Config Files
+                  </span>
+                  <FilesBulkDownloadButton
+                    disabled={!fileTreeData?.length}
+                    onError={(message) => toast.error(message)}
+                  />
                 </div>
                 {fileTreeData && (
                   <div className="min-h-0 flex-1">

@@ -1,0 +1,66 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { FilesBulkDownloadButton } from "../FilesBulkDownloadButton";
+
+const { downloadZipFileMock } = vi.hoisted(() => ({
+  downloadZipFileMock: vi.fn(),
+}));
+
+vi.mock("@/client/file/file", () => ({
+  downloadZipFile: downloadZipFileMock,
+}));
+
+describe("FilesBulkDownloadButton", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    downloadZipFileMock.mockReset();
+  });
+
+  it("downloads the complete config tree with the server filename", async () => {
+    downloadZipFileMock.mockResolvedValue({
+      data: new Blob(["zip-bytes"]),
+      headers: { "content-disposition": 'attachment; filename="qubex-config_20261004.zip"' },
+    });
+    const createObjectURLMock = vi.fn().mockReturnValue("blob:config-archive");
+    const revokeObjectURLMock = vi.fn();
+    globalThis.URL.createObjectURL = createObjectURLMock as unknown as typeof URL.createObjectURL;
+    globalThis.URL.revokeObjectURL = revokeObjectURLMock as unknown as typeof URL.revokeObjectURL;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const onError = vi.fn();
+
+    render(<FilesBulkDownloadButton onError={onError} />);
+    fireEvent.click(screen.getByRole("button", { name: "Download all" }));
+
+    await waitFor(() => {
+      expect(downloadZipFileMock).toHaveBeenCalledWith({ path: "." }, { responseType: "blob" });
+    });
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledOnce());
+
+    expect(createObjectURLMock).toHaveBeenCalledOnce();
+    expect(clickSpy.mock.instances[0].download).toBe("qubex-config_20261004.zip");
+    expect(revokeObjectURLMock).toHaveBeenCalledWith("blob:config-archive");
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("reports API errors and enables the button again", async () => {
+    downloadZipFileMock.mockRejectedValue({
+      response: {
+        data: new Blob([JSON.stringify({ detail: "Config directory not found" })], {
+          type: "application/json",
+        }),
+      },
+    });
+    const onError = vi.fn();
+
+    render(<FilesBulkDownloadButton onError={onError} />);
+    const button = screen.getByRole("button", { name: "Download all" });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledWith("Config directory not found");
+    });
+    expect(button).not.toBeDisabled();
+  });
+});
