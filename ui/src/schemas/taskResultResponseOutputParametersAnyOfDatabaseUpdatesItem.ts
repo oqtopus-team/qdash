@@ -5,14 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskResultResponseOutputParametersAnyOfDatabaseUpdatesItemRole } from './taskResultResponseOutputParametersAnyOfDatabaseUpdatesItemRole';
 
 /**
  * One calibration database update produced from a task output.
  */
 export type TaskResultResponseOutputParametersAnyOfDatabaseUpdatesItem = {
   parameter_name: string;
-  role: TaskResultResponseOutputParametersAnyOfDatabaseUpdatesItemRole;
   previous_value?: unknown;
   updated_value?: unknown;
   updated?: boolean;

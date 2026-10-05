@@ -5,14 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MetricHistoryItemOutputParametersAnyOfAnyOfDatabaseUpdatesItemRole } from './metricHistoryItemOutputParametersAnyOfAnyOfDatabaseUpdatesItemRole';
 
 /**
  * One calibration database update produced from a task output.
  */
 export type MetricHistoryItemOutputParametersAnyOfAnyOfDatabaseUpdatesItem = {
   parameter_name: string;
-  role: MetricHistoryItemOutputParametersAnyOfAnyOfDatabaseUpdatesItemRole;
   previous_value?: unknown;
   updated_value?: unknown;
   updated?: boolean;

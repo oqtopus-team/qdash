@@ -287,13 +287,11 @@ class TestProvenanceRecorder:
                     "database_updates": [
                         {
                             "parameter_name": "qubit_frequency",
-                            "role": "measurement",
                             "updated_value": 5.2,
                             "updated": True,
                         },
                         {
                             "parameter_name": "control_frequency",
-                            "role": "operational",
                             "updated_value": 5.2,
                             "updated": True,
                         },
@@ -301,11 +299,11 @@ class TestProvenanceRecorder:
                 }
             },
         )
-        measurement_entity = MagicMock(entity_id="measurement-entity")
-        operational_entity = MagicMock(entity_id="operational-entity")
+        qubit_frequency_entity = MagicMock(entity_id="qubit-frequency-entity")
+        control_frequency_entity = MagicMock(entity_id="control-frequency-entity")
         mock_repos["param_version"].create_version.side_effect = [
-            measurement_entity,
-            operational_entity,
+            qubit_frequency_entity,
+            control_frequency_entity,
         ]
 
         recorder.record_from_task(task, sample_execution_model)
@@ -320,9 +318,7 @@ class TestProvenanceRecorder:
             for call in mock_repos["provenance_relation"].create_relation.call_args_list
             if call.kwargs.get("relation_type") == ProvenanceRelationType.DERIVED_FROM
         ]
-        assert len(derived_calls) == 1
-        assert derived_calls[0].kwargs["source_id"] == "operational-entity"
-        assert derived_calls[0].kwargs["target_id"] == "measurement-entity"
+        assert derived_calls == []
 
     def test_record_from_task_does_not_raise_on_error(
         self, recorder, mock_repos, sample_task, sample_execution_model

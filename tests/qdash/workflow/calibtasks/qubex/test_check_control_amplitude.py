@@ -19,10 +19,7 @@ def test_control_amplitude_uses_operational_frequency_with_legacy_fallback() -> 
 
     assert frequency_spec.fallback_parameter_names == ("coarse_qubit_frequency",)
     publish_targets = CheckControlAmplitude.output_spec["coarse_qubit_frequency"].publish_targets
-    assert [(target.parameter_name, target.role) for target in publish_targets] == [
-        ("coarse_qubit_frequency", "measurement"),
-        ("control_frequency", "operational"),
-    ]
+    assert publish_targets == ("coarse_qubit_frequency", "control_frequency")
 
 
 def test_check_control_amplitude_floors_output_to_coarse_input(monkeypatch) -> None:

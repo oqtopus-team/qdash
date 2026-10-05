@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 from qdash.datamodel.task import (
     OutputParameterSpec,
-    OutputPublishTarget,
     ParameterModel,
 )
 from qdash.workflow.engine.task.backend_saver import BackendSaver
@@ -243,8 +242,8 @@ def test_save_qubex_publishes_measurement_and_operational_frequency() -> None:
             "qubit_frequency": OutputParameterSpec(
                 unit="GHz",
                 publish_targets=(
-                    OutputPublishTarget(parameter_name="qubit_frequency", role="measurement"),
-                    OutputPublishTarget(parameter_name="control_frequency", role="operational"),
+                    "qubit_frequency",
+                    "control_frequency",
                 ),
             )
         }
@@ -310,14 +309,12 @@ def test_save_qubex_publishes_measurement_and_operational_frequency() -> None:
     assert updates == [
         {
             "parameter_name": "qubit_frequency",
-            "role": "measurement",
             "previous_value": 5.1,
             "updated_value": 5.2,
             "updated": True,
         },
         {
             "parameter_name": "control_frequency",
-            "role": "operational",
             "previous_value": 5.0,
             "updated_value": 5.2,
             "updated": True,

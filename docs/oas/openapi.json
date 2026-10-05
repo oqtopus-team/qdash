@@ -24462,14 +24462,6 @@
                                 "type": "string",
                                 "title": "Parameter Name"
                               },
-                              "role": {
-                                "type": "string",
-                                "enum": [
-                                  "measurement",
-                                  "operational"
-                                ],
-                                "title": "Role"
-                              },
                               "previous_value": {
                                 "title": "Previous Value"
                               },
@@ -24484,8 +24476,7 @@
                             },
                             "type": "object",
                             "required": [
-                              "parameter_name",
-                              "role"
+                              "parameter_name"
                             ],
                             "title": "DatabaseUpdateModel",
                             "description": "One calibration database update produced from a task output."
@@ -25081,14 +25072,6 @@
                                 "type": "string",
                                 "title": "Parameter Name"
                               },
-                              "role": {
-                                "type": "string",
-                                "enum": [
-                                  "measurement",
-                                  "operational"
-                                ],
-                                "title": "Role"
-                              },
                               "previous_value": {
                                 "title": "Previous Value"
                               },
@@ -25103,8 +25086,7 @@
                             },
                             "type": "object",
                             "required": [
-                              "parameter_name",
-                              "role"
+                              "parameter_name"
                             ],
                             "title": "DatabaseUpdateModel",
                             "description": "One calibration database update produced from a task output."
@@ -28245,14 +28227,6 @@
                                 "type": "string",
                                 "title": "Parameter Name"
                               },
-                              "role": {
-                                "type": "string",
-                                "enum": [
-                                  "measurement",
-                                  "operational"
-                                ],
-                                "title": "Role"
-                              },
                               "previous_value": {
                                 "title": "Previous Value"
                               },
@@ -28267,8 +28241,7 @@
                             },
                             "type": "object",
                             "required": [
-                              "parameter_name",
-                              "role"
+                              "parameter_name"
                             ],
                             "title": "DatabaseUpdateModel",
                             "description": "One calibration database update produced from a task output."
@@ -29143,14 +29116,6 @@
                                 "type": "string",
                                 "title": "Parameter Name"
                               },
-                              "role": {
-                                "type": "string",
-                                "enum": [
-                                  "measurement",
-                                  "operational"
-                                ],
-                                "title": "Role"
-                              },
                               "previous_value": {
                                 "title": "Previous Value"
                               },
@@ -29165,8 +29130,7 @@
                             },
                             "type": "object",
                             "required": [
-                              "parameter_name",
-                              "role"
+                              "parameter_name"
                             ],
                             "title": "DatabaseUpdateModel",
                             "description": "One calibration database update produced from a task output."
@@ -29864,14 +29828,6 @@
                             "type": "string",
                             "title": "Parameter Name"
                           },
-                          "role": {
-                            "type": "string",
-                            "enum": [
-                              "measurement",
-                              "operational"
-                            ],
-                            "title": "Role"
-                          },
                           "previous_value": {
                             "title": "Previous Value"
                           },
@@ -29886,8 +29842,7 @@
                         },
                         "type": "object",
                         "required": [
-                          "parameter_name",
-                          "role"
+                          "parameter_name"
                         ],
                         "title": "DatabaseUpdateModel",
                         "description": "One calibration database update produced from a task output."

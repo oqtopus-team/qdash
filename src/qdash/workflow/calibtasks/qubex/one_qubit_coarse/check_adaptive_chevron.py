@@ -8,7 +8,6 @@ from qubex.experiment.experiment_constants import DEFAULT_INTERVAL, DEFAULT_SHOT
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
-    OutputPublishTarget,
     RunParameterSpec,
 )
 from qdash.workflow.calibtasks.base import (
@@ -73,8 +72,8 @@ class CheckAdaptiveChevron(QubexTask):
             unit="GHz",
             description="Qubit bare frequency (coarse)",
             publish_targets=(
-                OutputPublishTarget(parameter_name="qubit_frequency", role="measurement"),
-                OutputPublishTarget(parameter_name="control_frequency", role="operational"),
+                "qubit_frequency",
+                "control_frequency",
             ),
         ),
         "control_amplitude": OutputParameterSpec(

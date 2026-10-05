@@ -9,7 +9,6 @@ from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
-    OutputPublishTarget,
     RunParameterSpec,
 )
 from qdash.workflow.calibtasks.base import (
@@ -120,8 +119,8 @@ class CheckControlAmplitude(QubexTask):
                 "Rabi-detuning fit)."
             ),
             publish_targets=(
-                OutputPublishTarget(parameter_name="coarse_qubit_frequency", role="measurement"),
-                OutputPublishTarget(parameter_name="control_frequency", role="operational"),
+                "coarse_qubit_frequency",
+                "control_frequency",
             ),
         ),
     }

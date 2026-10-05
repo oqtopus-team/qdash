@@ -19,10 +19,7 @@ else:
 def test_qubit_spectroscopy_publishes_coarse_frequency_as_operational_seed() -> None:
     publish_targets = CheckQubitSpectroscopy.output_spec["coarse_qubit_frequency"].publish_targets
 
-    assert [(target.parameter_name, target.role) for target in publish_targets] == [
-        ("coarse_qubit_frequency", "measurement"),
-        ("control_frequency", "operational"),
-    ]
+    assert publish_targets == ("coarse_qubit_frequency", "control_frequency")
 
 
 def test_check_qubit_spectroscopy_outputs_uplifted_coarse_control_amplitude_and_marks_it(

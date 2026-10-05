@@ -28,7 +28,6 @@ type DatabaseUpdateStatus = "updated" | "not-updated" | "partial" | "unknown";
 
 interface DatabaseUpdate {
   parameter_name: string;
-  role: "measurement" | "operational";
   previous_value?: unknown;
   updated_value?: unknown;
   updated: boolean;
@@ -43,8 +42,6 @@ function getDatabaseUpdates(value: unknown): DatabaseUpdate[] {
       typeof update === "object" &&
       update !== null &&
       typeof (update as Record<string, unknown>).parameter_name === "string" &&
-      ((update as Record<string, unknown>).role === "measurement" ||
-        (update as Record<string, unknown>).role === "operational") &&
       typeof (update as Record<string, unknown>).updated === "boolean",
   );
 }
@@ -226,15 +223,8 @@ export function ParametersTable({
                     {databaseUpdates.map((update) => (
                       <li
                         key={`${key}:${update.parameter_name}`}
-                        className="list-row min-h-0 grid-cols-[auto_1fr] gap-2 rounded-field bg-base-200 px-2 py-1"
+                        className="list-row min-h-0 rounded-field bg-base-200 px-2 py-1"
                       >
-                        <span
-                          className={`badge badge-xs ${
-                            update.role === "measurement" ? "badge-info" : "badge-accent"
-                          }`}
-                        >
-                          {update.role}
-                        </span>
                         <span className="min-w-0">
                           <span className="font-mono">{update.parameter_name}</span>
                           <span className="ml-2 font-mono text-base-content/60">

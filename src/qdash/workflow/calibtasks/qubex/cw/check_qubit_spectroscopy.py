@@ -9,7 +9,6 @@ from qdash.common.visualization.figure_metadata import set_figure_role
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
-    OutputPublishTarget,
     RunParameterSpec,
 )
 from qdash.workflow.calibtasks.base import (
@@ -103,8 +102,8 @@ class CheckQubitSpectroscopy(QubexTask):
                 "frequency-refinement tasks."
             ),
             publish_targets=(
-                OutputPublishTarget(parameter_name="coarse_qubit_frequency", role="measurement"),
-                OutputPublishTarget(parameter_name="control_frequency", role="operational"),
+                "coarse_qubit_frequency",
+                "control_frequency",
             ),
         ),
         "anharmonicity": OutputParameterSpec(

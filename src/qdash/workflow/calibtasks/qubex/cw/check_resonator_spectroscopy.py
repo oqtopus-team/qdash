@@ -25,7 +25,6 @@ from qdash.common.visualization.figure_metadata import set_figure_role
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
-    OutputPublishTarget,
     RunParameterSpec,
 )
 from qdash.workflow.calibtasks.base import (
@@ -117,8 +116,8 @@ class CheckResonatorSpectroscopy(QubexTask):
             unit="GHz",
             description="Estimated resonator frequency from spectroscopy",
             publish_targets=(
-                OutputPublishTarget(parameter_name="resonator_frequency", role="measurement"),
-                OutputPublishTarget(parameter_name="readout_frequency", role="operational"),
+                "resonator_frequency",
+                "readout_frequency",
             ),
         ),
         "optimal_power": OutputParameterSpec(

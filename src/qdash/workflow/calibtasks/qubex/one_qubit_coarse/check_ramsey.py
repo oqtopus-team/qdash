@@ -9,7 +9,6 @@ from qubex.measurement.measurement_defaults import (
 from qdash.datamodel.task import (
     InputParameterSpec,
     OutputParameterSpec,
-    OutputPublishTarget,
     RunParameterSpec,
 )
 from qdash.workflow.calibtasks.base import (
@@ -77,8 +76,8 @@ class CheckRamsey(QubexTask):
             unit="GHz",
             description="Qubit bare frequency",
             publish_targets=(
-                OutputPublishTarget(parameter_name="qubit_frequency", role="measurement"),
-                OutputPublishTarget(parameter_name="control_frequency", role="operational"),
+                "qubit_frequency",
+                "control_frequency",
             ),
         ),
         "t2_star": OutputParameterSpec(unit="μs", description="T2* time"),

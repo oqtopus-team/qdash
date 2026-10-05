@@ -367,7 +367,6 @@ class DatabaseUpdateModel(BaseModel):
     """One calibration database update produced from a task output."""
 
     parameter_name: str
-    role: Literal["measurement", "operational"]
     previous_value: Any = None
     updated_value: Any = None
     updated: bool = False
@@ -461,19 +460,12 @@ def validate_task_result_output_parameters(parameters: dict[str, Any]) -> dict[s
     return _TASK_RESULT_OUTPUT_PARAMETERS_ADAPTER.validate_python(parameters)
 
 
-class OutputPublishTarget(BaseModel):
-    """Calibration parameter updated when an output is published."""
-
-    parameter_name: str
-    role: Literal["measurement", "operational"] = "measurement"
-
-
 class OutputParameterSpec(ParameterSpec):
     """Class-level declaration for a calibration output."""
 
     default: float | int | None = 0
     qid_role: str = ""
-    publish_targets: tuple[OutputPublishTarget, ...] = ()
+    publish_targets: tuple[str, ...] = ()
 
     def create_model(self) -> OutputParameterModel:
         """Create an independent runtime model from this declaration."""

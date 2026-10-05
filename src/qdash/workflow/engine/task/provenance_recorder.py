@@ -421,8 +421,7 @@ class ProvenanceRecorder:
             if value is None:
                 continue
 
-            targets = database_updates or [{"parameter_name": param_name, "role": "measurement"}]
-            created_entities: list[tuple[str, str]] = []
+            targets = database_updates or [{"parameter_name": param_name}]
             for target in targets:
                 entity = self.parameter_version_repo.create_version(
                     parameter_name=str(target["parameter_name"]),
@@ -438,8 +437,6 @@ class ProvenanceRecorder:
                     value_type=value_type,
                 )
                 entity_id = entity.entity_id
-                role = str(target.get("role", "measurement"))
-                created_entities.append((entity_id, role))
 
                 self.provenance_relation_repo.create_relation(
                     relation_type=ProvenanceRelationType.GENERATED_BY,
@@ -458,24 +455,6 @@ class ProvenanceRecorder:
                         source_id=entity_id,
                         target_type="entity",
                         target_id=input_entity_id,
-                        project_id=project_id,
-                        execution_id=execution_id,
-                    )
-
-            measurement_entity = next(
-                (entity_id for entity_id, role in created_entities if role == "measurement"),
-                None,
-            )
-            if measurement_entity is not None:
-                for entity_id, role in created_entities:
-                    if role != "operational":
-                        continue
-                    self.provenance_relation_repo.create_relation(
-                        relation_type=ProvenanceRelationType.DERIVED_FROM,
-                        source_type="entity",
-                        source_id=entity_id,
-                        target_type="entity",
-                        target_id=measurement_entity,
                         project_id=project_id,
                         execution_id=execution_id,
                     )
