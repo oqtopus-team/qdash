@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
 from qdash.api.services.pi_chat_service import (
+    _save_agent_messages,
     build_blocks_result,
+    save_agent_messages,
     tool_label,
     translate,
 )
+from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
 
 
 async def _lines(*events: dict[str, Any]):
@@ -117,6 +121,77 @@ class TestTranslate:
 
         assert events[-1][0] == "error"
         assert saved == []
+
+    @pytest.mark.asyncio
+    async def test_async_writeback_is_awaited(self) -> None:
+        saved: list[list[dict[str, Any]]] = []
+
+        async def on_done(messages: list[dict[str, Any]]) -> None:
+            saved.append(messages)
+
+        events = [
+            _parse(sse)
+            async for sse in translate(
+                _lines({"type": "done", "text": "ok", "messages": [{"role": "user"}]}),
+                on_done=on_done,
+            )
+        ]
+
+        assert events[-1][0] == "result"
+        assert saved == [[{"role": "user"}]]
+
+    @pytest.mark.asyncio
+    async def test_writeback_failure_becomes_an_error_event(self) -> None:
+        async def on_done(_messages: list[dict[str, Any]]) -> None:
+            raise RuntimeError("database unavailable")
+
+        events = [
+            _parse(sse)
+            async for sse in translate(
+                _lines({"type": "done", "text": "ok", "messages": []}),
+                on_done=on_done,
+            )
+        ]
+
+        assert events == [
+            (
+                "error",
+                {"step": "run_chat", "detail": "Could not persist the conversation state"},
+            )
+        ]
+
+
+class TestAgentMessagePersistence:
+    def test_atomic_update_only_writes_agent_messages(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        collection = MagicMock()
+        collection.update_one.return_value.matched_count = 1
+        monkeypatch.setattr(
+            CopilotChatSessionDocument,
+            "get_motor_collection",
+            lambda: collection,
+        )
+        messages = [{"role": "assistant", "content": "done"}]
+
+        assert _save_agent_messages("alice", "session-1", messages)
+
+        collection.update_one.assert_called_once_with(
+            {"username": "alice", "session_id": "session-1"},
+            {"$set": {"agent_messages": messages}},
+        )
+
+    @pytest.mark.asyncio
+    async def test_missing_session_is_not_silently_ignored(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def run_in_thread(_function, *_args):
+            return False
+
+        monkeypatch.setattr("qdash.api.services.pi_chat_service.asyncio.to_thread", run_in_thread)
+
+        with pytest.raises(RuntimeError, match="vanished before writeback"):
+            await save_agent_messages("alice", "missing", [])
 
 
 class TestBuildBlocksResult:

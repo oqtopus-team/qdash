@@ -10,12 +10,16 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import TYPE_CHECKING, Literal
 
 import httpx
 from pydantic import BaseModel
 
-from qdash.copilot.prompts.analysis import build_analysis_system_prompt
+from qdash.copilot.prompts.analysis import (
+    build_analysis_system_prompt,
+    build_language_instruction,
+)
 from qdash.copilot.prompts.models import AnalysisPromptOptions
 
 if TYPE_CHECKING:
@@ -28,6 +32,11 @@ RUNTIME_URL = os.environ.get("PI_AGENT_RUNTIME_URL", "http://agent-runtime:8002"
 # Generous: the runtime queues reviews behind a concurrency cap, and a local VLM
 # reading two figures is slow even once it starts.
 REQUEST_TIMEOUT_S = float(os.environ.get("PI_AGENT_RUNTIME_REVIEW_TIMEOUT", "600"))
+_REVIEW_FIELD_MARKER = re.compile(
+    r"-\s*(decision|human label suggestion|accepted parameter\(s\)|needs review|"
+    r"primary reason|closest knowledge case|suggested labels|recommended action|optional note)\s*:",
+    re.IGNORECASE,
+)
 
 
 class ReviewVerdict(BaseModel):
@@ -44,6 +53,13 @@ class ReviewVerdict(BaseModel):
     optional_note: str = ""
 
 
+def _single_line(value: str, *, default: str = "none") -> str:
+    """Collapse model-provided free text so it cannot inject parsed fields."""
+    collapsed = " ".join(value.split())
+    sanitized = _REVIEW_FIELD_MARKER.sub(lambda match: f"— {match.group(1)}:", collapsed)
+    return sanitized or default
+
+
 def render_review_markdown(verdict: ReviewVerdict) -> str:
     """Render a verdict as the markdown block QDash stores and parses.
 
@@ -55,13 +71,13 @@ def render_review_markdown(verdict: ReviewVerdict) -> str:
             "**AI review**",
             f"- Decision: `{verdict.decision}`",
             f"- Human label suggestion: `{verdict.human_label}`",
-            f"- Accepted parameter(s): {verdict.accepted_parameters or 'none'}",
-            f"- Needs review: {verdict.needs_review or 'none'}",
-            f"- Primary reason: {verdict.primary_reason}",
-            f"- Closest knowledge case: {verdict.closest_knowledge_case or 'none'}",
-            f"- Suggested labels: {verdict.suggested_labels or 'none'}",
-            f"- Recommended action: {verdict.recommended_action}",
-            f"- Optional note: {verdict.optional_note or 'none'}",
+            f"- Accepted parameter(s): {_single_line(verdict.accepted_parameters)}",
+            f"- Needs review: {_single_line(verdict.needs_review)}",
+            f"- Primary reason: {_single_line(verdict.primary_reason)}",
+            f"- Closest knowledge case: {_single_line(verdict.closest_knowledge_case)}",
+            f"- Suggested labels: {_single_line(verdict.suggested_labels)}",
+            f"- Recommended action: {_single_line(verdict.recommended_action)}",
+            f"- Optional note: {_single_line(verdict.optional_note)}",
         ]
     )
 
@@ -100,7 +116,7 @@ def build_review_prompt(
     body = build_analysis_system_prompt(
         AnalysisPromptOptions(
             context=bundle.context,
-            language_instruction="",
+            language_instruction=build_language_instruction(config),
             scoring=config.scoring,
             has_expected_images=expected_count > 0,
             has_experiment_image=experiment_count > 0,
@@ -141,7 +157,11 @@ def run_review(
     # trust_env=False: the runtime is an internal service, so an ambient
     # HTTP(S)_PROXY must not be applied to it.
     with httpx.Client(timeout=REQUEST_TIMEOUT_S, trust_env=False) as client:
-        response = client.post(f"{RUNTIME_URL}/review", json=payload)
+        response = client.post(
+            f"{RUNTIME_URL}/review",
+            headers=_runtime_headers(),
+            json=payload,
+        )
     if response.status_code != httpx.codes.OK:
         raise RuntimeError(f"Agent runtime returned HTTP {response.status_code}")
 
@@ -151,3 +171,12 @@ def run_review(
         logger.warning("Pi review produced no verdict: %s", body.get("text", "")[:500])
         raise RuntimeError(detail)
     return ReviewVerdict.model_validate(body["review"])
+
+
+def _runtime_headers() -> dict[str, str]:
+    """Return the internal runtime credential, failing closed when it is absent."""
+    token = os.environ.get("AGENT_RUNTIME_TOKEN")
+    if not token:
+        msg = "AGENT_RUNTIME_TOKEN is required for the Pi Agent Runtime"
+        raise RuntimeError(msg)
+    return {"Authorization": f"Bearer {token}"}

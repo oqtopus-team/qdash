@@ -64,15 +64,29 @@ async def _collect(
     saved: list[list[dict[str, Any]]] = []
     lines = ndjson or [{"type": "done", "text": "Looks good", "messages": [{"role": "user"}]}]
 
+    async def ensure_agent_session(_username: str, _session_id: str) -> None:
+        return None
+
+    async def load_agent_messages(_username: str, _session_id: str) -> list[dict[str, Any]]:
+        return stored
+
+    async def save_agent_messages(
+        _username: str,
+        _session_id: str,
+        messages: list[dict[str, Any]],
+    ) -> None:
+        saved.append(messages)
+
+    monkeypatch.setattr(pi_chat_service, "ensure_agent_session", ensure_agent_session)
     monkeypatch.setattr(
         pi_chat_service,
         "load_agent_messages",
-        lambda _username, _session_id: stored,
+        load_agent_messages,
     )
     monkeypatch.setattr(
         pi_chat_service,
         "save_agent_messages",
-        lambda _username, _session_id, messages: saved.append(messages),
+        save_agent_messages,
     )
 
     async def fake_stream_payload(payload, *, on_done, step, extra_result=None):
@@ -144,6 +158,36 @@ class TestBuildAnalysisPrompt:
 
 
 class TestStream:
+    @pytest.mark.asyncio
+    async def test_session_creation_failure_blocks_runtime_request(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def fail(_username: str, _session_id: str) -> None:
+            raise RuntimeError("database unavailable")
+
+        runtime = pytest.fail
+        monkeypatch.setattr(pi_chat_service, "ensure_agent_session", fail)
+        monkeypatch.setattr(pi_chat_service, "stream_payload", runtime)
+
+        events = [
+            _parse(sse)
+            async for sse in pi_analysis_service.stream(
+                _request(),
+                _config(),
+                _bundle(),
+                username="alice",
+                language_instruction="",
+                images_sent=_IMAGES_SENT,
+            )
+        ]
+
+        assert events == [
+            (
+                "error",
+                {"step": "init", "detail": "Could not persist the analysis session"},
+            )
+        ]
+
     @pytest.mark.asyncio
     async def test_first_turn_sends_context_and_figures(
         self, monkeypatch: pytest.MonkeyPatch

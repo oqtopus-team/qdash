@@ -3,12 +3,16 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { randomUUID } from "node:crypto";
 
 import { encodeLine, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
+import { hasBearerToken, readJsonBody, RequestError } from "./http.ts";
 import { SharedRuntime, type SessionRequest } from "./runtime.ts";
 
 const PORT = Number(process.env.PORT ?? 8002);
 const TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 180_000);
 const REVIEW_TIMEOUT_MS = Number(process.env.REVIEW_TIMEOUT_MS ?? 300_000);
 const REVIEW_CONCURRENCY = Number(process.env.REVIEW_CONCURRENCY ?? 2);
+const REVIEW_QUEUE_TIMEOUT_MS = Number(process.env.REVIEW_QUEUE_TIMEOUT_MS ?? 30_000);
+const MAX_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES ?? 20 * 1024 * 1024);
+const RUNTIME_TOKEN = process.env.AGENT_RUNTIME_TOKEN;
 
 interface ImageBody {
   data: string;
@@ -53,7 +57,18 @@ let reviewsInFlight = 0;
 
 async function acquireReviewSlot(): Promise<() => void> {
   if (reviewsInFlight >= REVIEW_CONCURRENCY) {
-    await new Promise<void>((resolve) => reviewQueue.push(resolve));
+    await new Promise<void>((resolve, reject) => {
+      const resume = (): void => {
+        clearTimeout(timeout);
+        resolve();
+      };
+      const timeout = setTimeout(() => {
+        const index = reviewQueue.indexOf(resume);
+        if (index >= 0) reviewQueue.splice(index, 1);
+        reject(new RequestError(503, "review queue is busy; retry later"));
+      }, REVIEW_QUEUE_TIMEOUT_MS);
+      reviewQueue.push(resume);
+    });
   }
   reviewsInFlight++;
   let released = false;
@@ -68,12 +83,6 @@ async function acquireReviewSlot(): Promise<() => void> {
 const runtime = await SharedRuntime.create();
 console.log(`[agent-runtime] tools: ${runtime.listToolNames().join(", ")}`);
 
-async function readBody<T>(req: IncomingMessage): Promise<T> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
-  return JSON.parse(Buffer.concat(chunks).toString("utf8")) as T;
-}
-
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
@@ -86,7 +95,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
  * verdict, and the Python side turns it into the stored markdown note.
  */
 async function handleReview(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = await readBody<ReviewBody>(req);
+  const body = await readJsonBody<ReviewBody>(req, MAX_BODY_BYTES);
   if (typeof body.prompt !== "string" || !body.prompt) {
     sendJson(res, 400, { error: "prompt is required" });
     return;
@@ -136,7 +145,7 @@ async function handleReview(req: IncomingMessage, res: ServerResponse): Promise<
 }
 
 async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = await readBody<ChatBody>(req);
+  const body = await readJsonBody<ChatBody>(req, MAX_BODY_BYTES);
   const conversationId = body.conversation_id;
   if (!conversationId || typeof body.message !== "string") {
     sendJson(res, 400, { error: "conversation_id and message are required" });
@@ -207,21 +216,36 @@ const server = createServer((req, res) => {
     return;
   }
   if (req.method === "POST" && req.url === "/chat") {
+    if (!hasBearerToken(req.headers.authorization, RUNTIME_TOKEN)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
     handleChat(req, res).catch((error: unknown) => {
       console.error("[agent-runtime] request failed:", error);
       if (res.headersSent) {
-        res.write(encodeLine({ type: "error", message: String(error) }));
+        res.write(encodeLine({ type: "error", message: "Agent runtime request failed" }));
         res.end();
+      } else if (error instanceof RequestError) {
+        sendJson(res, error.status, { error: error.message });
       } else {
-        sendJson(res, 500, { error: String(error) });
+        sendJson(res, 500, { error: "internal server error" });
       }
     });
     return;
   }
   if (req.method === "POST" && req.url === "/review") {
+    if (!hasBearerToken(req.headers.authorization, RUNTIME_TOKEN)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
     handleReview(req, res).catch((error: unknown) => {
       console.error("[agent-runtime] review failed:", error);
-      if (!res.headersSent) sendJson(res, 500, { error: String(error) });
+      if (res.headersSent) return;
+      if (error instanceof RequestError) {
+        sendJson(res, error.status, { error: error.message });
+      } else {
+        sendJson(res, 500, { error: "internal server error" });
+      }
     });
     return;
   }

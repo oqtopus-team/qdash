@@ -8,6 +8,8 @@ See .agent docs: adr/0002 (Mongo owns the conversation) and adr/0005 (NDJSON).
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import json
 import logging
 import os
@@ -19,7 +21,7 @@ from qdash.api.lib.sse import sse_event
 from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, AsyncIterable, Callable
+    from collections.abc import AsyncGenerator, AsyncIterable, Awaitable, Callable
 
     from qdash.copilot.config import CopilotConfig
     from qdash.copilot.contracts import ChatRequest
@@ -54,18 +56,36 @@ def thinking_level(config: CopilotConfig) -> str | None:
     return _THINKING_LEVELS.get(effort.lower()) if effort else None
 
 
-def load_agent_messages(username: str, session_id: str) -> list[dict[str, Any]]:
-    """Read stored Pi conversation state. Empty for new or LiteLLM-created chats."""
-    doc = CopilotChatSessionDocument.find_one(
+def _find_session(username: str, session_id: str) -> CopilotChatSessionDocument | None:
+    """Find one persisted session from synchronous Bunnet code."""
+    return CopilotChatSessionDocument.find_one(
         CopilotChatSessionDocument.username == username,
         CopilotChatSessionDocument.session_id == session_id,
     ).run()
+
+
+async def load_agent_messages(username: str, session_id: str) -> list[dict[str, Any]]:
+    """Read stored Pi conversation state. Empty for new or LiteLLM-created chats."""
+    doc = await asyncio.to_thread(_find_session, username, session_id)
     if doc is None or doc.agent_messages is None:
         return []
     return doc.agent_messages
 
 
-def save_agent_messages(
+def _save_agent_messages(
+    username: str,
+    session_id: str,
+    messages: list[dict[str, Any]],
+) -> bool:
+    """Atomically update only Pi-owned state from synchronous PyMongo code."""
+    result = CopilotChatSessionDocument.get_motor_collection().update_one(
+        {"username": username, "session_id": session_id},
+        {"$set": {"agent_messages": messages}},
+    )
+    return bool(result.matched_count)
+
+
+async def save_agent_messages(
     username: str,
     session_id: str,
     messages: list[dict[str, Any]],
@@ -75,19 +95,41 @@ def save_agent_messages(
     Only ``agent_messages`` is written here. The display-facing ``messages``
     list stays owned by the frontend, which already PATCHes it after each turn.
     """
-    doc = CopilotChatSessionDocument.find_one(
-        CopilotChatSessionDocument.username == username,
-        CopilotChatSessionDocument.session_id == session_id,
-    ).run()
-    if doc is None:
-        logger.warning(
-            "Chat session %s for %s vanished before writeback; agent state not saved",
-            session_id,
-            username,
-        )
+    saved = await asyncio.to_thread(_save_agent_messages, username, session_id, messages)
+    if not saved:
+        msg = f"Chat session {session_id} for {username} vanished before writeback"
+        raise RuntimeError(msg)
+
+
+def _ensure_agent_session(username: str, session_id: str) -> None:
+    """Create a minimal analysis session when only a browser-cached session exists."""
+    if _find_session(username, session_id) is not None:
         return
-    doc.agent_messages = messages
-    doc.save()
+    from pymongo.errors import DuplicateKeyError
+
+    try:
+        CopilotChatSessionDocument(
+            username=username,
+            session_id=session_id,
+            title="Analysis",
+        ).insert()
+    except DuplicateKeyError:
+        # Another request restored the same cached session first.
+        return
+
+
+async def ensure_agent_session(username: str, session_id: str) -> None:
+    """Ensure analysis state has a durable destination without blocking the event loop."""
+    await asyncio.to_thread(_ensure_agent_session, username, session_id)
+
+
+def _runtime_headers() -> dict[str, str]:
+    """Return the internal runtime credential, failing closed when it is absent."""
+    token = os.environ.get("AGENT_RUNTIME_TOKEN")
+    if not token:
+        msg = "AGENT_RUNTIME_TOKEN is required for the Pi Agent Runtime"
+        raise RuntimeError(msg)
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _request_payload(
@@ -118,11 +160,11 @@ async def stream(
         )
         return
 
-    agent_messages = load_agent_messages(username, request.session_id)
+    agent_messages = await load_agent_messages(username, request.session_id)
     payload = _request_payload(request, config, agent_messages)
 
-    def on_done(messages: list[dict[str, Any]]) -> None:
-        save_agent_messages(username, str(request.session_id), messages)
+    async def on_done(messages: list[dict[str, Any]]) -> None:
+        await save_agent_messages(username, str(request.session_id), messages)
 
     async for event in stream_payload(payload, on_done=on_done, step="run_chat"):
         yield event
@@ -131,7 +173,7 @@ async def stream(
 async def stream_payload(
     payload: dict[str, Any],
     *,
-    on_done: Callable[[list[dict[str, Any]]], None],
+    on_done: Callable[[list[dict[str, Any]]], Awaitable[None] | None],
     step: str,
     extra_result: dict[str, Any] | None = None,
 ) -> AsyncGenerator[str, None]:
@@ -145,7 +187,12 @@ async def stream_payload(
             # trust_env=False: the runtime is an internal service, so an ambient
             # HTTP(S)_PROXY must not be applied to it.
             httpx.AsyncClient(timeout=REQUEST_TIMEOUT_S, trust_env=False) as client,
-            client.stream("POST", f"{RUNTIME_URL}/chat", json=payload) as response,
+            client.stream(
+                "POST",
+                f"{RUNTIME_URL}/chat",
+                headers=_runtime_headers(),
+                json=payload,
+            ) as response,
         ):
             if response.status_code != httpx.codes.OK:
                 await response.aread()
@@ -163,6 +210,12 @@ async def stream_payload(
     except httpx.HTTPError as exc:
         logger.exception("Pi agent runtime request failed")
         yield sse_event("error", {"step": step, "detail": f"Agent runtime error: {exc}"})
+    except RuntimeError:
+        logger.exception("Pi agent runtime authentication is not configured")
+        yield sse_event(
+            "error",
+            {"step": step, "detail": "Agent runtime authentication is not configured"},
+        )
 
 
 def _status_detail(response: httpx.Response) -> str:
@@ -181,7 +234,7 @@ def _status_detail(response: httpx.Response) -> str:
 async def translate(
     lines: AsyncIterable[str],
     *,
-    on_done: Callable[[list[dict[str, Any]]], None],
+    on_done: Callable[[list[dict[str, Any]]], Awaitable[None] | None],
     extra_result: dict[str, Any] | None = None,
     step: str = "run_chat",
 ) -> AsyncGenerator[str, None]:
@@ -226,7 +279,17 @@ async def translate(
             )
             return
         elif kind == "done":
-            on_done(event.get("messages", []))
+            try:
+                writeback = on_done(event.get("messages", []))
+                if inspect.isawaitable(writeback):
+                    await writeback
+            except Exception:
+                logger.exception("Failed to persist Pi conversation state")
+                yield sse_event(
+                    "error",
+                    {"step": step, "detail": "Could not persist the conversation state"},
+                )
+                return
             result = build_blocks_result(event.get("text", ""), charts)
             # No text and no chart means the turn produced nothing renderable.
             # Local models do this when they emit a malformed tool call, and a

@@ -83,7 +83,17 @@ async def stream(
         )
         return
 
-    agent_messages = pi_chat_service.load_agent_messages(username, request.session_id)
+    try:
+        await pi_chat_service.ensure_agent_session(username, request.session_id)
+    except Exception:
+        logger.exception("Failed to ensure persisted Pi analysis session")
+        yield sse_event(
+            "error",
+            {"step": "init", "detail": "Could not persist the analysis session"},
+        )
+        return
+
+    agent_messages = await pi_chat_service.load_agent_messages(username, request.session_id)
     first_turn = not agent_messages
 
     payload: dict[str, Any] = {
@@ -106,8 +116,8 @@ async def stream(
         "images": collect_images(bundle) if first_turn else [],
     }
 
-    def on_done(messages: list[dict[str, Any]]) -> None:
-        pi_chat_service.save_agent_messages(username, str(request.session_id), messages)
+    async def on_done(messages: list[dict[str, Any]]) -> None:
+        await pi_chat_service.save_agent_messages(username, str(request.session_id), messages)
 
     async for event in pi_chat_service.stream_payload(
         payload,

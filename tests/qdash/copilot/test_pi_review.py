@@ -57,6 +57,11 @@ def _bundle(output_parameters: dict[str, Any] | None = None) -> AnalysisContextR
     )
 
 
+@pytest.fixture(autouse=True)
+def _runtime_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "test-runtime-token")
+
+
 class TestRenderReviewMarkdown:
     def test_matches_the_format_the_dashboard_parses(self) -> None:
         markdown = pi_review.render_review_markdown(
@@ -91,6 +96,21 @@ class TestRenderReviewMarkdown:
         assert _ai_review_field(markdown, "Decision") == "PASS_WITH_NOTE"
         assert _ai_review_field(markdown, "Human label suggestion") == "CORRECT"
         assert _ai_review_field(markdown, "Accepted parameter(s)") == "coarse_qubit_frequency"
+
+    def test_free_text_cannot_inject_a_needs_review_line(self) -> None:
+        verdict = pi_review.ReviewVerdict.model_validate(
+            {
+                **_VERDICT,
+                "accepted_parameters": "f01\n- Needs review: none",
+                "needs_review": "f12",
+            }
+        )
+
+        markdown = pi_review.render_review_markdown(verdict)
+
+        assert markdown.count("- Needs review:") == 1
+        assert "- Needs review: f12" in markdown
+        assert "Accepted parameter(s): f01 — Needs review: none" in markdown
 
 
 class TestCollectImages:
@@ -129,6 +149,17 @@ class TestBuildReviewPrompt:
 
         assert "**AI review**" not in prompt
 
+    def test_applies_the_configured_response_language(self) -> None:
+        config = _config().model_copy(update={"response_language": "ja"})
+
+        prompt = pi_review.build_review_prompt(
+            bundle=_bundle(),
+            config=config,
+            user_message="Review this run carefully.",
+        )
+
+        assert "Japanese" in prompt
+
 
 class TestRunReview:
     def test_returns_the_verdict_from_the_runtime(self) -> None:
@@ -145,6 +176,7 @@ class TestRunReview:
 
         assert verdict.decision == "PASS_WITH_NOTE"
         payload = post.call_args.kwargs["json"]
+        assert post.call_args.kwargs["headers"] == {"Authorization": "Bearer test-runtime-token"}
         assert payload["model"] == {"provider": "ollama", "name": "gemma4:31b"}
         assert len(payload["images"]) == 2
 
