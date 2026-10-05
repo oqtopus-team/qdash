@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { MuxTaskOutputParametersAnyOfAnyOfCalibratedAt } from './muxTaskOutputParametersAnyOfAnyOfCalibratedAt';
+import type { MuxTaskOutputParametersAnyOfAnyOfDatabaseUpdatesItem } from './muxTaskOutputParametersAnyOfAnyOfDatabaseUpdatesItem';
 import type { MuxTaskOutputParametersAnyOfAnyOfSource } from './muxTaskOutputParametersAnyOfAnyOfSource';
 
 /**
@@ -26,5 +27,6 @@ export type MuxTaskOutputParametersAnyOfAnyOf = {
   task_id?: string;
   previous_database_value?: unknown;
   database_updated?: boolean;
+  database_updates?: MuxTaskOutputParametersAnyOfAnyOfDatabaseUpdatesItem[];
   [key: string]: unknown;
  };

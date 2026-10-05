@@ -537,18 +537,26 @@ class QubexTask(BaseTask):
             # Get the ordered list of data sources for this role
             sources = role_data_sources.get(qid_role, role_data_sources.get("", []))
 
-            lookup_keys: tuple[str, ...] = (lookup_key,)
+            primary_lookup_keys: tuple[str, ...] = (lookup_key,)
+            fallback_lookup_keys: tuple[str, ...] = ()
             if isinstance(declaration, InputParameterSpec):
-                lookup_keys += declaration.parameter_aliases
+                primary_lookup_keys += declaration.parameter_aliases
+                fallback_lookup_keys = declaration.fallback_parameter_names
 
-            # Search sources in order, preferring the canonical key within each source.
+            # Preserve source priority for equivalent names, but only use semantic
+            # fallbacks when no canonical name or alias exists in any source.
             db_value = None
+            resolved_parameter_name = lookup_key
             value_found = False
-            for source in sources:
-                for candidate_key in lookup_keys:
-                    if candidate_key in source:
-                        db_value = source[candidate_key]
-                        value_found = True
+            for lookup_keys in (primary_lookup_keys, fallback_lookup_keys):
+                for source in sources:
+                    for candidate_key in lookup_keys:
+                        if candidate_key in source:
+                            db_value = source[candidate_key]
+                            resolved_parameter_name = candidate_key
+                            value_found = True
+                            break
+                    if value_found:
                         break
                 if value_found:
                     break
@@ -559,6 +567,8 @@ class QubexTask(BaseTask):
                         if declaration.resolution == "default_only":
                             continue
                         self.input_parameters[param_name] = InputParameterModel(
+                            parameter_name=resolved_parameter_name,
+                            qid_role=declaration.qid_role,
                             value=db_value.get("value", declaration.default),
                             value_type=declaration.value_type,
                             unit=db_value.get("unit", declaration.unit),
@@ -815,9 +825,9 @@ class QubexTask(BaseTask):
         raise ValueError("readout_amplitude input parameter is required")
 
     def _is_frequency_overridden(self, backend: "QubexBackend", qid: str) -> bool:
-        """Check if qubit_frequency was explicitly overridden from default.
+        """Check if control_frequency was explicitly overridden from default.
 
-        This method compares the current qubit_frequency in input_parameters
+        This method compares the current control_frequency in input_parameters
         with the default frequency from the quantum system. If they differ,
         it indicates that the user explicitly provided a custom frequency.
 
@@ -831,15 +841,15 @@ class QubexTask(BaseTask):
             True if frequency was explicitly provided (differs from default)
 
         """
-        # If qubit_frequency is not in input_parameters, there's no override
-        if "qubit_frequency" not in self.input_parameters:
+        # If control_frequency is not in input_parameters, there's no override
+        if "control_frequency" not in self.input_parameters:
             return False
 
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
 
         # Get current frequency from input_parameters
-        current_freq = self._get_calibration_value("qubit_frequency")
+        current_freq = self._get_calibration_value("control_frequency")
 
         # Get default frequency from quantum system
         default_freq = exp.experiment_system.quantum_system.get_qubit(label).frequency
@@ -854,7 +864,7 @@ class QubexTask(BaseTask):
         """Context manager to apply multiple parameter overrides.
 
         This unified method handles parameter types that can be overridden:
-        - qubit_frequency: Uses exp.modified_frequencies() context manager
+        - control_frequency: Uses exp.modified_frequencies() context manager
         - readout_amplitude: Direct modification with restoration
         - control_amplitude: Direct modification with restoration
 
@@ -891,7 +901,7 @@ class QubexTask(BaseTask):
             task_details = {
                 "CheckFineChevron": {
                     "input_parameters": {
-                        "qubit_frequency": {"value": 5.2},
+                        "control_frequency": {"value": 5.2},
                         "readout_amplitude": {"value": 0.15}
                     }
                 }
@@ -934,9 +944,9 @@ class QubexTask(BaseTask):
             # a method argument (e.g., exp.qubit_spectroscopy(readout_frequency=...))
             # because resonator.frequency is a read-only property in qubex.
 
-            # Check qubit_frequency override (handled specially via modified_frequencies)
+            # Check control_frequency override (handled specially via modified_frequencies)
             if self._is_frequency_overridden(backend, qid):
-                frequency_override = self._get_calibration_value("qubit_frequency")
+                frequency_override = self._get_calibration_value("control_frequency")
 
             # Execute with frequency override if needed
             if frequency_override is not None:
@@ -960,7 +970,7 @@ class QubexTask(BaseTask):
 
         DEPRECATED: Use _apply_parameter_overrides() instead for better flexibility.
 
-        This method checks if the qubit_frequency was explicitly overridden
+        This method checks if the control_frequency was explicitly overridden
         via task_details. If so, it uses exp.modified_frequencies() to
         temporarily modify the qubit frequency during task execution.
 
@@ -985,7 +995,7 @@ class QubexTask(BaseTask):
         label = self.get_qubit_label(backend, qid)
 
         if self._is_frequency_overridden(backend, qid):
-            override_freq = self._get_calibration_value("qubit_frequency")
+            override_freq = self._get_calibration_value("control_frequency")
             with exp.modified_frequencies({label: override_freq}):
                 yield
         else:

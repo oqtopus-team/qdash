@@ -1,6 +1,17 @@
 # Workflow Configuration
 # Settings for calibration workflow runtime behavior.
 
+seed_import:
+  # Optional allowlist for Qubex params/*.yaml files that may update the QDash DB.
+  # Physical measurement values (qubit/resonator frequency) are owned by experiments.
+  # Omit this setting to preserve the historical behavior of allowing all *.yaml files.
+  # An empty list disables seed parameter imports.
+  params_file_names:
+    - control_amplitude.yaml
+    - readout_amplitude.yaml
+    - control_frequency.yaml
+    - readout_frequency.yaml
+
 params_updater:
   # Map calibration output parameter names to params/*.yaml files.
   # Shared by workflow results and manual calibration updates from the UI.
@@ -11,9 +22,10 @@ params_updater:
     t2_echo: t2_echo.yaml
     t2_star: t2_star.yaml
     readout_amplitude: readout_amplitude.yaml
-    resonator_frequency: readout_frequency.yaml
+    resonator_frequency: resonator_frequency.yaml
     readout_frequency: readout_frequency.yaml
     control_amplitude: control_amplitude.yaml
+    control_frequency: control_frequency.yaml
     qubit_frequency: qubit_frequency.yaml
     x90_gate_fidelity: x90_gate_fidelity.yaml
     x180_gate_fidelity: x180_gate_fidelity.yaml
@@ -22,9 +34,7 @@ params_updater:
     average_readout_fidelity: average_readout_fidelity.yaml
 
   # Additional params/*.yaml files to update from the same output parameter.
-  extra_file_map:
-    qubit_frequency:
-      - control_frequency.yaml
+  extra_file_map: {}
 
 github:
   # Publish manual edits and saved Tasks runs when GitHub credentials are configured.

@@ -271,6 +271,83 @@ class TestProvenanceRecorder:
             value_type="float",
         )
 
+    def test_record_from_task_records_each_published_frequency_target(
+        self, recorder, mock_repos, sample_execution_model
+    ):
+        task = QubitTaskModel(
+            name="CheckChevron",
+            qid="Q0",
+            status=TaskStatusModel.COMPLETED,
+            input_parameters={},
+            output_parameters={
+                "qubit_frequency": {
+                    "value": 5.2,
+                    "unit": "GHz",
+                    "database_updated": True,
+                    "database_updates": [
+                        {
+                            "parameter_name": "qubit_frequency",
+                            "updated_value": 5.2,
+                            "updated": True,
+                        },
+                        {
+                            "parameter_name": "control_frequency",
+                            "updated_value": 5.2,
+                            "updated": True,
+                        },
+                    ],
+                }
+            },
+        )
+        qubit_frequency_entity = MagicMock(entity_id="qubit-frequency-entity")
+        control_frequency_entity = MagicMock(entity_id="control-frequency-entity")
+        mock_repos["param_version"].create_version.side_effect = [
+            qubit_frequency_entity,
+            control_frequency_entity,
+        ]
+
+        recorder.record_from_task(task, sample_execution_model)
+
+        version_calls = mock_repos["param_version"].create_version.call_args_list
+        assert [call.kwargs["parameter_name"] for call in version_calls] == [
+            "qubit_frequency",
+            "control_frequency",
+        ]
+        derived_calls = [
+            call
+            for call in mock_repos["provenance_relation"].create_relation.call_args_list
+            if call.kwargs.get("relation_type") == ProvenanceRelationType.DERIVED_FROM
+        ]
+        assert derived_calls == []
+
+    def test_record_from_task_skips_unsuccessful_database_updates(
+        self, recorder, mock_repos, sample_execution_model
+    ):
+        task = QubitTaskModel(
+            name="CheckChevron",
+            qid="Q0",
+            status=TaskStatusModel.COMPLETED,
+            input_parameters={},
+            output_parameters={
+                "qubit_frequency": {
+                    "value": 5.2,
+                    "unit": "GHz",
+                    "database_updated": False,
+                    "database_updates": [
+                        {
+                            "parameter_name": "qubit_frequency",
+                            "updated_value": 5.2,
+                            "updated": False,
+                        }
+                    ],
+                }
+            },
+        )
+
+        recorder.record_from_task(task, sample_execution_model)
+
+        mock_repos["param_version"].create_version.assert_not_called()
+
     def test_record_from_task_does_not_raise_on_error(
         self, recorder, mock_repos, sample_task, sample_execution_model
     ):

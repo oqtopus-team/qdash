@@ -74,8 +74,11 @@ class CheckCoarseReadoutParams(QubexTask):
     task_type: str = "qubit"
     r2_threshold: float = DEFAULT_RABI_R2_THRESHOLD
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
-        "qubit_frequency": InputParameterSpec.required_database(
-            unit="GHz", greater_than=0, description="Qubit drive frequency for the Rabi sweep"
+        "control_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("qubit_frequency",),
+            unit="GHz",
+            greater_than=0,
+            description="Qubit drive frequency for the Rabi sweep",
         ),
         "control_amplitude": InputParameterSpec.required_database(
             unit="a.u.",
@@ -84,7 +87,10 @@ class CheckCoarseReadoutParams(QubexTask):
             description="Control pulse amplitude for the Rabi sweep",
         ),
         "readout_frequency": InputParameterSpec.required_database(
-            unit="GHz", greater_than=0, description="Center frequency of the readout sweep"
+            fallback_parameter_names=("resonator_frequency",),
+            unit="GHz",
+            greater_than=0,
+            description="Center frequency of the readout sweep",
         ),
         "readout_amplitude": InputParameterSpec.required_database(
             unit="a.u.", greater_than=0, description="Reference amplitude of the readout sweep"

@@ -61,6 +61,17 @@ CLI updates without being hidden by the persisted `.local` volume. Host-side dep
 keep their Python environment and updater runtime state outside the checkout, so they do not reuse
 root-owned DevContainer artifacts.
 
+Use the same `task` commands from the host or DevContainer. Both sessions edit the same source
+checkout and use the same Docker daemon. Run development commands as the `vscode` user in the
+DevContainer; reserve root for container setup.
+
+The DevContainer keeps its Python `.venv` in a Docker volume mounted at the usual workspace path.
+The host retains its own `.venv`, so running `uv sync` or `uv run` in one environment does not
+replace packages used by the other. Ruff, mypy, pytest, and coverage caches are also kept inside
+the container. `ui/node_modules` and `ui/.next` also use DevContainer volumes, so its Next.js
+output does not replace host output. Recreate the DevContainer after changing these mounts; its
+first `uv sync` installs dependencies into the new volume.
+
 Then attach to the container using VS Code's DevContainer extension or:
 
 ```shell

@@ -31,9 +31,13 @@ class CreateDRAGPIPulse(QubexTask):
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam calibrates the pulse and normalizes IQ; validate its readout context.
         **required_rabi_normalization_inputs(),
-        "qubit_frequency": InputParameterSpec.required_database(),
+        "control_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("qubit_frequency",)
+        ),
         "readout_amplitude": InputParameterSpec.required_database(),
-        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),

@@ -53,6 +53,17 @@ class FakeBackend(BaseBackend):
         )
         self._exp.connect()
 
+    def disconnect(self) -> None:
+        """Release the fake Experiment if it was created."""
+        if self._exp is not None:
+            self._exp.disconnect()
+            self._exp = None
+
+    @property
+    def is_connected(self) -> bool:
+        """Return whether a fake Experiment has been created and connected."""
+        return self._exp is not None
+
     def get_instance(self) -> Any:
         if self._exp is None:
             self.connect()
