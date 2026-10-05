@@ -61,6 +61,12 @@ function getDatabaseUpdateStatus(parameters: Record<string, unknown>): DatabaseU
   return "partial";
 }
 
+function getDatabaseUpdatesLabel(updates: DatabaseUpdate[]): string {
+  if (updates.every((update) => update.updated)) return "Applied to calibration database";
+  if (updates.every((update) => !update.updated)) return "Not applied to calibration database";
+  return "Calibration database updates";
+}
+
 export function CalibrationUpdateStatusBadge({
   parameters,
 }: {
@@ -219,23 +225,24 @@ export function ParametersTable({
                   </span>
                 )}
                 {databaseUpdates.length > 0 && (
-                  <ul className="mt-2 list gap-1" aria-label={`Database updates for ${key}`}>
+                  <div
+                    className="mt-2 flex flex-wrap items-center gap-1.5"
+                    aria-label={`Database destinations for ${key}`}
+                  >
+                    <span className="text-xs font-normal text-base-content/60">
+                      {getDatabaseUpdatesLabel(databaseUpdates)}:
+                    </span>
                     {databaseUpdates.map((update) => (
-                      <li
+                      <span
                         key={`${key}:${update.parameter_name}`}
-                        className="list-row min-h-0 rounded-field bg-base-200 px-2 py-1"
+                        className={`badge badge-xs font-mono ${
+                          update.updated ? "badge-success badge-soft" : "badge-ghost"
+                        }`}
                       >
-                        <span className="min-w-0">
-                          <span className="font-mono">{update.parameter_name}</span>
-                          <span className="ml-2 font-mono text-base-content/60">
-                            {update.updated
-                              ? `${formatValue(update.previous_value)} → ${formatValue(update.updated_value)}`
-                              : "not applied"}
-                          </span>
-                        </span>
-                      </li>
+                        {update.parameter_name}
+                      </span>
                     ))}
-                  </ul>
+                  </div>
                 )}
               </td>
               {showsDatabaseComparison && (

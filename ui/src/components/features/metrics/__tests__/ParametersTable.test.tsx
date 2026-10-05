@@ -33,7 +33,18 @@ describe("ParametersTable", () => {
       <ParametersTable
         title="Output Parameters"
         parameters={{
-          readout_frequency: { value: 6.123, unit: "GHz", database_updated: false },
+          readout_frequency: {
+            value: 6.123,
+            unit: "GHz",
+            database_updated: false,
+            database_updates: [
+              {
+                parameter_name: "readout_frequency",
+                updated_value: 6.123,
+                updated: false,
+              },
+            ],
+          },
         }}
       />,
     );
@@ -41,6 +52,9 @@ describe("ParametersTable", () => {
     expect(screen.getByText("Value")).toBeTruthy();
     expect(screen.queryByText("Previous")).toBeNull();
     expect(screen.getByText("Measurement only")).toBeTruthy();
+    const destinations = screen.getByLabelText("Database destinations for readout_frequency");
+    expect(within(destinations).getByText("Not applied to calibration database:")).toBeTruthy();
+    expect(within(destinations).getByText("readout_frequency")).toBeTruthy();
   });
 
   it("shows every database publish target for one output", () => {
@@ -72,12 +86,11 @@ describe("ParametersTable", () => {
       />,
     );
 
-    const updates = screen.getByRole("list", {
-      name: "Database updates for qubit_frequency",
-    });
-    expect(within(updates).getByText("qubit_frequency")).toBeTruthy();
-    expect(within(updates).getByText("control_frequency")).toBeTruthy();
-    expect(within(updates).getByText("5.000000 → 5.200000")).toBeTruthy();
+    const destinations = screen.getByLabelText("Database destinations for qubit_frequency");
+    expect(within(destinations).getByText("Applied to calibration database:")).toBeTruthy();
+    expect(within(destinations).getByText("qubit_frequency")).toBeTruthy();
+    expect(within(destinations).getByText("control_frequency")).toBeTruthy();
+    expect(within(destinations).queryByText("5.000000 → 5.200000")).toBeNull();
   });
 
   it("labels a legacy result without update metadata as unknown", () => {
