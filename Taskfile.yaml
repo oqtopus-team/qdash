@@ -364,7 +364,7 @@ tasks:
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0=safe.directory \
             GIT_CONFIG_VALUE_0="$PWD" \
-            betterleaks git . --verbose
+            betterleaks git "$(git rev-parse --show-toplevel)" --config .betterleaks.toml --verbose
         else
           echo "betterleaks not installed; skipping leak scan"
         fi

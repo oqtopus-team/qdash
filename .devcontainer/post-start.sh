@@ -6,13 +6,21 @@ sudo mkdir -p \
   "${HOME}/.local" \
   "${HOME}/.cache/pip" \
   "${HOME}/.cache/uv" \
+  "${HOME}/.cache/ruff" \
+  "${HOME}/.cache/mypy" \
+  "${HOME}/.cache/pytest" \
+  "${HOME}/.cache/coverage" \
   /commandhistory \
+  /workspace/qdash/.venv \
+  /workspace/qdash/ui/.next \
   /workspace/qdash/ui/node_modules
 sudo chown -R "$(id -u):$(id -g)" \
   "${HOME}/.codex" \
   "${HOME}/.local" \
   "${HOME}/.cache" \
   /commandhistory \
+  /workspace/qdash/.venv \
+  /workspace/qdash/ui/.next \
   /workspace/qdash/ui/node_modules
 
 touch ~/.bashrc ~/.zshrc
