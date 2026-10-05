@@ -27,7 +27,12 @@ def build_language_instruction(config: CopilotConfig | None) -> str:
     if thinking_lang != response_lang and not config.model.disable_thinking_instruction:
         parts.append(f"Think and reason internally in {thinking_lang} for technical precision.")
 
-    if response_lang == "ja":
+    if response_lang == "auto":
+        parts.append(
+            "Respond in the same language as the user's latest message, "
+            "unless the user asks for another language."
+        )
+    elif response_lang == "ja":
         parts.append(
             "Always respond in Japanese (日本語). "
             "Use technical terms in English where appropriate (e.g., T1, T2, fidelity)."

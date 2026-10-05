@@ -11,9 +11,9 @@ copilot_backend: pi
 
 # Language configuration
 # thinking_language: Language for internal reasoning (en recommended for technical accuracy)
-# response_language: Language for user-facing responses (ja or en)
+# response_language: User-facing language (auto follows the latest user message; ja/en pin it)
 thinking_language: en
-response_language: en
+response_language: auto
 
 # Default model configuration.
 # Chat-specific selectable models live in chat.yaml.

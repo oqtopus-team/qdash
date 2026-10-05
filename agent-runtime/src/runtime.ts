@@ -35,6 +35,9 @@ const COPILOT_CONFIG_PATH =
   process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
 const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
 const REVIEW_CONFIG_PATH = process.env.REVIEW_CONFIG_PATH ?? "/app/config/copilot/review.yaml";
+const EXPERIMENTAL_WRITE_TOOLS_ENABLED = ["1", "true", "yes", "on"].includes(
+  (process.env.AGENT_RUNTIME_ENABLE_WRITE_TOOLS ?? "").trim().toLowerCase(),
+);
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
 
@@ -78,6 +81,9 @@ export class SharedRuntime {
   static async create(): Promise<SharedRuntime> {
     await resolveQDashApiToken();
     mkdirSync(STATE_DIR, { recursive: true });
+    if (EXPERIMENTAL_WRITE_TOOLS_ENABLED) {
+      console.warn("[agent-runtime] experimental QDash write tools are enabled");
+    }
 
     const { responseLanguage, thinkingLanguage } = loadLanguageConfig(COPILOT_CONFIG_PATH);
     const loader = new DefaultResourceLoader({ cwd: WORK_DIR, agentDir: AGENT_DIR });
@@ -95,7 +101,12 @@ export class SharedRuntime {
 
     const chatRegistry = createRegistry();
     chatRegistry.install(
-      buildQDashExtension(loader.getExtensions().extensions, modelRuntime, WORK_DIR),
+      buildQDashExtension(
+        loader.getExtensions().extensions,
+        modelRuntime,
+        WORK_DIR,
+        EXPERIMENTAL_WRITE_TOOLS_ENABLED,
+      ),
     );
     chatRegistry.install(
       defineExtension({
@@ -103,7 +114,12 @@ export class SharedRuntime {
         sections: [
           section(
             "qdash-copilot",
-            () => buildSystemPrompt(responseLanguage, thinkingLanguage),
+            () =>
+              buildSystemPrompt(
+                responseLanguage,
+                thinkingLanguage,
+                EXPERIMENTAL_WRITE_TOOLS_ENABLED,
+              ),
             { tag: false },
           ),
         ],

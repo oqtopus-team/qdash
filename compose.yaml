@@ -241,6 +241,7 @@ services:
     environment:
       - PORT=${AGENT_RUNTIME_PORT:-8002}
       - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
+      - AGENT_RUNTIME_ENABLE_WRITE_TOOLS=${AGENT_RUNTIME_ENABLE_WRITE_TOOLS:-false}
       - PI_CODING_AGENT_DIR=/app/.pi-agent
       - AGENT_STATE_DIR=/app/state
       - CHAT_TIMEOUT_MS=${AGENT_RUNTIME_TIMEOUT_MS:-180000}
@@ -251,8 +252,8 @@ services:
       - REVIEW_TIMEOUT_MS=${AGENT_RUNTIME_REVIEW_TIMEOUT_MS:-300000}
       # pi-qdash reaches QDash with this. The runtime logs in as the QDash
       # administrator at startup unless QDASH_API_TOKEN is already set, so no
-      # token has to be provisioned by hand. Write tools and raw GET access are
-      # excluded from the agent to keep that privilege read-only and scoped.
+      # token has to be provisioned by hand. Raw GET access is always excluded;
+      # reviewed write tools require an explicit experimental opt-in above.
       - QDASH_BASE_URL=http://api:${API_PORT:-5715}
       # Pi hides models whose provider has no credential, even when the server
       # ignores it. Keep a placeholder for keyless local endpoints.

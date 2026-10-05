@@ -12,7 +12,11 @@ import {
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
 
-import { ALLOWED_TOOL_NAMES } from "./allowed-tools.ts";
+import {
+  ALLOWED_TOOL_NAMES,
+  EXPERIMENTAL_WRITE_TOOL_NAMES,
+  isExperimentalWriteTool,
+} from "./allowed-tools.ts";
 
 /** Convert a value returned by an extension into durable's strict JSON shape. */
 function asJson(value: unknown): JsonValue | undefined {
@@ -23,22 +27,33 @@ function asJson(value: unknown): JsonValue | undefined {
 /**
  * Adapt one pi-coding-agent tool to pi-durable's execution contract.
  *
- * QDash exposes only read-only tools here, so replaying an interrupted call is
- * safe. The write-gated and raw-path tools are removed before adaptation.
+ * Read-only calls may be replayed after interruption. Experimental writes are
+ * adapted as unsafe and retain pi-qdash's non-interactive confirmation field.
+ * Raw-path access and unreviewed tools are removed before adaptation.
  */
 export function adaptCodingAgentTool(
   tool: CodingAgentTool,
   modelRuntime: ModelRuntime,
   cwd: string,
 ): ToolRegistration {
+  const writesQDash = isExperimentalWriteTool(tool.name);
   return defineTool({
     name: tool.name,
     description: tool.description,
     parameters: tool.parameters,
-    replay: "safe",
+    // A repeated read is harmless. A write interrupted after reaching QDash
+    // must instead surface as interrupted and be reconciled by the operator.
+    replay: writesQDash ? "unsafe" : "safe",
     ...(tool.prepareArguments ? { prepareArguments: tool.prepareArguments } : {}),
     ...(tool.executionMode ? { executionMode: tool.executionMode } : {}),
     execute: async (args, api: ToolExecutionApi, context: Context) => {
+      if (
+        writesQDash &&
+        (!(typeof args === "object" && args !== null && "confirmWrite" in args) ||
+          (args as { confirmWrite?: unknown }).confirmWrite !== true)
+      ) {
+        throw new Error(`${tool.name} requires confirmWrite: true`);
+      }
       const extensionContext = {
         cwd,
         mode: "json",
@@ -72,8 +87,12 @@ export function buildQDashExtension(
   extensions: ReadonlyArray<{ tools?: Map<string, { definition: CodingAgentTool }> }>,
   modelRuntime: ModelRuntime,
   cwd: string,
+  enableExperimentalWriteTools = false,
 ): Extension {
-  const allowed = new Set<string>(ALLOWED_TOOL_NAMES);
+  const allowed = new Set<string>([
+    ...ALLOWED_TOOL_NAMES,
+    ...(enableExperimentalWriteTools ? EXPERIMENTAL_WRITE_TOOL_NAMES : []),
+  ]);
   const tools = new Map<string, ToolRegistration>();
   for (const extension of extensions) {
     for (const [name, registered] of extension.tools ?? []) {

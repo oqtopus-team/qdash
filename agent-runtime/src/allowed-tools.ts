@@ -62,3 +62,28 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_wait_execution",
   "qdash_wiring_insights",
 ] as const;
+
+/**
+ * Reviewed write-capable tools from the pinned pi-qdash package.
+ *
+ * These stay separate from the normal allowlist so an operator must opt in to
+ * the whole experimental surface explicitly. Raw path access remains excluded.
+ */
+export const EXPERIMENTAL_WRITE_TOOL_NAMES = [
+  "qdash_create_agent_session",
+  "qdash_submit_agent_action",
+  "qdash_commit_agent_candidate",
+  "qdash_execute_agent_action",
+  "qdash_commit_agent_campaign_candidates",
+  "qdash_apply_agent_candidate_commit",
+  "qdash_create_forum_post",
+  "qdash_update_forum_post",
+  "qdash_create_forum_evidence_reply",
+  "qdash_create_forum_image_reply",
+] as const;
+
+const EXPERIMENTAL_WRITE_TOOLS = new Set<string>(EXPERIMENTAL_WRITE_TOOL_NAMES);
+
+export function isExperimentalWriteTool(name: string): boolean {
+  return EXPERIMENTAL_WRITE_TOOLS.has(name);
+}

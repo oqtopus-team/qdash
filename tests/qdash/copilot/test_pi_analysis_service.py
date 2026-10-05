@@ -10,6 +10,7 @@ import pytest
 from qdash.api.services import pi_analysis_service, pi_chat_service
 from qdash.copilot.config import CopilotConfig, ModelConfig
 from qdash.copilot.contracts import AnalysisContextResult, AnalyzeRequest, TaskAnalysisContext
+from qdash.copilot.prompts.analysis import build_language_instruction
 
 _IMAGES_SENT = {
     "experiment_figure": True,
@@ -52,6 +53,14 @@ def _request(message: str = "Is this result trustworthy?") -> AnalyzeRequest:
         session_id="session-1",
         request_id="request-1",
     )
+
+
+def test_auto_language_follows_the_latest_user_message() -> None:
+    config = _config().model_copy(update={"response_language": "auto"})
+
+    instruction = build_language_instruction(config)
+
+    assert "same language as the user's latest message" in instruction
 
 
 async def _collect(
