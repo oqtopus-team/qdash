@@ -1,9 +1,11 @@
 """Shared logging setup that loads configuration from a YAML file."""
 
+import atexit
 import logging
 import logging.config
 import os
 import re
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -43,7 +45,9 @@ def _resolve_log_file(log_file: str) -> str:
     except OSError:
         pass
 
-    return str(Path(tempfile.mkdtemp(prefix="qdash-logs-")) / path.name)
+    fallback_dir = Path(tempfile.mkdtemp(prefix="qdash-logs-"))
+    atexit.register(shutil.rmtree, fallback_dir, ignore_errors=True)
+    return prepare(fallback_dir / path.name)
 
 
 def setup_logging(

@@ -1,5 +1,8 @@
+import atexit
+import shutil
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from qdash.common.infrastructure import logging as logging_config
 from qdash.workflow.start_worker import _prefect_logging_yaml_path
@@ -26,23 +29,26 @@ def test_resolve_config_dir_falls_back_to_repo_app_logging(monkeypatch, tmp_path
 
 
 def test_resolve_log_file_uses_temp_dir_when_log_dirs_are_unwritable(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    state_dir = tmp_path / "state"
+    monkeypatch.setenv("XDG_STATE_HOME", str(state_dir))
     temp_dir = tmp_path / "temporary"
-    temp_dir.mkdir()
     monkeypatch.setattr(tempfile, "mkdtemp", lambda prefix: str(temp_dir))
+    register = MagicMock()
+    monkeypatch.setattr(atexit, "register", register)
 
     original_open = Path.open
 
     def open_unwritable(path, *args, **kwargs):
-        if path.name == "deployment.log":
+        if path.is_relative_to("/app/logs") or path.is_relative_to(state_dir):
             raise PermissionError("log directory is not writable")
         return original_open(path, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", open_unwritable)
 
-    assert logging_config._resolve_log_file("/app/logs/deployment.log") == str(
-        temp_dir / "deployment.log"
-    )
+    fallback_file = temp_dir / "deployment.log"
+    assert logging_config._resolve_log_file("/app/logs/deployment.log") == str(fallback_file)
+    assert fallback_file.exists()
+    register.assert_called_once_with(shutil.rmtree, temp_dir, ignore_errors=True)
 
 
 def test_resolve_log_file_uses_state_dir_outside_container(monkeypatch, tmp_path):
