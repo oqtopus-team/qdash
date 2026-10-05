@@ -227,7 +227,10 @@ services:
       - custom_net
   agent-runtime:
     # Pi Agent Runtime backing the Copilot chat page and automatic AI review
-    # when config/copilot/config.yaml sets copilot_backend: pi.
+    # when config/copilot/config.yaml sets copilot_backend: pi. Enable this
+    # opt-in service with COMPOSE_PROFILES=agent-runtime.
+    profiles:
+      - agent-runtime
     build:
       context: .
       dockerfile: ./agent-runtime/Dockerfile

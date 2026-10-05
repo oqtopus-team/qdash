@@ -7,6 +7,7 @@ enabled: true
 # Backend serving the chat page, automatic AI review, and the analysis sidebar.
 #   pi:      Pi Agent Runtime service (agent-runtime/)
 #   litellm: in-process agent (src/qdash/copilot/agent.py)
+# When using pi with Docker Compose, also set COMPOSE_PROFILES=agent-runtime in .env.
 copilot_backend: pi
 
 # Language configuration

@@ -29,6 +29,11 @@ task restart-api
 Go Task is optional for operators. When installed, `task deploy-local` wraps the first two startup
 commands and the remaining `task` commands provide development conveniences.
 
+The `agent-runtime` service is opt-in. Set `COMPOSE_PROFILES=agent-runtime` in `.env` when
+`config/copilot/config.yaml` uses `copilot_backend: pi`. Leave it unset for the in-process
+`litellm` backend so the container is not created. `task deploy` preserves that selection while
+adding the `tunnel` profile required by remote deployments.
+
 ## Logs
 
 ```bash

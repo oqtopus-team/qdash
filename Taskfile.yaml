@@ -525,10 +525,13 @@ tasks:
     desc: Start the UI development server
 
   deploy:
+    dotenv: [.env]
     cmds:
       - task: knowledge-pull
       - task: updater-start
-      - docker compose --profile tunnel up -d --build
+      - |
+        COMPOSE_PROFILES="${COMPOSE_PROFILES:+${COMPOSE_PROFILES},}tunnel" \
+          docker compose up -d --build
       - sleep 3
       - docker compose restart api
     desc: Deploy the application with Docker Compose
