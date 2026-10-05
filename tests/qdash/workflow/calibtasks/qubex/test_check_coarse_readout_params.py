@@ -31,7 +31,7 @@ from qdash.workflow.engine.task.state_manager import TaskStateManager
 @pytest.fixture
 def coarse_readout(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     task = CheckCoarseReadoutParams()
-    task.input_parameters["qubit_frequency"] = InputParameterModel(value=5.1, unit="GHz")
+    task.input_parameters["control_frequency"] = InputParameterModel(value=5.1, unit="GHz")
     task.input_parameters["control_amplitude"] = InputParameterModel(value=0.03, unit="a.u.")
     task.input_parameters["readout_frequency"] = InputParameterModel(value=6.0, unit="GHz")
     task.input_parameters["readout_amplitude"] = InputParameterModel(value=0.1, unit="a.u.")
@@ -364,7 +364,7 @@ def test_real_qubex_helper_uses_resolved_rabi_inputs_and_restores_context(
 ) -> None:
     task = coarse_readout.task
     exp = coarse_readout.experiment
-    task.input_parameters["qubit_frequency"].value = 5.4
+    task.input_parameters["control_frequency"].value = 5.4
     task.input_parameters["control_amplitude"].value = 0.04
     task.run_parameters["readout_duration"].value = 2300
     exp.ctx.resolve_qubit_label = lambda target: target

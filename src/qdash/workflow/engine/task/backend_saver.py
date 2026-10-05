@@ -9,9 +9,11 @@ Extracted from TaskExecutor to isolate backend-specific persistence concerns.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, cast
 
+from qdash.datamodel.task import OutputParameterSpec
 from qdash.workflow.engine.params_updater import get_params_updater
 
 if TYPE_CHECKING:
@@ -121,11 +123,14 @@ class BackendSaver:
         # Get output parameters from state_manager (already processed and stored)
         task_model = self._state_manager.get_task(task_name, task_type, qid)
         output_parameters = dict(task_model.output_parameters)
+        persisted_parameters, publish_targets = self._build_persistence_plan(
+            task, output_parameters
+        )
 
         if not output_parameters:
             return
         if not self._persist_output_parameters:
-            self._mark_database_not_updated(task_model, output_parameters)
+            self._mark_database_not_updated(task_model, output_parameters, publish_targets)
             return
 
         from qdash.repository import MongoQubitCalibrationRepository
@@ -136,13 +141,15 @@ class BackendSaver:
             username=self._username,
             qid=qid,
             chip_id=execution_service.chip_id,
-            output_parameters=output_parameters,
+            output_parameters=persisted_parameters,
             project_id=execution_service.project_id,
         )
         # Note: calib_data is already updated by put_output_parameters
         if backend is not None:
-            self._update_backend_params(backend, execution_service, qid, output_parameters)
-        self._attach_previous_database_values(task_model, output_parameters, previous_data)
+            self._update_backend_params(backend, execution_service, qid, persisted_parameters)
+        self._attach_previous_database_values(
+            task_model, output_parameters, publish_targets, previous_data
+        )
 
     def _save_qubex(
         self,
@@ -178,6 +185,9 @@ class BackendSaver:
         # Get output parameters
         task_model = self._state_manager.get_task(task_name, task_type, qid)
         output_parameters = dict(task_model.output_parameters)
+        persisted_parameters, publish_targets = self._build_persistence_plan(
+            task, output_parameters
+        )
 
         # Get repositories
         qubit_repo = MongoQubitCalibrationRepository()
@@ -201,7 +211,7 @@ class BackendSaver:
                 "Staging output parameters for %s without calibration/backend write-back",
                 task_name,
             )
-            self._mark_database_not_updated(task_model, output_parameters)
+            self._mark_database_not_updated(task_model, output_parameters, publish_targets)
             return
 
         # Save to the authoritative calibration database only when persistence is enabled.
@@ -214,10 +224,12 @@ class BackendSaver:
                     username=self._username,
                     qid=qid,
                     chip_id=execution_service.chip_id,
-                    output_parameters=output_parameters,
+                    output_parameters=persisted_parameters,
                     project_id=execution_service.project_id,
                 )
-                self._attach_previous_database_values(task_model, output_parameters, previous_data)
+                self._attach_previous_database_values(
+                    task_model, output_parameters, publish_targets, previous_data
+                )
             elif task.is_coupling_task():
                 previous_data = self._get_previous_calibration_data(
                     coupling_repo, execution_service, qid
@@ -226,10 +238,12 @@ class BackendSaver:
                     username=self._username,
                     qid=qid,
                     chip_id=execution_service.chip_id,
-                    output_parameters=output_parameters,
+                    output_parameters=persisted_parameters,
                     project_id=execution_service.project_id,
                 )
-                self._attach_previous_database_values(task_model, output_parameters, previous_data)
+                self._attach_previous_database_values(
+                    task_model, output_parameters, publish_targets, previous_data
+                )
 
         # Update backend params on success, or when force_update_params is enabled
         if not success and not self._force_update_params:
@@ -245,7 +259,42 @@ class BackendSaver:
                     "Force-updating backend params for %s despite failed R² validation",
                     task_name,
                 )
-            self._update_backend_params(backend, execution_service, qid, output_parameters)
+            self._update_backend_params(backend, execution_service, qid, persisted_parameters)
+
+    @staticmethod
+    def _build_persistence_plan(
+        task: TaskProtocol,
+        output_parameters: dict[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, tuple[str, ...]]]:
+        """Expand measured outputs into their declared calibration publish targets."""
+        persisted_parameters: dict[str, Any] = {}
+        publish_targets: dict[str, tuple[str, ...]] = {}
+        output_spec = getattr(task.__class__, "output_spec", {})
+
+        for output_name, parameter in output_parameters.items():
+            declaration = output_spec.get(output_name) if isinstance(output_spec, Mapping) else None
+            declared_targets = (
+                declaration.publish_targets if isinstance(declaration, OutputParameterSpec) else ()
+            )
+            targets = declared_targets or (output_name,)
+            publish_targets[output_name] = targets
+
+            for target in targets:
+                if target in persisted_parameters:
+                    raise ValueError(f"Multiple outputs publish to '{target}' in {task.get_name()}")
+                if not declared_targets and target == output_name:
+                    persisted_parameters[target] = parameter
+                    continue
+                if hasattr(parameter, "model_dump"):
+                    published = parameter.model_dump()
+                elif isinstance(parameter, dict):
+                    published = deepcopy(parameter)
+                else:
+                    published = {"value": deepcopy(parameter)}
+                published["parameter_name"] = target
+                persisted_parameters[target] = published
+
+        return persisted_parameters, publish_targets
 
     def _update_backend_params(
         self,
@@ -279,6 +328,7 @@ class BackendSaver:
     def _attach_previous_database_values(
         task_model: Any,
         output_parameters: dict[str, Any],
+        publish_targets: dict[str, tuple[str, ...]],
         previous_data: dict[str, Any],
     ) -> None:
         """Add pre-update database values to the history-facing task result."""
@@ -291,10 +341,21 @@ class BackendSaver:
             else:
                 current = {"value": deepcopy(parameter)}
 
-            previous = previous_data.get(name)
-            previous_value = previous.get("value") if isinstance(previous, dict) else previous
-            current["previous_database_value"] = deepcopy(previous_value)
+            updates = []
+            for target in publish_targets[name]:
+                previous = previous_data.get(target)
+                previous_value = previous.get("value") if isinstance(previous, dict) else previous
+                updates.append(
+                    {
+                        "parameter_name": target,
+                        "previous_value": deepcopy(previous_value),
+                        "updated_value": deepcopy(current.get("value")),
+                        "updated": True,
+                    }
+                )
+            current["previous_database_value"] = updates[0]["previous_value"]
             current["database_updated"] = True
+            current["database_updates"] = updates
             compared_parameters[name] = current
 
         task_model.output_parameters = compared_parameters
@@ -303,6 +364,7 @@ class BackendSaver:
     def _mark_database_not_updated(
         task_model: Any,
         output_parameters: dict[str, Any],
+        publish_targets: dict[str, tuple[str, ...]],
     ) -> None:
         """Mark history-facing outputs as measured but not written to the database."""
         staged_parameters: dict[str, TaskResultOutputParameter] = {}
@@ -314,6 +376,15 @@ class BackendSaver:
             else:
                 current = {"value": deepcopy(parameter)}
             current["database_updated"] = False
+            current["database_updates"] = [
+                {
+                    "parameter_name": target,
+                    "previous_value": None,
+                    "updated_value": deepcopy(current.get("value")),
+                    "updated": False,
+                }
+                for target in publish_targets[name]
+            ]
             staged_parameters[name] = current
 
         task_model.output_parameters = staged_parameters

@@ -301,7 +301,7 @@ data:
                 },
             )
 
-        assert updated_files == {"control_frequency.yaml", "t1.yaml"}
+        assert updated_files == {"t1.yaml"}
 
     def test_resolve_param_yaml_file_names_includes_mapped_and_extra_files(self):
         """Push candidates should be resolved even before checking file diffs."""

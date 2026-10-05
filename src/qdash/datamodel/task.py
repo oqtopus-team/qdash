@@ -152,6 +152,7 @@ class InputParameterSpec(ParameterSpec):
     default: float | int | None
     parameter_name: str = ""
     parameter_aliases: tuple[str, ...] = ()
+    fallback_parameter_names: tuple[str, ...] = ()
     qid_role: Literal["self", "control", "target", "coupling"] = "self"
     greater_than: float | None = None
     less_than: float | None = None
@@ -362,11 +363,35 @@ class TaskResultInputParameterModel(TaskResultParameterModel):
     ui_group_collapsed: bool = False
 
 
+class DatabaseUpdateModel(BaseModel):
+    """One calibration database update produced from a task output."""
+
+    parameter_name: str
+    previous_value: Any = None
+    updated_value: Any = None
+    updated: bool = False
+
+
+def _validate_database_update(value: Any) -> dict[str, Any]:
+    """Validate one database update while storing it as a plain dictionary."""
+    if hasattr(value, "model_dump"):
+        value = value.model_dump()
+    return DatabaseUpdateModel.model_validate(value).model_dump(exclude_unset=True)
+
+
+DatabaseUpdate = Annotated[
+    Any,
+    BeforeValidator(_validate_database_update),
+    WithJsonSchema(DatabaseUpdateModel.model_json_schema()),
+]
+
+
 class TaskResultOutputParameterModel(TaskResultParameterModel):
     """Output parameter persisted in task-result history with DB comparison metadata."""
 
     previous_database_value: Any = None
     database_updated: bool = False
+    database_updates: list[DatabaseUpdate] = Field(default_factory=list)
 
 
 def _validate_task_result_input_parameter(value: Any) -> Any:
@@ -440,6 +465,7 @@ class OutputParameterSpec(ParameterSpec):
 
     default: float | int | None = 0
     qid_role: str = ""
+    publish_targets: tuple[str, ...] = ()
 
     def create_model(self) -> OutputParameterModel:
         """Create an independent runtime model from this declaration."""

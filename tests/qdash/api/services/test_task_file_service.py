@@ -176,7 +176,7 @@ def test_coarse_readout_task_is_enabled_with_resolvable_input_metadata() -> None
 
     assert task.enabled
     assert set(task.input_parameters) == {
-        "qubit_frequency",
+        "control_frequency",
         "control_amplitude",
         "readout_frequency",
         "readout_amplitude",
@@ -258,7 +258,7 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
     task = next(t for t in tasks if t.name == "CheckT2EchoAverage")
 
     assert set(task.input_parameters) == {
-        "qubit_frequency",
+        "control_frequency",
         "hpi_amplitude",
         "hpi_duration",
         "pi_amplitude",
@@ -266,11 +266,15 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
         "readout_amplitude",
         "readout_frequency",
     } | set(RABI_NORMALIZATION_INPUT_UNITS)
-    assert task.input_parameters["qubit_frequency"] == {
+    assert task.input_parameters["control_frequency"] == {
         "resolution": "database_required",
         "user_override": "allowed",
         "default_value": None,
+        "fallback_parameter_names": ["qubit_frequency"],
     }
+    assert task.input_parameters["readout_frequency"]["fallback_parameter_names"] == [
+        "resonator_frequency"
+    ]
     assert task.input_parameters["pi_duration"]["parameter_aliases"] == ["pi_length"]
     assert task.run_parameters["readout_duration"]["unit"] == "ns"
     assert task.run_parameters["readout_duration"]["value"] == 1024
