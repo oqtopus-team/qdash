@@ -53,6 +53,34 @@ analysis_models:
 
 const env = { OLLAMA_BASE_URL: "http://ollama:11434/v1" };
 
+const OPENAI_COMPATIBLE_YAML = `
+chat_models:
+  - provider: openai-compatible
+    name: qwen3.8-flash-next
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL
+    api_key_env: OPENAI_COMPATIBLE_API_KEY
+    num_ctx: 65536
+    max_output_tokens: 16384
+    temperature: 0.7
+    top_p: 0.8
+    top_k: 20
+    sampling_params:
+      min_p: 0
+      presence_penalty: 1.5
+      repetition_penalty: 1
+    sampling_params_by_thinking_level:
+      high:
+        temperature: 1
+        top_p: 0.95
+        top_k: 20
+        min_p: 0
+        presence_penalty: 0
+        repetition_penalty: 1
+        reasoning_effort: xhigh
+    reasoning_effort: high
+`;
+
 test("a model with base_url becomes a provider definition", () => {
   const { providers } = buildModelsConfig(YAML, undefined, env);
   assert.deepEqual(providers.ollama, {
@@ -67,6 +95,52 @@ test("a model with base_url becomes a provider definition", () => {
         maxTokens: 4096,
         input: ["text", "image"],
         samplingParams: { temperature: 1, top_p: 0.95, top_k: 64 },
+      },
+    ],
+  });
+});
+
+test("OpenAI-compatible Qwen models preserve Pi 1.0 sampling and thinking settings", () => {
+  const { providers } = buildModelsConfig(OPENAI_COMPATIBLE_YAML, undefined, {
+    OPENAI_COMPATIBLE_BASE_URL: "https://gateway.example/model",
+  });
+  assert.deepEqual(providers["openai-compatible"], {
+    baseUrl: "https://gateway.example/model/v1",
+    api: "openai-completions",
+    apiKey: "$OPENAI_COMPATIBLE_API_KEY",
+    compat: {
+      supportsStore: false,
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: false,
+      maxTokensField: "max_tokens",
+      thinkingFormat: "qwen-chat-template",
+    },
+    models: [
+      {
+        id: "qwen3.8-flash-next",
+        contextWindow: 65536,
+        maxTokens: 16384,
+        reasoning: true,
+        input: ["text", "image"],
+        samplingParams: {
+          min_p: 0,
+          presence_penalty: 1.5,
+          repetition_penalty: 1,
+          temperature: 0.7,
+          top_p: 0.8,
+          top_k: 20,
+        },
+        samplingParamsByThinkingLevel: {
+          high: {
+            temperature: 1,
+            top_p: 0.95,
+            top_k: 20,
+            min_p: 0,
+            presence_penalty: 0,
+            repetition_penalty: 1,
+            reasoning_effort: "xhigh",
+          },
+        },
       },
     ],
   });

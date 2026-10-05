@@ -155,6 +155,8 @@ def test_build_litellm_kwargs_uses_provider_specific_model_strings(monkeypatch) 
     monkeypatch.setenv("LITELLM_MODEL", "openai/Gemma-4-31B-IT-NVFP4")
     monkeypatch.setenv("VLLM_BASE_URL", "http://10.20.10.19:8000/v1")
     monkeypatch.setenv("VLLM_API_KEY", "EMPTY")
+    monkeypatch.setenv("OPENAI_COMPATIBLE_BASE_URL", "https://gateway.example/v1")
+    monkeypatch.setenv("OPENAI_COMPATIBLE_API_KEY", "gateway-key")
 
     bedrock = build_litellm_kwargs(
         CopilotConfig(model=ModelConfig(provider="bedrock", name="jp.anthropic.claude"))
@@ -183,6 +185,16 @@ def test_build_litellm_kwargs_uses_provider_specific_model_strings(monkeypatch) 
             )
         )
     )
+    openai_compatible = build_litellm_kwargs(
+        CopilotConfig(
+            model=ModelConfig(
+                provider="openai-compatible",
+                name="qwen3.8-flash-next",
+                base_url="env:OPENAI_COMPATIBLE_BASE_URL",
+                api_key_env="OPENAI_COMPATIBLE_API_KEY",
+            )
+        )
+    )
 
     assert bedrock["model"] == "bedrock/jp.anthropic.claude"
     assert bedrock["api_base"] == "https://bedrock-runtime.us-west-2.amazonaws.com"
@@ -196,6 +208,11 @@ def test_build_litellm_kwargs_uses_provider_specific_model_strings(monkeypatch) 
         "model": "openai/Gemma-4-31B-IT-NVFP4",
         "api_base": "http://10.20.10.19:8000/v1",
         "api_key": "EMPTY",
+    }
+    assert openai_compatible == {
+        "model": "openai/qwen3.8-flash-next",
+        "api_base": "https://gateway.example/v1",
+        "api_key": "gateway-key",
     }
 
 

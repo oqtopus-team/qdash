@@ -29,6 +29,9 @@ interface ChatModel {
   top_p?: unknown;
   top_k?: unknown;
   keep_alive?: unknown;
+  reasoning_effort?: unknown;
+  sampling_params?: unknown;
+  sampling_params_by_thinking_level?: unknown;
 }
 
 interface ModelEntry {
@@ -37,6 +40,8 @@ interface ModelEntry {
   maxTokens: number;
   input: ("text" | "image")[];
   samplingParams?: Record<string, unknown>;
+  reasoning?: boolean;
+  samplingParamsByThinkingLevel?: Record<string, Record<string, unknown>>;
 }
 
 interface ModelOverride {
@@ -48,7 +53,7 @@ interface ProviderEntry {
   baseUrl?: string;
   api?: string;
   apiKey?: string;
-  compat?: Record<string, boolean>;
+  compat?: Record<string, unknown>;
   models?: ModelEntry[];
   modelOverrides?: Record<string, ModelOverride>;
 }
@@ -96,7 +101,10 @@ export function buildModelsConfig(
     const providerId = PROVIDER_ALIASES[rawProvider] ?? rawProvider;
     const baseUrlSetting = asString(model.base_url);
     const sampling = samplingParams(model);
+    const samplingByThinkingLevel = samplingParamsByThinkingLevel(model);
     const maxTokens = asNumber(model.max_output_tokens);
+    const reasoningEffort = asString(model.reasoning_effort)?.toLowerCase();
+    const reasoning = reasoningEffort !== undefined && reasoningEffort !== "none";
 
     if (!baseUrlSetting) {
       if (!sampling && maxTokens === undefined) continue;
@@ -125,7 +133,17 @@ export function buildModelsConfig(
       // ignores it, so keyless local endpoints still need a placeholder.
       ...(asString(model.api_key_env) ? { apiKey: `$${asString(model.api_key_env)}` } : {}),
       // Local OpenAI-compatible servers generally implement neither.
-      compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
+      compat: {
+        supportsDeveloperRole: false,
+        supportsReasoningEffort: false,
+        ...(rawProvider === "openai-compatible"
+          ? {
+              supportsStore: false,
+              maxTokensField: "max_tokens",
+              ...(reasoning ? { thinkingFormat: "qwen-chat-template" } : {}),
+            }
+          : {}),
+      },
       models: [],
     });
     const models_ = (entry.models ??= []);
@@ -134,12 +152,16 @@ export function buildModelsConfig(
       id: name,
       contextWindow: asNumber(model.num_ctx) ?? DEFAULT_CONTEXT_WINDOW,
       maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
+      ...(reasoning ? { reasoning: true } : {}),
       // Pi treats an unstated `input` as text-only and then silently drops
       // image content while building the request. AI review exists to read
       // figures, so the verdict would come back as "no figures attached"
       // without any error anywhere.
       input: ["text", "image"],
       ...(sampling ? { samplingParams: sampling } : {}),
+      ...(samplingByThinkingLevel
+        ? { samplingParamsByThinkingLevel: samplingByThinkingLevel }
+        : {}),
     });
   }
 
@@ -198,7 +220,7 @@ function apiFromStyle(style: string | undefined): string {
  * body and it keeps the local VLM resident between reviews, so it rides along.
  */
 function samplingParams(model: ChatModel): Record<string, unknown> | undefined {
-  const params: Record<string, unknown> = {};
+  const params = asRecord(model.sampling_params) ?? {};
   const temperature = asNumber(model.temperature);
   const topP = asNumber(model.top_p);
   const topK = asNumber(model.top_k);
@@ -210,10 +232,29 @@ function samplingParams(model: ChatModel): Record<string, unknown> | undefined {
   return Object.keys(params).length > 0 ? params : undefined;
 }
 
+function samplingParamsByThinkingLevel(
+  model: ChatModel,
+): Record<string, Record<string, unknown>> | undefined {
+  const raw = asRecord(model.sampling_params_by_thinking_level);
+  if (!raw) return undefined;
+  const result: Record<string, Record<string, unknown>> = {};
+  for (const level of ["off", "minimal", "low", "medium", "high", "xhigh", "max"]) {
+    const params = asRecord(raw[level]);
+    if (params) result[level] = params;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 function asString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function asNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }

@@ -9,6 +9,7 @@ Uses ConfigLoader for unified configuration loading with local override support.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -45,6 +46,8 @@ class ModelConfig(BaseModel):
     num_ctx: int | None = None
     top_p: float | None = None
     top_k: int | None = None
+    sampling_params: dict[str, Any] = Field(default_factory=dict)
+    sampling_params_by_thinking_level: dict[str, dict[str, Any]] = Field(default_factory=dict)
     reasoning_effort: str | None = None
     disable_thinking_instruction: bool = False
     # OpenAI-compatible servers vary in which endpoint they expose. Use
