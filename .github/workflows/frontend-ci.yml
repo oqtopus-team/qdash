@@ -5,12 +5,14 @@ on:
     branches: [main, develop]
     paths:
       - "ui/**"
+      - "agent-runtime/**"
       - "Taskfile.yaml"
       - ".github/workflows/frontend-ci.yml"
   pull_request:
     branches: [main, develop]
     paths:
       - "ui/**"
+      - "agent-runtime/**"
       - "Taskfile.yaml"
       - ".github/workflows/frontend-ci.yml"
 
@@ -68,6 +70,31 @@ jobs:
 
       - name: Build
         run: task ci-ui-build
+
+  agent-runtime:
+    name: Agent Runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
+
+      - name: Install Go Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        working-directory: ./agent-runtime
+        run: bun install --frozen-lockfile
+
+      - name: Run agent-runtime checks
+        run: task ci-agent-runtime
 
   knip:
     name: Knip (unused code)

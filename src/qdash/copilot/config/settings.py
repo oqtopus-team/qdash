@@ -9,6 +9,7 @@ Uses ConfigLoader for unified configuration loading with local override support.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -45,6 +46,8 @@ class ModelConfig(BaseModel):
     num_ctx: int | None = None
     top_p: float | None = None
     top_k: int | None = None
+    sampling_params: dict[str, Any] = Field(default_factory=dict)
+    sampling_params_by_thinking_level: dict[str, dict[str, Any]] = Field(default_factory=dict)
     reasoning_effort: str | None = None
     disable_thinking_instruction: bool = False
     # OpenAI-compatible servers vary in which endpoint they expose. Use
@@ -92,6 +95,10 @@ class CopilotConfig(BaseModel):
     # Optional list of selectable models for general chat. The first entry is
     # used as the default. When unset, the configured `model` above is used.
     chat_models: list[ModelConfig] = Field(default_factory=list)
+    # Backend serving the chat page and automatic AI review: "pi" (Pi Agent
+    # Runtime) or "litellm" (in-process). The side-panel analyze endpoint is
+    # still LiteLLM-only and ignores this.
+    copilot_backend: str = "litellm"
     evaluation_metrics: EvaluationMetrics = Field(default_factory=EvaluationMetrics)
     scoring: dict[str, ScoringThreshold] = Field(default_factory=dict)
     system_prompt: str = ""

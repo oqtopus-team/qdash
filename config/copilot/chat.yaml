@@ -1,9 +1,55 @@
 # Copilot Chat Configuration
 # Settings for the side-panel general chat experience.
 
+# The backend serving this page is `copilot_backend` in config.yaml.
+# Both backends read the models below. The pi backend generates pi's models.json
+# from them at startup; `temperature`/`top_p`/`top_k` do not reach Bedrock there.
+
 # Selectable models for general chat (UI shows a dropdown). The first entry is
 # the default. The configured model in config.yaml is also offered as a fallback.
 chat_models:
+  # Default vendor-neutral OpenAI Chat Completions endpoint.
+  - provider: openai-compatible
+    name: qwen3.8-flash-next
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL
+    api_key_env: OPENAI_COMPATIBLE_API_KEY
+    temperature: 0.7
+    top_p: 0.80
+    top_k: 20
+    sampling_params:
+      min_p: 0.0
+      presence_penalty: 1.5
+      repetition_penalty: 1.0
+    sampling_params_by_thinking_level:
+      minimal: &qwen_thinking_low
+        temperature: 1.0
+        top_p: 0.95
+        top_k: 20
+        min_p: 0.0
+        presence_penalty: 0.0
+        repetition_penalty: 1.0
+        reasoning_effort: low
+      low: *qwen_thinking_low
+      medium:
+        temperature: 1.0
+        top_p: 0.95
+        top_k: 20
+        min_p: 0.0
+        presence_penalty: 0.0
+        repetition_penalty: 1.0
+        reasoning_effort: medium
+      high:
+        temperature: 1.0
+        top_p: 0.95
+        top_k: 20
+        min_p: 0.0
+        presence_penalty: 0.0
+        repetition_penalty: 1.0
+        reasoning_effort: xhigh
+    reasoning_effort: high
+    num_ctx: 65536
+    max_output_tokens: 16384
   - provider: ollama
     name: nvidia/Gemma-4-31B-IT-NVFP4
     api_style: completion
@@ -13,6 +59,7 @@ chat_models:
     # Optional. LiteLLM forwards this when set.
     api_key_env: OLLAMA_API_KEY
     keep_alive: 30m
+    num_ctx: 16384
     temperature: 1.0
     top_p: 0.95
     top_k: 64
@@ -25,6 +72,7 @@ chat_models:
     base_url: env:OLLAMA_BASE_URL
     api_key_env: OLLAMA_API_KEY
     keep_alive: 30m
+    num_ctx: 16384
     temperature: 1.0
     top_p: 0.95
     top_k: 64
@@ -52,9 +100,10 @@ chat_models:
 
   # - provider: vllm
   #   name: Gemma-4-31B-IT-NVFP4
-  #   api_style: responses
+  #   api_style: completion
   #   base_url: env:VLLM_BASE_URL
   #   api_key_env: VLLM_API_KEY
+  #   num_ctx: 16384
   #   temperature: 1.0
   #   top_p: 0.95
   #   top_k: 64

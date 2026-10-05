@@ -260,6 +260,7 @@ export function MiniChatWindow() {
     {
       initialMessages,
       modelOverride,
+      sessionId: activeSessionId,
       onMessagesChange: (msgs) => {
         if (!activeSessionId || !effectiveContext) return;
         setSessionMessages(effectiveContext, msgs);

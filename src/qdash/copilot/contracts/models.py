@@ -142,6 +142,17 @@ class AnalyzeRequest(BaseModel):
     execution_id: str
     task_id: str
     message: str = Field(description="User question / message")
+    session_id: str | None = Field(
+        default=None,
+        description=(
+            "Analysis session identifier. Required by the Pi backend, which "
+            "restores conversation state from the persisted session."
+        ),
+    )
+    request_id: str | None = Field(
+        default=None,
+        description="Idempotency key for recovering or retrying one Pi submission.",
+    )
     image_base64: str | None = Field(
         default=None,
         description="Base64-encoded result figure (for multimodal analysis)",
@@ -164,6 +175,17 @@ class ChatRequest(BaseModel):
     """Request body for POST /copilot/chat/stream."""
 
     message: str = Field(description="User question / message")
+    session_id: str | None = Field(
+        default=None,
+        description=(
+            "Chat session identifier. Required by the Pi chat backend, which "
+            "restores conversation state from the persisted session."
+        ),
+    )
+    request_id: str | None = Field(
+        default=None,
+        description="Idempotency key for recovering or retrying one Pi submission.",
+    )
     chip_id: str | None = None
     qid: str | None = None
     conversation_history: list[dict[str, str]] = Field(
@@ -179,6 +201,12 @@ class ChatRequest(BaseModel):
             "When unset, the configured chat_models[0]/model selection is used."
         ),
     )
+
+
+class SandboxPythonRequest(BaseModel):
+    """Request body for POST /copilot/sandbox/python."""
+
+    code: str = Field(description="Python source to run in the sandbox")
 
 
 def _rebuild_models() -> None:

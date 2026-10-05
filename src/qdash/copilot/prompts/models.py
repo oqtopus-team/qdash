@@ -20,6 +20,9 @@ class AnalysisPromptOptions(BaseModel):
     include_response_format: bool = False
     has_expected_images: bool = False
     has_experiment_image: bool = False
+    # The Pi backend collects the verdict as `submit_review` tool arguments, so
+    # the markdown skeleton and its formatting rules would only contradict it.
+    include_ai_review_instruction: bool = True
 
 
 class ChatPromptContext(BaseModel):

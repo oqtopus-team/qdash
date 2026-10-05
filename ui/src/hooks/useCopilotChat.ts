@@ -61,6 +61,7 @@ export function useCopilotChat(options?: UseCopilotChatOptions) {
 
   const sendMessage = useCallback(
     async (userMessage: string) => {
+      const requestId = crypto.randomUUID();
       let sessionId = activeSessionId;
 
       // Auto-create session if none active
@@ -93,6 +94,10 @@ export function useCopilotChat(options?: UseCopilotChatOptions) {
           headers: buildHeaders(),
           body: JSON.stringify({
             message: userMessage,
+            // Required by the Pi backend, which restores conversation state
+            // from the persisted session rather than from the request body.
+            session_id: sessionId,
+            request_id: requestId,
             conversation_history: currentMessages.map((m) => ({
               role: m.role,
               content: m.content,

@@ -28,6 +28,10 @@ def build_litellm_kwargs(config: CopilotConfig) -> dict[str, Any]:
     configured_name = resolve_model_config_value(model.name, field_name="model") or model.name
     if provider == "ollama" and not configured_name.startswith("ollama_chat/"):
         model_name = f"ollama_chat/{configured_name}"
+    elif provider == "openai-compatible" and "/" not in configured_name:
+        # LiteLLM needs the protocol implementation in the model prefix, while
+        # QDash keeps the deployment vendor out of its public configuration.
+        model_name = f"openai/{configured_name}"
     elif provider == "vllm" and "/" not in configured_name:
         model_name = f"hosted_vllm/{configured_name}"
     elif configured_name.startswith(f"{provider}/"):
@@ -41,6 +45,8 @@ def build_litellm_kwargs(config: CopilotConfig) -> dict[str, Any]:
     if provider == "bedrock":
         aws_region_name = os.environ.get("AWS_REGION")
         api_base = os.environ.get("AWS_BASE_URL")
+        if not api_base:
+            raise ValueError("AWS_BASE_URL is required for the Bedrock provider")
         kwargs["api_base"] = api_base.rstrip("/")
         kwargs["aws_region_name"] = aws_region_name
 

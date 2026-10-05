@@ -42,10 +42,11 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 ```yaml
 # config.yaml
 enabled: true
+copilot_backend: pi       # Also requires COMPOSE_PROFILES=agent-runtime for Docker Compose
 
 # Language settings
 thinking_language: en      # Internal reasoning language
-response_language: en      # User-facing response language
+response_language: auto    # Follow the latest user message; use ja/en to pin it
 
 # Model settings
 model:

@@ -114,6 +114,12 @@ export function useAnalysisChat(
     initialMessages?: ChatMessage[];
     onMessagesChange?: (messages: ChatMessage[]) => void;
     modelOverride?: ModelOverride | null;
+    /**
+     * Active session id. Required by the Pi backend, which restores the Pi
+     * conversation state from the persisted session rather than from
+     * `conversation_history`.
+     */
+    sessionId?: string | null;
   },
 ) {
   const [messages, setMessagesRaw] = useState<ChatMessage[]>(options?.initialMessages ?? []);
@@ -144,6 +150,7 @@ export function useAnalysisChat(
 
   const sendMessage = useCallback(
     async (userMessage: string, imageBase64?: string) => {
+      const requestId = crypto.randomUUID();
       // Abort any in-flight request
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -170,6 +177,7 @@ export function useAnalysisChat(
           ? `${baseURL}/copilot/analyze/stream`
           : `${baseURL}/copilot/chat/stream`;
 
+        const history = messages.map((m) => ({ role: m.role, content: m.content }));
         const body = context
           ? {
               task_name: context.taskName,
@@ -178,19 +186,17 @@ export function useAnalysisChat(
               execution_id: context.executionId,
               task_id: context.taskId,
               message: userMessage,
+              session_id: options?.sessionId ?? null,
+              request_id: requestId,
               image_base64: imageBase64 || null,
               model_override: options?.modelOverride ?? null,
-              conversation_history: messages.map((m) => ({
-                role: m.role,
-                content: m.content,
-              })),
+              conversation_history: history,
             }
           : {
               message: userMessage,
-              conversation_history: messages.map((m) => ({
-                role: m.role,
-                content: m.content,
-              })),
+              session_id: options?.sessionId ?? null,
+              request_id: requestId,
+              conversation_history: history,
             };
 
         const response = await fetch(endpoint, {
@@ -267,7 +273,7 @@ export function useAnalysisChat(
         abortRef.current = null;
       }
     },
-    [context, messages, options?.modelOverride, setMessages],
+    [context, messages, options?.modelOverride, options?.sessionId, setMessages],
   );
 
   const clearMessages = useCallback(() => {

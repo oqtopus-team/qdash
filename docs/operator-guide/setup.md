@@ -44,7 +44,11 @@ Review or fill in these values before starting services:
 | `CLIENT_URL` | Public UI URL when the app is served through a domain or tunnel |
 | `TUNNEL_TOKEN` | Optional Cloudflare Tunnel token for remote access |
 | `QDASH_API_TOKEN` | Optional API token for automation or service-to-service access |
-| `OPENAI_API_KEY` / `OLLAMA_BASE_URL` / `OLLAMA_API_KEY` | Optional Copilot AI provider settings |
+| `AGENT_RUNTIME_TOKEN` | Shared secret for QDash API/workers to call the internal Pi Agent Runtime; required when `copilot_backend: pi`, and requests fail closed when it is empty |
+| `COMPOSE_PROFILES` | Set to `agent-runtime` when `copilot_backend: pi`; otherwise the Agent Runtime container is not created |
+| `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` | Experimental; set to `true` to expose the reviewed QDash write tools to Copilot (default: `false`) |
+| `OPENAI_COMPATIBLE_BASE_URL` / `OPENAI_COMPATIBLE_API_KEY` | Base URL and credential for the default vendor-neutral OpenAI Chat Completions endpoint |
+| `OPENAI_API_KEY` / `OLLAMA_BASE_URL` / `OLLAMA_API_KEY` | Optional settings for other Copilot AI providers |
 | `KNOWLEDGE_REPO_URL` | Optional external knowledge repository for Copilot context |
 | `SLACK_FORUM_NOTIFICATION` | Set to `true` to enable Slack notifications for forum thread creation, replies, and open/close status changes (optional) |
 | `SLACK_BOT_TOKEN` | Slack Bot Token (`xoxb-…`) with `chat:write` and `chat:write.public` scopes; required when `SLACK_FORUM_NOTIFICATION=true` |
@@ -52,6 +56,23 @@ Review or fill in these values before starting services:
 
 QDash application settings are committed under `config/app`, `config/domain`, and
 `config/copilot`; `CONFIG_PATH` is only for the Qubex backend configuration tree.
+
+`AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true` should be used only in a trusted experimental
+deployment. The runtime uses its service credential for these calls. Each operation still requires
+`confirmWrite: true`, and Copilot is instructed to describe the exact action and target and wait for
+explicit user approval before setting it. Interrupted write calls are not replayed automatically;
+inspect QDash state before retrying them.
+
+The Pi Agent Runtime is an opt-in Compose service. When `copilot_backend: pi`, set the following in
+`.env` before starting the stack:
+
+```dotenv
+COMPOSE_PROFILES=agent-runtime
+```
+
+Leave `COMPOSE_PROFILES` unset when using `copilot_backend: litellm`; normal Compose startup then
+does not build or create the Agent Runtime container. Multiple profiles use a comma-separated value,
+for example `COMPOSE_PROFILES=agent-runtime,tunnel`.
 
 ### Default Color Theme
 
@@ -129,9 +150,10 @@ Complete the Qubex config placement or repository setup before starting services
 ## Full Stack
 
 Application file logs use Docker named volumes; use `docker compose logs` to read live service
-output.
+output. Pi conversation checkpoints use the `agent-runtime-state` named volume. Keep that volume
+when recreating containers so interrupted chat and analysis work can resume.
 
-Start all services:
+Start all enabled services:
 
 ```bash
 uv run --env-file .env --isolated --locked --no-dev qdash-updater start
@@ -149,12 +171,19 @@ Open:
 
 ## Remote Access
 
-Set `TUNNEL_TOKEN` in `.env`, then run:
+Set `TUNNEL_TOKEN` in `.env` and add `tunnel` to `COMPOSE_PROFILES`. Keep
+`agent-runtime` in the comma-separated value when the Pi backend is enabled:
+
+```dotenv
+COMPOSE_PROFILES=agent-runtime,tunnel
+```
+
+Then run:
 
 ```bash
 uv run --env-file .env --isolated --locked --no-dev qdash-updater start
-docker compose --profile tunnel up -d --build
+docker compose up -d --build
 ```
 
-This starts the Compose stack with the Cloudflare tunnel profile. `task deploy` is the equivalent
-Go Task command.
+This starts the Compose stack with the enabled profiles. `task deploy` is the equivalent Go Task
+command; it appends `tunnel` while preserving profiles already configured in `.env`.
