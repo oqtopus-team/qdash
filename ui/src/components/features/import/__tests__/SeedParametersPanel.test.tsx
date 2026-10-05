@@ -186,6 +186,28 @@ describe("SeedParametersPanel", () => {
     expect(screen.getByText("5.123456400")).toBeTruthy();
   });
 
+  it("orders import values from YAML through current QDash to proposed", () => {
+    render(<SeedParametersPanel />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose chip" }));
+    openImportView();
+    fireEvent.click(screen.getByText("readout_frequency"));
+
+    const headers = screen
+      .getAllByRole("columnheader")
+      .map((header) => header.textContent?.trim())
+      .filter(Boolean);
+    expect(headers).toEqual([
+      "Qubit",
+      "Select",
+      "YAML",
+      "Current QDash",
+      "Proposed",
+      "Status",
+      "Edit",
+    ]);
+  });
+
   it("recomputes a stale new status when the current value is available", () => {
     render(<SeedParametersPanel />);
 

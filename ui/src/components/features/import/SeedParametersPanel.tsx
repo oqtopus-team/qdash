@@ -850,13 +850,13 @@ export function SeedParametersPanel() {
                           <thead>
                             <tr>
                               <th>Qubit</th>
-                              <th>Current QDash</th>
                               {viewMode === "import" && (
                                 <>
                                   <th className="w-8">
                                     <span className="sr-only">Select</span>
                                   </th>
                                   <th>YAML</th>
+                                  <th>Current QDash</th>
                                   <th>Proposed</th>
                                   <th>Status</th>
                                   <th className="w-12">
@@ -913,14 +913,6 @@ export function SeedParametersPanel() {
                                       </span>
                                     )}
                                   </td>
-                                  <td className="font-mono text-xs font-medium">
-                                    <span title={String(qubitData.qdash_value ?? "-")}>
-                                      {formatComparisonValue(
-                                        qubitData.qdash_value,
-                                        qubitData.status === "different",
-                                      )}
-                                    </span>
-                                  </td>
                                   <td>
                                     <input
                                       type="checkbox"
@@ -935,6 +927,14 @@ export function SeedParametersPanel() {
                                     <span title={String(qubitData.yaml_value ?? "-")}>
                                       {formatComparisonValue(
                                         qubitData.yaml_value,
+                                        qubitData.status === "different",
+                                      )}
+                                    </span>
+                                  </td>
+                                  <td className="font-mono text-xs font-medium">
+                                    <span title={String(qubitData.qdash_value ?? "-")}>
+                                      {formatComparisonValue(
+                                        qubitData.qdash_value,
                                         qubitData.status === "different",
                                       )}
                                     </span>
