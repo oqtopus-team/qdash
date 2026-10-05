@@ -199,7 +199,11 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
     apiListSessions()
       .then((list) => {
         if (cancelled) return;
-        setSessions(list.map(summaryToSession));
+        // Keep sessions created locally before the list arrived.
+        setSessions((prev) => {
+          const serverIds = new Set(list.map((s) => s.session_id));
+          return [...prev.filter((s) => !serverIds.has(s.id)), ...list.map(summaryToSession)];
+        });
       })
       .catch(() => {
         // Network/auth failure — start empty. Errors surface on next CRUD.

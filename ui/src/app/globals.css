@@ -1554,6 +1554,335 @@ html[data-theme="dark"],
   animation: fadeInUp 0.3s ease-out;
 }
 
+/* ---- Copilot chat page ---- */
+
+.chat-bubble-user-soft {
+  background: color-mix(in oklch, var(--color-base-content) 7%, var(--color-base-100));
+  color: var(--color-base-content);
+}
+
+.chat-avatar-active {
+  animation: chatAvatarPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes chatAvatarPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 25%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-primary) 0%, transparent);
+  }
+}
+
+.chat-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 16.5rem;
+  height: 100%;
+  flex-shrink: 0;
+  background: color-mix(in oklch, var(--color-base-content) 3%, var(--color-base-100));
+  border-right: 1px solid color-mix(in oklch, var(--color-base-content) 8%, transparent);
+}
+
+.chat-sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2rem;
+  padding: 0 0.625rem;
+  border-radius: 0.5rem;
+  background: color-mix(in oklch, var(--color-base-content) 5%, transparent);
+}
+
+.chat-sidebar-search:focus-within {
+  outline: 2px solid color-mix(in oklch, var(--color-primary) 40%, transparent);
+}
+
+.chat-sidebar-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 0.4rem 2rem 0.4rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  text-align: left;
+  color: color-mix(in oklch, var(--color-base-content) 85%, transparent);
+  transition: background-color 0.15s ease;
+}
+
+.chat-sidebar-item:hover {
+  background: color-mix(in oklch, var(--color-base-content) 6%, transparent);
+}
+
+.chat-sidebar-item-active,
+.chat-sidebar-item-active:hover {
+  background: color-mix(in oklch, var(--color-base-content) 9%, transparent);
+  color: var(--color-base-content);
+  font-weight: 500;
+}
+
+.chat-composer {
+  display: flex;
+  flex-direction: column;
+  padding: 0.625rem 0.625rem 0.5rem 0.75rem;
+  border-radius: 1.5rem;
+  background: var(--color-base-100);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 14%, transparent);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 6px 20px -8px rgb(0 0 0 / 0.12);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.chat-composer:focus-within {
+  border-color: color-mix(in oklch, var(--color-primary) 45%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--color-primary) 12%, transparent),
+    0 6px 20px -8px rgb(0 0 0 / 0.12);
+}
+
+/* Answer typography: a little roomier than prose-sm, like chat products. */
+.chat-prose {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.chat-prose > :first-child {
+  margin-top: 0;
+}
+
+.chat-prose > :last-child {
+  margin-bottom: 0;
+}
+
+.chat-prose :where(h1, h2, h3, h4) {
+  margin-top: 1.4em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+
+.chat-prose :where(ul, ol) {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.chat-prose :where(li) {
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+}
+
+.chat-prose .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
+}
+
+.chat-inline-code {
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.375rem;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: color-mix(in oklch, var(--color-base-content) 8%, transparent);
+}
+
+.chat-prose .chat-inline-code::before,
+.chat-prose .chat-inline-code::after {
+  content: none;
+}
+
+.chat-table-wrap {
+  margin: 1em 0;
+  overflow-x: auto;
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  border-radius: 0.75rem;
+}
+
+.chat-table-wrap table {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.chat-table-wrap :where(th, td) {
+  padding: 0.45rem 0.75rem;
+}
+
+.chat-table-wrap thead {
+  background: color-mix(in oklch, var(--color-base-content) 4%, transparent);
+}
+
+/* Blinking caret after the text that is still streaming. */
+.chat-streaming > :last-child::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 0.15em;
+  vertical-align: -0.12em;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.6;
+  animation: chatCaret 1s steps(2, start) infinite;
+}
+
+@keyframes chatCaret {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* Shimmering label for steps that are in progress. */
+.chat-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--color-base-content) 45%, transparent) 0%,
+    var(--color-base-content) 50%,
+    color-mix(in oklch, var(--color-base-content) 45%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: chatShimmer 1.6s linear infinite;
+}
+
+@keyframes chatShimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.chat-trace-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
+  border-radius: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  margin-left: -0.4rem;
+  transition: background-color 0.15s ease;
+}
+
+.chat-trace-toggle:hover {
+  background: color-mix(in oklch, var(--color-base-content) 6%, transparent);
+  color: var(--color-base-content);
+}
+
+/* Vertical timeline of thinking and tool steps. */
+.chat-trace-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chat-trace-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.chat-trace-item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 0.5625rem;
+  top: 1.25rem;
+  bottom: -0.5rem;
+  width: 1px;
+  background: color-mix(in oklch, var(--color-base-content) 12%, transparent);
+}
+
+.chat-trace-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+  background: color-mix(in oklch, var(--color-base-content) 7%, var(--color-base-100));
+}
+
+.chat-trace-dot[data-status="running"] {
+  color: var(--color-primary);
+  background: color-mix(in oklch, var(--color-primary) 12%, var(--color-base-100));
+}
+
+.chat-trace-dot[data-status="done"] {
+  color: var(--color-success);
+  background: color-mix(in oklch, var(--color-success) 12%, var(--color-base-100));
+}
+
+.chat-trace-dot[data-status="error"] {
+  color: var(--color-error);
+  background: color-mix(in oklch, var(--color-error) 12%, var(--color-base-100));
+}
+
+.chat-trace-dot[data-status="idle"]:empty {
+  transform: scale(0.45);
+}
+
+.chat-thinking-text {
+  max-height: 16rem;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+  border-left: 2px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  padding-left: 0.75rem;
+}
+
+/* highlight.js tokens mapped onto the active DaisyUI theme. */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-literal {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute {
+  color: var(--color-success);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--color-info);
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-type,
+.hljs-attr {
+  color: var(--color-secondary);
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-meta {
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
+  font-style: italic;
+}
+
+.hljs-deletion {
+  color: var(--color-error);
+}
+
 /* Driver.js product tours, themed to match DaisyUI. */
 .driver-popover.qdash-tour-popover {
   max-width: 22rem;

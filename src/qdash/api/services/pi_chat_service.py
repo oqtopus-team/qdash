@@ -234,17 +234,44 @@ async def translate(
                 completed_tools.append(tool_label(event["name"]))
             elif kind == "chart":
                 charts.append(event["chart"])
+            elif kind in ("text_delta", "thinking_delta") and not isinstance(event["delta"], str):
+                raise TypeError(kind)
         except (ValueError, KeyError, TypeError):
             logger.warning("Malformed NDJSON line from agent runtime")
             yield sse_event("error", {"step": step, "detail": "Agent runtime sent malformed data"})
             return
 
-        if kind == "tool_start":
+        # ``delta``/``thinking``/``tool_start``/``tool_end`` drive the live
+        # transcript in the chat page. ``status`` stays for consumers that only
+        # show a one-line progress message.
+        if kind == "text_delta":
+            yield sse_event("delta", {"text": event["delta"]})
+        elif kind == "thinking_delta":
+            yield sse_event("thinking", {"text": event["delta"]})
+        elif kind == "tool_start":
+            yield sse_event(
+                "tool_start",
+                {
+                    "id": event.get("id"),
+                    "tool": event["name"],
+                    "label": label,
+                    "args": event.get("args"),
+                },
+            )
             yield sse_event(
                 "status",
                 {"step": "tool_call", "tool": event["name"], "message": f"{label}..."},
             )
         elif kind == "tool_end":
+            yield sse_event(
+                "tool_end",
+                {
+                    "id": event.get("id"),
+                    "tool": event["name"],
+                    "label": tool_label(event["name"]),
+                    "is_error": bool(event.get("isError")),
+                },
+            )
             yield sse_event(
                 "status",
                 {

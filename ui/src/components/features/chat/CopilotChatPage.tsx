@@ -1,31 +1,25 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Send,
-  Bot,
-  Trash2,
-  Plus,
-  MessageSquare,
-  PanelLeftClose,
+  ArrowDown,
+  LineChart,
+  ListChecks,
   PanelLeftOpen,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
-  ImageIcon,
-  Check,
-  Loader2,
   Sparkles,
-  ArrowRight,
-  Cpu,
+  SquarePen,
+  GitCompare,
+  History,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { useCopilotChat, type CopilotMessage, type CopilotSession } from "@/hooks/useCopilotChat";
-import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
-import { CodeBlock } from "@/components/features/chat/CodeBlock";
-import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
-import { SelectedLabel } from "@/components/ui/SelectedLabel";
+import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+import { useCopilotChat } from "@/hooks/useCopilotChat";
+import { ChatComposer, type ChatComposerHandle } from "@/components/features/chat/ChatComposer";
+import {
+  AssistantMessage,
+  LiveAssistantMessage,
+  UserMessage,
+} from "@/components/features/chat/ChatMessages";
+import { ChatSidebar } from "@/components/features/chat/ChatSidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
 import {
@@ -34,287 +28,68 @@ import {
   resolveChatModelOption,
   setStoredChatModelKey,
 } from "@/lib/copilotModels";
-import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
-import type { BlocksResult } from "@/hooks/useAnalysisChat";
-
-// ---------------------------------------------------------------------------
-// Markdown components with code block rendering
-// ---------------------------------------------------------------------------
-
-const markdownComponents = {
-  code({
-    className,
-    children,
-    ...props
-  }: React.ComponentPropsWithoutRef<"code"> & { className?: string }) {
-    const match = /language-(\w+)/.exec(className || "");
-    const codeString = String(children).replace(/\n$/, "");
-    if (match) {
-      return <CodeBlock language={match[1]}>{codeString}</CodeBlock>;
-    }
-    return (
-      <code className="bg-base-200 px-1.5 py-0.5 rounded-md text-sm font-mono" {...props}>
-        {children}
-      </code>
-    );
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function parseBlocksContent(content: string): BlocksResult | null {
-  if (!content.startsWith("{")) return null;
-  try {
-    const data = JSON.parse(content);
-    if (data.blocks && Array.isArray(data.blocks)) {
-      return data as BlocksResult;
-    }
-  } catch {
-    // Not JSON
-  }
-  return null;
-}
-
-function AssessmentBadge({ assessment }: { assessment: string | null }) {
-  if (assessment === "good") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-success/10 text-success border border-success/20">
-        <CheckCircle2 className="w-3.5 h-3.5" />
-        Good
-      </span>
-    );
-  }
-  if (assessment === "warning") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-warning/10 text-warning border border-warning/20">
-        <AlertTriangle className="w-3.5 h-3.5" />
-        Warning
-      </span>
-    );
-  }
-  if (assessment === "bad") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-error/10 text-error border border-error/20">
-        <XCircle className="w-3.5 h-3.5" />
-        Bad
-      </span>
-    );
-  }
-  return null;
-}
-
-function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"] }) {
-  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
-  const openPreview = useCallback((src: string) => setPreviewSrc(src), []);
-
-  if (!imagesSent) return null;
-  const { experiment_figure, experiment_figure_paths, expected_images, task_name } = imagesSent;
-  if (!experiment_figure && expected_images.length === 0) return null;
-
-  const parts: string[] = [];
-  if (experiment_figure) parts.push("実験結果画像");
-  if (expected_images.length > 0) parts.push(`参照画像${expected_images.length}枚`);
-
-  const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
-
-  return (
-    <div className="mb-2">
-      <div className="flex items-center gap-1.5 text-xs text-base-content/50 mb-2">
-        <ImageIcon className="w-3.5 h-3.5" />
-        <span>{parts.join(" + ")}を送信</span>
-      </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {experiment_figure &&
-          experiment_figure_paths.map((fp) => {
-            const src = `${baseURL}/executions/figure?path=${encodeURIComponent(fp)}`;
-            return (
-              <button
-                key={fp}
-                onClick={() => openPreview(src)}
-                className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- runtime-generated API preview */}
-                <img
-                  src={src}
-                  alt="実験結果"
-                  className="h-16 w-auto object-contain bg-base-200"
-                  loading="lazy"
-                />
-              </button>
-            );
-          })}
-        {expected_images.map((img) => {
-          const src = `${baseURL}/copilot/expected-image?task_name=${encodeURIComponent(task_name)}&index=${img.index}`;
-          return (
-            <button
-              key={`expected-${img.index}`}
-              onClick={() => openPreview(src)}
-              className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- runtime-generated API preview */}
-              <img
-                src={src}
-                alt={img.alt_text}
-                className="h-16 w-auto object-contain bg-base-200"
-                loading="lazy"
-              />
-            </button>
-          );
-        })}
-      </div>
-      <ImagePreviewDialog src={previewSrc} onClose={() => setPreviewSrc(null)} />
-    </div>
-  );
-}
-
-function BlocksContent({ blocks }: { blocks: BlocksResult }) {
-  return (
-    <>
-      <ImageSentBadge imagesSent={blocks.images_sent} />
-      {blocks.assessment && (
-        <div className="mb-2">
-          <AssessmentBadge assessment={blocks.assessment} />
-        </div>
-      )}
-      {blocks.blocks.map((block, i) => {
-        if (block.type === "text" && block.content) {
-          return (
-            <div key={i} className="prose prose-sm max-w-none mt-1">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                {block.content}
-              </ReactMarkdown>
-            </div>
-          );
-        }
-        if (block.type === "chart" && block.chart) {
-          return (
-            <ChatPlotlyChart
-              key={i}
-              data={block.chart.data as Record<string, unknown>[]}
-              layout={block.chart.layout as Record<string, unknown>}
-            />
-          );
-        }
-        return null;
-      })}
-    </>
-  );
-}
-
-function MessageBubble({ message, isLatest }: { message: CopilotMessage; isLatest: boolean }) {
-  if (message.role === "user") {
-    return (
-      <div className={`flex justify-end ${isLatest ? "animate-fade-in-up" : ""}`}>
-        <div className="chat-bubble-user rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[75%] text-sm whitespace-pre-wrap shadow-sm">
-          {message.content}
-        </div>
-      </div>
-    );
-  }
-
-  const blocksResult = parseBlocksContent(message.content);
-
-  return (
-    <div className={`flex gap-3 ${isLatest ? "animate-fade-in-up" : ""}`}>
-      <div className="w-8 h-8 rounded-xl chat-avatar-bot flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
-        <Bot className="w-4 h-4 text-primary" />
-      </div>
-      <div className="flex-1 min-w-0 max-w-[85%]">
-        {blocksResult ? (
-          <BlocksContent blocks={blocksResult} />
-        ) : (
-          <div className="prose prose-sm max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {message.content}
-            </ReactMarkdown>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function formatTime(ts: number): string {
-  const d = new Date(ts);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffDays === 0) {
-    return formatDateTime(d.toISOString(), "HH:mm");
-  }
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return formatDateTimeCompact(d.toISOString()).split(" ")[0];
-}
-
-function SessionListItem({
-  session,
-  isActive,
-  onSelect,
-  onDelete,
-}: {
-  session: CopilotSession;
-  isActive: boolean;
-  onSelect: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div
-      className={`w-full rounded-xl group border ${
-        isActive ? "chat-session-active shadow-sm" : "hover:bg-base-200/80 border-transparent"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-1 px-3 py-2.5">
-        <button type="button" onClick={onSelect} className="min-w-0 flex-1 text-left">
-          <div className="text-sm font-medium truncate">{session.title}</div>
-          <div className="flex items-center gap-2 mt-1 text-xs text-base-content/50">
-            <span>{session.messages.length} msgs</span>
-            <span className="text-base-content/30">{formatTime(session.updatedAt)}</span>
-          </div>
-        </button>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={onDelete}
-              className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 text-base-content/40 hover:text-error"
-              aria-label={`Delete ${session.title}`}
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Delete session</TooltipContent>
-        </Tooltip>
-      </div>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const SUGGESTED_QUESTIONS = [
-  {
-    text: "Show T1 trend for Q00",
-    icon: "chart",
-  },
-  {
-    text: "What are Q00's current parameters?",
-    icon: "params",
-  },
-  {
-    text: "Compare T1 and T2 for Q01",
-    icon: "compare",
-  },
-  {
-    text: "Show gate fidelity history for Q00",
-    icon: "history",
-  },
+  { text: "Show T1 trend for Q00", Icon: LineChart },
+  { text: "What are Q00's current parameters?", Icon: ListChecks },
+  { text: "Compare T1 and T2 for Q01", Icon: GitCompare },
+  { text: "Show gate fidelity history for Q00", Icon: History },
 ];
+
+const MOBILE_BREAKPOINT_PX = 768;
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function ScrollToBottomButton() {
+  const { isAtBottom, scrollToBottom } = useStickToBottomContext();
+  if (isAtBottom) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => scrollToBottom()}
+      className="absolute bottom-3 left-1/2 -translate-x-1/2 btn btn-circle btn-sm bg-base-100 border border-base-300 shadow-md hover:bg-base-200 animate-fade-in-up"
+      aria-label="Scroll to bottom"
+    >
+      <ArrowDown className="w-4 h-4" />
+    </button>
+  );
+}
+
+function EmptyState({ onPick }: { onPick: (text: string) => void }) {
+  return (
+    <div className="w-full max-w-2xl mx-auto px-4 text-center">
+      <div className="chat-avatar-bot w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-5">
+        <Sparkles className="w-6 h-6 text-primary" />
+      </div>
+      <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">
+        How can I help with your qubits?
+      </h1>
+      <p className="text-sm text-base-content/50 mb-8">
+        Ask about calibration data — I can fetch parameters, analyze trends, run Python and plot
+        charts.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+        {SUGGESTED_QUESTIONS.map(({ text, Icon }) => (
+          <button
+            key={text}
+            type="button"
+            onClick={() => onPick(text)}
+            className="chat-suggestion-card group"
+          >
+            <Icon className="w-4 h-4 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
+            <span className="text-sm leading-snug flex-1">{text}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -339,282 +114,211 @@ export function CopilotChatPage() {
     sessions,
     activeSession,
     activeSessionId,
+    isLoadingSessions,
     isLoading,
     statusMessage,
-    completedTools,
-    error,
+    liveTurn,
     createSession,
     switchSession,
     deleteSession,
     sendMessage,
-    clearActiveSession,
+    stop,
+    retryLast,
   } = useCopilotChat({ modelOverride });
 
   const [input, setInput] = useState("");
-  const [showSessionSidebar, setShowSessionSidebar] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const composerRef = useRef<ChatComposerHandle>(null);
+
   useEffect(() => {
-    if (window.innerWidth < 640) {
-      setShowSessionSidebar(false);
-    }
+    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX - 1}px)`);
+    const apply = () => {
+      setIsMobile(mq.matches);
+      if (mq.matches) setShowSidebar(false);
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
   }, []);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const messages = useMemo(() => activeSession?.messages ?? [], [activeSession?.messages]);
-
-  // Auto-scroll to bottom
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, statusMessage]);
+  const isEmpty = messages.length === 0 && !liveTurn;
+  const isLoadingMessages = activeSession !== null && !activeSession.messagesLoaded;
 
   // Focus input on session switch
   useEffect(() => {
-    inputRef.current?.focus();
+    composerRef.current?.focus();
   }, [activeSessionId]);
 
-  const handleSend = () => {
-    const trimmed = input.trim();
-    if (!trimmed || isLoading) return;
-    setInput("");
-    sendMessage(trimmed);
-  };
+  const send = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || isLoading) return;
+      setInput("");
+      sendMessage(trimmed);
+    },
+    [isLoading, sendMessage],
+  );
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.nativeEvent.isComposing) return;
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+  const handleNewChat = useCallback(() => {
+    if (activeSession && activeSession.messages.length === 0) {
+      composerRef.current?.focus();
+      return;
     }
-  };
+    createSession();
+    if (isMobile) setShowSidebar(false);
+  }, [activeSession, createSession, isMobile]);
+
+  const handleSelect = useCallback(
+    (id: string) => {
+      switchSession(id);
+      if (isMobile) setShowSidebar(false);
+    },
+    [isMobile, switchSession],
+  );
+
+  // Keyboard shortcuts: Esc stops streaming, Ctrl/Cmd+Shift+O starts a new chat.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isLoading) {
+        e.preventDefault();
+        stop();
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        handleNewChat();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleNewChat, isLoading, stop]);
+
+  const lastIndex = messages.length - 1;
+
+  const composer = (
+    <ChatComposer
+      ref={composerRef}
+      value={input}
+      onChange={setInput}
+      onSubmit={() => send(input)}
+      onStop={stop}
+      isStreaming={isLoading}
+      modelOptions={modelOptions}
+      selectedModelKey={selectedModel.key}
+      onModelChange={handleModelChange}
+    />
+  );
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-base-100">
-      {/* Session Sidebar */}
-      {showSessionSidebar && (
-        <div className="w-64 flex-shrink-0 bg-base-200/30 border-r border-base-300/50 flex flex-col">
-          {/* Sidebar Header */}
-          <div className="flex items-center justify-between px-3 py-3 border-b border-base-300/50">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-base-content/60" />
-              <span className="text-sm font-semibold">Sessions</span>
-            </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => setShowSessionSidebar(false)}
-                  className="btn btn-ghost btn-xs btn-square"
-                  aria-label="Hide sessions"
-                >
-                  <PanelLeftClose className="w-4 h-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Hide sessions</TooltipContent>
-            </Tooltip>
+    <div className="relative flex h-[calc(100vh-64px)] bg-base-100 overflow-hidden">
+      {/* Sidebar */}
+      {showSidebar && (
+        <>
+          {isMobile && (
+            <button
+              type="button"
+              aria-label="Close sidebar"
+              className="absolute inset-0 z-20 bg-black/30 animate-fade-in-up"
+              onClick={() => setShowSidebar(false)}
+            />
+          )}
+          <div className={isMobile ? "absolute inset-y-0 left-0 z-30 shadow-xl" : "contents"}>
+            <ChatSidebar
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              isLoading={isLoadingSessions}
+              onNewChat={handleNewChat}
+              onSelect={handleSelect}
+              onDelete={deleteSession}
+              onClose={() => setShowSidebar(false)}
+            />
           </div>
-
-          {/* New Session Button */}
-          <div className="px-3 py-3">
-            <button onClick={createSession} className="btn btn-primary btn-sm w-full gap-1.5">
-              <Plus className="w-4 h-4" />
-              New Chat
-            </button>
-          </div>
-
-          {/* Session List */}
-          <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
-            {sessions.map((session) => (
-              <SessionListItem
-                key={session.id}
-                session={session}
-                isActive={session.id === activeSessionId}
-                onSelect={() => switchSession(session.id)}
-                onDelete={() => deleteSession(session.id)}
-              />
-            ))}
-            {sessions.length === 0 && (
-              <div className="text-center py-8 text-xs text-base-content/30">No sessions yet</div>
-            )}
-          </div>
-        </div>
+        </>
       )}
 
-      {/* Main Chat Area */}
+      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Chat Header */}
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-base-300/50 bg-base-100">
-          {!showSessionSidebar && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => setShowSessionSidebar(true)}
-                  className="btn btn-ghost btn-sm btn-square"
-                  aria-label="Show sessions"
-                >
-                  <PanelLeftOpen className="w-4 h-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Show sessions</TooltipContent>
-            </Tooltip>
+        {/* Header */}
+        <header className="flex items-center gap-1 px-3 h-12 shrink-0">
+          {!showSidebar && (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setShowSidebar(true)}
+                    className="btn btn-ghost btn-sm btn-square"
+                    aria-label="Open sidebar"
+                  >
+                    <PanelLeftOpen className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Open sidebar</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleNewChat}
+                    className="btn btn-ghost btn-sm btn-square"
+                    aria-label="New chat"
+                  >
+                    <SquarePen className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>New chat</TooltipContent>
+              </Tooltip>
+            </>
           )}
-          <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <div className="w-6 h-6 rounded-lg chat-avatar-bot flex items-center justify-center">
-              <Bot className="w-3.5 h-3.5 text-primary" />
-            </div>
-            <h2 className="text-sm font-bold truncate">{activeSession?.title || "AI Chat"}</h2>
-          </div>
-          {modelOptions.length > 1 && (
-            <label className="flex items-center gap-1 mr-1">
-              <Cpu className="w-3.5 h-3.5 text-base-content/40" />
-              <span className="sr-only">Chat model</span>
-              <select
-                className="select select-bordered select-xs w-44 text-xs"
-                value={selectedModel.key}
-                onChange={(event) => handleModelChange(event.target.value)}
-                disabled={isLoading}
-              >
-                <SelectedLabel />
-                {modelOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {messages.length > 0 && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={clearActiveSession}
-                  className="btn btn-ghost btn-xs gap-1 text-base-content/50 hover:text-error"
-                  aria-label="Clear messages"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline" aria-hidden="true">
-                    Clear
-                  </span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Clear messages</TooltipContent>
-            </Tooltip>
-          )}
-        </div>
+          <h2 className="ml-1 text-sm font-medium truncate text-base-content/80">
+            {activeSession && !isEmpty ? activeSession.title : "AI Chat"}
+          </h2>
+        </header>
 
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto min-h-0">
-          {!activeSession || messages.length === 0 ? (
-            /* Empty State */
-            <div className="flex flex-col items-center justify-center h-full px-4">
-              <div className="max-w-lg text-center">
-                <div className="w-16 h-16 rounded-2xl chat-avatar-bot flex items-center justify-center mx-auto mb-6 shadow-md">
-                  <Sparkles className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold mb-2">AI Chat</h3>
-                <p className="text-sm text-base-content/50 mb-8 leading-relaxed">
-                  Ask questions about qubit calibration data. I can fetch parameters, show trends,
-                  and create visualizations.
+        {isEmpty && !isLoadingMessages ? (
+          /* Empty state: greeting and composer centered, ChatGPT-style */
+          <div className="flex-1 flex flex-col items-center justify-center pb-[10vh] overflow-y-auto">
+            <EmptyState onPick={send} />
+            <div className="w-full max-w-3xl px-4 mt-8">{composer}</div>
+          </div>
+        ) : (
+          <>
+            <StickToBottom className="relative flex-1 min-h-0" resize="smooth" initial="instant">
+              <StickToBottom.Content className="max-w-3xl mx-auto px-4 pt-4 pb-10 space-y-8">
+                {isLoadingMessages && (
+                  <div className="space-y-6 pt-4" aria-label="Loading messages">
+                    <div className="ml-auto h-10 w-1/2 rounded-3xl bg-base-content/5 animate-pulse" />
+                    <div className="h-24 w-5/6 rounded-xl bg-base-content/5 animate-pulse" />
+                  </div>
+                )}
+                {messages.map((msg, idx) =>
+                  msg.role === "user" ? (
+                    <UserMessage key={idx} message={msg} />
+                  ) : (
+                    <AssistantMessage
+                      key={idx}
+                      message={msg}
+                      isLast={idx === lastIndex && !liveTurn}
+                      canRetry={!isLoading}
+                      onRetry={retryLast}
+                    />
+                  ),
+                )}
+                {liveTurn && <LiveAssistantMessage turn={liveTurn} statusMessage={statusMessage} />}
+              </StickToBottom.Content>
+              <ScrollToBottomButton />
+            </StickToBottom>
+
+            <div className="shrink-0 px-4 pb-3">
+              <div className="max-w-3xl mx-auto">
+                {composer}
+                <p className="text-[11px] text-base-content/35 text-center mt-2">
+                  AI can make mistakes. Verify important calibration values.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {SUGGESTED_QUESTIONS.map((q) => (
-                    <button
-                      key={q.text}
-                      onClick={() => {
-                        if (!isLoading) {
-                          setInput("");
-                          sendMessage(q.text);
-                        }
-                      }}
-                      className="chat-suggestion-card group"
-                    >
-                      <span className="text-xs text-left leading-relaxed flex-1">{q.text}</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-base-content/20 group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
-          ) : (
-            /* Message List */
-            <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-              {messages.map((msg, idx) => (
-                <MessageBubble key={idx} message={msg} isLatest={idx === messages.length - 1} />
-              ))}
-
-              {isLoading && (
-                <div className="flex gap-3 animate-fade-in-up">
-                  <div className="w-8 h-8 rounded-xl chat-avatar-bot flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-4 h-4 text-primary animate-pulse" />
-                  </div>
-                  <div className="flex flex-col gap-1.5 py-1.5 min-w-0">
-                    {completedTools.length > 0 && (
-                      <div className="flex flex-col gap-1 mb-1">
-                        {completedTools.map((tool, i) => (
-                          <div
-                            key={i}
-                            className="flex items-center gap-2 text-xs text-base-content/40"
-                          >
-                            <div className="w-4 h-4 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
-                              <Check className="w-2.5 h-2.5 text-success" />
-                            </div>
-                            <span>{tool}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Loader2 className="w-2.5 h-2.5 text-primary animate-spin" />
-                      </div>
-                      <span className="text-sm text-base-content/50">
-                        {statusMessage || "Thinking..."}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div className="flex items-start gap-2 text-sm text-error bg-error/5 rounded-xl px-4 py-3 border border-error/20">
-                  <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
-
-        {/* Input Area */}
-        <div className="bg-base-100 px-4 py-3">
-          <div className="max-w-3xl mx-auto">
-            <div className="chat-input-card flex items-end gap-2">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask about calibration data..."
-                rows={1}
-                className="flex-1 min-h-[44px] max-h-32 resize-none text-sm py-3 px-1 bg-transparent border-none outline-none focus:ring-0 placeholder:text-base-content/30"
-                disabled={isLoading}
-              />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || isLoading}
-                className="btn btn-primary btn-sm h-10 w-10 rounded-xl flex-shrink-0 mb-0.5"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
-            <p className="text-[10px] text-base-content/25 text-center mt-2">
-              Press Enter to send, Shift+Enter for new line
-            </p>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

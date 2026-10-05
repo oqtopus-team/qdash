@@ -1,0 +1,350 @@
+"use client";
+
+import React, { memo, useCallback, useState } from "react";
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  Copy,
+  ImageIcon,
+  RotateCcw,
+  Sparkles,
+  Square,
+  XCircle,
+} from "lucide-react";
+import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
+import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
+import { ChatTraceSummary, LiveTrace } from "@/components/features/chat/ChatTrace";
+import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import {
+  answerStartIndex,
+  type CopilotBlocksResult,
+  type CopilotMessage,
+  type LiveTurn,
+} from "@/hooks/useCopilotChat";
+import type { BlocksResult } from "@/hooks/useAnalysisChat";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function parseBlocksContent(content: string): CopilotBlocksResult | null {
+  if (!content.startsWith("{")) return null;
+  try {
+    const data = JSON.parse(content);
+    if (data.blocks && Array.isArray(data.blocks)) {
+      return data as CopilotBlocksResult;
+    }
+  } catch {
+    // Not JSON
+  }
+  return null;
+}
+
+/** Plain text of an assistant message, for copying. */
+function messageText(content: string): string {
+  const parsed = parseBlocksContent(content);
+  if (!parsed) return content;
+  return parsed.blocks
+    .filter((b) => b.type === "text" && b.content)
+    .map((b) => b.content)
+    .join("\n\n");
+}
+
+function isErrorMessage(message: CopilotMessage): boolean {
+  return message.role === "assistant" && message.content.startsWith("Error: ");
+}
+
+// ---------------------------------------------------------------------------
+// Small pieces
+// ---------------------------------------------------------------------------
+
+function AssistantAvatar({ active = false }: { active?: boolean }) {
+  return (
+    <div
+      className={`chat-avatar-bot w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+        active ? "chat-avatar-active" : ""
+      }`}
+    >
+      <Sparkles className="w-3.5 h-3.5 text-primary" />
+    </div>
+  );
+}
+
+function ActionButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          className="btn btn-ghost btn-xs btn-square text-base-content/45 hover:text-base-content"
+          aria-label={label}
+        >
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      },
+      () => {},
+    );
+  }, [text]);
+  return (
+    <ActionButton label={copied ? "Copied" : "Copy"} onClick={copy}>
+      {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
+    </ActionButton>
+  );
+}
+
+function AssessmentBadge({ assessment }: { assessment: string | null }) {
+  const styles = {
+    good: {
+      cls: "bg-success/10 text-success border-success/20",
+      Icon: CheckCircle2,
+      label: "Good",
+    },
+    warning: {
+      cls: "bg-warning/10 text-warning border-warning/20",
+      Icon: AlertTriangle,
+      label: "Warning",
+    },
+    bad: { cls: "bg-error/10 text-error border-error/20", Icon: XCircle, label: "Bad" },
+  } as const;
+  const style = assessment ? styles[assessment as keyof typeof styles] : undefined;
+  if (!style) return null;
+  const { cls, Icon, label } = style;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${cls}`}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+    </span>
+  );
+}
+
+function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"] }) {
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+
+  if (!imagesSent) return null;
+  const { experiment_figure, experiment_figure_paths, expected_images, task_name } = imagesSent;
+  if (!experiment_figure && expected_images.length === 0) return null;
+
+  const parts: string[] = [];
+  if (experiment_figure) parts.push("実験結果画像");
+  if (expected_images.length > 0) parts.push(`参照画像${expected_images.length}枚`);
+
+  const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
+  const sources = [
+    ...(experiment_figure
+      ? experiment_figure_paths.map((fp) => ({
+          key: fp,
+          alt: "実験結果",
+          src: `${baseURL}/executions/figure?path=${encodeURIComponent(fp)}`,
+        }))
+      : []),
+    ...expected_images.map((img) => ({
+      key: `expected-${img.index}`,
+      alt: img.alt_text,
+      src: `${baseURL}/copilot/expected-image?task_name=${encodeURIComponent(task_name)}&index=${img.index}`,
+    })),
+  ];
+
+  return (
+    <div className="mb-2">
+      <div className="flex items-center gap-1.5 text-xs text-base-content/50 mb-2">
+        <ImageIcon className="w-3.5 h-3.5" />
+        <span>{parts.join(" + ")}を送信</span>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {sources.map(({ key, alt, src }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setPreviewSrc(src)}
+            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- runtime-generated API preview */}
+            <img
+              src={src}
+              alt={alt}
+              className="h-16 w-auto object-contain bg-base-200"
+              loading="lazy"
+            />
+          </button>
+        ))}
+      </div>
+      <ImagePreviewDialog src={previewSrc} onClose={() => setPreviewSrc(null)} />
+    </div>
+  );
+}
+
+function BlocksContent({ blocks }: { blocks: CopilotBlocksResult }) {
+  return (
+    <>
+      {blocks.trace && <ChatTraceSummary trace={blocks.trace} />}
+      <ImageSentBadge imagesSent={blocks.images_sent} />
+      {blocks.assessment && (
+        <div className="mb-2">
+          <AssessmentBadge assessment={blocks.assessment} />
+        </div>
+      )}
+      {blocks.blocks.map((block, i) => {
+        if (block.type === "text" && block.content) {
+          return <ChatMarkdown key={i}>{block.content}</ChatMarkdown>;
+        }
+        if (block.type === "chart" && block.chart) {
+          return (
+            <div key={i} className="my-3 rounded-xl border border-base-300/60 overflow-hidden">
+              <ChatPlotlyChart
+                data={block.chart.data as Record<string, unknown>[]}
+                layout={block.chart.layout as Record<string, unknown>}
+              />
+            </div>
+          );
+        }
+        return null;
+      })}
+      {blocks.stopped && (
+        <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-base-content/45">
+          <Square className="w-3 h-3" />
+          Stopped
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
+export const UserMessage = memo(function UserMessage({ message }: { message: CopilotMessage }) {
+  return (
+    <div className="group flex flex-col items-end gap-1 animate-fade-in-up">
+      <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] sm:max-w-[75%] text-sm whitespace-pre-wrap break-words">
+        {message.content}
+      </div>
+      <div className="flex opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <CopyButton text={message.content} />
+      </div>
+    </div>
+  );
+});
+
+export const AssistantMessage = memo(function AssistantMessage({
+  message,
+  isLast,
+  canRetry,
+  onRetry,
+}: {
+  message: CopilotMessage;
+  isLast: boolean;
+  canRetry: boolean;
+  onRetry: () => void;
+}) {
+  if (isErrorMessage(message)) {
+    return (
+      <div className="flex gap-3 animate-fade-in-up">
+        <AssistantAvatar />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-2 text-sm text-error bg-error/5 rounded-xl px-4 py-3 border border-error/20">
+            <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span className="break-words min-w-0">{message.content.slice("Error: ".length)}</span>
+          </div>
+          {isLast && canRetry && (
+            <button type="button" onClick={onRetry} className="btn btn-ghost btn-xs gap-1.5 mt-2">
+              <RotateCcw className="w-3.5 h-3.5" />
+              Retry
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const blocks = parseBlocksContent(message.content);
+  return (
+    <div className="group flex gap-3">
+      <AssistantAvatar />
+      <div className="flex-1 min-w-0 pt-0.5">
+        {blocks ? (
+          <BlocksContent blocks={blocks} />
+        ) : (
+          <ChatMarkdown>{message.content}</ChatMarkdown>
+        )}
+        <div
+          className={`mt-1 -ml-1.5 flex items-center gap-0.5 transition-opacity ${
+            isLast ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+          }`}
+        >
+          <CopyButton text={messageText(message.content)} />
+          {isLast && canRetry && (
+            <ActionButton label="Regenerate" onClick={onRetry}>
+              <RotateCcw className="w-3.5 h-3.5" />
+            </ActionButton>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+/** The answer that is still streaming. */
+export function LiveAssistantMessage({
+  turn,
+  statusMessage,
+}: {
+  turn: LiveTurn;
+  statusMessage: string | null;
+}) {
+  const split = answerStartIndex(turn.steps);
+  const work = turn.steps.slice(0, split);
+  const answer = turn.steps
+    .slice(split)
+    .map((s) => (s.kind === "text" ? s.text : ""))
+    .join("");
+  const busy = turn.steps.some(
+    (s) =>
+      (s.kind === "tool" && s.status === "running") ||
+      (s.kind === "thinking" && s.endedAt === undefined),
+  );
+
+  return (
+    <div className="flex gap-3 animate-fade-in-up" aria-live="polite" aria-busy="true">
+      <AssistantAvatar active />
+      <div className="flex-1 min-w-0 pt-0.5">
+        <LiveTrace steps={work} />
+        {answer ? (
+          <ChatMarkdown className="chat-streaming">{answer}</ChatMarkdown>
+        ) : (
+          !busy && (
+            <div className="flex items-center gap-2 h-7 text-sm">
+              <span className="chat-shimmer-text">{statusMessage || "Thinking"}</span>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
