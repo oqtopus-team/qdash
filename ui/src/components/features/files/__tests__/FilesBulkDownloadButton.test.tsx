@@ -32,7 +32,7 @@ describe("FilesBulkDownloadButton", () => {
     const onError = vi.fn();
 
     render(<FilesBulkDownloadButton onError={onError} />);
-    fireEvent.click(screen.getByRole("button", { name: "Download all" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
 
     await waitFor(() => {
       expect(downloadZipFileMock).toHaveBeenCalledWith({ path: "." }, { responseType: "blob" });
@@ -40,9 +40,10 @@ describe("FilesBulkDownloadButton", () => {
     await waitFor(() => expect(clickSpy).toHaveBeenCalledOnce());
 
     expect(createObjectURLMock).toHaveBeenCalledOnce();
-    expect((appendChildSpy.mock.calls[0][0] as HTMLAnchorElement).download).toBe(
-      "qubex-config_20261004.zip",
-    );
+    const link = appendChildSpy.mock.calls
+      .map(([node]) => node)
+      .find((node): node is HTMLAnchorElement => node instanceof HTMLAnchorElement);
+    expect(link?.download).toBe("qubex-config_20261004.zip");
     expect(revokeObjectURLMock).toHaveBeenCalledWith("blob:config-archive");
     expect(onError).not.toHaveBeenCalled();
   });
@@ -58,7 +59,7 @@ describe("FilesBulkDownloadButton", () => {
     const onError = vi.fn();
 
     render(<FilesBulkDownloadButton onError={onError} />);
-    const button = screen.getByRole("button", { name: "Download all" });
+    const button = screen.getByRole("button", { name: "Download" });
     fireEvent.click(button);
 
     await waitFor(() => {

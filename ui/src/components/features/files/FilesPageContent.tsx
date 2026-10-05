@@ -356,6 +356,10 @@ export function FilesPageContent() {
             {hasUnsavedChanges && <span className="text-xs text-warning flex-shrink-0">●</span>}
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 overflow-x-auto">
+            <FilesBulkDownloadButton
+              disabled={!fileTreeData?.length}
+              onError={(message) => toast.error(message)}
+            />
             <button
               onClick={toggleEditorLock}
               className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-warning"}`}
@@ -516,14 +520,8 @@ export function FilesPageContent() {
                 <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
                   EXPLORER
                 </h2>
-                <div className="mb-2 flex items-center justify-between gap-2 px-3">
-                  <span className="text-xs uppercase tracking-wide text-base-content/50">
-                    Config Files
-                  </span>
-                  <FilesBulkDownloadButton
-                    disabled={!fileTreeData?.length}
-                    onError={(message) => toast.error(message)}
-                  />
+                <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
+                  Config Files
                 </div>
                 {fileTreeData && (
                   <div className="min-h-0 flex-1">

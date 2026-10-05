@@ -75,7 +75,7 @@ export function FilesBulkDownloadButton({
   return (
     <button
       type="button"
-      className="btn btn-ghost btn-xs gap-1"
+      className="btn btn-sm btn-outline hidden sm:flex"
       onClick={handleDownload}
       disabled={disabled || isDownloading}
       title="Download all config files as a ZIP archive"
@@ -83,9 +83,9 @@ export function FilesBulkDownloadButton({
       {isDownloading ? (
         <span className="loading loading-spinner loading-xs" aria-hidden="true" />
       ) : (
-        <Download className="h-3.5 w-3.5" aria-hidden="true" />
+        <Download size={16} aria-hidden="true" />
       )}
-      <span>{isDownloading ? "Downloading..." : "Download"}</span>
+      <span className="ml-1">{isDownloading ? "Downloading..." : "Download"}</span>
     </button>
   );
 }
