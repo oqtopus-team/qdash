@@ -128,6 +128,9 @@ Complete the Qubex config placement or repository setup before starting services
 
 ## Full Stack
 
+Application file logs use Docker named volumes; use `docker compose logs` to read live service
+output.
+
 Start all services:
 
 ```bash
