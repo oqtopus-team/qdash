@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 
 import { useQueryState, parseAsString } from "nuqs";
 
-import { dateToDateTimeLocal } from "@/lib/utils/datetime";
+import { dateTimeLocalToDate, dateToDateTimeLocal } from "@/lib/utils/datetime";
 
 interface UseRangeModeUrlStateResult {
   startDate: string;
@@ -10,8 +10,13 @@ interface UseRangeModeUrlStateResult {
   setStartDate: (date: string) => void;
   setEndDate: (date: string) => void;
   setQuickRange: (days: number) => void;
+  hasUrlRange: boolean;
 }
 
+/**
+ * Syncs the start / end time range with the `start` and `end` URL params, defaulting to the last 7 days.
+ * `hasUrlRange` is true only when both URL params are valid datetime-local values.
+ */
 export function useRangeModeUrlState(): UseRangeModeUrlStateResult {
   const [startDate, setStartDateState] = useQueryState("start", parseAsString);
   const [endDate, setEndDateState] = useQueryState("end", parseAsString);
@@ -55,5 +60,10 @@ export function useRangeModeUrlState(): UseRangeModeUrlStateResult {
     setStartDate,
     setEndDate,
     setQuickRange,
+    hasUrlRange:
+      startDate !== null &&
+      endDate !== null &&
+      dateTimeLocalToDate(startDate) !== null &&
+      dateTimeLocalToDate(endDate) !== null,
   };
 }

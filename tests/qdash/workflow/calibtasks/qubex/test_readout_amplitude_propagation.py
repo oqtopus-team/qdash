@@ -3,7 +3,9 @@ import pytest
 from qdash.datamodel.task import InputParameterModel
 from qdash.workflow.calibtasks.qubex.cw.check_control_amplitude import CheckControlAmplitude
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import CheckQubitSpectroscopy
-from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_chevron import CheckChevron
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_adaptive_chevron import (
+    CheckAdaptiveChevron,
+)
 from qdash.workflow.service.tasks import BRINGUP_TASKS
 
 
@@ -12,7 +14,7 @@ def test_bringup_tasks_prefer_loaded_readout_amplitude() -> None:
     for task_cls in (
         CheckQubitSpectroscopy,
         CheckControlAmplitude,
-        CheckChevron,
+        CheckAdaptiveChevron,
     ):
         task = task_cls()
         task.input_parameters["readout_amplitude"] = InputParameterModel(value=0.017, unit="a.u.")
@@ -33,7 +35,7 @@ def test_bringup_tasks_declare_readout_amplitude_as_calibration_input() -> None:
     for task_cls in (
         CheckQubitSpectroscopy,
         CheckControlAmplitude,
-        CheckChevron,
+        CheckAdaptiveChevron,
     ):
         assert "readout_amplitude" in task_cls.input_spec
 
@@ -44,9 +46,10 @@ def test_cw_tasks_do_not_declare_readout_amplitude_as_run_parameter() -> None:
         assert "readout_amplitude" not in task_cls.run_spec
 
 
-def test_bringup_uses_adaptive_check_chevron_before_fine_refinement() -> None:
+def test_bringup_uses_adaptive_chevron_after_coarse_calibration() -> None:
     """Verify bring-up orders adaptive chevron after CW calibration tasks."""
-    assert "CheckChevron" in BRINGUP_TASKS
+    assert "CheckAdaptiveChevron" in BRINGUP_TASKS
+    assert "CheckChevron" not in BRINGUP_TASKS
     assert "CheckCoarseChevron" not in BRINGUP_TASKS
     assert "Configure" not in BRINGUP_TASKS
     assert "CheckRabi" not in BRINGUP_TASKS
@@ -54,5 +57,9 @@ def test_bringup_uses_adaptive_check_chevron_before_fine_refinement() -> None:
     assert BRINGUP_TASKS.index("CheckControlAmplitude") > BRINGUP_TASKS.index(
         "CheckQubitSpectroscopy"
     )
-    assert BRINGUP_TASKS.index("CheckChevron") > BRINGUP_TASKS.index("CheckControlAmplitude")
-    assert BRINGUP_TASKS.index("CheckChevron") > BRINGUP_TASKS.index("CheckQubitSpectroscopy")
+    assert BRINGUP_TASKS.index("CheckAdaptiveChevron") > BRINGUP_TASKS.index(
+        "CheckControlAmplitude"
+    )
+    assert BRINGUP_TASKS.index("CheckAdaptiveChevron") > BRINGUP_TASKS.index(
+        "CheckQubitSpectroscopy"
+    )

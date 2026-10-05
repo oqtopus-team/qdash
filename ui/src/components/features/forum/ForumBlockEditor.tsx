@@ -12,6 +12,11 @@ import {
 import { BlockNoteView } from "@blocknote/mantine";
 
 import { DARK_THEMES, type ThemeName } from "@/constants/themes";
+import { blockNoteSchema } from "@/lib/blocknote/codeBlock";
+import {
+  useCodeBlockLanguageDetection,
+  withDetectedCodeLanguages,
+} from "@/lib/blocknote/codeBlockLanguage";
 import { uploadInlineFile } from "@/lib/blocknote/inlineFileUpload";
 
 // Reuse the cryo BlockNote theme (scoped to the `.wiring-blocknote` wrapper).
@@ -89,8 +94,9 @@ export function ForumBlockViewer({ blocks }: { blocks: Record<string, unknown>[]
     {
       // Use the same full schema as the editor so tables and other rich blocks
       // render consistently in forum previews.
+      schema: blockNoteSchema,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      initialContent: blocks.length > 0 ? (blocks as any) : undefined,
+      initialContent: blocks.length > 0 ? (withDetectedCodeLanguages(blocks) as any) : undefined,
     },
     [blocks],
   );
@@ -125,16 +131,18 @@ export function ForumBlockEditor({
   const editor = useCreateBlockNote({
     // Use the full default schema — image, video, audio, file, table, list,
     // code, quote, heading, …
+    schema: blockNoteSchema,
     initialContent:
       initialBlocks && initialBlocks.length > 0
         ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (initialBlocks as any)
+          (withDetectedCodeLanguages(initialBlocks) as any)
         : undefined,
     // Images go to the server (portable url, small documents); video / audio /
     // file are inlined as base64 data URLs, matching the cool-down editor.
     uploadFile: (file: File) =>
       file.type.startsWith("image/") ? onImageUpload(file) : uploadInlineFile(file),
   });
+  useCodeBlockLanguageDetection(editor);
   const getMentionItems = useCallback(
     async (query: string): Promise<DefaultReactSuggestionItem[]> =>
       filterForumMentionCandidates(mentionCandidates, query).map((candidate) => ({

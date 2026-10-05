@@ -49,6 +49,8 @@ class ParameterSpec(BaseModel):
     unit: str = ""
     value_type: str = "float"
     description: str = ""
+    ui_group: str = ""
+    ui_group_collapsed: bool = False
 
 
 class RunParameterModel(BaseModel):
@@ -268,6 +270,8 @@ class InputParameterSpec(ParameterSpec):
             value_type=self.value_type,
             unit=self.unit,
             description=self.description,
+            ui_group=self.ui_group,
+            ui_group_collapsed=self.ui_group_collapsed,
         )
 
 
@@ -324,6 +328,9 @@ class ParameterModel(BaseModel):
 class InputParameterModel(ParameterModel):
     """Resolved input parameter used by one task instance."""
 
+    ui_group: str = ""
+    ui_group_collapsed: bool = False
+
 
 class OutputParameterModel(ParameterModel):
     """Output parameter produced by one task instance."""
@@ -350,6 +357,9 @@ class TaskResultParameterModel(BaseModel):
 
 class TaskResultInputParameterModel(TaskResultParameterModel):
     """Input parameter persisted in task-result history."""
+
+    ui_group: str = ""
+    ui_group_collapsed: bool = False
 
 
 class TaskResultOutputParameterModel(TaskResultParameterModel):

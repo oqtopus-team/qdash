@@ -38,7 +38,7 @@ services:
     volumes:
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
-    command: python -m qdash.dbmodel.migration project-scoped-calibration --execute
+    command: python -m qdash.dbmodel.migration run --execute
     environment:
       - PYTHONPATH=/app
       - CALIB_DATA_PATH=/app/calib_data

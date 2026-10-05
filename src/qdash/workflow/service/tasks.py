@@ -35,7 +35,7 @@ BRINGUP_TASKS: list[str] = [
     "CheckControlAmplitude",  # Refine coarse_control_amplitude from spectroscopy-derived seed
     # Refine qubit_frequency during bring-up without requiring Configure.
     # Rabi remains a regular calibration task after backend configuration.
-    "CheckChevron",
+    "CheckAdaptiveChevron",
 ]
 
 # =============================================================================

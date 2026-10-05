@@ -11,6 +11,7 @@ import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureC
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
+import { CalibrationUpdateStatusBadge } from "@/components/features/metrics/ParametersTable";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -486,7 +487,12 @@ export function TaskDetailModal({
                   {/* Output Parameters */}
                   {task.output_parameters && (
                     <div className="mb-6">
-                      <h4 className="text-lg font-semibold mb-3">Output Parameters</h4>
+                      <div className="mb-3 flex items-center gap-2">
+                        <h4 className="text-lg font-semibold">Output Parameters</h4>
+                        <CalibrationUpdateStatusBadge
+                          parameters={task.output_parameters as Record<string, unknown>}
+                        />
+                      </div>
                       <div className="overflow-x-auto">
                         <table className="table table-zebra table-sm">
                           <thead>

@@ -5,6 +5,10 @@ QDash uses MongoDB via the Bunnet ODM with a project-centric multi-tenant model.
 - **datamodel** (`src/qdash/datamodel/`) — Pydantic `BaseModel` for business logic
 - **dbmodel** (`src/qdash/dbmodel/`) — Bunnet `Document` for database persistence
 
+The [Calibration Data Lifecycle](../development/workflow/calibration-data-lifecycle.md) explains
+which collections hold accepted values versus measurement history and how workflow outputs move
+between MongoDB, active execution state, and Qubex parameter files.
+
 ## MongoDB Collections
 
 | Collection            | Document Class            | Description                                     |

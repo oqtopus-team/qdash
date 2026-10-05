@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -15,6 +15,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { useGetTaskResult } from "@/client/task/task";
+import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
 import { useCreateIssue, getGetTaskResultIssuesQueryKey } from "@/client/issue/issue";
 import { useQueryClient } from "@tanstack/react-query";
 import { TaskFigure } from "@/components/charts/TaskFigure";
@@ -22,6 +23,7 @@ import { ExecutionTaskProgress } from "@/components/features/execution/Execution
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import { SpectroscopyManualCorrection } from "@/components/features/task-results/SpectroscopyManualCorrection";
 import { CalibrationGitHubSyncNotice } from "@/components/features/task-results/CalibrationGitHubSyncNotice";
+import { TaskResultHistoryNavigation } from "@/components/features/task-results/TaskResultHistoryNavigation";
 import type { CalibrationGitHubSync } from "@/schemas";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
@@ -160,6 +162,15 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
     },
   });
   const taskResult = taskResultResponse?.data;
+  const { data: taskFileSettings } = useGetTaskFileSettings();
+  const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
+  const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
+  const inputParameterDefinitions = useMemo(
+    () =>
+      taskInfoData?.data?.tasks.find((task) => task.name === taskResult?.task_name)
+        ?.input_parameters,
+    [taskInfoData?.data?.tasks, taskResult?.task_name],
+  );
 
   // Issues
   const {
@@ -238,15 +249,23 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           <span className="font-mono text-sm font-semibold truncate">{taskId}</span>
           <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
           <StatusBadge status={taskResult.status} />
-          {canReExecute && (
-            <button
-              onClick={() => router.push(`/tasks?sourceTaskId=${encodeURIComponent(taskId)}`)}
-              className="btn btn-sm btn-primary gap-1 ml-auto"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Run again
-            </button>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            <TaskResultHistoryNavigation
+              taskId={taskId}
+              taskName={taskResult.task_name}
+              chipId={taskResult.chip_id}
+              qid={taskResult.qid}
+            />
+            {canReExecute && (
+              <button
+                onClick={() => router.push(`/tasks?sourceTaskId=${encodeURIComponent(taskId)}`)}
+                className="btn btn-sm btn-primary gap-1"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Run again
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -442,6 +461,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           <ParametersTable
             title="Input Parameters"
             parameters={taskResult.input_parameters as Record<string, unknown>}
+            parameterDefinitions={inputParameterDefinitions}
           />
         )}
 
