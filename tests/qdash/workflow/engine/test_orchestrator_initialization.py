@@ -108,4 +108,6 @@ def test_delegating_session_keeps_execution_without_connecting_backend(monkeypat
     backend.save_note.assert_called_once()
     backend.connect.assert_not_called()
     assert orchestrator.backend is backend
-    assert repo.find_by_id(config.execution_id).status == ExecutionStatusModel.RUNNING
+    execution = repo.find_by_id(config.execution_id)
+    assert execution is not None
+    assert execution.status == ExecutionStatusModel.RUNNING

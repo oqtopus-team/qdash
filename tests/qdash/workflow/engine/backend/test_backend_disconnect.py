@@ -16,7 +16,7 @@ def test_disconnect_is_safe_without_an_experiment(
 
     backend.disconnect()
 
-    assert backend._exp is None
+    assert not backend.is_connected
 
 
 @pytest.mark.parametrize("backend_type", [FakeBackend, QubexBackend])
@@ -31,4 +31,4 @@ def test_disconnect_releases_experiment_once(
     backend.disconnect()
 
     experiment.disconnect.assert_called_once_with()
-    assert backend._exp is None
+    assert not backend.is_connected

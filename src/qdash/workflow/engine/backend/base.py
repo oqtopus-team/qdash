@@ -19,6 +19,12 @@ class BaseBackend(ABC):
         """Release resources held by the backend without opening a connection."""
         ...
 
+    @property
+    @abstractmethod
+    def is_connected(self) -> bool:
+        """Return whether the backend currently owns a live backend instance."""
+        ...
+
     @abstractmethod
     def version(self) -> str:
         """Return the version of the backend."""

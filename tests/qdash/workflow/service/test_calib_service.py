@@ -7,7 +7,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -523,7 +523,9 @@ class TestCalibServiceInitialization:
             session.cancel_calibration()
 
         getattr(execution_service.reload.return_value, terminal).assert_called_once()
-        session.backend.disconnect.assert_called_once_with()
+        backend = session.backend
+        assert backend is not None
+        cast("MagicMock", backend.disconnect).assert_called_once_with()
         if terminal == "fail":
             execution_service.reload.return_value.fail.assert_called_once_with("measurement failed")
         assert lock_repo.locked is False
@@ -554,7 +556,9 @@ class TestCalibServiceInitialization:
         session.execution_service = execution_service
 
         session.finish_calibration(update_chip_history=False, push_to_github=False)
-        session.backend.disconnect.assert_called_once_with()
+        backend = session.backend
+        assert backend is not None
+        cast("MagicMock", backend.disconnect).assert_called_once_with()
         session.fail_calibration()
         session.cancel_calibration()
 

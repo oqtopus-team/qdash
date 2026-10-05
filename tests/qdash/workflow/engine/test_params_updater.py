@@ -237,7 +237,7 @@ data:
     def test_unconnected_backend_does_not_connect_for_label_fallback(self):
         """A parent session that delegates hardware must stay disconnected on lookup failure."""
         backend = MagicMock()
-        backend._exp = None
+        backend.is_connected = False
         backend.config = {"project_id": "project-1", "chip_id": "chip-1"}
         updater = _QubexParamsUpdater(backend, chip_id="chip-1")
 
