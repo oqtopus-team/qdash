@@ -24454,6 +24454,35 @@
                           "type": "boolean",
                           "title": "Database Updated",
                           "default": false
+                        },
+                        "database_updates": {
+                          "items": {
+                            "properties": {
+                              "parameter_name": {
+                                "type": "string",
+                                "title": "Parameter Name"
+                              },
+                              "previous_value": {
+                                "title": "Previous Value"
+                              },
+                              "updated_value": {
+                                "title": "Updated Value"
+                              },
+                              "updated": {
+                                "type": "boolean",
+                                "title": "Updated",
+                                "default": false
+                              }
+                            },
+                            "type": "object",
+                            "required": [
+                              "parameter_name"
+                            ],
+                            "title": "DatabaseUpdateModel",
+                            "description": "One calibration database update produced from a task output."
+                          },
+                          "type": "array",
+                          "title": "Database Updates"
                         }
                       },
                       "additionalProperties": true,
@@ -25035,6 +25064,35 @@
                           "type": "boolean",
                           "title": "Database Updated",
                           "default": false
+                        },
+                        "database_updates": {
+                          "items": {
+                            "properties": {
+                              "parameter_name": {
+                                "type": "string",
+                                "title": "Parameter Name"
+                              },
+                              "previous_value": {
+                                "title": "Previous Value"
+                              },
+                              "updated_value": {
+                                "title": "Updated Value"
+                              },
+                              "updated": {
+                                "type": "boolean",
+                                "title": "Updated",
+                                "default": false
+                              }
+                            },
+                            "type": "object",
+                            "required": [
+                              "parameter_name"
+                            ],
+                            "title": "DatabaseUpdateModel",
+                            "description": "One calibration database update produced from a task output."
+                          },
+                          "type": "array",
+                          "title": "Database Updates"
                         }
                       },
                       "additionalProperties": true,
@@ -28161,6 +28219,35 @@
                           "type": "boolean",
                           "title": "Database Updated",
                           "default": false
+                        },
+                        "database_updates": {
+                          "items": {
+                            "properties": {
+                              "parameter_name": {
+                                "type": "string",
+                                "title": "Parameter Name"
+                              },
+                              "previous_value": {
+                                "title": "Previous Value"
+                              },
+                              "updated_value": {
+                                "title": "Updated Value"
+                              },
+                              "updated": {
+                                "type": "boolean",
+                                "title": "Updated",
+                                "default": false
+                              }
+                            },
+                            "type": "object",
+                            "required": [
+                              "parameter_name"
+                            ],
+                            "title": "DatabaseUpdateModel",
+                            "description": "One calibration database update produced from a task output."
+                          },
+                          "type": "array",
+                          "title": "Database Updates"
                         }
                       },
                       "additionalProperties": true,
@@ -29021,6 +29108,35 @@
                           "type": "boolean",
                           "title": "Database Updated",
                           "default": false
+                        },
+                        "database_updates": {
+                          "items": {
+                            "properties": {
+                              "parameter_name": {
+                                "type": "string",
+                                "title": "Parameter Name"
+                              },
+                              "previous_value": {
+                                "title": "Previous Value"
+                              },
+                              "updated_value": {
+                                "title": "Updated Value"
+                              },
+                              "updated": {
+                                "type": "boolean",
+                                "title": "Updated",
+                                "default": false
+                              }
+                            },
+                            "type": "object",
+                            "required": [
+                              "parameter_name"
+                            ],
+                            "title": "DatabaseUpdateModel",
+                            "description": "One calibration database update produced from a task output."
+                          },
+                          "type": "array",
+                          "title": "Database Updates"
                         }
                       },
                       "additionalProperties": true,
@@ -29704,6 +29820,35 @@
                       "type": "boolean",
                       "title": "Database Updated",
                       "default": false
+                    },
+                    "database_updates": {
+                      "items": {
+                        "properties": {
+                          "parameter_name": {
+                            "type": "string",
+                            "title": "Parameter Name"
+                          },
+                          "previous_value": {
+                            "title": "Previous Value"
+                          },
+                          "updated_value": {
+                            "title": "Updated Value"
+                          },
+                          "updated": {
+                            "type": "boolean",
+                            "title": "Updated",
+                            "default": false
+                          }
+                        },
+                        "type": "object",
+                        "required": [
+                          "parameter_name"
+                        ],
+                        "title": "DatabaseUpdateModel",
+                        "description": "One calibration database update produced from a task output."
+                      },
+                      "type": "array",
+                      "title": "Database Updates"
                     }
                   },
                   "additionalProperties": true,

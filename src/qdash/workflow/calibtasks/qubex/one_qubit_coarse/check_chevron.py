@@ -5,7 +5,11 @@ import numpy as np
 import plotly.graph_objects as go
 from qubex.experiment.experiment_constants import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
 from qdash.workflow.engine.backend.qubex import QubexBackend
@@ -21,8 +25,12 @@ class CheckChevron(QubexTask):
     name: str = "CheckChevron"
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
-        "qubit_frequency": InputParameterSpec.required_database(),
-        "readout_frequency": InputParameterSpec.required_database(),
+        "control_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("qubit_frequency",)
+        ),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
         "readout_amplitude": InputParameterSpec.required_database(),
         "control_amplitude": InputParameterSpec.database_or_default(
             default=DEFAULT_CONTROL_AMPLITUDE,
@@ -38,7 +46,7 @@ class CheckChevron(QubexTask):
             unit="GHz",
             value_type="np.linspace",
             default=(-0.05, 0.05, 51),
-            description="Drive-frequency detuning sweep around qubit_frequency",
+            description="Drive-frequency detuning sweep around control_frequency",
         ),
         "time_range": RunParameterSpec(
             unit="ns",
@@ -61,7 +69,12 @@ class CheckChevron(QubexTask):
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "qubit_frequency": OutputParameterSpec(
-            unit="GHz", description="Qubit bare frequency estimated from the Chevron fit"
+            unit="GHz",
+            description="Qubit bare frequency estimated from the Chevron fit",
+            publish_targets=(
+                "qubit_frequency",
+                "control_frequency",
+            ),
         ),
     }
 
@@ -117,7 +130,7 @@ class CheckChevron(QubexTask):
         exp = self.get_experiment(backend)
         label = exp.get_qubit_label(int(qid))
 
-        qubit_frequency = self._required_input_value("qubit_frequency")
+        control_frequency = self._required_input_value("control_frequency")
         readout_frequency = self._required_input_value("readout_frequency")
         readout_amplitude = self._required_input_value("readout_amplitude")
         control_amplitude = self._required_input_value("control_amplitude")
@@ -125,7 +138,7 @@ class CheckChevron(QubexTask):
         print(
             f"[run] CheckChevron params for {label}: "
             f"control_amplitude={control_amplitude}, "
-            f"qubit_frequency={qubit_frequency}, "
+            f"control_frequency={control_frequency}, "
             f"readout_amplitude={readout_amplitude}, "
             f"readout_frequency={readout_frequency}"
         )
@@ -134,11 +147,11 @@ class CheckChevron(QubexTask):
         with self._modified_qubit_readout_frequencies(
             exp,
             qubit_label=label,
-            frequency_overrides={label: qubit_frequency, "R" + label: readout_frequency},
+            frequency_overrides={label: control_frequency, "R" + label: readout_frequency},
         ):
             result = exp.chevron_pattern(
                 targets=[label],
-                frequencies={label: qubit_frequency},
+                frequencies={label: control_frequency},
                 amplitudes={label: control_amplitude},
                 detuning_range=self.run_parameters["detuning_range"].get_value(),
                 time_range=self.run_parameters["time_range"].get_value(),
