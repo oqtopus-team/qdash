@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { AnalyzeRequestApproval } from './analyzeRequestApproval';
 import type { AnalyzeRequestConversationHistoryItem } from './analyzeRequestConversationHistoryItem';
 import type { AnalyzeRequestImageBase64 } from './analyzeRequestImageBase64';
 import type { AnalyzeRequestModelOverride } from './analyzeRequestModelOverride';
@@ -33,4 +34,6 @@ export interface AnalyzeRequest {
   conversation_history?: AnalyzeRequestConversationHistoryItem[];
   /** Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used. */
   model_override?: AnalyzeRequestModelOverride;
+  /** Decision on the write operation the previous turn asked approval for. */
+  approval?: AnalyzeRequestApproval;
 }

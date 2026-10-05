@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from qdash.api.services.pi_chat_service import (
+    approval_payload,
     build_blocks_result,
     tool_label,
     translate,
@@ -28,6 +29,15 @@ async def _collect(
     *events: dict[str, Any],
 ) -> list[tuple[str, dict[str, Any]]]:
     return [_parse(sse) async for sse in translate(_lines(*events))]
+
+
+def test_approval_decisions_are_forwarded_to_the_runtime() -> None:
+    from qdash.copilot.contracts.models import ApprovalDecision
+
+    assert approval_payload(None) == {}
+    assert approval_payload(ApprovalDecision(id="c1", approve=True)) == {
+        "approval": {"id": "c1", "approve": True}
+    }
 
 
 class TestToolLabel:
@@ -96,6 +106,23 @@ class TestTranslate:
         assert [name for name, _ in events] == ["thinking", "delta", "delta", "status", "result"]
         assert events[0][1] == {"text": "Checking T1"}
         assert "".join(data["text"] for name, data in events if name == "delta") == "T1 is 45 us"
+
+    @pytest.mark.asyncio
+    async def test_a_turn_ending_on_a_question_renders_it_as_a_card(self) -> None:
+        ask = {"question": "Which qubit?", "options": [{"label": "Q32"}, {"label": "Q33"}]}
+        approval = {"id": "c1", "tool": "qdash_execute_agent_action", "label": "Run", "args": {}}
+        events = await _collect(
+            {"type": "ask", "ask": ask},
+            {"type": "approval", "approval": approval},
+            # Both end the turn, often without any text.
+            {"type": "done", "text": ""},
+        )
+
+        assert [name for name, _ in events] == ["status", "result"]
+        assert events[1][1]["blocks"] == [
+            {"type": "ask", "content": None, "chart": None, "ask": ask},
+            {"type": "approval", "content": None, "chart": None, "approval": approval},
+        ]
 
     @pytest.mark.asyncio
     async def test_charts_precede_the_text_block_in_order(self) -> None:

@@ -101,6 +101,24 @@ test("text and thinking deltas are forwarded in order", () => {
   );
 });
 
+test("ask and approval requests become their own lines", () => {
+  const ask = { question: "Which qubit?", options: [{ label: "Q32" }, { label: "Q33" }] };
+  const approval = { id: "call-1", tool: "qdash_execute_agent_action", label: "Execute", args: {} };
+  assert.deepEqual(
+    toNdjsonEvents({ type: "tool_execution_end", toolName: "ask_user", result: { details: { ask } } }),
+    [
+      { type: "ask", ask },
+      { type: "tool_end", name: "ask_user", isError: false },
+    ],
+  );
+  const [line] = toNdjsonEvents({
+    type: "tool_execution_end",
+    toolName: "qdash_execute_agent_action",
+    entry: { model: [{ role: "toolResult", details: { approval } }] },
+  });
+  assert.deepEqual(line, { type: "approval", approval });
+});
+
 test("unrelated events are dropped", () => {
   assert.deepEqual(toNdjsonEvents({ type: "message_update" }), []);
   assert.deepEqual(toNdjsonEvents({ type: "agent_end" }), []);

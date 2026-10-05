@@ -15,15 +15,20 @@ import {
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
 import { ChatTraceSummary, LiveTrace } from "@/components/features/chat/ChatTrace";
+import {
+  ApprovalCard,
+  AskCard,
+  type InteractionState,
+} from "@/components/features/chat/ChatInteractionCards";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
-import {
-  answerStartIndex,
-  type CopilotBlocksResult,
-  type CopilotMessage,
-  type LiveTurn,
-} from "@/hooks/useCopilotChat";
-import type { BlocksResult } from "@/hooks/useAnalysisChat";
+import { answerStartIndex } from "@/lib/copilotChatStream";
+import type {
+  BlocksResult,
+  ChatMessage as CopilotMessage,
+  CopilotBlocksResult,
+  LiveTurn,
+} from "@/types/copilotChat";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,7 +68,7 @@ function isErrorMessage(message: CopilotMessage): boolean {
 function AssistantAvatar({ active = false }: { active?: boolean }) {
   return (
     <div
-      className={`chat-avatar-bot w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+      className={`chat-avatar-slot chat-avatar-bot w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
         active ? "chat-avatar-active" : ""
       }`}
     >
@@ -199,7 +204,13 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
   );
 }
 
-function BlocksContent({ blocks }: { blocks: CopilotBlocksResult }) {
+function BlocksContent({
+  blocks,
+  interaction,
+}: {
+  blocks: CopilotBlocksResult;
+  interaction: InteractionState;
+}) {
   return (
     <>
       {blocks.trace && <ChatTraceSummary trace={blocks.trace} />}
@@ -212,6 +223,12 @@ function BlocksContent({ blocks }: { blocks: CopilotBlocksResult }) {
       {blocks.blocks.map((block, i) => {
         if (block.type === "text" && block.content) {
           return <ChatMarkdown key={i}>{block.content}</ChatMarkdown>;
+        }
+        if (block.type === "ask" && block.ask) {
+          return <AskCard key={i} ask={block.ask} state={interaction} />;
+        }
+        if (block.type === "approval" && block.approval) {
+          return <ApprovalCard key={i} approval={block.approval} state={interaction} />;
         }
         if (block.type === "chart" && block.chart) {
           return (
@@ -242,7 +259,13 @@ function BlocksContent({ blocks }: { blocks: CopilotBlocksResult }) {
 export const UserMessage = memo(function UserMessage({ message }: { message: CopilotMessage }) {
   return (
     <div className="group flex flex-col items-end gap-1 animate-fade-in-up">
-      <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] sm:max-w-[75%] text-sm whitespace-pre-wrap break-words">
+      {message.attachedImage && (
+        <span className="inline-flex items-center gap-1 text-[11px] text-base-content/45">
+          <ImageIcon className="w-3 h-3" />
+          Result figures attached
+        </span>
+      )}
+      <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] text-sm whitespace-pre-wrap break-words">
         {message.content}
       </div>
       <div className="flex opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
@@ -257,11 +280,20 @@ export const AssistantMessage = memo(function AssistantMessage({
   isLast,
   canRetry,
   onRetry,
+  answer,
+  onAnswer,
+  onDecide,
+  onOther,
 }: {
   message: CopilotMessage;
   isLast: boolean;
   canRetry: boolean;
   onRetry: () => void;
+  /** The user message that follows this answer, if any. */
+  answer?: string;
+  onAnswer: InteractionState["onAnswer"];
+  onDecide: InteractionState["onDecide"];
+  onOther: InteractionState["onOther"];
 }) {
   if (isErrorMessage(message)) {
     return (
@@ -289,7 +321,10 @@ export const AssistantMessage = memo(function AssistantMessage({
       <AssistantAvatar />
       <div className="flex-1 min-w-0 pt-0.5">
         {blocks ? (
-          <BlocksContent blocks={blocks} />
+          <BlocksContent
+            blocks={blocks}
+            interaction={{ active: isLast && canRetry, answer, onAnswer, onDecide, onOther }}
+          />
         ) : (
           <ChatMarkdown>{message.content}</ChatMarkdown>
         )}

@@ -10,6 +10,8 @@ export type NdjsonEvent =
   | { type: "text_delta"; delta: string }
   | { type: "thinking_delta"; delta: string }
   | { type: "chart"; chart: { data: unknown[]; layout: unknown } }
+  | { type: "ask"; ask: unknown }
+  | { type: "approval"; approval: unknown }
   | { type: "done"; text: string }
   | { type: "error"; message: string };
 
@@ -21,7 +23,7 @@ type SessionEventLike = {
   args?: unknown;
   isError?: boolean;
   changes?: ReadonlyArray<{ type: string; delta?: string }>;
-  result?: { details?: { chart?: { data: unknown[]; layout: unknown } } };
+  result?: { details?: Record<string, unknown> & { chart?: { data: unknown[]; layout: unknown } } };
   entry?: {
     model?: ReadonlyArray<{
       role?: string;
@@ -65,6 +67,14 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
     const durableResult = event.entry?.model?.[0];
     const chart = event.result?.details?.chart ?? chartFromDetails(durableResult?.details);
     if (chart) out.push({ type: "chart", chart });
+    // Interactive requests end the turn; the UI renders them as cards.
+    const details = (event.result?.details ?? durableResult?.details) as
+      | Record<string, unknown>
+      | undefined;
+    if (details && typeof details === "object") {
+      if (details.ask) out.push({ type: "ask", ask: details.ask });
+      if (details.approval) out.push({ type: "approval", approval: details.approval });
+    }
     out.push({
       type: "tool_end",
       name: event.toolName ?? "unknown",

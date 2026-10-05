@@ -124,6 +124,18 @@ class TestBuildAnalysisPrompt:
         assert "1 expected reference figure(s) first, then 1 figure(s)" in prompt
         assert prompt.endswith("## Your task\n\nIs this trustworthy?")
 
+    def test_tells_the_model_to_answer_from_the_provided_context(self) -> None:
+        prompt = pi_analysis_service.build_analysis_prompt(
+            bundle=_bundle(),
+            config=_config(),
+            user_message="hi",
+            language_instruction="",
+        )
+
+        guidance = prompt.index("## How to answer")
+        assert guidance < prompt.index("## Your task")
+        assert "Do not re-fetch this result" in prompt
+
     def test_does_not_request_the_blocks_json_schema(self) -> None:
         prompt = pi_analysis_service.build_analysis_prompt(
             bundle=_bundle(),

@@ -12,7 +12,7 @@ import {
   LineChart,
   Database,
 } from "lucide-react";
-import type { ChatTrace as ChatTraceData, TraceStep } from "@/hooks/useCopilotChat";
+import type { ChatTrace as ChatTraceData, TraceStep } from "@/types/copilotChat";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
 

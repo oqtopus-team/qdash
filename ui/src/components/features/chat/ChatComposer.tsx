@@ -23,6 +23,8 @@ interface ChatComposerProps {
   modelOptions: ModelOption[];
   selectedModelKey: string;
   onModelChange: (key: string) => void;
+  /** Narrow surfaces: smaller type and a shorter model label. */
+  compact?: boolean;
 }
 
 export interface ChatComposerHandle {
@@ -40,6 +42,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     modelOptions,
     selectedModelKey,
     onModelChange,
+    compact = false,
   },
   ref,
 ) {
@@ -85,7 +88,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         placeholder={placeholder}
         rows={1}
         aria-label="Message"
-        className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-[15px] leading-6 px-1 pt-1 placeholder:text-base-content/35"
+        className={`w-full resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 placeholder:text-base-content/35 ${
+          compact ? "text-sm" : "text-[15px]"
+        }`}
       />
       <div className="flex items-center gap-2 pt-1">
         {modelOptions.length > 1 && selected && (
@@ -98,7 +103,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                 aria-label="Chat model"
               >
                 <Cpu className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{selected.label}</span>
+                <span className="truncate">
+                  {compact ? (selected.model?.name ?? "Default model") : selected.label}
+                </span>
                 <ChevronDown className="w-3 h-3 shrink-0" />
               </button>
             </DropdownMenuTrigger>

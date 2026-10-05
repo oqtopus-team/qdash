@@ -1,7 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MessageSquare, PanelLeftClose, Search, SquarePen, Trash2 } from "lucide-react";
+import {
+  FlaskConical,
+  MessageSquare,
+  PanelLeftClose,
+  Search,
+  SquarePen,
+  Trash2,
+} from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import type { CopilotSession } from "@/hooks/useCopilotChat";
@@ -124,6 +131,12 @@ export function ChatSidebar({
                       aria-current={active ? "page" : undefined}
                       title={session.title}
                     >
+                      {session.context && (
+                        <FlaskConical
+                          className="w-3.5 h-3.5 mr-1.5 shrink-0 text-primary/70"
+                          aria-label="About a calibration result"
+                        />
+                      )}
                       <span className="truncate">{session.title}</span>
                     </button>
                     <button

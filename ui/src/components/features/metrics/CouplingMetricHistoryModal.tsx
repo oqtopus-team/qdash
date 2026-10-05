@@ -32,7 +32,7 @@ import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { ParametersTable } from "./ParametersTable";
 import { TaskResultIssues } from "./TaskResultIssues";
 import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
-import type { AnalysisContext } from "@/hooks/useAnalysisChat";
+import type { AnalysisContext } from "@/types/copilotChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { getApiErrorMessage } from "@/lib/utils/apiError";

@@ -136,6 +136,45 @@ def test_submit_action_authorizes_allowed_task(service: AgentSessionService) -> 
     assert updated.action_count == 1
 
 
+def test_get_action_resolves_actions_that_stored_the_qdash_execution_id(
+    service: AgentSessionService,
+) -> None:
+    """Actions dispatched before the fix kept the QDash execution ID as operation_id."""
+    session = _create_session(service)
+    submitted = service.submit_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        body=_run_task_action(),
+    )
+    action = AgentActionDocument.find_one({"action_id": submitted.action_id}).run()
+    assert action is not None
+    action.operation_id = "20260713-001"
+    action.execution_status = "queued"
+    action.save()
+    ExecutionHistoryDocument(
+        project_id="project-1",
+        username="tester",
+        name="agent execution",
+        execution_id="20260713-001",
+        calib_data_path="",
+        note={"flow_run_id": "prefect-flow-run-1"},
+        status="completed",
+        tags=[],
+        chip_id="chip-001",
+        message="",
+        system_info=SystemInfoModel(),
+    ).insert()
+
+    resolved = service.get_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        action_id=submitted.action_id,
+    )
+
+    assert resolved.execution_id == "20260713-001"
+    assert resolved.execution_status == "completed"
+
+
 def test_get_action_resolves_prefect_operation_to_qdash_execution(
     service: AgentSessionService,
 ) -> None:
@@ -887,7 +926,9 @@ async def test_execute_authorized_action_dispatches_single_task(
             assert kwargs["execution_name"] == "agent:CheckQubitSpectroscopy"
             assert kwargs["parameter_overrides"] == {"input": {"drive_amplitude": 0.1}}
             assert kwargs["persist_output_parameters"] is False
-            return type("Operation", (), {"execution_id": "operation-1"})()
+            return type(
+                "Operation", (), {"execution_id": "20260713-002", "flow_run_id": "operation-1"}
+            )()
 
     result = await service.execute_action(
         project_id="project-1",
