@@ -121,6 +121,12 @@ class QubexBackend(BaseBackend):
             )
             self._exp.connect()
 
+    def disconnect(self) -> None:
+        """Release the Experiment's hardware connections if it was created."""
+        if self._exp is not None:
+            self._exp.disconnect()
+            self._exp = None
+
     def get_instance(self) -> Experiment | None:
         if self._exp is None:
             self.connect()

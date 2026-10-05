@@ -122,6 +122,11 @@ class CustomOneQubit(CalibrationStep):
     def provides(self) -> set[str]:
         return {self.step_name, "candidate_qids"}
 
+    @property
+    def connect_parent_backend(self) -> bool:
+        """Synchronized qubit tasks connect in isolated workers."""
+        return self.mode != "synchronized"
+
     def execute(
         self,
         service: CalibService,

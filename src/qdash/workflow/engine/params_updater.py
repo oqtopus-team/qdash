@@ -135,6 +135,11 @@ class _QubexParamsUpdater(YamlParamsUpdater):
                     exc_info=True,
                 )
 
+        # A pipeline owner can prepare calibration files without connecting
+        # hardware. Do not reconnect it as a label lookup fallback.
+        if getattr(self._backend, "_exp", None) is None:
+            return None
+
         try:
             experiment = self._backend.get_instance()
         except Exception:

@@ -86,6 +86,7 @@ class MockBackend:
 
     def __init__(self, *args, **kwargs):
         self.name = "fake"
+        self.disconnect = MagicMock()
 
     def connect(self):
         pass
@@ -522,6 +523,7 @@ class TestCalibServiceInitialization:
             session.cancel_calibration()
 
         getattr(execution_service.reload.return_value, terminal).assert_called_once()
+        session.backend.disconnect.assert_called_once_with()
         if terminal == "fail":
             execution_service.reload.return_value.fail.assert_called_once_with("measurement failed")
         assert lock_repo.locked is False
@@ -552,6 +554,7 @@ class TestCalibServiceInitialization:
         session.execution_service = execution_service
 
         session.finish_calibration(update_chip_history=False, push_to_github=False)
+        session.backend.disconnect.assert_called_once_with()
         session.fail_calibration()
         session.cancel_calibration()
 
@@ -1214,6 +1217,10 @@ def test_pipeline_retains_whole_plan_and_releases_its_original_owner(
         session.run(QubitTargets(["0"]), [CustomOneQubit(), ConfigureAll(mux_ids=[1])])
     assert seen[0] == "exec-reserved"
     assert seen[1] != seen[0]
+    assert [record.config.connect_backend for record in pipeline_execution_env.records] == [
+        False,
+        True,
+    ]
     assert repo.try_lock("project-1", "next-run", "chip-1", (), True)
     assert not repo.try_lock("project-1", "other", "chip-2", ("mux:0",), False)
 
