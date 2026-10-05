@@ -180,8 +180,16 @@ class SeedImportService:
 
         """
         params_dir = self._params_dir(request.chip_id)
-        parameters = request.parameters or DEFAULT_SEED_PARAMETERS
-        self._validate_importable_parameters(set(parameters))
+        if request.parameters:
+            parameters = request.parameters
+            self._validate_importable_parameters(set(parameters))
+        else:
+            allowed_parameters = getattr(self, "_importable_parameters", None)
+            parameters = [
+                parameter
+                for parameter in DEFAULT_SEED_PARAMETERS
+                if allowed_parameters is None or parameter in allowed_parameters
+            ]
         results: list[SeedImportResultItem] = []
         imported_count = 0
         skipped_count = 0

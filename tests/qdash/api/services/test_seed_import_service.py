@@ -398,6 +398,26 @@ class TestSeedImportServiceImportFromQubex:
 
         mock_deps["activity"].return_value.create_activity.assert_not_called()
 
+    @pytest.mark.parametrize("parameters", [None, []])
+    def test_import_from_qubex_filters_defaults_by_allowlist(
+        self, service, mock_deps, tmp_path, parameters
+    ):
+        """Omitted parameters import only defaults permitted by the allowlist."""
+        service._config_base = str(tmp_path)
+        service._importable_parameters = {"control_frequency"}
+        params_dir = tmp_path / "chip001" / "params"
+        params_dir.mkdir(parents=True)
+        request = SeedImportRequest(
+            chip_id="chip001",
+            source=SeedImportSource.QUBEX_PARAMS,
+            parameters=parameters,
+        )
+
+        result = service._import_from_qubex(request, "project-001", "user001")
+
+        assert result.imported_count == 0
+        assert result.skipped_count == 1
+
     def test_import_from_qubex_loads_yaml_correctly(self, service, mock_deps, tmp_path):
         """Test _import_from_qubex correctly loads and imports YAML files."""
         # Set up a temporary params directory with a YAML file

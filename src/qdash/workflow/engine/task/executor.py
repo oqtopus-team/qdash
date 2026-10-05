@@ -873,7 +873,8 @@ class TaskExecutor:
                         if not compatible_value.get("parameter_name"):
                             compatible_value["parameter_name"] = compatible_name
                     normalized_input[param_name] = compatible_value
-                normalized_input.pop(compatible_key, None)
+                if compatible_key not in declarations:
+                    normalized_input.pop(compatible_key, None)
         snap_input = normalized_input
         if self._snapshot_loader.requires_snapshot(task_name):
             missing_inputs = set(declarations) - set(snap_input)

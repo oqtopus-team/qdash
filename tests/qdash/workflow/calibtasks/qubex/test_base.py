@@ -231,6 +231,28 @@ class TestLoadParametersFromDbQubitTask:
         assert canonical_parameter.value == 5.1
         assert canonical_parameter.parameter_name == "control_frequency"
 
+    def test_input_parameter_prefers_operational_value_across_sources(self) -> None:
+        class FrequencyInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "control_frequency": InputParameterSpec.required_database(
+                    fallback_parameter_names=("qubit_frequency",),
+                )
+            }
+
+        task = FrequencyInputTask()
+        task._populate_parameters(
+            {
+                "": [
+                    {"qubit_frequency": {"value": 5.2, "unit": "GHz"}},
+                    {"control_frequency": {"value": 5.1, "unit": "GHz"}},
+                ]
+            }
+        )
+
+        parameter = task.input_parameters["control_frequency"]
+        assert parameter.value == 5.1
+        assert parameter.parameter_name == "control_frequency"
+
     def test_qubit_task_falls_back_to_dict_key_when_no_parameter_name(self):
         """When parameter_name is empty, dict key is used as lookup."""
         task = ConcreteQubexTask()

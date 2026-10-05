@@ -537,21 +537,26 @@ class QubexTask(BaseTask):
             # Get the ordered list of data sources for this role
             sources = role_data_sources.get(qid_role, role_data_sources.get("", []))
 
-            lookup_keys: tuple[str, ...] = (lookup_key,)
+            primary_lookup_keys: tuple[str, ...] = (lookup_key,)
+            fallback_lookup_keys: tuple[str, ...] = ()
             if isinstance(declaration, InputParameterSpec):
-                lookup_keys += declaration.parameter_aliases
-                lookup_keys += declaration.fallback_parameter_names
+                primary_lookup_keys += declaration.parameter_aliases
+                fallback_lookup_keys = declaration.fallback_parameter_names
 
-            # Search sources in order, preferring the canonical key within each source.
+            # Preserve source priority for equivalent names, but only use semantic
+            # fallbacks when no canonical name or alias exists in any source.
             db_value = None
             resolved_parameter_name = lookup_key
             value_found = False
-            for source in sources:
-                for candidate_key in lookup_keys:
-                    if candidate_key in source:
-                        db_value = source[candidate_key]
-                        resolved_parameter_name = candidate_key
-                        value_found = True
+            for lookup_keys in (primary_lookup_keys, fallback_lookup_keys):
+                for source in sources:
+                    for candidate_key in lookup_keys:
+                        if candidate_key in source:
+                            db_value = source[candidate_key]
+                            resolved_parameter_name = candidate_key
+                            value_found = True
+                            break
+                    if value_found:
                         break
                 if value_found:
                     break

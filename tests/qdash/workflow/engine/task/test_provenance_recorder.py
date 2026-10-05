@@ -320,6 +320,34 @@ class TestProvenanceRecorder:
         ]
         assert derived_calls == []
 
+    def test_record_from_task_skips_unsuccessful_database_updates(
+        self, recorder, mock_repos, sample_execution_model
+    ):
+        task = QubitTaskModel(
+            name="CheckChevron",
+            qid="Q0",
+            status=TaskStatusModel.COMPLETED,
+            input_parameters={},
+            output_parameters={
+                "qubit_frequency": {
+                    "value": 5.2,
+                    "unit": "GHz",
+                    "database_updated": False,
+                    "database_updates": [
+                        {
+                            "parameter_name": "qubit_frequency",
+                            "updated_value": 5.2,
+                            "updated": False,
+                        }
+                    ],
+                }
+            },
+        )
+
+        recorder.record_from_task(task, sample_execution_model)
+
+        mock_repos["param_version"].create_version.assert_not_called()
+
     def test_record_from_task_does_not_raise_on_error(
         self, recorder, mock_repos, sample_task, sample_execution_model
     ):

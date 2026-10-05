@@ -154,6 +154,12 @@ describe("SeedParametersPanel", () => {
 
     expect(screen.getByText("coherence_time")).toBeTruthy();
     fireEvent.click(screen.getByText("coherence_time"));
+    expect(
+      screen
+        .getAllByRole("columnheader")
+        .map((header) => header.textContent?.trim())
+        .filter(Boolean),
+    ).toEqual(["Qubit", "Current QDash"]);
     expect(screen.getByText("42.0000")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit coherence_time for qubit 0" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Import from YAML/ })).toBeNull();

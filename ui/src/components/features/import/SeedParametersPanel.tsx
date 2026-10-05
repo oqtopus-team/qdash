@@ -850,6 +850,7 @@ export function SeedParametersPanel() {
                           <thead>
                             <tr>
                               <th>Qubit</th>
+                              {viewMode === "database" && <th>Current QDash</th>}
                               {viewMode === "import" && (
                                 <>
                                   <th className="w-8">

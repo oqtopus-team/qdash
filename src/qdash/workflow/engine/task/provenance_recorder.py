@@ -387,6 +387,7 @@ class ProvenanceRecorder:
         for param_key, param_data in task.output_parameters.items():
             # Extract parameter details and resolve qid
             database_updates: list[dict[str, Any]] = []
+            has_database_updates = False
             if isinstance(param_data, ParameterModel):
                 param_name = param_data.parameter_name or param_key
                 resolved_qid = resolve_qid(qid, param_data.qid_role)
@@ -403,6 +404,7 @@ class ProvenanceRecorder:
                 error = param_data.get("error", 0.0)
                 value_type = param_data.get("value_type", "float")
                 raw_updates = param_data.get("database_updates", [])
+                has_database_updates = "database_updates" in param_data
                 if isinstance(raw_updates, list):
                     database_updates = [
                         update
@@ -421,6 +423,8 @@ class ProvenanceRecorder:
             if value is None:
                 continue
 
+            if has_database_updates and not database_updates:
+                continue
             targets = database_updates or [{"parameter_name": param_name}]
             for target in targets:
                 entity = self.parameter_version_repo.create_version(
