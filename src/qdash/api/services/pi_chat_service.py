@@ -1,15 +1,13 @@
 """Bridge between the Copilot chat SSE endpoint and the Pi Agent Runtime.
 
 The runtime speaks NDJSON; this module owns the translation into QDash's SSE
-contract and the persistence of Pi conversation state.
-
-See .agent docs: adr/0002 (Mongo owns the conversation) and adr/0005 (NDJSON).
+contract. Pi owns its durable execution state; MongoDB owns the user-facing
+session metadata and rendered messages.
 """
 
 from __future__ import annotations
 
 import asyncio
-import inspect
 import json
 import logging
 import os
@@ -21,7 +19,7 @@ from qdash.api.lib.sse import sse_event
 from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, AsyncIterable, Awaitable, Callable
+    from collections.abc import AsyncGenerator, AsyncIterable
 
     from qdash.copilot.config import CopilotConfig
     from qdash.copilot.contracts import ChatRequest
@@ -64,43 +62,6 @@ def _find_session(username: str, session_id: str) -> CopilotChatSessionDocument 
     ).run()
 
 
-async def load_agent_messages(username: str, session_id: str) -> list[dict[str, Any]]:
-    """Read stored Pi conversation state. Empty for new or LiteLLM-created chats."""
-    doc = await asyncio.to_thread(_find_session, username, session_id)
-    if doc is None or doc.agent_messages is None:
-        return []
-    return doc.agent_messages
-
-
-def _save_agent_messages(
-    username: str,
-    session_id: str,
-    messages: list[dict[str, Any]],
-) -> bool:
-    """Atomically update only Pi-owned state from synchronous PyMongo code."""
-    result = CopilotChatSessionDocument.get_motor_collection().update_one(
-        {"username": username, "session_id": session_id},
-        {"$set": {"agent_messages": messages}},
-    )
-    return bool(result.matched_count)
-
-
-async def save_agent_messages(
-    username: str,
-    session_id: str,
-    messages: list[dict[str, Any]],
-) -> None:
-    """Persist Pi conversation state.
-
-    Only ``agent_messages`` is written here. The display-facing ``messages``
-    list stays owned by the frontend, which already PATCHes it after each turn.
-    """
-    saved = await asyncio.to_thread(_save_agent_messages, username, session_id, messages)
-    if not saved:
-        msg = f"Chat session {session_id} for {username} vanished before writeback"
-        raise RuntimeError(msg)
-
-
 def _ensure_agent_session(username: str, session_id: str) -> None:
     """Create a minimal analysis session when only a browser-cached session exists."""
     if _find_session(username, session_id) is not None:
@@ -123,6 +84,26 @@ async def ensure_agent_session(username: str, session_id: str) -> None:
     await asyncio.to_thread(_ensure_agent_session, username, session_id)
 
 
+async def delete_runtime_session_state(username: str, session_id: str) -> None:
+    """Best-effort cleanup of Pi state after its QDash session is deleted."""
+    try:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
+            response = await client.request(
+                "DELETE",
+                f"{RUNTIME_URL}/session",
+                headers=_runtime_headers(),
+                json={"owner_id": username, "conversation_id": session_id},
+            )
+            response.raise_for_status()
+    except (httpx.HTTPError, RuntimeError):
+        logger.warning(
+            "Could not delete Pi durable state for session %s owned by %s",
+            session_id,
+            username,
+            exc_info=True,
+        )
+
+
 def _runtime_headers() -> dict[str, str]:
     """Return the internal runtime credential, failing closed when it is absent."""
     token = os.environ.get("AGENT_RUNTIME_TOKEN")
@@ -135,12 +116,13 @@ def _runtime_headers() -> dict[str, str]:
 def _request_payload(
     request: ChatRequest,
     config: CopilotConfig,
-    agent_messages: list[dict[str, Any]],
+    username: str,
 ) -> dict[str, Any]:
     return {
+        "owner_id": username,
         "conversation_id": request.session_id,
+        "request_id": request.request_id,
         "message": request.message,
-        "messages": agent_messages,
         "model": {"provider": config.model.provider, "name": config.model.name},
         "thinking_level": thinking_level(config),
     }
@@ -160,20 +142,14 @@ async def stream(
         )
         return
 
-    agent_messages = await load_agent_messages(username, request.session_id)
-    payload = _request_payload(request, config, agent_messages)
-
-    async def on_done(messages: list[dict[str, Any]]) -> None:
-        await save_agent_messages(username, str(request.session_id), messages)
-
-    async for event in stream_payload(payload, on_done=on_done, step="run_chat"):
+    payload = _request_payload(request, config, username)
+    async for event in stream_payload(payload, step="run_chat"):
         yield event
 
 
 async def stream_payload(
     payload: dict[str, Any],
     *,
-    on_done: Callable[[list[dict[str, Any]]], Awaitable[None] | None],
     step: str,
     extra_result: dict[str, Any] | None = None,
 ) -> AsyncGenerator[str, None]:
@@ -202,7 +178,6 @@ async def stream_payload(
 
             async for event in translate(
                 response.aiter_lines(),
-                on_done=on_done,
                 extra_result=extra_result,
                 step=step,
             ):
@@ -234,16 +209,14 @@ def _status_detail(response: httpx.Response) -> str:
 async def translate(
     lines: AsyncIterable[str],
     *,
-    on_done: Callable[[list[dict[str, Any]]], Awaitable[None] | None],
     extra_result: dict[str, Any] | None = None,
     step: str = "run_chat",
 ) -> AsyncGenerator[str, None]:
     """Turn a runtime NDJSON stream into QDash SSE events.
 
-    ``on_done`` receives the final Pi conversation state so the caller can
-    persist it. ``extra_result`` is merged into the final ``result`` event,
-    which analysis uses to carry ``images_sent``. Kept free of HTTP and database
-    access so it can be tested on plain strings.
+    ``extra_result`` is merged into the final ``result`` event, which analysis
+    uses to carry ``images_sent``. Kept free of HTTP and database access so it
+    can be tested on plain strings.
     """
     charts: list[dict[str, Any]] = []
     completed_tools: list[str] = []
@@ -251,17 +224,27 @@ async def translate(
     async for line in lines:
         if not line.strip():
             continue
-        event = json.loads(line)
-        kind = event.get("type")
+        try:
+            event = json.loads(line)
+            kind = event.get("type")
+
+            if kind == "tool_start":
+                label = tool_label(event["name"])
+            elif kind == "tool_end":
+                completed_tools.append(tool_label(event["name"]))
+            elif kind == "chart":
+                charts.append(event["chart"])
+        except (ValueError, KeyError, TypeError):
+            logger.warning("Malformed NDJSON line from agent runtime")
+            yield sse_event("error", {"step": step, "detail": "Agent runtime sent malformed data"})
+            return
 
         if kind == "tool_start":
-            label = tool_label(event["name"])
             yield sse_event(
                 "status",
                 {"step": "tool_call", "tool": event["name"], "message": f"{label}..."},
             )
         elif kind == "tool_end":
-            completed_tools.append(tool_label(event["name"]))
             yield sse_event(
                 "status",
                 {
@@ -271,7 +254,7 @@ async def translate(
                 },
             )
         elif kind == "chart":
-            charts.append(event["chart"])
+            pass
         elif kind == "error":
             yield sse_event(
                 "error",
@@ -279,17 +262,6 @@ async def translate(
             )
             return
         elif kind == "done":
-            try:
-                writeback = on_done(event.get("messages", []))
-                if inspect.isawaitable(writeback):
-                    await writeback
-            except Exception:
-                logger.exception("Failed to persist Pi conversation state")
-                yield sse_event(
-                    "error",
-                    {"step": step, "detail": "Could not persist the conversation state"},
-                )
-                return
             result = build_blocks_result(event.get("text", ""), charts)
             # No text and no chart means the turn produced nothing renderable.
             # Local models do this when they emit a malformed tool call, and a

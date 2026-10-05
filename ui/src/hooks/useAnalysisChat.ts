@@ -150,6 +150,7 @@ export function useAnalysisChat(
 
   const sendMessage = useCallback(
     async (userMessage: string, imageBase64?: string) => {
+      const requestId = crypto.randomUUID();
       // Abort any in-flight request
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -186,6 +187,7 @@ export function useAnalysisChat(
               task_id: context.taskId,
               message: userMessage,
               session_id: options?.sessionId ?? null,
+              request_id: requestId,
               image_base64: imageBase64 || null,
               model_override: options?.modelOverride ?? null,
               conversation_history: history,
@@ -193,6 +195,7 @@ export function useAnalysisChat(
           : {
               message: userMessage,
               session_id: options?.sessionId ?? null,
+              request_id: requestId,
               conversation_history: history,
             };
 

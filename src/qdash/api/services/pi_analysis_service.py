@@ -93,35 +93,25 @@ async def stream(
         )
         return
 
-    agent_messages = await pi_chat_service.load_agent_messages(username, request.session_id)
-    first_turn = not agent_messages
-
     payload: dict[str, Any] = {
+        "owner_id": username,
         "conversation_id": request.session_id,
-        "message": (
-            build_analysis_prompt(
-                bundle=bundle,
-                config=config,
-                user_message=request.message,
-                language_instruction=language_instruction,
-            )
-            if first_turn
-            else request.message
+        "request_id": request.request_id,
+        "message": request.message,
+        "initial_message": build_analysis_prompt(
+            bundle=bundle,
+            config=config,
+            user_message=request.message,
+            language_instruction=language_instruction,
         ),
-        "messages": agent_messages,
         "model": {"provider": config.model.provider, "name": config.model.name},
         "thinking_level": pi_chat_service.thinking_level(config),
-        # Only on the first turn: the figures stay in the stored conversation,
-        # and resending them every turn would eat the context window.
-        "images": collect_images(bundle) if first_turn else [],
+        # The durable runtime accepts these only when the conversation is new.
+        "images": collect_images(bundle),
     }
-
-    async def on_done(messages: list[dict[str, Any]]) -> None:
-        await pi_chat_service.save_agent_messages(username, str(request.session_id), messages)
 
     async for event in pi_chat_service.stream_payload(
         payload,
-        on_done=on_done,
         step="run_analysis",
         extra_result={"images_sent": images_sent},
     ):

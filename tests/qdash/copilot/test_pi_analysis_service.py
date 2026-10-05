@@ -50,6 +50,7 @@ def _request(message: str = "Is this result trustworthy?") -> AnalyzeRequest:
         task_id="task-1",
         message=message,
         session_id="session-1",
+        request_id="request-1",
     )
 
 
@@ -67,29 +68,9 @@ async def _collect(
     async def ensure_agent_session(_username: str, _session_id: str) -> None:
         return None
 
-    async def load_agent_messages(_username: str, _session_id: str) -> list[dict[str, Any]]:
-        return stored
-
-    async def save_agent_messages(
-        _username: str,
-        _session_id: str,
-        messages: list[dict[str, Any]],
-    ) -> None:
-        saved.append(messages)
-
     monkeypatch.setattr(pi_chat_service, "ensure_agent_session", ensure_agent_session)
-    monkeypatch.setattr(
-        pi_chat_service,
-        "load_agent_messages",
-        load_agent_messages,
-    )
-    monkeypatch.setattr(
-        pi_chat_service,
-        "save_agent_messages",
-        save_agent_messages,
-    )
 
-    async def fake_stream_payload(payload, *, on_done, step, extra_result=None):
+    async def fake_stream_payload(payload, *, step, extra_result=None):
         captured["payload"] = payload
         captured["step"] = step
 
@@ -97,9 +78,7 @@ async def _collect(
             for line in lines:
                 yield json.dumps(line)
 
-        async for event in pi_chat_service.translate(
-            _lines(), on_done=on_done, extra_result=extra_result
-        ):
+        async for event in pi_chat_service.translate(_lines(), extra_result=extra_result):
             yield event
 
     monkeypatch.setattr(pi_chat_service, "stream_payload", fake_stream_payload)
@@ -195,7 +174,10 @@ class TestStream:
         captured, _, _ = await _collect(monkeypatch, stored=[])
 
         payload = captured["payload"]
-        assert "knowledge-v1" in payload["message"]
+        assert payload["owner_id"] == "alice"
+        assert payload["request_id"] == "request-1"
+        assert payload["message"] == "Is this result trustworthy?"
+        assert "knowledge-v1" in payload["initial_message"]
         assert [image["data"] for image in payload["images"]] == [
             "expected-b64",
             "experiment-b64",
@@ -204,14 +186,15 @@ class TestStream:
         assert captured["step"] == "run_analysis"
 
     @pytest.mark.asyncio
-    async def test_later_turns_send_neither_context_nor_figures(
+    async def test_runtime_decides_whether_to_use_opening_context(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         captured, _, _ = await _collect(monkeypatch, stored=[{"role": "user"}])
 
         payload = captured["payload"]
         assert payload["message"] == "Is this result trustworthy?"
-        assert payload["images"] == []
+        assert "knowledge-v1" in payload["initial_message"]
+        assert payload["images"]
 
     @pytest.mark.asyncio
     async def test_images_sent_rides_on_the_result_event(
@@ -223,7 +206,7 @@ class TestStream:
         assert name == "result"
         assert result["images_sent"] == _IMAGES_SENT
         assert result["blocks"] == [{"type": "text", "content": "Looks good", "chart": None}]
-        assert saved == [[{"role": "user"}]]
+        assert saved == []
 
     @pytest.mark.asyncio
     async def test_missing_session_id_is_rejected(self) -> None:

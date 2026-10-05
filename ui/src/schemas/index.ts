@@ -69,6 +69,7 @@ export * from './analyzeRequest';
 export * from './analyzeRequestConversationHistoryItem';
 export * from './analyzeRequestImageBase64';
 export * from './analyzeRequestModelOverride';
+export * from './analyzeRequestRequestId';
 export * from './analyzeRequestSessionId';
 export * from './applyAgentCandidateRequest';
 export * from './artifactPreviewResponse';

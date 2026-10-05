@@ -166,7 +166,7 @@ services:
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
       # Automatic AI review posts here when copilot_backend is pi.
       - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
-      - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:?AGENT_RUNTIME_TOKEN must be set}
+      - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
     networks:
       - custom_net
   api:
@@ -222,7 +222,7 @@ services:
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
       - UPDATER_SOCKET=/run/qdash-updater/updater.sock
       - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
-      - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:?AGENT_RUNTIME_TOKEN must be set}
+      - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
     networks:
       - custom_net
   agent-runtime:
@@ -237,10 +237,12 @@ services:
     volumes:
       - ./agent-runtime/src:/app/src
       - ./config:/app/config # Read for copilot language and model settings only
+      - agent-runtime-state:/app/state
     environment:
       - PORT=${AGENT_RUNTIME_PORT:-8002}
-      - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:?AGENT_RUNTIME_TOKEN must be set}
+      - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
       - PI_CODING_AGENT_DIR=/app/.pi-agent
+      - AGENT_STATE_DIR=/app/state
       - CHAT_TIMEOUT_MS=${AGENT_RUNTIME_TIMEOUT_MS:-180000}
       # Reviews arrive from two Python thread pools that do not know about each
       # other and all land on one local VLM, so the cap lives here.
@@ -305,3 +307,4 @@ volumes:
   deployment-logs:
   worker-logs:
   api-logs:
+  agent-runtime-state:

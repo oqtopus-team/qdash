@@ -18077,6 +18077,18 @@
             "title": "Session Id",
             "description": "Analysis session identifier. Required by the Pi backend, which restores conversation state from the persisted session."
           },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "description": "Idempotency key for recovering or retrying one Pi submission."
+          },
           "image_base64": {
             "anyOf": [
               {

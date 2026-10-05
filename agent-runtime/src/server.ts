@@ -1,14 +1,18 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
-import { randomUUID } from "node:crypto";
+import { UserEntry, watchEvents, type AgentEvent } from "@earendil-works/pi-durable";
 
 import { encodeLine, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
 import { hasBearerToken, readJsonBody, RequestError } from "./http.ts";
-import { SharedRuntime, type SessionRequest } from "./runtime.ts";
+import {
+  answerText,
+  BACKGROUND_CONTEXT,
+  SharedRuntime,
+  type SessionRequest,
+} from "./runtime.ts";
 
 const PORT = Number(process.env.PORT ?? 8002);
-const TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 180_000);
-const REVIEW_TIMEOUT_MS = Number(process.env.REVIEW_TIMEOUT_MS ?? 300_000);
+const CHAT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 180_000);
 const REVIEW_CONCURRENCY = Number(process.env.REVIEW_CONCURRENCY ?? 2);
 const REVIEW_QUEUE_TIMEOUT_MS = Number(process.env.REVIEW_QUEUE_TIMEOUT_MS ?? 30_000);
 const MAX_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES ?? 20 * 1024 * 1024);
@@ -20,9 +24,11 @@ interface ImageBody {
 }
 
 interface ChatBody {
+  owner_id?: string;
   conversation_id?: string;
+  request_id?: string;
   message?: string;
-  messages?: unknown[];
+  initial_message?: string;
   model?: { provider?: string; name?: string };
   thinking_level?: SessionRequest["thinkingLevel"];
   images?: ImageBody[];
@@ -34,7 +40,12 @@ interface ReviewBody {
   model?: { provider?: string; name?: string };
 }
 
-/** Pi's prompt() image attachments, from the wire shape both endpoints use. */
+interface DeleteSessionBody {
+  owner_id?: string;
+  conversation_id?: string;
+}
+
+/** Convert wire images into Pi image-content blocks. */
 function toImageContent(images: ImageBody[] | undefined) {
   return (images ?? []).map((image) => ({
     type: "image" as const,
@@ -43,18 +54,14 @@ function toImageContent(images: ImageBody[] | undefined) {
   }));
 }
 
-/** Conversations with a prompt in flight. Guards the stored history from concurrent writes. */
+/** One active writer per user/session storage file. */
 const running = new Set<string>();
 
-/**
- * Caps how many reviews hit the model at once.
- *
- * Reviews arrive from two Python thread pools that do not know about each other,
- * and they all land on one local VLM. Callers wait instead of being rejected.
- */
-const reviewQueue: (() => void)[] = [];
+/** Bound local-model review concurrency across API and worker callers. */
+const reviewQueue: Array<() => void> = [];
 let reviewsInFlight = 0;
 
+/** Wait for a review slot, rejecting before the caller's HTTP timeout. */
 async function acquireReviewSlot(): Promise<() => void> {
   if (reviewsInFlight >= REVIEW_CONCURRENCY) {
     await new Promise<void>((resolve, reject) => {
@@ -83,17 +90,13 @@ async function acquireReviewSlot(): Promise<() => void> {
 const runtime = await SharedRuntime.create();
 console.log(`[agent-runtime] tools: ${runtime.listToolNames().join(", ")}`);
 
+/** Send one JSON response. */
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
 }
 
-/**
- * Run one AI review and return the verdict as a single JSON response.
- *
- * Unlike /chat this does not stream: the caller only ever uses the finished
- * verdict, and the Python side turns it into the stored markdown note.
- */
+/** Run one automatic review and return its structured verdict. */
 async function handleReview(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJsonBody<ReviewBody>(req, MAX_BODY_BYTES);
   if (typeof body.prompt !== "string" || !body.prompt) {
@@ -103,111 +106,140 @@ async function handleReview(req: IncomingMessage, res: ServerResponse): Promise<
 
   const release = await acquireReviewSlot();
   try {
-    let session;
-    try {
-      ({ session } = await runtime.createReviewSession({
-        sessionId: randomUUID(),
-        provider: body.model?.provider,
-        modelName: body.model?.name,
-      }));
-    } catch (error) {
-      sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
-      return;
-    }
-
-    let review: unknown;
-    const unsubscribe = session.subscribe((event) => {
-      const settled = event as { type: string; result?: { details?: { review?: unknown } } };
-      if (settled.type === "tool_execution_end" && settled.result?.details?.review) {
-        review = settled.result.details.review;
-      }
+    const result = await runtime.runReview({
+      prompt: body.prompt,
+      provider: body.model?.provider,
+      modelName: body.model?.name,
+      images: toImageContent(body.images),
     });
-    const timeout = setTimeout(() => void session.abort(), REVIEW_TIMEOUT_MS);
-
-    try {
-      await session.prompt(body.prompt, { images: toImageContent(body.images) });
-      if (review) {
-        sendJson(res, 200, { review });
-      } else {
-        sendJson(res, 200, {
-          error: session.state.errorMessage ?? "submit_review was not called",
-          text: session.getLastAssistantText() ?? "",
-        });
-      }
-    } finally {
-      clearTimeout(timeout);
-      unsubscribe();
-      session.dispose();
+    if (result.review) {
+      sendJson(res, 200, { review: result.review });
+    } else {
+      sendJson(res, 200, { error: "submit_review was not called", text: result.text });
     }
   } finally {
     release();
   }
 }
 
+/** Translate one committed durable event to the existing NDJSON bridge. */
+function writeAgentEvent(event: AgentEvent, write: (event: NdjsonEvent) => void): void {
+  for (const line of toNdjsonEvents(event)) write(line);
+}
+
+/** Open or recover a durable conversation and wait for one idempotent input. */
 async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJsonBody<ChatBody>(req, MAX_BODY_BYTES);
+  const ownerId = body.owner_id;
   const conversationId = body.conversation_id;
-  if (!conversationId || typeof body.message !== "string") {
-    sendJson(res, 400, { error: "conversation_id and message are required" });
+  if (!ownerId || !conversationId || typeof body.message !== "string") {
+    sendJson(res, 400, { error: "owner_id, conversation_id and message are required" });
     return;
   }
 
-  if (running.has(conversationId)) {
+  const runKey = `${ownerId}\0${conversationId}`;
+  if (running.has(runKey)) {
     sendJson(res, 409, { error: "conversation is already processing a request" });
     return;
   }
-  running.add(conversationId);
+  running.add(runKey);
 
-  // Created before writeHead: unknown models throw here, and once NDJSON starts
-  // flowing an HTTP status can no longer be set.
-  let session;
+  let opened;
   try {
-    ({ session } = await runtime.createSession({
+    opened = await runtime.openSession({
+      ownerId,
       sessionId: conversationId,
-      messages: body.messages ?? [],
+      requestId: body.request_id,
+      message: body.message,
       provider: body.model?.provider,
       modelName: body.model?.name,
       thinkingLevel: body.thinking_level,
-    }));
+      images: toImageContent(body.images),
+    });
   } catch (error) {
-    running.delete(conversationId);
+    running.delete(runKey);
     sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
     return;
   }
 
+  const { harness, conversation } = opened;
   res.writeHead(200, {
     "Content-Type": "application/x-ndjson",
     "Cache-Control": "no-cache",
     "X-Accel-Buffering": "no",
   });
+  let connected = true;
+  res.on("close", () => {
+    // A dropped browser connection does not cancel durable work. Retrying with
+    // the same request_id recovers the committed answer instead of paying for
+    // a second model turn.
+    connected = false;
+  });
   const write = (event: NdjsonEvent): void => {
-    res.write(encodeLine(event));
+    if (connected && !res.writableEnded) res.write(encodeLine(event));
   };
 
-  const timeout = setTimeout(() => void session.abort(), TIMEOUT_MS);
-  const unsubscribe = session.subscribe((event) => {
-    for (const line of toNdjsonEvents(event as never)) write(line);
+  const events = await watchEvents(harness, conversation.id, BACKGROUND_CONTEXT);
+  events.start(async (batch) => {
+    for (const event of batch) writeAgentEvent(event, write);
   });
 
   try {
-    await session.prompt(body.message, { images: toImageContent(body.images) });
-    const text = session.getLastAssistantText() ?? "";
-    // A failed turn resolves normally with an empty assistant message, so
-    // without this the caller renders a blank reply and no error anywhere.
-    if (!text && session.state.errorMessage) {
-      write({ type: "error", message: session.state.errorMessage });
+    const view = await conversation.context(BACKGROUND_CONTEXT);
+    const isNew = !view.entries.some((entry) => UserEntry.is(entry));
+    const message = isNew && body.initial_message ? body.initial_message : body.message;
+    const images = isNew ? toImageContent(body.images) : [];
+    const content = images.length
+      ? [{ type: "text" as const, text: message }, ...images]
+      : message;
+    const submission = await conversation.submit(
+      {
+        type: "input",
+        content,
+        ...(body.request_id ? { requestId: body.request_id } : {}),
+      },
+      BACKGROUND_CONTEXT,
+    );
+    const timeout = setTimeout(
+      () => void conversation.abort(BACKGROUND_CONTEXT),
+      CHAT_TIMEOUT_MS,
+    );
+    const settled = await submission.wait(BACKGROUND_CONTEXT).finally(() => clearTimeout(timeout));
+    await events.stop();
+    if (settled.status === "done" && settled.type === "input") {
+      write({ type: "done", text: await answerText(conversation, settled.answer) });
     } else {
-      write({ type: "done", text, messages: session.messages });
+      write({ type: "error", message: `conversation was not answered: ${settled.reason}` });
     }
   } catch (error) {
     write({ type: "error", message: error instanceof Error ? error.message : String(error) });
   } finally {
-    clearTimeout(timeout);
-    unsubscribe();
-    session.dispose();
-    running.delete(conversationId);
-    res.end();
+    await events.stop();
+    await harness.close(BACKGROUND_CONTEXT);
+    running.delete(runKey);
+    if (connected && !res.writableEnded) res.end();
   }
+}
+
+/** Remove durable state after the owning QDash session has been deleted. */
+async function handleDeleteSession(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody<DeleteSessionBody>(req, MAX_BODY_BYTES);
+  if (!body.owner_id || !body.conversation_id) {
+    sendJson(res, 400, { error: "owner_id and conversation_id are required" });
+    return;
+  }
+  const runKey = `${body.owner_id}\0${body.conversation_id}`;
+  if (running.has(runKey)) {
+    sendJson(res, 409, { error: "conversation is still running" });
+    return;
+  }
+  runtime.deleteSessionState(body.owner_id, body.conversation_id);
+  sendJson(res, 200, { deleted: true });
+}
+
+/** Require the shared internal bearer secret for every mutating runtime route. */
+function authorized(req: IncomingMessage): boolean {
+  return hasBearerToken(req.headers.authorization, RUNTIME_TOKEN);
 }
 
 const server = createServer((req, res) => {
@@ -216,40 +248,46 @@ const server = createServer((req, res) => {
     return;
   }
   if (req.method === "POST" && req.url === "/chat") {
-    if (!hasBearerToken(req.headers.authorization, RUNTIME_TOKEN)) {
+    if (!authorized(req)) {
       sendJson(res, 401, { error: "unauthorized" });
       return;
     }
-    handleChat(req, res).catch((error: unknown) => {
-      console.error("[agent-runtime] request failed:", error);
-      if (res.headersSent) {
-        res.write(encodeLine({ type: "error", message: "Agent runtime request failed" }));
-        res.end();
-      } else if (error instanceof RequestError) {
-        sendJson(res, error.status, { error: error.message });
-      } else {
-        sendJson(res, 500, { error: "internal server error" });
-      }
-    });
+    handleChat(req, res).catch((error: unknown) => handleRouteError(res, error, "request"));
     return;
   }
   if (req.method === "POST" && req.url === "/review") {
-    if (!hasBearerToken(req.headers.authorization, RUNTIME_TOKEN)) {
+    if (!authorized(req)) {
       sendJson(res, 401, { error: "unauthorized" });
       return;
     }
-    handleReview(req, res).catch((error: unknown) => {
-      console.error("[agent-runtime] review failed:", error);
-      if (res.headersSent) return;
-      if (error instanceof RequestError) {
-        sendJson(res, error.status, { error: error.message });
-      } else {
-        sendJson(res, 500, { error: "internal server error" });
-      }
-    });
+    handleReview(req, res).catch((error: unknown) => handleRouteError(res, error, "review"));
+    return;
+  }
+  if (req.method === "DELETE" && req.url === "/session") {
+    if (!authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    handleDeleteSession(req, res).catch((error: unknown) =>
+      handleRouteError(res, error, "session delete"),
+    );
     return;
   }
   res.writeHead(404).end();
 });
+
+/** Map route failures without exposing internal exception details. */
+function handleRouteError(res: ServerResponse, error: unknown, route: string): void {
+  console.error(`[agent-runtime] ${route} failed:`, error);
+  if (res.headersSent) {
+    if (!res.writableEnded) res.end();
+    return;
+  }
+  if (error instanceof RequestError) {
+    sendJson(res, error.status, { error: error.message });
+  } else {
+    sendJson(res, 500, { error: "internal server error" });
+  }
+}
 
 server.listen(PORT, () => console.log(`[agent-runtime] listening on :${PORT}`));

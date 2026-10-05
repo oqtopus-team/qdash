@@ -1,4 +1,4 @@
-import { defineTool } from "@earendil-works/pi-coding-agent";
+import { defineTool } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
 
 const DECISIONS = ["PASS", "PASS_WITH_NOTE", "REVIEW", "FAIL"];
@@ -21,6 +21,10 @@ function pick(value: unknown, allowed: string[], fallback: string): string {
   return allowed.includes(normalized) ? normalized : fallback;
 }
 
+function oneLine(value: unknown): string {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
 /**
  * Normalize a verdict so downstream consumers only ever see the closed sets.
  *
@@ -28,11 +32,17 @@ function pick(value: unknown, allowed: string[], fallback: string): string {
  * unreadable verdict must never route a calibration result into automatic
  * parameter update.
  */
-export function normalizeVerdict(params: Record<string, unknown>): Record<string, unknown> {
+export function normalizeVerdict(params: Record<string, unknown>): Record<string, string> {
   return {
-    ...params,
     decision: pick(params.decision, DECISIONS, "REVIEW"),
     human_label: pick(params.human_label, HUMAN_LABELS, "SUSPICIOUS"),
+    accepted_parameters: oneLine(params.accepted_parameters),
+    needs_review: oneLine(params.needs_review),
+    primary_reason: oneLine(params.primary_reason),
+    closest_knowledge_case: oneLine(params.closest_knowledge_case),
+    suggested_labels: oneLine(params.suggested_labels),
+    recommended_action: oneLine(params.recommended_action),
+    optional_note: oneLine(params.optional_note),
   };
 }
 
@@ -51,7 +61,6 @@ export function normalizeVerdict(params: Record<string, unknown>): Record<string
  */
 export const submitReviewTool = defineTool({
   name: "submit_review",
-  label: "Submit review",
   description:
     "Submit the final calibration review verdict. Call this exactly once, as your last action. " +
     "Do not write the verdict as prose; every field belongs in this call.",
@@ -80,11 +89,12 @@ export const submitReviewTool = defineTool({
     recommended_action: Type.String({ description: "What the operator should do next." }),
     optional_note: Type.String({ description: "Any remaining caveat, or an empty string." }),
   }),
-  execute: async (_toolCallId, params) => ({
+  replay: "safe",
+  execute: async (params) => ({
     content: [{ type: "text" as const, text: "Review recorded." }],
     details: { review: normalizeVerdict(params) },
     // The verdict is the whole point of the session; without this the agent
     // takes another turn and calls the tool again.
-    terminate: true,
+    control: { terminate: true },
   }),
 });

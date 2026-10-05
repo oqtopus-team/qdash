@@ -47,6 +47,25 @@ test("failed tools keep the error flag", () => {
   assert.equal(event.isError, true);
 });
 
+test("durable tool-result entries expose chart details and failures", () => {
+  const events = toNdjsonEvents({
+    type: "tool_execution_end",
+    toolName: "render_chart",
+    entry: {
+      model: [
+        {
+          role: "toolResult",
+          isError: true,
+          details: { chart: { data: [{ y: [1] }], layout: { title: "T1" } } },
+        },
+      ],
+    },
+  });
+  assert.equal(events[0].type, "chart");
+  assert.deepEqual(events[0].chart.layout, { title: "T1" });
+  assert.deepEqual(events[1], { type: "tool_end", name: "render_chart", isError: true });
+});
+
 test("token deltas and other events are dropped", () => {
   assert.deepEqual(toNdjsonEvents({ type: "message_update" }), []);
   assert.deepEqual(toNdjsonEvents({ type: "agent_end" }), []);

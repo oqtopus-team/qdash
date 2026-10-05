@@ -44,7 +44,7 @@ Review or fill in these values before starting services:
 | `CLIENT_URL` | Public UI URL when the app is served through a domain or tunnel |
 | `TUNNEL_TOKEN` | Optional Cloudflare Tunnel token for remote access |
 | `QDASH_API_TOKEN` | Optional API token for automation or service-to-service access |
-| `AGENT_RUNTIME_TOKEN` | Required shared secret for QDash API/workers to call the internal Pi Agent Runtime; replace the example value with a random secret |
+| `AGENT_RUNTIME_TOKEN` | Shared secret for QDash API/workers to call the internal Pi Agent Runtime; required when `copilot_backend: pi`, and requests fail closed when it is empty |
 | `OPENAI_API_KEY` / `OLLAMA_BASE_URL` / `OLLAMA_API_KEY` | Optional Copilot AI provider settings |
 | `KNOWLEDGE_REPO_URL` | Optional external knowledge repository for Copilot context |
 | `SLACK_FORUM_NOTIFICATION` | Set to `true` to enable Slack notifications for forum thread creation, replies, and open/close status changes (optional) |
@@ -130,7 +130,8 @@ Complete the Qubex config placement or repository setup before starting services
 ## Full Stack
 
 Application file logs use Docker named volumes; use `docker compose logs` to read live service
-output.
+output. Pi conversation checkpoints use the `agent-runtime-state` named volume. Keep that volume
+when recreating containers so interrupted chat and analysis work can resume.
 
 Start all services:
 

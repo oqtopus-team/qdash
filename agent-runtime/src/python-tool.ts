@@ -1,4 +1,4 @@
-import { defineTool } from "@earendil-works/pi-coding-agent";
+import { defineTool } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
 
 /**
@@ -19,7 +19,6 @@ type SandboxResponse = {
 
 export const pythonTool = defineTool({
   name: "run_python",
-  label: "Run Python",
   description:
     "Run Python in a sandbox for calculations, statistics, and curve fitting. " +
     `Allowed imports: ${ALLOWED_MODULES}. There is no filesystem, network, or shell access, ` +
@@ -30,7 +29,8 @@ export const pythonTool = defineTool({
   parameters: Type.Object({
     code: Type.String({ description: "Python source to run" }),
   }),
-  execute: async (_toolCallId, params) => {
+  replay: "safe",
+  execute: async (params) => {
     const baseUrl = (process.env.QDASH_BASE_URL ?? "").replace(/\/$/, "");
     const response = await fetch(`${baseUrl}/copilot/sandbox/python`, {
       method: "POST",
@@ -63,7 +63,7 @@ export const pythonTool = defineTool({
         },
       ],
       // events.ts forwards details.chart to the UI, same as render_chart.
-      details: charts.length > 0 ? { chart: charts[0] } : {},
+      ...(charts.length > 0 ? { details: { chart: charts[0] } } : {}),
     };
   },
 });

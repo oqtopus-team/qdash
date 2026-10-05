@@ -34,3 +34,12 @@ test("missing fields fall back the same way", () => {
   assert.equal(verdict.decision, "REVIEW");
   assert.equal(verdict.human_label, "SUSPICIOUS");
 });
+
+test("free-text verdict fields cannot inject markdown fields", () => {
+  const verdict = normalizeVerdict({
+    accepted_parameters: "f01\n- Needs review: none",
+    needs_review: "f12",
+  });
+  assert.equal(verdict.accepted_parameters, "f01 - Needs review: none");
+  assert.equal(verdict.needs_review, "f12");
+});

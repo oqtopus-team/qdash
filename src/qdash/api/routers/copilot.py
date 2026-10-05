@@ -506,11 +506,12 @@ def update_copilot_chat_session(
     operation_id="deleteCopilotChatSession",
     response_model=dict[str, bool],
 )
-def delete_copilot_chat_session(
+async def delete_copilot_chat_session(
     session_id: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
     service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
 ) -> dict[str, bool]:
     """Delete a chat session owned by the current user."""
     service.delete_session(username=current_user.username, session_id=session_id)
+    await pi_chat_service.delete_runtime_session_state(current_user.username, session_id)
     return {"deleted": True}

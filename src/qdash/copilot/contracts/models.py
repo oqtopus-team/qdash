@@ -149,6 +149,10 @@ class AnalyzeRequest(BaseModel):
             "restores conversation state from the persisted session."
         ),
     )
+    request_id: str | None = Field(
+        default=None,
+        description="Idempotency key for recovering or retrying one Pi submission.",
+    )
     image_base64: str | None = Field(
         default=None,
         description="Base64-encoded result figure (for multimodal analysis)",
@@ -177,6 +181,10 @@ class ChatRequest(BaseModel):
             "Chat session identifier. Required by the Pi chat backend, which "
             "restores conversation state from the persisted session."
         ),
+    )
+    request_id: str | None = Field(
+        default=None,
+        description="Idempotency key for recovering or retrying one Pi submission.",
     )
     chip_id: str | None = None
     qid: str | None = None
