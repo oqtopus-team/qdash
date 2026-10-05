@@ -4,11 +4,17 @@ set -euo pipefail
 sudo mkdir -p \
   "${HOME}/.cache/pip" \
   "${HOME}/.cache/uv" \
+  "${HOME}/.cache/ruff" \
+  "${HOME}/.cache/mypy" \
+  "${HOME}/.cache/pytest" \
+  "${HOME}/.cache/coverage" \
   /commandhistory \
+  /workspace/qdash/.venv \
   /workspace/qdash/ui/node_modules
 sudo chown -R "$(id -u):$(id -g)" \
   "${HOME}/.cache" \
   /commandhistory \
+  /workspace/qdash/.venv \
   /workspace/qdash/ui/node_modules
 
 cd /workspace/qdash

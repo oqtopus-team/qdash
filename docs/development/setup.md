@@ -61,6 +61,13 @@ CLI updates without being hidden by the persisted `.local` volume. Host-side dep
 keep their Python environment and updater runtime state outside the checkout, so they do not reuse
 root-owned DevContainer artifacts.
 
+The DevContainer keeps its Python `.venv` in a Docker volume mounted at the usual workspace path.
+The host retains its own `.venv`, so running `uv sync` or `uv run` in one environment does not
+replace packages used by the other. Ruff, mypy, pytest, and coverage caches are also kept inside
+the container. Recreate the DevContainer after changing this mount; its first `uv sync` installs
+dependencies into the new volume. Use the `vscode` user for development commands inside the
+container so the volume stays writable.
+
 Then attach to the container using VS Code's DevContainer extension or:
 
 ```shell
