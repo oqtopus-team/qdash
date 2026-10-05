@@ -7,6 +7,7 @@ type QDashEditor = (typeof blockNoteSchema)["BlockNoteEditor"];
 
 type BlockRecord = Record<string, unknown>;
 
+/** Returns the concatenated plain text of an inline content node or list. */
 function inlineText(node: unknown): string {
   if (Array.isArray(node)) return node.map(inlineText).join("");
   if (node === null || typeof node !== "object") return "";
@@ -15,10 +16,12 @@ function inlineText(node: unknown): string {
   return inlineText(obj.content);
 }
 
+/** Returns whether `language` means auto-detect (unset or `"text"`), as opposed to an explicit choice such as `"txt"` (Plain Text). */
 function isAutoLanguage(language: unknown): boolean {
   return !language || language === "text";
 }
 
+/** Returns the detected language for an auto code block's content, or `null` if the block is not a code block, is not auto, or detection is unsure. */
 function detectBlockLanguage(block: BlockRecord): string | null {
   if (block.type !== "codeBlock") return null;
   const props = (block.props ?? {}) as BlockRecord;
@@ -26,6 +29,7 @@ function detectBlockLanguage(block: BlockRecord): string | null {
   return detectCodeLanguage(inlineText(block.content));
 }
 
+/** Returns a copy of `block`, and its children, with the language detected if it is an auto code block. */
 function withDetectedLanguage(block: BlockRecord): BlockRecord {
   const children = block.children;
   const next: BlockRecord = Array.isArray(children)
@@ -39,7 +43,7 @@ function withDetectedLanguage(block: BlockRecord): BlockRecord {
   return { ...next, props: { ...props, language: detected } };
 }
 
-/** Returns a copy of `blocks` with languages detected for plain-text code blocks. */
+/** Returns a copy of `blocks` with languages detected for auto code blocks. */
 export function withDetectedCodeLanguages(blocks: BlockRecord[]): BlockRecord[] {
   return blocks.map(withDetectedLanguage);
 }
