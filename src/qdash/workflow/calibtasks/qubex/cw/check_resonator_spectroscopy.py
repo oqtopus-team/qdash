@@ -112,8 +112,13 @@ class CheckResonatorSpectroscopy(QubexTask):
     _bare_shift_estimator_type: ClassVar[str] = "high_frequency_strength"
     _bare_shift_strength_limit: ClassVar[float] = 4.0
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
-        "readout_frequency": OutputParameterSpec(
-            unit="GHz", description="Estimated resonator frequency from spectroscopy"
+        "resonator_frequency": OutputParameterSpec(
+            unit="GHz",
+            description="Estimated resonator frequency from spectroscopy",
+            publish_targets=(
+                "resonator_frequency",
+                "readout_frequency",
+            ),
         ),
         "optimal_power": OutputParameterSpec(
             unit="dB",
@@ -295,7 +300,7 @@ class CheckResonatorSpectroscopy(QubexTask):
         # Create a deep copy of output_parameters to avoid sharing state
         # between multiple qids (output_parameters is a ClassVar)
         output_params_copy = copy.deepcopy(self.output_parameters)
-        output_params_copy["readout_frequency"].value = estimated_frequency
+        output_params_copy["resonator_frequency"].value = estimated_frequency
         if optimal_power is not None:
             output_params_copy["optimal_power"].value = optimal_power
         if readout_amplitude is not None:

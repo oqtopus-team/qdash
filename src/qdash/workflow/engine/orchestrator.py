@@ -136,7 +136,7 @@ class CalibOrchestrator:
         2. Pulls config from GitHub (if configured)
         3. Initializes ExecutionService
         4. Initializes TaskContext
-        5. Initializes and connects Backend
+        5. Initializes Backend and connects it when this session executes hardware tasks
         """
         if self._initialized:
             return
@@ -182,8 +182,14 @@ class CalibOrchestrator:
 
             # Initialize Backend
             self._backend = self._create_backend()
-            self._backend.connect()
+            if config.connect_backend:
+                self._backend.connect()
         except Exception:
+            if self._backend is not None:
+                try:
+                    self._backend.disconnect()
+                except Exception:
+                    logger.exception("Failed to disconnect backend after initialization error")
             if not config.skip_execution:
                 try:
                     self._execution_service.fail(traceback.format_exc())
