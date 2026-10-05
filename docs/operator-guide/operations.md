@@ -39,7 +39,8 @@ docker compose logs -f user-flow-worker
 docker compose logs -f prefect-server
 ```
 
-The API also writes logs under `logs/api` when mounted by Docker Compose or when run locally.
+The API also writes a rotating file to its Docker log volume. Host-side API runs write under
+`${XDG_STATE_HOME:-$HOME/.local/state}/qdash/logs`.
 
 ## Health Checks
 

@@ -36,7 +36,7 @@ Review or fill in these values before starting services:
 | `QDASH_ADMIN_USERNAME` / `QDASH_ADMIN_PASSWORD` | Initial admin login |
 | `API_PORT` / `UI_PORT` / `PREFECT_PORT` | Host ports for API, UI, and Prefect |
 | `NEXT_PUBLIC_DEFAULT_THEME` | Initial UI color theme for browsers without a saved preference; defaults to `light` |
-| `MONGO_DATA_PATH` / `POSTGRES_DATA_PATH` | Persistent database storage |
+| `MONGO_DATA_PATH` / `POSTGRES_DATA_PATH` | Optional existing bind-mounted database storage; new installations use named volumes |
 | `CALIB_DATA_PATH` | Calibration figures and run artifacts |
 | `CALIB_TASKS_PATH` | Calibration task definitions used by the workflow worker |
 | `CONFIG_PATH` | Qubex backend configuration repository/data |
@@ -127,6 +127,12 @@ calibration run.
 Complete the Qubex config placement or repository setup before starting services.
 
 ## Full Stack
+
+New installations store MongoDB and PostgreSQL data in Docker named volumes, outside the source
+checkout. Existing `.env` files with `MONGO_DATA_PATH` or `POSTGRES_DATA_PATH` keep using those
+paths, so an upgrade does not switch to an empty database. Back up and migrate the data before
+removing either setting. Application file logs also use named volumes; use `docker compose logs`
+to read live service output.
 
 Start all services:
 

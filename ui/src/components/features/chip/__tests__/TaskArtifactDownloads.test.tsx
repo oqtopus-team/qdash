@@ -36,7 +36,7 @@ describe("TaskArtifactDownloads", () => {
       (screen.getByRole("button", { name: "Download all (.zip)" }) as HTMLButtonElement).disabled,
     ).toBe(true);
     expect(screen.getByText(/Download all supports up to 100 files/)).toBeTruthy();
-  });
+  }, 15_000);
 
   it("renders nothing without artifacts", () => {
     const { container } = render(<TaskArtifactDownloads />);

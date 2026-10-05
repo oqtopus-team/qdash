@@ -12,6 +12,7 @@ sudo mkdir -p \
   "${HOME}/.cache/coverage" \
   /commandhistory \
   /workspace/qdash/.venv \
+  /workspace/qdash/ui/.next \
   /workspace/qdash/ui/node_modules
 sudo chown -R "$(id -u):$(id -g)" \
   "${HOME}/.codex" \
@@ -19,6 +20,7 @@ sudo chown -R "$(id -u):$(id -g)" \
   "${HOME}/.cache" \
   /commandhistory \
   /workspace/qdash/.venv \
+  /workspace/qdash/ui/.next \
   /workspace/qdash/ui/node_modules
 
 touch ~/.bashrc ~/.zshrc
