@@ -2,7 +2,7 @@
 
 from typing import ClassVar
 
-from qubex.contrib.experiment import estimate_ef_frequency_from_chevron
+from qubex.contrib.experiment import estimate_ef_frequency_from_chevron_adaptive
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
 from qdash.datamodel.task import (
@@ -54,13 +54,13 @@ class CheckEFChevron(QubexTask):
             unit="GHz",
             value_type="np.linspace",
             default=(-0.05, 0.05, 41),
-            description="EF detuning sweep around qubit_frequency + anharmonicity",
+            description="Final EF detuning sweep around the adaptively estimated frequency",
         ),
         "time_range": RunParameterSpec(
             unit="ns",
             value_type="range",
             default=(0, 257, 8),
-            description="EF drive duration sweep",
+            description="Final EF drive duration sweep",
         ),
         "shots": RunParameterSpec(
             unit="a.u.",
@@ -135,13 +135,13 @@ class CheckEFChevron(QubexTask):
                 exp.ctx.resolve_read_label(label): self._get_calibration_value("readout_frequency"),
             }
         ):
-            result = estimate_ef_frequency_from_chevron(
+            result = estimate_ef_frequency_from_chevron_adaptive(
                 exp=exp,
                 targets=[label],
                 frequencies={label: ef_frequency},
                 amplitudes={label: self._get_calibration_value("ef_control_amplitude")},
-                detuning_range=self.run_parameters["detuning_range"].get_value(),
-                time_range=self.run_parameters["time_range"].get_value(),
+                final_detuning_range=self.run_parameters["detuning_range"].get_value(),
+                final_time_range=self.run_parameters["time_range"].get_value(),
                 n_shots=self.run_parameters["shots"].get_value(),
                 shot_interval=self.run_parameters["interval"].get_value(),
                 plot=False,

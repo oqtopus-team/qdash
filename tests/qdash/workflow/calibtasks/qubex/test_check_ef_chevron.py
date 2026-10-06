@@ -3,11 +3,12 @@
 from contextlib import nullcontext
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, create_autospec, patch
 
 import numpy as np
 import plotly.graph_objects as go
 import pytest
+from qubex.contrib.experiment import estimate_ef_frequency_from_chevron_adaptive
 
 from qdash.common.config.metrics import load_metrics_config
 from qdash.datamodel.task import InputParameterModel
@@ -45,6 +46,7 @@ def _result(frequency=4.72, ratio=8.5, figures=None) -> RunResult:
     return RunResult(
         raw_result=SimpleNamespace(
             data={
+                "search_results": {"Q00_ef": {"omega_q": 4.7}},
                 "resonant_frequencies": {"Q00_ef": frequency},
                 "peak_background_rms_ratios": {"Q00_ef": ratio},
             },
@@ -53,7 +55,7 @@ def _result(frequency=4.72, ratio=8.5, figures=None) -> RunResult:
     )
 
 
-def test_run_passes_ef_seed_sweep_and_amplitude(monkeypatch) -> None:
+def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monkeypatch) -> None:
     task = _task()
     exp = MagicMock()
     exp.get_qubit_label.return_value = "Q00"
@@ -61,10 +63,12 @@ def test_run_passes_ef_seed_sweep_and_amplitude(monkeypatch) -> None:
     exp.ctx.resolve_read_label.return_value = "Q00_read"
     exp.modified_frequencies.return_value = nullcontext()
     monkeypatch.setattr(task, "get_experiment", lambda backend: exp)
-    estimate = MagicMock(return_value=_result().raw_result)
+    estimate = create_autospec(
+        estimate_ef_frequency_from_chevron_adaptive, return_value=_result().raw_result
+    )
     with patch(
         "qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_chevron."
-        "estimate_ef_frequency_from_chevron",
+        "estimate_ef_frequency_from_chevron_adaptive",
         estimate,
     ):
         result = task.run(cast("Any", object()), "0")
@@ -72,8 +76,8 @@ def test_run_passes_ef_seed_sweep_and_amplitude(monkeypatch) -> None:
     assert kwargs["targets"] == ["Q00"]
     assert kwargs["frequencies"] == {"Q00": 4.7}
     assert kwargs["amplitudes"] == {"Q00": 0.0625}
-    np.testing.assert_allclose(kwargs["detuning_range"], np.linspace(-0.05, 0.05, 41))
-    assert list(kwargs["time_range"]) == list(range(0, 257, 8))
+    np.testing.assert_allclose(kwargs["final_detuning_range"], np.linspace(-0.05, 0.05, 41))
+    assert list(kwargs["final_time_range"]) == list(range(0, 257, 8))
     assert kwargs["n_shots"] == 256
     assert kwargs["shot_interval"] == task.run_parameters["interval"].get_value()
     assert kwargs["plot"] is False and kwargs["save_image"] is False
@@ -82,18 +86,21 @@ def test_run_passes_ef_seed_sweep_and_amplitude(monkeypatch) -> None:
     exp.modified_frequencies.assert_called_once_with({"Q00_ge": 5.001, "Q00_read": 6.1})
 
 
-def test_postprocess_uses_measured_ge_and_returns_qubex_figures() -> None:
-    figure = go.Figure()
-    result = _task().postprocess(
-        _backend(), "exec-1", _result(figures={"measurement": figure}), "0"
-    )
+def test_postprocess_uses_final_frequency_and_returns_search_and_final_figures() -> None:
+    figures = {
+        "Q00_ef_search_measurement": go.Figure(),
+        "Q00_ef_search_transform": go.Figure(),
+        "Q00_ef_measurement": go.Figure(),
+        "Q00_ef_transform": go.Figure(),
+    }
+    result = _task().postprocess(_backend(), "exec-1", _result(figures=figures), "0")
     assert result.validation_error is None
     assert result.output_parameters["ef_frequency"].value == 4.72
     assert result.output_parameters["anharmonicity"].value == pytest.approx(-0.28)
     assert all(
         p.unit == "GHz" and p.execution_id == "exec-1" for p in result.output_parameters.values()
     )
-    assert result.figures == [figure]
+    assert result.figures == list(figures.values())
 
 
 @pytest.mark.parametrize(

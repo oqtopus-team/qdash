@@ -2134,7 +2134,7 @@
         "name": "CheckEFChevron",
         "run_parameters": {
           "detuning_range": {
-            "description": "EF detuning sweep around qubit_frequency + anharmonicity",
+            "description": "Final EF detuning sweep around the adaptively estimated frequency",
             "unit": "GHz",
             "value": [
               -0.05,
@@ -2168,7 +2168,7 @@
             "value_type": "int"
           },
           "time_range": {
-            "description": "EF drive duration sweep",
+            "description": "Final EF drive duration sweep",
             "unit": "ns",
             "value": [
               0,
