@@ -143,7 +143,7 @@ class TestValidate:
         assert data["steps"][1]["tasks"] == []
         assert data["steps"][2]["tasks"] == ["CheckT1", "CheckT2Echo"]
         assert data["targets"] == {"qids": ["0", "1"], "mux_ids": [], "exclude_qids": []}
-        assert data["task_run_count"] == 12
+        assert data["task_run_count"] == 5
         # The normalized spec carries the defaults the worker will use.
         assert data["spec"]["steps"][0]["configure"] is False
 

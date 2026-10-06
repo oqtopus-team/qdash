@@ -1,12 +1,43 @@
 "use client";
 
 import { memo } from "react";
+import type React from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
+import { useChatLinkPreview } from "@/components/features/chat/ChatLinkPreview";
+
+/**
+ * A link in an answer. QDash records (task results, executions, forum posts,
+ * figures) open as a preview over the chat; everything else opens in a new
+ * tab, so a click never navigates away from the conversation.
+ */
+function ChatLink({
+  href,
+  children,
+  ...props
+}: React.AnchorHTMLAttributes<HTMLAnchorElement> & { children?: React.ReactNode }) {
+  const preview = useChatLinkPreview();
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      {...props}
+      onClick={(event) => {
+        props.onClick?.(event);
+        if (event.defaultPrevented || !href || !preview) return;
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+        if (preview.preview(href)) event.preventDefault();
+      }}
+    >
+      {children}
+    </a>
+  );
+}
 
 const components: Components = {
   // Fenced blocks render through CodeBlock; `pre` is a pass-through so the
@@ -27,15 +58,10 @@ const components: Components = {
     );
   },
   a({ href, children, ...props }) {
-    const external = href ? /^https?:\/\//.test(href) : false;
     return (
-      <a
-        href={href}
-        {...props}
-        {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      >
+      <ChatLink href={href} {...props}>
         {children}
-      </a>
+      </ChatLink>
     );
   },
   table({ children, ...props }) {

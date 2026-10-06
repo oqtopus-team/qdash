@@ -1474,6 +1474,41 @@ html[data-theme="dark"],
   box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-base-content) 8%, transparent);
 }
 
+/*
+ * First-message transition on the chat page (lib/viewTransition.ts): the mark
+ * and the composer keep their names across the layout change, so the browser
+ * morphs them from the centered greeting into the thread while the rest
+ * cross-fades. Names are scoped to the page so the docked panel and floating
+ * window, which can be open at the same time, never carry duplicates.
+ */
+.chat-page-thread .chat-avatar-hero,
+.chat-page-thread .chat-bot-mark {
+  view-transition-name: qdash-bot-mark;
+}
+
+.chat-page-thread .chat-composer {
+  view-transition-name: chat-composer;
+}
+
+::view-transition-group(qdash-bot-mark),
+::view-transition-group(chat-composer) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 260ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
 /* Fade-in-up animation for new messages */
 @keyframes fadeInUp {
   from {
