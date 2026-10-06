@@ -35,7 +35,7 @@ export function buildSystemPrompt(
     ...(toolGuide
       ? [
           "",
-          "Which tool to use: prefer the dedicated tool for a question; fall back to `qdash_query` only when no dedicated tool fits.",
+          "Tool guide:",
           toolGuide,
         ]
       : []),

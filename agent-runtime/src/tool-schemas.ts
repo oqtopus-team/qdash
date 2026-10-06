@@ -66,9 +66,19 @@ export const agentSessionPolicy = Type.Object(
   { additionalProperties: false },
 );
 
+// pi-qdash declares `format` as a union of literals; same vLLM caveat as above.
+const taskKnowledgeFormat = Type.Optional(
+  Type.Unsafe<string>({
+    type: "string",
+    enum: ["markdown", "summary"],
+    description: "Output format. Defaults to markdown.",
+  }),
+);
+
 /** Replacement schemas for individual parameters, keyed by tool name. */
 const PARAMETER_OVERRIDES: Record<string, Record<string, TSchema>> = {
   qdash_create_agent_session: { policy: agentSessionPolicy },
+  qdash_get_task_knowledge: { format: taskKnowledgeFormat },
 };
 
 /** The tool's parameters with any loose properties replaced by precise schemas. */

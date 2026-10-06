@@ -40,6 +40,6 @@ test("listed skills point the model at read_skill", () => {
 
 test("the tool guide is inlined after the guidelines", () => {
   const prompt = buildSystemPrompt("auto", "en", false, [], "- `qdash_list_chips` for chips");
-  assert.match(prompt, /Which tool to use:[\s\S]*- `qdash_list_chips` for chips/);
-  assert.doesNotMatch(buildSystemPrompt("auto", "en"), /Which tool to use/);
+  assert.match(prompt, /Tool guide:\n- `qdash_list_chips` for chips/);
+  assert.doesNotMatch(buildSystemPrompt("auto", "en"), /Tool guide/);
 });

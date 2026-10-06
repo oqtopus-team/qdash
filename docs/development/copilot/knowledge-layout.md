@@ -4,7 +4,7 @@ Copilot's behaviour comes from three kinds of knowledge that live in three place
 
 | Kind | Examples | Home | How QDash gets it |
 | --- | --- | --- | --- |
-| Facts about calibration tasks | Physics, expected curve, failure modes, postmortem cases | [qdash-task-knowledge](https://github.com/oqtopus-team/qdash-task-knowledge), cloned into `config/task-knowledge` | `task knowledge` generates `task-knowledge.json`; the API serves it and the review/analysis prompts and the `qdash_query` tool read it |
+| Facts about calibration tasks | Physics, expected curve, failure modes, postmortem cases | [qdash-task-knowledge](https://github.com/oqtopus-team/qdash-task-knowledge), cloned into `config/task-knowledge` | `task knowledge` generates `task-knowledge.json`; the API serves it to the review/analysis prompts and to the `qdash_get_task_knowledge` tool |
 | Tools and procedures | Tool definitions, "which tool for which question", diagnosis workflows, agent-session workflows | [pi-qdash](https://github.com/oqtopus-team/pi-qdash) (`extensions/`, `skills/`) | Installed into the Agent Runtime image at a pinned version (`agent-runtime/Dockerfile`) |
 | Product behaviour | Persona, approval cards, `ask_user`, output language, turn budgets, model catalog | This repository | `agent-runtime/src/prompt.ts`, `config/copilot/*.yaml` |
 
