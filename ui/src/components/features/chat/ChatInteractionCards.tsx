@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, CircleHelp, PenLine, ShieldCheck, X } from "lucide-react";
+import { PipelinePreview, isPipelineSpec } from "@/components/features/chat/PipelinePreview";
 import type { ApprovalRequest, AskRequest } from "@/types/copilotChat";
 
 /** How a card behaves: open for an answer, or showing the answer it got. */
@@ -13,6 +14,11 @@ export interface InteractionState {
   onDecide: (approvalId: string, approve: boolean, label: string) => void;
   /** Move focus to the composer so the user can type their own answer. */
   onOther: () => void;
+}
+
+function stringArg(args: Record<string, unknown>, key: string): string | null {
+  const value = args[key];
+  return typeof value === "string" && value.trim() ? value : null;
 }
 
 function approvedText(approval: ApprovalRequest): string {
@@ -89,7 +95,12 @@ export function ApprovalCard({
       : state.answer === declinedText(approval)
         ? "declined"
         : null;
-  const entries = Object.entries(approval.args);
+  // A pipeline spec gets its own preview; the other arguments stay in the list.
+  const pipelineSpec = isPipelineSpec(approval.args.spec) ? approval.args.spec : null;
+  const chipId = stringArg(approval.args, "chipId") ?? stringArg(approval.args, "chip_id");
+  const entries = Object.entries(approval.args).filter(
+    ([key]) => !(pipelineSpec && key === "spec"),
+  );
 
   return (
     <div
@@ -106,6 +117,12 @@ export function ApprovalCard({
           </p>
         </div>
       </div>
+
+      {pipelineSpec && (
+        <div className="mt-3">
+          <PipelinePreview chipId={chipId} spec={pipelineSpec} />
+        </div>
+      )}
 
       {entries.length > 0 && (
         <dl className="mt-3 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">

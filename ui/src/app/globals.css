@@ -1906,6 +1906,31 @@ html[data-theme="dark"],
   border-style: dashed;
 }
 
+/* Pipeline approval preview: steps and their task chips. */
+.chat-pipeline-preview {
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.625rem;
+  background: color-mix(in oklch, var(--color-base-content) 4%, var(--color-base-100));
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 8%, transparent);
+}
+
+.chat-pipeline-task {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border-radius: 0.3rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: color-mix(in oklch, var(--color-base-content) 75%, transparent);
+  background: color-mix(in oklch, var(--color-base-content) 7%, transparent);
+}
+
+.chat-pipeline-task-more {
+  cursor: pointer;
+  color: var(--color-primary);
+  background: color-mix(in oklch, var(--color-primary) 8%, transparent);
+}
+
 .chat-option-key {
   display: inline-flex;
   align-items: center;
