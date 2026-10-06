@@ -28,7 +28,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 RUNTIME_URL = os.environ.get("PI_AGENT_RUNTIME_URL", "http://agent-runtime:8002")
-REQUEST_TIMEOUT_S = float(os.environ.get("PI_AGENT_RUNTIME_TIMEOUT", "300"))
+# No read timeout: a turn runs until it answers or the user stops it, and a
+# tool waiting on a calibration can be quiet for a long time. The runtime pings
+# every few seconds (translated to SSE comments below), so a dead runtime still
+# surfaces as a closed stream rather than a hang.
+REQUEST_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0)
 
 # Maps QDash's reasoning_effort vocabulary onto Pi thinking levels.
 _THINKING_LEVELS = {
@@ -83,6 +87,26 @@ def _ensure_agent_session(username: str, session_id: str) -> None:
 async def ensure_agent_session(username: str, session_id: str) -> None:
     """Ensure analysis state has a durable destination without blocking the event loop."""
     await asyncio.to_thread(_ensure_agent_session, username, session_id)
+
+
+async def abort_runtime_turn(username: str, session_id: str) -> bool:
+    """Stop the turn the runtime is running for this session, if any.
+
+    Closing the SSE stream alone does not cancel durable work in the runtime,
+    so the chat's Stop button calls this. Returns False when nothing was
+    running or the runtime could not be reached.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
+            response = await client.post(
+                f"{RUNTIME_URL}/chat/abort",
+                headers=_runtime_headers(),
+                json={"owner_id": username, "conversation_id": session_id},
+            )
+    except (httpx.HTTPError, RuntimeError):
+        logger.warning("Could not abort Pi turn for session %s", session_id, exc_info=True)
+        return False
+    return response.status_code == httpx.codes.OK
 
 
 async def delete_runtime_session_state(username: str, session_id: str) -> None:
@@ -169,7 +193,7 @@ async def stream_payload(
         async with (
             # trust_env=False: the runtime is an internal service, so an ambient
             # HTTP(S)_PROXY must not be applied to it.
-            httpx.AsyncClient(timeout=REQUEST_TIMEOUT_S, trust_env=False) as client,
+            httpx.AsyncClient(timeout=REQUEST_TIMEOUT, trust_env=False) as client,
             client.stream(
                 "POST",
                 f"{RUNTIME_URL}/chat",
@@ -237,6 +261,11 @@ async def translate(
             event = json.loads(line)
             kind = event.get("type")
 
+            if kind == "ping":
+                # Keepalive from a quiet turn. An SSE comment keeps every proxy
+                # on the way to the browser from timing out an idle stream.
+                yield ":\n\n"
+                continue
             if kind == "tool_start":
                 label = tool_label(event["name"])
             elif kind == "tool_end":
@@ -285,6 +314,7 @@ async def translate(
                 {"step": "tool_call", "tool": event["name"], "message": f"{label}..."},
             )
         elif kind == "tool_end":
+            figures = event.get("figures")
             yield sse_event(
                 "tool_end",
                 {
@@ -292,6 +322,8 @@ async def translate(
                     "tool": event["name"],
                     "label": tool_label(event["name"]),
                     "is_error": bool(event.get("isError")),
+                    # Figure paths the tool fetched; the chat renders them inline.
+                    **({"figures": figures} if isinstance(figures, list) and figures else {}),
                 },
             )
             yield sse_event(

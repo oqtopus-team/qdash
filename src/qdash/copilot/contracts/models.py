@@ -182,6 +182,18 @@ class AnalyzeRequest(BaseModel):
     )
 
 
+class ChatStopRequest(BaseModel):
+    """Request body for POST /copilot/chat/stop."""
+
+    session_id: str = Field(description="Chat session whose running turn should stop")
+
+
+class ChatStopResponse(BaseModel):
+    """Whether a running turn was stopped."""
+
+    stopped: bool
+
+
 class ChatRequest(BaseModel):
     """Request body for POST /copilot/chat/stream."""
 

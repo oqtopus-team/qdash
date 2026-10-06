@@ -60,6 +60,32 @@ class TestTranslate:
         }
 
     @pytest.mark.asyncio
+    async def test_pings_become_sse_comments(self) -> None:
+        raw = [
+            sse async for sse in translate(_lines({"type": "ping"}, {"type": "done", "text": "ok"}))
+        ]
+        assert raw[0] == ":\n\n"
+        assert "result" in [_parse(sse)[0] for sse in raw[1:]]
+
+    @pytest.mark.asyncio
+    async def test_tool_end_carries_fetched_figures(self) -> None:
+        events = await _collect(
+            {"type": "tool_start", "name": "qdash_get_task_figures", "id": "c7"},
+            {
+                "type": "tool_end",
+                "name": "qdash_get_task_figures",
+                "id": "c7",
+                "isError": False,
+                "figures": ["exec/1/CheckRabi_0.png"],
+            },
+            {"type": "tool_end", "name": "qdash_get_timeseries", "isError": False},
+            {"type": "done", "text": "ok"},
+        )
+        ends = [data for name, data in events if name == "tool_end"]
+        assert ends[0]["figures"] == ["exec/1/CheckRabi_0.png"]
+        assert "figures" not in ends[1]
+
+    @pytest.mark.asyncio
     async def test_tool_events_become_status_updates(self) -> None:
         events = await _collect(
             {"type": "tool_start", "name": "qdash_get_timeseries"},

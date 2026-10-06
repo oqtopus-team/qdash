@@ -64,6 +64,8 @@ export type TraceStep =
       status: "running" | "done" | "error";
       startedAt: number;
       endedAt?: number;
+      /** QDash figure paths the tool fetched, shown inline in the chat. */
+      figures?: string[];
     }
   | { kind: "text"; text: string };
 
@@ -74,10 +76,14 @@ export interface ChatTrace {
 }
 
 /** Assistant payload stored in `ChatMessage.content` as JSON. */
+export type AnswerFeedback = "up" | "down";
+
 export type CopilotBlocksResult = BlocksResult & {
   trace?: ChatTrace;
   /** The user stopped the turn; the blocks hold whatever had streamed. */
   stopped?: boolean;
+  /** The user's rating of this answer, kept with it for later evaluation. */
+  feedback?: AnswerFeedback;
 };
 
 /** The turn that is still streaming. */

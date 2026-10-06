@@ -21154,6 +21154,17 @@
             "type": "string",
             "title": "Chip Id",
             "default": ""
+          },
+          "pipeline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PipelineProgress"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when this execution belongs to a pipeline run; covers every step of it"
           }
         },
         "type": "object",
@@ -26527,6 +26538,116 @@
         ],
         "title": "PipelineProblem",
         "description": "One reason a spec cannot run as written."
+      },
+      "PipelineProgress": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "flow_run_id": {
+            "type": "string",
+            "title": "Flow Run Id"
+          },
+          "root_execution_id": {
+            "type": "string",
+            "title": "Root Execution Id",
+            "description": "The first step's execution, as returned at dispatch"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineStepProgress"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "flow_run_id",
+          "root_execution_id",
+          "status",
+          "steps"
+        ],
+        "title": "PipelineProgress",
+        "description": "A pipeline run as a whole: one execution per calibration step, same flow run.\n\n``status`` is the whole run's: running while any step runs or the run holds\nthe project lock between steps, otherwise the outcome of the last step."
+      },
+      "PipelineStepProgress": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index",
+            "description": "1-based position in the pipeline spec"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": ""
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "\"calibration\" or \"transform\"",
+            "default": "calibration"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id",
+            "description": "The step's own execution, once it has started"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "The execution status, \"skipped\" for transforms, or \"pending\" before it starts"
+          },
+          "task_total": {
+            "type": "integer",
+            "title": "Task Total",
+            "default": 0
+          },
+          "task_finished": {
+            "type": "integer",
+            "title": "Task Finished",
+            "default": 0
+          },
+          "task_failed": {
+            "type": "integer",
+            "title": "Task Failed",
+            "default": 0
+          },
+          "figure_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Figure Paths",
+            "description": "Figures of the step's finished tasks, in task order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "name",
+          "status"
+        ],
+        "title": "PipelineStepProgress",
+        "description": "One planned step of a pipeline run and how far its execution got."
       },
       "PipelineStepTypeInfo": {
         "properties": {

@@ -1469,14 +1469,9 @@ html[data-theme="dark"],
    Chat UI Styles
    ======================================== */
 
-/* Bot avatar icon background */
-.chat-avatar-bot {
-  background: linear-gradient(
-    135deg,
-    color-mix(in oklch, var(--color-primary) 12%, transparent),
-    color-mix(in oklch, var(--color-accent) 8%, transparent)
-  );
-  border: 1px solid color-mix(in oklch, var(--color-primary) 15%, transparent);
+/* The QDash bot mark (OQTOPUS logo) on the empty chat. */
+.chat-avatar-hero {
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-base-content) 8%, transparent);
 }
 
 /* Fade-in-up animation for new messages */
@@ -1600,9 +1595,25 @@ html[data-theme="dark"],
   color: var(--color-base-content);
 }
 
-/* Assistant answers sit flush left, full width, with no avatar (ChatGPT style). */
+/* Assistant answers sit flush left, full width, with no avatar (ChatGPT and Claude style). */
 .chat-assistant-row {
   min-width: 0;
+}
+
+/* Breathing ring on the bot mark while the answer is still being worked out. */
+.chat-avatar-active {
+  border-radius: 9999px;
+  animation: chatAvatarPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes chatAvatarPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 35%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-primary) 0%, transparent);
+  }
 }
 
 /* Inline editor for a sent user message. */
@@ -1615,12 +1626,12 @@ html[data-theme="dark"],
   border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
 }
 
-/* Small breathing dot next to the "Thinking" label. */
+/* Small breathing dot marking a session that is still answering. */
 .chat-pulse-dot {
-  width: 0.625rem;
-  height: 0.625rem;
+  width: 0.4rem;
+  height: 0.4rem;
   border-radius: 9999px;
-  background: var(--color-base-content);
+  background: var(--color-primary);
   animation: chatPulseDot 1.2s ease-in-out infinite;
 }
 
@@ -1748,27 +1759,84 @@ html[data-theme="dark"],
   }
 }
 
-/* Shimmering label for steps that are in progress. */
-.chat-shimmer-text {
+/* Loader keyframes (ui/Loader.tsx, adapted from prompt-kit). */
+@keyframes loader-bounce-dots {
+  0%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+@keyframes loader-typing {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-2px);
+    opacity: 1;
+  }
+}
+
+@keyframes loader-wave {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.6);
+  }
+}
+
+@keyframes loader-pulse-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+}
+
+@keyframes loader-blink {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Light sweeps across the label from left to right while something runs. */
+.loader-text-shimmer {
   background: linear-gradient(
     90deg,
-    color-mix(in oklch, var(--color-base-content) 45%, transparent) 0%,
-    var(--color-base-content) 50%,
-    color-mix(in oklch, var(--color-base-content) 45%, transparent) 100%
+    color-mix(in oklch, var(--color-base-content) 45%, transparent) 40%,
+    var(--color-base-content) 60%,
+    color-mix(in oklch, var(--color-base-content) 45%, transparent) 80%
   );
-  background-size: 200% 100%;
+  background-size: 200% auto;
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  animation: chatShimmer 1.6s linear infinite;
+  animation: loader-shimmer 3s linear infinite;
 }
 
-@keyframes chatShimmer {
+@keyframes loader-shimmer {
   from {
-    background-position: 100% 0;
+    background-position: 200% 50%;
   }
   to {
-    background-position: -100% 0;
+    background-position: -200% 50%;
   }
 }
 
@@ -1789,32 +1857,17 @@ html[data-theme="dark"],
   color: var(--color-base-content);
 }
 
-/* Vertical timeline of thinking and tool steps. */
-.chat-trace-list {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+/* Live execution card under a waiting tool step. */
+.chat-execution-progress {
+  margin-top: 0.4rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  background: color-mix(in oklch, var(--color-base-content) 4%, var(--color-base-100));
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 8%, transparent);
 }
 
-.chat-trace-item {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-}
-
-.chat-trace-item:not(:last-child)::before {
-  content: "";
-  position: absolute;
-  left: 0.5625rem;
-  top: 1.25rem;
-  bottom: -0.5rem;
-  width: 1px;
-  background: color-mix(in oklch, var(--color-base-content) 12%, transparent);
-}
-
-.chat-trace-dot {
+/* Marker on the chain-of-thought timeline (ui/ChainOfThought.tsx). */
+.chain-marker {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1826,22 +1879,22 @@ html[data-theme="dark"],
   background: color-mix(in oklch, var(--color-base-content) 7%, var(--color-base-100));
 }
 
-.chat-trace-dot[data-status="running"] {
+.chain-marker[data-status="running"] {
   color: var(--color-primary);
   background: color-mix(in oklch, var(--color-primary) 12%, var(--color-base-100));
 }
 
-.chat-trace-dot[data-status="done"] {
+.chain-marker[data-status="done"] {
   color: var(--color-success);
   background: color-mix(in oklch, var(--color-success) 12%, var(--color-base-100));
 }
 
-.chat-trace-dot[data-status="error"] {
+.chain-marker[data-status="error"] {
   color: var(--color-error);
   background: color-mix(in oklch, var(--color-error) 12%, var(--color-base-100));
 }
 
-.chat-trace-dot[data-status="idle"]:empty {
+.chain-marker:empty {
   transform: scale(0.45);
 }
 

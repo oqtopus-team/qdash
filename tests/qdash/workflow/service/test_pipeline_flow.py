@@ -10,7 +10,12 @@ from qdash.datamodel.calibration_pipeline import (
     PipelineStep,
     step_provides,
 )
-from qdash.workflow.service.pipeline_flow import build_step, build_steps, build_targets
+from qdash.workflow.service.pipeline_flow import (
+    build_step,
+    build_steps,
+    build_targets,
+    pipeline_note,
+)
 from qdash.workflow.service.steps import (
     CustomOneQubit,
     FilterByMetric,
@@ -98,3 +103,38 @@ def test_unknown_step_object_is_refused() -> None:
 def test_spec_step_type_alias_is_the_union() -> None:
     # Guard against the union silently dropping a member.
     assert len(PipelineStep.__args__[0].__args__) == len(STEP_CATALOG)
+
+
+def test_pipeline_note_lists_the_plan_with_step_kinds() -> None:
+    parsed = CalibrationPipelineSpec.model_validate(
+        {
+            "name": "coarse-then-coherence",
+            "targets": {"qids": ["0"]},
+            "steps": [
+                {"type": "OneQubitCheck"},
+                {"type": "FilterByStatus"},
+                {"type": "CustomOneQubit", "step_name": "coherence", "tasks": ["CheckT1"]},
+            ],
+        }
+    )
+    note = pipeline_note(parsed, build_steps(parsed))
+    assert note == {
+        "pipeline": {
+            "name": "coarse-then-coherence",
+            "steps": [
+                {
+                    "index": 1,
+                    "name": "one_qubit_check",
+                    "type": "OneQubitCheck",
+                    "kind": "calibration",
+                },
+                {
+                    "index": 2,
+                    "name": "filter_by_status",
+                    "type": "FilterByStatus",
+                    "kind": "transform",
+                },
+                {"index": 3, "name": "coherence", "type": "CustomOneQubit", "kind": "calibration"},
+            ],
+        }
+    }

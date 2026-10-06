@@ -156,12 +156,23 @@ describe("useCopilotChat streaming", () => {
     const thinking = result.current.chat.liveTurn!.steps[0];
     expect(thinking.kind === "thinking" && thinking.text).toBe("Need the timeseries.");
 
-    stream.push(sse("tool_end", { id: "c1", tool: "qdash_get_timeseries", is_error: false }));
+    stream.push(
+      sse("tool_end", {
+        id: "c1",
+        tool: "qdash_get_timeseries",
+        is_error: false,
+        figures: ["exec/1/CheckT1_0.png"],
+      }),
+    );
     stream.push(sse("delta", { text: "T1 is " }));
     stream.push(sse("delta", { text: "45 us." }));
     await waitFor(() => {
       const steps = result.current.chat.liveTurn?.steps ?? [];
-      expect(steps[1]).toMatchObject({ kind: "tool", status: "done" });
+      expect(steps[1]).toMatchObject({
+        kind: "tool",
+        status: "done",
+        figures: ["exec/1/CheckT1_0.png"],
+      });
       expect(steps[2]).toEqual({ kind: "text", text: "T1 is 45 us." });
     });
 
@@ -179,7 +190,11 @@ describe("useCopilotChat streaming", () => {
     expect(saved.blocks[0].content).toBe("T1 is 45 us.");
     // The answer text is not duplicated into the trace.
     expect(saved.trace?.steps.map((s) => s.kind)).toEqual(["thinking", "tool"]);
-    expect(saved.trace?.steps[1]).toMatchObject({ id: "c1", args: { qid: "0" } });
+    expect(saved.trace?.steps[1]).toMatchObject({
+      id: "c1",
+      args: { qid: "0" },
+      figures: ["exec/1/CheckT1_0.png"],
+    });
     expect(streamRequest().url).toMatch(/\/copilot\/chat\/stream$/);
   });
 
@@ -197,6 +212,14 @@ describe("useCopilotChat streaming", () => {
     const saved = lastAssistant(result);
     expect(saved.stopped).toBe(true);
     expect(saved.blocks[0].content).toBe("T2 echo measures");
+    // Closing the stream is not enough: the runtime is told to abort the turn.
+    const stopCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith("/copilot/chat/stop"),
+    );
+    expect(stopCall).toBeDefined();
+    expect(JSON.parse(String(stopCall![1].body))).toEqual({
+      session_id: result.current.chat.session!.id,
+    });
   });
 
   it("edits a sent message by resending it with the history before it", async () => {
@@ -262,6 +285,36 @@ describe("useCopilotChat streaming", () => {
     // Blank titles are ignored.
     act(() => result.current.store.renameSession(id, "   "));
     expect(result.current.chat.session?.title).toBe("T1 drift");
+  });
+
+  it("stores a rating inside the answer and clears it when given again", async () => {
+    const result = await renderChat();
+
+    act(() => result.current.chat.send("Hello"));
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+    stream.push(sse("result", { blocks: [{ type: "text", content: "Hi", chart: null }] }));
+    stream.close();
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(false));
+    fetchMock.mockClear();
+
+    act(() => result.current.chat.rateAnswer(1, "down"));
+    expect(lastAssistant(result).feedback).toBe("down");
+    expect(lastAssistant(result).blocks[0].content).toBe("Hi");
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([, init]) => {
+          if (init?.method !== "PATCH") return false;
+          const body = JSON.parse(String(init.body)) as { messages?: { content: string }[] };
+          return body.messages?.some((m) => m.content.includes('"feedback":"down"')) ?? false;
+        }),
+      ).toBe(true),
+    );
+
+    act(() => result.current.chat.rateAnswer(1, "down"));
+    expect(lastAssistant(result).feedback).toBeUndefined();
+    // User messages cannot be rated.
+    act(() => result.current.chat.rateAnswer(0, "up"));
+    expect(result.current.chat.messages[0].content).toBe("Hello");
   });
 
   it("records a stream that ends without a result as an error", async () => {

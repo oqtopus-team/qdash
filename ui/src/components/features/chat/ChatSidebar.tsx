@@ -139,6 +139,8 @@ export function SessionMenu({
 interface ChatSidebarProps {
   sessions: CopilotSession[];
   activeSessionId: string | null;
+  /** Sessions with an answer streaming right now. */
+  runningSessionIds?: readonly string[];
   isLoading: boolean;
   onNewChat: () => void;
   onSelect: (id: string) => void;
@@ -150,6 +152,7 @@ interface ChatSidebarProps {
 export function ChatSidebar({
   sessions,
   activeSessionId,
+  runningSessionIds = [],
   isLoading,
   onNewChat,
   onSelect,
@@ -258,6 +261,14 @@ export function ChatSidebar({
                         />
                       )}
                       <span className="truncate">{session.title}</span>
+                      {runningSessionIds.includes(session.id) && (
+                        <span
+                          className="chat-pulse-dot ml-2 shrink-0"
+                          role="status"
+                          aria-label="Answering"
+                          title="Answering"
+                        />
+                      )}
                     </button>
                     <span
                       className={`chat-sidebar-item-actions ${

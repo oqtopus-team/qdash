@@ -1,6 +1,11 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
-import { UserEntry, watchEvents, type AgentEvent } from "@earendil-works/pi-durable";
+import {
+  UserEntry,
+  watchEvents,
+  type AgentEvent,
+  type Conversation,
+} from "@earendil-works/pi-durable";
 
 import { WRAP_UP_MESSAGE } from "./budget.ts";
 import { encodeLine, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
@@ -15,10 +20,16 @@ import {
 } from "./runtime.ts";
 
 const PORT = Number(process.env.PORT ?? 8002);
-// After CHAT_WRAP_UP_MS the model is told to stop calling tools and answer;
-// CHAT_TIMEOUT_MS is the hard stop for a turn that still does not finish.
-const CHAT_WRAP_UP_MS = Number(process.env.CHAT_WRAP_UP_MS ?? 120_000);
-const CHAT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 600_000);
+// Optional turn budgets, both off by default: a turn runs until it answers or
+// the user stops it (POST /chat/abort). Calibrations take as long as they take,
+// and a tool waiting on one must not be cut off by the clock. Set
+// CHAT_WRAP_UP_MS to steer the model to answer with what it has after that
+// long, and CHAT_TIMEOUT_MS to abort a turn outright.
+const CHAT_WRAP_UP_MS = Number(process.env.CHAT_WRAP_UP_MS ?? 0);
+const CHAT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 0);
+// A quiet turn (a tool polling an execution) sends a ping this often so the
+// proxies between here and the browser do not take silence for a dead stream.
+const CHAT_PING_MS = Number(process.env.CHAT_PING_MS ?? 15_000);
 const REVIEW_CONCURRENCY = Number(process.env.REVIEW_CONCURRENCY ?? 2);
 const REVIEW_QUEUE_TIMEOUT_MS = Number(process.env.REVIEW_QUEUE_TIMEOUT_MS ?? 30_000);
 const MAX_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES ?? 20 * 1024 * 1024);
@@ -63,7 +74,11 @@ function toImageContent(images: ImageBody[] | undefined) {
 }
 
 /** One active writer per user/session storage file. */
-const running = new Set<string>();
+/**
+ * Turns in flight by owner and conversation. The value is the conversation to
+ * abort on a stop request, or null while the session is still being opened.
+ */
+const running = new Map<string, Conversation | null>();
 
 /** Bound local-model review concurrency across API and worker callers. */
 const reviewQueue: Array<() => void> = [];
@@ -150,7 +165,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     sendJson(res, 409, { error: "conversation is already processing a request" });
     return;
   }
-  running.add(runKey);
+  running.set(runKey, null);
 
   let opened;
   try {
@@ -171,6 +186,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   }
 
   const { harness, conversation } = opened;
+  running.set(runKey, conversation);
 
   let approval: ApprovalRequest | undefined;
   if (body.approval) {
@@ -200,6 +216,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   const write = (event: NdjsonEvent): void => {
     if (connected && !res.writableEnded) res.write(encodeLine(event));
   };
+  const ping = CHAT_PING_MS > 0 ? setInterval(() => write({ type: "ping" }), CHAT_PING_MS) : null;
 
   const events = await watchEvents(harness, conversation.id, BACKGROUND_CONTEXT);
   events.start(async (batch) => {
@@ -244,21 +261,24 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     // A steer is placed after the current tool round, so the model reads it
     // before deciding on more tools and answers in the same run.
     let wrapUp: ReturnType<typeof conversation.submit> | undefined;
-    const wrapUpTimer = setTimeout(() => {
-      wrapUp = conversation.submit(
-        { type: "input", content: WRAP_UP_MESSAGE, whenBusy: "steer" },
-        BACKGROUND_CONTEXT,
-      );
-      // Handled after the turn settles; keep the rejection from going unhandled meanwhile.
-      wrapUp.catch(() => undefined);
-    }, CHAT_WRAP_UP_MS);
-    const timeout = setTimeout(
-      () => void conversation.abort(BACKGROUND_CONTEXT),
-      CHAT_TIMEOUT_MS,
-    );
+    const wrapUpTimer =
+      CHAT_WRAP_UP_MS > 0
+        ? setTimeout(() => {
+            wrapUp = conversation.submit(
+              { type: "input", content: WRAP_UP_MESSAGE, whenBusy: "steer" },
+              BACKGROUND_CONTEXT,
+            );
+            // Handled after the turn settles; keep the rejection from going unhandled meanwhile.
+            wrapUp.catch(() => undefined);
+          }, CHAT_WRAP_UP_MS)
+        : null;
+    const timeout =
+      CHAT_TIMEOUT_MS > 0
+        ? setTimeout(() => void conversation.abort(BACKGROUND_CONTEXT), CHAT_TIMEOUT_MS)
+        : null;
     const settled = await submission.wait(BACKGROUND_CONTEXT).finally(() => {
-      clearTimeout(wrapUpTimer);
-      clearTimeout(timeout);
+      if (wrapUpTimer) clearTimeout(wrapUpTimer);
+      if (timeout) clearTimeout(timeout);
     });
     // A steer still queued when the run answered would start a new run.
     await wrapUp
@@ -273,11 +293,34 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   } catch (error) {
     write({ type: "error", message: error instanceof Error ? error.message : String(error) });
   } finally {
+    if (ping) clearInterval(ping);
     await events.stop();
     await harness.close(BACKGROUND_CONTEXT);
     running.delete(runKey);
     if (connected && !res.writableEnded) res.end();
   }
+}
+
+/**
+ * Stop the turn a conversation is running, at the user's request.
+ *
+ * A dropped connection alone never cancels durable work (see handleChat), so
+ * the chat's Stop button calls this explicitly. The turn then settles as
+ * aborted and the next message can start a new one.
+ */
+async function handleAbortChat(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody<DeleteSessionBody>(req, MAX_BODY_BYTES);
+  if (!body.owner_id || !body.conversation_id) {
+    sendJson(res, 400, { error: "owner_id and conversation_id are required" });
+    return;
+  }
+  const conversation = running.get(`${body.owner_id}\0${body.conversation_id}`);
+  if (!conversation) {
+    sendJson(res, 404, { error: "conversation is not running" });
+    return;
+  }
+  await conversation.abort(BACKGROUND_CONTEXT);
+  sendJson(res, 200, { aborted: true });
 }
 
 /** Remove durable state after the owning QDash session has been deleted. */
@@ -312,6 +355,14 @@ const server = createServer((req, res) => {
       return;
     }
     handleChat(req, res).catch((error: unknown) => handleRouteError(res, error, "request"));
+    return;
+  }
+  if (req.method === "POST" && req.url === "/chat/abort") {
+    if (!authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    handleAbortChat(req, res).catch((error: unknown) => handleRouteError(res, error, "abort"));
     return;
   }
   if (req.method === "POST" && req.url === "/review") {
