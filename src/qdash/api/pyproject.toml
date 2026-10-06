@@ -9,7 +9,7 @@ dependencies = [
     "uvicorn[standard]",
     "gunicorn==26.0.0",
     "python-dotenv>=1.2.2",
-    "pymongo==4.17.0",
+    "pymongo==4.18.2",
     "bunnet==1.3.0",
     "passlib[bcrypt]==1.7.4",
     "pyyaml==6.0.3",
