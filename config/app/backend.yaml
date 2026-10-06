@@ -45,6 +45,7 @@ backends:
         - CheckDRAGHPIPulse
         - CreateDRAGPIPulse
         - CheckDRAGPIPulse
+        - CheckEFChevron
         - ReadoutClassification
         - RandomizedBenchmarking
         - X90InterleavedRandomizedBenchmarking
