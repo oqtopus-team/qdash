@@ -14,7 +14,7 @@ dependencies = [
     "pyyaml==6.0.3",
     "qubex[backend]",
     "filelock>=3.17.0",
-    "gitpython>=3.1.50",
+    "gitpython>=3.1.62",
     "reportlab>=4.4.1",
     "pillow>=12.2.0",
     "ruamel.yaml>=0.18.0",
