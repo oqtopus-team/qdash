@@ -605,7 +605,7 @@ def test_get_lock_status_does_not_query_prefect_once_the_flow_has_started(
 # Pipeline runs: one execution per calibration step, one flow run
 # ---------------------------------------------------------------------------
 
-PIPELINE_PLAN = {
+PIPELINE_PLAN: dict[str, Any] = {
     "name": "coarse-then-coherence",
     "steps": [
         {"index": 1, "name": "one_qubit_check", "type": "OneQubitCheck", "kind": "calibration"},
