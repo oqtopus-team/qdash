@@ -7,6 +7,7 @@ repositories and services into route handlers.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
     from qdash.api.services.flow_schedule_service import FlowScheduleService
     from qdash.api.services.flow_service import FlowService
 
@@ -513,6 +514,16 @@ def get_reanalysis_service() -> ReanalysisService:
 def get_flow_repository() -> MongoFlowRepository:
     """Get the flow repository instance."""
     return MongoFlowRepository()
+
+
+@cached_dependency_provider
+def get_calibration_pipeline_service() -> "CalibrationPipelineService":
+    """Get the calibration pipeline service instance."""
+    from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
+
+    return CalibrationPipelineService(
+        task_definition_repository=get_task_definition_repository(),
+    )
 
 
 @cached_dependency_provider

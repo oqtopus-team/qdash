@@ -22,75 +22,22 @@ Example:
     results = cal.run(targets, steps=[BringUp(), CustomOneQubit(tasks=CHECK_1Q_TASKS)])
 """
 
-# =============================================================================
-# MUX-level Bring-up Task Lists
-# =============================================================================
+# The lists live in ``qdash.datamodel.calibration_pipeline`` so the API, which
+# validates declarative pipeline specs without a Prefect runtime, resolves a
+# step's default tasks exactly as the worker does. This module keeps the names
+# templates import.
+from qdash.datamodel.calibration_pipeline import (
+    BRINGUP_TASKS,
+    CHECK_1Q_TASKS,
+    FULL_1Q_TASKS,
+    FULL_1Q_TASKS_AFTER_CHECK,
+    FULL_2Q_TASKS,
+)
 
-# Bring-up: Tasks for initial qubit characterization
-# - MUX-level tasks (is_mux_level=True) run once per MUX for representative qubit
-# - Qubit-level tasks run for each qubit individually
-BRINGUP_TASKS: list[str] = [
-    "CheckResonatorSpectroscopy",  # MUX-level: estimates readout_frequency
-    "CheckQubitSpectroscopy",  # Qubit-level: coarse_qubit_frequency, anharmonicity, coarse_control_amplitude
-    "CheckControlAmplitude",  # Refine coarse_control_amplitude from spectroscopy-derived seed
-    # Refine qubit_frequency during bring-up without requiring Configure.
-    # Rabi remains a regular calibration task after backend configuration.
-    "CheckAdaptiveChevron",
-]
-
-# =============================================================================
-# 1-Qubit Task Lists
-# =============================================================================
-
-# 1Q Check: Basic characterization tasks (run first)
-CHECK_1Q_TASKS: list[str] = [
-    "CheckRabi",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    # "CheckOptimalReadoutFrequency",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CheckT1",
-    "CheckT2Echo",
-    "CheckRamsey",
-]
-
-# 1Q Full (after check): Advanced calibration tasks
-FULL_1Q_TASKS_AFTER_CHECK: list[str] = [
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "ReadoutClassification",
-    "CheckT1Average",
-    "CheckT2EchoAverage",
-    "Check1QGateCoherenceLimit",
-    "RandomizedBenchmarking",
-    "X90InterleavedRandomizedBenchmarking",
-]
-
-# Complete 1Q task list (CHECK + AFTER_CHECK)
-FULL_1Q_TASKS: list[str] = CHECK_1Q_TASKS + FULL_1Q_TASKS_AFTER_CHECK
-
-
-# =============================================================================
-# 2-Qubit Task Lists
-# =============================================================================
-
-# Complete 2Q task list
-FULL_2Q_TASKS: list[str] = [
-    "CheckCrossResonance",
-    "CreateZX90",
-    "CheckZX90",
-    "CheckBellState",
-    "CheckBellStateTomography",
-    "Check2QGateCoherenceLimit",
-    "ZX90InterleavedRandomizedBenchmarking",
+__all__ = [
+    "BRINGUP_TASKS",
+    "CHECK_1Q_TASKS",
+    "FULL_1Q_TASKS",
+    "FULL_1Q_TASKS_AFTER_CHECK",
+    "FULL_2Q_TASKS",
 ]

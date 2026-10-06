@@ -3996,6 +3996,207 @@
         }
       }
     },
+    "/calibration-pipelines/catalog": {
+      "get": {
+        "tags": [
+          "calibration-pipeline"
+        ],
+        "summary": "Step types, tasks, and spec schema for writing a calibration pipeline",
+        "description": "Everything an agent needs to compose a spec: step types with their\ndependencies and default tasks, the backend's tasks by type, and the JSON\nschema of the spec.",
+        "operationId": "getCalibrationPipelineCatalog",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "backend_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Backend Name"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineCatalogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibration-pipelines/validate": {
+      "post": {
+        "tags": [
+          "calibration-pipeline"
+        ],
+        "summary": "Check a calibration pipeline spec without running it",
+        "description": "Dry run: reports every problem with a path into the spec, and the\nresolved steps and tasks when it would run.",
+        "operationId": "validateCalibrationPipeline",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidatePipelineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidatePipelineResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibration-pipelines/execute": {
+      "post": {
+        "tags": [
+          "calibration-pipeline"
+        ],
+        "summary": "Validate and run a calibration pipeline spec",
+        "description": "Runs the spec as one execution through the worker's calibration-pipeline\ndeployment. A spec with problems is rejected with 422 and the same problem\nlist that /validate returns.",
+        "operationId": "executeCalibrationPipeline",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutePipelineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutePipelineResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/copilot/config": {
       "get": {
         "tags": [
@@ -20550,6 +20751,131 @@
         "title": "ExecuteFlowResponse",
         "description": "Response after executing a flow."
       },
+      "ExecutePipelineRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Chip Id"
+          },
+          "spec": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Spec",
+            "description": "CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog."
+          },
+          "backend_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Name",
+            "description": "Defaults to the configured backend."
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "spec"
+        ],
+        "title": "ExecutePipelineRequest",
+        "description": "Validate, then dispatch the pipeline as one execution.",
+        "examples": [
+          {
+            "chip_id": "64Qv3",
+            "spec": {
+              "default_run_parameters": {
+                "shots": 1024
+              },
+              "name": "coarse-then-coherence",
+              "steps": [
+                {
+                  "mode": "scheduled",
+                  "type": "OneQubitCheck"
+                },
+                {
+                  "type": "FilterByStatus"
+                },
+                {
+                  "mode": "scheduled",
+                  "step_name": "coherence",
+                  "tasks": [
+                    "CheckT1",
+                    "CheckT2Echo"
+                  ],
+                  "type": "CustomOneQubit"
+                }
+              ],
+              "targets": {
+                "qids": [
+                  "0",
+                  "1"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ExecutePipelineResponse": {
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "description": "QDash execution ID (falls back to the Prefect flow run ID when no execution row could be pre-created)"
+          },
+          "flow_run_id": {
+            "type": "string",
+            "title": "Flow Run Id",
+            "description": "Prefect flow run ID"
+          },
+          "flow_run_url": {
+            "type": "string",
+            "title": "Flow Run Url",
+            "description": "Prefect flow run URL"
+          },
+          "qdash_ui_url": {
+            "type": "string",
+            "title": "Qdash Ui Url",
+            "description": "QDash UI URL for execution"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Success message"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedPipelineStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "targets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedPipelineTargets"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_id",
+          "flow_run_id",
+          "flow_run_url",
+          "qdash_ui_url",
+          "message"
+        ],
+        "title": "ExecutePipelineResponse",
+        "description": "Dispatch result plus the resolved plan that was started."
+      },
       "ExecutionAvailabilityRequest": {
         "properties": {
           "flow_name": {
@@ -26128,6 +26454,142 @@
         "title": "PasswordResetResponse",
         "description": "One-time response containing a generated temporary password."
       },
+      "PipelineCatalogResponse": {
+        "properties": {
+          "backend_name": {
+            "type": "string",
+            "title": "Backend Name"
+          },
+          "step_types": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineStepTypeInfo"
+            },
+            "type": "array",
+            "title": "Step Types"
+          },
+          "one_qubit_modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "One Qubit Modes"
+          },
+          "tasks": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Tasks",
+            "description": "Available task names by task_type (\"qubit\", \"coupling\", ...)."
+          },
+          "spec_schema": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Spec Schema",
+            "description": "JSON schema of CalibrationPipelineSpec."
+          },
+          "example": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Example"
+          }
+        },
+        "type": "object",
+        "required": [
+          "backend_name",
+          "step_types",
+          "one_qubit_modes",
+          "tasks",
+          "spec_schema"
+        ],
+        "title": "PipelineCatalogResponse",
+        "description": "Everything needed to write a spec for this project."
+      },
+      "PipelineProblem": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Where in the spec, e.g. \"steps[2].tasks[0]\" or \"targets.qids\"."
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "message"
+        ],
+        "title": "PipelineProblem",
+        "description": "One reason a spec cannot run as written."
+      },
+      "PipelineStepTypeInfo": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "requires": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Requires",
+            "description": "Any one of these must come from an earlier step."
+          },
+          "provides": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Provides"
+          },
+          "task_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Scope",
+            "description": "\"qubit\" or \"coupling\" for steps that run tasks."
+          },
+          "default_tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Default Tasks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "kind",
+          "description",
+          "requires",
+          "provides",
+          "task_scope",
+          "default_tasks"
+        ],
+        "title": "PipelineStepTypeInfo",
+        "description": "One step type an agent may use."
+      },
       "Position": {
         "properties": {
           "x": {
@@ -27126,6 +27588,79 @@
         ],
         "title": "RecommendedTaskResponse",
         "description": "Response model for a recommended recalibration task.\n\nAttributes\n----------\ntask_name : str\n    Name of the task to re-run\npriority : int\n    Priority level (1=highest, larger=lower priority)\naffected_parameters : list[str]\n    Parameters that would be recalibrated by this task\naffected_qids : list[str]\n    Qubit/coupling IDs affected\nreason : str\n    Human-readable explanation"
+      },
+      "ResolvedPipelineStep": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index",
+            "description": "1-based position in the pipeline."
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Step name as it appears in execution history."
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "\"calibration\" runs hardware; \"transform\" only filters."
+          },
+          "tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tasks",
+            "description": "Tasks the step runs, in order; empty for transforms."
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "type",
+          "name",
+          "kind",
+          "tasks"
+        ],
+        "title": "ResolvedPipelineStep",
+        "description": "A step as it will run: effective tasks filled in from the catalog defaults."
+      },
+      "ResolvedPipelineTargets": {
+        "properties": {
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qids",
+            "description": "Explicit qids, or empty when targeting MUXes."
+          },
+          "mux_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Mux Ids"
+          },
+          "exclude_qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exclude Qids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "qids"
+        ],
+        "title": "ResolvedPipelineTargets",
+        "description": "The starting targets after chip lookup."
       },
       "SaveFileRequest": {
         "properties": {
@@ -30900,6 +31435,137 @@
         ],
         "title": "ValidateFileRequest",
         "description": "Request model for validating file content."
+      },
+      "ValidatePipelineRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Chip Id"
+          },
+          "spec": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Spec",
+            "description": "CalibrationPipelineSpec as JSON; see GET /calibration-pipelines/catalog."
+          },
+          "backend_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Name",
+            "description": "Defaults to the configured backend."
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "spec"
+        ],
+        "title": "ValidatePipelineRequest",
+        "description": "A spec to check against the project, chip, and backend.",
+        "examples": [
+          {
+            "chip_id": "64Qv3",
+            "spec": {
+              "default_run_parameters": {
+                "shots": 1024
+              },
+              "name": "coarse-then-coherence",
+              "steps": [
+                {
+                  "mode": "scheduled",
+                  "type": "OneQubitCheck"
+                },
+                {
+                  "type": "FilterByStatus"
+                },
+                {
+                  "mode": "scheduled",
+                  "step_name": "coherence",
+                  "tasks": [
+                    "CheckT1",
+                    "CheckT2Echo"
+                  ],
+                  "type": "CustomOneQubit"
+                }
+              ],
+              "targets": {
+                "qids": [
+                  "0",
+                  "1"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ValidatePipelineResponse": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineProblem"
+            },
+            "type": "array",
+            "title": "Problems"
+          },
+          "backend_name": {
+            "type": "string",
+            "title": "Backend Name"
+          },
+          "spec": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spec",
+            "description": "The normalized spec, when it parsed; defaults filled in."
+          },
+          "targets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedPipelineTargets"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedPipelineStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "task_run_count": {
+            "type": "integer",
+            "title": "Task Run Count",
+            "description": "Task runs per target qubit or coupling.",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid",
+          "backend_name"
+        ],
+        "title": "ValidatePipelineResponse",
+        "description": "Whether the spec can run, and what it would do."
       },
       "ValidationError": {
         "properties": {

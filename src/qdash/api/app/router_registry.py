@@ -17,6 +17,7 @@ from qdash.api.routers import (
     auth,
     backend,
     calibration,
+    calibration_pipeline,
     chip,
     config,
     cooldown,
@@ -74,6 +75,7 @@ PUBLIC_ROUTERS: tuple[RouterRegistration, ...] = (
 PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(agent_session.router, tags=("agent-session",)),
     RouterRegistration(calibration.router, tags=("calibration",)),
+    RouterRegistration(calibration_pipeline.router, tags=("calibration-pipeline",)),
     RouterRegistration(copilot.router, prefix="/copilot", tags=("copilot",)),
     RouterRegistration(settings.router, tags=("settings",)),
     RouterRegistration(chip.router, tags=("chip",)),
