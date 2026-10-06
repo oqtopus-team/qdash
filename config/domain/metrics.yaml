@@ -16,6 +16,55 @@ qubit_metrics:
         min: 6.0
         max: 10.0
         step: 0.01
+
+  resonator_frequency:
+    title: Resonator Frequency
+    unit: GHz
+    scale: 1
+    description: Ground-state readout-resonator frequency
+    evaluation:
+      mode: none
+
+  purcell_filter_frequency:
+    title: Purcell Filter Frequency
+    unit: GHz
+    scale: 1
+    description: Purcell-filter resonance frequency
+    evaluation:
+      mode: none
+
+  resonator_purcell_filter_coupling:
+    title: Resonator–Purcell Filter Coupling
+    unit: MHz
+    scale: 1
+    description: Coupling strength between the readout resonator and Purcell filter
+    evaluation:
+      mode: none
+
+  purcell_filter_linewidth:
+    title: Purcell Filter Linewidth
+    unit: MHz
+    scale: 1
+    description: Total Purcell-filter linewidth
+    evaluation:
+      mode: none
+
+  dispersive_shift:
+    title: Dispersive Shift
+    unit: MHz
+    scale: 1
+    description: Qubit-state-dependent readout-resonator frequency shift
+    evaluation:
+      mode: none
+
+  critical_photon_number:
+    title: Critical Photon Number
+    unit: a.u.
+    scale: 1
+    description: Estimated critical intracavity photon number
+    evaluation:
+      mode: none
+
   qubit_frequency:
     title: Qubit Frequency
     unit: GHz
