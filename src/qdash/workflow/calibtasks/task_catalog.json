@@ -2062,6 +2062,125 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CheckEFChevron",
+        "description": "Measure f_ef and alpha = f_ef - f_ge using the calibrated GE DRAG pi pulse.",
+        "file_path": "one_qubit_fine/check_ef_chevron.py",
+        "input_parameters": {
+          "anharmonicity": {
+            "default_value": -0.3,
+            "description": "Initial EF frequency offset from f_ge",
+            "resolution": "database_or_default",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "drag_pi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "drag_pi_beta": {
+            "default_value": null,
+            "resolution": "database_required",
+            "user_override": "allowed"
+          },
+          "drag_pi_duration": {
+            "default_value": null,
+            "parameter_aliases": [
+              "drag_pi_length"
+            ],
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "ef_control_amplitude": {
+            "default_value": 0.0625,
+            "description": "EF drive pulse amplitude",
+            "resolution": "database_or_default",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckEFChevron",
+        "run_parameters": {
+          "detuning_range": {
+            "description": "EF detuning sweep around qubit_frequency + anharmonicity",
+            "unit": "GHz",
+            "value": [
+              -0.05,
+              0.05,
+              41
+            ],
+            "value_type": "np.linspace"
+          },
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "minimum_peak_background_rms_ratio": {
+            "description": "Minimum matched-transform peak/background RMS ratio",
+            "unit": "a.u.",
+            "value": 5.0,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Number of shots per EF chevron point",
+            "unit": "a.u.",
+            "value": 256,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "EF drive duration sweep",
+            "unit": "ns",
+            "value": [
+              0,
+              257,
+              8
+            ],
+            "value_type": "range"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckHPIPulse",
         "description": "Task to check the HPI pulse.",
         "file_path": "one_qubit_coarse/check_hpi_pulse.py",

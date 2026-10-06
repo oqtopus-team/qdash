@@ -30,6 +30,14 @@ qubit_metrics:
         max: 6.0
         step: 0.01
 
+  ef_frequency:
+    title: EF Frequency
+    unit: GHz
+    scale: 1
+    description: Measured e-to-f transition frequency
+    evaluation:
+      mode: none
+
   anharmonicity:
     title: Qubit Anharmonicity
     unit: MHz
