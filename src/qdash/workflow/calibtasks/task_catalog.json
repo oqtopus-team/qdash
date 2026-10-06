@@ -445,6 +445,210 @@
     ],
     "qubex": [
       {
+        "class_name": "CharacterizeFilteredCKP",
+        "description": "Estimate readout-resonator and Purcell-filter parameters with filtered CKP.",
+        "file_path": "measurement/characterize_filtered_ckp.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "description": "Rabi control amplitude",
+            "greater_than": 0,
+            "less_than": 1,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_amplitude": {
+            "default_value": null,
+            "description": "Calibrated half-pi pulse amplitude",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_duration": {
+            "default_value": null,
+            "description": "Calibrated half-pi pulse duration",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "maximum_rabi_frequency": {
+            "default_value": null,
+            "description": "Maximum Rabi frequency per control amplitude",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "MHz/a.u.",
+            "user_override": "allowed"
+          },
+          "qubit_frequency": {
+            "default_value": null,
+            "description": "Calibrated qubit frequency",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "rabi_amplitude": {
+            "default_value": null,
+            "description": "Rabi-fit amplitude",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_angle": {
+            "default_value": null,
+            "description": "Rabi IQ angle",
+            "resolution": "database_required",
+            "unit": "rad",
+            "user_override": "allowed"
+          },
+          "rabi_distance": {
+            "default_value": null,
+            "description": "Rabi IQ offset perpendicular to the Rabi axis",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_noise": {
+            "default_value": null,
+            "description": "Rabi-fit noise",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_offset": {
+            "default_value": null,
+            "description": "Rabi-fit offset",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_phase": {
+            "default_value": null,
+            "description": "Rabi-fit phase",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_r2": {
+            "default_value": null,
+            "description": "Rabi-fit R²",
+            "greater_than_or_equal": 0.6,
+            "resolution": "database_required",
+            "unit": "",
+            "user_override": "allowed"
+          },
+          "rabi_reference_phase": {
+            "default_value": null,
+            "description": "Rabi reference phase",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "description": "Reference readout amplitude",
+            "greater_than": 0,
+            "less_than_or_equal": 1,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "description": "Readout-frequency sweep center",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CharacterizeFilteredCKP",
+        "run_parameters": {
+          "enable_rough_search": {
+            "description": "Adjust drive amplitude before CKP",
+            "unit": "",
+            "value": true,
+            "value_type": "bool"
+          },
+          "interval": {
+            "description": "Shot interval",
+            "unit": "ns",
+            "value": 153600,
+            "value_type": "int"
+          },
+          "max_rough_search_increases": {
+            "description": "Maximum rough-search increases",
+            "unit": "a.u.",
+            "value": 4,
+            "value_type": "int"
+          },
+          "max_rough_search_reductions": {
+            "description": "Maximum rough-search reductions",
+            "unit": "a.u.",
+            "value": 4,
+            "value_type": "int"
+          },
+          "qubit_detuning_range": {
+            "description": "Qubit-frequency offsets. Uses Qubex's CKP default when unset.",
+            "unit": "GHz",
+            "value": null,
+            "value_type": "list"
+          },
+          "qubit_drive_duration": {
+            "description": "CKP qubit-drive duration",
+            "unit": "ns",
+            "value": 128.0,
+            "value_type": "float"
+          },
+          "qubit_drive_scale": {
+            "description": "Relative CKP qubit-drive area",
+            "unit": "",
+            "value": 0.8,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration. Uses the Qubex session default when unset.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "float"
+          },
+          "resonator_detuning_range": {
+            "description": "Readout-frequency offsets. Uses Qubex's CKP default when unset.",
+            "unit": "GHz",
+            "value": null,
+            "value_type": "list"
+          },
+          "resonator_drive_amplitude_ratio": {
+            "description": "CKP resonator-drive amplitude relative to readout_amplitude",
+            "unit": "",
+            "value": 0.5,
+            "value_type": "float"
+          },
+          "resonator_settle_duration": {
+            "description": "Resonator settling time",
+            "unit": "ns",
+            "value": 512.0,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Shots per CKP point",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "target_min_qubit_detuning": {
+            "description": "Target minimum Stark-shift detuning during rough search",
+            "unit": "GHz",
+            "value": -0.02,
+            "value_type": "float"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "Check1QGateCoherenceLimit",
         "description": "Task to calculate 1Q gate coherence limit from T1, T2, and gate duration.",
         "file_path": "benchmark/check_1q_gate_coherence_limit.py",
