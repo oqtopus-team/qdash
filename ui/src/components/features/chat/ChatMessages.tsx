@@ -1,14 +1,14 @@
 "use client";
 
-import React, { memo, useCallback, useState } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
   CheckCircle2,
   Copy,
   ImageIcon,
+  Pencil,
   RotateCcw,
-  Sparkles,
   Square,
   XCircle,
 } from "lucide-react";
@@ -64,18 +64,6 @@ function isErrorMessage(message: CopilotMessage): boolean {
 // ---------------------------------------------------------------------------
 // Small pieces
 // ---------------------------------------------------------------------------
-
-function AssistantAvatar({ active = false }: { active?: boolean }) {
-  return (
-    <div
-      className={`chat-avatar-slot chat-avatar-bot w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
-        active ? "chat-avatar-active" : ""
-      }`}
-    >
-      <Sparkles className="w-3.5 h-3.5 text-primary" />
-    </div>
-  );
-}
 
 function ActionButton({
   label,
@@ -256,7 +244,82 @@ function BlocksContent({
 // Messages
 // ---------------------------------------------------------------------------
 
-export const UserMessage = memo(function UserMessage({ message }: { message: CopilotMessage }) {
+export const UserMessage = memo(function UserMessage({
+  message,
+  canEdit,
+  onEdit,
+}: {
+  message: CopilotMessage;
+  /** Nothing is streaming, so the message can be edited and resent. */
+  canEdit: boolean;
+  onEdit: (text: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(message.content);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const startEdit = useCallback(() => {
+    setDraft(message.content);
+    setEditing(true);
+  }, [message.content]);
+
+  const cancelEdit = useCallback(() => setEditing(false), []);
+
+  const submitEdit = useCallback(() => {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    setEditing(false);
+    if (trimmed !== message.content) onEdit(trimmed);
+  }, [draft, message.content, onEdit]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 320)}px`;
+  }, [editing, draft]);
+
+  if (editing) {
+    return (
+      <div className="chat-user-edit animate-fade-in-up">
+        <textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === "Escape") {
+              e.preventDefault();
+              cancelEdit();
+            } else if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submitEdit();
+            }
+          }}
+          rows={1}
+          aria-label="Edit message"
+          className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-[15px] leading-6"
+        />
+        <div className="flex items-center justify-end gap-2 mt-2">
+          <button type="button" onClick={cancelEdit} className="btn btn-ghost btn-sm rounded-full">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submitEdit}
+            disabled={!draft.trim()}
+            className="btn btn-primary btn-sm rounded-full"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="group flex flex-col items-end gap-1 animate-fade-in-up">
       {message.attachedImage && (
@@ -265,11 +328,16 @@ export const UserMessage = memo(function UserMessage({ message }: { message: Cop
           Result figures attached
         </span>
       )}
-      <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] text-sm whitespace-pre-wrap break-words">
+      <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] text-[15px] leading-relaxed whitespace-pre-wrap break-words">
         {message.content}
       </div>
-      <div className="flex opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <CopyButton text={message.content} />
+        {canEdit && (
+          <ActionButton label="Edit message" onClick={startEdit}>
+            <Pencil className="w-3.5 h-3.5" />
+          </ActionButton>
+        )}
       </div>
     </div>
   );
@@ -297,49 +365,47 @@ export const AssistantMessage = memo(function AssistantMessage({
 }) {
   if (isErrorMessage(message)) {
     return (
-      <div className="flex gap-3 animate-fade-in-up">
-        <AssistantAvatar />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-2 text-sm text-error bg-error/5 rounded-xl px-4 py-3 border border-error/20">
-            <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span className="break-words min-w-0">{message.content.slice("Error: ".length)}</span>
-          </div>
-          {isLast && canRetry && (
-            <button type="button" onClick={onRetry} className="btn btn-ghost btn-xs gap-1.5 mt-2">
-              <RotateCcw className="w-3.5 h-3.5" />
-              Retry
-            </button>
-          )}
+      <div className="chat-assistant-row animate-fade-in-up">
+        <div className="flex items-start gap-2 text-sm text-error bg-error/5 rounded-xl px-4 py-3 border border-error/20">
+          <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span className="break-words min-w-0">{message.content.slice("Error: ".length)}</span>
         </div>
+        {isLast && canRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="btn btn-ghost btn-sm gap-1.5 mt-2 rounded-full"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Retry
+          </button>
+        )}
       </div>
     );
   }
 
   const blocks = parseBlocksContent(message.content);
   return (
-    <div className="group flex gap-3">
-      <AssistantAvatar />
-      <div className="flex-1 min-w-0 pt-0.5">
-        {blocks ? (
-          <BlocksContent
-            blocks={blocks}
-            interaction={{ active: isLast && canRetry, answer, onAnswer, onDecide, onOther }}
-          />
-        ) : (
-          <ChatMarkdown>{message.content}</ChatMarkdown>
+    <div className="group chat-assistant-row">
+      {blocks ? (
+        <BlocksContent
+          blocks={blocks}
+          interaction={{ active: isLast && canRetry, answer, onAnswer, onDecide, onOther }}
+        />
+      ) : (
+        <ChatMarkdown>{message.content}</ChatMarkdown>
+      )}
+      <div
+        className={`mt-1.5 -ml-1.5 flex items-center gap-0.5 transition-opacity ${
+          isLast ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+        }`}
+      >
+        <CopyButton text={messageText(message.content)} />
+        {isLast && canRetry && (
+          <ActionButton label="Regenerate" onClick={onRetry}>
+            <RotateCcw className="w-3.5 h-3.5" />
+          </ActionButton>
         )}
-        <div
-          className={`mt-1 -ml-1.5 flex items-center gap-0.5 transition-opacity ${
-            isLast ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
-          }`}
-        >
-          <CopyButton text={messageText(message.content)} />
-          {isLast && canRetry && (
-            <ActionButton label="Regenerate" onClick={onRetry}>
-              <RotateCcw className="w-3.5 h-3.5" />
-            </ActionButton>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -366,20 +432,18 @@ export function LiveAssistantMessage({
   );
 
   return (
-    <div className="flex gap-3 animate-fade-in-up" aria-live="polite" aria-busy="true">
-      <AssistantAvatar active />
-      <div className="flex-1 min-w-0 pt-0.5">
-        <LiveTrace steps={work} />
-        {answer ? (
-          <ChatMarkdown className="chat-streaming">{answer}</ChatMarkdown>
-        ) : (
-          !busy && (
-            <div className="flex items-center gap-2 h-7 text-sm">
-              <span className="chat-shimmer-text">{statusMessage || "Thinking"}</span>
-            </div>
-          )
-        )}
-      </div>
+    <div className="chat-assistant-row animate-fade-in-up" aria-live="polite" aria-busy="true">
+      <LiveTrace steps={work} />
+      {answer ? (
+        <ChatMarkdown className="chat-streaming">{answer}</ChatMarkdown>
+      ) : (
+        !busy && (
+          <div className="flex items-center gap-2 h-7 text-sm">
+            <span className="chat-pulse-dot" aria-hidden="true" />
+            <span className="chat-shimmer-text">{statusMessage || "Thinking"}</span>
+          </div>
+        )
+      )}
     </div>
   );
 }

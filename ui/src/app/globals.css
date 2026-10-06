@@ -1469,16 +1469,6 @@ html[data-theme="dark"],
    Chat UI Styles
    ======================================== */
 
-/* User message bubble - uses primary gradient consistent with btn-primary */
-.chat-bubble-user {
-  background: linear-gradient(
-    135deg,
-    var(--color-primary),
-    color-mix(in oklch, var(--color-primary) 80%, var(--color-accent))
-  );
-  color: var(--color-primary-content);
-}
-
 /* Bot avatar icon background */
 .chat-avatar-bot {
   background: linear-gradient(
@@ -1487,55 +1477,6 @@ html[data-theme="dark"],
     color-mix(in oklch, var(--color-accent) 8%, transparent)
   );
   border: 1px solid color-mix(in oklch, var(--color-primary) 15%, transparent);
-}
-
-/* Active session in sidebar */
-.chat-session-active {
-  background: color-mix(in oklch, var(--color-primary) 8%, transparent);
-  border: 1px solid color-mix(in oklch, var(--color-primary) 20%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-primary) 5%, transparent);
-}
-
-/* Input card container */
-.chat-input-card {
-  background: var(--color-base-100);
-  border: 2px solid var(--color-base-300);
-  border-radius: 1rem;
-  padding: 0.25rem 0.75rem;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.3s ease;
-}
-
-.chat-input-card:focus-within {
-  border-color: var(--color-primary);
-  box-shadow:
-    0 0 0 4px color-mix(in oklch, var(--color-primary) 15%, transparent),
-    0 4px 12px -2px rgb(0 0 0 / 0.08);
-}
-
-/* Suggestion cards in empty state */
-.chat-suggestion-card {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
-  border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
-  background: var(--color-base-100);
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
-}
-
-.chat-suggestion-card:hover {
-  border-color: color-mix(in oklch, var(--color-primary) 30%, transparent);
-  background: color-mix(in oklch, var(--color-primary) 3%, var(--color-base-100));
-  box-shadow:
-    0 4px 6px -1px rgb(0 0 0 / 0.07),
-    0 0 0 1px color-mix(in oklch, var(--color-primary) 10%, transparent);
-  transform: translateY(-1px);
 }
 
 /* Fade-in-up animation for new messages */
@@ -1559,20 +1500,6 @@ html[data-theme="dark"],
 .chat-bubble-user-soft {
   background: color-mix(in oklch, var(--color-base-content) 7%, var(--color-base-100));
   color: var(--color-base-content);
-}
-
-.chat-avatar-active {
-  animation: chatAvatarPulse 1.8s ease-in-out infinite;
-}
-
-@keyframes chatAvatarPulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 25%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-primary) 0%, transparent);
-  }
 }
 
 .chat-sidebar {
@@ -1620,6 +1547,93 @@ html[data-theme="dark"],
   background: color-mix(in oklch, var(--color-base-content) 9%, transparent);
   color: var(--color-base-content);
   font-weight: 500;
+}
+
+/* "..." menu button on the right of a sidebar item, shown on hover like ChatGPT. */
+.chat-sidebar-item-actions {
+  position: absolute;
+  right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.group:hover > .chat-sidebar-item-actions,
+.group:focus-within > .chat-sidebar-item-actions {
+  opacity: 1;
+}
+
+.chat-sidebar-rename {
+  width: 100%;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  background: var(--color-base-100);
+  border: 1px solid color-mix(in oklch, var(--color-primary) 50%, transparent);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 12%, transparent);
+}
+
+/* Suggestion pills under the composer (ChatGPT / Claude style). */
+.chat-suggestion-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.875rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 12%, transparent);
+  background: var(--color-base-100);
+  color: color-mix(in oklch, var(--color-base-content) 75%, transparent);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.chat-suggestion-pill:hover {
+  border-color: color-mix(in oklch, var(--color-base-content) 22%, transparent);
+  background: color-mix(in oklch, var(--color-base-content) 4%, var(--color-base-100));
+  color: var(--color-base-content);
+}
+
+/* Assistant answers sit flush left, full width, with no avatar (ChatGPT style). */
+.chat-assistant-row {
+  min-width: 0;
+}
+
+/* Inline editor for a sent user message. */
+.chat-user-edit {
+  margin-left: auto;
+  width: 100%;
+  padding: 0.75rem 1rem 0.625rem;
+  border-radius: 1.25rem;
+  background: color-mix(in oklch, var(--color-base-content) 5%, var(--color-base-100));
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
+}
+
+/* Small breathing dot next to the "Thinking" label. */
+.chat-pulse-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 9999px;
+  background: var(--color-base-content);
+  animation: chatPulseDot 1.2s ease-in-out infinite;
+}
+
+@keyframes chatPulseDot {
+  0%,
+  100% {
+    transform: scale(0.75);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
 }
 
 .chat-composer {
@@ -1915,10 +1929,6 @@ html[data-theme="dark"],
 .chat-compact .chat-composer {
   border-radius: 1.125rem;
   padding: 0.5rem 0.5rem 0.4rem 0.625rem;
-}
-
-.chat-compact-xs .chat-avatar-slot {
-  display: none;
 }
 
 .chat-compact-xs .chat-prose {

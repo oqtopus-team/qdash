@@ -67,6 +67,7 @@ interface CopilotChatSessionContextValue {
   switchSession: (sessionId: string | null) => void;
   createNewSession: (context?: AnalysisContext | null) => string;
   deleteSession: (sessionId: string) => void;
+  renameSession: (sessionId: string, title: string) => void;
   findSessionByContext: (context: AnalysisContext) => CopilotChatSession | null;
 
   sendMessage: (text: string, options?: SendOptions) => void;
@@ -412,6 +413,24 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
     [awaitCreate],
   );
 
+  const renameSession = useCallback(
+    (sessionId: string, title: string) => {
+      const trimmed = title.trim();
+      if (!trimmed) return;
+      const update = (s: CopilotChatSession): CopilotChatSession =>
+        s.id === sessionId ? { ...s, title: trimmed } : s;
+      sessionsRef.current = sessionsRef.current.map(update);
+      setSessions((prev) => prev.map(update));
+      (async () => {
+        await awaitCreate(sessionId);
+        apiUpdateSession(sessionId, { title: trimmed }).catch(() => {
+          /* swallow — local state is the source of truth until reload */
+        });
+      })();
+    },
+    [awaitCreate],
+  );
+
   const updateSessionMessages = useCallback(
     (sessionId: string, messages: ChatMessage[]) => {
       // Derive a sidebar title from the first user message while the session
@@ -612,6 +631,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
       switchSession,
       createNewSession,
       deleteSession,
+      renameSession,
       findSessionByContext,
       sendMessage,
       stop,
@@ -625,6 +645,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
       switchSession,
       createNewSession,
       deleteSession,
+      renameSession,
       findSessionByContext,
       sendMessage,
       stop,

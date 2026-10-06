@@ -199,6 +199,71 @@ describe("useCopilotChat streaming", () => {
     expect(saved.blocks[0].content).toBe("T2 echo measures");
   });
 
+  it("edits a sent message by resending it with the history before it", async () => {
+    const result = await renderChat();
+
+    act(() => result.current.chat.send("Show T1 for Q00"));
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+    stream.push(sse("result", { blocks: [{ type: "text", content: "Here", chart: null }] }));
+    stream.close();
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(false));
+    expect(result.current.chat.messages).toHaveLength(2);
+
+    stream = controllableStream();
+    fetchMock.mockClear();
+    act(() => result.current.chat.editMessage(0, "Show T2 for Q00"));
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+
+    // The old exchange is replaced by the edited question alone.
+    expect(result.current.chat.messages.map((m) => m.content)).toEqual(["Show T2 for Q00"]);
+    expect(streamRequest().body).toMatchObject({
+      message: "Show T2 for Q00",
+      conversation_history: [],
+    });
+  });
+
+  it("ignores edits of assistant messages and empty text", async () => {
+    const result = await renderChat();
+
+    act(() => result.current.chat.send("Hello"));
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+    stream.push(sse("result", { blocks: [{ type: "text", content: "Hi", chart: null }] }));
+    stream.close();
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(false));
+    fetchMock.mockClear();
+
+    act(() => result.current.chat.editMessage(1, "Not a user message"));
+    act(() => result.current.chat.editMessage(0, "   "));
+
+    expect(result.current.chat.isStreaming).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/stream"))).toBe(false);
+  });
+
+  it("renames a session locally and on the server", async () => {
+    const result = await renderChat();
+
+    act(() => result.current.chat.send("Hello"));
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+    const id = result.current.chat.session!.id;
+
+    act(() => result.current.store.renameSession(id, "  T1 drift  "));
+    expect(result.current.chat.session?.title).toBe("T1 drift");
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) =>
+            String(url).endsWith(`/copilot/chat/sessions/${id}`) &&
+            init?.method === "PATCH" &&
+            JSON.parse(String(init.body)).title === "T1 drift",
+        ),
+      ).toBe(true),
+    );
+
+    // Blank titles are ignored.
+    act(() => result.current.store.renameSession(id, "   "));
+    expect(result.current.chat.session?.title).toBe("T1 drift");
+  });
+
   it("records a stream that ends without a result as an error", async () => {
     const result = await renderChat();
 

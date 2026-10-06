@@ -104,6 +104,17 @@ export function useCopilotChat(sessionId?: string | null) {
     });
   }, [id, messages, modelOverride, run, sendMessage]);
 
+  /** Replace the user message at `index` and everything after it with a new turn. */
+  const editMessage = useCallback(
+    (index: number, text: string) => {
+      const trimmed = text.trim();
+      if (!id || run || !trimmed) return;
+      if (messages[index]?.role !== "user") return;
+      sendMessage(trimmed, { sessionId: id, history: messages.slice(0, index), modelOverride });
+    },
+    [id, messages, modelOverride, run, sendMessage],
+  );
+
   return {
     session,
     messages,
@@ -116,5 +127,6 @@ export function useCopilotChat(sessionId?: string | null) {
     decide,
     stop,
     retryLast,
+    editMessage,
   };
 }

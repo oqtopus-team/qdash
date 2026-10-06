@@ -1,15 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Ellipsis,
   FlaskConical,
   MessageSquare,
   PanelLeftClose,
+  Pencil,
   Search,
   SquarePen,
   Trash2,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/DropdownMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import type { CopilotSession } from "@/hooks/useCopilotChat";
 
@@ -36,12 +44,105 @@ function groupSessions(sessions: CopilotSession[]): [string, CopilotSession[]][]
   return [...groups.entries()];
 }
 
+/** Inline title editor: Enter or blur commits, Esc cancels. */
+export function RenameInput({
+  initial,
+  onCommit,
+  onCancel,
+  className = "chat-sidebar-rename",
+}: {
+  initial: string;
+  onCommit: (title: string) => void;
+  onCancel: () => void;
+  className?: string;
+}) {
+  const [value, setValue] = useState(initial);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Browsers blur an element that is removed while focused; once the editor
+  // has committed or cancelled, that late blur must not commit again.
+  const done = useRef(false);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  const finish = (commit: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    const trimmed = value.trim();
+    if (commit && trimmed && trimmed !== initial) onCommit(trimmed);
+    else onCancel();
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={() => finish(true)}
+      onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing) return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          finish(true);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          finish(false);
+        }
+      }}
+      aria-label="Chat title"
+      className={className}
+    />
+  );
+}
+
+/** Rename / Delete menu for one chat, used by the sidebar and the page header. */
+export function SessionMenu({
+  session,
+  onRename,
+  onDelete,
+  className,
+  onOpenChange,
+}: {
+  session: CopilotSession;
+  onRename: () => void;
+  onDelete: () => void;
+  className?: string;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  return (
+    <DropdownMenu onOpenChange={onOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={`btn btn-ghost btn-xs btn-square text-base-content/50 hover:text-base-content ${className ?? ""}`}
+          aria-label={`Options for ${session.title}`}
+        >
+          <Ellipsis className="w-4 h-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-40">
+        <DropdownMenuItem onSelect={onRename}>
+          <Pencil className="w-3.5 h-3.5 text-base-content/60" />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onDelete} className="text-error data-[highlighted]:text-error">
+          <Trash2 className="w-3.5 h-3.5" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 interface ChatSidebarProps {
   sessions: CopilotSession[];
   activeSessionId: string | null;
   isLoading: boolean;
   onNewChat: () => void;
   onSelect: (id: string) => void;
+  onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }
@@ -52,11 +153,14 @@ export function ChatSidebar({
   isLoading,
   onNewChat,
   onSelect,
+  onRename,
   onDelete,
   onClose,
 }: ChatSidebarProps) {
   const [query, setQuery] = useState("");
   const [pendingDelete, setPendingDelete] = useState<CopilotSession | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -122,11 +226,27 @@ export function ChatSidebar({
             <ul className="space-y-px">
               {items.map((session) => {
                 const active = session.id === activeSessionId;
+                if (renamingId === session.id) {
+                  return (
+                    <li key={session.id} className="px-0.5">
+                      <RenameInput
+                        initial={session.title}
+                        onCommit={(title) => {
+                          onRename(session.id, title);
+                          setRenamingId(null);
+                        }}
+                        onCancel={() => setRenamingId(null)}
+                      />
+                    </li>
+                  );
+                }
+                const menuOpen = menuOpenId === session.id;
                 return (
                   <li key={session.id} className="group relative">
                     <button
                       type="button"
                       onClick={() => onSelect(session.id)}
+                      onDoubleClick={() => setRenamingId(session.id)}
                       className={`chat-sidebar-item ${active ? "chat-sidebar-item-active" : ""}`}
                       aria-current={active ? "page" : undefined}
                       title={session.title}
@@ -139,18 +259,18 @@ export function ChatSidebar({
                       )}
                       <span className="truncate">{session.title}</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setPendingDelete(session)}
-                      className={`absolute right-1 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-error ${
-                        active
-                          ? "opacity-100"
-                          : "opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    <span
+                      className={`chat-sidebar-item-actions ${
+                        active || menuOpen ? "opacity-100" : ""
                       }`}
-                      aria-label={`Delete ${session.title}`}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      <SessionMenu
+                        session={session}
+                        onRename={() => setRenamingId(session.id)}
+                        onDelete={() => setPendingDelete(session)}
+                        onOpenChange={(open) => setMenuOpenId(open ? session.id : null)}
+                      />
+                    </span>
                   </li>
                 );
               })}

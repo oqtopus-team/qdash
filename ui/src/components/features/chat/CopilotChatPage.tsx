@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { PanelLeftOpen, SquarePen } from "lucide-react";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
-import { ChatSidebar } from "@/components/features/chat/ChatSidebar";
+import { ChatSidebar, RenameInput, SessionMenu } from "@/components/features/chat/ChatSidebar";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   ChatThread,
   ContextChip,
@@ -47,9 +48,12 @@ export function CopilotChatPage() {
     isLoadingSessions,
     switchSession,
     deleteSession,
+    renameSession,
   } = useCopilotChatSessionContext();
 
   const [showSidebar, setShowSidebar] = useState(true);
+  const [renaming, setRenaming] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const threadRef = useRef<ChatThreadHandle>(null);
 
@@ -115,6 +119,7 @@ export function CopilotChatPage() {
               isLoading={isLoadingSessions}
               onNewChat={handleNewChat}
               onSelect={handleSelect}
+              onRename={renameSession}
               onDelete={deleteSession}
               onClose={() => setShowSidebar(false)}
             />
@@ -134,18 +139,60 @@ export function CopilotChatPage() {
               </HeaderButton>
             </>
           )}
-          <h2 className="ml-1 text-sm font-medium truncate text-base-content/80">
-            {activeSession && hasMessages ? activeSession.title : "AI Chat"}
-          </h2>
-          {activeSession?.context && hasMessages && (
-            <span className="ml-1 min-w-0 shrink">
-              <ContextChip context={activeSession.context} />
-            </span>
+          {activeSession && hasMessages ? (
+            renaming ? (
+              <RenameInput
+                key={activeSession.id}
+                initial={activeSession.title}
+                onCommit={(title) => {
+                  renameSession(activeSession.id, title);
+                  setRenaming(false);
+                }}
+                onCancel={() => setRenaming(false)}
+                className="chat-sidebar-rename ml-1 max-w-sm flex-1 text-sm font-medium"
+              />
+            ) : (
+              <div className="ml-1 flex items-center gap-1 min-w-0">
+                <h2 className="text-sm font-medium truncate text-base-content/80">
+                  {activeSession.title}
+                </h2>
+                {activeSession.context && (
+                  <span className="ml-1 min-w-0 shrink">
+                    <ContextChip context={activeSession.context} />
+                  </span>
+                )}
+                <SessionMenu
+                  session={activeSession}
+                  onRename={() => setRenaming(true)}
+                  onDelete={() => setConfirmDelete(true)}
+                  className="opacity-60 hover:opacity-100"
+                />
+              </div>
+            )
+          ) : (
+            <h2 className="ml-1 text-sm font-medium truncate text-base-content/80">AI Chat</h2>
           )}
         </header>
 
         <ChatThread ref={threadRef} variant="page" />
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete chat?"
+        description={
+          <>
+            This will delete <strong>{activeSession?.title}</strong>. This cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => {
+          if (activeSession) deleteSession(activeSession.id);
+          setConfirmDelete(false);
+        }}
+        onOpenChange={(open) => !open && setConfirmDelete(false)}
+      />
     </div>
   );
 }

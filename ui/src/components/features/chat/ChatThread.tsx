@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCopilotChat } from "@/hooks/useCopilotChat";
 import { ChatComposer, type ChatComposerHandle } from "@/components/features/chat/ChatComposer";
 import {
@@ -71,6 +72,13 @@ function ScrollToBottomButton() {
   );
 }
 
+function greetingFor(hour: number): string {
+  if (hour < 5) return "Working late";
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
 function EmptyState({
   variant,
   context,
@@ -80,55 +88,84 @@ function EmptyState({
   context: AnalysisContext | null;
   onPick: (text: string) => void;
 }) {
+  const { user, username } = useAuth();
   const suggestions = context ? ANALYSIS_SUGGESTIONS : GENERAL_SUGGESTIONS;
   const large = variant === "page";
+  const name = user?.display_name || username;
   const title = context
     ? "Ask about this result"
     : large
-      ? "How can I help with your qubits?"
+      ? `${greetingFor(new Date().getHours())}${name ? `, ${name}` : ""}`
       : "Ask anything about calibration";
 
-  return (
-    <div className={`w-full mx-auto text-center ${large ? "max-w-2xl px-4" : "px-1"}`}>
-      {large && (
-        <div className="chat-avatar-bot w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-5">
-          <Sparkles className="w-6 h-6 text-primary" />
+  if (large) {
+    return (
+      <div className="w-full text-center px-4">
+        <div className="chat-avatar-bot w-11 h-11 rounded-2xl flex items-center justify-center mx-auto mb-5">
+          <Sparkles className="w-5 h-5 text-primary" />
         </div>
-      )}
+        {context && (
+          <div className="mb-3">
+            <ContextChip context={context} />
+          </div>
+        )}
+        <h2 className="text-2xl sm:text-[28px] font-medium tracking-tight">{title}</h2>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full mx-auto px-1">
       {context && (
         <div className="mb-2">
           <ContextChip context={context} />
         </div>
       )}
-      <h2
-        className={
-          large
-            ? "text-2xl sm:text-3xl font-semibold tracking-tight mb-2"
-            : "text-sm font-semibold mb-1"
-        }
-      >
-        {title}
-      </h2>
-      <p className={`text-base-content/50 ${large ? "text-sm mb-8" : "text-xs mb-4"}`}>
+      <h2 className="text-sm font-semibold mb-1">{title}</h2>
+      <p className="text-xs text-base-content/50 mb-4">
         {context
           ? "The result figures are attached to your first question."
           : "I can fetch parameters, analyze trends, run Python and plot charts."}
       </p>
-      <div
-        className={`grid gap-2 text-left ${large ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}
-      >
+      <div className="flex flex-wrap gap-1.5">
         {(variant === "compact" ? suggestions.slice(0, 3) : suggestions).map(({ text, Icon }) => (
           <button
             key={text}
             type="button"
             onClick={() => onPick(text)}
-            className={`chat-suggestion-card group ${large ? "" : "!py-2 !px-3"}`}
+            className="chat-suggestion-pill group"
           >
-            <Icon className="w-4 h-4 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
-            <span className={`leading-snug flex-1 ${large ? "text-sm" : "text-xs"}`}>{text}</span>
+            <Icon className="w-3.5 h-3.5 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
+            <span className="text-xs leading-snug">{text}</span>
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Suggestion pills under the composer on the page. */
+function SuggestionPills({
+  context,
+  onPick,
+}: {
+  context: AnalysisContext | null;
+  onPick: (text: string) => void;
+}) {
+  const suggestions = context ? ANALYSIS_SUGGESTIONS : GENERAL_SUGGESTIONS;
+  return (
+    <div className="flex flex-wrap justify-center gap-2 mt-4 animate-fade-in-up">
+      {suggestions.map(({ text, Icon }) => (
+        <button
+          key={text}
+          type="button"
+          onClick={() => onPick(text)}
+          className="chat-suggestion-pill group"
+        >
+          <Icon className="w-3.5 h-3.5 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
+          <span className="text-[13px] leading-snug">{text}</span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -160,6 +197,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     decide,
     stop,
     retryLast,
+    editMessage,
   } = useCopilotChat(sessionId);
   const [input, setInput] = useState("");
   const composerRef = useRef<ChatComposerHandle>(null);
@@ -228,10 +266,11 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
         } ${density}`}
       >
         {variant === "page" ? (
-          <>
+          <div className="w-full max-w-3xl px-4">
             <EmptyState variant={variant} context={context} onPick={submit} />
-            <div className="w-full max-w-3xl px-4 mt-8">{composer}</div>
-          </>
+            <div className="mt-8">{composer}</div>
+            <SuggestionPills context={context} onPick={submit} />
+          </div>
         ) : (
           <>
             <div className={`flex-1 flex items-center ${pad} py-4`}>
@@ -248,7 +287,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     <div className={`flex-1 min-h-0 flex flex-col ${density}`}>
       <StickToBottom className="relative flex-1 min-h-0" resize="smooth" initial="instant">
         <StickToBottom.Content
-          className={`${variant === "page" ? "max-w-3xl mx-auto px-4 pt-4 pb-10 space-y-8" : `${pad} pt-3 pb-6 space-y-5`}`}
+          className={`${variant === "page" ? "max-w-3xl mx-auto px-4 pt-6 pb-10 space-y-7" : `${pad} pt-3 pb-6 space-y-5`}`}
         >
           {isLoadingMessages && (
             <div className="space-y-6 pt-4" aria-label="Loading messages">
@@ -258,7 +297,12 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
           )}
           {messages.map((msg, idx) =>
             msg.role === "user" ? (
-              <UserMessage key={idx} message={msg} />
+              <UserMessage
+                key={idx}
+                message={msg}
+                canEdit={!isStreaming && !isLoadingMessages}
+                onEdit={(text) => editMessage(idx, text)}
+              />
             ) : (
               <AssistantMessage
                 key={idx}
