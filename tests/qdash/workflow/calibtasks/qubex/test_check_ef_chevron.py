@@ -86,7 +86,7 @@ def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monk
     exp.modified_frequencies.assert_called_once_with({"Q00_ge": 5.001, "Q00_read": 6.1})
 
 
-def test_postprocess_uses_final_frequency_and_returns_search_and_final_figures() -> None:
+def test_postprocess_uses_final_frequency_and_prioritizes_final_chevron_figure() -> None:
     figures = {
         "Q00_ef_search_measurement": go.Figure(),
         "Q00_ef_search_transform": go.Figure(),
@@ -100,7 +100,16 @@ def test_postprocess_uses_final_frequency_and_returns_search_and_final_figures()
     assert all(
         p.unit == "GHz" and p.execution_id == "exec-1" for p in result.output_parameters.values()
     )
-    assert result.figures == list(figures.values())
+    expected_keys = [
+        "Q00_ef_measurement",
+        "Q00_ef_search_measurement",
+        "Q00_ef_search_transform",
+        "Q00_ef_transform",
+    ]
+    assert len(result.figures) == len(expected_keys)
+    assert all(
+        figure is figures[key] for figure, key in zip(result.figures, expected_keys, strict=True)
+    )
 
 
 @pytest.mark.parametrize(
