@@ -264,6 +264,9 @@ services:
       # token has to be provisioned by hand. Raw GET access is always excluded;
       # reviewed write tools require an explicit experimental opt-in above.
       - QDASH_BASE_URL=http://api:${API_PORT:-5715}
+      # Links in Copilot answers point here. QDASH_BASE_URL is an internal
+      # hostname, so the browser-facing UI address comes from CLIENT_URL.
+      - QDASH_WEB_URL=${CLIENT_URL:-http://localhost:${UI_PORT:-5714}}
       # Pi hides models whose provider has no credential, even when the server
       # ignores it. Keep a placeholder for keyless local endpoints.
       - OLLAMA_API_KEY=${OLLAMA_API_KEY:-ollama}

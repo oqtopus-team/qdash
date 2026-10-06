@@ -33,17 +33,12 @@ BRINGUP_TASKS: list[str] = [
     "CheckAdaptiveChevron",
 ]
 
+# Coarse one-qubit calibration: Rabi, then the HPI and PI pulses. DRAG pulses
+# and coherence checks are their own steps so a pipeline can filter first.
 CHECK_1Q_TASKS: list[str] = [
     "CheckRabi",
-    "CheckRabi",
     "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CheckT1",
-    "CheckT2Echo",
-    "CheckRamsey",
+    "CreatePIPulse",
 ]
 
 FULL_1Q_TASKS_AFTER_CHECK: list[str] = [
