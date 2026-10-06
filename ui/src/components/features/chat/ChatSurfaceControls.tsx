@@ -63,7 +63,7 @@ export function SurfaceTitle() {
 
 /** Jump back to a recent chat without leaving the page. Full history lives on /chat. */
 export function RecentChatsMenu({ onOpenAll }: { onOpenAll: () => void }) {
-  const { sessions, activeSessionId, switchSession } = useCopilotChatSessionContext();
+  const { sessions, activeSessionId, runs, switchSession } = useCopilotChatSessionContext();
   const recent = [...sessions].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, RECENT_LIMIT);
 
   return (
@@ -99,6 +99,9 @@ export function RecentChatsMenu({ onOpenAll }: { onOpenAll: () => void }) {
               <MessageSquare className="w-3.5 h-3.5 shrink-0 text-base-content/45" />
             )}
             <span className="truncate">{session.title}</span>
+            {session.id in runs && (
+              <span className="chat-pulse-dot ml-auto shrink-0" title="Answering" />
+            )}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />

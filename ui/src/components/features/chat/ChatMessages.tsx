@@ -10,20 +10,27 @@ import {
   Pencil,
   RotateCcw,
   Square,
+  ThumbsDown,
+  ThumbsUp,
   XCircle,
 } from "lucide-react";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
 import { ChatTraceSummary, LiveTrace } from "@/components/features/chat/ChatTrace";
+import { FigureStrip, figuresInSteps } from "@/components/features/chat/ChatFigures";
 import {
   ApprovalCard,
   AskCard,
   type InteractionState,
 } from "@/components/features/chat/ChatInteractionCards";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
+import { Loader } from "@/components/ui/Loader";
+import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { answerStartIndex } from "@/lib/copilotChatStream";
+import { answerFeedback } from "@/hooks/useCopilotChat";
 import type {
+  AnswerFeedback,
   BlocksResult,
   ChatMessage as CopilotMessage,
   CopilotBlocksResult,
@@ -68,10 +75,13 @@ function isErrorMessage(message: CopilotMessage): boolean {
 function ActionButton({
   label,
   onClick,
+  active = false,
   children,
 }: {
   label: string;
   onClick: () => void;
+  /** A toggle that is on, e.g. the rating the user gave. */
+  active?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -80,14 +90,26 @@ function ActionButton({
         <button
           type="button"
           onClick={onClick}
-          className="btn btn-ghost btn-xs btn-square text-base-content/45 hover:text-base-content"
+          className={`btn btn-ghost btn-xs btn-square ${
+            active ? "text-primary" : "text-base-content/45 hover:text-base-content"
+          }`}
           aria-label={label}
+          aria-pressed={active}
         >
           {children}
         </button>
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
+  );
+}
+
+/** One assistant turn: full-width text, no avatar, like ChatGPT and Claude. */
+function AssistantRow({ className = "", children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`chat-assistant-row ${className}`} {...rest}>
+      {children}
+    </div>
   );
 }
 
@@ -199,9 +221,11 @@ function BlocksContent({
   blocks: CopilotBlocksResult;
   interaction: InteractionState;
 }) {
+  const figures = blocks.trace ? figuresInSteps(blocks.trace.steps) : [];
   return (
     <>
       {blocks.trace && <ChatTraceSummary trace={blocks.trace} />}
+      {figures.length > 0 && <FigureStrip paths={figures} className="mb-3" />}
       <ImageSentBadge imagesSent={blocks.images_sent} />
       {blocks.assessment && (
         <div className="mb-2">
@@ -352,6 +376,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   onAnswer,
   onDecide,
   onOther,
+  onRate,
 }: {
   message: CopilotMessage;
   isLast: boolean;
@@ -362,10 +387,11 @@ export const AssistantMessage = memo(function AssistantMessage({
   onAnswer: InteractionState["onAnswer"];
   onDecide: InteractionState["onDecide"];
   onOther: InteractionState["onOther"];
+  onRate: (feedback: AnswerFeedback) => void;
 }) {
   if (isErrorMessage(message)) {
     return (
-      <div className="chat-assistant-row animate-fade-in-up">
+      <AssistantRow className="animate-fade-in-up">
         <div className="flex items-start gap-2 text-sm text-error bg-error/5 rounded-xl px-4 py-3 border border-error/20">
           <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span className="break-words min-w-0">{message.content.slice("Error: ".length)}</span>
@@ -380,13 +406,14 @@ export const AssistantMessage = memo(function AssistantMessage({
             Retry
           </button>
         )}
-      </div>
+      </AssistantRow>
     );
   }
 
   const blocks = parseBlocksContent(message.content);
+  const feedback = answerFeedback(message);
   return (
-    <div className="group chat-assistant-row">
+    <AssistantRow className="group">
       {blocks ? (
         <BlocksContent
           blocks={blocks}
@@ -397,17 +424,33 @@ export const AssistantMessage = memo(function AssistantMessage({
       )}
       <div
         className={`mt-1.5 -ml-1.5 flex items-center gap-0.5 transition-opacity ${
-          isLast ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+          isLast || feedback
+            ? "opacity-100"
+            : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
         }`}
       >
         <CopyButton text={messageText(message.content)} />
+        <ActionButton
+          label={feedback === "up" ? "Rated helpful" : "Helpful"}
+          active={feedback === "up"}
+          onClick={() => onRate("up")}
+        >
+          <ThumbsUp className="w-3.5 h-3.5" />
+        </ActionButton>
+        <ActionButton
+          label={feedback === "down" ? "Rated not helpful" : "Not helpful"}
+          active={feedback === "down"}
+          onClick={() => onRate("down")}
+        >
+          <ThumbsDown className="w-3.5 h-3.5" />
+        </ActionButton>
         {isLast && canRetry && (
           <ActionButton label="Regenerate" onClick={onRetry}>
             <RotateCcw className="w-3.5 h-3.5" />
           </ActionButton>
         )}
       </div>
-    </div>
+    </AssistantRow>
   );
 });
 
@@ -432,18 +475,25 @@ export function LiveAssistantMessage({
   );
 
   return (
-    <div className="chat-assistant-row animate-fade-in-up" aria-live="polite" aria-busy="true">
+    <AssistantRow className="animate-fade-in-up" aria-live="polite" aria-busy="true">
       <LiveTrace steps={work} />
+      {answer && figuresInSteps(work).length > 0 && (
+        <FigureStrip paths={figuresInSteps(work)} className="mb-3" />
+      )}
       {answer ? (
         <ChatMarkdown className="chat-streaming">{answer}</ChatMarkdown>
       ) : (
         !busy && (
-          <div className="flex items-center gap-2 h-7 text-sm">
-            <span className="chat-pulse-dot" aria-hidden="true" />
-            <span className="chat-shimmer-text">{statusMessage || "Thinking"}</span>
+          <div className="flex items-center gap-2.5 h-7 text-sm">
+            <QdashBotAvatar size={20} className="chat-avatar-active" />
+            {statusMessage ? (
+              <Loader variant="text-shimmer" size="sm" text={statusMessage} />
+            ) : (
+              <Loader variant="typing" size="sm" />
+            )}
           </div>
         )
       )}
-    </div>
+    </AssistantRow>
   );
 }

@@ -1,19 +1,13 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import {
-  ArrowDown,
-  FlaskConical,
-  GitCompare,
-  History,
-  LineChart,
-  ListChecks,
-  Sparkles,
-} from "lucide-react";
+import { ArrowDown, FlaskConical } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
 import { useCopilotChat } from "@/hooks/useCopilotChat";
 import { ChatComposer, type ChatComposerHandle } from "@/components/features/chat/ChatComposer";
+import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import {
   AssistantMessage,
   LiveAssistantMessage,
@@ -27,20 +21,6 @@ import type { AnalysisContext } from "@/types/copilotChat";
  * - compact: the floating window above modals
  */
 type ChatThreadVariant = "page" | "panel" | "compact";
-
-const GENERAL_SUGGESTIONS = [
-  { text: "Show T1 trend for Q00", Icon: LineChart },
-  { text: "What are Q00's current parameters?", Icon: ListChecks },
-  { text: "Compare T1 and T2 for Q01", Icon: GitCompare },
-  { text: "Show gate fidelity history for Q00", Icon: History },
-];
-
-const ANALYSIS_SUGGESTIONS = [
-  { text: "How should I interpret this result?", Icon: FlaskConical },
-  { text: "Is this value within expected range?", Icon: ListChecks },
-  { text: "What could cause this issue?", Icon: GitCompare },
-  { text: "What should I try next?", Icon: Sparkles },
-];
 
 /** "CheckT1 · Q00" badge for chats about one result. */
 export function ContextChip({ context }: { context: AnalysisContext }) {
@@ -82,14 +62,15 @@ function greetingFor(hour: number): string {
 function EmptyState({
   variant,
   context,
+  suggestions,
   onPick,
 }: {
   variant: ChatThreadVariant;
   context: AnalysisContext | null;
+  suggestions: ChatSuggestion[];
   onPick: (text: string) => void;
 }) {
   const { user, username } = useAuth();
-  const suggestions = context ? ANALYSIS_SUGGESTIONS : GENERAL_SUGGESTIONS;
   const large = variant === "page";
   const name = user?.display_name || username;
   const title = context
@@ -101,9 +82,7 @@ function EmptyState({
   if (large) {
     return (
       <div className="w-full text-center px-4">
-        <div className="chat-avatar-bot w-11 h-11 rounded-2xl flex items-center justify-center mx-auto mb-5">
-          <Sparkles className="w-5 h-5 text-primary" />
-        </div>
+        <QdashBotAvatar size={48} className="mx-auto mb-5 chat-avatar-hero" />
         {context && (
           <div className="mb-3">
             <ContextChip context={context} />
@@ -146,13 +125,12 @@ function EmptyState({
 
 /** Suggestion pills under the composer on the page. */
 function SuggestionPills({
-  context,
+  suggestions,
   onPick,
 }: {
-  context: AnalysisContext | null;
+  suggestions: ChatSuggestion[];
   onPick: (text: string) => void;
 }) {
-  const suggestions = context ? ANALYSIS_SUGGESTIONS : GENERAL_SUGGESTIONS;
   return (
     <div className="flex flex-wrap justify-center gap-2 mt-4 animate-fade-in-up">
       {suggestions.map(({ text, Icon }) => (
@@ -198,12 +176,14 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     stop,
     retryLast,
     editMessage,
+    rateAnswer,
   } = useCopilotChat(sessionId);
   const [input, setInput] = useState("");
   const composerRef = useRef<ChatComposerHandle>(null);
   useImperativeHandle(ref, () => ({ focus: () => composerRef.current?.focus() }), []);
 
   const context = session?.context ?? null;
+  const suggestions = useChatSuggestions(Boolean(context));
   const isEmpty = messages.length === 0 && !liveTurn;
   const lastIndex = messages.length - 1;
 
@@ -267,14 +247,24 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       >
         {variant === "page" ? (
           <div className="w-full max-w-3xl px-4">
-            <EmptyState variant={variant} context={context} onPick={submit} />
+            <EmptyState
+              variant={variant}
+              context={context}
+              suggestions={suggestions}
+              onPick={submit}
+            />
             <div className="mt-8">{composer}</div>
-            <SuggestionPills context={context} onPick={submit} />
+            <SuggestionPills suggestions={suggestions} onPick={submit} />
           </div>
         ) : (
           <>
             <div className={`flex-1 flex items-center ${pad} py-4`}>
-              <EmptyState variant={variant} context={context} onPick={submit} />
+              <EmptyState
+                variant={variant}
+                context={context}
+                suggestions={suggestions}
+                onPick={submit}
+              />
             </div>
             <div className={`${pad} pb-3`}>{composer}</div>
           </>
@@ -314,6 +304,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
                 onAnswer={submit}
                 onDecide={decide}
                 onOther={focusComposer}
+                onRate={(feedback) => rateAnswer(idx, feedback)}
               />
             ),
           )}

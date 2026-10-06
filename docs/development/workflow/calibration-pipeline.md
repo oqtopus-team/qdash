@@ -46,6 +46,12 @@ One-qubit steps take `mode` (`synchronized`, `scheduled`, `simultaneous_spectros
 
 The step order is checked the same way `Pipeline._validate` checks it in the worker: a step that lists several requirements needs at least one of them.
 
+## Following a run
+
+`CalibService.run` gives every calibration step its own execution; transform steps create none. The executions of one run share `note.flow_run_id`, carry `note.step_index`, and, for a spec run, `note.pipeline` with the planned steps. `GET /executions/{id}` on any of them returns a `pipeline` field that covers the whole run: the plan with each step's execution id, status (`pending`, `skipped` for transforms, or the execution's own), task counts, and the figures of its finished tasks. `pipeline.status` is `running` while any step runs or the run still holds the project lock between steps, and otherwise the outcome of the last step.
+
+Readers that want the whole run use that field rather than the first execution's status, which completes when step 1 does. `QDashClient.waitForExecution` does so by default (`wholePipeline: false` waits for the single execution), so pi-qdash's `qdash_wait_execution` returns when the run ends, and the chat's execution card shows every step and figure as the run advances.
+
 ## Where the pieces live
 
 | File | Role |

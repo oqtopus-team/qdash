@@ -22,6 +22,8 @@ from qdash.api.schemas.execution import (
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ExecutionResponseSummary,
+    PipelineProgress,
+    PipelineStepProgress,
     Task,
 )
 from qdash.common.utils.datetime import now, parse_elapsed_time
@@ -107,6 +109,11 @@ def _reconcile_outcome(
     if flow_run_state is None:
         return None
     return _TERMINAL_STATE_OUTCOMES.get(flow_run_state)
+
+
+def by_index_ids(by_index: dict[int, ExecutionHistoryDocument]) -> set[str]:
+    """Execution ids of a pipeline's started steps."""
+    return {doc.execution_id for doc in by_index.values()}
 
 
 class ExecutionService:
@@ -255,6 +262,125 @@ class ExecutionService:
             note=execution.note,
             tags=execution.tags,
             chip_id=execution.chip_id,
+            pipeline=self._pipeline_progress(project_id, execution),
+        )
+
+    def _pipeline_progress(
+        self, project_id: str, execution: ExecutionHistoryDocument
+    ) -> PipelineProgress | None:
+        """The whole pipeline run this execution is a step of, or None.
+
+        Steps are the executions sharing ``note.flow_run_id``; the plan comes
+        from ``note.pipeline`` written by the calibration-pipeline flow.
+        """
+        note = execution.note or {}
+        plan = note.get("pipeline")
+        flow_run_id = note.get("flow_run_id")
+        if not isinstance(plan, dict) or not isinstance(flow_run_id, str) or not flow_run_id:
+            return None
+        planned = plan.get("steps")
+        if not isinstance(planned, list) or not planned:
+            return None
+
+        siblings = self._history_repo.list_by_flow_run_id(project_id, flow_run_id)
+        self._reconcile_with_prefect(siblings)
+        by_index: dict[int, ExecutionHistoryDocument] = {}
+        for doc in siblings:
+            index = (doc.note or {}).get("step_index")
+            if isinstance(index, int) and index not in by_index:
+                by_index[index] = doc
+
+        steps: list[PipelineStepProgress] = []
+        open_statuses = {
+            ExecutionStatusModel.RUNNING.value,
+            ExecutionStatusModel.SCHEDULED.value,
+            ExecutionStatusModel.CANCELLING.value,
+        }
+        any_open = False
+        last_terminal: str | None = None
+        for entry in planned:
+            if not isinstance(entry, dict):
+                continue
+            index = int(entry.get("index", 0))
+            kind = str(entry.get("kind") or "calibration")
+            started = by_index.get(index)
+            if kind == "transform":
+                steps.append(
+                    PipelineStepProgress(
+                        index=index,
+                        name=str(entry.get("name") or ""),
+                        type=str(entry.get("type") or ""),
+                        kind=kind,
+                        status="skipped",
+                    )
+                )
+                continue
+            if started is None:
+                steps.append(
+                    PipelineStepProgress(
+                        index=index,
+                        name=str(entry.get("name") or ""),
+                        type=str(entry.get("type") or ""),
+                        kind=kind,
+                        status="pending",
+                    )
+                )
+                continue
+            tasks = self._fetch_tasks_for_execution(project_id, started.execution_id)
+            finished = [t for t in tasks if t.status in ("completed", "failed")]
+            figures = [
+                path for t in finished for path in (t.figure_path or []) if isinstance(path, str)
+            ]
+            if started.status in open_statuses:
+                any_open = True
+            else:
+                last_terminal = started.status
+            steps.append(
+                PipelineStepProgress(
+                    index=index,
+                    name=str(entry.get("name") or ""),
+                    type=str(entry.get("type") or ""),
+                    kind=kind,
+                    execution_id=started.execution_id,
+                    status=started.status,
+                    task_total=len(tasks),
+                    task_finished=len(finished),
+                    task_failed=sum(1 for t in finished if t.status == "failed"),
+                    figure_paths=figures,
+                )
+            )
+
+        root = min(by_index.items(), key=lambda item: item[0])[1] if by_index else execution
+        pending_left = any(s.status == "pending" for s in steps)
+        if any_open:
+            status = ExecutionStatusModel.RUNNING.value
+        elif last_terminal in (
+            ExecutionStatusModel.FAILED.value,
+            ExecutionStatusModel.CANCELLED.value,
+        ):
+            status = last_terminal
+        elif pending_left:
+            # Between steps the flow still holds the project lock as the root
+            # execution; without it the run died before finishing the plan.
+            lock = self._lock_repo.get_lock_status(project_id)
+            latest = self._history_repo.find_latest_by_project(project_id)
+            held_by_run = (
+                bool(lock) and latest is not None and latest.execution_id in by_index_ids(by_index)
+            )
+            status = (
+                ExecutionStatusModel.RUNNING.value
+                if held_by_run
+                else ExecutionStatusModel.FAILED.value
+            )
+        else:
+            status = last_terminal or ExecutionStatusModel.COMPLETED.value
+
+        return PipelineProgress(
+            name=str(plan.get("name") or execution.name),
+            flow_run_id=flow_run_id,
+            root_execution_id=root.execution_id,
+            status=status,
+            steps=steps,
         )
 
     def get_execution_metadata(

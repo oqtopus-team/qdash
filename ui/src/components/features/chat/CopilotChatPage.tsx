@@ -46,10 +46,12 @@ export function CopilotChatPage() {
     activeSession,
     activeSessionId,
     isLoadingSessions,
+    runs,
     switchSession,
     deleteSession,
     renameSession,
   } = useCopilotChatSessionContext();
+  const runningSessionIds = Object.keys(runs);
 
   const [showSidebar, setShowSidebar] = useState(true);
   const [renaming, setRenaming] = useState(false);
@@ -116,6 +118,7 @@ export function CopilotChatPage() {
             <ChatSidebar
               sessions={sessions}
               activeSessionId={activeSessionId}
+              runningSessionIds={runningSessionIds}
               isLoading={isLoadingSessions}
               onNewChat={handleNewChat}
               onSelect={handleSelect}

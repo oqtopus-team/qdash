@@ -128,6 +128,43 @@ class ExecutionResponseSummary(BaseModel):
         return format_elapsed_time(v) if v else None
 
 
+class PipelineStepProgress(BaseModel):
+    """One planned step of a pipeline run and how far its execution got."""
+
+    index: int = Field(description="1-based position in the pipeline spec")
+    name: str
+    type: str = ""
+    kind: str = Field(default="calibration", description='"calibration" or "transform"')
+    execution_id: str | None = Field(
+        default=None, description="The step's own execution, once it has started"
+    )
+    status: str = Field(
+        description='The execution status, "skipped" for transforms, or "pending" before it starts'
+    )
+    task_total: int = 0
+    task_finished: int = 0
+    task_failed: int = 0
+    figure_paths: list[str] = Field(
+        default_factory=list, description="Figures of the step's finished tasks, in task order"
+    )
+
+
+class PipelineProgress(BaseModel):
+    """A pipeline run as a whole: one execution per calibration step, same flow run.
+
+    ``status`` is the whole run's: running while any step runs or the run holds
+    the project lock between steps, otherwise the outcome of the last step.
+    """
+
+    name: str
+    flow_run_id: str
+    root_execution_id: str = Field(
+        description="The first step's execution, as returned at dispatch"
+    )
+    status: str
+    steps: list[PipelineStepProgress]
+
+
 class ExecutionResponseDetail(BaseModel):
     """ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.
 
@@ -160,6 +197,10 @@ class ExecutionResponseDetail(BaseModel):
     note: dict[str, Any]
     tags: list[str] = []
     chip_id: str = ""
+    pipeline: PipelineProgress | None = Field(
+        default=None,
+        description="Set when this execution belongs to a pipeline run; covers every step of it",
+    )
 
     @field_validator("elapsed_time", mode="before")
     @classmethod

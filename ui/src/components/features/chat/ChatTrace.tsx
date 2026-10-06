@@ -1,20 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Brain,
-  Check,
-  ChevronRight,
-  Loader2,
-  Wrench,
-  X,
-  Code2,
-  LineChart,
-  Database,
-} from "lucide-react";
+import { Brain, Check, Loader2, Wrench, X, Code2, LineChart, Database } from "lucide-react";
 import type { ChatTrace as ChatTraceData, TraceStep } from "@/types/copilotChat";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
+import { FigureStrip } from "@/components/features/chat/ChatFigures";
+import {
+  ExecutionProgress,
+  executionIdFromArgs,
+} from "@/components/features/chat/ExecutionProgress";
+import {
+  ChainOfThought,
+  ChainOfThoughtContent,
+  ChainOfThoughtStep,
+  ChainOfThoughtTrigger,
+} from "@/components/ui/ChainOfThought";
+import { Loader } from "@/components/ui/Loader";
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ui/Reasoning";
 
 function formatDuration(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -79,63 +82,69 @@ function ToolArgs({ args }: { args: unknown }) {
   return <CodeBlock language="json">{JSON.stringify(args, null, 2)}</CodeBlock>;
 }
 
-function ToolStepRow({ step, now }: { step: Extract<TraceStep, { kind: "tool" }>; now: number }) {
-  const [open, setOpen] = useState(false);
+function ToolStepRow({
+  step,
+  now,
+  isLast,
+}: {
+  step: Extract<TraceStep, { kind: "tool" }>;
+  now: number;
+  isLast?: boolean;
+}) {
   const Icon = toolIcon(step.tool);
   const preview = argsPreview(step.args);
   const elapsed = (step.endedAt ?? now) - step.startedAt;
   const hasArgs = step.args !== undefined && step.args !== null;
+  // While the assistant waits on an execution, show its tasks and figures as they land.
+  const waitingOn = executionIdFromArgs(step.args);
 
   return (
-    <li className="chat-trace-item">
-      <span className="chat-trace-dot" data-status={step.status}>
-        {step.status === "running" ? (
+    <ChainOfThoughtStep
+      isLast={isLast}
+      status={step.status}
+      marker={
+        step.status === "running" ? (
           <Loader2 className="w-3 h-3 animate-spin" />
         ) : step.status === "error" ? (
           <X className="w-3 h-3" />
         ) : (
           <Check className="w-3 h-3" />
-        )}
-      </span>
-      <div className="min-w-0 flex-1">
-        <button
-          type="button"
-          onClick={() => hasArgs && setOpen((o) => !o)}
-          className={`group flex w-full items-center gap-2 text-left text-xs ${
-            hasArgs ? "cursor-pointer" : "cursor-default"
+        )
+      }
+    >
+      <ChainOfThoughtTrigger
+        hideChevron={!hasArgs}
+        disabled={!hasArgs}
+        className={hasArgs ? "" : "cursor-default"}
+      >
+        <Icon className="w-3.5 h-3.5 shrink-0 text-base-content/50" />
+        <span
+          className={`font-medium shrink-0 ${
+            step.status === "running" ? "loader-text-shimmer" : "text-base-content/80"
           }`}
-          aria-expanded={hasArgs ? open : undefined}
         >
-          <Icon className="w-3.5 h-3.5 shrink-0 text-base-content/50" />
-          <span
-            className={`font-medium shrink-0 ${
-              step.status === "running" ? "chat-shimmer-text" : "text-base-content/80"
-            }`}
-          >
-            {step.label}
-          </span>
-          {preview && (
-            <span className="truncate font-mono text-[11px] text-base-content/40">{preview}</span>
-          )}
-          <span className="ml-auto shrink-0 tabular-nums text-[11px] text-base-content/35">
-            {step.status === "error" ? "failed · " : ""}
-            {formatDuration(elapsed)}
-          </span>
-          {hasArgs && (
-            <ChevronRight
-              className={`w-3 h-3 shrink-0 text-base-content/30 transition-transform ${
-                open ? "rotate-90" : ""
-              }`}
-            />
-          )}
-        </button>
-        {open && (
-          <div className="mt-1 animate-fade-in-up">
-            <ToolArgs args={step.args} />
-          </div>
+          {step.label}
+        </span>
+        {preview && (
+          <span className="truncate font-mono text-[11px] text-base-content/40">{preview}</span>
         )}
-      </div>
-    </li>
+        <span className="ml-auto shrink-0 tabular-nums text-[11px] text-base-content/35">
+          {step.status === "error" ? "failed · " : ""}
+          {formatDuration(elapsed)}
+        </span>
+      </ChainOfThoughtTrigger>
+      {step.status === "running" && step.tool === "qdash_wait_execution" && waitingOn && (
+        <ExecutionProgress executionId={waitingOn} />
+      )}
+      {step.figures && step.figures.length > 0 && (
+        <FigureStrip paths={step.figures} compact className="mt-1.5" />
+      )}
+      {hasArgs && (
+        <ChainOfThoughtContent>
+          <ToolArgs args={step.args} />
+        </ChainOfThoughtContent>
+      )}
+    </ChainOfThoughtStep>
   );
 }
 
@@ -143,43 +152,39 @@ function ThinkingStepRow({
   step,
   now,
   live,
+  isLast,
 }: {
   step: Extract<TraceStep, { kind: "thinking" }>;
   now: number;
   live: boolean;
+  isLast?: boolean;
 }) {
   const active = live && step.endedAt === undefined;
-  const [open, setOpen] = useState(false);
   const elapsed = (step.endedAt ?? now) - step.startedAt;
 
   return (
-    <li className="chat-trace-item">
-      <span className="chat-trace-dot" data-status={active ? "running" : "idle"}>
-        <Brain className="w-3 h-3" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center gap-2 text-left text-xs"
-          aria-expanded={open || active}
-        >
-          <span className={`font-medium ${active ? "chat-shimmer-text" : "text-base-content/80"}`}>
-            {active ? "Thinking" : `Thought for ${formatDuration(elapsed)}`}
+    // Open while the thought streams, folds up on its own when it ends.
+    <ChainOfThoughtStep
+      isLast={isLast}
+      status={active ? "running" : "idle"}
+      marker={<Brain className="w-3 h-3" />}
+      isStreaming={active}
+    >
+      <ChainOfThoughtTrigger hideChevron={active}>
+        {active ? (
+          <Loader variant="text-shimmer" size="sm" text="Thinking" />
+        ) : (
+          <span className="font-medium text-base-content/80">
+            Thought for {formatDuration(elapsed)}
           </span>
-          <ChevronRight
-            className={`w-3 h-3 text-base-content/30 transition-transform ${
-              open || active ? "rotate-90" : ""
-            }`}
-          />
-        </button>
-        {(open || active) && step.text && (
-          <div className="chat-thinking-text mt-1">
-            {active ? step.text.slice(-1200) : step.text}
-          </div>
         )}
-      </div>
-    </li>
+      </ChainOfThoughtTrigger>
+      {step.text && (
+        <ChainOfThoughtContent>
+          <div className="chat-thinking-text">{active ? step.text.slice(-1200) : step.text}</div>
+        </ChainOfThoughtContent>
+      )}
+    </ChainOfThoughtStep>
   );
 }
 
@@ -187,22 +192,19 @@ function TraceSteps({ steps, live }: { steps: TraceStep[]; live: boolean }) {
   const running = live && steps.some((s) => s.kind === "thinking" || s.kind === "tool");
   const now = useNow(running);
   return (
-    <ol className="chat-trace-list">
+    <ChainOfThought>
       {steps.map((step, i) => {
         if (step.kind === "tool") return <ToolStepRow key={step.id} step={step} now={now} />;
         if (step.kind === "thinking") {
           return <ThinkingStepRow key={`thinking-${i}`} step={step} now={now} live={live} />;
         }
         return (
-          <li key={`text-${i}`} className="chat-trace-item">
-            <span className="chat-trace-dot" data-status="idle" />
-            <ChatMarkdown className="text-[13px] text-base-content/70 min-w-0 flex-1">
-              {step.text}
-            </ChatMarkdown>
-          </li>
+          <ChainOfThoughtStep key={`text-${i}`} marker={null} defaultOpen>
+            <ChatMarkdown className="text-[13px] text-base-content/70">{step.text}</ChatMarkdown>
+          </ChainOfThoughtStep>
         );
       })}
-    </ol>
+    </ChainOfThought>
   );
 }
 
@@ -218,27 +220,20 @@ function summarize(steps: TraceStep[]): string {
 
 /** Collapsed "Used 3 tools · 12s" summary for a finished answer. */
 export function ChatTraceSummary({ trace }: { trace: ChatTraceData }) {
-  const [open, setOpen] = useState(false);
   const failed = trace.steps.some((s) => s.kind === "tool" && s.status === "error");
   return (
-    <div className="mb-2">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="chat-trace-toggle"
-        aria-expanded={open}
-      >
+    <Reasoning className="mb-2">
+      <ReasoningTrigger className="chat-trace-toggle">
         <span>{summarize(trace.steps)}</span>
         <span className="text-base-content/35">· {formatDuration(trace.durationMs)}</span>
         {failed && <span className="text-error/70">· some steps failed</span>}
-        <ChevronRight className={`w-3 h-3 transition-transform ${open ? "rotate-90" : ""}`} />
-      </button>
-      {open && (
-        <div className="mt-2 animate-fade-in-up">
+      </ReasoningTrigger>
+      <ReasoningContent>
+        <div className="mt-2">
           <TraceSteps steps={trace.steps} live={false} />
         </div>
-      )}
-    </div>
+      </ReasoningContent>
+    </Reasoning>
   );
 }
 

@@ -21,6 +21,8 @@ interface AnalysisChatContextValue {
 
   miniChat: { isOpen: boolean };
   openMiniChat: (context: AnalysisContext) => void;
+  /** Show this session in the floating window, e.g. to follow a streaming answer. */
+  openMiniChatForSession: (sessionId: string) => void;
   closeMiniChat: () => void;
 }
 
@@ -73,6 +75,15 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
     [focusContext],
   );
 
+  const openMiniChatForSession = useCallback(
+    (sessionId: string) => {
+      switchSession(sessionId);
+      setIsOpen(false);
+      setMiniOpen(true);
+    },
+    [switchSession],
+  );
+
   const closeMiniChat = useCallback(() => setMiniOpen(false), []);
 
   const value = useMemo(
@@ -85,6 +96,7 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
       closeAnalysisChat,
       miniChat: { isOpen: miniOpen },
       openMiniChat,
+      openMiniChatForSession,
       closeMiniChat,
     }),
     [
@@ -96,6 +108,7 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
       closeAnalysisChat,
       miniOpen,
       openMiniChat,
+      openMiniChatForSession,
       closeMiniChat,
     ],
   );

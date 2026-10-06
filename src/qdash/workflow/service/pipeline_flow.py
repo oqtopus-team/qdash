@@ -17,6 +17,7 @@ from typing import Any
 from prefect import flow, get_run_logger
 
 from qdash.datamodel.calibration_pipeline import (
+    STEP_CATALOG,
     BringUpStep,
     CalibrationPipelineSpec,
     ConfigureAllStep,
@@ -106,6 +107,30 @@ def build_steps(spec: CalibrationPipelineSpec) -> list[Step]:
     return [build_step(step) for step in spec.steps]
 
 
+def pipeline_note(spec: CalibrationPipelineSpec, steps: list[Step]) -> dict[str, Any]:
+    """The plan, stored in every execution's note so the API can follow the run.
+
+    Each calibration step gets its own execution (see ``CalibService.run``);
+    they share ``note.flow_run_id`` and carry ``step_index``. This adds the
+    full step list so a reader of any one execution knows what else is
+    planned, which steps run hardware, and the spec it came from.
+    """
+    return {
+        "pipeline": {
+            "name": spec.name,
+            "steps": [
+                {
+                    "index": index,
+                    "name": built.name,
+                    "type": step.type,
+                    "kind": STEP_CATALOG[step.type].kind,
+                }
+                for index, (step, built) in enumerate(zip(spec.steps, steps, strict=True), 1)
+            ],
+        }
+    }
+
+
 @flow(
     name="calibration-pipeline",
     on_cancellation=[on_flow_cancellation],
@@ -154,5 +179,6 @@ def calibration_pipeline(
         backend_name=backend_name,
         task_run_parameters=parsed.task_run_parameters or None,
         default_run_parameters=parsed.default_run_parameters or None,
+        note=pipeline_note(parsed, steps),
     )
     return cal.run(targets, steps=steps)

@@ -20,6 +20,7 @@ import {
 import { buildHeaders, consumeSSEEvents, readErrorResponse } from "@/lib/sse-utils";
 import type {
   AnalysisContext,
+  AnswerFeedback,
   ChatMessage,
   CopilotBlocksResult,
   LiveTurn,
@@ -68,6 +69,8 @@ interface CopilotChatSessionContextValue {
   createNewSession: (context?: AnalysisContext | null) => string;
   deleteSession: (sessionId: string) => void;
   renameSession: (sessionId: string, title: string) => void;
+  /** Rate the assistant message at `index`; null clears the rating. */
+  setMessageFeedback: (sessionId: string, index: number, feedback: AnswerFeedback | null) => void;
   findSessionByContext: (context: AnalysisContext) => CopilotChatSession | null;
 
   sendMessage: (text: string, options?: SendOptions) => void;
@@ -131,6 +134,29 @@ function serverMessageToLocal(m: ServerMessage): ChatMessage {
     content: m.content,
     attachedImage: Boolean(m.attached_image),
   };
+}
+
+/**
+ * The assistant message with its rating set or cleared. Plain-text answers
+ * (older sessions, error-free fallbacks) are wrapped into the blocks form so
+ * the rating has a place to live. Error messages are not ratable.
+ */
+function withFeedback(message: ChatMessage, feedback: AnswerFeedback | null): ChatMessage | null {
+  if (message.content.startsWith("Error: ")) return null;
+  let payload: CopilotBlocksResult;
+  try {
+    const parsed = JSON.parse(message.content) as CopilotBlocksResult;
+    if (!Array.isArray(parsed.blocks)) throw new Error("not blocks");
+    payload = parsed;
+  } catch {
+    payload = {
+      blocks: [{ type: "text", content: message.content, chart: null }],
+      assessment: null,
+    };
+  }
+  const { feedback: _previous, ...rest } = payload;
+  const next: CopilotBlocksResult = feedback ? { ...rest, feedback } : rest;
+  return { ...message, content: JSON.stringify(next) };
 }
 
 function localMessageToServer(m: ChatMessage): ServerMessage {
@@ -468,6 +494,21 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
     [awaitCreate],
   );
 
+  const setMessageFeedback = useCallback(
+    (sessionId: string, index: number, feedback: AnswerFeedback | null) => {
+      const session = sessionsRef.current.find((s) => s.id === sessionId);
+      const message = session?.messages[index];
+      if (!session || !message || message.role !== "assistant") return;
+      const updated = withFeedback(message, feedback);
+      if (!updated) return;
+      updateSessionMessages(
+        sessionId,
+        session.messages.map((m, i) => (i === index ? updated : m)),
+      );
+    },
+    [updateSessionMessages],
+  );
+
   // ------- streaming -------
 
   const setRun = useCallback(
@@ -612,7 +653,19 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
 
   /** Stop streaming and keep the partial answer. */
   const stop = useCallback((sessionId: string) => {
-    controllers.current.get(sessionId)?.abort("stop");
+    const controller = controllers.current.get(sessionId);
+    if (!controller) return;
+    controller.abort("stop");
+    // Closing the stream keeps the partial answer here, but the runtime keeps
+    // working on the turn until told otherwise.
+    fetch(`${BASE_URL}/copilot/chat/stop`, {
+      method: "POST",
+      headers: buildHeaders(),
+      body: JSON.stringify({ session_id: sessionId }),
+      keepalive: true,
+    }).catch(() => {
+      /* best effort: the next message reports if the turn is still running */
+    });
   }, []);
 
   // Abort everything on unmount (e.g. logout).
@@ -632,6 +685,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
       createNewSession,
       deleteSession,
       renameSession,
+      setMessageFeedback,
       findSessionByContext,
       sendMessage,
       stop,
@@ -646,6 +700,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
       createNewSession,
       deleteSession,
       renameSession,
+      setMessageFeedback,
       findSessionByContext,
       sendMessage,
       stop,

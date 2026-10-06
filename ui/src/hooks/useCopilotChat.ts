@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import type { AnswerFeedback, ChatMessage } from "@/types/copilotChat";
 import {
   useCopilotChatSessionContext,
   type CopilotChatSession,
@@ -115,6 +116,16 @@ export function useCopilotChat(sessionId?: string | null) {
     [id, messages, modelOverride, run, sendMessage],
   );
 
+  /** Rate the assistant message at `index`; rating it the same way again clears it. */
+  const rateAnswer = useCallback(
+    (index: number, feedback: AnswerFeedback) => {
+      if (!id) return;
+      const current = answerFeedback(messages[index]);
+      ctx.setMessageFeedback(id, index, current === feedback ? null : feedback);
+    },
+    [ctx, id, messages],
+  );
+
   return {
     session,
     messages,
@@ -128,5 +139,17 @@ export function useCopilotChat(sessionId?: string | null) {
     stop,
     retryLast,
     editMessage,
+    rateAnswer,
   };
+}
+
+/** The stored rating of an assistant message, if any. */
+export function answerFeedback(message: ChatMessage | undefined): AnswerFeedback | null {
+  if (!message || message.role !== "assistant" || !message.content.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(message.content) as { feedback?: unknown };
+    return parsed.feedback === "up" || parsed.feedback === "down" ? parsed.feedback : null;
+  } catch {
+    return null;
+  }
 }

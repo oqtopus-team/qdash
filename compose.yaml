@@ -247,10 +247,12 @@ services:
       - AGENT_RUNTIME_ENABLE_WRITE_TOOLS=${AGENT_RUNTIME_ENABLE_WRITE_TOOLS:-false}
       - PI_CODING_AGENT_DIR=/app/.pi-agent
       - AGENT_STATE_DIR=/app/state
-      # Local models can spend minutes on tool rounds. After the wrap-up time the
-      # turn is steered to answer with what it has; the timeout is the hard stop.
-      - CHAT_WRAP_UP_MS=${AGENT_RUNTIME_WRAP_UP_MS:-120000}
-      - CHAT_TIMEOUT_MS=${AGENT_RUNTIME_TIMEOUT_MS:-600000}
+      # A turn runs until it answers or the user stops it; calibrations a tool
+      # waits on take as long as they take. Set these (ms) to steer the model to
+      # answer after a while, or to abort a turn outright. 0 disables.
+      - CHAT_WRAP_UP_MS=${AGENT_RUNTIME_WRAP_UP_MS:-0}
+      - CHAT_TIMEOUT_MS=${AGENT_RUNTIME_TIMEOUT_MS:-0}
+      - CHAT_PING_MS=${AGENT_RUNTIME_PING_MS:-15000}
       - MODEL_STREAM_TIMEOUT_MS=${AGENT_RUNTIME_MODEL_STREAM_TIMEOUT_MS:-180000}
       # Reviews arrive from two Python thread pools that do not know about each
       # other and all land on one local VLM, so the cap lives here.

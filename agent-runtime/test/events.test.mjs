@@ -127,3 +127,42 @@ test("unrelated events are dropped", () => {
 test("lines are newline terminated json", () => {
   assert.equal(encodeLine({ type: "tool_start", name: "x" }), '{"type":"tool_start","name":"x"}\n');
 });
+
+test("a ping line carries no content", () => {
+  assert.equal(encodeLine({ type: "ping" }), '{"type":"ping"}\n');
+});
+
+test("figures a tool fetched travel with tool_end as paths", () => {
+  const events = toNdjsonEvents({
+    type: "tool_execution_end",
+    toolName: "qdash_get_task_figures",
+    toolCallId: "c7",
+    isError: false,
+    result: {
+      details: {
+        tool: "qdash_get_task_figures",
+        path: "exec/20261006-001/CheckRabi_0.png",
+        mediaType: "image/png",
+        base64: "AAAA",
+        figurePaths: ["exec/20261006-001/CheckRabi_0.png", "exec/20261006-001/CheckRabi_1.png"],
+      },
+    },
+  });
+  assert.deepEqual(events, [
+    {
+      type: "tool_end",
+      name: "qdash_get_task_figures",
+      id: "c7",
+      isError: false,
+      figures: ["exec/20261006-001/CheckRabi_0.png", "exec/20261006-001/CheckRabi_1.png"],
+    },
+  ]);
+  // A JSON figure is not an image; a tool without figures adds nothing.
+  const json = toNdjsonEvents({
+    type: "tool_execution_end",
+    toolName: "qdash_get_figure",
+    isError: false,
+    result: { details: { path: "a.json", mediaType: "application/json", figurePaths: [] } },
+  });
+  assert.equal("figures" in json[0], false);
+});

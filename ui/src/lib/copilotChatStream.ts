@@ -61,7 +61,7 @@ export function startTool(
 
 export function endTool(
   steps: TraceStep[],
-  payload: { id?: string | null; tool: string; is_error?: boolean },
+  payload: { id?: string | null; tool: string; is_error?: boolean; figures?: unknown },
 ): TraceStep[] {
   // Match by call id; fall back to the oldest running call of that tool.
   const idx =
@@ -72,8 +72,16 @@ export function endTool(
         );
   const step = steps[idx];
   if (!step || step.kind !== "tool") return steps;
+  const figures = Array.isArray(payload.figures)
+    ? payload.figures.filter((p): p is string => typeof p === "string" && p.length > 0)
+    : [];
   const next = [...steps];
-  next[idx] = { ...step, status: payload.is_error ? "error" : "done", endedAt: Date.now() };
+  next[idx] = {
+    ...step,
+    status: payload.is_error ? "error" : "done",
+    endedAt: Date.now(),
+    ...(figures.length ? { figures } : {}),
+  };
   return next;
 }
 

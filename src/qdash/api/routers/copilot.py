@@ -41,6 +41,8 @@ from qdash.copilot.contracts import (
     AnalysisResponse,
     AnalyzeRequest,
     ChatRequest,
+    ChatStopRequest,
+    ChatStopResponse,
     SandboxPythonRequest,
 )
 from qdash.copilot.prompts.analysis import build_language_instruction
@@ -335,6 +337,23 @@ async def run_sandboxed_python(
 
     result = await execute_python_analysis(request.code)
     return dict(result)
+
+
+@router.post("/chat/stop", include_in_schema=False)
+async def chat_stop(
+    request: ChatStopRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> ChatStopResponse:
+    """Stop the turn running for a chat session.
+
+    Only the Pi backend runs turns that outlive the stream; for the other
+    backend closing the stream is the cancellation, so this reports False.
+    """
+    config = load_copilot_config()
+    if config.copilot_backend != "pi":
+        return ChatStopResponse(stopped=False)
+    stopped = await pi_chat_service.abort_runtime_turn(current_user.username, request.session_id)
+    return ChatStopResponse(stopped=stopped)
 
 
 @router.post("/chat/stream", include_in_schema=False)

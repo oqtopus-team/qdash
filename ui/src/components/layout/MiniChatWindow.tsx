@@ -5,6 +5,7 @@ import { GripHorizontal, Minus, PanelRight, SquarePen, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
+import { CHAT_PAGE_PATH, sessionToFollow } from "@/lib/followStreamingChat";
 import { ChatThread } from "@/components/features/chat/ChatThread";
 import {
   RecentChatsMenu,
@@ -101,11 +102,28 @@ const MARGIN = 16;
  * the sidebar, so expanding it keeps a streaming answer going.
  */
 export function MiniChatWindow() {
-  const { miniChat, closeMiniChat, openSidebar } = useAnalysisChatContext();
-  const { createNewSession, activeSession } = useCopilotChatSessionContext();
+  const { miniChat, closeMiniChat, openSidebar, openMiniChatForSession } = useAnalysisChatContext();
+  const { createNewSession, activeSession, activeSessionId, runs } = useCopilotChatSessionContext();
   const router = useRouter();
   const pathname = usePathname();
   const [minimized, setMinimized] = useState(false);
+
+  // Leaving /chat mid-answer: follow the streaming chat in this window.
+  // Arriving on /chat: the page shows it, so the window gets out of the way.
+  const previousPath = useRef<string | null>(null);
+  useEffect(() => {
+    const from = previousPath.current;
+    previousPath.current = pathname;
+    if (from === pathname) return;
+    if (pathname === CHAT_PAGE_PATH) {
+      if (miniChat.isOpen) closeMiniChat();
+      return;
+    }
+    const follow = sessionToFollow(from, pathname, activeSessionId, Object.keys(runs));
+    if (follow) openMiniChatForSession(follow);
+    // Only path changes should trigger this; the other values are read as they are then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   // Default position: bottom-right, shrunk to fit small viewports.
   const size = useMemo(
