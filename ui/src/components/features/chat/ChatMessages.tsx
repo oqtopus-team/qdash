@@ -485,7 +485,7 @@ export function LiveAssistantMessage({
       ) : (
         !busy && (
           <div className="flex items-center gap-2.5 h-7 text-sm">
-            <QdashBotAvatar size={20} className="chat-avatar-active" />
+            <QdashBotAvatar size={20} className="chat-avatar-active chat-bot-mark" />
             {statusMessage ? (
               <Loader variant="text-shimmer" size="sm" text={statusMessage} />
             ) : (

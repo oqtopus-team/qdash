@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { PanelLeftOpen, SquarePen } from "lucide-react";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
+import { withViewTransition } from "@/lib/viewTransition";
 import { ChatSidebar, RenameInput, SessionMenu } from "@/components/features/chat/ChatSidebar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
@@ -76,7 +77,7 @@ export function CopilotChatPage() {
       return;
     }
     // The page starts from the greeting; the session is created on first send.
-    switchSession(null);
+    withViewTransition(() => switchSession(null));
     if (isMobile) setShowSidebar(false);
   }, [activeSession, isMobile, switchSession]);
 

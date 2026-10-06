@@ -6,7 +6,9 @@ import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
 import { useCopilotChat } from "@/hooks/useCopilotChat";
+import { withViewTransition } from "@/lib/viewTransition";
 import { ChatComposer, type ChatComposerHandle } from "@/components/features/chat/ChatComposer";
+import { ChatLinkPreviewProvider } from "@/components/features/chat/ChatLinkPreview";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import {
   AssistantMessage,
@@ -210,7 +212,9 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       const trimmed = text.trim();
       if (!trimmed || isStreaming || isLoadingMessages) return;
       setInput("");
-      send(trimmed);
+      // The first send turns the greeting into a thread; morph the mark and
+      // the composer into their new places instead of swapping layouts.
+      withViewTransition(() => send(trimmed));
     },
     [isLoadingMessages, isStreaming, send],
   );
@@ -242,7 +246,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     return (
       <div
         className={`flex-1 min-h-0 flex flex-col overflow-y-auto ${
-          variant === "page" ? "items-center justify-center pb-[10vh]" : ""
+          variant === "page" ? "chat-page-thread items-center justify-center pb-[10vh]" : ""
         } ${density}`}
       >
         {variant === "page" ? (
@@ -274,55 +278,61 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
   }
 
   return (
-    <div className={`flex-1 min-h-0 flex flex-col ${density}`}>
-      <StickToBottom className="relative flex-1 min-h-0" resize="smooth" initial="instant">
-        <StickToBottom.Content
-          className={`${variant === "page" ? "max-w-3xl mx-auto px-4 pt-6 pb-10 space-y-7" : `${pad} pt-3 pb-6 space-y-5`}`}
-        >
-          {isLoadingMessages && (
-            <div className="space-y-6 pt-4" aria-label="Loading messages">
-              <div className="ml-auto h-10 w-1/2 rounded-3xl bg-base-content/5 animate-pulse" />
-              <div className="h-24 w-5/6 rounded-xl bg-base-content/5 animate-pulse" />
-            </div>
-          )}
-          {messages.map((msg, idx) =>
-            msg.role === "user" ? (
-              <UserMessage
-                key={idx}
-                message={msg}
-                canEdit={!isStreaming && !isLoadingMessages}
-                onEdit={(text) => editMessage(idx, text)}
-              />
-            ) : (
-              <AssistantMessage
-                key={idx}
-                message={msg}
-                isLast={idx === lastIndex && !liveTurn}
-                canRetry={!isStreaming}
-                onRetry={retryLast}
-                answer={messages[idx + 1]?.role === "user" ? messages[idx + 1].content : undefined}
-                onAnswer={submit}
-                onDecide={decide}
-                onOther={focusComposer}
-                onRate={(feedback) => rateAnswer(idx, feedback)}
-              />
-            ),
-          )}
-          {liveTurn && <LiveAssistantMessage turn={liveTurn} statusMessage={statusMessage} />}
-        </StickToBottom.Content>
-        <ScrollToBottomButton />
-      </StickToBottom>
+    <ChatLinkPreviewProvider>
+      <div
+        className={`flex-1 min-h-0 flex flex-col ${variant === "page" ? "chat-page-thread" : ""} ${density}`}
+      >
+        <StickToBottom className="relative flex-1 min-h-0" resize="smooth" initial="instant">
+          <StickToBottom.Content
+            className={`${variant === "page" ? "max-w-3xl mx-auto px-4 pt-6 pb-10 space-y-7" : `${pad} pt-3 pb-6 space-y-5`}`}
+          >
+            {isLoadingMessages && (
+              <div className="space-y-6 pt-4" aria-label="Loading messages">
+                <div className="ml-auto h-10 w-1/2 rounded-3xl bg-base-content/5 animate-pulse" />
+                <div className="h-24 w-5/6 rounded-xl bg-base-content/5 animate-pulse" />
+              </div>
+            )}
+            {messages.map((msg, idx) =>
+              msg.role === "user" ? (
+                <UserMessage
+                  key={idx}
+                  message={msg}
+                  canEdit={!isStreaming && !isLoadingMessages}
+                  onEdit={(text) => editMessage(idx, text)}
+                />
+              ) : (
+                <AssistantMessage
+                  key={idx}
+                  message={msg}
+                  isLast={idx === lastIndex && !liveTurn}
+                  canRetry={!isStreaming}
+                  onRetry={retryLast}
+                  answer={
+                    messages[idx + 1]?.role === "user" ? messages[idx + 1].content : undefined
+                  }
+                  onAnswer={submit}
+                  onDecide={decide}
+                  onOther={focusComposer}
+                  onRate={(feedback) => rateAnswer(idx, feedback)}
+                />
+              ),
+            )}
+            {liveTurn && <LiveAssistantMessage turn={liveTurn} statusMessage={statusMessage} />}
+          </StickToBottom.Content>
+          <ScrollToBottomButton />
+        </StickToBottom>
 
-      <div className={`shrink-0 ${pad} pb-3`}>
-        <div className={variant === "page" ? "max-w-3xl mx-auto" : ""}>
-          {composer}
-          {variant === "page" && (
-            <p className="text-[11px] text-base-content/35 text-center mt-2">
-              AI can make mistakes. Verify important calibration values.
-            </p>
-          )}
+        <div className={`shrink-0 ${pad} pb-3`}>
+          <div className={variant === "page" ? "max-w-3xl mx-auto" : ""}>
+            {composer}
+            {variant === "page" && (
+              <p className="text-[11px] text-base-content/35 text-center mt-2">
+                AI can make mistakes. Verify important calibration values.
+              </p>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </ChatLinkPreviewProvider>
   );
 });

@@ -171,6 +171,22 @@ def test_ef_chevron_is_enabled_with_calibration_and_sweep_metadata() -> None:
     assert task.run_parameters["shots"]["value"] == 256
 
 
+def test_jazz_task_is_enabled_in_two_qubit_group() -> None:
+    from qdash.common.config.backend import is_task_available
+
+    clear_backend_config_cache()
+    task = next(
+        task
+        for task in TaskFileService().list_task_info("qubex", enabled_only=True).tasks
+        if task.name == "CheckJAZZ"
+    )
+
+    assert task.enabled
+    assert task.category == "Two Qubit"
+    assert task.task_type == "coupling"
+    assert is_task_available("CheckJAZZ", "qubex")
+
+
 def test_list_task_info_extracts_input_parameter_metadata() -> None:
     clear_backend_config_cache()
     service = TaskFileService()
