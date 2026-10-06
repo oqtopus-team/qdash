@@ -24,6 +24,20 @@ The assistant can use the project tools exposed by QDash to inspect records such
 metrics, task results, issues, workflows, and provenance. Keep the active project and selected chip
 in mind when interpreting an answer. Open referenced records to confirm important conclusions.
 
+### Run a calibration pipeline from chat
+
+With the Pi backend and write tools enabled (`AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true`), the
+assistant can compose a calibration from QDash's step catalog and run it as one execution. Ask for
+the calibration in plain terms, for example "run the coarse one-qubit check on Q00 and Q01, then
+measure T1 and T2 on the ones that pass". The assistant reads the available step types and tasks,
+validates its plan with QDash, and shows an approval card listing the targets, the steps, and the
+exact tasks each step will run. Nothing starts until you approve the card.
+
+The plan can only use the step types and task names QDash exposes; it cannot contain code, and
+every task result is judged by the same gates as a saved workflow. The execution appears on the
+**Execution** page tagged `pipeline`. See
+[Calibration Pipeline Spec](../development/workflow/calibration-pipeline.md) for the spec format.
+
 ## Metrics Analysis
 
 The Metrics page includes a chat panel with the current analysis context. Use it when a question

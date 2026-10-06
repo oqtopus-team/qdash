@@ -25,6 +25,7 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_get_figure",
   "qdash_get_flow",
   "qdash_get_forum_post",
+  "qdash_get_pipeline_catalog",
   "qdash_get_provenance_stats",
   "qdash_get_task_figures",
   "qdash_get_task_knowledge",
@@ -48,6 +49,7 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_list_issues",
   "qdash_list_task_results",
   "qdash_plan_calibration",
+  "qdash_plan_pipeline",
   "qdash_plot_timeseries",
   "qdash_preview_forum_evidence_reply",
   "qdash_preview_forum_image_reply",
@@ -81,6 +83,7 @@ export const EXPERIMENTAL_WRITE_TOOL_NAMES = [
   "qdash_update_forum_post",
   "qdash_create_forum_evidence_reply",
   "qdash_create_forum_image_reply",
+  "qdash_run_pipeline",
 ] as const;
 
 const EXPERIMENTAL_WRITE_TOOLS = new Set<string>(EXPERIMENTAL_WRITE_TOOL_NAMES);
