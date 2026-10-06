@@ -51,6 +51,7 @@ backends:
         - X180InterleavedRandomizedBenchmarking
 
       Two Qubit:
+        - CheckJAZZ
         - CheckCrossResonance
         - CreateZX90
         - CheckZX90

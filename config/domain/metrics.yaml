@@ -273,8 +273,8 @@ coupling_metrics:
 
   static_zz_interaction:
     title: Static ZZ Interaction
-    unit: MHz
-    scale: 1000 # Convert GHz to MHz
+    unit: KHz
+    scale: 1
     description: Static ZZ coupling strength between qubits
     evaluation:
       mode: minimize
