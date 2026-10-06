@@ -58,10 +58,16 @@ QDash application settings are committed under `config/app`, `config/domain`, an
 `config/copilot`; `CONFIG_PATH` is only for the Qubex backend configuration tree.
 
 `AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true` should be used only in a trusted experimental
-deployment. The runtime uses its service credential for these calls. Each operation still requires
-`confirmWrite: true`, and Copilot is instructed to describe the exact action and target and wait for
-explicit user approval before setting it. Interrupted write calls are not replayed automatically;
-inspect QDash state before retrying them.
+deployment. The runtime uses its service credential for these calls. Copilot never runs a write
+operation itself: when it calls one, the chat shows an approval card with the exact arguments, and
+the runtime runs the operation only after the user clicks **Approve**, with the arguments shown. A
+decision is accepted only for the approval the latest answer asked for, so it cannot run the same
+operation twice.
+
+The Agent Runtime bounds each chat turn by time. After `AGENT_RUNTIME_WRAP_UP_MS` (default 120 s)
+it tells the model to stop calling tools and answer with what it has, and it aborts the turn after
+`AGENT_RUNTIME_TIMEOUT_MS` (default 600 s). `AGENT_RUNTIME_MODEL_STREAM_TIMEOUT_MS` (default 180 s)
+limits a single model request.
 
 The Pi Agent Runtime is an opt-in Compose service. When `copilot_backend: pi`, set the following in
 `.env` before starting the stack:

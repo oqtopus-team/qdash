@@ -66,7 +66,60 @@ test("durable tool-result entries expose chart details and failures", () => {
   assert.deepEqual(events[1], { type: "tool_end", name: "render_chart", isError: true });
 });
 
-test("token deltas and other events are dropped", () => {
+test("tool start and end carry the call id and args when present", () => {
+  assert.deepEqual(
+    toNdjsonEvents({
+      type: "tool_execution_start",
+      toolName: "qdash_get_timeseries",
+      toolCallId: "call_1",
+      args: { qid: "0" },
+    }),
+    [{ type: "tool_start", name: "qdash_get_timeseries", id: "call_1", args: { qid: "0" } }],
+  );
+  assert.deepEqual(
+    toNdjsonEvents({ type: "tool_execution_end", toolName: "qdash_query", toolCallId: "call_1" }),
+    [{ type: "tool_end", name: "qdash_query", isError: false, id: "call_1" }],
+  );
+});
+
+test("text and thinking deltas are forwarded in order", () => {
+  assert.deepEqual(
+    toNdjsonEvents({
+      type: "message_update",
+      changes: [
+        { type: "thinking_start" },
+        { type: "thinking_delta", delta: "Let me " },
+        { type: "text_delta", delta: "T1 is " },
+        { type: "toolcall_delta", delta: '{"q' },
+        { type: "text_delta", delta: "" },
+      ],
+    }),
+    [
+      { type: "thinking_delta", delta: "Let me " },
+      { type: "text_delta", delta: "T1 is " },
+    ],
+  );
+});
+
+test("ask and approval requests become their own lines", () => {
+  const ask = { question: "Which qubit?", options: [{ label: "Q32" }, { label: "Q33" }] };
+  const approval = { id: "call-1", tool: "qdash_execute_agent_action", label: "Execute", args: {} };
+  assert.deepEqual(
+    toNdjsonEvents({ type: "tool_execution_end", toolName: "ask_user", result: { details: { ask } } }),
+    [
+      { type: "ask", ask },
+      { type: "tool_end", name: "ask_user", isError: false },
+    ],
+  );
+  const [line] = toNdjsonEvents({
+    type: "tool_execution_end",
+    toolName: "qdash_execute_agent_action",
+    entry: { model: [{ role: "toolResult", details: { approval } }] },
+  });
+  assert.deepEqual(line, { type: "approval", approval });
+});
+
+test("unrelated events are dropped", () => {
   assert.deepEqual(toNdjsonEvents({ type: "message_update" }), []);
   assert.deepEqual(toNdjsonEvents({ type: "agent_end" }), []);
 });

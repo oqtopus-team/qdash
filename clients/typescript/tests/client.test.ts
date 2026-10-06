@@ -254,4 +254,28 @@ describe("QDashClient", () => {
       statusCode: 422,
     });
   });
+
+  it("spells out which field a FastAPI validation error is about", async () => {
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      {
+        fetch: async () =>
+          jsonResponse(
+            {
+              detail: [
+                { type: "missing", loc: ["body", "policy", "qids"], msg: "Field required" },
+                { type: "missing", loc: ["body", "policy", "allowed_tasks"], msg: "Field required" },
+              ],
+            },
+            422,
+          ),
+      },
+    );
+
+    const result = client.createAgentSession({ chipId: "144Qv2", policy: {} as never });
+    await expect(result).rejects.toThrow(
+      "policy.qids: Field required; policy.allowed_tasks: Field required",
+    );
+    await expect(result).rejects.not.toThrow("[object Object]");
+  });
 });

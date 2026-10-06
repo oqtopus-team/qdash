@@ -12,6 +12,7 @@ import {
   MemoryStorage,
   section,
   ToolResultEntry,
+  UserEntry,
   type Conversation,
   type EntryId,
   type Harness as DurableHarness,
@@ -20,12 +21,19 @@ import {
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 
 import { resolveQDashApiToken } from "./auth.ts";
+import { compactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
-import { buildQDashExtension } from "./durable-tools.ts";
+import { askUserTool } from "./ask-tool.ts";
+import {
+  buildQDashExtension,
+  type ApprovalRequest,
+  type QDashWriteTools,
+} from "./durable-tools.ts";
 import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
 import { buildReviewSystemPrompt, buildSystemPrompt } from "./prompt.ts";
 import { pythonTool } from "./python-tool.ts";
+import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
 import { submitReviewTool } from "./review-tool.ts";
 
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
@@ -35,6 +43,8 @@ const COPILOT_CONFIG_PATH =
   process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
 const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
 const REVIEW_CONFIG_PATH = process.env.REVIEW_CONFIG_PATH ?? "/app/config/copilot/review.yaml";
+// One model request; a whole turn is bounded by the server's own timers.
+const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 180_000);
 const EXPERIMENTAL_WRITE_TOOLS_ENABLED = ["1", "true", "yes", "on"].includes(
   (process.env.AGENT_RUNTIME_ENABLE_WRITE_TOOLS ?? "").trim().toLowerCase(),
 );
@@ -75,6 +85,8 @@ export class SharedRuntime {
     private readonly modelRuntime: ModelRuntime,
     private readonly chatRegistry: ReturnType<typeof createRegistry>,
     private readonly reviewRegistry: ReturnType<typeof createRegistry>,
+    /** Runs write calls the user approved in the UI. */
+    readonly writeTools: QDashWriteTools,
   ) {}
 
   /** Load the Pi model catalog and adapt the installed pi-qdash extension once. */
@@ -99,15 +111,20 @@ export class SharedRuntime {
       authPath: join(AGENT_DIR, "auth.json"),
     });
 
+    const skills: SkillSummary[] = loader
+      .getSkills()
+      .skills.filter((skill) => !skill.disableModelInvocation)
+      .map(({ name, description, filePath }) => ({ name, description, filePath }));
+    console.log(`[agent-runtime] skills: ${skills.map((skill) => skill.name).join(", ") || "none"}`);
+
     const chatRegistry = createRegistry();
-    chatRegistry.install(
-      buildQDashExtension(
-        loader.getExtensions().extensions,
-        modelRuntime,
-        WORK_DIR,
-        EXPERIMENTAL_WRITE_TOOLS_ENABLED,
-      ),
+    const qdash = buildQDashExtension(
+      loader.getExtensions().extensions,
+      modelRuntime,
+      WORK_DIR,
+      EXPERIMENTAL_WRITE_TOOLS_ENABLED,
     );
+    chatRegistry.install(qdash.extension);
     chatRegistry.install(
       defineExtension({
         name: "qdash-copilot",
@@ -119,11 +136,17 @@ export class SharedRuntime {
                 responseLanguage,
                 thinkingLanguage,
                 EXPERIMENTAL_WRITE_TOOLS_ENABLED,
+                skills,
               ),
             { tag: false },
           ),
         ],
-        tools: [chartTool, pythonTool],
+        tools: [
+          chartTool,
+          pythonTool,
+          askUserTool,
+          ...(skills.length ? [buildSkillTool(skills)] : []),
+        ],
       }),
     );
 
@@ -139,19 +162,31 @@ export class SharedRuntime {
         tools: [submitReviewTool],
       }),
     );
-    return new SharedRuntime(modelRuntime, chatRegistry, reviewRegistry);
+    return new SharedRuntime(modelRuntime, chatRegistry, reviewRegistry, qdash.writeTools);
   }
 
   /** Resolve a configured QDash model without allowing an invisible fallback. */
   private resolveModel(provider: string | undefined, modelName: string | undefined): ModelRef {
+    return this.resolveModelWithLimits(provider, modelName).ref;
+  }
+
+  private resolveModelWithLimits(
+    provider: string | undefined,
+    modelName: string | undefined,
+  ): { ref: ModelRef; contextWindow: number; maxTokens: number } {
     if (!provider || !modelName) throw new Error("provider and model name are required");
     const providerId = PROVIDER_ALIASES[provider] ?? provider;
-    if (!this.modelRuntime.getModel(providerId, modelName)) {
+    const model = this.modelRuntime.getModel(providerId, modelName);
+    if (!model) {
       throw new Error(
         `unknown model ${providerId}/${modelName}: not declared in chat.yaml or review.yaml`,
       );
     }
-    return { provider: providerId, modelId: modelName };
+    return {
+      ref: { provider: providerId, modelId: modelName },
+      contextWindow: model.contextWindow,
+      maxTokens: model.maxTokens,
+    };
   }
 
   /** Names of the tools the chat agent can actually call. */
@@ -167,7 +202,10 @@ export class SharedRuntime {
 
   /** Open or recover the SQLite-backed root conversation for one user/session. */
   async openSession(request: SessionRequest): Promise<OpenDurableSession> {
-    const model = this.resolveModel(request.provider, request.modelName);
+    const { ref: model, contextWindow, maxTokens } = this.resolveModelWithLimits(
+      request.provider,
+      request.modelName,
+    );
     const path = join(STATE_DIR, sessionStorageName(request.ownerId, request.sessionId));
     const harness = await Harness.open(
       await openNodeSqliteStorage(path),
@@ -175,8 +213,8 @@ export class SharedRuntime {
         models: this.modelRuntime,
         registry: this.chatRegistry,
         settings: {
-          stream: { timeoutMs: Number(process.env.CHAT_TIMEOUT_MS ?? 180_000) },
-          compaction: { enabled: true },
+          stream: { timeoutMs: MODEL_STREAM_TIMEOUT_MS },
+          compaction: { enabled: true, ...compactionBudget(contextWindow, maxTokens) },
         },
       },
       BACKGROUND_CONTEXT,
@@ -231,6 +269,29 @@ export class SharedRuntime {
       await harness.close(BACKGROUND_CONTEXT);
     }
   }
+}
+
+/**
+ * The write call the user is deciding on, if `id` names one still pending.
+ *
+ * Only an approval requested since the last user message counts: once the
+ * decision has been submitted it is a user entry, so a replayed or stale
+ * decision cannot run the operation a second time.
+ */
+export async function pendingApproval(
+  conversation: Conversation,
+  id: string,
+): Promise<ApprovalRequest | undefined> {
+  const view = await conversation.context(BACKGROUND_CONTEXT);
+  for (let i = view.entries.length - 1; i >= 0; i--) {
+    const entry = view.entries[i];
+    if (UserEntry.is(entry)) return undefined;
+    if (!ToolResultEntry.is(entry)) continue;
+    const details = entry.model?.[0]?.role === "toolResult" ? entry.model[0].details : undefined;
+    const approval = (details as { approval?: ApprovalRequest } | undefined)?.approval;
+    if (approval?.id === id) return approval;
+  }
+  return undefined;
 }
 
 /** Read the concatenated text blocks of a durable answer entry. */

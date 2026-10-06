@@ -26,7 +26,7 @@ import { TaskResultAiReviewNote } from "./TaskResultAiReviewNote";
 import { TaskResultIssues } from "./TaskResultIssues";
 import { TaskResultMemo } from "./TaskResultMemo";
 import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
-import type { AnalysisContext } from "@/hooks/useAnalysisChat";
+import type { AnalysisContext } from "@/types/copilotChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { getApiErrorMessage } from "@/lib/utils/apiError";

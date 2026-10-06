@@ -11,12 +11,14 @@ import {
   type ToolExecutionApi,
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
+import { Type, type TSchema } from "typebox";
 
 import {
   ALLOWED_TOOL_NAMES,
   EXPERIMENTAL_WRITE_TOOL_NAMES,
   isExperimentalWriteTool,
 } from "./allowed-tools.ts";
+import { withParameterOverrides } from "./tool-schemas.ts";
 
 /** Convert a value returned by an extension into durable's strict JSON shape. */
 function asJson(value: unknown): JsonValue | undefined {
@@ -24,12 +26,60 @@ function asJson(value: unknown): JsonValue | undefined {
   return JSON.parse(JSON.stringify(value)) as JsonValue;
 }
 
+/** A write call waiting for the user, as stored in the tool result and shown in the UI. */
+export interface ApprovalRequest {
+  /** The tool call id; the user's decision names it. */
+  id: string;
+  tool: string;
+  label: string;
+  args: Record<string, unknown>;
+}
+
+// pi-qdash connection plumbing; meaningless to the person approving the call.
+const HIDDEN_ARGS = new Set(["confirmWrite", "profile", "configPath", "useEnv"]);
+
+function approvalArgs(args: unknown): Record<string, unknown> {
+  if (typeof args !== "object" || args === null) return {};
+  return Object.fromEntries(Object.entries(args).filter(([key]) => !HIDDEN_ARGS.has(key)));
+}
+
+/** The model does not decide approval, so it is not offered the confirmation flag. */
+function withoutConfirmWrite(parameters: TSchema): TSchema {
+  const properties = (parameters as { properties?: Record<string, TSchema> }).properties;
+  if (!properties || !("confirmWrite" in properties)) return parameters;
+  const { confirmWrite: _confirmWrite, ...rest } = properties;
+  return Type.Object(rest);
+}
+
+/** Run a pi-coding-agent tool with the non-interactive context this runtime provides. */
+async function runCodingAgentTool(
+  tool: CodingAgentTool,
+  callId: string,
+  args: unknown,
+  signal: AbortSignal | undefined,
+  modelRuntime: ModelRuntime,
+  cwd: string,
+) {
+  const extensionContext = {
+    cwd,
+    mode: "json",
+    hasUI: false,
+    signal,
+    modelRegistry: new ModelRegistry(modelRuntime),
+    isIdle: () => false,
+    isProjectTrusted: () => true,
+    hasPendingMessages: () => false,
+  };
+  return tool.execute(callId, args as never, signal, undefined, extensionContext as never);
+}
+
 /**
  * Adapt one pi-coding-agent tool to pi-durable's execution contract.
  *
- * Read-only calls may be replayed after interruption. Experimental writes are
- * adapted as unsafe and retain pi-qdash's non-interactive confirmation field.
- * Raw-path access and unreviewed tools are removed before adaptation.
+ * Read-only calls may be replayed after interruption. Experimental writes
+ * never run from the model's call: the call ends the turn with an approval
+ * request, and the runtime runs it only after the user approves it in the UI
+ * (see `QDashWriteTools.runApproved`).
  */
 export function adaptCodingAgentTool(
   tool: CodingAgentTool,
@@ -37,39 +87,44 @@ export function adaptCodingAgentTool(
   cwd: string,
 ): ToolRegistration {
   const writesQDash = isExperimentalWriteTool(tool.name);
+  const parameters = withParameterOverrides(tool.name, tool.parameters);
   return defineTool({
     name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters,
-    // A repeated read is harmless. A write interrupted after reaching QDash
-    // must instead surface as interrupted and be reconciled by the operator.
-    replay: writesQDash ? "unsafe" : "safe",
+    description: writesQDash
+      ? `${tool.description} The user is shown the exact arguments and must approve before it runs.`
+      : tool.description,
+    parameters: writesQDash ? withoutConfirmWrite(parameters) : parameters,
+    // A repeated read is harmless. A write never runs inside the harness, so
+    // replaying the call only re-issues the approval request.
+    replay: "safe",
     ...(tool.prepareArguments ? { prepareArguments: tool.prepareArguments } : {}),
     ...(tool.executionMode ? { executionMode: tool.executionMode } : {}),
     execute: async (args, api: ToolExecutionApi, context: Context) => {
-      if (
-        writesQDash &&
-        (!(typeof args === "object" && args !== null && "confirmWrite" in args) ||
-          (args as { confirmWrite?: unknown }).confirmWrite !== true)
-      ) {
-        throw new Error(`${tool.name} requires confirmWrite: true`);
+      if (writesQDash) {
+        const approval: ApprovalRequest = {
+          id: api.callId,
+          tool: tool.name,
+          label: tool.label || tool.name,
+          args: approvalArgs(args),
+        };
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Approval requested: the user now sees this operation with its arguments and Approve/Decline buttons. Stop here. Their decision arrives as the next message.",
+            },
+          ],
+          details: asJson({ approval }),
+          control: { terminate: true as const },
+        };
       }
-      const extensionContext = {
-        cwd,
-        mode: "json",
-        hasUI: false,
-        signal: context.abortSignal,
-        modelRegistry: new ModelRegistry(modelRuntime),
-        isIdle: () => false,
-        isProjectTrusted: () => true,
-        hasPendingMessages: () => false,
-      };
-      const result = await tool.execute(
+      const result = await runCodingAgentTool(
+        tool,
         api.callId,
         args,
         context.abortSignal,
-        undefined,
-        extensionContext as never,
+        modelRuntime,
+        cwd,
       );
       return {
         content: result.content,
@@ -82,24 +137,78 @@ export function adaptCodingAgentTool(
   });
 }
 
+const MAX_RESULT_CHARS = 8_000;
+
+/** What the model is told after the user decided on a write call. */
+export function decisionMessage(
+  approval: ApprovalRequest,
+  outcome: { approved: false } | { approved: true; result: string } | { approved: true; error: string },
+): string {
+  const what = `${approval.label} (${approval.tool})`;
+  if (!outcome.approved) {
+    return `[QDash runtime] The user declined ${what}. It was not run. Do not call it again unless the user asks; suggest another way forward if there is one.`;
+  }
+  if ("error" in outcome) {
+    return `[QDash runtime] The user approved ${what}, but running it failed:\n${outcome.error}\nExplain the failure and what the user can do next.`;
+  }
+  const result =
+    outcome.result.length > MAX_RESULT_CHARS
+      ? `${outcome.result.slice(0, MAX_RESULT_CHARS)}\n… (truncated)`
+      : outcome.result;
+  return `[QDash runtime] The user approved ${what} and it ran with the arguments they saw. Result:\n${result || "(no output)"}\nContinue the task from here.`;
+}
+
+/** The original write tools, run by the runtime once the user has approved a call. */
+export class QDashWriteTools {
+  constructor(
+    private readonly tools: ReadonlyMap<string, CodingAgentTool>,
+    private readonly modelRuntime: ModelRuntime,
+    private readonly cwd: string,
+  ) {}
+
+  /** Run an approved call with the exact arguments the user saw; returns its text. */
+  async runApproved(approval: ApprovalRequest, signal?: AbortSignal): Promise<string> {
+    const tool = this.tools.get(approval.tool);
+    if (!tool) throw new Error(`write tool ${approval.tool} is not enabled`);
+    const result = await runCodingAgentTool(
+      tool,
+      approval.id,
+      { ...approval.args, confirmWrite: true },
+      signal,
+      this.modelRuntime,
+      this.cwd,
+    );
+    const text = result.content
+      .map((block) => (block.type === "text" ? block.text : ""))
+      .join("\n")
+      .trim();
+    if (result.isError) throw new Error(text || `${approval.tool} failed`);
+    return text;
+  }
+}
+
 /** Build the durable extension containing all permitted pi-qdash tools. */
 export function buildQDashExtension(
   extensions: ReadonlyArray<{ tools?: Map<string, { definition: CodingAgentTool }> }>,
   modelRuntime: ModelRuntime,
   cwd: string,
   enableExperimentalWriteTools = false,
-): Extension {
+): { extension: Extension; writeTools: QDashWriteTools } {
   const allowed = new Set<string>([
     ...ALLOWED_TOOL_NAMES,
     ...(enableExperimentalWriteTools ? EXPERIMENTAL_WRITE_TOOL_NAMES : []),
   ]);
   const tools = new Map<string, ToolRegistration>();
+  const writes = new Map<string, CodingAgentTool>();
   for (const extension of extensions) {
     for (const [name, registered] of extension.tools ?? []) {
-      if (allowed.has(name)) {
-        tools.set(name, adaptCodingAgentTool(registered.definition, modelRuntime, cwd));
-      }
+      if (!allowed.has(name)) continue;
+      tools.set(name, adaptCodingAgentTool(registered.definition, modelRuntime, cwd));
+      if (isExperimentalWriteTool(name)) writes.set(name, registered.definition);
     }
   }
-  return defineExtension({ name: "qdash", tools: [...tools.values()] });
+  return {
+    extension: defineExtension({ name: "qdash", tools: [...tools.values()] }),
+    writeTools: new QDashWriteTools(writes, modelRuntime, cwd),
+  };
 }

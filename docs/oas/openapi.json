@@ -18122,6 +18122,17 @@
               }
             ],
             "description": "Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used."
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalDecision"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Decision on the write operation the previous turn asked approval for."
           }
         },
         "type": "object",
@@ -18162,6 +18173,26 @@
         ],
         "title": "ApplyAgentCandidateRequest",
         "description": "Dispatch a committed candidate for worker-side backend application."
+      },
+      "ApprovalDecision": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Tool call id from the approval card"
+          },
+          "approve": {
+            "type": "boolean",
+            "title": "Approve"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "approve"
+        ],
+        "title": "ApprovalDecision",
+        "description": "The user's decision on a write operation the assistant asked approval for."
       },
       "ArtifactPreviewResponse": {
         "properties": {
@@ -24773,6 +24804,19 @@
               }
             ],
             "title": "Top K"
+          },
+          "sampling_params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Sampling Params"
+          },
+          "sampling_params_by_thinking_level": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Sampling Params By Thinking Level"
           },
           "reasoning_effort": {
             "anyOf": [

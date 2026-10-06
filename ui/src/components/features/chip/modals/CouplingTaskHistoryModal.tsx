@@ -28,7 +28,7 @@ import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
-import type { AnalysisContext } from "@/hooks/useAnalysisChat";
+import type { AnalysisContext } from "@/types/copilotChat";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { getApiErrorMessage } from "@/lib/utils/apiError";

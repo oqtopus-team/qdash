@@ -133,6 +133,13 @@ class BlocksAnalysisResponse(BaseModel):
 BlocksResponse = BlocksAnalysisResponse
 
 
+class ApprovalDecision(BaseModel):
+    """The user's decision on a write operation the assistant asked approval for."""
+
+    id: str = Field(description="Tool call id from the approval card")
+    approve: bool
+
+
 class AnalyzeRequest(BaseModel):
     """Request body for POST /copilot/analyze."""
 
@@ -169,6 +176,10 @@ class AnalyzeRequest(BaseModel):
             "When unset, the configured analysis_model/model selection is used."
         ),
     )
+    approval: ApprovalDecision | None = Field(
+        default=None,
+        description="Decision on the write operation the previous turn asked approval for.",
+    )
 
 
 class ChatRequest(BaseModel):
@@ -200,6 +211,10 @@ class ChatRequest(BaseModel):
             "Optional per-request model override for general chat. "
             "When unset, the configured chat_models[0]/model selection is used."
         ),
+    )
+    approval: ApprovalDecision | None = Field(
+        default=None,
+        description="Decision on the write operation the previous turn asked approval for.",
     )
 
 

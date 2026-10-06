@@ -26,6 +26,19 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# The context above already holds the result, its parameters, task knowledge
+# and figures. Without this, local models re-fetch all of it through tools
+# before answering and run out of time or context.
+_ANSWERING_GUIDANCE = """\
+## How to answer
+
+Everything about this result is already above: its parameters, the task \
+knowledge, past cases and the attached figures. Answer from them first. Call a \
+tool only when the question needs data that is not here, such as history, \
+other qubits or other executions, and keep it to a few targeted calls. Do not \
+re-fetch this result, its figures or its task knowledge."""
+
+
 def build_analysis_prompt(
     *,
     bundle: AnalysisContextResult,
@@ -63,7 +76,7 @@ def build_analysis_prompt(
         if expected_count or experiment_count
         else ""
     )
-    return f"{body}{image_note}\n\n## Your task\n\n{user_message}"
+    return f"{body}{image_note}\n\n{_ANSWERING_GUIDANCE}\n\n## Your task\n\n{user_message}"
 
 
 async def stream(
@@ -108,6 +121,7 @@ async def stream(
         "thinking_level": pi_chat_service.thinking_level(config),
         # The durable runtime accepts these only when the conversation is new.
         "images": collect_images(bundle),
+        **pi_chat_service.approval_payload(request.approval),
     }
 
     async for event in pi_chat_service.stream_payload(

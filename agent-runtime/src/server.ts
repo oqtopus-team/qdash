@@ -2,17 +2,23 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 
 import { UserEntry, watchEvents, type AgentEvent } from "@earendil-works/pi-durable";
 
+import { WRAP_UP_MESSAGE } from "./budget.ts";
 import { encodeLine, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
 import { hasBearerToken, readJsonBody, RequestError } from "./http.ts";
+import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
 import {
   answerText,
+  pendingApproval,
   BACKGROUND_CONTEXT,
   SharedRuntime,
   type SessionRequest,
 } from "./runtime.ts";
 
 const PORT = Number(process.env.PORT ?? 8002);
-const CHAT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 180_000);
+// After CHAT_WRAP_UP_MS the model is told to stop calling tools and answer;
+// CHAT_TIMEOUT_MS is the hard stop for a turn that still does not finish.
+const CHAT_WRAP_UP_MS = Number(process.env.CHAT_WRAP_UP_MS ?? 120_000);
+const CHAT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 600_000);
 const REVIEW_CONCURRENCY = Number(process.env.REVIEW_CONCURRENCY ?? 2);
 const REVIEW_QUEUE_TIMEOUT_MS = Number(process.env.REVIEW_QUEUE_TIMEOUT_MS ?? 30_000);
 const MAX_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES ?? 20 * 1024 * 1024);
@@ -32,6 +38,8 @@ interface ChatBody {
   model?: { provider?: string; name?: string };
   thinking_level?: SessionRequest["thinkingLevel"];
   images?: ImageBody[];
+  /** The user's decision on a write call the previous turn asked approval for. */
+  approval?: { id?: string; approve?: boolean };
 }
 
 interface ReviewBody {
@@ -163,6 +171,20 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   }
 
   const { harness, conversation } = opened;
+
+  let approval: ApprovalRequest | undefined;
+  if (body.approval) {
+    approval = body.approval.id
+      ? await pendingApproval(conversation, body.approval.id)
+      : undefined;
+    if (!approval) {
+      await harness.close(BACKGROUND_CONTEXT);
+      running.delete(runKey);
+      sendJson(res, 400, { error: "This approval is no longer pending; ask the assistant again." });
+      return;
+    }
+  }
+
   res.writeHead(200, {
     "Content-Type": "application/x-ndjson",
     "Cache-Control": "no-cache",
@@ -187,7 +209,26 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   try {
     const view = await conversation.context(BACKGROUND_CONTEXT);
     const isNew = !view.entries.some((entry) => UserEntry.is(entry));
-    const message = isNew && body.initial_message ? body.initial_message : body.message;
+    let message = isNew && body.initial_message ? body.initial_message : body.message;
+    if (approval) {
+      // The runtime, not the model, runs the call the user approved, with the
+      // exact arguments the user saw. The model only learns the outcome.
+      if (body.approval?.approve === true) {
+        const id = `${approval.id}:approved`;
+        write({ type: "tool_start", name: approval.tool, id, args: approval.args });
+        try {
+          const result = await runtime.writeTools.runApproved(approval);
+          write({ type: "tool_end", name: approval.tool, id, isError: false });
+          message = decisionMessage(approval, { approved: true, result });
+        } catch (error) {
+          write({ type: "tool_end", name: approval.tool, id, isError: true });
+          const reason = error instanceof Error ? error.message : String(error);
+          message = decisionMessage(approval, { approved: true, error: reason });
+        }
+      } else {
+        message = decisionMessage(approval, { approved: false });
+      }
+    }
     const images = isNew ? toImageContent(body.images) : [];
     const content = images.length
       ? [{ type: "text" as const, text: message }, ...images]
@@ -200,11 +241,29 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
       },
       BACKGROUND_CONTEXT,
     );
+    // A steer is placed after the current tool round, so the model reads it
+    // before deciding on more tools and answers in the same run.
+    let wrapUp: ReturnType<typeof conversation.submit> | undefined;
+    const wrapUpTimer = setTimeout(() => {
+      wrapUp = conversation.submit(
+        { type: "input", content: WRAP_UP_MESSAGE, whenBusy: "steer" },
+        BACKGROUND_CONTEXT,
+      );
+      // Handled after the turn settles; keep the rejection from going unhandled meanwhile.
+      wrapUp.catch(() => undefined);
+    }, CHAT_WRAP_UP_MS);
     const timeout = setTimeout(
       () => void conversation.abort(BACKGROUND_CONTEXT),
       CHAT_TIMEOUT_MS,
     );
-    const settled = await submission.wait(BACKGROUND_CONTEXT).finally(() => clearTimeout(timeout));
+    const settled = await submission.wait(BACKGROUND_CONTEXT).finally(() => {
+      clearTimeout(wrapUpTimer);
+      clearTimeout(timeout);
+    });
+    // A steer still queued when the run answered would start a new run.
+    await wrapUp
+      ?.then((placed) => placed.abort(BACKGROUND_CONTEXT))
+      .catch((error: unknown) => console.warn("[agent-runtime] wrap-up steer failed:", error));
     await events.stop();
     if (settled.status === "done" && settled.type === "input") {
       write({ type: "done", text: await answerText(conversation, settled.answer) });

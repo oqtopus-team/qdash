@@ -18,7 +18,7 @@ import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
-import type { AnalysisContext } from "@/hooks/useAnalysisChat";
+import type { AnalysisContext } from "@/types/copilotChat";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 interface ExecutionTaskDetailModalProps {

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
     from qdash.copilot.config import CopilotConfig
     from qdash.copilot.contracts import ChatRequest
+    from qdash.copilot.contracts.models import ApprovalDecision
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +126,13 @@ def _request_payload(
         "message": request.message,
         "model": {"provider": config.model.provider, "name": config.model.name},
         "thinking_level": thinking_level(config),
+        **approval_payload(request.approval),
     }
+
+
+def approval_payload(approval: ApprovalDecision | None) -> dict[str, Any]:
+    """Forward the user's decision on a pending write operation, if any."""
+    return {"approval": approval.model_dump()} if approval else {}
 
 
 async def stream(
@@ -219,6 +226,8 @@ async def translate(
     can be tested on plain strings.
     """
     charts: list[dict[str, Any]] = []
+    # Questions and approval requests the turn ended on, rendered as cards.
+    interactions: list[dict[str, Any]] = []
     completed_tools: list[str] = []
 
     async for line in lines:
@@ -234,17 +243,57 @@ async def translate(
                 completed_tools.append(tool_label(event["name"]))
             elif kind == "chart":
                 charts.append(event["chart"])
+            elif kind == "ask":
+                interactions.append(
+                    {"type": "ask", "content": None, "chart": None, "ask": event["ask"]}
+                )
+            elif kind == "approval":
+                interactions.append(
+                    {
+                        "type": "approval",
+                        "content": None,
+                        "chart": None,
+                        "approval": event["approval"],
+                    }
+                )
+            elif kind in ("text_delta", "thinking_delta") and not isinstance(event["delta"], str):
+                raise TypeError(kind)
         except (ValueError, KeyError, TypeError):
             logger.warning("Malformed NDJSON line from agent runtime")
             yield sse_event("error", {"step": step, "detail": "Agent runtime sent malformed data"})
             return
 
-        if kind == "tool_start":
+        # ``delta``/``thinking``/``tool_start``/``tool_end`` drive the live
+        # transcript in the chat page. ``status`` stays for consumers that only
+        # show a one-line progress message.
+        if kind == "text_delta":
+            yield sse_event("delta", {"text": event["delta"]})
+        elif kind == "thinking_delta":
+            yield sse_event("thinking", {"text": event["delta"]})
+        elif kind == "tool_start":
+            yield sse_event(
+                "tool_start",
+                {
+                    "id": event.get("id"),
+                    "tool": event["name"],
+                    "label": label,
+                    "args": event.get("args"),
+                },
+            )
             yield sse_event(
                 "status",
                 {"step": "tool_call", "tool": event["name"], "message": f"{label}..."},
             )
         elif kind == "tool_end":
+            yield sse_event(
+                "tool_end",
+                {
+                    "id": event.get("id"),
+                    "tool": event["name"],
+                    "label": tool_label(event["name"]),
+                    "is_error": bool(event.get("isError")),
+                },
+            )
             yield sse_event(
                 "status",
                 {
@@ -253,7 +302,7 @@ async def translate(
                     "completed_tools": list(completed_tools),
                 },
             )
-        elif kind == "chart":
+        elif kind in ("chart", "ask", "approval"):
             pass
         elif kind == "error":
             yield sse_event(
@@ -262,7 +311,7 @@ async def translate(
             )
             return
         elif kind == "done":
-            result = build_blocks_result(event.get("text", ""), charts)
+            result = build_blocks_result(event.get("text", ""), charts, interactions)
             # No text and no chart means the turn produced nothing renderable.
             # Local models do this when they emit a malformed tool call, and a
             # silent empty reply is indistinguishable from the UI hanging.
@@ -282,7 +331,11 @@ async def translate(
     )
 
 
-def build_blocks_result(text: str, charts: list[dict[str, Any]]) -> dict[str, Any]:
+def build_blocks_result(
+    text: str,
+    charts: list[dict[str, Any]],
+    interactions: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Assemble the blocks payload the chat UI renders.
 
     ``assessment`` stays null: the Pi backend returns free-form text rather than
@@ -293,4 +346,5 @@ def build_blocks_result(text: str, charts: list[dict[str, Any]]) -> dict[str, An
     ]
     if text:
         blocks.append({"type": "text", "content": text, "chart": None})
+    blocks.extend(interactions or [])
     return {"blocks": blocks, "assessment": None}

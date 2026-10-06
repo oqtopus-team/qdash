@@ -10,6 +10,8 @@ import type { ModelConfigBaseUrl } from './modelConfigBaseUrl';
 import type { ModelConfigKeepAlive } from './modelConfigKeepAlive';
 import type { ModelConfigNumCtx } from './modelConfigNumCtx';
 import type { ModelConfigReasoningEffort } from './modelConfigReasoningEffort';
+import type { ModelConfigSamplingParams } from './modelConfigSamplingParams';
+import type { ModelConfigSamplingParamsByThinkingLevel } from './modelConfigSamplingParamsByThinkingLevel';
 import type { ModelConfigTemperature } from './modelConfigTemperature';
 import type { ModelConfigTopK } from './modelConfigTopK';
 import type { ModelConfigTopP } from './modelConfigTopP';
@@ -28,6 +30,8 @@ export interface ModelConfig {
   num_ctx?: ModelConfigNumCtx;
   top_p?: ModelConfigTopP;
   top_k?: ModelConfigTopK;
+  sampling_params?: ModelConfigSamplingParams;
+  sampling_params_by_thinking_level?: ModelConfigSamplingParamsByThinkingLevel;
   reasoning_effort?: ModelConfigReasoningEffort;
   disable_thinking_instruction?: boolean;
   api_style?: string;
