@@ -114,6 +114,7 @@ def test_download_zip_file_maps_config_parent_to_qubex_config(tmp_path: Path) ->
 
 
 def test_download_zip_file_preserves_tree_for_relative_root(tmp_path: Path) -> None:
+    """Zipping the relative root (".") keeps each file's chip-relative directory tree."""
     config_dir = tmp_path / "qubex-config"
     first_file = config_dir / "64Q" / "config" / "wiring.yaml"
     second_file = config_dir / "16Qtest" / "config" / "chip.yaml"

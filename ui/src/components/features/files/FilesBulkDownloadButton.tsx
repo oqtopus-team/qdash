@@ -4,13 +4,17 @@ import { Download } from "lucide-react";
 import { useState } from "react";
 
 import { downloadZipFile } from "@/client/file/file";
-import { getApiErrorMessage } from "@/lib/utils/apiError";
+import { getApiErrorMessage, parseBlobErrorBody } from "@/lib/utils/apiError";
 
 interface FilesBulkDownloadButtonProps {
   disabled?: boolean;
   onError: (message: string) => void;
 }
 
+/**
+ * Derives the archive's filename from a `Content-Disposition` header, preferring
+ * the UTF-8 encoded `filename*` form and falling back to a default name.
+ */
 function getArchiveFilename(contentDisposition: unknown): string {
   if (typeof contentDisposition !== "string") return "config-files.zip";
 
@@ -27,24 +31,16 @@ function getArchiveFilename(contentDisposition: unknown): string {
   return filenameMatch?.[1] ?? "config-files.zip";
 }
 
-async function parseDownloadError(error: unknown): Promise<unknown> {
-  const response = (error as { response?: { data?: unknown } } | null)?.response;
-  if (response?.data instanceof Blob) {
-    try {
-      response.data = JSON.parse(await response.data.text());
-    } catch {
-      // Preserve the original response when it is not JSON.
-    }
-  }
-  return error;
-}
-
+/**
+ * Button that downloads the entire config file tree as a single ZIP archive.
+ */
 export function FilesBulkDownloadButton({
   disabled = false,
   onError,
 }: FilesBulkDownloadButtonProps) {
   const [isDownloading, setIsDownloading] = useState(false);
 
+  /** Fetches the config tree as a ZIP blob and saves it via a temporary link. */
   const handleDownload = async () => {
     if (isDownloading) return;
 
@@ -65,7 +61,7 @@ export function FilesBulkDownloadButton({
       document.body.removeChild(link);
     } catch (error) {
       onError(
-        getApiErrorMessage(await parseDownloadError(error), "Failed to download config files"),
+        getApiErrorMessage(await parseBlobErrorBody(error), "Failed to download config files"),
       );
     } finally {
       setIsDownloading(false);
@@ -75,7 +71,7 @@ export function FilesBulkDownloadButton({
   return (
     <button
       type="button"
-      className="btn btn-sm btn-outline hidden sm:flex"
+      className="btn btn-sm btn-outline"
       onClick={handleDownload}
       disabled={disabled || isDownloading}
       title="Download all config files as a ZIP archive"
@@ -85,7 +81,7 @@ export function FilesBulkDownloadButton({
       ) : (
         <Download size={16} aria-hidden="true" />
       )}
-      <span className="ml-1">{isDownloading ? "Downloading..." : "Download"}</span>
+      <span className="ml-1 hidden sm:inline">{isDownloading ? "Downloading..." : "Download"}</span>
     </button>
   );
 }
