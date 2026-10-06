@@ -1,4 +1,10 @@
-"""Prompt builders for generic Copilot chat flows."""
+"""Prompt builders for the LiteLLM chat backend (``copilot_backend: litellm``).
+
+Kept for that backend only. The Pi Agent Runtime, the current chat backend,
+builds its prompt in ``agent-runtime/src/prompt.ts`` and takes tool guidance
+from the pi-qdash skills; see docs/development/copilot/knowledge-layout.md.
+New chat guidance belongs there, not here.
+"""
 
 from __future__ import annotations
 

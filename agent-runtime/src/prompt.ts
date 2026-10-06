@@ -10,6 +10,8 @@ export function buildSystemPrompt(
   thinkingLanguage: string,
   experimentalWriteTools = false,
   skills: ReadonlyArray<{ name: string; description: string }> = [],
+  /** Routing guide from the pi-qdash `qdash` skill; see tool-guide.ts. */
+  toolGuide: string | null = null,
 ): string {
   const thinkingLanguageName = languageName(thinkingLanguage);
   return [
@@ -30,6 +32,13 @@ export function buildSystemPrompt(
         ]
       : []),
     `- Reason internally in ${thinkingLanguageName}. ${responseInstruction(responseLanguage)}`,
+    ...(toolGuide
+      ? [
+          "",
+          "Tool guide:",
+          toolGuide,
+        ]
+      : []),
     ...(skills.length
       ? [
           "",

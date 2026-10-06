@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -35,6 +35,7 @@ import { buildReviewSystemPrompt, buildSystemPrompt } from "./prompt.ts";
 import { pythonTool } from "./python-tool.ts";
 import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
 import { submitReviewTool } from "./review-tool.ts";
+import { extractToolGuide, TOOL_GUIDE_SKILL } from "./tool-guide.ts";
 
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
 const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
@@ -125,6 +126,19 @@ export class SharedRuntime {
       EXPERIMENTAL_WRITE_TOOLS_ENABLED,
     );
     chatRegistry.install(qdash.extension);
+
+    // The qdash skill's tool guide goes into the system prompt, limited to the
+    // tools this runtime exposes (see tool-guide.ts).
+    const qdashToolNames = chatRegistry
+      .snapshot()
+      .tools()
+      .map(({ tool }) => tool.name);
+    const guideSkill = skills.find((skill) => skill.name === TOOL_GUIDE_SKILL);
+    const toolGuide = guideSkill
+      ? extractToolGuide(readFileSync(guideSkill.filePath, "utf8"), qdashToolNames)
+      : null;
+    if (!toolGuide) console.warn("[agent-runtime] no tool guide: qdash skill not found");
+
     chatRegistry.install(
       defineExtension({
         name: "qdash-copilot",
@@ -137,6 +151,7 @@ export class SharedRuntime {
                 thinkingLanguage,
                 EXPERIMENTAL_WRITE_TOOLS_ENABLED,
                 skills,
+                toolGuide,
               ),
             { tag: false },
           ),

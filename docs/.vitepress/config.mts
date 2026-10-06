@@ -205,6 +205,7 @@ export default withMermaid(
               items: [
                 { text: "Agent Platform", link: "/development/agent-platform" },
                 { text: "Architecture", link: "/development/copilot/architecture" },
+                { text: "Knowledge Layout", link: "/development/copilot/knowledge-layout" },
                 { text: "AI Review Evals", link: "/development/copilot/ai-review-evals" },
                 { text: "Sandbox", link: "/development/copilot/sandbox" },
                 { text: "LLM Agent", link: "/development/copilot/agent" },
