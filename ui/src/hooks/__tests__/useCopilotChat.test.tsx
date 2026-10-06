@@ -32,7 +32,8 @@ function controllableStream() {
     push: (text: string) => controller.enqueue(encoder.encode(text)),
     close: () => controller.close(),
     // What a real fetch does to the body when its signal aborts.
-    abort: () => controller.error(new DOMException("aborted", "AbortError")),
+    abort: (reason?: unknown) =>
+      controller.error(reason ?? new DOMException("aborted", "AbortError")),
   };
 }
 
@@ -55,7 +56,7 @@ beforeEach(() => {
   stream = controllableStream();
   fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/stream")) {
-      init?.signal?.addEventListener("abort", () => stream.abort());
+      init?.signal?.addEventListener("abort", () => stream.abort(init.signal!.reason));
       return new Response(stream.body, { status: 200 });
     }
     if (url.endsWith("/copilot/chat/sessions") && !init?.method) {
@@ -98,6 +99,41 @@ function streamRequest() {
 }
 
 describe("useCopilotChat streaming", () => {
+  it("does not send from a restored session before its messages load", async () => {
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/copilot/chat/sessions") && !init?.method) {
+        return Response.json({
+          sessions: [
+            {
+              session_id: "saved-session",
+              title: "Saved chat",
+              context: null,
+              message_count: 2,
+              created_at: "2026-10-05T00:00:00Z",
+              updated_at: "2026-10-05T00:01:00Z",
+            },
+          ],
+        });
+      }
+      if (url.endsWith("/copilot/chat/sessions/saved-session") && !init?.method) {
+        return new Promise<Response>(() => {});
+      }
+      return Response.json({ session_id: "saved-session", title: "Saved chat", messages: [] });
+    });
+    const result = await renderChat();
+
+    act(() => result.current.store.switchSession("saved-session"));
+    await waitFor(() => expect(result.current.chat.isLoadingMessages).toBe(true));
+    act(() => result.current.chat.send("Do not overwrite history"));
+
+    expect(result.current.chat.isStreaming).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) => String(url).endsWith("/stream") || init?.method === "PATCH",
+      ),
+    ).toBe(false);
+  });
+
   it("builds a live transcript and persists the work as a trace", async () => {
     const result = await renderChat();
 

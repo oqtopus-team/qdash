@@ -19,6 +19,7 @@ interface ChatComposerProps {
   onSubmit: () => void;
   onStop: () => void;
   isStreaming: boolean;
+  disabled?: boolean;
   placeholder?: string;
   modelOptions: ModelOption[];
   selectedModelKey: string;
@@ -38,6 +39,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     onSubmit,
     onStop,
     isStreaming,
+    disabled = false,
     placeholder = "Ask about calibration data...",
     modelOptions,
     selectedModelKey,
@@ -57,7 +59,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT_PX)}px`;
   }, [value]);
 
-  const canSend = value.trim().length > 0 && !isStreaming;
+  const canSend = value.trim().length > 0 && !isStreaming && !disabled;
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -83,6 +85,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
       <textarea
         ref={textareaRef}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
@@ -98,7 +101,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                disabled={isStreaming}
+                disabled={isStreaming || disabled}
                 className="btn btn-ghost btn-xs h-7 gap-1.5 rounded-lg font-normal text-base-content/60 max-w-[60%]"
                 aria-label="Chat model"
               >

@@ -471,6 +471,10 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
       const sessionId = options?.sessionId ?? activeSessionId ?? createNewSession(null);
       if (controllers.current.has(sessionId)) return;
       const session = sessionsRef.current.find((s) => s.id === sessionId);
+      // A session restored from the list has no local history until its detail
+      // request completes. Sending from that placeholder would replace the
+      // persisted conversation with only the new turn.
+      if (session && !session.messagesLoaded && !options?.history) return;
       const history = options?.history ?? session?.messages ?? [];
 
       const controller = new AbortController();
@@ -560,7 +564,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
             throw new Error("The connection closed before the answer was complete");
           }
         } catch (err) {
-          if (err instanceof DOMException && err.name === "AbortError") {
+          if (controller.signal.aborted) {
             // Keep whatever had streamed, like ChatGPT/Claude do on Stop.
             if (controller.signal.reason === "stop") {
               const partial = streamedAnswer(turn);

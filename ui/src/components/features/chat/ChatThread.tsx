@@ -190,11 +190,11 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
   const submit = useCallback(
     (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || isStreaming) return;
+      if (!trimmed || isStreaming || isLoadingMessages) return;
       setInput("");
       send(trimmed);
     },
-    [isStreaming, send],
+    [isLoadingMessages, isStreaming, send],
   );
 
   const focusComposer = useCallback(() => composerRef.current?.focus(), []);
@@ -207,6 +207,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       onSubmit={() => submit(input)}
       onStop={stop}
       isStreaming={isStreaming}
+      disabled={isLoadingMessages}
       placeholder={context ? "Ask about this result..." : "Ask about calibration data..."}
       modelOptions={model.options}
       selectedModelKey={model.selected.key}
