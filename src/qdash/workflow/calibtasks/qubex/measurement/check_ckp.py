@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
@@ -14,27 +13,29 @@ from qdash.datamodel.task import (
     RunParameterSpec,
 )
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
-from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
+from qdash.workflow.calibtasks.qubex.base import (
+    QubexTask,
+    readout_duration_run_parameter,
+    required_rabi_normalization_inputs,
+)
 from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.progress import ProgressPlan
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
-
     from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
-class CharacterizeFilteredCKP(QubexTask):
+class CheckCKP(QubexTask):
     """Estimate readout-resonator and Purcell-filter parameters with filtered CKP."""
 
-    name: str = "CharacterizeFilteredCKP"
+    name: str = "CheckCKP"
     task_type: str = "qubit"
 
     # ``filtered_ckp_experiment`` normalizes IQ data with the stored Rabi fit,
     # and builds the |1> preparation pulse from the calibrated HPI pulse.
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "qubit_frequency": InputParameterSpec.required_database(
-            unit="GHz", greater_than=0, description="Calibrated qubit frequency"
+            unit="GHz", greater_than=0, description="Calibrated GE control frequency"
         ),
         "readout_frequency": InputParameterSpec.required_database(
             unit="GHz", greater_than=0, description="Readout-frequency sweep center"
@@ -51,27 +52,12 @@ class CharacterizeFilteredCKP(QubexTask):
         "hpi_duration": InputParameterSpec.required_database(
             unit="ns", greater_than=0, description="Calibrated half-pi pulse duration"
         ),
+        # Qubex normalizes CKP IQ data with the persisted Rabi fit.
+        **required_rabi_normalization_inputs(),
+        # Keep task-specific effective-input constraints for values that
+        # directly determine the restored Rabi context.
         "control_amplitude": InputParameterSpec.required_database(
             unit="a.u.", greater_than=0, less_than=1, description="Rabi control amplitude"
-        ),
-        "rabi_amplitude": InputParameterSpec.required_database(
-            unit="a.u.", description="Rabi-fit amplitude"
-        ),
-        "rabi_phase": InputParameterSpec.required_database(
-            unit="a.u.", description="Rabi-fit phase"
-        ),
-        "rabi_offset": InputParameterSpec.required_database(
-            unit="a.u.", description="Rabi-fit offset"
-        ),
-        "rabi_angle": InputParameterSpec.required_database(unit="rad", description="Rabi IQ angle"),
-        "rabi_noise": InputParameterSpec.required_database(
-            unit="a.u.", description="Rabi-fit noise"
-        ),
-        "rabi_distance": InputParameterSpec.required_database(
-            unit="a.u.", description="Rabi IQ offset perpendicular to the Rabi axis"
-        ),
-        "rabi_reference_phase": InputParameterSpec.required_database(
-            unit="a.u.", description="Rabi reference phase"
         ),
         "rabi_r2": InputParameterSpec.required_database(
             unit="", greater_than_or_equal=0.6, description="Rabi-fit R²"
@@ -95,12 +81,6 @@ class CharacterizeFilteredCKP(QubexTask):
             value_type="list",
             default=None,
             description="Readout-frequency offsets. Uses Qubex's CKP default when unset.",
-        ),
-        "resonator_drive_amplitude_ratio": RunParameterSpec(
-            unit="",
-            value_type="float",
-            default=0.5,
-            description="CKP resonator-drive amplitude relative to readout_amplitude",
         ),
         "qubit_drive_scale": RunParameterSpec(
             unit="", value_type="float", default=0.8, description="Relative CKP qubit-drive area"
@@ -191,45 +171,7 @@ class CharacterizeFilteredCKP(QubexTask):
         rough_attempts_max = max(1, reductions, increases, reductions + increases - 1)
         return ProgressPlan(5, 4 + 2 * rough_attempts_max)
 
-    @contextmanager
-    def _apply_ckp_overrides(self, backend: QubexBackend, qid: str) -> Generator[None, None, None]:
-        """Scope logical CKP inputs without resetting the hardware IQ reference frame.
-
-        Filtered CKP normalizes its measured IQ data using the Rabi parameters
-        prepared immediately before this task.  Reconfiguring the QuEL1
-        readout mixer here can reset that IQ reference frame, so this context
-        changes only Qubex logical target frequencies and the readout
-        amplitude.  ``Configure`` is responsible for hardware mixer setup.
-        """
-        exp = self.get_experiment(backend)
-        qubit_label = self.get_qubit_label(backend, qid)
-        resonator_label = self.get_resonator_label(backend, qid)
-        qubit_frequency = self._get_calibration_value("qubit_frequency")
-        readout_frequency = self._get_calibration_value("readout_frequency")
-        readout_amplitude = self._get_calibration_value("readout_amplitude")
-        for name, value in (
-            ("qubit_frequency", qubit_frequency),
-            ("readout_frequency", readout_frequency),
-            ("readout_amplitude", readout_amplitude),
-        ):
-            if not math.isfinite(value) or value <= 0:
-                raise ValueError(f"{name} must be finite and positive")
-
-        original_amplitude = exp.params.readout_amplitude[qubit_label]
-        exp.params.readout_amplitude[qubit_label] = readout_amplitude
-        try:
-            with exp.modified_frequencies(
-                {
-                    qubit_label: qubit_frequency,
-                    resonator_label: readout_frequency,
-                }
-            ):
-                yield
-        finally:
-            exp.params.readout_amplitude[qubit_label] = original_amplitude
-
     def _run_kwargs(self) -> dict[str, Any]:
-        ratio = float(self.run_parameters["resonator_drive_amplitude_ratio"].get_value())
         qubit_drive_scale = float(self.run_parameters["qubit_drive_scale"].get_value())
         qubit_drive_duration = float(self.run_parameters["qubit_drive_duration"].get_value())
         resonator_settle_duration = float(
@@ -237,8 +179,6 @@ class CharacterizeFilteredCKP(QubexTask):
         )
         n_shots = int(self.run_parameters["shots"].get_value())
         interval = float(self.run_parameters["interval"].get_value())
-        if not math.isfinite(ratio) or ratio <= 0:
-            raise ValueError("resonator_drive_amplitude_ratio must be finite and positive")
         if not math.isfinite(qubit_drive_scale) or qubit_drive_scale <= 0:
             raise ValueError("qubit_drive_scale must be finite and positive")
         if not math.isfinite(qubit_drive_duration) or qubit_drive_duration <= 0:
@@ -250,11 +190,13 @@ class CharacterizeFilteredCKP(QubexTask):
 
         rough_enabled, rough_target, reductions, increases = self._rough_search_options()
         return {
+            "control_frequency": self._get_calibration_value("qubit_frequency"),
+            "readout_frequency": self._get_calibration_value("readout_frequency"),
+            "readout_amplitude": self._get_calibration_value("readout_amplitude"),
             "qubit_detuning_range": self._optional_sweep("qubit_detuning_range"),
             "qubit_drive_scale": qubit_drive_scale,
             "qubit_drive_duration": qubit_drive_duration,
             "resonator_detuning_range": self._optional_sweep("resonator_detuning_range"),
-            "resonator_drive_amplitude": self._get_calibration_value("readout_amplitude") * ratio,
             "resonator_settle_duration": resonator_settle_duration,
             "n_shots": n_shots,
             "shot_interval": interval,
@@ -272,12 +214,11 @@ class CharacterizeFilteredCKP(QubexTask):
 
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
-        with self._apply_ckp_overrides(backend, qid):
-            result = qubex.contrib.filtered_ckp_experiment(
-                exp,
-                target=label,
-                **self._run_kwargs(),
-            )
+        result = qubex.contrib.filtered_ckp_experiment(
+            exp,
+            target=label,
+            **self._run_kwargs(),
+        )
         r2 = result.data.get("r2")
         return RunResult(raw_result=result, r2={qid: None if r2 is None else float(r2)})
 

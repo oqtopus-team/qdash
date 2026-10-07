@@ -185,7 +185,7 @@ def test_capture_qubex_progress_patches_filtered_ckp() -> None:
     from qubex.contrib.experiment import ckp_characterization
 
     events: list[TaskProgress] = []
-    with capture_qubex_progress(events.append, task_name="CharacterizeFilteredCKP"):
+    with capture_qubex_progress(events.append, task_name="CheckCKP"):
         list(_service_tqdm(ckp_characterization)(range(2), file=StringIO()))
 
     assert events[0].current == 0

@@ -34,7 +34,7 @@ backends:
         - RabiOscillation
         - CheckRabi
         - CheckCoarseReadoutParams
-        - CharacterizeFilteredCKP
+        - CheckCKP
         - CreateHPIPulse
         - CheckHPIPulse
         - CreatePIPulse

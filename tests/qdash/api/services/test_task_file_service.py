@@ -403,7 +403,7 @@ def test_extract_parameter_metadata_expands_rabi_normalization_inputs() -> None:
         "default_value": None,
         "parameter_name": "rabi_angle",
         "qid_role": "control",
-        "unit": "degree",
+        "unit": "rad",
         "ui_group": "Rabi normalization",
         "ui_group_collapsed": True,
     }

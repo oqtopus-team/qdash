@@ -40,7 +40,7 @@ _MULTI_PHASE_TASKS = {
     "CheckAdaptiveChevron",
     "CheckChevron",
     "CheckCrossResonance",
-    "CharacterizeFilteredCKP",
+    "CheckCKP",
     "CheckRamsey",
     "CheckT1Average",
     "CheckT2EchoAverage",
@@ -193,7 +193,7 @@ def _progress_description(task_name: str, description: str) -> str:
     task_labels = {
         "CheckAdaptiveChevron": "Adaptive Chevron sweep",
         "CheckChevron": "Chevron sweep",
-        "CharacterizeFilteredCKP": "Filtered CKP sweep",
+        "CheckCKP": "Filtered CKP sweep",
         "CheckRabi": "Rabi time sweep",
         "CheckCoarseReadoutParams": "Readout parameter search",
         "CheckRamsey": "Ramsey delay sweep",
