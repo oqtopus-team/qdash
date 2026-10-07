@@ -140,7 +140,10 @@ interface ExecutionDAGProps {
   tasks: TaskNode[];
 }
 
-// Inner component that can use useReactFlow hook
+/**
+ * React Flow canvas for the execution graph. Starts locked so the page scrolls normally;
+ * the Controls lock button toggles pan, zoom and node dragging.
+ */
 function FlowContent({
   nodes,
   edges,
@@ -173,7 +176,7 @@ function FlowContent({
       minZoom={0.1}
       maxZoom={1.5}
       zoomOnScroll={!isLocked}
-      panOnScroll={!isLocked}
+      panOnScroll={false}
       panOnDrag={!isLocked}
       zoomOnPinch={!isLocked}
       zoomOnDoubleClick={!isLocked}
@@ -234,6 +237,9 @@ function FlowContent({
   );
 }
 
+/**
+ * Execution task graph with fullscreen support and a side panel for the selected task's details.
+ */
 export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const [selectedTask, setSelectedTask] = useState<TaskDetails | null>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();

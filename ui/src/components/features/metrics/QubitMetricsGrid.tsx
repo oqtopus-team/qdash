@@ -214,6 +214,9 @@ const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }
   return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
 });
 
+/**
+ * Chip grid of per-qubit metric values with Lock (region selection) and Zoom (pan/zoom) view modes.
+ */
 export function QubitMetricsGrid({
   metricData,
   title,

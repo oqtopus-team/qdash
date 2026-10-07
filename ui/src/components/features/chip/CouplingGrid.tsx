@@ -129,6 +129,9 @@ function taskRangeLabel(
   return selectedDate;
 }
 
+/**
+ * Chip grid of coupling task results with Lock (region selection) and Zoom (pan/zoom) view modes.
+ */
 export function CouplingGrid({
   chipId,
   topologyId,

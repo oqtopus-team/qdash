@@ -303,6 +303,9 @@ const GridCell = memo(function GridCell({
   );
 });
 
+/**
+ * Chip grid of per-qubit task results with Lock (region selection) and Zoom (pan/zoom) view modes.
+ */
 export function QubitGrid({
   chipId,
   topologyId,

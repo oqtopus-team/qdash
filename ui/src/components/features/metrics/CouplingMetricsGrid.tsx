@@ -60,6 +60,9 @@ interface SelectedCouplingInfo {
   metric: MetricValue;
 }
 
+/**
+ * Chip grid of coupling metric values with Lock (region selection) and Zoom (pan/zoom) view modes.
+ */
 export function CouplingMetricsGrid({
   metricData,
   title,

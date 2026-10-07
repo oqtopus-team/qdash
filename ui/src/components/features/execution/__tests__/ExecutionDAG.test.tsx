@@ -114,7 +114,7 @@ describe("ExecutionDAG lock control", () => {
 
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: true,
-      panOnScroll: true,
+      panOnScroll: false,
       panOnDrag: true,
       zoomOnPinch: true,
       zoomOnDoubleClick: true,
