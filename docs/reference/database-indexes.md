@@ -284,6 +284,14 @@ db.slack_forum_thread.create_index([("post_id", 1)], unique=True, name="slack_fo
 
 **Usage**: `SlackForumThreadDocument.find_by_post_id(post_id)` is called on every forum reply and status-change notification to resolve the original Slack `thread_ts`. The unique index also serves as the upsert key in `SlackForumThreadDocument.record()`.
 
+### ForumLabelDocument
+
+```python
+db.forum_label.create_index([("project_id", 1), ("key", 1)], unique=True, name="project_key_unique_idx")
+```
+
+**Usage**: Enforces one label per key per project and backs the lookup in `ForumService._normalize_forum_labels()`, which validates every label on a thread against this collection before saving a post.
+
 ## Performance Impact
 
 Without indexes:

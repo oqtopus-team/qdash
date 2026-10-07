@@ -30,6 +30,9 @@ import type {
   ForumCategoryResponse,
   ForumCategoryUpdate,
   ForumImageUploadResponse,
+  ForumLabelCreate,
+  ForumLabelResponse,
+  ForumLabelUpdate,
   ForumPostCreate,
   ForumPostResponse,
   ForumPostUpdate,
@@ -37,6 +40,7 @@ import type {
   HTTPValidationError,
   ListForumCategoriesParams,
   ListForumCategoriesResponse,
+  ListForumLabelsResponse,
   ListForumPostsParams,
   ListForumPostsResponse,
   SuccessResponse
@@ -351,6 +355,293 @@ export const useDeleteForumCategory = <TError = HTTPValidationError,
         TContext
       > => {
       return useMutation(getDeleteForumCategoryMutationOptions(options), queryClient);
+    }
+    /**
+ * List forum labels for the active project.
+ * @summary List forum labels
+ */
+export const listForumLabels = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ListForumLabelsResponse>(
+      {url: `/forum/labels`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListForumLabelsQueryKey = () => {
+    return [
+    `/forum/labels`
+    ] as const;
+    }
+
+
+export const getListForumLabelsQueryOptions = <TData = Awaited<ReturnType<typeof listForumLabels>>, TError = HTTPValidationError>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumLabels>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListForumLabelsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listForumLabels>>> = ({ signal }) => listForumLabels(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listForumLabels>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListForumLabelsQueryResult = NonNullable<Awaited<ReturnType<typeof listForumLabels>>>
+export type ListForumLabelsQueryError = HTTPValidationError
+
+
+export function useListForumLabels<TData = Awaited<ReturnType<typeof listForumLabels>>, TError = HTTPValidationError>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumLabels>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listForumLabels>>,
+          TError,
+          Awaited<ReturnType<typeof listForumLabels>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListForumLabels<TData = Awaited<ReturnType<typeof listForumLabels>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumLabels>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listForumLabels>>,
+          TError,
+          Awaited<ReturnType<typeof listForumLabels>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListForumLabels<TData = Awaited<ReturnType<typeof listForumLabels>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumLabels>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List forum labels
+ */
+
+export function useListForumLabels<TData = Awaited<ReturnType<typeof listForumLabels>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumLabels>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListForumLabelsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Create a forum label. Only project owners can manage labels.
+ * @summary Create a forum label
+ */
+export const createForumLabel = (
+    forumLabelCreate: ForumLabelCreate,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ForumLabelResponse>(
+      {url: `/forum/labels`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: forumLabelCreate, signal
+    },
+      options);
+    }
+
+
+
+
+export const getCreateForumLabelMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createForumLabel>>, TError,{data: ForumLabelCreate}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createForumLabel>>, TError,{data: ForumLabelCreate}, TContext> => {
+
+const mutationKey = ['createForumLabel'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createForumLabel>>, {data: ForumLabelCreate}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createForumLabel(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateForumLabelMutationResult = NonNullable<Awaited<ReturnType<typeof createForumLabel>>>
+    export type CreateForumLabelMutationBody = ForumLabelCreate
+    export type CreateForumLabelMutationError = HTTPValidationError
+
+    /**
+ * @summary Create a forum label
+ */
+export const useCreateForumLabel = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createForumLabel>>, TError,{data: ForumLabelCreate}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createForumLabel>>,
+        TError,
+        {data: ForumLabelCreate},
+        TContext
+      > => {
+      return useMutation(getCreateForumLabelMutationOptions(options), queryClient);
+    }
+    /**
+ * Update a forum label. Only project owners can manage labels.
+ * @summary Update a forum label
+ */
+export const updateForumLabel = (
+    labelKey: string,
+    forumLabelUpdate: ForumLabelUpdate,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ForumLabelResponse>(
+      {url: `/forum/labels/${labelKey}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: forumLabelUpdate, signal
+    },
+      options);
+    }
+
+
+
+
+export const getUpdateForumLabelMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateForumLabel>>, TError,{labelKey: string;data: ForumLabelUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateForumLabel>>, TError,{labelKey: string;data: ForumLabelUpdate}, TContext> => {
+
+const mutationKey = ['updateForumLabel'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateForumLabel>>, {labelKey: string;data: ForumLabelUpdate}> = (props) => {
+          const {labelKey,data} = props ?? {};
+
+          return  updateForumLabel(labelKey,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateForumLabelMutationResult = NonNullable<Awaited<ReturnType<typeof updateForumLabel>>>
+    export type UpdateForumLabelMutationBody = ForumLabelUpdate
+    export type UpdateForumLabelMutationError = HTTPValidationError
+
+    /**
+ * @summary Update a forum label
+ */
+export const useUpdateForumLabel = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateForumLabel>>, TError,{labelKey: string;data: ForumLabelUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateForumLabel>>,
+        TError,
+        {labelKey: string;data: ForumLabelUpdate},
+        TContext
+      > => {
+      return useMutation(getUpdateForumLabelMutationOptions(options), queryClient);
+    }
+    /**
+ * Delete a forum label. Only project owners can manage labels.
+ * @summary Delete a forum label
+ */
+export const deleteForumLabel = (
+    labelKey: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<SuccessResponse>(
+      {url: `/forum/labels/${labelKey}`, method: 'DELETE', signal
+    },
+      options);
+    }
+
+
+
+
+export const getDeleteForumLabelMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteForumLabel>>, TError,{labelKey: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteForumLabel>>, TError,{labelKey: string}, TContext> => {
+
+const mutationKey = ['deleteForumLabel'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteForumLabel>>, {labelKey: string}> = (props) => {
+          const {labelKey} = props ?? {};
+
+          return  deleteForumLabel(labelKey,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteForumLabelMutationResult = NonNullable<Awaited<ReturnType<typeof deleteForumLabel>>>
+
+    export type DeleteForumLabelMutationError = HTTPValidationError
+
+    /**
+ * @summary Delete a forum label
+ */
+export const useDeleteForumLabel = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteForumLabel>>, TError,{labelKey: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteForumLabel>>,
+        TError,
+        {labelKey: string},
+        TContext
+      > => {
+      return useMutation(getDeleteForumLabelMutationOptions(options), queryClient);
     }
     /**
  * List root forum threads for the active project.

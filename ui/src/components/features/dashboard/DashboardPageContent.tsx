@@ -28,6 +28,7 @@ import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import type { MentionCandidate } from "@/components/ui/MarkdownEditor";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useMetricsUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
@@ -59,27 +60,19 @@ const SUMMARY_TOPOLOGY_HEADER_CLASS = "flex flex-wrap items-center justify-betwe
 const MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER =
   "<!-- qdash:migrated-metric-notes-to-latest-cooldown -->";
 
-const FORUM_LABEL_PRIORITY = [
-  "anomaly",
-  "review",
-  "discussion",
-  "mtg",
-  "info",
-  "resolved",
-] as const;
+/** Default label key still prioritized for the dashboard marker; falls back gracefully if renamed or removed. */
+const PRIORITY_FORUM_LABEL = "anomaly";
+const DEFAULT_FORUM_MARKER_LABEL = "review";
 
 function representativeForumLabel(labels: string[] | undefined): string {
-  const values = new Set(labels ?? []);
-  const label = FORUM_LABEL_PRIORITY.find((item) => values.has(item));
-  if (label === "discussion" || label === "mtg" || label === "info" || label === "resolved") {
-    return "review";
-  }
-  return label ?? "review";
+  const values = labels ?? [];
+  if (values.includes(PRIORITY_FORUM_LABEL)) return PRIORITY_FORUM_LABEL;
+  return values[0] ?? DEFAULT_FORUM_MARKER_LABEL;
 }
 
 function mergeForumMarkerLabel(current: string | undefined, labels: string[] | undefined): string {
   const next = representativeForumLabel(labels);
-  return current === "anomaly" || next === "anomaly" ? "anomaly" : next;
+  return current === PRIORITY_FORUM_LABEL || next === PRIORITY_FORUM_LABEL ? PRIORITY_FORUM_LABEL : next;
 }
 
 function coverageOf(
@@ -320,6 +313,7 @@ export function DashboardPageContent() {
     },
     { query: { enabled: !!selectedChip, staleTime: 30_000 } },
   );
+  const { labels: forumLabels } = useForumLabels();
 
   const forumLinkedQids = useMemo(() => {
     const targets: Record<string, string> = {};
@@ -723,6 +717,7 @@ export function DashboardPageContent() {
                         presentation="summary"
                         targetNotedQids={targetNotedQids}
                         forumLinkedQids={forumLinkedQids}
+                        forumLabels={forumLabels}
                         forumLinksByTarget={forumLinksByTarget}
                         notesByTarget={notesByTarget}
                         targetNotesByTarget={targetNotesByTarget}
@@ -765,6 +760,7 @@ export function DashboardPageContent() {
                         reverseDirection={isReverseCouplingDirection}
                         targetNotedTargets={targetNotedCouplings}
                         forumLinkedTargets={forumLinkedCouplings}
+                        forumLabels={forumLabels}
                         forumLinksByTarget={forumLinksByTarget}
                         notesByTarget={notesByTarget}
                         targetNotesByTarget={targetNotesByTarget}
@@ -887,6 +883,7 @@ export function DashboardPageContent() {
                               notedQids={noted}
                               targetNotedQids={targetNotedQids}
                               forumLinkedQids={forumLinkedQids}
+                              forumLabels={forumLabels}
                               forumLinksByTarget={forumLinksByTarget}
                               crossMetricNotedQids={crossMetricNoted}
                               notesByTarget={notesByTarget}
@@ -913,6 +910,7 @@ export function DashboardPageContent() {
                                 notedQids={noted}
                                 targetNotedQids={targetNotedQids}
                                 forumLinkedQids={forumLinkedQids}
+                                forumLabels={forumLabels}
                                 forumLinksByTarget={forumLinksByTarget}
                                 crossMetricNotedQids={crossMetricNoted}
                                 notesByTarget={notesByTarget}
@@ -1045,6 +1043,7 @@ export function DashboardPageContent() {
                               notedTargets={noted}
                               targetNotedTargets={targetNotedCouplings}
                               forumLinkedTargets={forumLinkedCouplings}
+                              forumLabels={forumLabels}
                               forumLinksByTarget={forumLinksByTarget}
                               crossMetricNotedTargets={crossMetricNoted}
                               notesByTarget={notesByTarget}
@@ -1072,6 +1071,7 @@ export function DashboardPageContent() {
                                 notedTargets={noted}
                                 targetNotedTargets={targetNotedCouplings}
                                 forumLinkedTargets={forumLinkedCouplings}
+                                forumLabels={forumLabels}
                                 forumLinksByTarget={forumLinksByTarget}
                                 crossMetricNotedTargets={crossMetricNoted}
                                 notesByTarget={notesByTarget}

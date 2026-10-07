@@ -12,6 +12,8 @@ FORUM_CATEGORY_COLOR_PATTERN = (
 FORUM_CATEGORY_ICON_PATTERN = r"^[a-z0-9][a-z0-9-]{0,63}$"
 FORUM_TARGET_TYPE_PATTERN = r"^(qubit|coupling)$"
 FORUM_THREAD_STATUS_PATTERN = r"^(open|investigating|identified|resolved)$"
+FORUM_LABEL_KEY_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,31}$"
+FORUM_LABEL_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
 ForumThreadStatus = Literal["open", "investigating", "identified", "resolved"]
 
 
@@ -87,6 +89,49 @@ class ListForumCategoriesResponse(BaseModel):
     categories: list[ForumCategoryResponse]
 
 
+class ForumLabelCreate(BaseModel):
+    """Request schema for creating a forum label."""
+
+    key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=32,
+        pattern=FORUM_LABEL_KEY_PATTERN,
+        description="Stable label key. Generated from name when omitted.",
+    )
+    name: str = Field(..., min_length=1, max_length=80, description="Display name")
+    description: str = Field(default="", max_length=200, description="Short description")
+    color: str = Field(..., pattern=FORUM_LABEL_COLOR_PATTERN, description="Display hex color")
+
+
+class ForumLabelUpdate(BaseModel):
+    """Request schema for updating a forum label."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=80, description="Display name")
+    description: str | None = Field(default=None, max_length=200, description="Short description")
+    color: str | None = Field(
+        default=None, pattern=FORUM_LABEL_COLOR_PATTERN, description="Display hex color"
+    )
+
+
+class ForumLabelResponse(BaseModel):
+    """Response schema for a forum label."""
+
+    key: str = Field(..., description="Stable label key")
+    name: str = Field(..., description="Display name")
+    description: str = Field(default="", description="Short label description")
+    color: str = Field(..., description="Display hex color")
+    is_system: bool = Field(
+        default=False, description="Whether this label is managed by the system"
+    )
+
+
+class ListForumLabelsResponse(BaseModel):
+    """List of forum labels."""
+
+    labels: list[ForumLabelResponse]
+
+
 class ForumPostCreate(BaseModel):
     """Request schema for creating a forum thread or reply."""
 
@@ -112,8 +157,8 @@ class ForumPostCreate(BaseModel):
     )
     labels: list[str] = Field(
         default_factory=list,
-        max_length=1,
-        description="Operator label for root threads",
+        max_length=10,
+        description="Operator labels for root threads",
     )
     assignee_username: str | None = Field(
         default=None, max_length=64, description="Assigned project member username"
@@ -149,8 +194,8 @@ class ForumPostUpdate(BaseModel):
     )
     labels: list[str] | None = Field(
         default=None,
-        max_length=1,
-        description="Updated operator label for root threads",
+        max_length=10,
+        description="Updated operator labels for root threads",
     )
     assignee_username: str | None = Field(
         default=None, max_length=64, description="Updated assigned project member username"
@@ -199,7 +244,7 @@ class ForumPostResponse(BaseModel):
         description="BlockNote document JSON. Source of truth for rich content; content is derived.",
     )
     parent_id: str | None = Field(default=None, description="Parent forum post ID")
-    labels: list[str] = Field(default_factory=list, description="Operator label for root threads")
+    labels: list[str] = Field(default_factory=list, description="Operator labels for root threads")
     assignee_username: str | None = Field(
         default=None, description="Assigned project member username"
     )

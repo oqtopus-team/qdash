@@ -17,9 +17,11 @@ import {
 import type { GetChipNotesSummaryParams, NoteCommentModel } from "@/schemas";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor, type MentionCandidate } from "@/components/ui/MarkdownEditor";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import { formatForumPostTitle, getForumLabel } from "../forum/categories";
+import { ForumLabelBadge } from "../forum/ForumLabelBadge";
 
 export interface NoteEntry {
   targetId: string;
@@ -174,6 +176,7 @@ export function MetricNotePanel({
   const relatedForumPosts =
     forumPostsResponse?.data.posts.filter((post) => matchesForumTarget(post, chipId, targetId)) ??
     [];
+  const { labels: forumLabels } = useForumLabels();
 
   useEffect(() => {
     setLocalExisting(existing);
@@ -328,14 +331,13 @@ export function MetricNotePanel({
                       </span>
                       {(post.labels ?? []).length > 0 && (
                         <span className="mt-1 flex flex-wrap gap-1">
-                          {(post.labels ?? []).map((label) => {
-                            const labelDef = getForumLabel(label);
-                            return (
-                              <span key={label} className={`badge badge-xs ${labelDef.badgeClass}`}>
-                                {labelDef.label}
-                              </span>
-                            );
-                          })}
+                          {(post.labels ?? []).map((label) => (
+                            <ForumLabelBadge
+                              key={label}
+                              size="xs"
+                              label={getForumLabel(label, forumLabels)}
+                            />
+                          ))}
                         </span>
                       )}
                     </span>

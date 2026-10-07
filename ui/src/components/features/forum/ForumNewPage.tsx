@@ -19,6 +19,7 @@ import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useForumAiReply } from "@/hooks/useForumAiReply";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { formatDateTimeCompact } from "@/lib/utils/datetime";
 
@@ -27,7 +28,7 @@ import {
   getForumCategory,
   toForumCategoryDefinition,
 } from "./categories";
-import { ForumLabelPicker } from "./ForumLabelSelector";
+import { ForumLabelPicker, MAX_FORUM_POST_LABELS } from "./ForumLabelSelector";
 import type { ForumBlockSnapshotGetter, ForumMentionCandidate } from "./ForumBlockEditor";
 
 const ForumBlockEditor = dynamic(
@@ -48,12 +49,19 @@ function formatCooldownPeriod(
   return `${start} - ${end}`;
 }
 
-function parseLabels(value: string | null): string[] {
-  return (value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 1);
+export function parseLabels(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of values) {
+    for (const item of raw.split(",")) {
+      const trimmed = item.trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      result.push(trimmed);
+      if (result.length >= MAX_FORUM_POST_LABELS) return result;
+    }
+  }
+  return result;
 }
 
 export function ForumNewPage() {
@@ -74,7 +82,7 @@ export function ForumNewPage() {
   const [content, setContent] = useState(searchParams.get("content") ?? "");
   const [contentBlocks, setContentBlocks] = useState<Record<string, unknown>[]>([]);
   const [selectedLabels, setSelectedLabels] = useState<string[]>(() =>
-    parseLabels(searchParams.get("labels")),
+    parseLabels(searchParams.getAll("labels")),
   );
   const [targetDraftChipId, setTargetDraftChipId] = useState(searchParams.get("chip_id") ?? "");
   const [targetDraftType, setTargetDraftType] = useState<"qubit" | "coupling">(
@@ -145,9 +153,14 @@ export function ForumNewPage() {
   );
 
   const createMutation = useCreateForumPost();
+  const { labels } = useForumLabels();
 
   const toggleLabel = (label: string) => {
-    setSelectedLabels((current) => (current.includes(label) ? [] : [label]));
+    setSelectedLabels((current) => {
+      if (current.includes(label)) return current.filter((item) => item !== label);
+      if (current.length >= MAX_FORUM_POST_LABELS) return current;
+      return [...current, label];
+    });
   };
 
   const clearTargetMetadata = () => {
@@ -386,7 +399,11 @@ export function ForumNewPage() {
               <Tag className="h-3.5 w-3.5" />
               Labels
             </div>
-            <ForumLabelPicker selectedLabels={selectedLabels} onToggle={toggleLabel} />
+            <ForumLabelPicker
+              labels={labels}
+              selectedLabels={selectedLabels}
+              onToggle={toggleLabel}
+            />
           </section>
 
           <section className="space-y-2">

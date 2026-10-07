@@ -51,6 +51,11 @@ vi.mock("@/client/forum/forum", () => ({
       data: { data: { posts: mockForumPosts(), total: 0, skip: 0, limit: 200 } },
     };
   },
+  useListForumLabels: () => ({
+    data: { data: { labels: [] } },
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 vi.mock("@/client/metrics/metrics", () => ({

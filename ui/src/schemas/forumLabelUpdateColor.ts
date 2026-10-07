@@ -7,6 +7,6 @@
  */
 
 /**
- * Updated operator labels for root threads
+ * Display hex color
  */
-export type ForumPostUpdateLabels = string[] | null;
+export type ForumLabelUpdateColor = string | null;

@@ -7,6 +7,6 @@
  */
 
 /**
- * Updated operator labels for root threads
+ * Display name
  */
-export type ForumPostUpdateLabels = string[] | null;
+export type ForumLabelUpdateName = string | null;

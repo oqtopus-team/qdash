@@ -14,44 +14,42 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import type { ForumCategoryResponse } from "@/schemas";
+import type { ForumCategoryResponse, ForumLabelResponse } from "@/schemas";
+
+/** Neutral fallback color for labels that no longer exist in the project. */
+export const NEUTRAL_FORUM_LABEL_COLOR = "#6b7280";
 
 export type ForumLabelDefinition = {
   id: string;
   label: string;
-  badgeClass: string;
-  buttonClass: string;
+  description: string;
+  color: string;
+  isSystem: boolean;
 };
 
-export const FORUM_LABELS: ForumLabelDefinition[] = [
-  { id: "review", label: "Review", badgeClass: "badge-primary", buttonClass: "btn-primary" },
-  { id: "anomaly", label: "Anomaly", badgeClass: "badge-warning", buttonClass: "btn-warning" },
-];
-
-const LEGACY_LABEL_ALIASES: Record<string, string> = {
-  discussion: "review",
-  info: "review",
-  mtg: "review",
-  resolved: "review",
-};
-
-export function getForumLabel(label: string): ForumLabelDefinition {
-  const resolvedId = LEGACY_LABEL_ALIASES[label] ?? label;
-  const definition = FORUM_LABELS.find((item) => item.id === resolvedId);
-  return definition
-    ? { ...definition, id: label }
-    : {
-        id: label,
-        label,
-        badgeClass: "badge-ghost",
-        buttonClass: "btn-ghost",
-      };
+export function toForumLabelDefinition(label: ForumLabelResponse): ForumLabelDefinition {
+  return {
+    id: label.key,
+    label: label.name,
+    description: label.description ?? "",
+    color: label.color,
+    isSystem: label.is_system ?? false,
+  };
 }
 
-export function forumMarkerClass(label: string | undefined): string {
-  if (label === "anomaly") return "bg-warning text-warning-content";
-  if (label === "review") return "bg-primary text-primary-content";
-  return "bg-base-300 text-base-content";
+export function getForumLabel(
+  key: string,
+  labels: ForumLabelDefinition[] = [],
+): ForumLabelDefinition {
+  return (
+    labels.find((item) => item.id === key) ?? {
+      id: key,
+      label: key,
+      description: "",
+      color: NEUTRAL_FORUM_LABEL_COLOR,
+      isSystem: false,
+    }
+  );
 }
 
 export type ForumStatusDefinition = {

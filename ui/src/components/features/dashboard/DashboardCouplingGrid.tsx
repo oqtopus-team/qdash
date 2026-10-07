@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import { MessageSquare, StickyNote } from "lucide-react";
 
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
-import { forumMarkerClass } from "../forum/categories";
+import { getForumLabel, type ForumLabelDefinition } from "../forum/categories";
+import { getReadableTextColor } from "../forum/ForumLabelBadge";
 import { getQubitGridPosition } from "@/lib/utils/grid-position";
 
 import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
@@ -29,6 +30,8 @@ interface DashboardCouplingGridProps {
   targetNotedTargets?: Set<string>;
   /** Linked forum discussion label keyed by coupling ID. */
   forumLinkedTargets?: Record<string, string>;
+  /** Forum label definitions used to resolve marker colors. */
+  forumLabels?: ForumLabelDefinition[];
   /** Linked forum discussion details keyed by coupling ID. */
   forumLinksByTarget?: Record<string, ForumLinkEntry[]>;
   crossMetricNotedTargets?: Set<string>;
@@ -86,6 +89,7 @@ export function DashboardCouplingGrid({
   notedTargets,
   targetNotedTargets,
   forumLinkedTargets,
+  forumLabels,
   forumLinksByTarget,
   crossMetricNotedTargets,
   notesByTarget,
@@ -247,6 +251,9 @@ export function DashboardCouplingGrid({
           const hasTargetNote = targetNotedTargets?.has(couplingId) ?? false;
           const forumLabel = forumLinkedTargets?.[couplingId];
           const hasForumDiscussion = !!forumLabel;
+          const forumMarkerColor = forumLabel
+            ? getForumLabel(forumLabel, forumLabels).color
+            : undefined;
           const hasCrossMetricNote =
             !hasNote && !hasTargetNote && (crossMetricNotedTargets?.has(couplingId) ?? false);
           const Tag = onCouplingClick ? "button" : "div";
@@ -363,7 +370,11 @@ export function DashboardCouplingGrid({
                 <span
                   className={`absolute rounded-full p-0.5 shadow ${
                     isSummaryPresentation ? "-bottom-2 -right-2" : "-bottom-1 -right-1"
-                  } ${forumMarkerClass(forumLabel)}`}
+                  }`}
+                  style={{
+                    backgroundColor: forumMarkerColor,
+                    color: getReadableTextColor(forumMarkerColor ?? "#6b7280"),
+                  }}
                   title="Linked forum discussion"
                 >
                   <MessageSquare className="h-2.5 w-2.5" />

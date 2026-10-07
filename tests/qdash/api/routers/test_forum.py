@@ -140,7 +140,11 @@ def test_forum_thread_labels_round_trip_filter_and_update(test_client, init_db):
     assert hidden.status_code == 200
     assert hidden.json()["total"] == 0
 
-    rejected = _create_post(test_client, headers, title="multi label", labels=["review", "anomaly"])
+    multi = _create_post(test_client, headers, title="multi label", labels=["review", "anomaly"])
+    assert multi.status_code == 201, multi.text
+    assert multi.json()["labels"] == ["review", "anomaly"]
+
+    rejected = _create_post(test_client, headers, title="unknown label", labels=["not-a-label"])
     assert rejected.status_code == 422
 
     updated = test_client.patch(
@@ -170,6 +174,207 @@ def test_forum_thread_labels_round_trip_filter_and_update(test_client, init_db):
         },
     )
     assert rejected_status_label.status_code == 422
+
+
+def test_list_forum_labels_returns_defaults(test_client, init_db):
+    """Listing labels lazily seeds the default label set, including the system label."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    response = test_client.get("/forum/labels", headers=headers)
+
+    assert response.status_code == 200
+    labels = response.json()["labels"]
+    keys = {item["key"] for item in labels}
+    assert {"review", "anomaly", "task-result"} <= keys
+    task_result = next(item for item in labels if item["key"] == "task-result")
+    assert task_result["is_system"] is True
+
+
+def test_owner_can_create_update_and_delete_forum_label(test_client, init_db):
+    """Project owners can manage custom forum labels."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = test_client.post(
+        "/forum/labels",
+        headers=headers,
+        json={"name": "Hardware", "color": "#ABCDEF"},
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["key"] == "hardware"
+    assert body["color"] == "#abcdef"
+    assert body["is_system"] is False
+
+    duplicate = test_client.post(
+        "/forum/labels",
+        headers=headers,
+        json={"key": "hardware", "name": "Hardware again", "color": "#111111"},
+    )
+    assert duplicate.status_code == 409
+
+    updated = test_client.patch(
+        "/forum/labels/hardware",
+        headers=headers,
+        json={"name": "Hardware Issue", "color": "#222222"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["name"] == "Hardware Issue"
+    assert updated.json()["color"] == "#222222"
+
+    deleted = test_client.delete("/forum/labels/hardware", headers=headers)
+    assert deleted.status_code == 200
+
+    listed = test_client.get("/forum/labels", headers=headers)
+    assert "hardware" not in {item["key"] for item in listed.json()["labels"]}
+
+
+def test_editor_and_viewer_cannot_create_forum_label(test_client, init_db):
+    """Only project owners can manage forum labels."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_user("editor", "editor_token", ProjectRole.EDITOR)
+    _create_user("viewer", "viewer_token", ProjectRole.VIEWER)
+    _create_project()
+
+    for token in ("editor_token", "viewer_token"):
+        response = test_client.post(
+            "/forum/labels",
+            headers=_headers(token),
+            json={"name": "Hardware", "color": "#123456"},
+        )
+        assert response.status_code == 403
+
+
+def test_cannot_delete_system_forum_label(test_client, init_db):
+    """System labels cannot be deleted."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+    test_client.get("/forum/labels", headers=headers)  # seed defaults
+
+    response = test_client.delete("/forum/labels/task-result", headers=headers)
+
+    assert response.status_code == 409
+
+
+def test_delete_forum_label_removes_it_from_posts(test_client, init_db):
+    """Deleting a label pulls it from every thread that used it."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Flaky", "color": "#654321"}
+    )
+    assert created.status_code == 201
+
+    root = _create_post(test_client, headers, labels=["flaky", "review"])
+    assert root.status_code == 201, root.text
+    root_id = root.json()["id"]
+
+    deleted = test_client.delete("/forum/labels/flaky", headers=headers)
+    assert deleted.status_code == 200
+
+    fetched = test_client.get(f"/forum/posts/{root_id}", headers=headers)
+    assert fetched.json()["labels"] == ["review"]
+
+
+def test_create_root_post_auto_labels_task_result_link(test_client, init_db):
+    """Posting a thread with a task-result markdown link auto-assigns the task-result label."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    root = _create_post(
+        test_client,
+        headers,
+        content="See [results](/task-results/abc123) for details",
+    )
+
+    assert root.status_code == 201, root.text
+    assert "task-result" in root.json()["labels"]
+
+
+def test_create_post_without_link_has_no_task_result_label(test_client, init_db):
+    """Threads without a task-result link are not auto-labeled."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    root = _create_post(test_client, headers, content="No links here")
+
+    assert root.status_code == 201, root.text
+    assert "task-result" not in root.json()["labels"]
+
+
+def test_reply_with_blocknote_link_auto_labels_root_thread(test_client, init_db):
+    """A reply whose BlockNote content links a task result auto-labels the root thread."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    root = _create_post(test_client, headers, content="Plain root, no link")
+    root_id = root.json()["id"]
+    assert "task-result" not in root.json()["labels"]
+
+    blocks = [
+        {
+            "id": "b1",
+            "type": "paragraph",
+            "props": {},
+            "content": [
+                {
+                    "type": "link",
+                    "href": "https://qdash.example.com/task-results/xyz-789",
+                    "content": [{"type": "text", "text": "result", "styles": {}}],
+                }
+            ],
+            "children": [],
+        }
+    ]
+    reply = test_client.post(
+        "/forum/posts",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": None,
+            "content": "see result",
+            "content_blocks": blocks,
+            "parent_id": root_id,
+        },
+    )
+    assert reply.status_code == 201, reply.text
+    assert "task-result" in reply.json()["labels"]
+
+    fetched_root = test_client.get(f"/forum/posts/{root_id}", headers=headers)
+    assert "task-result" in fetched_root.json()["labels"]
+
+
+def test_update_post_with_task_result_link_auto_labels_thread(test_client, init_db):
+    """Editing a post to add a task-result link auto-assigns the label."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    root = _create_post(test_client, headers, content="No link yet")
+    root_id = root.json()["id"]
+    assert "task-result" not in root.json()["labels"]
+
+    updated = test_client.patch(
+        f"/forum/posts/{root_id}",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": root.json()["title"],
+            "content": "Now see /task-results/zzz-1",
+        },
+    )
+
+    assert updated.status_code == 200, updated.text
+    assert "task-result" in updated.json()["labels"]
 
 
 def test_forum_thread_assignee_round_trip_update_and_reply_inherit(test_client, init_db):

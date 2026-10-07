@@ -8448,6 +8448,260 @@
         }
       }
     },
+    "/forum/labels": {
+      "get": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "List forum labels",
+        "description": "List forum labels for the active project.",
+        "operationId": "listForumLabels",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListForumLabelsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Create a forum label",
+        "description": "Create a forum label. Only project owners can manage labels.",
+        "operationId": "createForumLabel",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForumLabelCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumLabelResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/forum/labels/{label_key}": {
+      "patch": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Update a forum label",
+        "description": "Update a forum label. Only project owners can manage labels.",
+        "operationId": "updateForumLabel",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "label_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Label Key"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForumLabelUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumLabelResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Delete a forum label",
+        "description": "Delete a forum label. Only project owners can manage labels.",
+        "operationId": "deleteForumLabel",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "label_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Label Key"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/forum/posts": {
       "get": {
         "tags": [
@@ -21890,6 +22144,138 @@
         "title": "ForumImageUploadResponse",
         "description": "Response returned after uploading a forum image."
       },
+      "ForumLabelCreate": {
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key",
+            "description": "Stable label key. Generated from name when omitted."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Display name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Description",
+            "description": "Short description",
+            "default": ""
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Color",
+            "description": "Display hex color"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "color"
+        ],
+        "title": "ForumLabelCreate",
+        "description": "Request schema for creating a forum label."
+      },
+      "ForumLabelResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Stable label key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Short label description",
+            "default": ""
+          },
+          "color": {
+            "type": "string",
+            "title": "Color",
+            "description": "Display hex color"
+          },
+          "is_system": {
+            "type": "boolean",
+            "title": "Is System",
+            "description": "Whether this label is managed by the system",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "color"
+        ],
+        "title": "ForumLabelResponse",
+        "description": "Response schema for a forum label."
+      },
+      "ForumLabelUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Display name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Short description"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color",
+            "description": "Display hex color"
+          }
+        },
+        "type": "object",
+        "title": "ForumLabelUpdate",
+        "description": "Request schema for updating a forum label."
+      },
       "ForumPostCreate": {
         "properties": {
           "category": {
@@ -21946,9 +22332,9 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 1,
+            "maxItems": 10,
             "title": "Labels",
-            "description": "Operator label for root threads"
+            "description": "Operator labels for root threads"
           },
           "assignee_username": {
             "anyOf": [
@@ -22139,7 +22525,7 @@
             },
             "type": "array",
             "title": "Labels",
-            "description": "Operator label for root threads"
+            "description": "Operator labels for root threads"
           },
           "assignee_username": {
             "anyOf": [
@@ -22310,14 +22696,14 @@
                   "type": "string"
                 },
                 "type": "array",
-                "maxItems": 1
+                "maxItems": 10
               },
               {
                 "type": "null"
               }
             ],
             "title": "Labels",
-            "description": "Updated operator label for root threads"
+            "description": "Updated operator labels for root threads"
           },
           "assignee_username": {
             "anyOf": [
@@ -23835,6 +24221,23 @@
         ],
         "title": "ListForumCategoriesResponse",
         "description": "List of forum categories."
+      },
+      "ListForumLabelsResponse": {
+        "properties": {
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/ForumLabelResponse"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "labels"
+        ],
+        "title": "ListForumLabelsResponse",
+        "description": "List of forum labels."
       },
       "ListForumPostsResponse": {
         "properties": {

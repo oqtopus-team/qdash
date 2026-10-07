@@ -48,6 +48,36 @@ class ForumCategoryDocument(Document):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ForumLabelDocument(Document):
+    """Project-scoped custom forum label."""
+
+    project_id: str = Field(..., description="Owning project identifier")
+    key: str = Field(..., description="Stable label key")
+    name: str = Field(..., description="Display name")
+    description: str = Field(default="", description="Short label description")
+    color: str = Field(..., description="Display color as a lowercase hex string")
+    is_system: bool = Field(
+        default=False, description="Whether this label is managed by the system"
+    )
+    system_info: SystemInfoModel = Field(
+        default_factory=SystemInfoModel, description="System timestamps"
+    )
+
+    class Settings:
+        """Settings for the document."""
+
+        name = "forum_label"
+        indexes: ClassVar = [
+            IndexModel(
+                [("project_id", ASCENDING), ("key", ASCENDING)],
+                unique=True,
+                name="project_key_unique_idx",
+            ),
+        ]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 FORUM_THREAD_STATUSES = {"open", "investigating", "identified", "resolved"}
 
 

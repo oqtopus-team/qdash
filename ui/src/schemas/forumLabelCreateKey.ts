@@ -7,6 +7,6 @@
  */
 
 /**
- * Updated operator labels for root threads
+ * Stable label key. Generated from name when omitted.
  */
-export type ForumPostUpdateLabels = string[] | null;
+export type ForumLabelCreateKey = string | null;

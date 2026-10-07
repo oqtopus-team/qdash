@@ -25,10 +25,14 @@ from qdash.api.schemas.forum import (
     ForumCategoryResponse,
     ForumCategoryUpdate,
     ForumImageUploadResponse,
+    ForumLabelCreate,
+    ForumLabelResponse,
+    ForumLabelUpdate,
     ForumPostCreate,
     ForumPostResponse,
     ForumPostUpdate,
     ListForumCategoriesResponse,
+    ListForumLabelsResponse,
     ListForumPostsResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
@@ -122,6 +126,79 @@ def delete_forum_category(
 ) -> SuccessResponse:
     """Archive a forum category. Existing threads keep their category key."""
     return service.delete_category(project_id=ctx.project_id, key=category_key)
+
+
+@router.get(
+    "/forum/labels",
+    summary="List forum labels",
+    operation_id="listForumLabels",
+    response_model=ListForumLabelsResponse,
+)
+def list_forum_labels(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ForumService, Depends(get_forum_service)],
+) -> ListForumLabelsResponse:
+    """List forum labels for the active project."""
+    return service.list_labels(project_id=ctx.project_id)
+
+
+@router.post(
+    "/forum/labels",
+    summary="Create a forum label",
+    operation_id="createForumLabel",
+    response_model=ForumLabelResponse,
+    status_code=201,
+)
+def create_forum_label(
+    body: ForumLabelCreate,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    service: Annotated[ForumService, Depends(get_forum_service)],
+) -> ForumLabelResponse:
+    """Create a forum label. Only project owners can manage labels."""
+    return service.create_label(
+        project_id=ctx.project_id,
+        key=body.key,
+        name=body.name,
+        description=body.description,
+        color=body.color,
+    )
+
+
+@router.patch(
+    "/forum/labels/{label_key}",
+    summary="Update a forum label",
+    operation_id="updateForumLabel",
+    response_model=ForumLabelResponse,
+)
+def update_forum_label(
+    label_key: str,
+    body: ForumLabelUpdate,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    service: Annotated[ForumService, Depends(get_forum_service)],
+) -> ForumLabelResponse:
+    """Update a forum label. Only project owners can manage labels."""
+    return service.update_label(
+        project_id=ctx.project_id,
+        key=label_key,
+        name=body.name,
+        description=body.description,
+        color=body.color,
+    )
+
+
+@router.delete(
+    "/forum/labels/{label_key}",
+    summary="Delete a forum label",
+    operation_id="deleteForumLabel",
+    response_model=SuccessResponse,
+)
+def delete_forum_label(
+    label_key: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    service: Annotated[ForumService, Depends(get_forum_service)],
+) -> SuccessResponse:
+    """Delete a forum label. Only project owners can manage labels."""
+    return service.delete_label(project_id=ctx.project_id, key=label_key)
 
 
 @router.get(
