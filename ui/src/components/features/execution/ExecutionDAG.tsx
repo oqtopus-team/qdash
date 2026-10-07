@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Maximize2, Move } from "lucide-react";
 import {
   ReactFlow,
   Background,
@@ -27,8 +26,6 @@ import {
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { formatDateTime } from "@/lib/utils/datetime";
 import "@xyflow/react/dist/style.css";
-
-type ViewMode = "region" | "pan-zoom";
 
 const FIT_VIEW_OPTIONS = { padding: 0.05, minZoom: 0.1, maxZoom: 1.5 };
 
@@ -148,26 +145,23 @@ function FlowContent({
   nodes,
   edges,
   setSelectedTask,
-  viewMode,
   isFullscreen,
 }: {
   nodes: Node[];
   edges: Edge[];
   setSelectedTask: (task: TaskDetails | null) => void;
-  viewMode: ViewMode;
   isFullscreen: boolean;
 }) {
   const { fitView } = useReactFlow();
-  const isRegionMode = viewMode === "region";
+  const [isLocked, setIsLocked] = useState(true);
 
-  // Region mode keeps a fixed view, so re-fit whenever the mode or the
-  // container size (fullscreen toggle) changes.
+  // Re-fit whenever the container size (fullscreen toggle) changes.
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       fitView({ ...FIT_VIEW_OPTIONS, duration: 0 });
     });
     return () => cancelAnimationFrame(frame);
-  }, [viewMode, isFullscreen, fitView]);
+  }, [isFullscreen, fitView]);
 
   return (
     <ReactFlow
@@ -178,13 +172,15 @@ function FlowContent({
       className="bg-base-200"
       minZoom={0.1}
       maxZoom={1.5}
-      zoomOnScroll={!isRegionMode}
-      panOnScroll={!isRegionMode}
-      panOnDrag={!isRegionMode}
-      zoomOnPinch={!isRegionMode}
-      zoomOnDoubleClick={!isRegionMode}
-      preventScrolling={!isRegionMode}
-      nodesDraggable={!isRegionMode}
+      zoomOnScroll={!isLocked}
+      panOnScroll={!isLocked}
+      panOnDrag={!isLocked}
+      zoomOnPinch={!isLocked}
+      zoomOnDoubleClick={!isLocked}
+      preventScrolling={!isLocked}
+      nodesDraggable={!isLocked}
+      nodesConnectable={false}
+      elementsSelectable={!isLocked}
       defaultEdgeOptions={{
         type: "smoothstep",
         animated: true,
@@ -209,7 +205,7 @@ function FlowContent({
       }}
     >
       <Background />
-      {!isRegionMode && <Controls />}
+      <Controls showInteractive onInteractiveChange={(interactive) => setIsLocked(!interactive)} />
       <Panel position="top-left" className="bg-base-100 p-2 rounded flex items-center gap-2">
         <div className="text-sm">Click nodes to see details</div>
         <button
@@ -240,7 +236,6 @@ function FlowContent({
 
 export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const [selectedTask, setSelectedTask] = useState<TaskDetails | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("region");
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
 
   const getLayoutedElements = useCallback(() => {
@@ -316,35 +311,11 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
 
   return (
     <div className={isFullscreen ? gridFullscreenPanelClass : ""}>
-      <div
-        className={`flex flex-wrap items-center justify-between gap-2 ${
-          isFullscreen ? "shrink-0" : "mb-4"
-        }`}
-      >
-        {isFullscreen && <h2 className="text-lg sm:text-xl font-bold">Execution Flow</h2>}
-        <div className="tabs tabs-boxed bg-base-300 w-fit">
-          <button
-            type="button"
-            className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-            aria-pressed={viewMode === "region"}
-            aria-label="Region"
-            onClick={() => setViewMode("region")}
-          >
-            <Maximize2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Region</span>
-          </button>
-          <button
-            type="button"
-            className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
-            aria-pressed={viewMode === "pan-zoom"}
-            aria-label="DOM"
-            onClick={() => setViewMode("pan-zoom")}
-          >
-            <Move className="h-4 w-4" />
-            <span className="hidden sm:inline">DOM</span>
-          </button>
+      {isFullscreen && (
+        <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <h2 className="text-lg sm:text-xl font-bold">Execution Flow</h2>
         </div>
-      </div>
+      )}
 
       <div className={`flex gap-4 ${isFullscreen ? "flex-1 min-h-0" : "h-[600px]"}`}>
         <ReactFlowProvider>
@@ -353,7 +324,6 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
               nodes={nodes}
               edges={edges}
               setSelectedTask={setSelectedTask}
-              viewMode={viewMode}
               isFullscreen={isFullscreen}
             />
             <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />

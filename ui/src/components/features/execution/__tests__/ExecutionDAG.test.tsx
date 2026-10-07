@@ -38,7 +38,19 @@ vi.mock("@xyflow/react", () => {
       );
     },
     Background: () => null,
-    Controls: () => <div data-testid="controls" />,
+    Controls: ({
+      onInteractiveChange,
+    }: {
+      onInteractiveChange?: (interactive: boolean) => void;
+    }) => (
+      <button
+        type="button"
+        data-testid="controls-interactive"
+        onClick={() => onInteractiveChange?.(true)}
+      >
+        toggle-lock
+      </button>
+    ),
     Handle: () => null,
     Position: { Left: "left", Right: "right" },
     ReactFlowProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -77,14 +89,11 @@ afterEach(() => {
   mocks.fitView.mockClear();
 });
 
-describe("ExecutionDAG view mode", () => {
-  it("defaults to Region mode with wheel/drag navigation disabled", () => {
+describe("ExecutionDAG lock control", () => {
+  it("starts locked with pan/zoom and dragging disabled", () => {
     render(<ExecutionDAG tasks={tasks} />);
 
-    const regionTab = screen.getByRole("button", { name: "Region" });
-    expect(regionTab).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "DOM" })).toHaveAttribute("aria-pressed", "false");
-
+    expect(screen.getByTestId("controls-interactive")).toBeTruthy();
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: false,
       panOnScroll: false,
@@ -93,16 +102,16 @@ describe("ExecutionDAG view mode", () => {
       zoomOnDoubleClick: false,
       preventScrolling: false,
       nodesDraggable: false,
+      nodesConnectable: false,
+      elementsSelectable: false,
     });
-    expect(screen.queryByTestId("controls")).toBeNull();
   });
 
-  it("enables interactive navigation when switching to DOM mode", () => {
+  it("unlocks pan/zoom and dragging when the lock control is toggled", () => {
     render(<ExecutionDAG tasks={tasks} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "DOM" }));
+    fireEvent.click(screen.getByTestId("controls-interactive"));
 
-    expect(screen.getByRole("button", { name: "DOM" })).toHaveAttribute("aria-pressed", "true");
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: true,
       panOnScroll: true,
@@ -111,8 +120,9 @@ describe("ExecutionDAG view mode", () => {
       zoomOnDoubleClick: true,
       preventScrolling: true,
       nodesDraggable: true,
+      nodesConnectable: false,
+      elementsSelectable: true,
     });
-    expect(screen.getByTestId("controls")).toBeTruthy();
   });
 });
 
