@@ -158,7 +158,7 @@ class ForumPostCreate(BaseModel):
     labels: list[str] = Field(
         default_factory=list,
         max_length=10,
-        description="Operator labels for root threads",
+        description="Operator label for root threads",
     )
     assignee_username: str | None = Field(
         default=None, max_length=64, description="Assigned project member username"
@@ -195,7 +195,7 @@ class ForumPostUpdate(BaseModel):
     labels: list[str] | None = Field(
         default=None,
         max_length=10,
-        description="Updated operator labels for root threads",
+        description="Updated operator label for root threads",
     )
     assignee_username: str | None = Field(
         default=None, max_length=64, description="Updated assigned project member username"
@@ -244,7 +244,7 @@ class ForumPostResponse(BaseModel):
         description="BlockNote document JSON. Source of truth for rich content; content is derived.",
     )
     parent_id: str | None = Field(default=None, description="Parent forum post ID")
-    labels: list[str] = Field(default_factory=list, description="Operator labels for root threads")
+    labels: list[str] = Field(default_factory=list, description="Operator label for root threads")
     assignee_username: str | None = Field(
         default=None, description="Assigned project member username"
     )

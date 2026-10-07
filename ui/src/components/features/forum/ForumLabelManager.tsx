@@ -185,7 +185,9 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
                     >
                       <div className="flex items-center gap-2">
                         <ForumLabelBadge label={item} />
-                        {item.isSystem && <span className="badge badge-ghost badge-xs">system</span>}
+                        {item.isSystem && (
+                          <span className="badge badge-ghost badge-xs">system</span>
+                        )}
                       </div>
                       {item.description && (
                         <p className="mt-1 truncate text-xs text-base-content/50">

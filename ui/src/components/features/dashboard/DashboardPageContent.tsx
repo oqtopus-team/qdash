@@ -72,7 +72,9 @@ function representativeForumLabel(labels: string[] | undefined): string {
 
 function mergeForumMarkerLabel(current: string | undefined, labels: string[] | undefined): string {
   const next = representativeForumLabel(labels);
-  return current === PRIORITY_FORUM_LABEL || next === PRIORITY_FORUM_LABEL ? PRIORITY_FORUM_LABEL : next;
+  return current === PRIORITY_FORUM_LABEL || next === PRIORITY_FORUM_LABEL
+    ? PRIORITY_FORUM_LABEL
+    : next;
 }
 
 function coverageOf(

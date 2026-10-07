@@ -3,7 +3,10 @@
 import { useMemo } from "react";
 
 import { useListForumLabels } from "@/client/forum/forum";
-import { toForumLabelDefinition, type ForumLabelDefinition } from "@/components/features/forum/categories";
+import {
+  toForumLabelDefinition,
+  type ForumLabelDefinition,
+} from "@/components/features/forum/categories";
 
 export function useForumLabels() {
   const { data, isLoading, isError } = useListForumLabels({
