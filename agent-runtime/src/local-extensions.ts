@@ -1,10 +1,12 @@
 /**
- * Local pi extension checkouts loaded next to the pinned pi-qdash package.
+ * Extensions trusted as a whole, next to the allowlisted pi-qdash package.
  *
- * `AGENT_RUNTIME_EXTENSION_PATHS` names package directories (the layout pi
- * installs: a package.json with a `pi` manifest) that are mounted into the
- * runtime container during development, so an extension can be iterated on
- * without publishing it and rebuilding the image.
+ * Two sources qualify. Local checkouts: `AGENT_RUNTIME_EXTENSION_PATHS` names
+ * package directories (the layout pi installs: a package.json with a `pi`
+ * manifest) mounted into the runtime container during development, so an
+ * extension can be iterated on without publishing it and rebuilding the image.
+ * Installed packages: `TRUSTED_EXTENSION_PACKAGES` names pi packages the
+ * image installs at a pinned version, so the same extension runs in production.
  *
  * Pure functions only, so they can be tested without a running agent.
  */
@@ -38,7 +40,29 @@ export function isLocalExtension(extensionPath: string, roots: readonly string[]
 }
 
 /**
- * System-prompt lines for the tools of local extension checkouts.
+ * Whether an extension file belongs to one of the named installed packages.
+ *
+ * pi installs npm packages under its agent directory's `node_modules`, so the
+ * package name (scope included) appears as path segments right after a
+ * `node_modules` segment, e.g. `/app/.pi-agent/npm/node_modules/@scope/name/extensions/x.ts`.
+ */
+export function isInstalledPackage(extensionPath: string, packages: readonly string[]): boolean {
+  if (packages.length === 0) return false;
+  const normalized = resolve(extensionPath).split(sep).join("/");
+  return packages.some((name) => normalized.includes(`/node_modules/${name}/`));
+}
+
+/** Whether an extension is trusted as a whole: a local checkout or a listed package. */
+export function isTrustedExtension(
+  extensionPath: string,
+  roots: readonly string[],
+  packages: readonly string[] = [],
+): boolean {
+  return isLocalExtension(extensionPath, roots) || isInstalledPackage(extensionPath, packages);
+}
+
+/**
+ * System-prompt lines for the tools of trusted extensions.
  *
  * pi-qdash's routing guide comes from its `qdash` skill (tool-guide.ts), which
  * knows nothing about other extensions. Their tools describe themselves with
@@ -54,10 +78,11 @@ export function buildLocalToolGuide(
   }>,
   roots: readonly string[],
   enabledTools: ReadonlySet<string>,
+  packages: readonly string[] = [],
 ): string | null {
   const lines: string[] = [];
   for (const extension of extensions) {
-    if (!isLocalExtension(extension.path, roots)) continue;
+    if (!isTrustedExtension(extension.path, roots, packages)) continue;
     for (const [name, { definition }] of extension.tools ?? []) {
       if (!enabledTools.has(name)) continue;
       lines.push(`- \`${name}\`: ${definition.promptSnippet ?? definition.description}`);
@@ -67,16 +92,17 @@ export function buildLocalToolGuide(
   return lines.length ? lines.join("\n") : null;
 }
 
-/** Tool names provided by local extension checkouts, for logging and the tool list. */
+/** Tool names provided by trusted extensions, for logging and the tool list. */
 export function localToolNames(
   extensions: ReadonlyArray<{ path: string; tools?: ReadonlyMap<string, unknown> }>,
   roots: readonly string[],
+  packages: readonly string[] = [],
 ): string[] {
-  if (roots.length === 0) return [];
+  if (roots.length === 0 && packages.length === 0) return [];
   return [
     ...new Set(
       extensions
-        .filter((extension) => isLocalExtension(extension.path, roots))
+        .filter((extension) => isTrustedExtension(extension.path, roots, packages))
         .flatMap((extension) => [...(extension.tools?.keys() ?? [])]),
     ),
   ];

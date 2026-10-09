@@ -90,3 +90,11 @@ const EXPERIMENTAL_WRITE_TOOLS = new Set<string>(EXPERIMENTAL_WRITE_TOOL_NAMES);
 export function isExperimentalWriteTool(name: string): boolean {
   return EXPERIMENTAL_WRITE_TOOLS.has(name);
 }
+
+/**
+ * Installed pi packages trusted as a whole, like a local checkout: every tool
+ * they define is offered without a per-name entry above (the experimental
+ * write opt-in still applies). Reviewed per package, pinned by version in
+ * `agent-runtime/Dockerfile`.
+ */
+export const TRUSTED_EXTENSION_PACKAGES = ["@orangekame3/pi-qcaleval"] as const;

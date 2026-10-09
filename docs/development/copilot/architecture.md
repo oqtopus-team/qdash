@@ -143,7 +143,11 @@ on the packages the runtime already ships (`@earendil-works/pi-coding-agent`,
 
 A checkout is trusted by its path, not by tool name: every tool it defines is
 offered to the model without the pi-qdash allowlist review
-(`agent-runtime/src/allowed-tools.ts`), with three limits.
+(`agent-runtime/src/allowed-tools.ts`), with three limits. The same trust applies
+in production to the packages listed in `TRUSTED_EXTENSION_PACKAGES` (for example
+`@orangekame3/pi-qcaleval`), which the image installs at a pinned version next to
+pi-qdash in `agent-runtime/Dockerfile`; a package is added to that list only after
+review, and the version pin is the release gate.
 
 - An experimental write name (`EXPERIMENTAL_WRITE_TOOL_NAMES`) still needs
   `AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true`, and then goes through the same

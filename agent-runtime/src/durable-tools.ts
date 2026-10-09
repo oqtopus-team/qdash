@@ -1,4 +1,5 @@
 import type { Context, JsonValue } from "@earendil-works/chord";
+import type { Api, Model } from "@earendil-works/pi-ai";
 import type {
   ModelRuntime,
   ToolDefinition as CodingAgentTool,
@@ -16,6 +17,7 @@ import type { TSchema } from "typebox";
 import {
   ALLOWED_TOOL_NAMES,
   EXPERIMENTAL_WRITE_TOOL_NAMES,
+  TRUSTED_EXTENSION_PACKAGES,
   isExperimentalWriteTool,
 } from "./allowed-tools.ts";
 import type { QDashConnection } from "./auth.ts";
@@ -26,15 +28,30 @@ import {
   requestedImageCount,
   withImages,
 } from "./figure-context.ts";
-import { isLocalExtension } from "./local-extensions.ts";
+import { isTrustedExtension } from "./local-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 
 /** Newest transcript entries searched for a figure when a tool asks for one. */
 const FIGURE_SCAN_LIMIT = 50;
 
-/** Whether an extension comes from a mounted development checkout. */
-function isLocal(extension: { path?: string }, roots: readonly string[]): boolean {
-  return extension.path !== undefined && isLocalExtension(extension.path, roots);
+/** Whether an extension is a mounted development checkout or a trusted installed package. */
+function isTrusted(
+  extension: { path?: string },
+  roots: readonly string[],
+  packages: readonly string[],
+): boolean {
+  return extension.path !== undefined && isTrustedExtension(extension.path, roots, packages);
+}
+
+/** The model the conversation runs on, resolved from the durable agent record. */
+async function conversationModel(
+  api: Pick<ToolExecutionApi, "agent">,
+  context: Context,
+  modelRuntime: ModelRuntime,
+): Promise<Model<Api> | undefined> {
+  if (typeof api.agent !== "function") return undefined;
+  const ref = (await api.agent(context)).model;
+  return ref ? (modelRuntime.getModel(ref.provider, ref.modelId) ?? undefined) : undefined;
 }
 
 /** Convert a value returned by an extension into durable's strict JSON shape. */
@@ -87,12 +104,15 @@ async function runCodingAgentTool(
   modelRuntime: ModelRuntime,
   cwd: string,
   connection: QDashConnection,
+  /** The conversation's model, so a tool can fall back to it (pi-qcaleval does). */
+  model?: Model<Api>,
 ) {
   const extensionContext = {
     cwd,
     mode: "json",
     hasUI: false,
     signal,
+    model,
     modelRegistry: new ModelRegistry(modelRuntime),
     isIdle: () => false,
     isProjectTrusted: () => true,
@@ -184,6 +204,7 @@ export function adaptCodingAgentTool(
         modelRuntime,
         cwd,
         connection,
+        await conversationModel(api, context, modelRuntime),
       );
       return {
         content: result.content,
@@ -254,13 +275,14 @@ export class QDashWriteTools {
 /**
  * Build the durable extension containing all permitted pi-qdash tools.
  *
- * Tools of the pinned package pass the reviewed allowlist by name. An
- * extension whose file lies under one of `localExtensionRoots`
- * (`AGENT_RUNTIME_EXTENSION_PATHS`, development only) is trusted by its path
- * instead: every tool it defines is offered, except that an experimental
- * write name still needs the opt-in, and a tool is replayed on recovery only
- * when its annotations say it is read-only. A local tool that reuses a
- * pinned name replaces the pinned implementation.
+ * Tools of the pinned pi-qdash package pass the reviewed allowlist by name.
+ * An extension trusted as a whole, because its file lies under one of
+ * `localExtensionRoots` (`AGENT_RUNTIME_EXTENSION_PATHS`, development only)
+ * or it belongs to one of `trustedPackages` (installed at a pinned version),
+ * offers every tool it defines, except that an experimental write name still
+ * needs the opt-in, and a tool is replayed on recovery only when its
+ * annotations say it is read-only. A trusted tool that reuses a pinned name
+ * replaces the pinned implementation.
  */
 export function buildQDashExtension(
   extensions: ReadonlyArray<{
@@ -272,6 +294,7 @@ export function buildQDashExtension(
   connection: QDashConnection,
   enableExperimentalWriteTools = false,
   localExtensionRoots: readonly string[] = [],
+  trustedPackages: readonly string[] = TRUSTED_EXTENSION_PACKAGES,
 ): { extension: Extension; writeTools: QDashWriteTools } {
   const allowed = new Set<string>([
     ...ALLOWED_TOOL_NAMES,
@@ -279,20 +302,20 @@ export function buildQDashExtension(
   ]);
   const tools = new Map<string, ToolRegistration>();
   const writes = new Map<string, CodingAgentTool>();
-  // Pinned extensions first, so a local definition is the one that replaces.
-  const ordered = [...extensions].sort(
-    (a, b) => Number(isLocal(a, localExtensionRoots)) - Number(isLocal(b, localExtensionRoots)),
-  );
+  const trusted = (extension: { path?: string }) =>
+    isTrusted(extension, localExtensionRoots, trustedPackages);
+  // Pinned extensions first, so a trusted definition is the one that replaces.
+  const ordered = [...extensions].sort((a, b) => Number(trusted(a)) - Number(trusted(b)));
   for (const extension of ordered) {
-    const local = isLocal(extension, localExtensionRoots);
+    const local = trusted(extension);
     for (const [name, registered] of extension.tools ?? []) {
       const writeName = isExperimentalWriteTool(name);
       if (local ? writeName && !enableExperimentalWriteTools : !allowed.has(name)) continue;
       if (local && tools.has(name)) {
-        console.warn(`[agent-runtime] local extension ${extension.path} replaces tool ${name}`);
+        console.warn(`[agent-runtime] trusted extension ${extension.path} replaces tool ${name}`);
       }
       const replay = local && !registered.definition.annotations?.readOnlyHint ? "unsafe" : "safe";
-      // Only checkout tools evaluate figures; pi-qdash tools fetch them.
+      // Only trusted extensions evaluate figures; pi-qdash tools fetch them.
       const fillImages = local && acceptsImages(registered.definition.parameters);
       tools.set(
         name,

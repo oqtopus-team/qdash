@@ -24,6 +24,7 @@ import { createQDashConnection, type QDashAuth, type QDashConnection } from "./a
 import {
   ALLOWED_TOOL_NAMES,
   EXPERIMENTAL_WRITE_TOOL_NAMES,
+  TRUSTED_EXTENSION_PACKAGES,
   isExperimentalWriteTool,
 } from "./allowed-tools.ts";
 import { compactionBudget } from "./budget.ts";
@@ -148,14 +149,15 @@ export class SharedRuntime {
     );
 
     const extensions = loader.getExtensions().extensions;
-    // Local checkouts are trusted by path (see buildQDashExtension); the
-    // experimental write opt-in still applies to their tool names.
-    const localTools = localToolNames(extensions, EXTENSION_PATHS).filter(
+    // Local checkouts and trusted installed packages are trusted as a whole
+    // (see buildQDashExtension); the experimental write opt-in still applies
+    // to their tool names.
+    const localTools = localToolNames(extensions, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES).filter(
       (name) => EXPERIMENTAL_WRITE_TOOLS_ENABLED || !isExperimentalWriteTool(name),
     );
-    if (EXTENSION_PATHS.length) {
+    if (EXTENSION_PATHS.length || localTools.length) {
       console.log(
-        `[agent-runtime] local extensions: ${EXTENSION_PATHS.join(", ")} (tools: ${localTools.join(", ") || "none"})`,
+        `[agent-runtime] trusted extensions: packages=${TRUSTED_EXTENSION_PACKAGES.join(", ") || "none"}; local=${EXTENSION_PATHS.join(", ") || "none"} (tools: ${localTools.join(", ") || "none"})`,
       );
     }
     const allowed = new Set<string>([
@@ -175,7 +177,12 @@ export class SharedRuntime {
       ? extractToolGuide(readFileSync(guideSkill.filePath, "utf8"), qdashToolNames)
       : null;
     if (!toolGuide) console.warn("[agent-runtime] no tool guide: qdash skill not found");
-    const localToolGuide = buildLocalToolGuide(extensions, EXTENSION_PATHS, new Set(localTools));
+    const localToolGuide = buildLocalToolGuide(
+      extensions,
+      EXTENSION_PATHS,
+      new Set(localTools),
+      TRUSTED_EXTENSION_PACKAGES,
+    );
 
     const copilotExtension = defineExtension({
       name: "qdash-copilot",
@@ -205,6 +212,7 @@ export class SharedRuntime {
         connection,
         EXPERIMENTAL_WRITE_TOOLS_ENABLED,
         EXTENSION_PATHS,
+        TRUSTED_EXTENSION_PACKAGES,
       );
       registry.install(qdash.extension);
       registry.install(copilotExtension);
