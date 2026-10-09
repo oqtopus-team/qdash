@@ -10,6 +10,9 @@ import litellm
 if TYPE_CHECKING:
     from qdash.copilot.config import CopilotConfig
 
+# Model names already qualified for LiteLLM; anything else gets a prefix.
+_LITELLM_PREFIXES = ("openai/", "hosted_vllm/")
+
 
 async def litellm_completion(config: CopilotConfig, **kwargs: Any) -> Any:
     """Call LiteLLM Chat Completions with provider-aware configuration."""
@@ -28,11 +31,13 @@ def build_litellm_kwargs(config: CopilotConfig) -> dict[str, Any]:
     configured_name = resolve_model_config_value(model.name, field_name="model") or model.name
     if provider == "ollama" and not configured_name.startswith("ollama_chat/"):
         model_name = f"ollama_chat/{configured_name}"
-    elif provider == "openai-compatible" and "/" not in configured_name:
+    elif provider == "openai-compatible" and not configured_name.startswith(_LITELLM_PREFIXES):
         # LiteLLM needs the protocol implementation in the model prefix, while
         # QDash keeps the deployment vendor out of its public configuration.
+        # Served names may carry an org segment (nvidia/Ising-...), so only an
+        # explicit LiteLLM prefix counts as already qualified.
         model_name = f"openai/{configured_name}"
-    elif provider == "vllm" and "/" not in configured_name:
+    elif provider == "vllm" and not configured_name.startswith(_LITELLM_PREFIXES):
         model_name = f"hosted_vllm/{configured_name}"
     elif configured_name.startswith(f"{provider}/"):
         model_name = configured_name

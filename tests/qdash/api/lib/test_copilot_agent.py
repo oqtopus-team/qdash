@@ -195,6 +195,17 @@ def test_build_litellm_kwargs_uses_provider_specific_model_strings(monkeypatch) 
             )
         )
     )
+    # Served names with an org segment still need the LiteLLM protocol prefix.
+    vllm_org_name = build_litellm_kwargs(
+        CopilotConfig(
+            model=ModelConfig(
+                provider="vllm",
+                name="nvidia/Ising-Calibration-1.5-31B-NVFP4",
+                base_url="env:VLLM_BASE_URL",
+                api_key_env="VLLM_API_KEY",
+            )
+        )
+    )
 
     assert bedrock["model"] == "bedrock/jp.anthropic.claude"
     assert bedrock["api_base"] == "https://bedrock-runtime.us-west-2.amazonaws.com"
@@ -206,6 +217,11 @@ def test_build_litellm_kwargs_uses_provider_specific_model_strings(monkeypatch) 
     assert openai == {"model": "openai/gpt-5.4", "api_key": "test-key"}
     assert vllm == {
         "model": "openai/Gemma-4-31B-IT-NVFP4",
+        "api_base": "http://10.20.10.19:8000/v1",
+        "api_key": "EMPTY",
+    }
+    assert vllm_org_name == {
+        "model": "hosted_vllm/nvidia/Ising-Calibration-1.5-31B-NVFP4",
         "api_base": "http://10.20.10.19:8000/v1",
         "api_key": "EMPTY",
     }
