@@ -18240,6 +18240,15 @@
       },
       "AnalyzeRequest": {
         "properties": {
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/ChatImageAttachment"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Images",
+            "description": "Figures attached to this turn (at most 12 MiB of base64 in total)."
+          },
           "task_name": {
             "type": "string",
             "title": "Task Name",
@@ -19027,6 +19036,32 @@
         ],
         "title": "CandidateGateResponse",
         "description": "Side-effect-free deterministic decision for one candidate value."
+      },
+      "ChatImageAttachment": {
+        "properties": {
+          "data": {
+            "type": "string",
+            "maxLength": 6291456,
+            "minLength": 1,
+            "title": "Data",
+            "description": "Base64 image bytes without a data: prefix"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg"
+            ],
+            "title": "Mimetype"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "mimeType"
+        ],
+        "title": "ChatImageAttachment",
+        "description": "One figure the user attached to a chat message."
       },
       "ChipDatesResponse": {
         "properties": {

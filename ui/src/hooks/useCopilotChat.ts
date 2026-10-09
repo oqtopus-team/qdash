@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { recoverMessageImages } from "@/lib/chatAttachments";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
-import type { AnswerFeedback, ChatMessage } from "@/types/copilotChat";
+import type { AnswerFeedback, ChatImageAttachment, ChatMessage } from "@/types/copilotChat";
 import {
   useCopilotChatSessionContext,
   type CopilotChatSession,
@@ -77,7 +78,8 @@ export function useCopilotChat(sessionId?: string | null) {
   const messages = useMemo(() => session?.messages ?? [], [session?.messages]);
 
   const send = useCallback(
-    (text: string) => sendMessage(text, { sessionId: id, modelOverride }),
+    (text: string, images?: ChatImageAttachment[]) =>
+      sendMessage(text, { sessionId: id, modelOverride, ...(images?.length ? { images } : {}) }),
     [id, modelOverride, sendMessage],
   );
 
@@ -98,7 +100,10 @@ export function useCopilotChat(sessionId?: string | null) {
     let lastUser = messages.length - 1;
     while (lastUser >= 0 && messages[lastUser].role !== "user") lastUser--;
     if (lastUser < 0) return;
+    const images = recoverMessageImages(messages[lastUser]);
+    if (images === null) return;
     sendMessage(messages[lastUser].content, {
+      images,
       sessionId: id,
       history: messages.slice(0, lastUser),
       modelOverride,
@@ -111,7 +116,14 @@ export function useCopilotChat(sessionId?: string | null) {
       const trimmed = text.trim();
       if (!id || run || !trimmed) return;
       if (messages[index]?.role !== "user") return;
-      sendMessage(trimmed, { sessionId: id, history: messages.slice(0, index), modelOverride });
+      const images = recoverMessageImages(messages[index]);
+      if (images === null) return;
+      sendMessage(trimmed, {
+        sessionId: id,
+        history: messages.slice(0, index),
+        modelOverride,
+        images,
+      });
     },
     [id, messages, modelOverride, run, sendMessage],
   );
@@ -138,6 +150,14 @@ export function useCopilotChat(sessionId?: string | null) {
     decide,
     stop,
     retryLast,
+    canRetryLast:
+      !run &&
+      messages
+        .filter((m) => m.role === "user")
+        .slice(-1)
+        .some((m) => recoverMessageImages(m) !== null),
+    canEditMessage: (index: number) =>
+      !run && messages[index]?.role === "user" && recoverMessageImages(messages[index]) !== null,
     editMessage,
     rateAnswer,
   };

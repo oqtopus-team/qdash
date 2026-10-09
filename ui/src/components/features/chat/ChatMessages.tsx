@@ -346,11 +346,25 @@ export const UserMessage = memo(function UserMessage({
 
   return (
     <div className="group flex flex-col items-end gap-1 animate-fade-in-up">
-      {message.attachedImage && (
-        <span className="inline-flex items-center gap-1 text-[11px] text-base-content/45">
-          <ImageIcon className="w-3 h-3" />
-          Result figures attached
-        </span>
+      {message.attachments?.length ? (
+        <div className="flex flex-wrap justify-end gap-1.5 max-w-[85%]">
+          {message.attachments.map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element -- data URL kept for this browser session
+            <img
+              key={i}
+              src={src}
+              alt={`Attached figure ${i + 1}`}
+              className="h-24 max-w-[200px] rounded-xl object-contain border border-base-300 bg-base-200"
+            />
+          ))}
+        </div>
+      ) : (
+        message.attachedImage && (
+          <span className="inline-flex items-center gap-1 text-[11px] text-base-content/45">
+            <ImageIcon className="w-3 h-3" />
+            Figures attached
+          </span>
+        )
       )}
       <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] text-[15px] leading-relaxed whitespace-pre-wrap break-words">
         {message.content}

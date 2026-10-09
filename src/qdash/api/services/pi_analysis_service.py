@@ -123,6 +123,7 @@ async def stream(
         # Opening figures: the runtime attaches them only when the conversation
         # is new. Per-turn attachments would go in "images" instead.
         "initial_images": collect_images(bundle),
+        "images": [image.model_dump(by_alias=True) for image in request.images],
         **pi_chat_service.approval_payload(request.approval),
     }
 
