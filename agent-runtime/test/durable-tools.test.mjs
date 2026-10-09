@@ -124,15 +124,16 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
         context: Type.String(),
         images: Type.Optional(Type.Array(Type.Object({ data: Type.String(), mimeType: Type.String() }))),
       }),
-      execute: async (_id, params) => {
-        seen.push(params);
+      execute: async (_id, params, _signal, _onUpdate, ctx) => {
+        seen.push({ ...params, ctxModel: ctx.model });
         return { content: [], details: {} };
       },
     },
   };
+  const qwen = { provider: "openai-compatible", id: "qwen3.8-flash-next", input: ["text", "image"] };
   const { extension } = buildQDashExtension(
     [{ path: "/app/extensions/pi-qcaleval/extensions/qcaleval.ts", tools: new Map([["qcal_evaluate", evaluate]]) }],
-    {},
+    { getModel: (provider, id) => (provider === qwen.provider && id === qwen.id ? qwen : undefined) },
     "/tmp/work",
     connection,
     false,
@@ -142,6 +143,8 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
   const api = {
     callId: "call-1",
     conversationId: "conv-1",
+    // The conversation's model reaches the tool, so it can fall back to it.
+    agent: async () => ({ model: { provider: qwen.provider, modelId: qwen.id } }),
     commit: async (change) =>
       change({
         scanEntries: async (query, limit) => {
@@ -165,6 +168,7 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
   assert.deepEqual(scans, [{ query: { conversationId: "conv-1" }, limit: 50 }]);
   assert.deepEqual(seen[0].images, [{ data: "png-bytes", mimeType: "image/png" }]);
   assert.equal(seen[0].context, "Rabi on Q05");
+  assert.equal(seen[0].ctxModel, qwen);
 
   // Real image bytes the model passed itself are kept, and the transcript is not read.
   const own = [
@@ -288,4 +292,33 @@ test("decision messages tell the model what happened", () => {
     /approved .*Result:\n\{"execution_status":"queued"\}/,
   );
   assert.match(decisionMessage(approval, { approved: true, error: "409" }), /failed:\n409/);
+});
+
+test("a trusted installed package gets the checkout treatment", () => {
+  const readOnly = registered("qcal_evaluate");
+  readOnly.definition.annotations = { readOnlyHint: true };
+  const { extension } = buildQDashExtension(
+    [
+      {
+        path: "/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval/extensions/qcaleval.ts",
+        tools: new Map([["qcal_evaluate", readOnly]]),
+      },
+      {
+        path: "/app/.pi-agent/npm/node_modules/@someone/pi-other/extensions/other.ts",
+        tools: new Map([["other_tool", registered("other_tool")]]),
+      },
+    ],
+    {},
+    "/tmp/work",
+    connection,
+    false,
+    [],
+    ["@orangekame3/pi-qcaleval"],
+  );
+  // The listed package is offered; an unlisted installed package still needs the allowlist.
+  assert.deepEqual(
+    extension.tools.map((tool) => tool.name),
+    ["qcal_evaluate"],
+  );
+  assert.equal(extension.tools[0].replay, "safe");
 });

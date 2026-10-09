@@ -3,7 +3,9 @@ import { test } from "node:test";
 
 import {
   buildLocalToolGuide,
+  isInstalledPackage,
   isLocalExtension,
+  isTrustedExtension,
   localToolNames,
   parseExtensionPaths,
 } from "../src/local-extensions.ts";
@@ -91,4 +93,31 @@ test("local tools describe themselves to the model through their pi guidelines",
       "  - Pass the task name as context.",
     ].join("\n"),
   );
+});
+
+test("an installed package is trusted by its name under pi's node_modules", () => {
+  const packages = ["@orangekame3/pi-qcaleval"];
+  const installed = "/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval/extensions/qcaleval.ts";
+  assert.equal(isInstalledPackage(installed, packages), true);
+  assert.equal(isInstalledPackage(installed, []), false);
+  // The pinned pi-qdash package and look-alike names are not covered.
+  assert.equal(
+    isInstalledPackage("/app/.pi-agent/npm/node_modules/@oqtopus-team/pi-qdash/extensions/qdash.ts", packages),
+    false,
+  );
+  assert.equal(
+    isInstalledPackage("/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval-fork/extensions/x.ts", packages),
+    false,
+  );
+  // A checkout root or a trusted package both qualify.
+  assert.equal(isTrustedExtension(installed, [], packages), true);
+  assert.equal(isTrustedExtension("/app/extensions/dev/extensions/x.ts", ["/app/extensions/dev"], packages), true);
+  assert.equal(isTrustedExtension("/app/extensions/dev/extensions/x.ts", [], packages), false);
+
+  const extensions = [
+    { path: installed, tools: new Map([["qcal_evaluate", { definition: { description: "d" } }]]) },
+  ];
+  assert.deepEqual(localToolNames(extensions, [], packages), ["qcal_evaluate"]);
+  assert.deepEqual(localToolNames(extensions, [], []), []);
+  assert.equal(buildLocalToolGuide(extensions, [], new Set(["qcal_evaluate"]), packages), "- `qcal_evaluate`: d");
 });
