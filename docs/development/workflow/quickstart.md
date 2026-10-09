@@ -80,7 +80,7 @@ tasks = ["ConfigureEF", "CheckEFChevron"]
 ```
 
 The qubit must already have calibrated GE DRAG pi pulse parameters and readout
-parameters. `CheckEFChevron` verifies that distinct GE and EF channels exist before
+parameters. `CheckEFChevron` verifies that GE and EF targets exist before
 starting measurement. Configuration tasks delegate channel allocation to Qubex.
 
 `Configure` also accepts the `configuration_mode` run parameter: `ge-cr-cr`,

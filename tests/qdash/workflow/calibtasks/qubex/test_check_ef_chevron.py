@@ -61,10 +61,8 @@ def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monk
     exp.get_qubit_label.return_value = "Q00"
     exp.ctx.resolve_ge_label.return_value = "Q00_ge"
     exp.ctx.resolve_ef_label.return_value = "Q00_ef"
-    exp.targets = {
-        "Q00_ge": SimpleNamespace(channel=SimpleNamespace(id="ctrl:0")),
-        "Q00_ef": SimpleNamespace(channel=SimpleNamespace(id="ctrl:1")),
-    }
+    # Validation must not access backend-specific channel attributes.
+    exp.targets = {"Q00_ge": object(), "Q00_ef": object()}
     exp.ctx.resolve_read_label.return_value = "Q00_read"
     exp.modified_frequencies.return_value = nullcontext()
     monkeypatch.setattr(task, "get_experiment", lambda backend: exp)
