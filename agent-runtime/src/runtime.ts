@@ -21,12 +21,17 @@ import {
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 
 import { createQDashConnection, type QDashAuth, type QDashConnection } from "./auth.ts";
-import { ALLOWED_TOOL_NAMES, EXPERIMENTAL_WRITE_TOOL_NAMES } from "./allowed-tools.ts";
+import {
+  ALLOWED_TOOL_NAMES,
+  EXPERIMENTAL_WRITE_TOOL_NAMES,
+  isExperimentalWriteTool,
+} from "./allowed-tools.ts";
 import { compactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { askUserTool } from "./ask-tool.ts";
 import { formatSettledDetail } from "./events.ts";
+import { localToolNames, parseExtensionPaths } from "./local-extensions.ts";
 import {
   buildQDashExtension,
   type ApprovalRequest,
@@ -50,6 +55,9 @@ const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 18
 const EXPERIMENTAL_WRITE_TOOLS_ENABLED = ["1", "true", "yes", "on"].includes(
   (process.env.AGENT_RUNTIME_ENABLE_WRITE_TOOLS ?? "").trim().toLowerCase(),
 );
+// Development only: local extension checkouts mounted into the container.
+// Relative entries resolve against WORK_DIR, the resource loader's cwd.
+const EXTENSION_PATHS = parseExtensionPaths(process.env.AGENT_RUNTIME_EXTENSION_PATHS, WORK_DIR);
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
 
@@ -106,8 +114,12 @@ export class SharedRuntime {
     const loader = new DefaultResourceLoader({
       cwd: WORK_DIR,
       agentDir: AGENT_DIR,
+      additionalExtensionPaths: EXTENSION_PATHS,
     });
     await loader.reload();
+    for (const { path, error } of loader.getExtensions().errors) {
+      console.error(`[agent-runtime] extension ${path}: ${error}`);
+    }
 
     const modelsPath = writeModelsConfig(
       CHAT_CONFIG_PATH,
@@ -132,9 +144,20 @@ export class SharedRuntime {
     );
 
     const extensions = loader.getExtensions().extensions;
+    // Local checkouts are trusted by path (see buildQDashExtension); the
+    // experimental write opt-in still applies to their tool names.
+    const localTools = localToolNames(extensions, EXTENSION_PATHS).filter(
+      (name) => EXPERIMENTAL_WRITE_TOOLS_ENABLED || !isExperimentalWriteTool(name),
+    );
+    if (EXTENSION_PATHS.length) {
+      console.log(
+        `[agent-runtime] local extensions: ${EXTENSION_PATHS.join(", ")} (tools: ${localTools.join(", ") || "none"})`,
+      );
+    }
     const allowed = new Set<string>([
       ...ALLOWED_TOOL_NAMES,
       ...(EXPERIMENTAL_WRITE_TOOLS_ENABLED ? EXPERIMENTAL_WRITE_TOOL_NAMES : []),
+      ...localTools,
     ]);
     const qdashToolNames = [
       ...new Set(
@@ -175,6 +198,7 @@ export class SharedRuntime {
         WORK_DIR,
         connection,
         EXPERIMENTAL_WRITE_TOOLS_ENABLED,
+        EXTENSION_PATHS,
       );
       registry.install(qdash.extension);
       registry.install(copilotExtension);

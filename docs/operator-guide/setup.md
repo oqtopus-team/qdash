@@ -46,6 +46,7 @@ Review or fill in these values before starting services:
 | `AGENT_RUNTIME_TOKEN` | Shared secret for QDash API/workers to call the internal Pi Agent Runtime; required when `copilot_backend: pi`, and requests fail closed when it is empty |
 | `COMPOSE_PROFILES` | Set to `agent-runtime` when `copilot_backend: pi`; otherwise the Agent Runtime container is not created |
 | `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` | Experimental; set to `true` to expose the reviewed QDash write tools to Copilot (default: `false`) |
+| `AGENT_RUNTIME_EXTENSION_PATHS` | Development only; colon-separated pi extension checkouts (absolute container paths) the Agent Runtime loads next to the pinned pi-qdash package, together with `compose.extensions.yaml`. A checkout is trusted by its path: its tools are offered to Copilot without the pi-qdash allowlist review, while experimental write names keep their opt-in and only tools annotated read-only are replayed after an interruption |
 | `OPENAI_COMPATIBLE_BASE_URL` / `OPENAI_COMPATIBLE_API_KEY` | Base URL and credential for the default vendor-neutral OpenAI Chat Completions endpoint |
 | `VLLM_BASE_URL` / `VLLM_API_KEY` | Base URL and bearer token of a vLLM endpoint; used by the `vllm` models in `config/copilot/*.yaml` such as `nvidia/Ising-Calibration-1.5-31B-NVFP4` |
 | `OPENAI_API_KEY` / `OLLAMA_BASE_URL` / `OLLAMA_API_KEY` | Optional settings for other Copilot AI providers |

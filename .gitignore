@@ -240,6 +240,8 @@ src/tools/schedule/*
 docs/internal/*
 docs/papers/*
 config/qubex-config
+# Local pi extension checkouts mounted into the Agent Runtime during development.
+agent-runtime/extensions/
 scripts/estimate_qubit_frequency
 scripts/estimate-resonator-frequency
 .direnv
