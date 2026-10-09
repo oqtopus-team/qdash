@@ -1,11 +1,28 @@
-"""Validation helpers for qubex calibration task outputs."""
+"""Validation helpers for qubex calibration tasks."""
 
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from qubex import Experiment
 
 DEFAULT_RABI_R2_THRESHOLD = 0.6
+
+
+def require_ef_configuration(exp: Experiment, label: str) -> None:
+    """Require actual GE and EF targets on distinct channels, not legacy aliases."""
+    try:
+        ge = exp.targets[exp.ctx.resolve_ge_label(label)]
+        ef = exp.targets[exp.ctx.resolve_ef_label(label)]
+    except (KeyError, ValueError) as exc:
+        raise ValueError(
+            f"GE/EF targets are not configured for {label}. Run ConfigureEF before "
+            "CheckEFChevron in the same session; the control port must support EF channels."
+        ) from exc
+    if ge.channel.id == ef.channel.id:
+        raise ValueError(f"{label} requires separate GE and EF drive channels for EF chevron")
 
 
 def finite_value_error(

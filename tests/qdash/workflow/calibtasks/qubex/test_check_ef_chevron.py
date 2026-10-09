@@ -60,6 +60,11 @@ def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monk
     exp = MagicMock()
     exp.get_qubit_label.return_value = "Q00"
     exp.ctx.resolve_ge_label.return_value = "Q00_ge"
+    exp.ctx.resolve_ef_label.return_value = "Q00_ef"
+    exp.targets = {
+        "Q00_ge": SimpleNamespace(channel=SimpleNamespace(id="ctrl:0")),
+        "Q00_ef": SimpleNamespace(channel=SimpleNamespace(id="ctrl:1")),
+    }
     exp.ctx.resolve_read_label.return_value = "Q00_read"
     exp.modified_frequencies.return_value = nullcontext()
     monkeypatch.setattr(task, "get_experiment", lambda backend: exp)
@@ -84,6 +89,25 @@ def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monk
     assert result.raw_result is estimate.return_value
     exp.params.readout_amplitude.__setitem__.assert_called_once_with("Q00", 0.031)
     exp.modified_frequencies.assert_called_once_with({"Q00_ge": 5.001, "Q00_read": 6.1})
+
+
+def test_run_rejects_missing_ef_target_before_measurement() -> None:
+    exp = MagicMock()
+    exp.get_qubit_label.return_value = "Q00"
+    exp.ctx.resolve_ge_label.return_value = "Q00_ge"
+    exp.ctx.resolve_ef_label.return_value = "Q00_ef"
+    exp.targets = {"Q00_ge": SimpleNamespace(channel=SimpleNamespace(id="ctrl:0"))}
+    backend = SimpleNamespace(get_instance=lambda: exp)
+    with (
+        patch(
+            "qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_chevron."
+            "estimate_ef_frequency_from_chevron_adaptive"
+        ) as estimate,
+        pytest.raises(ValueError, match="Run ConfigureEF"),
+    ):
+        _task().run(cast("Any", backend), "0")
+    estimate.assert_not_called()
+    exp.modified_frequencies.assert_not_called()
 
 
 def test_postprocess_uses_final_frequency_and_prioritizes_final_chevron_figure() -> None:

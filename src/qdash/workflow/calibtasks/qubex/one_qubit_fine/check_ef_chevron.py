@@ -18,7 +18,11 @@ from qdash.workflow.calibtasks.qubex.base import (
     QubexTask,
     readout_duration_run_parameter,
 )
-from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
+from qdash.workflow.calibtasks.qubex.validation import (
+    finite_value_error,
+    first_validation_error,
+    require_ef_configuration,
+)
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -127,6 +131,7 @@ class CheckEFChevron(QubexTask):
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
+        require_ef_configuration(exp, label)
         readout_amp_param = self.input_parameters["readout_amplitude"]
         if readout_amp_param is not None:
             exp.params.readout_amplitude[label] = readout_amp_param.value
