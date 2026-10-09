@@ -126,9 +126,9 @@ def test_postprocess_uses_final_frequency_and_prioritizes_final_chevron_figure()
     )
     expected_keys = [
         "Q00_ef_measurement",
+        "Q00_ef_transform",
         "Q00_ef_search_measurement",
         "Q00_ef_search_transform",
-        "Q00_ef_transform",
     ]
     assert len(result.figures) == len(expected_keys)
     assert all(

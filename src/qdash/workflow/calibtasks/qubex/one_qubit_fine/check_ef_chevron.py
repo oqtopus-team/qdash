@@ -109,10 +109,10 @@ class CheckEFChevron(QubexTask):
         )
         self.output_parameters["ef_frequency"].value = frequency
         self.output_parameters["anharmonicity"].value = anharmonicity
-        # Topology previews display the first figure; prioritize the final chevron.
-        measurement_key = f"{label}_measurement"
-        figures = [figure for key, figure in result.figures.items() if key == measurement_key]
-        figures.extend(figure for key, figure in result.figures.items() if key != measurement_key)
+        # Keep the final chevron and its transform together at the front.
+        final_keys = (f"{label}_measurement", f"{label}_transform")
+        figures = [result.figures[key] for key in final_keys if key in result.figures]
+        figures.extend(figure for key, figure in result.figures.items() if key not in final_keys)
         return PostProcessResult(
             output_parameters=self.attach_execution_id(execution_id),
             figures=figures,
