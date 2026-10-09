@@ -437,47 +437,6 @@ def command_executions(args: argparse.Namespace) -> None:
         client.close()
 
 
-def command_ai_reviews(args: argparse.Namespace) -> None:
-    client = load_client(args)
-    try:
-        print_json(
-            client.list_task_result_ai_reviews(
-                chip_id=args.chip_id,
-                task_name=args.task_name,
-                status=args.status,
-                decision=args.decision,
-                latest_only=args.latest_only,
-                skip=args.skip,
-                limit=args.limit,
-            )
-        )
-    finally:
-        client.close()
-
-
-def command_ai_review_runs(args: argparse.Namespace) -> None:
-    client = load_client(args)
-    try:
-        print_json(
-            client.list_task_result_ai_review_runs(
-                chip_id=args.chip_id,
-                task_name=args.task_name,
-                skip=args.skip,
-                limit=args.limit,
-            )
-        )
-    finally:
-        client.close()
-
-
-def command_ai_review_run(args: argparse.Namespace) -> None:
-    client = load_client(args)
-    try:
-        print_json(client.get_task_result_ai_review_run(args.review_run_id))
-    finally:
-        client.close()
-
-
 def command_provenance_stats(args: argparse.Namespace) -> None:
     client_get(args, "/provenance/stats")
 
@@ -694,27 +653,6 @@ def build_parser() -> argparse.ArgumentParser:
     executions.add_argument("--skip", type=int, default=0)
     executions.add_argument("--limit", type=int, default=20)
     executions.set_defaults(func=command_executions)
-
-    ai_reviews = sub.add_parser("ai-reviews", help="List task result AI reviews")
-    ai_reviews.add_argument("--chip-id")
-    ai_reviews.add_argument("--task-name")
-    ai_reviews.add_argument("--status")
-    ai_reviews.add_argument("--decision")
-    ai_reviews.add_argument("--latest-only", action="store_true")
-    ai_reviews.add_argument("--skip", type=int, default=0)
-    ai_reviews.add_argument("--limit", type=int, default=50)
-    ai_reviews.set_defaults(func=command_ai_reviews)
-
-    ai_review_runs = sub.add_parser("ai-review-runs", help="List AI review runs")
-    ai_review_runs.add_argument("--chip-id")
-    ai_review_runs.add_argument("--task-name")
-    ai_review_runs.add_argument("--skip", type=int, default=0)
-    ai_review_runs.add_argument("--limit", type=int, default=50)
-    ai_review_runs.set_defaults(func=command_ai_review_runs)
-
-    ai_review_run = sub.add_parser("ai-review-run", help="Show one AI review run")
-    ai_review_run.add_argument("--review-run-id", required=True)
-    ai_review_run.set_defaults(func=command_ai_review_run)
 
     provenance_stats = sub.add_parser("provenance-stats", help="Show provenance statistics")
     provenance_stats.set_defaults(func=command_provenance_stats)

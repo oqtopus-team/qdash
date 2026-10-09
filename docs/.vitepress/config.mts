@@ -125,7 +125,7 @@ export default withMermaid(
               link: "/user-guide/reviewing-results",
             },
             {
-              text: "Copilot and AI Reviews",
+              text: "Copilot",
               link: "/user-guide/copilot",
             },
             {
@@ -184,6 +184,7 @@ export default withMermaid(
               items: [
                 { text: "Quickstart", link: "/development/workflow/quickstart" },
                 { text: "Engine Architecture", link: "/development/workflow/engine-architecture" },
+                { text: "Calibration Pipeline Spec", link: "/development/workflow/calibration-pipeline" },
                 { text: "Parameter Resolution", link: "/development/workflow/parameter-resolution" },
                 { text: "Frequency Parameter Policy", link: "/development/workflow/frequency-parameter-policy" },
                 { text: "Testing", link: "/development/workflow/testing" },
@@ -205,7 +206,7 @@ export default withMermaid(
               items: [
                 { text: "Agent Platform", link: "/development/agent-platform" },
                 { text: "Architecture", link: "/development/copilot/architecture" },
-                { text: "AI Review Evals", link: "/development/copilot/ai-review-evals" },
+                { text: "Knowledge Layout", link: "/development/copilot/knowledge-layout" },
                 { text: "Sandbox", link: "/development/copilot/sandbox" },
                 { text: "LLM Agent", link: "/development/copilot/agent" },
                 { text: "LLM Integration Patterns", link: "/development/copilot/llm-integration-patterns" },

@@ -450,7 +450,6 @@ class CopilotRuntime:
         task_id: str,
         image_base64: str | None,
         config: CopilotConfig,
-        use_review_knowledge: bool = False,
     ) -> AnalysisContextResult:
         """Build a full analysis context from DB data and TaskKnowledge.
 
@@ -465,7 +464,6 @@ class CopilotRuntime:
             task_id=task_id,
             image_base64=image_base64,
             config=config,
-            use_review_knowledge=use_review_knowledge,
         )
 
     @staticmethod

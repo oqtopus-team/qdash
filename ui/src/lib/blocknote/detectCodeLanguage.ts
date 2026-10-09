@@ -41,6 +41,7 @@ const HLJS_TO_BLOCKNOTE_LANGUAGE: Record<string, string> = {
 
 const MIN_RELEVANCE = 2;
 
+/** Returns whether `trimmed` is a JSON object or array literal. */
 function detectJson(trimmed: string): boolean {
   if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return false;
   try {

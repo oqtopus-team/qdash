@@ -7,7 +7,10 @@ from qdash.copilot.contracts.models import (
     BlocksAnalysisResponse,
     BlocksResponse,
     ChatRequest,
+    ChatStopRequest,
+    ChatStopResponse,
     ContentBlock,
+    SandboxPythonRequest,
     TaskAnalysisContext,
 )
 
@@ -18,6 +21,9 @@ __all__ = [
     "BlocksAnalysisResponse",
     "BlocksResponse",
     "ChatRequest",
+    "ChatStopRequest",
+    "ChatStopResponse",
     "ContentBlock",
+    "SandboxPythonRequest",
     "TaskAnalysisContext",
 ]

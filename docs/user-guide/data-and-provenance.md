@@ -29,8 +29,8 @@ ranges, distinguish the latest value from best or average aggregation.
 ## Chip and Task Artifacts
 
 **Chip** organizes calibration task results on the device topology. Select a task, then a qubit or
-coupling to open its details and history. Multi-select actions can request AI review or download
-figures for the displayed results.
+coupling to open its details and history. Multi-select actions can download figures for the
+displayed results.
 
 Task-result pages expose the stored parameters and artifacts for one measurement. Figure JSON and
 NetCDF raw data are downloadable when that task produced them.
@@ -58,3 +58,13 @@ context. See [Calibration Data Sharing](./calibration-data-sharing.md) for the c
 **Import** compares Qubex YAML values with QDash calibration state before importing initial
 parameters. Review the comparison rather than treating the file as an unconditional overwrite.
 Imported values become part of the calibration history and provenance context.
+
+The available files are restricted by `seed_import.params_file_names` in
+`config/app/workflow.yaml`. The default configuration permits only the operational control and
+readout frequency and amplitude YAML files. The measured `qubit_frequency` and
+`resonator_frequency` values cannot be updated through seed import; calibration experiments own
+those values. The API enforces the same allowlist for both Qubex-file and manual import requests.
+
+The page opens in a read-only **Calibration database** view containing every current parameter.
+Switch to **Import from YAML** to see only permitted YAML parameters and access selection, editing,
+review, and apply actions.

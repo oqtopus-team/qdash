@@ -1,7 +1,7 @@
-# Copilot and AI Reviews
+# Copilot
 
-QDash provides conversational analysis and bulk AI review tools that use project calibration
-context without replacing operator judgment.
+QDash provides conversational analysis tools that use project calibration context without
+replacing operator judgment.
 
 ## Choose a Tool
 
@@ -9,7 +9,6 @@ context without replacing operator judgment.
 | --- | --- |
 | AI Chat | Explore a question interactively with project-aware tools and cited QDash records. |
 | Analysis chat panel | Discuss the metric and filters already open on the Metrics page. |
-| AI Reviews | Analyze a selected set of displayed task results and compare target-level findings. |
 | Agent calibration | Run a separately authorized, bounded calibration campaign through the client. |
 
 Agent calibration performs hardware-affecting operations and is documented separately in
@@ -24,21 +23,25 @@ The assistant can use the project tools exposed by QDash to inspect records such
 metrics, task results, issues, workflows, and provenance. Keep the active project and selected chip
 in mind when interpreting an answer. Open referenced records to confirm important conclusions.
 
+### Run a calibration pipeline from chat
+
+With the Pi backend and write tools enabled (`AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true`), the
+assistant can compose a calibration from QDash's step catalog and run it as one execution. Ask for
+the calibration in plain terms, for example "run the coarse one-qubit check on Q00 and Q01, then
+measure T1 and T2 on the ones that pass". The assistant reads the available step types and tasks,
+validates its plan with QDash, and shows an approval card listing the targets, the steps, and the
+exact tasks each step will run. Nothing starts until you approve the card.
+
+The plan can only use the step types and task names QDash exposes; it cannot contain code, and
+every task result is judged by the same gates as a saved workflow. The execution appears on the
+**Execution** page tagged `pipeline`. See
+[Calibration Pipeline Spec](../development/workflow/calibration-pipeline.md) for the spec format.
+
 ## Metrics Analysis
 
 The Metrics page includes a chat panel with the current analysis context. Use it when a question
 depends on the selected chip, metric, target direction, or time range. Changing those filters can
 change the records available to the analysis; state the intended comparison explicitly.
-
-## Request an AI Review
-
-From a chip task view, select the displayed qubit or coupling results and request an AI review.
-The request creates a review run containing one record per reviewed target. Open **AI Reviews** to
-filter runs by chip or task and inspect findings and referenced artifacts.
-
-Review only the results currently displayed and verify target direction and selection before
-submitting. A review run is a snapshot of that request; later calibration results do not rewrite
-its findings.
 
 ## Evaluate Findings
 

@@ -2,7 +2,8 @@
 
 The workflow engine resolves task inputs, experiment configuration, snapshots, user overrides, and output persistence at different lifecycle stages.
 
-The [Frequency Parameter Policy](./frequency-parameter-policy.md) specifies the agreed design for exploration and calibrated frequencies, derived drive frequencies, YAML export, and update UX. Its implementation gaps are tracked separately from the current lifecycle described here.
+The [Frequency Parameter Policy](./frequency-parameter-policy.md) specifies frequency roles,
+task-specific fallbacks, multi-target publication, YAML export, and update UX.
 [Calibration Data Lifecycle](./calibration-data-lifecycle.md) shows how accepted calibration
 values, task history, active workflow state, and Qubex parameter files differ.
 
@@ -23,7 +24,8 @@ Every calibration input spec explicitly states its resolution and override polic
 
 ```python
 input_spec = {
-    "qubit_frequency": InputParameterSpec.required_database(
+    "control_frequency": InputParameterSpec.required_database(
+        fallback_parameter_names=("qubit_frequency",),
         unit="GHz",
     ),
     "readout_amplitude": InputParameterSpec.database_or_default(
@@ -41,7 +43,7 @@ input_spec = {
 
 The constructors default to allowing user overrides; pass `user_override="forbidden"` when a task must prohibit them. A permitted user override has higher precedence than the selected baseline. The constructor's `default` is spec-time fallback data; the effective runtime value is stored separately in `input_parameters` as an `InputParameterModel`.
 
-For coupling tasks, `InputParameterSpec.parameter_name` selects the database key and `InputParameterSpec.qid_role` selects `control`, `target`, or `coupling` data. Qubit tasks read from the selected qubit record.
+For coupling tasks, `InputParameterSpec.parameter_name` selects the database key and `InputParameterSpec.qid_role` selects `control`, `target`, or `coupling` data. Qubit tasks read from the selected qubit record. `parameter_aliases` lists legacy names with identical semantics. `fallback_parameter_names` lists lower-priority parameters with different semantics, such as resolving `control_frequency` from `qubit_frequency` only when the operational value is absent.
 
 ## Normal workflow execution
 

@@ -1,20 +1,17 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Send, X, Bot, Minus, Maximize2, GripHorizontal } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { useAnalysisChat, type ChatMessage, type BlocksResult } from "@/hooks/useAnalysisChat";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { GripHorizontal, Minus, PanelRight, SquarePen, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
-import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
-import { CodeBlock } from "@/components/features/chat/CodeBlock";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
-import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
+import { CHAT_PAGE_PATH, sessionToFollow } from "@/lib/followStreamingChat";
+import { ChatThread } from "@/components/features/chat/ChatThread";
 import {
-  buildAnalysisModelOptions,
-  getStoredAnalysisModelKey,
-  resolveAnalysisModelOption,
-} from "@/lib/copilotModels";
+  RecentChatsMenu,
+  SurfaceButton,
+  SurfaceTitle,
+} from "@/components/features/chat/ChatSurfaceControls";
 
 // ---------------------------------------------------------------------------
 // Drag hook
@@ -88,144 +85,66 @@ function useDrag(initialPosition: { x: number; y: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared rendering helpers (compact versions)
-// ---------------------------------------------------------------------------
-
-const markdownComponents = {
-  code({
-    className,
-    children,
-    ...props
-  }: React.ComponentPropsWithoutRef<"code"> & { className?: string }) {
-    const match = /language-(\w+)/.exec(className || "");
-    const codeString = String(children).replace(/\n$/, "");
-    if (match) {
-      return <CodeBlock language={match[1]}>{codeString}</CodeBlock>;
-    }
-    return (
-      <code className="bg-base-200 px-1 py-0.5 rounded text-sm" {...props}>
-        {children}
-      </code>
-    );
-  },
-};
-
-function parseBlocksContent(content: string): BlocksResult | null {
-  if (!content.startsWith("{")) return null;
-  try {
-    const data = JSON.parse(content);
-    if (data.blocks && Array.isArray(data.blocks)) {
-      return data as BlocksResult;
-    }
-  } catch {
-    // Not JSON
-  }
-  return null;
-}
-
-function MiniMessageBubble({ message }: { message: ChatMessage }) {
-  if (message.role === "user") {
-    return (
-      <div className="flex justify-end">
-        <div className="bg-primary text-primary-content rounded-2xl rounded-br-sm px-3 py-1.5 max-w-[85%] text-xs">
-          {message.content}
-        </div>
-      </div>
-    );
-  }
-
-  const blocksResult = parseBlocksContent(message.content);
-
-  return (
-    <div className="flex gap-1.5">
-      <div className="w-5 h-5 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-        <Bot className="w-3 h-3 text-primary" />
-      </div>
-      <div className="flex-1 min-w-0">
-        {blocksResult ? (
-          <>
-            {blocksResult.blocks.map((block, i) => {
-              if (block.type === "text" && block.content) {
-                return (
-                  <div key={i} className="prose prose-sm max-w-none text-xs mt-0.5">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                      {block.content}
-                    </ReactMarkdown>
-                  </div>
-                );
-              }
-              if (block.type === "chart" && block.chart) {
-                return (
-                  <ChatPlotlyChart
-                    key={i}
-                    data={block.chart.data as Record<string, unknown>[]}
-                    layout={block.chart.layout as Record<string, unknown>}
-                  />
-                );
-              }
-              return null;
-            })}
-          </>
-        ) : (
-          <div className="prose prose-sm max-w-none text-xs mt-0.5">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {message.content
-                .replace(/\*\*\[Good\]\*\*\s*/, "")
-                .replace(/\*\*\[Warning\]\*\*\s*/, "")
-                .replace(/\*\*\[Bad\]\*\*\s*/, "")}
-            </ReactMarkdown>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Suggested questions
-// ---------------------------------------------------------------------------
-
-const MINI_SUGGESTED_QUESTIONS = [
-  "How should I interpret this result?",
-  "Is this value within expected range?",
-  "What should I try next?",
-];
-
-// ---------------------------------------------------------------------------
 // Size constants
 // ---------------------------------------------------------------------------
 
-const WINDOW_WIDTH = 360;
-const WINDOW_HEIGHT = 460;
+const WINDOW_WIDTH = 400;
+const WINDOW_HEIGHT = 560;
 const MARGIN = 16;
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
+/**
+ * Floating chat above modals, opened by "Ask AI" in result modals where the
+ * docked sidebar would sit behind the overlay. Shows the same active chat as
+ * the sidebar, so expanding it keeps a streaming answer going.
+ */
 export function MiniChatWindow() {
-  const {
-    miniChat,
-    closeMiniChat,
-    activeSessionId,
-    activeSession,
-    openAnalysisChat,
-    getSessionMessages,
-    setSessionMessages,
-  } = useAnalysisChatContext();
-
+  const { miniChat, closeMiniChat, openSidebar, openMiniChatForSession } = useAnalysisChatContext();
+  const { createNewSession, activeSession, activeSessionId, runs } = useCopilotChatSessionContext();
+  const router = useRouter();
+  const pathname = usePathname();
   const [minimized, setMinimized] = useState(false);
-  const [input, setInput] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Default position: bottom-right
-  const defaultPos = useMemo(
+  // Leaving /chat mid-answer: follow the streaming chat in this window.
+  // Arriving on /chat: the page shows it, so the window gets out of the way.
+  const previousPath = useRef<string | null>(null);
+  useEffect(() => {
+    const from = previousPath.current;
+    previousPath.current = pathname;
+    if (from === pathname) return;
+    if (pathname === CHAT_PAGE_PATH) {
+      if (miniChat.isOpen) closeMiniChat();
+      return;
+    }
+    const follow = sessionToFollow(from, pathname, activeSessionId, Object.keys(runs));
+    if (follow) openMiniChatForSession(follow);
+    // Only path changes should trigger this; the other values are read as they are then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // Default position: bottom-right, shrunk to fit small viewports.
+  const size = useMemo(
     () => ({
-      x: typeof window !== "undefined" ? window.innerWidth - WINDOW_WIDTH - MARGIN : 0,
-      y: typeof window !== "undefined" ? window.innerHeight - WINDOW_HEIGHT - MARGIN : 0,
+      width:
+        typeof window !== "undefined"
+          ? Math.min(WINDOW_WIDTH, window.innerWidth - 2 * MARGIN)
+          : WINDOW_WIDTH,
+      height:
+        typeof window !== "undefined"
+          ? Math.min(WINDOW_HEIGHT, window.innerHeight - 2 * MARGIN)
+          : WINDOW_HEIGHT,
     }),
     [],
+  );
+  const defaultPos = useMemo(
+    () => ({
+      x: typeof window !== "undefined" ? window.innerWidth - size.width - MARGIN : 0,
+      y: typeof window !== "undefined" ? window.innerHeight - size.height - MARGIN : 0,
+    }),
+    [size],
   );
 
   const { position, resetPosition, dragHandlers } = useDrag(defaultPos);
@@ -238,222 +157,73 @@ export function MiniChatWindow() {
     }
   }, [miniChat.isOpen, resetPosition]);
 
-  const effectiveContext = activeSession?.context ?? miniChat.context;
-
-  const initialMessages = useMemo(
-    () => (effectiveContext ? getSessionMessages(effectiveContext) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeSessionId],
-  );
-  const { data: copilotConfigResponse } = useGetCopilotConfig();
-  const modelOptions = useMemo(
-    () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
-    [copilotConfigResponse?.data],
-  );
-  const selectedModel = resolveAnalysisModelOption(modelOptions, getStoredAnalysisModelKey());
-  const modelOverride = effectiveContext ? selectedModel.model : null;
-  const effectiveModelName =
-    selectedModel.model?.name ?? selectedModel.label.replace(/^Configured:\s*/, "");
-
-  const { messages, isLoading, statusMessage, sendMessage } = useAnalysisChat(
-    effectiveContext ?? null,
-    {
-      initialMessages,
-      modelOverride,
-      onMessagesChange: (msgs) => {
-        if (!activeSessionId || !effectiveContext) return;
-        setSessionMessages(effectiveContext, msgs);
-      },
-    },
-  );
-
-  // Auto-scroll
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, statusMessage]);
-
-  // Focus input when opened
-  useEffect(() => {
-    if (miniChat.isOpen && !minimized) {
-      inputRef.current?.focus();
-    }
-  }, [miniChat.isOpen, minimized]);
-
   if (!miniChat.isOpen) return null;
 
-  const handleSend = () => {
-    const trimmed = input.trim();
-    if (!trimmed || isLoading) return;
-    setInput("");
-    sendMessage(trimmed);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.nativeEvent.isComposing) return;
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   const handleExpand = () => {
-    if (effectiveContext) {
-      openAnalysisChat(effectiveContext);
-    }
     closeMiniChat();
+    if (pathname === "/chat") return;
+    openSidebar();
+  };
+
+  const openFullPage = () => {
+    closeMiniChat();
+    router.push("/chat");
   };
 
   return (
     <div
-      className="fixed z-[1100] flex flex-col bg-base-100 border border-base-300 rounded-xl shadow-2xl"
+      className="fixed z-[1100] flex flex-col bg-base-100 border border-base-300 rounded-2xl shadow-2xl overflow-hidden"
       style={{
         left: position.x,
         top: position.y,
-        width: minimized ? 220 : WINDOW_WIDTH,
-        height: minimized ? "auto" : WINDOW_HEIGHT,
+        width: minimized ? 260 : size.width,
+        height: minimized ? "auto" : size.height,
       }}
+      role="dialog"
+      aria-label="AI chat"
     >
       {/* Draggable header */}
       <div
         {...dragHandlers}
-        className="flex items-center justify-between px-3 py-2 border-b border-base-300 bg-base-200/50 rounded-t-xl select-none touch-none"
+        className="flex items-start gap-1.5 px-2.5 py-2 border-b border-base-300/70 bg-base-200/40 select-none touch-none"
         style={{ cursor: "grab" }}
       >
-        <div className="flex items-center gap-1.5 min-w-0">
-          <GripHorizontal className="w-3.5 h-3.5 text-base-content/30 flex-shrink-0" />
-          <Bot className="w-4 h-4 text-primary flex-shrink-0" />
-          <span className="text-xs font-bold truncate">
-            {effectiveContext
-              ? `${effectiveContext.taskName} / ${effectiveContext.qid} / ${effectiveModelName}`
-              : "AI Chat"}
+        <GripHorizontal className="w-3.5 h-3.5 mt-1 text-base-content/30 flex-shrink-0" />
+        {minimized ? (
+          <span className="flex-1 min-w-0 truncate text-sm font-semibold">
+            {activeSession?.title ?? "Ask AI"}
           </span>
-        </div>
-        <div className="flex items-center gap-0.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => setMinimized((prev) => !prev)}
-                className="btn btn-ghost btn-xs btn-square"
-                aria-label={minimized ? "Expand chat" : "Minimize chat"}
+        ) : (
+          <SurfaceTitle />
+        )}
+        <div className="flex items-center gap-0.5 shrink-0">
+          {!minimized && (
+            <>
+              <SurfaceButton
+                label="New chat"
+                onClick={() => createNewSession(activeSession?.context ?? null)}
               >
-                <Minus className="w-3 h-3" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {minimized ? "Expand chat" : "Minimize chat"}
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={handleExpand}
-                className="btn btn-ghost btn-xs btn-square"
-                aria-label="Open chat in sidebar"
-              >
-                <Maximize2 className="w-3 h-3" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Open in sidebar</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={closeMiniChat}
-                className="btn btn-ghost btn-xs btn-square"
-                aria-label="Close chat"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Close chat</TooltipContent>
-          </Tooltip>
+                <SquarePen className="w-3.5 h-3.5" />
+              </SurfaceButton>
+              <RecentChatsMenu onOpenAll={openFullPage} />
+            </>
+          )}
+          <SurfaceButton
+            label={minimized ? "Expand chat" : "Minimize chat"}
+            onClick={() => setMinimized((prev) => !prev)}
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </SurfaceButton>
+          <SurfaceButton label="Open in sidebar" onClick={handleExpand}>
+            <PanelRight className="w-3.5 h-3.5" />
+          </SurfaceButton>
+          <SurfaceButton label="Close chat" onClick={closeMiniChat}>
+            <X className="w-3.5 h-3.5" />
+          </SurfaceButton>
         </div>
       </div>
 
-      {/* Body (hidden when minimized) */}
-      {!minimized && (
-        <>
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
-            {messages.length === 0 ? (
-              <div className="text-center py-4">
-                <Bot className="w-6 h-6 mx-auto text-primary/30 mb-2" />
-                <p className="text-xs text-base-content/60 mb-3">
-                  Ask about this calibration result
-                </p>
-                <div className="flex flex-col gap-1.5">
-                  {MINI_SUGGESTED_QUESTIONS.map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => {
-                        if (!isLoading) sendMessage(q);
-                      }}
-                      className="btn btn-outline btn-xs text-left justify-start text-[11px]"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              messages.map((msg, idx) => <MiniMessageBubble key={idx} message={msg} />)
-            )}
-
-            {isLoading && (
-              <div className="flex gap-1.5">
-                <div className="w-5 h-5 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0 animate-pulse">
-                  <Bot className="w-3 h-3 text-primary" />
-                </div>
-                <div className="flex items-center gap-1 py-1">
-                  {statusMessage ? (
-                    <span className="text-[10px] text-base-content/60">{statusMessage}</span>
-                  ) : (
-                    <>
-                      <span
-                        className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce"
-                        style={{ animationDelay: "0ms" }}
-                      />
-                      <span
-                        className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce"
-                        style={{ animationDelay: "150ms" }}
-                      />
-                      <span
-                        className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce"
-                        style={{ animationDelay: "300ms" }}
-                      />
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          <div className="flex items-end gap-1.5 p-2 border-t border-base-300">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask about this result..."
-              rows={1}
-              className="textarea textarea-bordered flex-1 min-h-[32px] max-h-20 resize-none text-xs py-1.5 leading-tight"
-              disabled={isLoading}
-            />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading}
-              className="btn btn-primary btn-xs h-8 w-8 rounded-lg"
-            >
-              <Send className="w-3 h-3" />
-            </button>
-          </div>
-        </>
-      )}
+      {!minimized && <ChatThread variant="compact" />}
     </div>
   );
 }

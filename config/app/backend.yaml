@@ -45,12 +45,14 @@ backends:
         - CheckDRAGHPIPulse
         - CreateDRAGPIPulse
         - CheckDRAGPIPulse
+        - CheckEFChevron
         - ReadoutClassification
         - RandomizedBenchmarking
         - X90InterleavedRandomizedBenchmarking
         - X180InterleavedRandomizedBenchmarking
 
       Two Qubit:
+        - CheckJAZZ
         - CheckCrossResonance
         - CreateZX90
         - CheckZX90

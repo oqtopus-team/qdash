@@ -121,7 +121,9 @@ class CheckRabi(QubexTask):
     task_type: str = "qubit"
     r2_threshold: float = DEFAULT_RABI_R2_THRESHOLD
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
-        "qubit_frequency": InputParameterSpec.required_database(),
+        "control_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("qubit_frequency",)
+        ),
         "control_amplitude": InputParameterSpec.database_or_default(
             default=DEFAULT_CONTROL_AMPLITUDE,
             greater_than=CONTROL_AMPLITUDE_MIN,
@@ -129,7 +131,9 @@ class CheckRabi(QubexTask):
             unit="a.u.",
             description="Control pulse amplitude",
         ),
-        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
         "readout_amplitude": InputParameterSpec.database_or_default(
             default=DEFAULT_READOUT_AMPLITUDE,
             unit="a.u.",
@@ -234,10 +238,10 @@ class CheckRabi(QubexTask):
         label = self.get_qubit_label(backend, qid)
 
         control_amplitude_param = self.input_parameters["control_amplitude"]
-        qubit_frequency_param = self.input_parameters["qubit_frequency"]
+        control_frequency_param = self.input_parameters["control_frequency"]
         readout_amplitude_param = self.input_parameters["readout_amplitude"]
         assert control_amplitude_param is not None
-        assert qubit_frequency_param is not None
+        assert control_frequency_param is not None
         assert readout_amplitude_param is not None
 
         # Get readout_amplitude from input_parameters (loaded from DB)
@@ -247,13 +251,13 @@ class CheckRabi(QubexTask):
         print(
             f"[run] CheckRabi params for {label}: "
             f"control_amplitude={control_amplitude_param.value}, "
-            f"qubit_frequency={qubit_frequency_param.value}, "
+            f"control_frequency={control_frequency_param.value}, "
             f"readout_amplitude={readout_amp}"
         )
 
         result = exp.obtain_rabi_params(
             amplitudes={label: control_amplitude_param.value},
-            frequencies={label: qubit_frequency_param.value},
+            frequencies={label: control_frequency_param.value},
             time_range=self.run_parameters["time_range"].get_value(),
             n_shots=self.run_parameters["shots"].get_value(),
             shot_interval=self.run_parameters["interval"].get_value(),

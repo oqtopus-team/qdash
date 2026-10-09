@@ -22,3 +22,8 @@ logs/
 calib_data/
 mongo_data/
 postgres_data/
+# Qubex config checkout: mounted at runtime, never copied into an image, and
+# containers write files there that the building user may not be able to read.
+config/qubex-config/
+# Local pi extension checkouts (see compose.extensions.yaml).
+agent-runtime/extensions/

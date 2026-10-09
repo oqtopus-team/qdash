@@ -1,11 +1,16 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { Bot } from "lucide-react";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
-import { AnalysisChatPanel } from "@/components/features/metrics/AnalysisChatPanel";
+import { DockedChatPanel } from "@/components/features/chat/DockedChatPanel";
 
 export function AnalysisSidebar() {
-  const { isOpen, activeSession, openGeneralChat, closeAnalysisChat } = useAnalysisChatContext();
+  const { isOpen, openGeneralChat, closeAnalysisChat } = useAnalysisChatContext();
+  const pathname = usePathname();
+
+  // The /chat page is the same chat at full size; a second copy beside it is noise.
+  if (pathname === "/chat") return null;
 
   return (
     <>
@@ -43,7 +48,7 @@ export function AnalysisSidebar() {
       >
         {isOpen && (
           <div className="h-full w-screen max-w-full lg:w-[28rem] xl:w-[32rem]">
-            <AnalysisChatPanel context={activeSession?.context ?? null} />
+            <DockedChatPanel onClose={closeAnalysisChat} />
           </div>
         )}
       </div>

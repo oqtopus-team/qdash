@@ -16,10 +16,6 @@ QDash uses Next.js App Router with route groups for organization:
 src/app/
 ├── (auth)/                     # Protected routes
 │   ├── admin/page.tsx          # /admin
-│   ├── ai-reviews/
-│   │   ├── page.tsx            # /ai-reviews
-│   │   └── [reviewRunId]/
-│   │       └── page.tsx        # /ai-reviews/:reviewRunId
 │   ├── analysis/page.tsx       # /analysis
 │   ├── chat/page.tsx           # /chat
 │   ├── chip/page.tsx           # /chip
@@ -110,7 +106,6 @@ components/
 │
 ├── features/               # Feature-specific components
 │   ├── admin/              # Admin page components
-│   ├── ai-reviews/         # AI review list/detail components
 │   ├── analysis/           # Analysis page components
 │   ├── chat/               # Copilot chat components
 │   ├── chip/               # Chip page components

@@ -5,10 +5,12 @@ Defines the structured context sent to the LLM and the expected response format.
 
 from __future__ import annotations
 
+import base64
+import binascii
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 if TYPE_CHECKING:
     from qdash.copilot.config import ModelConfig
@@ -133,7 +135,60 @@ class BlocksAnalysisResponse(BaseModel):
 BlocksResponse = BlocksAnalysisResponse
 
 
-class AnalyzeRequest(BaseModel):
+class ApprovalDecision(BaseModel):
+    """The user's decision on a write operation the assistant asked approval for."""
+
+    id: str = Field(description="Tool call id from the approval card")
+    approve: bool
+
+
+class ChatImageAttachment(BaseModel):
+    """One figure the user attached to a chat message."""
+
+    data: str = Field(
+        description="Base64 image bytes without a data: prefix",
+        min_length=1,
+        # 6 MB of base64: the UI downscales to 1600 px, so real plots are far smaller.
+        max_length=6 * 1024 * 1024,
+    )
+    mime_type: Literal["image/png", "image/jpeg"] = Field(alias="mimeType")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="after")
+    def validate_image_data(self) -> ChatImageAttachment:
+        """Reject invalid base64 and bytes that do not match the declared image format."""
+        try:
+            decoded = base64.b64decode(self.data, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError("Image data must be valid base64") from exc
+        signature = b"\x89PNG\r\n\x1a\n" if self.mime_type == "image/png" else b"\xff\xd8\xff"
+        if not decoded.startswith(signature):
+            raise ValueError("Image bytes do not match the declared PNG or JPEG format")
+        return self
+
+
+class ImageAttachmentsRequest(BaseModel):
+    """Shared attachment validation for chat and analysis turns."""
+
+    images: list[ChatImageAttachment] = Field(
+        default_factory=list,
+        max_length=4,
+        description="Figures attached to this turn (at most 12 MiB of base64 in total).",
+    )
+
+    @field_validator("images")
+    @classmethod
+    def validate_total_image_size(
+        cls, images: list[ChatImageAttachment]
+    ) -> list[ChatImageAttachment]:
+        """Leave room for context below the runtime's default 20 MiB body limit."""
+        if sum(len(image.data) for image in images) > 12 * 1024 * 1024:
+            raise ValueError("Attached images exceed 12 MiB in total; use fewer or smaller images")
+        return images
+
+
+class AnalyzeRequest(ImageAttachmentsRequest):
     """Request body for POST /copilot/analyze."""
 
     task_name: str = Field(description="Task class name (e.g. CheckT1)")
@@ -142,6 +197,17 @@ class AnalyzeRequest(BaseModel):
     execution_id: str
     task_id: str
     message: str = Field(description="User question / message")
+    session_id: str | None = Field(
+        default=None,
+        description=(
+            "Analysis session identifier. Required by the Pi backend, which "
+            "restores conversation state from the persisted session."
+        ),
+    )
+    request_id: str | None = Field(
+        default=None,
+        description="Idempotency key for recovering or retrying one Pi submission.",
+    )
     image_base64: str | None = Field(
         default=None,
         description="Base64-encoded result figure (for multimodal analysis)",
@@ -158,12 +224,39 @@ class AnalyzeRequest(BaseModel):
             "When unset, the configured analysis_model/model selection is used."
         ),
     )
+    approval: ApprovalDecision | None = Field(
+        default=None,
+        description="Decision on the write operation the previous turn asked approval for.",
+    )
 
 
-class ChatRequest(BaseModel):
+class ChatStopRequest(BaseModel):
+    """Request body for POST /copilot/chat/stop."""
+
+    session_id: str = Field(description="Chat session whose running turn should stop")
+
+
+class ChatStopResponse(BaseModel):
+    """Whether a running turn was stopped."""
+
+    stopped: bool
+
+
+class ChatRequest(ImageAttachmentsRequest):
     """Request body for POST /copilot/chat/stream."""
 
     message: str = Field(description="User question / message")
+    session_id: str | None = Field(
+        default=None,
+        description=(
+            "Chat session identifier. Required by the Pi chat backend, which "
+            "restores conversation state from the persisted session."
+        ),
+    )
+    request_id: str | None = Field(
+        default=None,
+        description="Idempotency key for recovering or retrying one Pi submission.",
+    )
     chip_id: str | None = None
     qid: str | None = None
     conversation_history: list[dict[str, str]] = Field(
@@ -179,6 +272,16 @@ class ChatRequest(BaseModel):
             "When unset, the configured chat_models[0]/model selection is used."
         ),
     )
+    approval: ApprovalDecision | None = Field(
+        default=None,
+        description="Decision on the write operation the previous turn asked approval for.",
+    )
+
+
+class SandboxPythonRequest(BaseModel):
+    """Request body for POST /copilot/sandbox/python."""
+
+    code: str = Field(description="Python source to run in the sandbox")
 
 
 def _rebuild_models() -> None:

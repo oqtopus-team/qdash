@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { TaskResultOutputParametersAnyOfAnyOfCalibratedAt } from './taskResultOutputParametersAnyOfAnyOfCalibratedAt';
+import type { TaskResultOutputParametersAnyOfAnyOfDatabaseUpdatesItem } from './taskResultOutputParametersAnyOfAnyOfDatabaseUpdatesItem';
 import type { TaskResultOutputParametersAnyOfAnyOfSource } from './taskResultOutputParametersAnyOfAnyOfSource';
 
 /**
@@ -26,5 +27,6 @@ export type TaskResultOutputParametersAnyOfAnyOf = {
   task_id?: string;
   previous_database_value?: unknown;
   database_updated?: boolean;
+  database_updates?: TaskResultOutputParametersAnyOfAnyOfDatabaseUpdatesItem[];
   [key: string]: unknown;
  };

@@ -46,9 +46,8 @@ class AnalysisContextBuilder:
         task_id: str,
         image_base64: str | None,
         config: CopilotConfig,
-        use_review_knowledge: bool = False,
     ) -> AnalysisContextResult:
-        """Build the full analysis context consumed by Copilot review flows."""
+        """Build the full analysis context consumed by Copilot analysis flows."""
         from qdash.copilot.contracts import (
             AnalysisContextResult,
             TaskAnalysisContext,
@@ -56,11 +55,7 @@ class AnalysisContextBuilder:
         from qdash.datamodel.task_knowledge import get_task_knowledge
 
         knowledge = get_task_knowledge(task_name)
-        knowledge_prompt = self._build_task_knowledge_prompt(
-            task_name,
-            knowledge,
-            use_review_knowledge=use_review_knowledge,
-        )
+        knowledge_prompt = self._build_task_knowledge_prompt(task_name, knowledge)
         qubit_params = self._load_qubit_params(chip_id, qid)
         task_result = self._load_task_result(task_id)
         input_params, output_params, run_params, figure_paths = self._extract_task_result_payload(
@@ -80,7 +75,6 @@ class AnalysisContextBuilder:
             figure_paths=figure_paths,
             image_base64=image_base64,
             config=config,
-            use_review_knowledge=use_review_knowledge,
         )
 
         context = TaskAnalysisContext(
@@ -104,18 +98,11 @@ class AnalysisContextBuilder:
         )
 
     @staticmethod
-    def _build_task_knowledge_prompt(
-        task_name: str,
-        knowledge: Any,
-        *,
-        use_review_knowledge: bool,
-    ) -> str:
+    def _build_task_knowledge_prompt(task_name: str, knowledge: Any) -> str:
         """Build the prompt prefix from task knowledge or fall back to the task name."""
         if not knowledge:
             return f"Task: {task_name}"
-        if use_review_knowledge:
-            return knowledge.to_review_prompt()
-        return knowledge.to_prompt()
+        return str(knowledge.to_prompt())
 
     @staticmethod
     def _extract_task_result_payload(
@@ -168,7 +155,6 @@ class AnalysisContextBuilder:
         figure_paths: list[str],
         image_base64: str | None,
         config: CopilotConfig,
-        use_review_knowledge: bool,
     ) -> tuple[str | None, list[tuple[str, str]], list[tuple[str, str]]]:
         """Resolve experiment and expected images for multimodal analysis."""
         expected_images: list[tuple[str, str]] = []
@@ -180,10 +166,13 @@ class AnalysisContextBuilder:
             experiment_images = self._load_figures_as_base64(figure_paths)
         if not image_base64:
             image_base64 = self._load_figure_as_base64(figure_paths)
+        # Case images illustrate past outcomes for the Ask AI sidebar; the
+        # task-knowledge review guide images were only used by the retired
+        # automatic review and are left out of the analysis context.
         expected_images = self._collect_expected_images(
             knowledge,
             config.analysis.max_expected_images,
-            include_case_images=not use_review_knowledge,
-            include_review_images=use_review_knowledge,
+            include_case_images=True,
+            include_review_images=False,
         )
         return image_base64, expected_images, experiment_images

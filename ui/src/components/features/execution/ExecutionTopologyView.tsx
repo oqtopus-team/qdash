@@ -389,7 +389,6 @@ export function ExecutionTopologyView({
         gridTemplateColumns: `repeat(${gridCols}, minmax(${baseCellSize}px, 1fr))`,
         gridTemplateRows: `repeat(${gridRows}, minmax(${baseCellSize}px, 1fr))`,
         width: calculateGridContainerWidth(gridCols, baseCellSize, isMobile, viewportHeight),
-        willChange: "transform",
       }}
     >
       {Array.from({ length: gridRows * gridCols }).map((_, index) => {

@@ -83,7 +83,7 @@ def test_load_copilot_merges_chat_and_review_yaml(monkeypatch, tmp_path):
     )
     _write_yaml(
         tmp_path / "copilot" / "review.yaml",
-        "analysis:\n  ai_review_tasks:\n    - CheckQubitSpectroscopy\n",
+        "analysis:\n  max_expected_images: 2\n",
     )
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
     ConfigLoader.clear_cache()
@@ -91,7 +91,7 @@ def test_load_copilot_merges_chat_and_review_yaml(monkeypatch, tmp_path):
     assert ConfigLoader.load_copilot() == {
         "enabled": True,
         "chat_models": [{"provider": "openai", "name": "gpt-5.4"}],
-        "analysis": {"ai_review_tasks": ["CheckQubitSpectroscopy"]},
+        "analysis": {"max_expected_images": 2},
     }
 
     ConfigLoader.clear_cache()

@@ -65,8 +65,7 @@ task, status, or target you want to investigate.
 ## Files and Artifacts
 
 Workflow definitions and project configuration are managed from **Files**. The editor tracks
-unsaved changes and provides project Git operations. Save before requesting an AI review or
-creating a pull request. Pulling can replace the working copy, so resolve or discard unsaved edits
+unsaved changes and provides project Git operations. Save before creating a pull request. Pulling can replace the working copy, so resolve or discard unsaved edits
 first.
 
 Execution figures and raw data are stored under the configured calibration data path and remain

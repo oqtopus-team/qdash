@@ -9,7 +9,7 @@ export interface ModelOverride {
   reasoning_effort?: string | null;
 }
 
-interface ModelOption {
+export interface ModelOption {
   key: string;
   label: string;
   model: ModelOverride | null;

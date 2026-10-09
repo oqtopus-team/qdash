@@ -5,14 +5,23 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { AnalyzeRequestApproval } from './analyzeRequestApproval';
 import type { AnalyzeRequestConversationHistoryItem } from './analyzeRequestConversationHistoryItem';
 import type { AnalyzeRequestImageBase64 } from './analyzeRequestImageBase64';
 import type { AnalyzeRequestModelOverride } from './analyzeRequestModelOverride';
+import type { AnalyzeRequestRequestId } from './analyzeRequestRequestId';
+import type { AnalyzeRequestSessionId } from './analyzeRequestSessionId';
+import type { ChatImageAttachment } from './chatImageAttachment';
 
 /**
  * Request body for POST /copilot/analyze.
  */
 export interface AnalyzeRequest {
+  /**
+     * Figures attached to this turn (at most 12 MiB of base64 in total).
+     * @maxItems 4
+     */
+  images?: ChatImageAttachment[];
   /** Task class name (e.g. CheckT1) */
   task_name: string;
   chip_id: string;
@@ -21,10 +30,16 @@ export interface AnalyzeRequest {
   task_id: string;
   /** User question / message */
   message: string;
+  /** Analysis session identifier. Required by the Pi backend, which restores conversation state from the persisted session. */
+  session_id?: AnalyzeRequestSessionId;
+  /** Idempotency key for recovering or retrying one Pi submission. */
+  request_id?: AnalyzeRequestRequestId;
   /** Base64-encoded result figure (for multimodal analysis) */
   image_base64?: AnalyzeRequestImageBase64;
   /** Previous conversation messages [{role, content}, ...] */
   conversation_history?: AnalyzeRequestConversationHistoryItem[];
   /** Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used. */
   model_override?: AnalyzeRequestModelOverride;
+  /** Decision on the write operation the previous turn asked approval for. */
+  approval?: AnalyzeRequestApproval;
 }

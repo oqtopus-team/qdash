@@ -14,6 +14,9 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response, StreamingResponse
+from fastapi.security import (
+    HTTPAuthorizationCredentials,  # noqa: TC002 - FastAPI resolves annotations
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -23,7 +26,8 @@ from qdash.api.dependencies import (
     get_copilot_runtime,
 )
 from qdash.api.lib.ai_labels import STATUS_LABELS, TOOL_LABELS
-from qdash.api.lib.auth import get_current_active_user
+from qdash.api.lib.auth import bearer_scheme, get_current_active_user
+from qdash.api.lib.project import get_project_id_from_header
 from qdash.api.lib.sse import SSETaskBridge, sse_event
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.copilot_chat_session import (
@@ -32,15 +36,25 @@ from qdash.api.schemas.copilot_chat_session import (
     ListCopilotChatSessionsResponse,
     UpdateCopilotChatSessionRequest,
 )
+from qdash.api.services import pi_analysis_service, pi_chat_service
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
-from qdash.copilot.config import CopilotConfig, ModelConfig, load_copilot_config
+from qdash.copilot.config import (
+    CopilotConfig,
+    ModelConfig,
+    load_copilot_config,
+    select_analysis_model,
+)
 from qdash.copilot.contracts import (
     AnalysisResponse,
     AnalyzeRequest,
     ChatRequest,
+    ChatStopRequest,
+    ChatStopResponse,
+    SandboxPythonRequest,
 )
+from qdash.copilot.prompts.analysis import build_language_instruction
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
@@ -193,7 +207,10 @@ async def analyze_task_result(
 @router.post("/analyze/stream", include_in_schema=False)
 async def analyze_task_result_stream(
     request: AnalyzeRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
     copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
 ) -> StreamingResponse:
     """SSE streaming version of analyze_task_result.
 
@@ -237,8 +254,38 @@ async def analyze_task_result_stream(
             yield sse_event("status", {"step": "load_images", "message": img_msg})
             await asyncio.sleep(0)
 
+        images_sent = CopilotRuntime.build_images_sent_metadata(
+            ctx.image_base64,
+            ctx.figure_paths,
+            ctx.expected_images,
+            request.task_name,
+            ctx.experiment_images,
+        )
+
         # Run analysis with tool progress streaming
         yield sse_event("status", {"step": "run_analysis", "message": "AIが分析中..."})
+
+        if config.copilot_backend == "pi":
+            # The Pi runtime owns the model selection, so the analysis model has
+            # to be resolved into `config.model` before the payload is built.
+            pi_config = analysis_config.model_copy(
+                update={"model": select_analysis_model(analysis_config)}
+            )
+            async for event in pi_analysis_service.stream(
+                request,
+                pi_config,
+                ctx,
+                username=current_user.username,
+                auth=pi_chat_service.QDashAuth(
+                    access_token=credentials.credentials,
+                    project_id=project_id or current_user.default_project_id,
+                ),
+                language_instruction=build_language_instruction(pi_config),
+                images_sent=images_sent,
+            ):
+                yield event
+            return
+
         tool_executors = copilot_runtime.build_tool_executors()
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
@@ -277,14 +324,7 @@ async def analyze_task_result_stream(
             yield sse_event("error", {"step": "run_analysis", "detail": f"Analysis failed: {e}"})
             return
 
-        # Inject images_sent metadata
-        result["images_sent"] = CopilotRuntime.build_images_sent_metadata(
-            ctx.image_base64,
-            ctx.figure_paths,
-            ctx.expected_images,
-            request.task_name,
-            ctx.experiment_images,
-        )
+        result["images_sent"] = images_sent
 
         # Complete
         yield sse_event("status", {"step": "complete", "message": "分析完了"})
@@ -297,10 +337,46 @@ async def analyze_task_result_stream(
     )
 
 
+@router.post("/sandbox/python", include_in_schema=False)
+async def run_sandboxed_python(
+    request: SandboxPythonRequest,
+    _current_user: Annotated[User, Depends(get_current_active_user)],
+) -> dict[str, Any]:
+    """Run analysis code in the Copilot Python sandbox.
+
+    Exposes the same sandbox the LiteLLM agent uses as ``execute_python_analysis``
+    so the Pi Agent Runtime can offer Python without running code itself.
+    """
+    from qdash.copilot.tooling import execute_python_analysis
+
+    result = await execute_python_analysis(request.code)
+    return dict(result)
+
+
+@router.post("/chat/stop", include_in_schema=False)
+async def chat_stop(
+    request: ChatStopRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> ChatStopResponse:
+    """Stop the turn running for a chat session.
+
+    Only the Pi backend runs turns that outlive the stream; for the other
+    backend closing the stream is the cancellation, so this reports False.
+    """
+    config = load_copilot_config()
+    if config.copilot_backend != "pi":
+        return ChatStopResponse(stopped=False)
+    stopped = await pi_chat_service.abort_runtime_turn(current_user.username, request.session_id)
+    return ChatStopResponse(stopped=stopped)
+
+
 @router.post("/chat/stream", include_in_schema=False)
 async def chat_stream(
     request: ChatRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
     copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
 ) -> StreamingResponse:
     """SSE streaming generic chat endpoint.
 
@@ -313,6 +389,19 @@ async def chat_stream(
             yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
             return
         chat_config = _config_with_chat_model(config, request)
+
+        if config.copilot_backend == "pi":
+            async for event in pi_chat_service.stream(
+                request,
+                chat_config,
+                username=current_user.username,
+                auth=pi_chat_service.QDashAuth(
+                    access_token=credentials.credentials,
+                    project_id=project_id or current_user.default_project_id,
+                ),
+            ):
+                yield event
+            return
 
         # Load config and resolve default chip_id
         yield sse_event("status", {"step": "load_config", "message": "設定を読み込み中..."})
@@ -456,11 +545,12 @@ def update_copilot_chat_session(
     operation_id="deleteCopilotChatSession",
     response_model=dict[str, bool],
 )
-def delete_copilot_chat_session(
+async def delete_copilot_chat_session(
     session_id: str,
     current_user: Annotated[User, Depends(get_current_active_user)],
     service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
 ) -> dict[str, bool]:
     """Delete a chat session owned by the current user."""
     service.delete_session(username=current_user.username, session_id=session_id)
+    await pi_chat_service.delete_runtime_session_state(current_user.username, session_id)
     return {"deleted": True}

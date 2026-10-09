@@ -602,6 +602,103 @@ class FlowService:
             ),
         )
 
+    async def execute_calibration_pipeline(
+        self,
+        *,
+        spec: dict[str, Any],
+        chip_id: str,
+        username: str,
+        project_id: str,
+        backend_name: str | None = None,
+        flow_name: str | None = None,
+        tags: list[str] | None = None,
+    ) -> ExecuteFlowResponse:
+        """Run a validated pipeline spec through the system calibration-pipeline deployment.
+
+        The caller (``CalibrationPipelineService``) has already validated the
+        spec; this only claims the execution lock, creates the Prefect run, and
+        pre-creates the execution row, exactly as a saved flow would.
+        """
+        settings = get_settings()
+        deployment_name = "calibration-pipeline/system-calibration-pipeline"
+
+        try:
+            async with get_client() as client:
+                deployment = await client.read_deployment_by_name(deployment_name)
+        except Exception:
+            logger.error(f"System deployment '{deployment_name}' not found")
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Calibration pipeline deployment not available."
+                    " The worker may not have started yet."
+                ),
+            )
+
+        name = flow_name or str(spec.get("name") or "pipeline")
+        all_tags = sorted({*(tags or []), *(spec.get("tags") or []), "pipeline"})
+        parameters: dict[str, Any] = {
+            "username": username,
+            "chip_id": chip_id,
+            "spec": spec,
+            "project_id": project_id,
+            "flow_name": name,
+            "tags": all_tags,
+            "backend_name": backend_name,
+        }
+        logger.info(
+            f"Executing calibration pipeline '{name}' on chip {chip_id} "
+            f"(deployment={deployment.id}, steps={len(spec.get('steps') or [])})"
+        )
+
+        claimed_execution_id = self._claim_execution_lock(
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            parameters=parameters,
+            workflow=True,
+        )
+
+        try:
+            async with get_client() as client:
+                flow_run = await client.create_flow_run_from_deployment(
+                    deployment_id=deployment.id,
+                    parameters=parameters,
+                )
+                flow_run_id = str(flow_run.id)
+                flow_run_url = (
+                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
+                )
+                logger.info(f"Pipeline flow run created: {flow_run_id}")
+        except Exception as e:
+            self._release_execution_lock(project_id, claimed_execution_id)
+            logger.error(f"Failed to execute calibration pipeline: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to execute calibration pipeline: {e}",
+            )
+
+        qdash_execution_id = self._create_scheduled_execution(
+            project_id=project_id,
+            username=username,
+            chip_id=chip_id,
+            name=name,
+            flow_run_id=flow_run_id,
+            execution_id=claimed_execution_id,
+            tags=all_tags,
+        )
+        if qdash_execution_id is None:
+            self._release_execution_lock(project_id, claimed_execution_id)
+        qdash_ui_url = self._build_qdash_ui_url(settings.ui_port, chip_id, qdash_execution_id)
+
+        return ExecuteFlowResponse(
+            execution_id=qdash_execution_id or flow_run_id,
+            flow_run_id=flow_run_id,
+            flow_run_url=flow_run_url,
+            qdash_ui_url=qdash_ui_url,
+            message=f"Calibration pipeline '{name}' started",
+        )
+
     async def execute_agent_candidate_apply(
         self,
         *,

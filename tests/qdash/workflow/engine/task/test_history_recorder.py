@@ -1,6 +1,6 @@
 """Tests for TaskHistoryRecorder."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -73,35 +73,6 @@ class TestTaskHistoryRecorder:
         mock_repos["task_result_history"].save.assert_called_once_with(
             sample_task, sample_execution_model
         )
-
-    @patch("qdash.workflow.engine.task.ai_review.enqueue_ai_review_note")
-    def test_record_task_result_attaches_ai_review_note(
-        self,
-        mock_ai_review: MagicMock,
-        recorder,
-        sample_task,
-        sample_execution_model,
-    ):
-        """Test record_task_result triggers best-effort AI review attachment."""
-        recorder.record_task_result(sample_task, sample_execution_model)
-
-        mock_ai_review.assert_called_once_with(sample_task, sample_execution_model)
-
-    @patch("qdash.workflow.engine.task.ai_review.enqueue_ai_review_note")
-    def test_record_task_result_continues_on_ai_review_error(
-        self,
-        mock_ai_review: MagicMock,
-        recorder,
-        mock_repos,
-        sample_task,
-        sample_execution_model,
-    ):
-        """Test AI review failures do not fail task result recording."""
-        mock_ai_review.side_effect = Exception("AI review error")
-
-        recorder.record_task_result(sample_task, sample_execution_model)
-
-        mock_repos["task_result_history"].save.assert_called_once()
 
     def test_record_task_result_raises_on_error(
         self, recorder, mock_repos, sample_task, sample_execution_model
