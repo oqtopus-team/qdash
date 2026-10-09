@@ -1,7 +1,7 @@
 # Reviewing and Sharing Results
 
-QDash connects task results, notes, issues, discussions, knowledge, notifications, and AI reviews
-inside the active project.
+QDash connects task results, notes, issues, discussions, knowledge, and notifications inside the
+active project.
 
 ## Record Result Context
 
@@ -37,16 +37,14 @@ These sources have different roles:
 | Issue | One task result and its discussion | Coordinate diagnosis and follow-up. |
 | Forum | Project-wide topic | Discuss work not anchored to one result. |
 
-## Use AI Reviews
-
-AI review requests analyze the task results selected from chip views. A review run groups the
-request, while its target records contain the individual findings and referenced files. Open **AI
-Reviews** to filter runs by chip or task and drill into a run.
+## Ask Copilot
 
 AI output is supporting evidence, not an automatic calibration decision. Confirm findings against
 the task result, raw artifacts, task knowledge, and current calibration context before changing
-parameters or excluding data. See [Copilot and AI Reviews](./copilot.md) for the chat and review
-workflows.
+parameters or excluding data. See [Copilot](./copilot.md) for the chat and analysis workflows.
+
+AI review notes created before the automatic review feature was retired still show on their task
+results as read-only archived notes.
 
 ## Follow Notifications
 

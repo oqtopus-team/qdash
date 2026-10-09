@@ -1,9 +1,8 @@
 """Bridge between the Copilot analysis SSE endpoint and the Pi Agent Runtime.
 
-Analysis sits between chat and review: it is a continuing conversation with
-tools, like chat, but its first turn carries figures and a pre-built context,
-like review. Only that first turn differs, so this module builds the opening
-message and then hands off to the chat bridge.
+Analysis is a continuing conversation with tools, like chat, but its first
+turn carries figures and a pre-built context. Only that first turn differs, so
+this module builds the opening message and then hands off to the chat bridge.
 """
 
 from __future__ import annotations
@@ -13,7 +12,6 @@ from typing import TYPE_CHECKING, Any
 
 from qdash.api.lib.sse import sse_event
 from qdash.api.services import pi_chat_service
-from qdash.copilot.pi_review import collect_images
 from qdash.copilot.prompts.analysis import build_analysis_system_prompt
 from qdash.copilot.prompts.models import AnalysisPromptOptions
 
@@ -39,6 +37,23 @@ other qubits or other executions, and keep it to a few targeted calls. Do not \
 re-fetch this result, its figures or its task knowledge."""
 
 
+def collect_images(bundle: AnalysisContextResult) -> list[dict[str, str]]:
+    """Flatten the context bundle's figures into Pi image attachments.
+
+    Expected reference images come first, then the measured ones. Pi's
+    ``ImageContent`` carries no alt text, so the prompt states the counts and the
+    order instead.
+    """
+    experiment = bundle.experiment_images or (
+        [(bundle.image_base64, "result figure")] if bundle.image_base64 else []
+    )
+    return [
+        {"data": data, "mimeType": "image/png"}
+        for data, _alt in [*bundle.expected_images, *experiment]
+        if data
+    ]
+
+
 def build_analysis_prompt(
     *,
     bundle: AnalysisContextResult,
@@ -48,9 +63,9 @@ def build_analysis_prompt(
 ) -> str:
     """Build the opening message that carries the whole analysis context.
 
-    Sibling of ``pi_review.build_review_prompt``. Unlike review this keeps the
-    AI review markdown skeleton (the sidebar shows it as text and nothing
-    competes for it here) and it does keep the language instruction.
+    The system prompt body (including the verdict rubric the sidebar renders as
+    text) and the language instruction are folded into this first message,
+    because the Pi runtime has no separate system-prompt channel for it.
     """
     expected_count = len(bundle.expected_images)
     experiment_count = len(collect_images(bundle)) - expected_count

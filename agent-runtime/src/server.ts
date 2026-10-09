@@ -31,8 +31,6 @@ const CHAT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 0);
 // A quiet turn (a tool polling an execution) sends a ping this often so the
 // proxies between here and the browser do not take silence for a dead stream.
 const CHAT_PING_MS = Number(process.env.CHAT_PING_MS ?? 15_000);
-const REVIEW_CONCURRENCY = Number(process.env.REVIEW_CONCURRENCY ?? 2);
-const REVIEW_QUEUE_TIMEOUT_MS = Number(process.env.REVIEW_QUEUE_TIMEOUT_MS ?? 30_000);
 const MAX_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES ?? 20 * 1024 * 1024);
 const RUNTIME_TOKEN = process.env.AGENT_RUNTIME_TOKEN;
 
@@ -57,12 +55,6 @@ interface ChatBody {
   approval?: { id?: string; approve?: boolean };
 }
 
-interface ReviewBody {
-  prompt?: string;
-  images?: ImageBody[];
-  model?: { provider?: string; name?: string };
-}
-
 interface DeleteSessionBody {
   owner_id?: string;
   conversation_id?: string;
@@ -84,36 +76,6 @@ function toImageContent(images: ImageBody[] | undefined) {
  */
 const running = new Map<string, Conversation | null>();
 
-/** Bound local-model review concurrency across API and worker callers. */
-const reviewQueue: Array<() => void> = [];
-let reviewsInFlight = 0;
-
-/** Wait for a review slot, rejecting before the caller's HTTP timeout. */
-async function acquireReviewSlot(): Promise<() => void> {
-  if (reviewsInFlight >= REVIEW_CONCURRENCY) {
-    await new Promise<void>((resolve, reject) => {
-      const resume = (): void => {
-        clearTimeout(timeout);
-        resolve();
-      };
-      const timeout = setTimeout(() => {
-        const index = reviewQueue.indexOf(resume);
-        if (index >= 0) reviewQueue.splice(index, 1);
-        reject(new RequestError(503, "review queue is busy; retry later"));
-      }, REVIEW_QUEUE_TIMEOUT_MS);
-      reviewQueue.push(resume);
-    });
-  }
-  reviewsInFlight++;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    reviewsInFlight--;
-    reviewQueue.shift()?.();
-  };
-}
-
 const runtime = await SharedRuntime.create();
 console.log(`[agent-runtime] tools: ${runtime.listToolNames().join(", ")}`);
 
@@ -121,35 +83,6 @@ console.log(`[agent-runtime] tools: ${runtime.listToolNames().join(", ")}`);
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
-}
-
-/** Run one automatic review and return its structured verdict. */
-async function handleReview(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = await readJsonBody<ReviewBody>(req, MAX_BODY_BYTES);
-  if (typeof body.prompt !== "string" || !body.prompt) {
-    sendJson(res, 400, { error: "prompt is required" });
-    return;
-  }
-
-  const release = await acquireReviewSlot();
-  try {
-    const result = await runtime.runReview({
-      prompt: body.prompt,
-      provider: body.model?.provider,
-      modelName: body.model?.name,
-      images: toImageContent(body.images),
-    });
-    if (result.review) {
-      sendJson(res, 200, { review: result.review });
-    } else {
-      sendJson(res, 200, {
-        error: "submit_review was not called",
-        text: result.text,
-      });
-    }
-  } finally {
-    release();
-  }
 }
 
 /** Translate one committed durable event to the existing NDJSON bridge. */
@@ -408,7 +341,6 @@ const server = createServer((req, res) => {
     sendJson(res, 200, {
       status: "ok",
       running: running.size,
-      reviews: reviewsInFlight,
     });
     return;
   }
@@ -426,14 +358,6 @@ const server = createServer((req, res) => {
       return;
     }
     handleAbortChat(req, res).catch((error: unknown) => handleRouteError(res, error, "abort"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/review") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleReview(req, res).catch((error: unknown) => handleRouteError(res, error, "review"));
     return;
   }
   if (req.method === "DELETE" && req.url === "/session") {

@@ -70,12 +70,6 @@ class AnalysisConfig(BaseModel):
     multimodal: bool = True
     max_conversation_turns: int = 10
     max_expected_images: int | None = None
-    ai_review_max_expected_images: int | None = None
-    ai_review_max_output_tokens: int | None = None
-    ai_review_tasks: list[str] = Field(default_factory=list)
-    ai_review_message: str = (
-        "Review this completed calibration result and attach a concise operational review note."
-    )
 
 
 class CopilotConfig(BaseModel):
@@ -95,9 +89,8 @@ class CopilotConfig(BaseModel):
     # Optional list of selectable models for general chat. The first entry is
     # used as the default. When unset, the configured `model` above is used.
     chat_models: list[ModelConfig] = Field(default_factory=list)
-    # Backend serving the chat page and automatic AI review: "pi" (Pi Agent
-    # Runtime) or "litellm" (in-process). The side-panel analyze endpoint is
-    # still LiteLLM-only and ignores this.
+    # Backend serving the chat page and the analysis side panel: "pi" (Pi Agent
+    # Runtime) or "litellm" (in-process).
     copilot_backend: str = "litellm"
     evaluation_metrics: EvaluationMetrics = Field(default_factory=EvaluationMetrics)
     scoring: dict[str, ScoringThreshold] = Field(default_factory=dict)
@@ -105,6 +98,13 @@ class CopilotConfig(BaseModel):
     initial_message: str = ""
     suggestions: list[Suggestion] = Field(default_factory=list)
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
+
+
+def select_analysis_model(config: CopilotConfig) -> ModelConfig:
+    """Return the effective model used for task-result analysis."""
+    return config.analysis_model or (
+        config.analysis_models[0] if config.analysis_models else config.model
+    )
 
 
 @lru_cache(maxsize=1)

@@ -6,8 +6,9 @@ import { parse } from "yaml";
  * Build pi's models.json from QDash's chat.yaml and review.yaml.
  *
  * Those two files are the single place model wiring is declared; this module is
- * the only translation into pi's schema. See adr/0004 of the chat session and
- * adr/0001 of 2026-09-28-ai-review-pi-agent.
+ * the only translation into pi's schema. chat.yaml's `chat_models` back the
+ * Copilot chat; review.yaml's `analysis_models` back the figure analysis
+ * sidebar. See adr/0004 of the chat session.
  */
 
 /** QDash's chat config names providers the way LiteLLM does; pi uses its own ids. */
@@ -79,7 +80,7 @@ function readModels(yaml: string | undefined, key: string): ChatModel[] {
  * without one are served by pi's bundled catalog (openai, bedrock); only their
  * sampling parameters are layered on via `modelOverrides`.
  *
- * Chat and review routinely name the same provider and sometimes the same
+ * Chat and analysis routinely name the same provider and sometimes the same
  * model, so entries are merged rather than appended blindly.
  */
 export function buildModelsConfig(
@@ -154,8 +155,8 @@ export function buildModelsConfig(
       maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
       ...(reasoning ? { reasoning: true } : {}),
       // Pi treats an unstated `input` as text-only and then silently drops
-      // image content while building the request. AI review exists to read
-      // figures, so the verdict would come back as "no figures attached"
+      // image content while building the request. Figure analysis exists to
+      // read figures, so the answer would come back as "no figures attached"
       // without any error anywhere.
       input: ["text", "image"],
       ...(sampling ? { samplingParams: sampling } : {}),
@@ -217,7 +218,7 @@ function apiFromStyle(style: string | undefined): string {
  * Sampling parameters pi merges into the request body verbatim.
  *
  * `keep_alive` is not a sampling parameter, but ollama reads it from the same
- * body and it keeps the local VLM resident between reviews, so it rides along.
+ * body and it keeps the local VLM resident between analyses, so it rides along.
  */
 function samplingParams(model: ChatModel): Record<string, unknown> | undefined {
   const params = asRecord(model.sampling_params) ?? {};

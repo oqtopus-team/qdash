@@ -12,9 +12,6 @@ if TYPE_CHECKING:
 import pytest
 
 from qdash.client import (
-    AiReviewListResponse,
-    AiReviewRunDetailResponse,
-    AiReviewRunListResponse,
     CancelExecutionResponse,
     ChipResponse,
     CouplingResponse,
@@ -786,7 +783,7 @@ def test_chip_topology_read_helpers_return_models() -> None:
         client.close()
 
 
-def test_task_file_flow_and_ai_review_read_helpers_return_models() -> None:
+def test_task_file_and_flow_read_helpers_return_models() -> None:
     issue_payload = {
         "id": "issue-1",
         "task_id": "task-1",
@@ -827,25 +824,6 @@ def test_task_file_flow_and_ai_review_read_helpers_return_models() -> None:
         "failure_modes": [{"severity": "warning", "description": "Noisy curve"}],
         "tips": ["Inspect the fitted decay"],
         "prompt_text": "Review t1",
-    }
-    review_run_payload: dict[str, object] = {
-        "review_run_id": "run-1",
-        "trigger_type": "manual_chip_bulk",
-        "chip_id": "chip-a",
-        "task_name": "t1",
-        "entity_type": "qubit",
-        "execution_ids": ["exec-1"],
-        "requested_by": "operator",
-        "requested_at": "2026-01-01T00:00:00Z",
-        "completed_at": None,
-        "model": "gpt-test",
-        "total": 0,
-        "completed_count": 0,
-        "failed_count": 0,
-        "running_count": 0,
-        "requested_count": 0,
-        "decision_counts": {},
-        "status_counts": {},
     }
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -904,32 +882,6 @@ def test_task_file_flow_and_ai_review_read_helpers_return_models() -> None:
                         "updated_at": "2026-01-01T00:00:00Z",
                     },
                 )
-            case "/task-results/ai-review":
-                assert request.url.params.get("chip_id") == "chip-a"
-                assert request.url.params.get("task_name") == "t1"
-                assert request.url.params.get("status") == "completed"
-                assert request.url.params.get("decision") == "accept"
-                assert request.url.params.get("latest_only") == "true"
-                return httpx.Response(
-                    200,
-                    json={
-                        "items": [],
-                        "total": 0,
-                        "skip": 2,
-                        "limit": 5,
-                        "decision_counts": {},
-                        "status_counts": {},
-                    },
-                )
-            case "/task-results/ai-review/runs":
-                assert request.url.params.get("chip_id") == "chip-a"
-                assert request.url.params.get("task_name") == "t1"
-                return httpx.Response(
-                    200,
-                    json={"items": [review_run_payload], "total": 1, "skip": 0, "limit": 10},
-                )
-            case "/task-results/ai-review/runs/run-1":
-                return httpx.Response(200, json={"run": review_run_payload, "items": []})
         return httpx.Response(404, json={"detail": "missing"})
 
     client = _build_client(httpx.MockTransport(handler), api_token="api-token")
@@ -946,23 +898,6 @@ def test_task_file_flow_and_ai_review_read_helpers_return_models() -> None:
         assert isinstance(client.get_task_knowledge("t1"), TaskKnowledgeResponse)
         assert client.get_task_knowledge_markdown("t1") == "# T1"
         assert isinstance(client.get_task_note("task-1"), NoteModel)
-        assert isinstance(
-            client.list_task_result_ai_reviews(
-                chip_id="chip-a",
-                task_name="t1",
-                status="completed",
-                decision="accept",
-                latest_only=True,
-                skip=2,
-                limit=5,
-            ),
-            AiReviewListResponse,
-        )
-        assert isinstance(
-            client.list_task_result_ai_review_runs(chip_id="chip-a", task_name="t1", limit=10),
-            AiReviewRunListResponse,
-        )
-        assert isinstance(client.get_task_result_ai_review_run("run-1"), AiReviewRunDetailResponse)
     finally:
         client.close()
 

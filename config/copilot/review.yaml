@@ -1,5 +1,5 @@
 # Copilot Review Configuration
-# Settings for task result analysis, automatic AI review, and chip scoring.
+# Settings for task result analysis and chip scoring.
 
 # Specialized models for task result analysis (chevron patterns, Rabi, etc.).
 analysis_models:
@@ -53,11 +53,11 @@ analysis_models:
   #   base_url: env:OLLAMA_BASE_URL
   #   # Optional. LiteLLM forwards this when set.
   #   api_key_env: OLLAMA_API_KEY
-  #   # Keep the local VLM resident between automatic review requests and avoid
-  #   # repeated cold model loads between short qdash reviews.
+  #   # Keep the local VLM resident between analysis requests and avoid
+  #   # repeated cold model loads between short qdash analyses.
   #   keep_alive: 30m
   #   num_ctx: 16384
-  #   # Gemma 4 best-practice sampling for stable local VLM review.
+  #   # Gemma 4 best-practice sampling for stable local VLM analysis.
   #   temperature: 1.0
   #   top_p: 0.95
   #   top_k: 64
@@ -68,7 +68,7 @@ analysis_models:
   #   name: gemma4:31b
   #   api_style: completion
   #   # Higher-stability local VLM fallback. It is slower than 26B but showed
-  #   # fewer format failures in qdash review spot checks.
+  #   # fewer format failures in qdash analysis spot checks.
   #   base_url: env:OLLAMA_BASE_URL
   #   api_key_env: OLLAMA_API_KEY
   #   keep_alive: 30m
@@ -90,7 +90,7 @@ analysis_models:
   - provider: vllm
     name: nvidia/Ising-Calibration-1.5-31B-NVFP4
     # /v1/responses rejects input_image on vLLM; only chat/completions accepts
-    # figures, which AI review depends on.
+    # figures, which task analysis depends on.
     api_style: completion
     base_url: env:VLLM_BASE_URL
     api_key_env: VLLM_API_KEY
@@ -209,31 +209,7 @@ analysis:
   enabled: true
   # Whether to send result figures to the LLM (requires multimodal model)
   multimodal: true
-  # Reference images to send during task analysis and automatic AI review.
+  # Reference images to send during task analysis.
   max_expected_images: 2
-  # Automatic AI review prioritizes review quality by default and inherits the
-  # same reference-image and output-token settings as task analysis. Set these
-  # optional overrides only when a lower-latency review mode is required.
-  ai_review_max_expected_images: null
-  ai_review_max_output_tokens: null
-  # Terminal task results whose notes should receive automatic AI review. Both
-  # completed and failed results are eligible; running, pending, scheduled, and
-  # skipped results are ignored. The hook runs asynchronously after history
-  # persistence and does not block calibration progress.
-  ai_review_tasks:
-    - CheckQubitSpectroscopy
-    - CheckResonatorSpectroscopy
-  ai_review_message: >-
-    Review this calibration result and attach a concise operational
-    review note. Auto-pass results that are good enough for routine parameter
-    update. History consistency alone is not enough to accept visually
-    unsupported output parameters, but weak f12 support by itself should usually
-    become PASS_WITH_NOTE when f01 is clearly supported and no clearly stronger
-    competing transition is visible. Do not escalate only because f12 is weak,
-    anharmonicity is shallow, or nearby f01-like peaks have similar length and
-    intensity when the marked f01 is still visibly supported and physically
-    plausible; put that caveat in PASS_WITH_NOTE. Keep REVIEW for absent,
-    off-marker, or clearly weaker f01 support, or when a clearly stronger
-    competing f01 candidate would materially change the update.
   # Maximum conversation turns to maintain in context
   max_conversation_turns: 10

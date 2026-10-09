@@ -137,7 +137,7 @@ function IssueCard({
  * Full page view of a single task result.
  *
  * Shows figures, artifacts, and parameters, and links to the task workbench for re-execution.
- * Also hosts the AI review note, the memo editor, and linked issues.
+ * Also hosts the archived AI review note (if any), the memo editor, and linked issues.
  */
 export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const router = useRouter();

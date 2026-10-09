@@ -56,7 +56,6 @@ permission. See [Running Calibrations](./running-calibrations.md) for the end-to
 | **Issues** | Track and discuss a problem attached to a task result. |
 | **Forum** | Hold project-wide discussions that are not tied to one result. |
 | **Knowledge** | Reuse curated cases derived from resolved issues. |
-| **AI Reviews** | Inspect bulk AI review runs and their target-level findings. |
 | **Task Knowledge** | Read task physics, expected results, failure patterns, and analysis guidance. |
 
 See [Reviewing and Sharing Results](./reviewing-results.md) for how these records relate.
