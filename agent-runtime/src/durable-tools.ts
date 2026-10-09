@@ -11,13 +11,14 @@ import {
   type ToolExecutionApi,
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
-import { Type, type TSchema } from "typebox";
+import type { TSchema } from "typebox";
 
 import {
   ALLOWED_TOOL_NAMES,
   EXPERIMENTAL_WRITE_TOOL_NAMES,
   isExperimentalWriteTool,
 } from "./allowed-tools.ts";
+import type { QDashConnection } from "./auth.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 
 /** Convert a value returned by an extension into durable's strict JSON shape. */
@@ -43,12 +44,22 @@ function approvalArgs(args: unknown): Record<string, unknown> {
   return Object.fromEntries(Object.entries(args).filter(([key]) => !HIDDEN_ARGS.has(key)));
 }
 
-/** The model does not decide approval, so it is not offered the confirmation flag. */
-function withoutConfirmWrite(parameters: TSchema): TSchema {
-  const properties = (parameters as { properties?: Record<string, TSchema> }).properties;
-  if (!properties || !("confirmWrite" in properties)) return parameters;
-  const { confirmWrite: _confirmWrite, ...rest } = properties;
-  return Type.Object(rest);
+/** Connection settings and write confirmation belong exclusively to the runtime. */
+function withoutRuntimeArguments(parameters: TSchema): TSchema {
+  const { properties, required } = parameters as {
+    properties?: Record<string, TSchema>;
+    required?: string[];
+  };
+  if (!properties) return parameters;
+  return {
+    ...parameters,
+    properties: Object.fromEntries(
+      Object.entries(properties).filter(([key]) => !HIDDEN_ARGS.has(key)),
+    ),
+    ...(Array.isArray(required)
+      ? { required: required.filter((key: string) => !HIDDEN_ARGS.has(key)) }
+      : {}),
+  };
 }
 
 /** Run a pi-coding-agent tool with the non-interactive context this runtime provides. */
@@ -59,6 +70,7 @@ async function runCodingAgentTool(
   signal: AbortSignal | undefined,
   modelRuntime: ModelRuntime,
   cwd: string,
+  connection: QDashConnection,
 ) {
   const extensionContext = {
     cwd,
@@ -70,7 +82,17 @@ async function runCodingAgentTool(
     isProjectTrusted: () => true,
     hasPendingMessages: () => false,
   };
-  return tool.execute(callId, args as never, signal, undefined, extensionContext as never);
+  return tool.execute(
+    callId,
+    {
+      ...approvalArgs(args),
+      ...connection.toolArgs,
+      ...(isExperimentalWriteTool(tool.name) ? { confirmWrite: true } : {}),
+    } as never,
+    signal,
+    undefined,
+    extensionContext as never,
+  );
 }
 
 /**
@@ -85,6 +107,7 @@ export function adaptCodingAgentTool(
   tool: CodingAgentTool,
   modelRuntime: ModelRuntime,
   cwd: string,
+  connection: QDashConnection,
 ): ToolRegistration {
   const writesQDash = isExperimentalWriteTool(tool.name);
   const parameters = withParameterOverrides(tool.name, tool.parameters);
@@ -93,7 +116,7 @@ export function adaptCodingAgentTool(
     description: writesQDash
       ? `${tool.description} The user is shown the exact arguments and must approve before it runs.`
       : tool.description,
-    parameters: writesQDash ? withoutConfirmWrite(parameters) : parameters,
+    parameters: withoutRuntimeArguments(parameters),
     // A repeated read is harmless. A write never runs inside the harness, so
     // replaying the call only re-issues the approval request.
     replay: "safe",
@@ -125,6 +148,7 @@ export function adaptCodingAgentTool(
         context.abortSignal,
         modelRuntime,
         cwd,
+        connection,
       );
       return {
         content: result.content,
@@ -142,7 +166,10 @@ const MAX_RESULT_CHARS = 8_000;
 /** What the model is told after the user decided on a write call. */
 export function decisionMessage(
   approval: ApprovalRequest,
-  outcome: { approved: false } | { approved: true; result: string } | { approved: true; error: string },
+  outcome:
+    | { approved: false }
+    | { approved: true; result: string }
+    | { approved: true; error: string },
 ): string {
   const what = `${approval.label} (${approval.tool})`;
   if (!outcome.approved) {
@@ -164,6 +191,7 @@ export class QDashWriteTools {
     private readonly tools: ReadonlyMap<string, CodingAgentTool>,
     private readonly modelRuntime: ModelRuntime,
     private readonly cwd: string,
+    private readonly connection: QDashConnection,
   ) {}
 
   /** Run an approved call with the exact arguments the user saw; returns its text. */
@@ -177,6 +205,7 @@ export class QDashWriteTools {
       signal,
       this.modelRuntime,
       this.cwd,
+      this.connection,
     );
     const text = result.content
       .map((block) => (block.type === "text" ? block.text : ""))
@@ -189,9 +218,12 @@ export class QDashWriteTools {
 
 /** Build the durable extension containing all permitted pi-qdash tools. */
 export function buildQDashExtension(
-  extensions: ReadonlyArray<{ tools?: Map<string, { definition: CodingAgentTool }> }>,
+  extensions: ReadonlyArray<{
+    tools?: Map<string, { definition: CodingAgentTool }>;
+  }>,
   modelRuntime: ModelRuntime,
   cwd: string,
+  connection: QDashConnection,
   enableExperimentalWriteTools = false,
 ): { extension: Extension; writeTools: QDashWriteTools } {
   const allowed = new Set<string>([
@@ -203,12 +235,12 @@ export function buildQDashExtension(
   for (const extension of extensions) {
     for (const [name, registered] of extension.tools ?? []) {
       if (!allowed.has(name)) continue;
-      tools.set(name, adaptCodingAgentTool(registered.definition, modelRuntime, cwd));
+      tools.set(name, adaptCodingAgentTool(registered.definition, modelRuntime, cwd, connection));
       if (isExperimentalWriteTool(name)) writes.set(name, registered.definition);
     }
   }
   return {
     extension: defineExtension({ name: "qdash", tools: [...tools.values()] }),
-    writeTools: new QDashWriteTools(writes, modelRuntime, cwd),
+    writeTools: new QDashWriteTools(writes, modelRuntime, cwd, connection),
   };
 }

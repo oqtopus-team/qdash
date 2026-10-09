@@ -85,6 +85,7 @@ async def stream(
     bundle: AnalysisContextResult,
     *,
     username: str,
+    auth: pi_chat_service.QDashAuth,
     language_instruction: str,
     images_sent: dict[str, Any],
 ) -> AsyncGenerator[str, None]:
@@ -127,6 +128,7 @@ async def stream(
     async for event in pi_chat_service.stream_payload(
         payload,
         step="run_analysis",
+        auth=auth,
         extra_result={"images_sent": images_sent},
     ):
         yield event

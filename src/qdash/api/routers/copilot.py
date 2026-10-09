@@ -14,6 +14,9 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response, StreamingResponse
+from fastapi.security import (
+    HTTPAuthorizationCredentials,  # noqa: TC002 - FastAPI resolves annotations
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -23,7 +26,8 @@ from qdash.api.dependencies import (
     get_copilot_runtime,
 )
 from qdash.api.lib.ai_labels import STATUS_LABELS, TOOL_LABELS
-from qdash.api.lib.auth import get_current_active_user
+from qdash.api.lib.auth import bearer_scheme, get_current_active_user
+from qdash.api.lib.project import get_project_id_from_header
 from qdash.api.lib.sse import SSETaskBridge, sse_event
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.copilot_chat_session import (
@@ -201,6 +205,8 @@ async def analyze_task_result_stream(
     request: AnalyzeRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
     copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
 ) -> StreamingResponse:
     """SSE streaming version of analyze_task_result.
 
@@ -266,6 +272,10 @@ async def analyze_task_result_stream(
                 pi_config,
                 ctx,
                 username=current_user.username,
+                auth=pi_chat_service.QDashAuth(
+                    access_token=credentials.credentials,
+                    project_id=project_id or current_user.default_project_id,
+                ),
                 language_instruction=build_language_instruction(pi_config),
                 images_sent=images_sent,
             ):
@@ -361,6 +371,8 @@ async def chat_stream(
     request: ChatRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
     copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
 ) -> StreamingResponse:
     """SSE streaming generic chat endpoint.
 
@@ -379,6 +391,10 @@ async def chat_stream(
                 request,
                 chat_config,
                 username=current_user.username,
+                auth=pi_chat_service.QDashAuth(
+                    access_token=credentials.credentials,
+                    project_id=project_id or current_user.default_project_id,
+                ),
             ):
                 yield event
             return

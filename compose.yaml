@@ -241,6 +241,9 @@ services:
       - ./agent-runtime/src:/app/src
       - ./config:/app/config # Read for copilot language and model settings only
       - agent-runtime-state:/app/state
+    # Per-turn pi-qdash credential profiles are transient, including on crashes.
+    tmpfs:
+      - /tmp
     environment:
       - PORT=${AGENT_RUNTIME_PORT:-8002}
       - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
@@ -259,10 +262,8 @@ services:
       - REVIEW_CONCURRENCY=${AGENT_RUNTIME_REVIEW_CONCURRENCY:-2}
       - REVIEW_QUEUE_TIMEOUT_MS=${AGENT_RUNTIME_REVIEW_QUEUE_TIMEOUT_MS:-30000}
       - REVIEW_TIMEOUT_MS=${AGENT_RUNTIME_REVIEW_TIMEOUT_MS:-300000}
-      # pi-qdash reaches QDash with this. The runtime logs in as the QDash
-      # administrator at startup unless QDASH_API_TOKEN is already set, so no
-      # token has to be provisioned by hand. Raw GET access is always excluded;
-      # reviewed write tools require an explicit experimental opt-in above.
+      # The API forwards the logged-in user's token and project on each turn.
+      # No shared API token or administrator login is used by the runtime.
       - QDASH_BASE_URL=http://api:${API_PORT:-5715}
       # Links in Copilot answers point here. QDASH_BASE_URL is an internal
       # hostname, so the browser-facing UI address comes from CLIENT_URL.

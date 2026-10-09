@@ -20,7 +20,8 @@ import {
 } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 
-import { resolveQDashApiToken } from "./auth.ts";
+import { createQDashConnection, type QDashAuth, type QDashConnection } from "./auth.ts";
+import { ALLOWED_TOOL_NAMES, EXPERIMENTAL_WRITE_TOOL_NAMES } from "./allowed-tools.ts";
 import { compactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
@@ -32,7 +33,7 @@ import {
 } from "./durable-tools.ts";
 import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
 import { buildReviewSystemPrompt, buildSystemPrompt } from "./prompt.ts";
-import { pythonTool } from "./python-tool.ts";
+import { buildPythonTool } from "./python-tool.ts";
 import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
 import { submitReviewTool } from "./review-tool.ts";
 import { extractToolGuide, TOOL_GUIDE_SKILL } from "./tool-guide.ts";
@@ -40,8 +41,7 @@ import { extractToolGuide, TOOL_GUIDE_SKILL } from "./tool-guide.ts";
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
 const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
 const STATE_DIR = process.env.AGENT_STATE_DIR ?? "/app/state";
-const COPILOT_CONFIG_PATH =
-  process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
+const COPILOT_CONFIG_PATH = process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
 const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
 const REVIEW_CONFIG_PATH = process.env.REVIEW_CONFIG_PATH ?? "/app/config/copilot/review.yaml";
 // One model request; a whole turn is bounded by the server's own timers.
@@ -73,6 +73,8 @@ export interface ReviewSessionRequest {
 export interface OpenDurableSession {
   harness: DurableHarness;
   conversation: Conversation;
+  writeTools: QDashWriteTools;
+  close(): Promise<void>;
 }
 
 /** Return a stable non-identifying filename for one user's QDash session. */
@@ -84,22 +86,26 @@ export function sessionStorageName(ownerId: string, sessionId: string): string {
 export class SharedRuntime {
   private constructor(
     private readonly modelRuntime: ModelRuntime,
-    private readonly chatRegistry: ReturnType<typeof createRegistry>,
+    private readonly buildChatRegistry: (connection: QDashConnection) => {
+      registry: ReturnType<typeof createRegistry>;
+      writeTools: QDashWriteTools;
+    },
+    private readonly toolNames: string[],
     private readonly reviewRegistry: ReturnType<typeof createRegistry>,
-    /** Runs write calls the user approved in the UI. */
-    readonly writeTools: QDashWriteTools,
   ) {}
 
   /** Load the Pi model catalog and adapt the installed pi-qdash extension once. */
   static async create(): Promise<SharedRuntime> {
-    await resolveQDashApiToken();
     mkdirSync(STATE_DIR, { recursive: true });
     if (EXPERIMENTAL_WRITE_TOOLS_ENABLED) {
       console.warn("[agent-runtime] experimental QDash write tools are enabled");
     }
 
     const { responseLanguage, thinkingLanguage } = loadLanguageConfig(COPILOT_CONFIG_PATH);
-    const loader = new DefaultResourceLoader({ cwd: WORK_DIR, agentDir: AGENT_DIR });
+    const loader = new DefaultResourceLoader({
+      cwd: WORK_DIR,
+      agentDir: AGENT_DIR,
+    });
     await loader.reload();
 
     const modelsPath = writeModelsConfig(
@@ -115,55 +121,77 @@ export class SharedRuntime {
     const skills: SkillSummary[] = loader
       .getSkills()
       .skills.filter((skill) => !skill.disableModelInvocation)
-      .map(({ name, description, filePath }) => ({ name, description, filePath }));
-    console.log(`[agent-runtime] skills: ${skills.map((skill) => skill.name).join(", ") || "none"}`);
-
-    const chatRegistry = createRegistry();
-    const qdash = buildQDashExtension(
-      loader.getExtensions().extensions,
-      modelRuntime,
-      WORK_DIR,
-      EXPERIMENTAL_WRITE_TOOLS_ENABLED,
+      .map(({ name, description, filePath }) => ({
+        name,
+        description,
+        filePath,
+      }));
+    console.log(
+      `[agent-runtime] skills: ${skills.map((skill) => skill.name).join(", ") || "none"}`,
     );
-    chatRegistry.install(qdash.extension);
 
-    // The qdash skill's tool guide goes into the system prompt, limited to the
-    // tools this runtime exposes (see tool-guide.ts).
-    const qdashToolNames = chatRegistry
-      .snapshot()
-      .tools()
-      .map(({ tool }) => tool.name);
+    const extensions = loader.getExtensions().extensions;
+    const allowed = new Set<string>([
+      ...ALLOWED_TOOL_NAMES,
+      ...(EXPERIMENTAL_WRITE_TOOLS_ENABLED ? EXPERIMENTAL_WRITE_TOOL_NAMES : []),
+    ]);
+    const qdashToolNames = [
+      ...new Set(
+        extensions.flatMap((extension) =>
+          [...extension.tools.keys()].filter((name) => allowed.has(name)),
+        ),
+      ),
+    ];
     const guideSkill = skills.find((skill) => skill.name === TOOL_GUIDE_SKILL);
     const toolGuide = guideSkill
       ? extractToolGuide(readFileSync(guideSkill.filePath, "utf8"), qdashToolNames)
       : null;
     if (!toolGuide) console.warn("[agent-runtime] no tool guide: qdash skill not found");
 
-    chatRegistry.install(
-      defineExtension({
-        name: "qdash-copilot",
-        sections: [
-          section(
-            "qdash-copilot",
-            () =>
-              buildSystemPrompt(
-                responseLanguage,
-                thinkingLanguage,
-                EXPERIMENTAL_WRITE_TOOLS_ENABLED,
-                skills,
-                toolGuide,
-              ),
-            { tag: false },
-          ),
-        ],
-        tools: [
-          chartTool,
-          pythonTool,
-          askUserTool,
-          ...(skills.length ? [buildSkillTool(skills)] : []),
-        ],
-      }),
-    );
+    const copilotExtension = defineExtension({
+      name: "qdash-copilot",
+      sections: [
+        section(
+          "qdash-copilot",
+          () =>
+            buildSystemPrompt(
+              responseLanguage,
+              thinkingLanguage,
+              EXPERIMENTAL_WRITE_TOOLS_ENABLED,
+              skills,
+              toolGuide,
+            ),
+          { tag: false },
+        ),
+      ],
+      tools: [chartTool, askUserTool, ...(skills.length ? [buildSkillTool(skills)] : [])],
+    });
+    const buildChatRegistry = (connection: QDashConnection) => {
+      const registry = createRegistry();
+      const qdash = buildQDashExtension(
+        extensions,
+        modelRuntime,
+        WORK_DIR,
+        connection,
+        EXPERIMENTAL_WRITE_TOOLS_ENABLED,
+      );
+      registry.install(qdash.extension);
+      registry.install(copilotExtension);
+      registry.install(
+        defineExtension({
+          name: "qdash-python",
+          tools: [buildPythonTool(connection)],
+        }),
+      );
+      return { registry, writeTools: qdash.writeTools };
+    };
+    const toolNames = [
+      ...qdashToolNames,
+      "render_chart",
+      "run_python",
+      "ask_user",
+      ...(skills.length ? ["read_skill"] : []),
+    ];
 
     const reviewRegistry = createRegistry();
     reviewRegistry.install(
@@ -177,7 +205,7 @@ export class SharedRuntime {
         tools: [submitReviewTool],
       }),
     );
-    return new SharedRuntime(modelRuntime, chatRegistry, reviewRegistry, qdash.writeTools);
+    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames, reviewRegistry);
   }
 
   /** Resolve a configured QDash model without allowing an invisible fallback. */
@@ -206,7 +234,7 @@ export class SharedRuntime {
 
   /** Names of the tools the chat agent can actually call. */
   listToolNames(): string[] {
-    return [...new Set(this.chatRegistry.snapshot().tools().map(({ tool }) => tool.name))].sort();
+    return [...new Set(this.toolNames)].sort();
   }
 
   /** Delete the closed durable store for one deleted QDash session. */
@@ -216,33 +244,52 @@ export class SharedRuntime {
   }
 
   /** Open or recover the SQLite-backed root conversation for one user/session. */
-  async openSession(request: SessionRequest): Promise<OpenDurableSession> {
-    const { ref: model, contextWindow, maxTokens } = this.resolveModelWithLimits(
-      request.provider,
-      request.modelName,
-    );
+  async openSession(request: SessionRequest, auth: QDashAuth): Promise<OpenDurableSession> {
+    const {
+      ref: model,
+      contextWindow,
+      maxTokens,
+    } = this.resolveModelWithLimits(request.provider, request.modelName);
     const path = join(STATE_DIR, sessionStorageName(request.ownerId, request.sessionId));
-    const harness = await Harness.open(
-      await openNodeSqliteStorage(path),
-      {
-        models: this.modelRuntime,
-        registry: this.chatRegistry,
-        settings: {
-          stream: { timeoutMs: MODEL_STREAM_TIMEOUT_MS },
-          compaction: { enabled: true, ...compactionBudget(contextWindow, maxTokens) },
-        },
-      },
-      BACKGROUND_CONTEXT,
-    );
-    const agent = {
-      model,
-      ...(request.thinkingLevel ? { thinkingLevel: request.thinkingLevel } : {}),
-      cwd: WORK_DIR,
+    const connection = await createQDashConnection(auth);
+    let harness: DurableHarness | undefined;
+    const close = async () => {
+      try {
+        await harness?.close(BACKGROUND_CONTEXT);
+      } finally {
+        await connection.close();
+      }
     };
-    const conversation = await harness.root(BACKGROUND_CONTEXT, { agent });
-    await conversation.configure(agent, BACKGROUND_CONTEXT);
-    harness.resume();
-    return { harness, conversation };
+    try {
+      const { registry, writeTools } = this.buildChatRegistry(connection);
+      harness = await Harness.open(
+        await openNodeSqliteStorage(path),
+        {
+          models: this.modelRuntime,
+          registry,
+          settings: {
+            stream: { timeoutMs: MODEL_STREAM_TIMEOUT_MS },
+            compaction: {
+              enabled: true,
+              ...compactionBudget(contextWindow, maxTokens),
+            },
+          },
+        },
+        BACKGROUND_CONTEXT,
+      );
+      const agent = {
+        model,
+        ...(request.thinkingLevel ? { thinkingLevel: request.thinkingLevel } : {}),
+        cwd: WORK_DIR,
+      };
+      const conversation = await harness.root(BACKGROUND_CONTEXT, { agent });
+      await conversation.configure(agent, BACKGROUND_CONTEXT);
+      harness.resume();
+      return { harness, conversation, writeTools, close };
+    } catch (error) {
+      await close();
+      throw error;
+    }
   }
 
   /** Run a stateless automatic review with durable task semantics in memory. */
@@ -265,7 +312,9 @@ export class SharedRuntime {
         () => void conversation.abort(BACKGROUND_CONTEXT),
         Number(process.env.REVIEW_TIMEOUT_MS ?? 300_000),
       );
-      const settled = await submission.wait(BACKGROUND_CONTEXT).finally(() => clearTimeout(timeout));
+      const settled = await submission
+        .wait(BACKGROUND_CONTEXT)
+        .finally(() => clearTimeout(timeout));
       if (settled.status !== "done" || settled.type !== "input") {
         throw new Error(`review was not answered: ${settled.reason}`);
       }

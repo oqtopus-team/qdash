@@ -1,9 +1,8 @@
 /**
  * Positive allowlist for the pinned pi-qdash package.
  *
- * The runtime authenticates to QDash with a service credential. A newly added
- * extension tool must therefore be reviewed here before the model can see it;
- * relying only on a denylist would silently expand that credential's surface.
+ * The runtime authenticates as the user who submitted the turn. Newly added
+ * extension tools still require review before they are exposed to the model.
  */
 export const ALLOWED_TOOL_NAMES = [
   "qdash_analyze_figure_json",

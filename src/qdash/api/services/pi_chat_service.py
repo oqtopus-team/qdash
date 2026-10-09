@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import os
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -129,6 +130,22 @@ async def delete_runtime_session_state(username: str, session_id: str) -> None:
         )
 
 
+@dataclass(frozen=True)
+class QDashAuth:
+    """User credentials forwarded only in internal headers, never chat payloads."""
+
+    access_token: str = field(repr=False)
+    project_id: str | None = None
+
+    def headers(self) -> dict[str, str]:
+        if not self.access_token:
+            raise RuntimeError("QDash user token is required")
+        return {
+            "X-QDash-Token": self.access_token,
+            **({"X-QDash-Project-Id": self.project_id} if self.project_id else {}),
+        }
+
+
 def _runtime_headers() -> dict[str, str]:
     """Return the internal runtime credential, failing closed when it is absent."""
     token = os.environ.get("AGENT_RUNTIME_TOKEN")
@@ -164,6 +181,7 @@ async def stream(
     config: CopilotConfig,
     *,
     username: str,
+    auth: QDashAuth,
 ) -> AsyncGenerator[str, None]:
     """Proxy one chat turn through the Pi Agent Runtime as SSE events."""
     if not request.session_id:
@@ -174,7 +192,7 @@ async def stream(
         return
 
     payload = _request_payload(request, config, username)
-    async for event in stream_payload(payload, step="run_chat"):
+    async for event in stream_payload(payload, step="run_chat", auth=auth):
         yield event
 
 
@@ -182,6 +200,7 @@ async def stream_payload(
     payload: dict[str, Any],
     *,
     step: str,
+    auth: QDashAuth,
     extra_result: dict[str, Any] | None = None,
 ) -> AsyncGenerator[str, None]:
     """POST one turn to the runtime and re-emit its NDJSON as SSE.
@@ -197,7 +216,7 @@ async def stream_payload(
             client.stream(
                 "POST",
                 f"{RUNTIME_URL}/chat",
-                headers=_runtime_headers(),
+                headers={**_runtime_headers(), **auth.headers()},
                 json=payload,
             ) as response,
         ):
