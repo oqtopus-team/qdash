@@ -47,6 +47,7 @@ Review or fill in these values before starting services:
 | `COMPOSE_PROFILES` | Set to `agent-runtime` when `copilot_backend: pi`; otherwise the Agent Runtime container is not created |
 | `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` | Experimental; set to `true` to expose the reviewed QDash write tools to Copilot (default: `false`) |
 | `OPENAI_COMPATIBLE_BASE_URL` / `OPENAI_COMPATIBLE_API_KEY` | Base URL and credential for the default vendor-neutral OpenAI Chat Completions endpoint |
+| `VLLM_BASE_URL` / `VLLM_API_KEY` | Base URL and bearer token of a vLLM endpoint; used by the `vllm` models in `config/copilot/*.yaml` such as `nvidia/Ising-Calibration-1.5-31B-NVFP4` |
 | `OPENAI_API_KEY` / `OLLAMA_BASE_URL` / `OLLAMA_API_KEY` | Optional settings for other Copilot AI providers |
 | `KNOWLEDGE_REPO_URL` | Optional external knowledge repository for Copilot context |
 | `SLACK_FORUM_NOTIFICATION` | Set to `true` to enable Slack notifications for forum thread creation, replies, and open/close status changes (optional) |

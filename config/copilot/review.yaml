@@ -45,60 +45,62 @@ analysis_models:
     reasoning_effort: high
     num_ctx: 65536
     max_output_tokens: 16384
-  - provider: ollama
-    name: nvidia/Gemma-4-31B-IT-NVFP4 # gemma4:26b
-    api_style: completion
-    # Ollama endpoint for LiteLLM. Set OLLAMA_BASE_URL to your Ollama server URL,
-    # e.g. http://localhost:11434.
-    base_url: env:OLLAMA_BASE_URL
-    # Optional. LiteLLM forwards this when set.
-    api_key_env: OLLAMA_API_KEY
-    # Keep the local VLM resident between automatic review requests and avoid
-    # repeated cold model loads between short qdash reviews.
-    keep_alive: 30m
-    num_ctx: 16384
-    # Gemma 4 best-practice sampling for stable local VLM review.
-    temperature: 1.0
-    top_p: 0.95
-    top_k: 64
-    reasoning_effort: none
-    disable_thinking_instruction: true
-    max_output_tokens: 4096
-  - provider: ollama
-    name: gemma4:31b
-    api_style: completion
-    # Higher-stability local VLM fallback. It is slower than 26B but showed
-    # fewer format failures in qdash review spot checks.
-    base_url: env:OLLAMA_BASE_URL
-    api_key_env: OLLAMA_API_KEY
-    keep_alive: 30m
-    num_ctx: 16384
-    temperature: 1.0
-    top_p: 0.95
-    top_k: 64
-    reasoning_effort: none
-    disable_thinking_instruction: true
-    max_output_tokens: 4096
-  - provider: openai
-    name: gpt-5.4
-    api_style: responses
-    temperature: 0.7
-    max_output_tokens: 4096
-
-  # - provider: vllm
-  #   name: Gemma-4-31B-IT-NVFP4
-  #   # /v1/responses rejects input_image on vLLM 0.21; only chat/completions
-  #   # accepts figures, which AI review depends on.
+  # - provider: ollama
+  #   name: nvidia/Gemma-4-31B-IT-NVFP4 # gemma4:26b
   #   api_style: completion
-  #   base_url: env:VLLM_BASE_URL
-  #   api_key_env: VLLM_API_KEY
+  #   # Ollama endpoint for LiteLLM. Set OLLAMA_BASE_URL to your Ollama server URL,
+  #   # e.g. http://localhost:11434.
+  #   base_url: env:OLLAMA_BASE_URL
+  #   # Optional. LiteLLM forwards this when set.
+  #   api_key_env: OLLAMA_API_KEY
+  #   # Keep the local VLM resident between automatic review requests and avoid
+  #   # repeated cold model loads between short qdash reviews.
+  #   keep_alive: 30m
+  #   num_ctx: 16384
+  #   # Gemma 4 best-practice sampling for stable local VLM review.
+  #   temperature: 1.0
+  #   top_p: 0.95
+  #   top_k: 64
+  #   reasoning_effort: none
+  #   disable_thinking_instruction: true
+  #   max_output_tokens: 4096
+  # - provider: ollama
+  #   name: gemma4:31b
+  #   api_style: completion
+  #   # Higher-stability local VLM fallback. It is slower than 26B but showed
+  #   # fewer format failures in qdash review spot checks.
+  #   base_url: env:OLLAMA_BASE_URL
+  #   api_key_env: OLLAMA_API_KEY
+  #   keep_alive: 30m
   #   num_ctx: 16384
   #   temperature: 1.0
   #   top_p: 0.95
   #   top_k: 64
   #   reasoning_effort: none
   #   disable_thinking_instruction: true
-  #   max_output_tokens: 2048
+  #   max_output_tokens: 4096
+  # - provider: openai
+  #   name: gpt-5.4
+  #   api_style: responses
+  #   temperature: 0.7
+  #   max_output_tokens: 4096
+  # NVIDIA Ising-Calibration: Gemma 4 31B fine-tuned on qubit calibration plots
+  # (fit quality, parameter extraction, success classification). Served by vLLM;
+  # set VLLM_BASE_URL / VLLM_API_KEY. Move it to the top to make it the default.
+  - provider: vllm
+    name: nvidia/Ising-Calibration-1.5-31B-NVFP4
+    # /v1/responses rejects input_image on vLLM; only chat/completions accepts
+    # figures, which AI review depends on.
+    api_style: completion
+    base_url: env:VLLM_BASE_URL
+    api_key_env: VLLM_API_KEY
+    num_ctx: 32768
+    # Model card recommendation. The model is not a thinking model.
+    temperature: 0.2
+    reasoning_effort: none
+    disable_thinking_instruction: true
+    # Model card: 8192 for zero-shot, up to 32767 with in-context examples.
+    max_output_tokens: 8192
 
   # - provider: bedrock
   #   name: jp.anthropic.claude-sonnet-4-6
