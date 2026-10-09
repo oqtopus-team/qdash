@@ -13,6 +13,7 @@ import {
   describeExtensionError,
   discoverExtensionCheckouts,
   trustedCheckoutRoots,
+  withoutReplacedInstalls,
 } from "../src/local-extensions.ts";
 
 test("checkouts are the package directories with a pi manifest under the mount", () => {
@@ -174,4 +175,18 @@ test("an installed copy rejected in favour of a checkout is reported as a replac
     "error",
   );
   assert.equal(describeExtensionError(installed, "Extension path does not exist", checkouts).level, "error");
+});
+
+test("an installed copy is dropped when a checkout of the same package is present", () => {
+  const checkouts = [
+    { path: "/app/extensions/pi-qdash", name: "@oqtopus-team/pi-qdash" },
+    { path: "/app/extensions/unnamed", name: null },
+  ];
+  const checkout = { path: "/app/extensions/pi-qdash/extensions/qdash.ts" };
+  const installed = { path: "/app/.pi-agent/npm/node_modules/@oqtopus-team/pi-qdash/extensions/qdash.ts" };
+  const other = { path: "/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval/extensions/qcaleval.ts" };
+  // pi lists the checkout first and the rejected installed copy after it.
+  assert.deepEqual(withoutReplacedInstalls([checkout, installed, other], checkouts), [checkout, other]);
+  // Without a checkout of that package, the installed copy stays.
+  assert.deepEqual(withoutReplacedInstalls([installed, other], []), [installed, other]);
 });
