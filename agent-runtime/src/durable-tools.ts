@@ -19,8 +19,12 @@ import {
   isExperimentalWriteTool,
 } from "./allowed-tools.ts";
 import type { QDashConnection } from "./auth.ts";
+import { acceptsImages, hasImages, latestImages, withImages } from "./figure-context.ts";
 import { isLocalExtension } from "./local-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
+
+/** Newest transcript entries searched for a figure when a tool asks for one. */
+const FIGURE_SCAN_LIMIT = 50;
 
 /** Whether an extension comes from a mounted development checkout. */
 function isLocal(extension: { path?: string }, roots: readonly string[]): boolean {
@@ -114,7 +118,11 @@ export function adaptCodingAgentTool(
   modelRuntime: ModelRuntime,
   cwd: string,
   connection: QDashConnection,
-  options: { replay?: "safe" | "unsafe" } = {},
+  options: {
+    replay?: "safe" | "unsafe";
+    /** Fill an omitted `images` argument from the newest figure in the transcript. */
+    fillImages?: boolean;
+  } = {},
 ): ToolRegistration {
   const writesQDash = isExperimentalWriteTool(tool.name);
   const parameters = withParameterOverrides(tool.name, tool.parameters);
@@ -149,10 +157,20 @@ export function adaptCodingAgentTool(
           control: { terminate: true as const },
         };
       }
+      let callArgs: unknown = args;
+      if (options.fillImages && !hasImages(args)) {
+        // The model names the figure it wants evaluated by having fetched or
+        // received it; the bytes are taken from the transcript, not its call.
+        const page = await api.commit(
+          (tx) => tx.scanEntries({ conversationId: api.conversationId }, FIGURE_SCAN_LIMIT),
+          context,
+        );
+        callArgs = withImages(args as object, latestImages(page.items));
+      }
       const result = await runCodingAgentTool(
         tool,
         api.callId,
-        args,
+        callArgs,
         context.abortSignal,
         modelRuntime,
         cwd,
@@ -265,9 +283,14 @@ export function buildQDashExtension(
         console.warn(`[agent-runtime] local extension ${extension.path} replaces tool ${name}`);
       }
       const replay = local && !registered.definition.annotations?.readOnlyHint ? "unsafe" : "safe";
+      // Only checkout tools evaluate figures; pi-qdash tools fetch them.
+      const fillImages = local && acceptsImages(registered.definition.parameters);
       tools.set(
         name,
-        adaptCodingAgentTool(registered.definition, modelRuntime, cwd, connection, { replay }),
+        adaptCodingAgentTool(registered.definition, modelRuntime, cwd, connection, {
+          replay,
+          fillImages,
+        }),
       );
       if (writeName) writes.set(name, registered.definition);
     }

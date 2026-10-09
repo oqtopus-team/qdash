@@ -44,7 +44,7 @@ analysis_models:
         reasoning_effort: xhigh
     reasoning_effort: high
     num_ctx: 65536
-    max_output_tokens: 16384
+    max_output_tokens: 8192
   # - provider: ollama
   #   name: nvidia/Gemma-4-31B-IT-NVFP4 # gemma4:26b
   #   api_style: completion

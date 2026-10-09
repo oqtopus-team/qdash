@@ -113,6 +113,66 @@ test("a checkout tool with a pinned name replaces the pinned implementation", as
   assert.equal(pinnedTool.calls(), 0);
 });
 
+test("a checkout tool with an `images` parameter gets the newest transcript figure", async () => {
+  const seen = [];
+  const evaluate = {
+    definition: {
+      name: "qcal_evaluate",
+      label: "Evaluate",
+      description: "Evaluate a plot",
+      parameters: Type.Object({
+        context: Type.String(),
+        images: Type.Optional(Type.Array(Type.Object({ data: Type.String(), mimeType: Type.String() }))),
+      }),
+      execute: async (_id, params) => {
+        seen.push(params);
+        return { content: [], details: {} };
+      },
+    },
+  };
+  const { extension } = buildQDashExtension(
+    [{ path: "/app/extensions/pi-qcaleval/extensions/qcaleval.ts", tools: new Map([["qcal_evaluate", evaluate]]) }],
+    {},
+    "/tmp/work",
+    connection,
+    false,
+    ["/app/extensions/pi-qcaleval"],
+  );
+  const scans = [];
+  const api = {
+    callId: "call-1",
+    conversationId: "conv-1",
+    commit: async (change) =>
+      change({
+        scanEntries: async (query, limit) => {
+          scans.push({ query, limit });
+          return {
+            items: [
+              { model: [{ role: "user", content: "evaluate it" }] },
+              {
+                model: [
+                  { role: "toolResult", content: [{ type: "image", data: "png-bytes", mimeType: "image/png" }] },
+                ],
+              },
+            ],
+          };
+        },
+      }),
+  };
+  const tool = extension.tools[0];
+
+  await tool.execute({ context: "Rabi on Q05" }, api, { abortSignal: undefined });
+  assert.deepEqual(scans, [{ query: { conversationId: "conv-1" }, limit: 50 }]);
+  assert.deepEqual(seen[0].images, [{ data: "png-bytes", mimeType: "image/png" }]);
+  assert.equal(seen[0].context, "Rabi on Q05");
+
+  // Images the model passed itself are kept, and the transcript is not read.
+  const own = [{ data: "own-bytes", mimeType: "image/png" }];
+  await tool.execute({ context: "Rabi on Q05", images: own }, api, { abortSignal: undefined });
+  assert.equal(scans.length, 1);
+  assert.deepEqual(seen[1].images, own);
+});
+
 test("experimental write tools require opt-in and never run from the model's call", async () => {
   const write = registered("qdash_create_forum_post");
   const { extension, writeTools } = buildQDashExtension(

@@ -31,7 +31,11 @@ import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { askUserTool } from "./ask-tool.ts";
 import { formatSettledDetail } from "./events.ts";
-import { localToolNames, parseExtensionPaths } from "./local-extensions.ts";
+import {
+  buildLocalToolGuide,
+  localToolNames,
+  parseExtensionPaths,
+} from "./local-extensions.ts";
 import {
   buildQDashExtension,
   type ApprovalRequest,
@@ -171,6 +175,7 @@ export class SharedRuntime {
       ? extractToolGuide(readFileSync(guideSkill.filePath, "utf8"), qdashToolNames)
       : null;
     if (!toolGuide) console.warn("[agent-runtime] no tool guide: qdash skill not found");
+    const localToolGuide = buildLocalToolGuide(extensions, EXTENSION_PATHS, new Set(localTools));
 
     const copilotExtension = defineExtension({
       name: "qdash-copilot",
@@ -184,6 +189,7 @@ export class SharedRuntime {
               EXPERIMENTAL_WRITE_TOOLS_ENABLED,
               skills,
               toolGuide,
+              localToolGuide,
             ),
           { tag: false },
         ),

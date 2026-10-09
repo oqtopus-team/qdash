@@ -37,6 +37,36 @@ export function isLocalExtension(extensionPath: string, roots: readonly string[]
   return roots.some((root) => resolved === root || resolved.startsWith(root + sep));
 }
 
+/**
+ * System-prompt lines for the tools of local extension checkouts.
+ *
+ * pi-qdash's routing guide comes from its `qdash` skill (tool-guide.ts), which
+ * knows nothing about other extensions. Their tools describe themselves with
+ * pi's `promptSnippet`/`promptGuidelines`, so those are inlined instead.
+ */
+export function buildLocalToolGuide(
+  extensions: ReadonlyArray<{
+    path: string;
+    tools?: ReadonlyMap<
+      string,
+      { definition: { description: string; promptSnippet?: string; promptGuidelines?: string[] } }
+    >;
+  }>,
+  roots: readonly string[],
+  enabledTools: ReadonlySet<string>,
+): string | null {
+  const lines: string[] = [];
+  for (const extension of extensions) {
+    if (!isLocalExtension(extension.path, roots)) continue;
+    for (const [name, { definition }] of extension.tools ?? []) {
+      if (!enabledTools.has(name)) continue;
+      lines.push(`- \`${name}\`: ${definition.promptSnippet ?? definition.description}`);
+      for (const guideline of definition.promptGuidelines ?? []) lines.push(`  - ${guideline}`);
+    }
+  }
+  return lines.length ? lines.join("\n") : null;
+}
+
 /** Tool names provided by local extension checkouts, for logging and the tool list. */
 export function localToolNames(
   extensions: ReadonlyArray<{ path: string; tools?: ReadonlyMap<string, unknown> }>,

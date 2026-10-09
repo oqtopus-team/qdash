@@ -49,7 +49,10 @@ interface ChatBody {
   initial_message?: string;
   model?: { provider?: string; name?: string };
   thinking_level?: SessionRequest["thinkingLevel"];
+  /** Figures attached to this turn's message. */
   images?: ImageBody[];
+  /** Figures of the opening context; attached only when the conversation is new. */
+  initial_images?: ImageBody[];
   /** The user's decision on a write call the previous turn asked approval for. */
   approval?: { id?: string; approve?: boolean };
 }
@@ -281,7 +284,11 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
           message = decisionMessage(approval, { approved: false });
         }
       }
-      const images = isNew ? toImageContent(body.images) : [];
+      // Opening figures go with the first turn only; attachments go with every turn.
+      const images = [
+        ...(isNew ? toImageContent(body.initial_images) : []),
+        ...toImageContent(body.images),
+      ];
       const content = images.length
         ? [{ type: "text" as const, text: message }, ...images]
         : message;

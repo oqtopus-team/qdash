@@ -202,7 +202,7 @@ class TestStream:
         assert payload["request_id"] == "request-1"
         assert payload["message"] == "Is this result trustworthy?"
         assert "knowledge-v1" in payload["initial_message"]
-        assert [image["data"] for image in payload["images"]] == [
+        assert [image["data"] for image in payload["initial_images"]] == [
             "expected-b64",
             "experiment-b64",
         ]
@@ -220,7 +220,7 @@ class TestStream:
         payload = captured["payload"]
         assert payload["message"] == "Is this result trustworthy?"
         assert "knowledge-v1" in payload["initial_message"]
-        assert payload["images"]
+        assert payload["initial_images"]
 
     @pytest.mark.asyncio
     async def test_images_sent_rides_on_the_result_event(

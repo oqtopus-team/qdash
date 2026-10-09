@@ -43,3 +43,10 @@ test("the tool guide is inlined after the guidelines", () => {
   assert.match(prompt, /Tool guide:\n- `qdash_list_chips` for chips/);
   assert.doesNotMatch(buildSystemPrompt("auto", "en"), /Tool guide/);
 });
+
+test("local extension tools are introduced after the pi-qdash tool guide", () => {
+  const guide = "- `qcal_evaluate`: Diagnose a calibration plot\n  - Use it for every figure.";
+  const prompt = buildSystemPrompt("auto", "en", false, [], "qdash guide", guide);
+  assert.match(prompt, /Tool guide:\nqdash guide\n\nAdditional tools:\n- `qcal_evaluate`/);
+  assert.doesNotMatch(buildSystemPrompt("auto", "en", false, [], "qdash guide"), /Additional tools/);
+});
