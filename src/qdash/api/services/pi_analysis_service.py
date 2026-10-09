@@ -120,8 +120,9 @@ async def stream(
         ),
         "model": {"provider": config.model.provider, "name": config.model.name},
         "thinking_level": pi_chat_service.thinking_level(config),
-        # The durable runtime accepts these only when the conversation is new.
-        "images": collect_images(bundle),
+        # Opening figures: the runtime attaches them only when the conversation
+        # is new. Per-turn attachments would go in "images" instead.
+        "initial_images": collect_images(bundle),
         **pi_chat_service.approval_payload(request.approval),
     }
 

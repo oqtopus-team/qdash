@@ -12,6 +12,8 @@ export function buildSystemPrompt(
   skills: ReadonlyArray<{ name: string; description: string }> = [],
   /** Routing guide from the pi-qdash `qdash` skill; see tool-guide.ts. */
   toolGuide: string | null = null,
+  /** Guidelines of tools from local extension checkouts; see local-extensions.ts. */
+  localToolGuide: string | null = null,
 ): string {
   const thinkingLanguageName = languageName(thinkingLanguage);
   return [
@@ -37,6 +39,13 @@ export function buildSystemPrompt(
           "",
           "Tool guide:",
           toolGuide,
+        ]
+      : []),
+    ...(localToolGuide
+      ? [
+          "",
+          "Additional tools:",
+          localToolGuide,
         ]
       : []),
     ...(skills.length

@@ -133,7 +133,10 @@ docker compose -f compose.yaml -f compose.extensions.yaml up -d agent-runtime
 
 `compose.extensions.yaml` mounts the directory at `/app/extensions` and sets
 `AGENT_RUNTIME_EXTENSION_PATHS`, which the runtime passes to pi's resource loader as
-additional extension paths. The checkout must use the pi package layout
+additional extension paths. Any `docker compose up -d` without the `-f` pair
+recreates the runtime without the checkout, so while developing an extension set
+`COMPOSE_FILE=compose.yaml:compose.extensions.yaml` in `.env`; Compose then
+applies the override to every invocation from the project directory. The checkout must use the pi package layout
 (`package.json` with a `pi.extensions` manifest, like pi-qdash) and may depend only
 on the packages the runtime already ships (`@earendil-works/pi-coding-agent`,
 `typebox`), because its imports resolve from the runtime's `node_modules`.
@@ -152,7 +155,18 @@ offered to the model without the pi-qdash allowlist review
   implementation; the runtime logs the replacement at startup.
 
 Checkout tools receive the same extension context as pi-qdash tools, including
-`modelRegistry` for calling a model other than the conversation's. Restart the
+`modelRegistry` for calling a model other than the conversation's. Their pi
+`promptSnippet` and `promptGuidelines` are inlined into the system prompt under
+"Additional tools", since the pi-qdash tool guide does not know them. A checkout
+tool that declares an `images` parameter (for example `qcal_evaluate`) gets it
+filled by the runtime when the model omits it: the newest figure in the
+conversation, whether a user attachment or a figure a pi-qdash tool returned, is
+taken from the durable transcript, so the model never has to copy image bytes
+into a call.
+
+The runtime's `/chat` body carries two image lists: `initial_images` (the
+analysis sidebar's opening figures, attached only when the conversation is new)
+and `images` (attachments of the current turn, attached every time). Restart the
 runtime after editing the extension; the startup log lists the local paths and
 the tools they contributed. Relative entries in `AGENT_RUNTIME_EXTENSION_PATHS`
 resolve against the runtime's `AGENT_WORK_DIR`, as pi does; prefer absolute paths.

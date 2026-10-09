@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  buildLocalToolGuide,
   isLocalExtension,
   localToolNames,
   parseExtensionPaths,
@@ -55,4 +56,39 @@ test("only tools defined by local checkouts are collected", () => {
     "qcal_evaluate",
     "qcal_list_models",
   ]);
+});
+
+test("local tools describe themselves to the model through their pi guidelines", () => {
+  const extensions = [
+    {
+      path: "/app/.pi-agent/packages/pi-qdash/extensions/qdash.ts",
+      tools: new Map([["qdash_get_figure", { definition: { description: "Fetch a figure" } }]]),
+    },
+    {
+      path: "/app/extensions/pi-qcaleval/extensions/qcaleval.ts",
+      tools: new Map([
+        [
+          "qcal_evaluate",
+          {
+            definition: {
+              description: "Long description",
+              promptSnippet: "Diagnose a calibration plot",
+              promptGuidelines: ["Use it for every figure.", "Pass the task name as context."],
+            },
+          },
+        ],
+        ["qcal_disabled", { definition: { description: "Not enabled" } }],
+      ]),
+    },
+  ];
+  const roots = ["/app/extensions/pi-qcaleval"];
+  assert.equal(buildLocalToolGuide(extensions, [], new Set(["qcal_evaluate"])), null);
+  assert.equal(
+    buildLocalToolGuide(extensions, roots, new Set(["qcal_evaluate"])),
+    [
+      "- `qcal_evaluate`: Diagnose a calibration plot",
+      "  - Use it for every figure.",
+      "  - Pass the task name as context.",
+    ].join("\n"),
+  );
 });

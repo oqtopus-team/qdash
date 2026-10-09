@@ -72,7 +72,7 @@ model:
   reasoning_effort: high
   # Maximum tokens for response
   num_ctx: 65536
-  max_output_tokens: 16384
+  max_output_tokens: 8192
 
   # provider: bedrock
   # name: jp.anthropic.claude-sonnet-4-6

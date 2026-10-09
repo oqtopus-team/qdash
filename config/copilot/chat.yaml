@@ -49,7 +49,9 @@ chat_models:
         reasoning_effort: xhigh
     reasoning_effort: high
     num_ctx: 65536
-    max_output_tokens: 16384
+    # Chat answers and their thinking fit well within 8k; 16k reserved a quarter
+    # of the 64k window for output and left prompts no room.
+    max_output_tokens: 8192
   # - provider: ollama
   #   name: nvidia/Gemma-4-31B-IT-NVFP4
   #   api_style: completion
