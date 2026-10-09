@@ -86,8 +86,8 @@ model:
   # api_style: completion
   # base_url: env:VLLM_BASE_URL
   # api_key_env: VLLM_API_KEY
-  # num_ctx: 32768
+  # num_ctx: 16384
   # temperature: 0.2
   # reasoning_effort: none
   # disable_thinking_instruction: true
-  # max_output_tokens: 8192
+  # max_output_tokens: 2048

@@ -94,13 +94,15 @@ analysis_models:
     api_style: completion
     base_url: env:VLLM_BASE_URL
     api_key_env: VLLM_API_KEY
-    num_ctx: 32768
+    # Must not exceed the server's max_model_len (16384 on llm.qiqb.dev).
+    num_ctx: 16384
     # Model card recommendation. The model is not a thinking model.
     temperature: 0.2
     reasoning_effort: none
     disable_thinking_instruction: true
-    # Model card: 8192 for zero-shot, up to 32767 with in-context examples.
-    max_output_tokens: 8192
+    # The prompt (system prompt + tool schemas) already takes roughly half of
+    # the context, so leave the model card's 8192 for larger deployments.
+    max_output_tokens: 2048
 
   # - provider: bedrock
   #   name: jp.anthropic.claude-sonnet-4-6

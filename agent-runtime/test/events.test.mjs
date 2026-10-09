@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { encodeLine, toNdjsonEvents } from "../src/events.ts";
+import { encodeLine, formatSettledDetail, toNdjsonEvents } from "../src/events.ts";
 
 test("tool start becomes a tool_start line", () => {
   assert.deepEqual(
@@ -165,4 +165,14 @@ test("figures a tool fetched travel with tool_end as paths", () => {
     result: { details: { path: "a.json", mediaType: "application/json", figurePaths: [] } },
   });
   assert.equal("figures" in json[0], false);
+});
+
+test("formatSettledDetail appends the provider error text to an unanswered reason", () => {
+  assert.equal(formatSettledDetail(undefined), "");
+  assert.equal(formatSettledDetail(""), "");
+  assert.equal(
+    formatSettledDetail("400: tool choice requires --enable-auto-tool-choice"),
+    ": 400: tool choice requires --enable-auto-tool-choice",
+  );
+  assert.equal(formatSettledDetail({ code: 400 }), ': {"code":400}');
 });
