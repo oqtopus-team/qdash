@@ -70,6 +70,30 @@ order visible in the template file itself.
 `one_qubit.py` lists its coarse and fine tasks locally, with a status filter between
 them. Its tests compare those lists with `coarse_one.py` and `fine_one.py`.
 
+## Preparing EF Chevron Measurements
+
+`ConfigureEF` assigns GE and EF drive channels using Qubex's `ge-ef-cr` mode.
+Run it immediately before `CheckEFChevron` in the same worker session:
+
+```python
+tasks = ["ConfigureEF", "CheckEFChevron"]
+```
+
+The qubit must already have calibrated GE DRAG pi pulse parameters and readout
+parameters. `CheckEFChevron` verifies that distinct GE and EF channels exist before
+starting measurement. Configuration tasks delegate channel allocation to Qubex.
+
+`Configure` also accepts the `configuration_mode` run parameter: `ge-cr-cr`,
+`ge-ef-cr`, or `ge-ef-fh`. It defaults to `ge-cr-cr`, regardless of the session's
+initial mode or a preceding `ConfigureEF` task.
+`ConfigureEF` defaults to `ge-ef-cr` and also accepts `ge-ef-fh`.
+Each configuration task loads the selected mode and pushes it to the boxes.
+A separate execution must establish its own EF configuration.
+
+EF configuration changes the channel allocation available to CR gates. Before
+returning to CR calibration, run `Configure` without a mode override to restore
+`ge-cr-cr`.
+
 ## Adding a New Calibration Task
 
 1. Create a task class in `workflow/calibtasks/`:

@@ -4491,7 +4491,13 @@
         "file_path": "box_setup/configure.py",
         "input_parameters": {},
         "name": "Configure",
-        "run_parameters": {},
+        "run_parameters": {
+          "configuration_mode": {
+            "description": "Control layout: ge-cr-cr, ge-ef-cr, or ge-ef-fh.",
+            "value": "ge-cr-cr",
+            "value_type": "str"
+          }
+        },
         "task_type": "qubit"
       },
       {
@@ -4509,6 +4515,21 @@
           }
         },
         "task_type": "system"
+      },
+      {
+        "class_name": "ConfigureEF",
+        "description": "Configure GE and EF drive channels before EF calibration in the same session.",
+        "file_path": "box_setup/configure.py",
+        "input_parameters": {},
+        "name": "ConfigureEF",
+        "run_parameters": {
+          "configuration_mode": {
+            "description": "EF control layout: ge-ef-cr or ge-ef-fh.",
+            "value": "ge-ef-cr",
+            "value_type": "str"
+          }
+        },
+        "task_type": "qubit"
       },
       {
         "class_name": "CreateDRAGHPIPulse",
