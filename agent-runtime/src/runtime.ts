@@ -26,6 +26,7 @@ import { compactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { askUserTool } from "./ask-tool.ts";
+import { formatSettledDetail } from "./events.ts";
 import {
   buildQDashExtension,
   type ApprovalRequest,
@@ -316,7 +317,9 @@ export class SharedRuntime {
         .wait(BACKGROUND_CONTEXT)
         .finally(() => clearTimeout(timeout));
       if (settled.status !== "done" || settled.type !== "input") {
-        throw new Error(`review was not answered: ${settled.reason}`);
+        throw new Error(
+          `review was not answered: ${settled.reason}${formatSettledDetail(settled.detail)}`,
+        );
       }
 
       const view = await conversation.context(BACKGROUND_CONTEXT);

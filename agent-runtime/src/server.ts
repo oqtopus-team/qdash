@@ -9,7 +9,7 @@ import {
 
 import { requestQDashAuth } from "./auth.ts";
 import { WRAP_UP_MESSAGE } from "./budget.ts";
-import { encodeLine, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
+import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
 import { hasBearerToken, readJsonBody, RequestError } from "./http.ts";
 import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
 import {
@@ -326,9 +326,12 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
           text: await answerText(conversation, settled.answer),
         });
       } else {
+        // `detail` carries the provider's error text (HTTP status, vLLM message).
+        const detail = formatSettledDetail(settled.detail);
+        console.error(`[agent-runtime] chat not answered: ${settled.reason}${detail}`);
         write({
           type: "error",
-          message: `conversation was not answered: ${settled.reason}`,
+          message: `conversation was not answered: ${settled.reason}${detail}`,
         });
       }
     } catch (error) {
