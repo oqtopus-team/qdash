@@ -223,12 +223,12 @@ def test_user_attachments_are_forwarded_as_turn_images() -> None:
         {
             "message": "Evaluate this",
             "session_id": "s1",
-            "images": [{"data": "cGxvdA==", "mimeType": "image/png"}],
+            "images": [{"data": "iVBORw0KGgo=", "mimeType": "image/png"}],
         }
     )
     payload = pi_chat_service._request_payload(request, config, "alice")
 
-    assert payload["images"] == [{"data": "cGxvdA==", "mimeType": "image/png"}]
+    assert payload["images"] == [{"data": "iVBORw0KGgo=", "mimeType": "image/png"}]
     # A turn without attachments carries no images key, so the runtime attaches nothing.
     bare = ChatRequest.model_validate({"message": "hi", "session_id": "s1"})
     assert "images" not in pi_chat_service._request_payload(bare, config, "alice")
@@ -253,6 +253,6 @@ def test_attachments_are_limited_to_supported_image_types() -> None:
             {
                 "message": "x",
                 "session_id": "s1",
-                "images": [{"data": "YQ==", "mimeType": "image/png"}] * 5,
+                "images": [{"data": "iVBORw0KGgo=", "mimeType": "image/png"}] * 5,
             }
         )

@@ -40,6 +40,8 @@ interface ChatComposerProps {
   onModelChange: (key: string) => void;
   /** Figures staged for the next message; omit to hide attachments entirely. */
   attachments?: StagedAttachment[];
+  isStaging?: boolean;
+  attachmentNotice?: string;
   /** Files picked, pasted, or dropped; the owner stages them. */
   onAttach?: (files: File[]) => void;
   onRemoveAttachment?: (id: string) => void;
@@ -64,6 +66,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     selectedModelKey,
     onModelChange,
     attachments,
+    isStaging = false,
+    attachmentNotice,
     onAttach,
     onRemoveAttachment,
     compact = false,
@@ -73,6 +77,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [notice, setNotice] = useState("");
   useImperativeHandle(ref, () => ({ focus: () => textareaRef.current?.focus() }), []);
 
   // Grow with the content up to MAX_HEIGHT_PX, then scroll.
@@ -85,7 +90,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 
   const canAttach = Boolean(onAttach) && !isStreaming && !disabled;
   const attachmentsFull = (attachments?.length ?? 0) >= MAX_ATTACHMENTS;
-  const canSend = value.trim().length > 0 && !isStreaming && !disabled;
+  const canSend = value.trim().length > 0 && !isStreaming && !disabled && !isStaging;
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -105,6 +110,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
       const files = pastedImageFiles(e.clipboardData);
       if (files.length === 0) return;
       e.preventDefault();
+      setNotice("");
       onAttach?.(files);
     },
     [canAttach, onAttach],
@@ -112,12 +118,20 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLFormElement>) => {
-      setDragging(false);
-      if (!canAttach) return;
-      const files = acceptedImageFiles(e.dataTransfer.files);
-      if (files.length === 0) return;
       e.preventDefault();
-      onAttach?.(files);
+      setDragging(false);
+      if (!e.dataTransfer.files.length) return;
+      if (!canAttach) {
+        setNotice("Images cannot be attached while this chat is busy.");
+        return;
+      }
+      const files = acceptedImageFiles(e.dataTransfer.files);
+      setNotice(
+        files.length < e.dataTransfer.files.length
+          ? "Only PNG and JPEG images can be attached."
+          : "",
+      );
+      if (files.length) onAttach?.(files);
     },
     [canAttach, onAttach],
   );
@@ -127,9 +141,10 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
       const files = acceptedImageFiles(e.target.files);
       // Reset so picking the same file again fires a change event.
       e.target.value = "";
-      if (files.length) onAttach?.(files);
+      setNotice("");
+      if (canAttach && files.length) onAttach?.(files);
     },
-    [onAttach],
+    [canAttach, onAttach],
   );
 
   const selected = modelOptions.find((o) => o.key === selectedModelKey) ?? modelOptions[0];
@@ -142,13 +157,22 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         if (canSend) onSubmit();
       }}
       onDragOver={(e) => {
-        if (!canAttach) return;
         e.preventDefault();
-        setDragging(true);
+        setDragging(canAttach);
       }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
     >
+      {(notice || attachmentNotice) && (
+        <p role="alert" className="text-xs text-error px-1 pb-2">
+          {notice || attachmentNotice}
+        </p>
+      )}
+      {isStaging && (
+        <p role="status" className="text-xs text-base-content/60 px-1 pb-2">
+          Preparing images…
+        </p>
+      )}
       {attachments && attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 px-1 pb-2" aria-label="Attached figures">
           {attachments.map((attachment) => (

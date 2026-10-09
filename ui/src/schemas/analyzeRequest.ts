@@ -11,11 +11,17 @@ import type { AnalyzeRequestImageBase64 } from './analyzeRequestImageBase64';
 import type { AnalyzeRequestModelOverride } from './analyzeRequestModelOverride';
 import type { AnalyzeRequestRequestId } from './analyzeRequestRequestId';
 import type { AnalyzeRequestSessionId } from './analyzeRequestSessionId';
+import type { ChatImageAttachment } from './chatImageAttachment';
 
 /**
  * Request body for POST /copilot/analyze.
  */
 export interface AnalyzeRequest {
+  /**
+     * Figures attached to this turn (at most 12 MiB of base64 in total).
+     * @maxItems 4
+     */
+  images?: ChatImageAttachment[];
   /** Task class name (e.g. CheckT1) */
   task_name: string;
   chip_id: string;

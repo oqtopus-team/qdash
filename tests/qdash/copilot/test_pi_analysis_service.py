@@ -68,6 +68,7 @@ async def _collect(
     *,
     stored: list[dict[str, Any]],
     ndjson: list[dict[str, Any]] | None = None,
+    request: AnalyzeRequest | None = None,
 ) -> tuple[dict[str, Any], list[tuple[str, dict[str, Any]]], list[list[dict[str, Any]]]]:
     """Run one turn against a stubbed runtime, returning payload, events and writes."""
     captured: dict[str, Any] = {}
@@ -96,7 +97,7 @@ async def _collect(
     events = [
         _parse(sse)
         async for sse in pi_analysis_service.stream(
-            _request(),
+            request or _request(),
             _config(),
             _bundle(),
             username="alice",
@@ -260,3 +261,19 @@ class TestStream:
                 },
             )
         ]
+
+
+@pytest.mark.asyncio
+async def test_analysis_forwards_turn_attachments_separately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """User attachments reach the runtime on follow-up turns as well as the opening turn."""
+    request = AnalyzeRequest.model_validate(
+        {
+            **_request().model_dump(),
+            "images": [{"data": "iVBORw0KGgo=", "mimeType": "image/png"}],
+        }
+    )
+    captured, _, _ = await _collect(monkeypatch, stored=[{"role": "user"}], request=request)
+    assert captured["payload"]["images"] == [{"data": "iVBORw0KGgo=", "mimeType": "image/png"}]
+    assert len(captured["payload"]["initial_images"]) == 2

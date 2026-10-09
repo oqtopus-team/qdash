@@ -76,7 +76,7 @@ interface CopilotChatSessionContextValue {
   setMessageFeedback: (sessionId: string, index: number, feedback: AnswerFeedback | null) => void;
   findSessionByContext: (context: AnalysisContext) => CopilotChatSession | null;
 
-  sendMessage: (text: string, options?: SendOptions) => void;
+  sendMessage: (text: string, options?: SendOptions) => boolean;
   stop: (sessionId: string) => void;
 }
 
@@ -534,12 +534,12 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
   const sendMessage = useCallback(
     (text: string, options?: SendOptions) => {
       const sessionId = options?.sessionId ?? activeSessionId ?? createNewSession(null);
-      if (controllers.current.has(sessionId)) return;
+      if (controllers.current.has(sessionId)) return false;
       const session = sessionsRef.current.find((s) => s.id === sessionId);
       // A session restored from the list has no local history until its detail
       // request completes. Sending from that placeholder would replace the
       // persisted conversation with only the new turn.
-      if (session && !session.messagesLoaded && !options?.history) return;
+      if (session && !session.messagesLoaded && !options?.history) return false;
       const history = options?.history ?? session?.messages ?? [];
 
       const controller = new AbortController();
@@ -553,9 +553,9 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
         attachedImage:
           images.length > 0 ||
           (Boolean(session?.context) && !history.some((m) => m.role === "user")),
-        ...(images.length
-          ? { attachments: images.map((i) => `data:${i.mimeType};base64,${i.data}`) }
-          : {}),
+        // An empty local list distinguishes server-provided analysis figures
+        // from user attachments whose bytes were lost after a reload.
+        attachments: images.map((i) => `data:${i.mimeType};base64,${i.data}`),
       };
       updateSessionMessages(sessionId, [...history, userMsg]);
 
@@ -660,6 +660,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
           setRun(sessionId, null);
         }
       })();
+      return true;
     },
     [activeSessionId, awaitCreate, createNewSession, setRun, updateSessionMessages],
   );

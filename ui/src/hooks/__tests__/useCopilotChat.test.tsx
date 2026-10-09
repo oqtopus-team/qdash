@@ -372,3 +372,76 @@ describe("useCopilotChat streaming", () => {
     await waitFor(() => expect(result.current.floating.isStreaming).toBe(false));
   });
 });
+
+describe("image turn replay", () => {
+  it.each(["retry", "edit"])("preserves the original image on %s", async (action) => {
+    const result = await renderChat();
+    const images = [{ data: "iVBORw0KGgo=", mimeType: "image/png" }];
+    act(() => result.current.chat.send("Evaluate", images));
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+    stream.push(sse("result", { blocks: [{ type: "text", content: "Here", chart: null }] }));
+    stream.close();
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(false));
+    stream = controllableStream();
+    fetchMock.mockClear();
+    act(() =>
+      action === "retry"
+        ? result.current.chat.retryLast()
+        : result.current.chat.editMessage(0, "Evaluate again"),
+    );
+    await waitFor(() => expect(streamRequest().body.images).toEqual(images));
+    expect(result.current.chat.messages[0].attachments).toEqual([
+      "data:image/png;base64,iVBORw0KGgo=",
+    ]);
+  });
+
+  it("blocks retry and edit when reloaded images cannot be recovered", async () => {
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/copilot/chat/sessions") && !init?.method) {
+        return Response.json({ sessions: [{ session_id: "saved", title: "Plot", context: null }] });
+      }
+      return Response.json({
+        session_id: "saved",
+        title: "Plot",
+        context: null,
+        messages: [
+          { role: "user", content: "Evaluate", attached_image: "1" },
+          { role: "assistant", content: "Done" },
+        ],
+      });
+    });
+    const result = await renderChat();
+    act(() => result.current.store.switchSession("saved"));
+    await waitFor(() => expect(result.current.chat.messages).toHaveLength(2));
+    expect(result.current.chat.canRetryLast).toBe(false);
+    expect(result.current.chat.canEditMessage(0)).toBe(false);
+    fetchMock.mockClear();
+    act(() => {
+      result.current.chat.retryLast();
+      result.current.chat.editMessage(0, "Again");
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports whether a turn was accepted before React renders the active stream", async () => {
+    const result = await renderChat();
+    act(() => result.current.store.createNewSession(null));
+    act(() => {
+      expect(result.current.chat.send("First")).toBe(true);
+      expect(result.current.chat.send("Second")).toBe(false);
+    });
+    await waitFor(() => expect(result.current.chat.messages[0]?.content).toBe("First"));
+  });
+});
+
+it("keeps retry available for locally known analysis context figures", async () => {
+  const result = await renderChat();
+  act(() => result.current.store.createNewSession(CONTEXT));
+  act(() => result.current.chat.send("Is this fit good?"));
+  await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+  stream.push(sse("result", { blocks: [{ type: "text", content: "Here", chart: null }] }));
+  stream.close();
+  await waitFor(() => expect(result.current.chat.isStreaming).toBe(false));
+  expect(result.current.chat.canRetryLast).toBe(true);
+  expect(result.current.chat.canEditMessage(0)).toBe(true);
+});

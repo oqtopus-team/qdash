@@ -7,12 +7,15 @@
  * well below screen resolution.
  */
 
-import type { ChatImageAttachment } from "@/types/copilotChat";
+import type { ChatImageAttachment, ChatMessage } from "@/types/copilotChat";
 
 /** Attachments per message; the evaluation tool reads the newest figure. */
 export const MAX_ATTACHMENTS = 4;
 /** Longest edge after downscaling, in pixels. */
 export const MAX_IMAGE_EDGE = 1600;
+/** Match the API's base64 limits, leaving room in the runtime request. */
+export const MAX_IMAGE_DATA_LENGTH = 6 * 1024 * 1024;
+export const MAX_TOTAL_IMAGE_DATA_LENGTH = 12 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg"] as const;
 export const ACCEPT_ATTRIBUTE = ACCEPTED_IMAGE_TYPES.join(",");
 
@@ -26,7 +29,7 @@ export interface StagedAttachment extends ChatImageAttachment {
 }
 
 export function isSupportedImage(file: Pick<File, "type">): boolean {
-  return (ACCEPTED_IMAGE_TYPES as readonly string[]).includes(file.type);
+  return !file.type || (ACCEPTED_IMAGE_TYPES as readonly string[]).includes(file.type);
 }
 
 /** Supported images from a drop, paste, or file picker, newest-first order kept. */
@@ -93,10 +96,24 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 /**
  * Stage one file: decode it, downscale if needed, and keep a preview.
- * JPEG stays JPEG; everything else is re-encoded as PNG so plots keep crisp lines.
+ * Resized JPEG stays JPEG; resized PNG stays PNG so plots keep crisp lines.
  */
 export async function stageAttachment(file: File): Promise<StagedAttachment> {
-  const original = await readAsDataUrl(file);
+  if (!isSupportedImage(file)) throw new Error("Only PNG and JPEG images can be attached.");
+  let original = await readAsDataUrl(file);
+  // Clipboard and drag sources sometimes omit the MIME type. Check the bytes
+  // before decoding so unsupported images do not silently become PNGs.
+  if (!file.type) {
+    const { data } = dataUrlToBase64(original);
+    const prefix = atob(data.slice(0, 12));
+    const mimeType = prefix.startsWith("\x89PNG\r\n\x1a\n")
+      ? "image/png"
+      : prefix.startsWith("\xff\xd8\xff")
+        ? "image/jpeg"
+        : null;
+    if (!mimeType) throw new Error("Only PNG and JPEG images can be attached.");
+    original = `data:${mimeType};base64,${data}`;
+  }
   const image = await loadImage(original);
   const { width, height } = fitWithin(image.naturalWidth, image.naturalHeight);
   let dataUrl = original;
@@ -107,12 +124,14 @@ export async function stageAttachment(file: File): Promise<StagedAttachment> {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("canvas is not available");
     context.drawImage(image, 0, 0, width, height);
-    dataUrl =
-      file.type === "image/jpeg"
-        ? canvas.toDataURL("image/jpeg", 0.9)
-        : canvas.toDataURL("image/png");
+    dataUrl = original.startsWith("data:image/jpeg;")
+      ? canvas.toDataURL("image/jpeg", 0.9)
+      : canvas.toDataURL("image/png");
   }
   const { data, mimeType } = dataUrlToBase64(dataUrl);
+  if (data.length > MAX_IMAGE_DATA_LENGTH) {
+    throw new Error("This image is too large. Choose a smaller image.");
+  }
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: file.name,
@@ -120,4 +139,14 @@ export async function stageAttachment(file: File): Promise<StagedAttachment> {
     data,
     mimeType,
   };
+}
+
+/** Recover locally retained image bytes; null means the turn cannot be replayed safely. */
+export function recoverMessageImages(message: ChatMessage): ChatImageAttachment[] | null {
+  if (!message.attachments) return message.attachedImage ? null : [];
+  try {
+    return message.attachments.map(dataUrlToBase64);
+  } catch {
+    return null;
+  }
 }

@@ -113,6 +113,8 @@ export * from './candidateGateResponse';
 export * from './candidateGateResponseMaximum';
 export * from './candidateGateResponseMinimum';
 export * from './changePassword200';
+export * from './chatImageAttachment';
+export * from './chatImageAttachmentMimeType';
 export * from './chipDatesResponse';
 export * from './chipDeletionImpactResponse';
 export * from './chipMetricsResponse';

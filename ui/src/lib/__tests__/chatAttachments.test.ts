@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   MAX_ATTACHMENTS,
+  MAX_IMAGE_DATA_LENGTH,
+  stageAttachment,
+  recoverMessageImages,
   MAX_IMAGE_EDGE,
   acceptedImageFiles,
   attachmentRoom,
@@ -67,5 +70,58 @@ describe("dataUrlToBase64", () => {
       data: "iVBORw0KGgo=",
     });
     expect(() => dataUrlToBase64("data:text/plain,hello")).toThrow(/data URL/);
+  });
+});
+
+describe("stageAttachment", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function decodeAsSmallImage() {
+    vi.stubGlobal(
+      "Image",
+      class {
+        naturalWidth = 800;
+        naturalHeight = 600;
+        onload: (() => void) | null = null;
+        set src(_value: string) {
+          queueMicrotask(() => this.onload?.());
+        }
+      },
+    );
+  }
+
+  it("detects the format of MIME-less PNG and JPEG files", async () => {
+    decodeAsSmallImage();
+    for (const [bytes, mimeType] of [
+      [[137, 80, 78, 71, 13, 10, 26, 10], "image/png"],
+      [[255, 216, 255], "image/jpeg"],
+    ] as const) {
+      const imageFile = new File([new Uint8Array(bytes)], "clipboard", { type: "" });
+      expect(acceptedImageFiles([imageFile])).toEqual([imageFile]);
+      expect(await stageAttachment(imageFile)).toMatchObject({ mimeType });
+    }
+  });
+
+  it("rejects unsupported bytes even when the MIME type is missing", async () => {
+    decodeAsSmallImage();
+    await expect(stageAttachment(new File(["GIF89a"], "unknown"))).rejects.toThrow(/PNG and JPEG/);
+  });
+
+  it("rejects oversized data even when no pixel resizing is needed", async () => {
+    decodeAsSmallImage();
+    const large = new File([new Uint8Array(MAX_IMAGE_DATA_LENGTH)], "large.png", {
+      type: "image/png",
+    });
+    await expect(stageAttachment(large)).rejects.toThrow(/too large/);
+  });
+});
+
+describe("recoverMessageImages", () => {
+  it("distinguishes text-only messages from images lost after reload", () => {
+    expect(recoverMessageImages({ role: "user", content: "hi" })).toEqual([]);
+    expect(recoverMessageImages({ role: "user", content: "hi", attachedImage: true })).toBeNull();
+    expect(
+      recoverMessageImages({ role: "user", content: "hi", attachments: ["invalid"] }),
+    ).toBeNull();
   });
 });
