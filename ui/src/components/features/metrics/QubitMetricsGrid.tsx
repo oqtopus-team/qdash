@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
-import { GitBranch, Maximize2, Move } from "lucide-react";
+import { GitBranch, Lock, ZoomIn } from "lucide-react";
 
 import {
   GridFullscreenButton,
@@ -214,6 +214,9 @@ const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }
   return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
 });
 
+/**
+ * Chip grid of per-qubit metric values with Lock (region selection) and Zoom (pan/zoom) view modes.
+ */
 export function QubitMetricsGrid({
   metricData,
   title,
@@ -656,14 +659,18 @@ export function QubitMetricsGrid({
         <div className="tabs tabs-boxed bg-base-200 w-fit">
           {isSquareGrid && (
             <button
+              type="button"
               className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
               onClick={() => setViewMode("region")}
+              title="Lock"
+              aria-label="Lock"
             >
-              <Maximize2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Region</span>
+              <Lock className="h-4 w-4" />
+              <span className="hidden sm:inline">Lock</span>
             </button>
           )}
           <button
+            type="button"
             className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
             onClick={() => {
               setViewMode("pan-zoom");
@@ -671,9 +678,11 @@ export function QubitMetricsGrid({
               setSelectedRegion(null);
               setRegionSelectionEnabled(false);
             }}
+            title="Zoom"
+            aria-label="Zoom"
           >
-            <Move className="h-4 w-4" />
-            <span className="hidden sm:inline">DOM</span>
+            <ZoomIn className="h-4 w-4" />
+            <span className="hidden sm:inline">Zoom</span>
           </button>
         </div>
 

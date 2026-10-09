@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
-import { ArrowRightLeft, GitBranch, Maximize2, Move } from "lucide-react";
+import { ArrowRightLeft, GitBranch, Lock, ZoomIn } from "lucide-react";
 
 import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
@@ -60,6 +60,9 @@ interface SelectedCouplingInfo {
   metric: MetricValue;
 }
 
+/**
+ * Chip grid of coupling metric values with Lock (region selection) and Zoom (pan/zoom) view modes.
+ */
 export function CouplingMetricsGrid({
   metricData,
   title,
@@ -590,14 +593,18 @@ export function CouplingMetricsGrid({
         <div className="tabs tabs-boxed bg-base-200/50 p-1">
           {isSquareGrid && (
             <button
+              type="button"
               className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
               onClick={() => setViewMode("region")}
+              title="Lock"
+              aria-label="Lock"
             >
-              <Maximize2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Region</span>
+              <Lock className="h-4 w-4" />
+              <span className="hidden sm:inline">Lock</span>
             </button>
           )}
           <button
+            type="button"
             className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
             onClick={() => {
               setViewMode("pan-zoom");
@@ -605,9 +612,11 @@ export function CouplingMetricsGrid({
               setSelectedRegion(null);
               setRegionSelectionEnabled(false);
             }}
+            title="Zoom"
+            aria-label="Zoom"
           >
-            <Move className="h-4 w-4" />
-            <span className="hidden sm:inline">DOM</span>
+            <ZoomIn className="h-4 w-4" />
+            <span className="hidden sm:inline">Zoom</span>
           </button>
         </div>
 

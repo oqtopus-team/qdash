@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   ReactFlow,
@@ -19,8 +19,15 @@ import JsonView from "react18-json-view";
 import type { Node, Edge, NodeProps, NodeTypes } from "@xyflow/react";
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import {
+  GridFullscreenButton,
+  gridFullscreenPanelClass,
+} from "@/components/ui/GridFullscreenButton";
+import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { formatDateTime } from "@/lib/utils/datetime";
 import "@xyflow/react/dist/style.css";
+
+const FIT_VIEW_OPTIONS = { padding: 0.05, minZoom: 0.1, maxZoom: 1.5 };
 
 interface TaskNode {
   task_id: string;
@@ -133,136 +140,110 @@ interface ExecutionDAGProps {
   tasks: TaskNode[];
 }
 
-// Inner component that can use useReactFlow hook
+/**
+ * React Flow canvas for the execution graph. Starts locked so the page scrolls normally;
+ * the Controls lock button toggles pan, zoom and node dragging.
+ */
 function FlowContent({
   nodes,
   edges,
   setSelectedTask,
-  isMaximized,
-  setIsMaximized,
+  isFullscreen,
 }: {
   nodes: Node[];
   edges: Edge[];
   setSelectedTask: (task: TaskDetails | null) => void;
-  isMaximized: boolean;
-  setIsMaximized: (value: boolean) => void;
+  isFullscreen: boolean;
 }) {
   const { fitView } = useReactFlow();
+  const [isLocked, setIsLocked] = useState(true);
+
+  // Re-fit whenever the container size (fullscreen toggle) changes.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      fitView({ ...FIT_VIEW_OPTIONS, duration: 0 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isFullscreen, fitView]);
 
   return (
-    <>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        fitView
-        className="bg-base-200"
-        minZoom={0.1}
-        maxZoom={1.5}
-        defaultEdgeOptions={{
-          type: "smoothstep",
-          animated: true,
-          style: { strokeWidth: 2 },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: "#64748b",
-          },
-        }}
-        fitViewOptions={{
-          padding: 0.05,
-          minZoom: 0.1,
-          maxZoom: 1.5,
-        }}
-        onNodeClick={(_, node) => {
-          const data = node.data as NodeData;
-          setSelectedTask({
-            name: data.name,
-            status: data.status,
-            startAt: data.startAt,
-            elapsedTime: data.elapsedTime,
-            figurePath: data.figurePath,
-            inputParameters: data.inputParameters,
-            outputParameters: data.outputParameters,
-          });
-        }}
-      >
-        <Background />
-        <Controls />
-        <Panel position="top-left" className="bg-base-100 p-2 rounded flex items-center gap-2">
-          <div className="text-sm">Click nodes to see details</div>
-          <button
-            onClick={() =>
-              fitView({
-                padding: 0.05,
-                minZoom: 0.1,
-                maxZoom: 1.5,
-                duration: 300,
-              })
-            }
-            className="btn btn-sm btn-ghost"
-            title="Fit to view"
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      fitView
+      className="bg-base-200"
+      minZoom={0.1}
+      maxZoom={1.5}
+      zoomOnScroll={!isLocked}
+      panOnScroll={false}
+      panOnDrag={!isLocked}
+      zoomOnPinch={!isLocked}
+      zoomOnDoubleClick={!isLocked}
+      preventScrolling={!isLocked}
+      nodesDraggable={!isLocked}
+      nodesConnectable={false}
+      elementsSelectable={!isLocked}
+      defaultEdgeOptions={{
+        type: "smoothstep",
+        animated: true,
+        style: { strokeWidth: 2 },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: "#64748b",
+        },
+      }}
+      fitViewOptions={FIT_VIEW_OPTIONS}
+      onNodeClick={(_, node) => {
+        const data = node.data as NodeData;
+        setSelectedTask({
+          name: data.name,
+          status: data.status,
+          startAt: data.startAt,
+          elapsedTime: data.elapsedTime,
+          figurePath: data.figurePath,
+          inputParameters: data.inputParameters,
+          outputParameters: data.outputParameters,
+        });
+      }}
+    >
+      <Background />
+      <Controls showInteractive onInteractiveChange={(interactive) => setIsLocked(!interactive)} />
+      <Panel position="top-left" className="bg-base-100 p-2 rounded flex items-center gap-2">
+        <div className="text-sm">Click nodes to see details</div>
+        <button
+          type="button"
+          onClick={() => fitView({ ...FIT_VIEW_OPTIONS, duration: 300 })}
+          className="btn btn-sm btn-ghost"
+          title="Fit to view"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m-4 0h4m0 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-              />
-            </svg>
-          </button>
-          <button
-            onClick={() => setIsMaximized(!isMaximized)}
-            className="btn btn-sm btn-ghost"
-            title={isMaximized ? "Exit fullscreen" : "Fullscreen"}
-          >
-            {isMaximized ? (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
-                />
-              </svg>
-            ) : (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
-                />
-              </svg>
-            )}
-          </button>
-        </Panel>
-      </ReactFlow>
-    </>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m-4 0h4m0 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+            />
+          </svg>
+        </button>
+      </Panel>
+    </ReactFlow>
   );
 }
 
+/**
+ * Execution task graph with fullscreen support and a side panel for the selected task's details.
+ */
 export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const [selectedTask, setSelectedTask] = useState<TaskDetails | null>(null);
-  const [isMaximized, setIsMaximized] = useState(false);
+  const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
+
   const getLayoutedElements = useCallback(() => {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -335,143 +316,107 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const { nodes, edges } = getLayoutedElements();
 
   return (
-    <div className={`flex gap-4 relative ${isMaximized ? "" : "h-[600px]"}`}>
-      <ReactFlowProvider>
-        <div
-          style={{
-            width: selectedTask ? "70%" : "100%",
-            position: isMaximized ? "fixed" : "relative",
-            top: isMaximized ? "5vh" : "auto",
-            left: isMaximized ? "5vw" : "auto",
-            right: isMaximized ? "5vw" : "auto",
-            zIndex: isMaximized ? 50 : "auto",
-          }}
-          className={isMaximized ? "h-[90vh] bg-base-100 p-4 rounded-lg shadow-xl" : "h-full"}
-        >
-          <FlowContent
-            nodes={nodes}
-            edges={edges}
-            setSelectedTask={setSelectedTask}
-            isMaximized={isMaximized}
-            setIsMaximized={setIsMaximized}
-          />
+    <div className={isFullscreen ? gridFullscreenPanelClass : ""}>
+      {isFullscreen && (
+        <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <h2 className="text-lg sm:text-xl font-bold">Execution Flow</h2>
         </div>
-      </ReactFlowProvider>
-
-      {isMaximized && !selectedTask && (
-        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsMaximized(false)} />
       )}
-      {selectedTask && (
-        <div
-          className={`bg-base-100 p-4 rounded-lg shadow overflow-y-auto ${
-            isMaximized
-              ? "fixed right-8 top-[5vh] w-[400px] z-50 h-auto max-h-[90vh]"
-              : "w-[30%] h-full"
-          }`}
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">{selectedTask.name}</h3>
-            <div className="flex gap-2">
-              {isMaximized && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsMaximized(false);
-                  }}
-                  className="text-base-content/60 hover:text-base-content"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0-4l5-5m11 5l-5-5m5 5v-4"
-                    />
-                  </svg>
-                </button>
-              )}
+
+      <div className={`flex gap-4 ${isFullscreen ? "flex-1 min-h-0" : "h-[600px]"}`}>
+        <ReactFlowProvider>
+          <div className={`relative h-full ${selectedTask ? "w-[70%]" : "w-full"}`}>
+            <FlowContent
+              nodes={nodes}
+              edges={edges}
+              setSelectedTask={setSelectedTask}
+              isFullscreen={isFullscreen}
+            />
+            <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
+          </div>
+        </ReactFlowProvider>
+
+        {selectedTask && (
+          <div className="w-[30%] h-full overflow-y-auto rounded-lg bg-base-100 p-4 shadow">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">{selectedTask.name}</h3>
               <button
+                type="button"
                 onClick={() => setSelectedTask(null)}
                 className="text-base-content/60 hover:text-base-content"
               >
                 ×
               </button>
             </div>
-          </div>
 
-          <div className="space-y-4">
-            <div>
-              <div className="font-medium">Status</div>
-              <div
-                className={`text-sm ${
-                  selectedTask.status === "running"
-                    ? "text-info"
-                    : selectedTask.status === "completed"
-                      ? "text-success"
-                      : selectedTask.status === "scheduled"
-                        ? "text-warning"
-                        : selectedTask.status === "cancelled"
-                          ? "text-neutral"
-                          : "text-error"
-                }`}
-              >
-                {selectedTask.status}
+            <div className="space-y-4">
+              <div>
+                <div className="font-medium">Status</div>
+                <div
+                  className={`text-sm ${
+                    selectedTask.status === "running"
+                      ? "text-info"
+                      : selectedTask.status === "completed"
+                        ? "text-success"
+                        : selectedTask.status === "scheduled"
+                          ? "text-warning"
+                          : selectedTask.status === "cancelled"
+                            ? "text-neutral"
+                            : "text-error"
+                  }`}
+                >
+                  {selectedTask.status}
+                </div>
               </div>
+
+              {selectedTask.startAt && (
+                <div>
+                  <div className="font-medium">Start Time</div>
+                  <div className="text-sm">{formatDateTime(selectedTask.startAt)}</div>
+                </div>
+              )}
+
+              {selectedTask.elapsedTime && (
+                <div>
+                  <div className="font-medium">Duration</div>
+                  <div className="text-sm">{selectedTask.elapsedTime}</div>
+                </div>
+              )}
+
+              {selectedTask.figurePath && selectedTask.figurePath.length > 0 && (
+                <div>
+                  <div className="font-medium mb-2">Figures</div>
+                  <div className="space-y-2">
+                    <TaskFigure
+                      path={selectedTask.figurePath}
+                      qid={selectedTask.name}
+                      className="w-full h-auto rounded border max-h-[200px] object-contain"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {selectedTask.inputParameters && (
+                <div>
+                  <div className="font-medium mb-1">Input Parameters</div>
+                  <div className="bg-base-200 p-2 rounded text-sm">
+                    <JsonView src={selectedTask.inputParameters} theme="vscode" collapsed={1} />
+                  </div>
+                </div>
+              )}
+
+              {selectedTask.outputParameters && (
+                <div>
+                  <div className="font-medium mb-1">Output Parameters</div>
+                  <div className="bg-base-200 p-2 rounded text-sm">
+                    <JsonView src={selectedTask.outputParameters} theme="vscode" collapsed={1} />
+                  </div>
+                </div>
+              )}
             </div>
-
-            {selectedTask.startAt && (
-              <div>
-                <div className="font-medium">Start Time</div>
-                <div className="text-sm">{formatDateTime(selectedTask.startAt)}</div>
-              </div>
-            )}
-
-            {selectedTask.elapsedTime && (
-              <div>
-                <div className="font-medium">Duration</div>
-                <div className="text-sm">{selectedTask.elapsedTime}</div>
-              </div>
-            )}
-
-            {selectedTask.figurePath && selectedTask.figurePath.length > 0 && (
-              <div>
-                <div className="font-medium mb-2">Figures</div>
-                <div className="space-y-2">
-                  <TaskFigure
-                    path={selectedTask.figurePath}
-                    qid={selectedTask.name}
-                    className="w-full h-auto rounded border max-h-[200px] object-contain"
-                  />
-                </div>
-              </div>
-            )}
-
-            {selectedTask.inputParameters && (
-              <div>
-                <div className="font-medium mb-1">Input Parameters</div>
-                <div className="bg-base-200 p-2 rounded text-sm">
-                  <JsonView src={selectedTask.inputParameters} theme="vscode" collapsed={1} />
-                </div>
-              </div>
-            )}
-
-            {selectedTask.outputParameters && (
-              <div>
-                <div className="font-medium mb-1">Output Parameters</div>
-                <div className="bg-base-200 p-2 rounded text-sm">
-                  <JsonView src={selectedTask.outputParameters} theme="vscode" collapsed={1} />
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
