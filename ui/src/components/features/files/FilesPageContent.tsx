@@ -45,6 +45,8 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
+import { FilesBulkDownloadButton } from "./FilesBulkDownloadButton";
+
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 // Helper to check if file is a params YAML that can be imported
@@ -354,6 +356,10 @@ export function FilesPageContent() {
             {hasUnsavedChanges && <span className="text-xs text-warning flex-shrink-0">●</span>}
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 overflow-x-auto">
+            <FilesBulkDownloadButton
+              disabled={!fileTreeData?.length}
+              onError={(message) => toast.error(message)}
+            />
             <button
               onClick={toggleEditorLock}
               className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-warning"}`}

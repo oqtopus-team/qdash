@@ -12,9 +12,6 @@ import type {
   AgentCampaignCommitResponse,
   AgentCandidateCommitResponse,
   AgentSessionResponse,
-  AiReviewListResponse,
-  AiReviewRunDetailResponse,
-  AiReviewRunListResponse,
   AllConfigResponse,
   AnalysisResponse,
   AnalyzeRequest,
@@ -25,8 +22,6 @@ import type {
   BodyLogin,
   BodyReExecuteTaskResult,
   BodyUploadForumImage,
-  BulkAiReviewRequest,
-  BulkAiReviewResponse,
   BulkUserImportResponse,
   CalibrationGitHubSync,
   CalibrationNoteResponse,
@@ -59,7 +54,6 @@ import type {
   CryostatCreateRequest,
   CryostatResponse,
   CryostatUpdateRequest,
-  DashboardAiInsightsResponse,
   DegradationTrendsResponse,
   DeleteChipNoteParams,
   DeleteChipParams,
@@ -85,6 +79,8 @@ import type {
   ExecuteAgentActionRequest,
   ExecuteFlowRequest,
   ExecuteFlowResponse,
+  ExecutePipelineRequest,
+  ExecutePipelineResponse,
   ExecutionAvailabilityRequest,
   ExecutionAvailabilityResponse,
   ExecutionComparisonResponse,
@@ -100,13 +96,13 @@ import type {
   ForumPostCreate,
   ForumPostResponse,
   ForumPostUpdate,
+  GetCalibrationPipelineCatalogParams,
   GetChipMetricsParams,
   GetChipNoteParams,
   GetChipNotesSummaryParams,
   GetCopilotConfig200,
   GetCouplingMetricHistoryParams,
   GetCouplingTaskHistoryParams,
-  GetDashboardAiInsightsParams,
   GetDegradationTrendsParams,
   GetFigureByPathParams,
   GetFileContent200,
@@ -183,8 +179,6 @@ import type {
   ListTaskInfoResponse,
   ListTaskKnowledgeResponse,
   ListTaskResponse,
-  ListTaskResultAiReviewRunsParams,
-  ListTaskResultAiReviewsParams,
   ListTaskResultsParams,
   ListTasksParams,
   ListTopologies200,
@@ -211,6 +205,7 @@ import type {
   PasswordChange,
   PasswordReset,
   PasswordResetResponse,
+  PipelineCatalogResponse,
   PreviewArtifactByPathParams,
   ProjectCreate,
   ProjectResponse,
@@ -274,7 +269,9 @@ import type {
   UserProfileUpdate,
   UserWithToken,
   ValidateFileContent200,
-  ValidateFileRequest
+  ValidateFileRequest,
+  ValidatePipelineRequest,
+  ValidatePipelineResponse
 } from '../../../../ui/src/schemas';
 
 import { qdashRequest } from '../orval-request';
@@ -1630,6 +1627,55 @@ const getManualEdits = (
     }
 
 /**
+ * Everything an agent needs to compose a spec: step types with their
+ * dependencies and default tasks, the backend's tasks by type, and the JSON
+ * schema of the spec.
+ * @summary Step types, tasks, and spec schema for writing a calibration pipeline
+ */
+const getCalibrationPipelineCatalog = (
+    params?: GetCalibrationPipelineCatalogParams,
+ options?: SecondParameter<typeof qdashRequest<PipelineCatalogResponse>>,) => {
+      return qdashRequest<PipelineCatalogResponse>(
+      {url: `/calibration-pipelines/catalog`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Dry run: reports every problem with a path into the spec, and the
+ * resolved steps and tasks when it would run.
+ * @summary Check a calibration pipeline spec without running it
+ */
+const validateCalibrationPipeline = (
+    validatePipelineRequest: ValidatePipelineRequest,
+ options?: SecondParameter<typeof qdashRequest<ValidatePipelineResponse>>,) => {
+      return qdashRequest<ValidatePipelineResponse>(
+      {url: `/calibration-pipelines/validate`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: validatePipelineRequest
+    },
+      options);
+    }
+
+/**
+ * Runs the spec as one execution through the worker's calibration-pipeline
+ * deployment. A spec with problems is rejected with 422 and the same problem
+ * list that /validate returns.
+ * @summary Validate and run a calibration pipeline spec
+ */
+const executeCalibrationPipeline = (
+    executePipelineRequest: ExecutePipelineRequest,
+ options?: SecondParameter<typeof qdashRequest<ExecutePipelineResponse>>,) => {
+      return qdashRequest<ExecutePipelineResponse>(
+      {url: `/calibration-pipelines/execute`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: executePipelineRequest
+    },
+      options);
+    }
+
+/**
  * Get Copilot configuration for the metrics assistant.
  *
  * Retrieves the Copilot configuration from YAML, including:
@@ -2759,62 +2805,6 @@ const getTimeseriesTaskResults = (
       return qdashRequest<TimeSeriesData>(
       {url: `/task-results/timeseries`, method: 'GET',
         params
-    },
-      options);
-    }
-
-/**
- * Return bulk AI review runs for run-oriented browsing.
- * @summary List bulk AI review runs
- */
-const listTaskResultAiReviewRuns = (
-    params?: ListTaskResultAiReviewRunsParams,
- options?: SecondParameter<typeof qdashRequest<AiReviewRunListResponse>>,) => {
-      return qdashRequest<AiReviewRunListResponse>(
-      {url: `/task-results/ai-review/runs`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * Return one bulk AI review run and its task-result review rows.
- * @summary Get one bulk AI review run
- */
-const getTaskResultAiReviewRun = (
-    reviewRunId: string,
- options?: SecondParameter<typeof qdashRequest<AiReviewRunDetailResponse>>,) => {
-      return qdashRequest<AiReviewRunDetailResponse>(
-      {url: `/task-results/ai-review/runs/${reviewRunId}`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Return task-result AI reviews for review queue style browsing.
- * @summary List task-result AI reviews
- */
-const listTaskResultAiReviews = (
-    params?: ListTaskResultAiReviewsParams,
- options?: SecondParameter<typeof qdashRequest<AiReviewListResponse>>,) => {
-      return qdashRequest<AiReviewListResponse>(
-      {url: `/task-results/ai-review`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * Enqueue AI review for the current latest task result per entity.
- * @summary Request bulk AI review for latest task results
- */
-const requestBulkAiReview = (
-    bulkAiReviewRequest: BulkAiReviewRequest,
- options?: SecondParameter<typeof qdashRequest<BulkAiReviewResponse>>,) => {
-      return qdashRequest<BulkAiReviewResponse>(
-      {url: `/task-results/ai-review/bulk`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: bulkAiReviewRequest
     },
       options);
     }
@@ -4372,25 +4362,6 @@ const getConfigAll = (
     }
 
 /**
- * Return compact operational insights for the dashboard.
- *
- * The first implementation is deterministic: it extracts high-signal patterns
- * from persisted AI review notes and task-result metadata. A later LLM
- * synthesis layer can consume the same structured candidate contract.
- * @summary Generate dashboard-level AI insight candidates
- */
-const getDashboardAiInsights = (
-    chipId: string,
-    params?: GetDashboardAiInsightsParams,
- options?: SecondParameter<typeof qdashRequest<DashboardAiInsightsResponse>>,) => {
-      return qdashRequest<DashboardAiInsightsResponse>(
-      {url: `/dashboard/chips/${chipId}/ai-insights`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
  * Get a specific parameter version by entity ID.
  *
  * Parameters
@@ -4733,7 +4704,7 @@ const getRecalibrationRecommendations = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,getSystemUpdateStatus,startSystemUpdate,getSystemUpdateOperation,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCampaignCandidates,getAgentCampaignCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,getManualEdits,getCopilotConfig,analyzeCopilot,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,getSettings,listChips,createChip,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,listTaskResultAiReviewRuns,getTaskResultAiReviewRun,listTaskResultAiReviews,requestBulkAiReview,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listIssues,getIssue,deleteIssue,updateIssue,getIssueReplies,closeIssue,reopenIssue,getTaskResultIssues,createIssue,listIssueKnowledge,getIssueKnowledge,updateIssueKnowledge,deleteIssueKnowledge,extractIssueKnowledge,approveIssueKnowledge,rejectIssueKnowledge,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,executeFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getDashboardAiInsights,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,getSystemUpdateStatus,startSystemUpdate,getSystemUpdateOperation,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCampaignCandidates,getAgentCampaignCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,analyzeCopilot,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,getSettings,listChips,createChip,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listIssues,getIssue,deleteIssue,updateIssue,getIssueReplies,closeIssue,reopenIssue,getTaskResultIssues,createIssue,listIssueKnowledge,getIssueKnowledge,updateIssueKnowledge,deleteIssueKnowledge,extractIssueKnowledge,approveIssueKnowledge,rejectIssueKnowledge,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,executeFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -4804,6 +4775,9 @@ export type GetAvailableSeedParametersResult = NonNullable<Awaited<ReturnType<Re
 export type CompareSeedValuesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['compareSeedValues']>>>
 export type UpdateCalibrationParametersResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateCalibrationParameters']>>>
 export type GetManualEditsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getManualEdits']>>>
+export type GetCalibrationPipelineCatalogResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCalibrationPipelineCatalog']>>>
+export type ValidateCalibrationPipelineResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['validateCalibrationPipeline']>>>
+export type ExecuteCalibrationPipelineResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['executeCalibrationPipeline']>>>
 export type GetCopilotConfigResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotConfig']>>>
 export type AnalyzeCopilotResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['analyzeCopilot']>>>
 export type ListCopilotChatSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCopilotChatSessions']>>>
@@ -4850,10 +4824,6 @@ export type GetLatestCouplingTaskResultsResult = NonNullable<Awaited<ReturnType<
 export type GetHistoricalCouplingTaskResultsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getHistoricalCouplingTaskResults']>>>
 export type GetCouplingTaskHistoryResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCouplingTaskHistory']>>>
 export type GetTimeseriesTaskResultsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTimeseriesTaskResults']>>>
-export type ListTaskResultAiReviewRunsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTaskResultAiReviewRuns']>>>
-export type GetTaskResultAiReviewRunResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTaskResultAiReviewRun']>>>
-export type ListTaskResultAiReviewsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTaskResultAiReviews']>>>
-export type RequestBulkAiReviewResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['requestBulkAiReview']>>>
 export type ReExecuteTaskResultResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['reExecuteTaskResult']>>>
 export type SetTaskResultExcludedResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['setTaskResultExcluded']>>>
 export type DownloadFiguresAsZipResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['downloadFiguresAsZip']>>>
@@ -4951,7 +4921,6 @@ export type ListCooldownWiringEventsResult = NonNullable<Awaited<ReturnType<Retu
 export type ListTopologiesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTopologies']>>>
 export type GetTopologyByIdResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTopologyById']>>>
 export type GetConfigAllResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getConfigAll']>>>
-export type GetDashboardAiInsightsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getDashboardAiInsights']>>>
 export type GetProvenanceEntityResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getProvenanceEntity']>>>
 export type GetProvenanceLineageResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getProvenanceLineage']>>>
 export type GetProvenanceImpactResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getProvenanceImpact']>>>

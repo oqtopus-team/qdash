@@ -23,6 +23,11 @@ SYSTEM_FLOWS = [
         "flow_function_name": "single_task_executor",
         "deployment_name": "system-single-task",
     },
+    {
+        "file_path": "/app/qdash/workflow/service/pipeline_flow.py",
+        "flow_function_name": "calibration_pipeline",
+        "deployment_name": "system-calibration-pipeline",
+    },
 ]
 
 

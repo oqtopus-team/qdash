@@ -8,6 +8,7 @@
 import type { ExecutionResponseDetailElapsedTime } from './executionResponseDetailElapsedTime';
 import type { ExecutionResponseDetailEndAt } from './executionResponseDetailEndAt';
 import type { ExecutionResponseDetailNote } from './executionResponseDetailNote';
+import type { ExecutionResponseDetailPipeline } from './executionResponseDetailPipeline';
 import type { ExecutionResponseDetailStartAt } from './executionResponseDetailStartAt';
 import type { ExecutionResponseDetailUserId } from './executionResponseDetailUserId';
 import type { Task } from './task';
@@ -43,4 +44,6 @@ export interface ExecutionResponseDetail {
   note: ExecutionResponseDetailNote;
   tags?: string[];
   chip_id?: string;
+  /** Set when this execution belongs to a pipeline run; covers every step of it */
+  pipeline?: ExecutionResponseDetailPipeline;
 }

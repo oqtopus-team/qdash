@@ -1,57 +1,108 @@
 # Copilot Review Configuration
-# Settings for task result analysis, automatic AI review, and chip scoring.
+# Settings for task result analysis and chip scoring.
 
 # Specialized models for task result analysis (chevron patterns, Rabi, etc.).
 analysis_models:
-  - provider: ollama
-    name: nvidia/Gemma-4-31B-IT-NVFP4 # gemma4:26b
+  # Default vendor-neutral OpenAI Chat Completions endpoint.
+  - provider: openai-compatible
+    name: qwen3.8-flash-next
     api_style: completion
-    # Ollama endpoint for LiteLLM. Set OLLAMA_BASE_URL to your Ollama server URL,
-    # e.g. http://localhost:11434.
-    base_url: env:OLLAMA_BASE_URL
-    # Optional. LiteLLM forwards this when set.
-    api_key_env: OLLAMA_API_KEY
-    # Keep the local VLM resident between automatic review requests and avoid
-    # repeated cold model loads between short qdash reviews.
-    keep_alive: 30m
-    # Gemma 4 best-practice sampling for stable local VLM review.
-    temperature: 1.0
-    top_p: 0.95
-    top_k: 64
-    reasoning_effort: none
-    disable_thinking_instruction: true
-    max_output_tokens: 4096
-  - provider: ollama
-    name: gemma4:31b
-    api_style: completion
-    # Higher-stability local VLM fallback. It is slower than 26B but showed
-    # fewer format failures in qdash review spot checks.
-    base_url: env:OLLAMA_BASE_URL
-    api_key_env: OLLAMA_API_KEY
-    keep_alive: 30m
-    temperature: 1.0
-    top_p: 0.95
-    top_k: 64
-    reasoning_effort: none
-    disable_thinking_instruction: true
-    max_output_tokens: 4096
-  - provider: openai
-    name: gpt-5.4
-    api_style: responses
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL
+    api_key_env: OPENAI_COMPATIBLE_API_KEY
     temperature: 0.7
-    max_output_tokens: 4096
-
-  # - provider: vllm
-  #   name: Gemma-4-31B-IT-NVFP4
-  #   api_style: responses
-  #   base_url: env:VLLM_BASE_URL
-  #   api_key_env: VLLM_API_KEY
+    top_p: 0.80
+    top_k: 20
+    sampling_params:
+      min_p: 0.0
+      presence_penalty: 1.5
+      repetition_penalty: 1.0
+    sampling_params_by_thinking_level:
+      minimal: &qwen_review_thinking_low
+        temperature: 1.0
+        top_p: 0.95
+        top_k: 20
+        min_p: 0.0
+        presence_penalty: 0.0
+        repetition_penalty: 1.0
+        reasoning_effort: low
+      low: *qwen_review_thinking_low
+      medium:
+        temperature: 1.0
+        top_p: 0.95
+        top_k: 20
+        min_p: 0.0
+        presence_penalty: 0.0
+        repetition_penalty: 1.0
+        reasoning_effort: medium
+      high:
+        temperature: 1.0
+        top_p: 0.95
+        top_k: 20
+        min_p: 0.0
+        presence_penalty: 0.0
+        repetition_penalty: 1.0
+        reasoning_effort: xhigh
+    reasoning_effort: high
+    num_ctx: 65536
+    max_output_tokens: 8192
+  # - provider: ollama
+  #   name: nvidia/Gemma-4-31B-IT-NVFP4 # gemma4:26b
+  #   api_style: completion
+  #   # Ollama endpoint for LiteLLM. Set OLLAMA_BASE_URL to your Ollama server URL,
+  #   # e.g. http://localhost:11434.
+  #   base_url: env:OLLAMA_BASE_URL
+  #   # Optional. LiteLLM forwards this when set.
+  #   api_key_env: OLLAMA_API_KEY
+  #   # Keep the local VLM resident between analysis requests and avoid
+  #   # repeated cold model loads between short qdash analyses.
+  #   keep_alive: 30m
+  #   num_ctx: 16384
+  #   # Gemma 4 best-practice sampling for stable local VLM analysis.
   #   temperature: 1.0
   #   top_p: 0.95
   #   top_k: 64
   #   reasoning_effort: none
   #   disable_thinking_instruction: true
-  #   max_output_tokens: 2048
+  #   max_output_tokens: 4096
+  # - provider: ollama
+  #   name: gemma4:31b
+  #   api_style: completion
+  #   # Higher-stability local VLM fallback. It is slower than 26B but showed
+  #   # fewer format failures in qdash analysis spot checks.
+  #   base_url: env:OLLAMA_BASE_URL
+  #   api_key_env: OLLAMA_API_KEY
+  #   keep_alive: 30m
+  #   num_ctx: 16384
+  #   temperature: 1.0
+  #   top_p: 0.95
+  #   top_k: 64
+  #   reasoning_effort: none
+  #   disable_thinking_instruction: true
+  #   max_output_tokens: 4096
+  # - provider: openai
+  #   name: gpt-5.4
+  #   api_style: responses
+  #   temperature: 0.7
+  #   max_output_tokens: 4096
+  # NVIDIA Ising-Calibration: Gemma 4 31B fine-tuned on qubit calibration plots
+  # (fit quality, parameter extraction, success classification). Served by vLLM;
+  # set VLLM_BASE_URL / VLLM_API_KEY. Move it to the top to make it the default.
+  - provider: vllm
+    name: nvidia/Ising-Calibration-1.5-31B-NVFP4
+    # /v1/responses rejects input_image on vLLM; only chat/completions accepts
+    # figures, which task analysis depends on.
+    api_style: completion
+    base_url: env:VLLM_BASE_URL
+    api_key_env: VLLM_API_KEY
+    # Must not exceed the server's max_model_len (16384 on llm.qiqb.dev).
+    num_ctx: 16384
+    # Model card recommendation. The model is not a thinking model.
+    temperature: 0.2
+    reasoning_effort: none
+    disable_thinking_instruction: true
+    # The prompt (system prompt + tool schemas) already takes roughly half of
+    # the context, so leave the model card's 8192 for larger deployments.
+    max_output_tokens: 2048
 
   # - provider: bedrock
   #   name: jp.anthropic.claude-sonnet-4-6
@@ -158,31 +209,7 @@ analysis:
   enabled: true
   # Whether to send result figures to the LLM (requires multimodal model)
   multimodal: true
-  # Reference images to send during task analysis and automatic AI review.
+  # Reference images to send during task analysis.
   max_expected_images: 2
-  # Automatic AI review prioritizes review quality by default and inherits the
-  # same reference-image and output-token settings as task analysis. Set these
-  # optional overrides only when a lower-latency review mode is required.
-  ai_review_max_expected_images: null
-  ai_review_max_output_tokens: null
-  # Terminal task results whose notes should receive automatic AI review. Both
-  # completed and failed results are eligible; running, pending, scheduled, and
-  # skipped results are ignored. The hook runs asynchronously after history
-  # persistence and does not block calibration progress.
-  ai_review_tasks:
-    - CheckQubitSpectroscopy
-    - CheckResonatorSpectroscopy
-  ai_review_message: >-
-    Review this calibration result and attach a concise operational
-    review note. Auto-pass results that are good enough for routine parameter
-    update. History consistency alone is not enough to accept visually
-    unsupported output parameters, but weak f12 support by itself should usually
-    become PASS_WITH_NOTE when f01 is clearly supported and no clearly stronger
-    competing transition is visible. Do not escalate only because f12 is weak,
-    anharmonicity is shallow, or nearby f01-like peaks have similar length and
-    intensity when the marked f01 is still visibly supported and physically
-    plausible; put that caveat in PASS_WITH_NOTE. Keep REVIEW for absent,
-    off-marker, or clearly weaker f01 support, or when a clearly stronger
-    competing f01 candidate would materially change the update.
   # Maximum conversation turns to maintain in context
   max_conversation_turns: 10

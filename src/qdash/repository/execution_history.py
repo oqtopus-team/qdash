@@ -128,6 +128,25 @@ class MongoExecutionHistoryRepository:
             {"project_id": project_id, "execution_id": execution_id}
         ).run()
 
+    def list_by_flow_run_id(
+        self,
+        project_id: str,
+        flow_run_id: str,
+    ) -> list[ExecutionHistoryDocument]:
+        """Every execution of one Prefect flow run, oldest first.
+
+        A pipeline run creates one execution per calibration step; they share
+        ``note.flow_run_id``.
+        """
+        docs: list[ExecutionHistoryDocument] = (
+            ExecutionHistoryDocument.find(
+                {"project_id": project_id, "note.flow_run_id": flow_run_id}
+            )
+            .sort([("start_at", SortDirection.ASCENDING)])
+            .run()
+        )
+        return docs
+
     def find_by_flow_run_id(
         self,
         project_id: str,

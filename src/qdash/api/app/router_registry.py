@@ -17,13 +17,13 @@ from qdash.api.routers import (
     auth,
     backend,
     calibration,
+    calibration_pipeline,
     chip,
     config,
     cooldown,
     cooldown_wiring_event,
     copilot,
     cryostat,
-    dashboard,
     device_topology,
     execution,
     file,
@@ -74,6 +74,7 @@ PUBLIC_ROUTERS: tuple[RouterRegistration, ...] = (
 PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(agent_session.router, tags=("agent-session",)),
     RouterRegistration(calibration.router, tags=("calibration",)),
+    RouterRegistration(calibration_pipeline.router, tags=("calibration-pipeline",)),
     RouterRegistration(copilot.router, prefix="/copilot", tags=("copilot",)),
     RouterRegistration(settings.router, tags=("settings",)),
     RouterRegistration(chip.router, tags=("chip",)),
@@ -95,7 +96,6 @@ PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(cooldown_wiring_event.router, tags=("cooldown-wiring",)),
     RouterRegistration(topology.router, prefix="/topology", tags=("topology",)),
     RouterRegistration(config.router, tags=("config",)),
-    RouterRegistration(dashboard.router, prefix="/dashboard", tags=("dashboard",)),
     RouterRegistration(provenance.router, prefix="/provenance", tags=("provenance",)),
 )
 

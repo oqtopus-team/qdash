@@ -96,9 +96,9 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
       {detail?.review_markdown?.trim() && (
         <section className="mt-10">
           <div className="mb-3">
-            <h2 className="text-lg font-semibold">AI Review Guide</h2>
+            <h2 className="text-lg font-semibold">Review Guide</h2>
             <p className="text-sm text-base-content/60">
-              Operational guidance used for automatic review decisions.
+              Operational guidance for reviewing results of this task.
             </p>
           </div>
           <div className="rounded-xl border border-base-300 bg-base-100 p-5">

@@ -28,6 +28,7 @@ interface WiringBlockEditorProps {
   colorScheme: "light" | "dark";
 }
 
+/** Cryo wiring rich-text editor built on BlockNote, with legacy-markdown migration on first mount. */
 export function WiringBlockEditor({
   initialBlocks,
   legacyMarkdown,

@@ -109,6 +109,12 @@ export interface SubmitAgentActionOptions {
 export interface PollOptions {
   timeoutSeconds?: number;
   pollIntervalSeconds?: number;
+  /**
+   * For an execution that is one step of a pipeline run, wait for the whole
+   * run rather than that step (default true). The returned detail's
+   * `pipeline.status` then carries the run's outcome.
+   */
+  wholePipeline?: boolean;
 }
 
 export interface DownloadedFile {
@@ -421,9 +427,13 @@ export class QDashClient {
     this.validatePollOptions(timeoutSeconds, pollIntervalSeconds);
     const deadline = Date.now() + timeoutSeconds * 1_000;
     const terminal = new Set(["completed", "failed", "cancelled", "canceled", "crashed"]);
+    const wholePipeline = options.wholePipeline ?? true;
     while (true) {
       const execution = await this.getExecution(executionId);
-      if (terminal.has(execution.status.toLowerCase())) return execution;
+      // A pipeline step's own execution completes long before the run does.
+      const status =
+        wholePipeline && execution.pipeline ? execution.pipeline.status : execution.status;
+      if (terminal.has(status.toLowerCase())) return execution;
       if (Date.now() >= deadline) {
         throw new Error(
           `Execution '${executionId}' did not reach a terminal state within ${timeoutSeconds} seconds`,

@@ -79,25 +79,32 @@ tasks:
           echo "KNOWLEDGE_REPO_URL not set, skipping pull"
           exit 0
         fi
-        # Build auth URL if credentials available
-        AUTH_URL="$KNOWLEDGE_REPO_URL"
-        if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_TOKEN" ]; then
-          AUTH_URL=$(echo "$KNOWLEDGE_REPO_URL" | sed "s|https://|https://${GITHUB_USER}:${GITHUB_TOKEN}@|")
-        fi
+        # Credentials go through a one-shot credential helper, never into the
+        # remote URL: a URL with a token embedded is written to .git/config and
+        # stays there in plain text.
+        git_auth() {
+          if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_TOKEN" ]; then
+            git -c credential.helper= \
+              -c "credential.helper=!f() { echo username=$GITHUB_USER; echo password=$GITHUB_TOKEN; }; f" "$@"
+          else
+            git "$@"
+          fi
+        }
         # Clone or pull
         if [ -d "$KNOWLEDGE_DIR/.git" ]; then
           echo "Pulling latest from $KNOWLEDGE_REPO_URL..."
-          git -C "$KNOWLEDGE_DIR" remote set-url origin "$AUTH_URL"
-          git -C "$KNOWLEDGE_DIR" fetch origin && git -C "$KNOWLEDGE_DIR" reset --hard origin/main || {
+          # Also scrubs a token that an earlier version of this task embedded.
+          git -C "$KNOWLEDGE_DIR" remote set-url origin "$KNOWLEDGE_REPO_URL"
+          git_auth -C "$KNOWLEDGE_DIR" fetch origin && git -C "$KNOWLEDGE_DIR" reset --hard origin/main || {
             echo "Pull failed, re-cloning..."
             rm -rf "$KNOWLEDGE_DIR"
-            git clone --depth 1 "$AUTH_URL" "$KNOWLEDGE_DIR"
+            git_auth clone --depth 1 "$KNOWLEDGE_REPO_URL" "$KNOWLEDGE_DIR"
           }
         else
           echo "Cloning $KNOWLEDGE_REPO_URL..."
           rm -rf "$KNOWLEDGE_DIR"
           mkdir -p config
-          git clone --depth 1 "$AUTH_URL" "$KNOWLEDGE_DIR"
+          git_auth clone --depth 1 "$KNOWLEDGE_REPO_URL" "$KNOWLEDGE_DIR"
         fi
         # Verify JSON exists in the cloned repo
         if [ -f "$KNOWLEDGE_DIR/task-knowledge.json" ]; then
@@ -364,7 +371,7 @@ tasks:
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0=safe.directory \
             GIT_CONFIG_VALUE_0="$PWD" \
-            betterleaks git "$(git rev-parse --show-toplevel)" --config .betterleaks.toml --verbose
+            betterleaks git "$(git rev-parse --absolute-git-dir)" --config .betterleaks.toml --verbose
         else
           echo "betterleaks not installed; skipping leak scan"
         fi
@@ -446,6 +453,13 @@ tasks:
       # Bun <1.4 cannot read the current lockfile format, even when other UI commands succeed.
       - bunx bun@1.4.0 audit
 
+  ci-agent-runtime:
+    desc: Run all agent-runtime CI checks
+    dir: agent-runtime
+    cmds:
+      - bun test
+      - bunx tsc --noEmit
+
   ci-ui-build:
     desc: Build UI for production
     dir: ui
@@ -518,10 +532,13 @@ tasks:
     desc: Start the UI development server
 
   deploy:
+    dotenv: [.env]
     cmds:
       - task: knowledge-pull
       - task: updater-start
-      - docker compose --profile tunnel up -d --build
+      - |
+        COMPOSE_PROFILES="${COMPOSE_PROFILES:+${COMPOSE_PROFILES},}tunnel" \
+          docker compose up -d --build
       - sleep 3
       - docker compose restart api
     desc: Deploy the application with Docker Compose

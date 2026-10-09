@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
-import { Bot, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { dateToDateTimeLocal, formatDateTime, toIsoSeconds } from "@/lib/utils/datetime";
 
@@ -12,13 +12,11 @@ import { CouplingGrid } from "./CouplingGrid";
 import { QubitGrid } from "./QubitGrid";
 import { ChipManageModal } from "./ChipManageModal";
 import { ChipCreationTour } from "./ChipCreationTour";
-import { getAiReviewBadgeState, type AiReviewBadgeState } from "./aiReviewBadge";
 import { CreateChipModal } from "./modals/CreateChipModal";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
 
 import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
-import { useGetChipNotesSummary } from "@/client/note/note";
 import { useListTaskInfo, useGetTaskFileSettings } from "@/client/task-file/task-file";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
@@ -177,22 +175,6 @@ export function ChipPageContent() {
 
   // Get task list from task-files API
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
-
-  const { data: notesSummaryData } = useGetChipNotesSummary(selectedChip, undefined, {
-    query: { enabled: !!selectedChip, staleTime: 30_000 },
-  });
-
-  const aiReviewBadgesByTaskId = useMemo(() => {
-    const badges = new Map<string, AiReviewBadgeState>();
-    for (const entry of notesSummaryData?.data?.task_notes ?? []) {
-      const content = entry.ai_review_note?.content || entry.note?.content || "";
-      const badge = getAiReviewBadgeState(content);
-      if (badge) {
-        badges.set(entry.task_id, badge);
-      }
-    }
-    return badges;
-  }, [notesSummaryData]);
 
   // Use custom hook for date navigation
   const {
@@ -582,7 +564,6 @@ export function ChipPageContent() {
               endAt={taskResultEndAt}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
-              aiReviewBadgesByTaskId={aiReviewBadgesByTaskId}
             />
           ) : viewMode === "2q" ? (
             <CouplingGrid
@@ -596,7 +577,6 @@ export function ChipPageContent() {
               endAt={taskResultEndAt}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
-              aiReviewBadgesByTaskId={aiReviewBadgesByTaskId}
             />
           ) : (
             <div className="space-y-4">
@@ -681,9 +661,6 @@ export function ChipPageContent() {
                                   }
 
                                   const figurePath = getFigurePath(task);
-                                  const aiReviewBadge = task.task_id
-                                    ? aiReviewBadgesByTaskId.get(task.task_id)
-                                    : null;
 
                                   return (
                                     <div key={qid} className="relative group">
@@ -703,15 +680,6 @@ export function ChipPageContent() {
                                             <div className="flex justify-between items-center mb-1">
                                               <span>QID: {qid}</span>
                                               <div className="flex items-center gap-1">
-                                                {aiReviewBadge && (
-                                                  <span
-                                                    className={`badge ${aiReviewBadge.badgeClass} badge-xs gap-1`}
-                                                    title={aiReviewBadge.title}
-                                                  >
-                                                    <Bot className="h-3 w-3" />
-                                                    {aiReviewBadge.label}
-                                                  </span>
-                                                )}
                                                 <div
                                                   className={`w-2 h-2 rounded-full ${
                                                     task.status === "completed"

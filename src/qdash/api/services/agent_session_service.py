@@ -101,10 +101,15 @@ class AgentSessionService:
         """Resolve a Prefect operation to its QDash execution without changing flow IDs."""
         if doc.operation_id is None:
             return doc
+        # operation_id is the Prefect flow run ID. Actions dispatched before that
+        # was fixed stored the QDash execution ID there instead, so match both.
         execution = ExecutionHistoryDocument.find_one(
             {
                 "project_id": doc.project_id,
-                "note.flow_run_id": doc.operation_id,
+                "$or": [
+                    {"note.flow_run_id": doc.operation_id},
+                    {"execution_id": doc.operation_id},
+                ],
             }
         ).run()
         if execution is None:
@@ -1173,6 +1178,6 @@ class AgentSessionService:
             raise
 
         action.execution_status = "queued"
-        action.operation_id = operation.execution_id
+        action.operation_id = operation.flow_run_id
         action.save()
-        return self._action_response(action)
+        return self._action_response(self._refresh_action_execution(action))

@@ -29,6 +29,11 @@ task restart-api
 Go Task is optional for operators. When installed, `task deploy-local` wraps the first two startup
 commands and the remaining `task` commands provide development conveniences.
 
+The `agent-runtime` service is opt-in. Set `COMPOSE_PROFILES=agent-runtime` in `.env` when
+`config/copilot/config.yaml` uses `copilot_backend: pi`. Leave it unset for the in-process
+`litellm` backend so the container is not created. `task deploy` preserves that selection while
+adding the `tunnel` profile required by remote deployments.
+
 ## Logs
 
 ```bash
@@ -37,10 +42,15 @@ docker compose logs -f ui
 docker compose logs -f deployment-service
 docker compose logs -f user-flow-worker
 docker compose logs -f prefect-server
+docker compose logs -f agent-runtime
 ```
 
 The API also writes a rotating file to its Docker log volume. Host-side API runs write under
 `${XDG_STATE_HOME:-$HOME/.local/state}/qdash/logs`.
+
+Pi stores per-user durable conversation state in the `agent-runtime-state` Docker volume. Normal
+container rebuilds preserve it. Deleting that volume removes Pi transcripts and unfinished work;
+the user-facing session list in MongoDB is unaffected.
 
 ## Health Checks
 

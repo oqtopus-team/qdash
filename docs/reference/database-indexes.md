@@ -149,7 +149,8 @@ db.task_result_history.create_index([
 ])  # Latest task result queries
 
 # Partial sparse indexes for the dashboard notes summary — only index rows
-# that have a user-authored note or an AI review note.
+# that have a user-authored note or a legacy AI review note (feature retired;
+# notes stay readable).
 db.task_result_history.create_index(
     [("project_id", 1), ("chip_id", 1), ("user_note.updated_at", -1)],
     name="project_chip_user_note_idx",

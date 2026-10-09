@@ -5,7 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskResultAiReview } from './taskResultAiReview';
 import type { TaskResultElapsedTime } from './taskResultElapsedTime';
 import type { TaskResultEndAt } from './taskResultEndAt';
 import type { TaskResultExecutionId } from './taskResultExecutionId';
@@ -48,5 +47,4 @@ export interface TaskResult {
   elapsed_time?: TaskResultElapsedTime;
   task_type?: TaskResultTaskType;
   default_view?: boolean;
-  ai_review?: TaskResultAiReview;
 }

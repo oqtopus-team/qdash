@@ -1,17 +1,12 @@
 "use client";
 
-import { Check, Download, Bot, LoaderCircle, X, Lock, Minimize, ZoomIn } from "lucide-react";
+import { Check, Download, LoaderCircle, X, Lock, Minimize, ZoomIn } from "lucide-react";
 import { useMemo, useState, useRef, useCallback, memo, useEffect, type KeyboardEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
 
-import { getGetChipNotesSummaryQueryKey } from "@/client/note/note";
-import { useGetCopilotConfig } from "@/client/copilot/copilot";
-import { downloadFiguresAsZip, requestBulkAiReview } from "@/client/task-result/task-result";
-import { AiReviewConfirmModal } from "@/components/features/chip/AiReviewConfirmModal";
-import type { AiReviewBadgeState } from "@/components/features/chip/aiReviewBadge";
+import { downloadFiguresAsZip } from "@/client/task-result/task-result";
 import {
   DownloadConfirmModal,
   type DownloadItemCounts,
@@ -29,12 +24,6 @@ import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
-import {
-  buildAnalysisModelOptions,
-  getStoredAnalysisModelKey,
-  resolveAnalysisModelOption,
-  setStoredAnalysisModelKey,
-} from "@/lib/copilotModels";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
 
@@ -47,7 +36,6 @@ interface QubitGridProps {
   endAt?: string | null;
   gridSize: number;
   onDateChange?: (date: string) => void;
-  aiReviewBadgesByTaskId?: Map<string, AiReviewBadgeState>;
 }
 
 interface SelectedTaskInfo {
@@ -55,18 +43,10 @@ interface SelectedTaskInfo {
   taskName: string;
 }
 
-type TaskWithAiReview = Task & {
-  ai_review?: {
-    status?: string;
-  } | null;
-};
-
 const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
   figureImages: false,
   jsonFigures: false,
   rawData: true,
-  aiReviewNotes: false,
-  aiReviewReplayBundles: false,
 };
 
 // Memoized empty cell component
@@ -84,23 +64,6 @@ function getStatusColor(status: string | undefined): string {
     default:
       return "bg-warning";
   }
-}
-
-function isAiReviewRequestPending(task: TaskWithAiReview | null | undefined): boolean {
-  const status = task?.ai_review?.status;
-  return status === "requested" || status === "running";
-}
-
-function getPendingAiReviewTaskIds(
-  tasks: Record<string, TaskWithAiReview> | undefined,
-): Set<string> {
-  const taskIds = new Set<string>();
-  for (const task of Object.values(tasks ?? {})) {
-    if (task.task_id && isAiReviewRequestPending(task)) {
-      taskIds.add(task.task_id);
-    }
-  }
-  return taskIds;
 }
 
 function toPathList(paths: string[] | string | null | undefined): string[] {
@@ -144,11 +107,6 @@ interface GridCellProps {
   isDownloadMode: boolean;
   isSelectedForDownload: boolean;
   canBeDownloaded: boolean;
-  isAiReviewMode: boolean;
-  isSelectedForAiReview: boolean;
-  canBeAiReviewed: boolean;
-  aiReviewBadge: AiReviewBadgeState | null;
-  isAiReviewPending: boolean;
   onClick: () => void;
 }
 
@@ -163,17 +121,8 @@ const GridCell = memo(function GridCell({
   isDownloadMode,
   isSelectedForDownload,
   canBeDownloaded,
-  isAiReviewMode,
-  isSelectedForAiReview,
-  canBeAiReviewed,
-  aiReviewBadge,
-  isAiReviewPending,
   onClick,
 }: GridCellProps) {
-  const isSelectionMode = isDownloadMode || isAiReviewMode;
-  const isSelected = isDownloadMode ? isSelectedForDownload : isSelectedForAiReview;
-  const canBeSelected = isDownloadMode ? canBeDownloaded : canBeAiReviewed;
-
   if (!task) {
     return (
       <div
@@ -190,39 +139,22 @@ const GridCell = memo(function GridCell({
       <button
         onClick={onClick}
         className={`aspect-square rounded-lg shadow-sm relative group cursor-pointer ${getStatusColor(task.status)} ${muxBgClass} ${
-          isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-1" : ""
-        } ${isSelectionMode && !canBeSelected ? "opacity-40 cursor-not-allowed" : ""}`}
+          isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-1" : ""
+        } ${isDownloadMode && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""}`}
       >
         {showLabels && (
           <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-bold">
             {qid}
           </div>
         )}
-        {isAiReviewPending ? (
-          <div
-            className="absolute top-0.5 right-0.5 rounded bg-info text-info-content p-0.5 shadow-sm"
-            title="AI review requested"
-          >
-            <LoaderCircle size={10} className="animate-spin" />
-          </div>
-        ) : aiReviewBadge ? (
-          <div
-            className={`absolute top-0.5 right-0.5 rounded ${aiReviewBadge.iconClass} p-0.5 shadow-sm`}
-            title={aiReviewBadge.title}
-          >
-            <Bot size={10} />
-          </div>
-        ) : null}
         {/* Hover tooltip */}
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
           {qid}: {task.status}
-          {isAiReviewPending ? " · AI review requested" : ""}
-          {aiReviewBadge ? ` · ${aiReviewBadge.tooltip}` : ""}
         </div>
-        {isSelectionMode && canBeSelected && isSelected && (
+        {isDownloadMode && canBeDownloaded && isSelectedForDownload && (
           <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
             <div className="bg-primary text-primary-content rounded-full p-0.5">
-              {isAiReviewMode ? <Bot size={10} /> : <Check size={10} />}
+              <Check size={10} />
             </div>
           </div>
         )}
@@ -245,8 +177,8 @@ const GridCell = memo(function GridCell({
       onClick={onClick}
       onKeyDown={handleKeyDown}
       className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${muxBgClass} ${
-        isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2" : ""
-      } ${isSelectionMode && !canBeSelected ? "opacity-40 cursor-not-allowed" : ""}`}
+        isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-2" : ""
+      } ${isDownloadMode && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""}`}
     >
       {task.figure_path && figurePath && (
         <div className="absolute inset-1">
@@ -267,34 +199,19 @@ const GridCell = memo(function GridCell({
           {qid}
         </div>
       )}
-      {isAiReviewPending ? (
-        <div
-          className="absolute top-1 right-1 rounded bg-info text-info-content p-1 shadow-sm"
-          title="AI review requested"
-        >
-          <LoaderCircle size={14} className="animate-spin" />
-        </div>
-      ) : aiReviewBadge ? (
-        <div
-          className={`absolute top-1 right-1 rounded ${aiReviewBadge.iconClass} p-1 shadow-sm`}
-          title={aiReviewBadge.title}
-        >
-          <Bot size={14} />
-        </div>
-      ) : null}
       <div
         className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(task.status)}`}
       />
       {/* Download selection overlay */}
-      {isSelectionMode && canBeSelected && (
+      {isDownloadMode && canBeDownloaded && (
         <div
           className={`absolute inset-0 flex items-center justify-center transition-colors ${
-            isSelected ? "bg-primary/20" : "bg-transparent hover:bg-base-content/10"
+            isSelectedForDownload ? "bg-primary/20" : "bg-transparent hover:bg-base-content/10"
           }`}
         >
-          {isSelected && (
+          {isSelectedForDownload && (
             <div className="bg-primary text-primary-content rounded-full p-1">
-              {isAiReviewMode ? <Bot size={16} /> : <Check size={16} />}
+              <Check size={16} />
             </div>
           )}
         </div>
@@ -314,9 +231,7 @@ export function QubitGrid({
   startAt,
   endAt,
   gridSize: defaultGridSize,
-  aiReviewBadgesByTaskId,
 }: QubitGridProps) {
-  const queryClient = useQueryClient();
   // Get topology configuration
   const {
     muxSize = 2,
@@ -366,19 +281,6 @@ export function QubitGrid({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadConfirmOpen, setIsDownloadConfirmOpen] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
-  const [aiReviewSelectionEnabled, setAiReviewSelectionEnabled] = useState(false);
-  const [selectedForAiReview, setSelectedForAiReview] = useState<Set<string>>(new Set());
-  const [pendingAiReviewTaskIds, setPendingAiReviewTaskIds] = useState<Set<string>>(new Set());
-  const [isRequestingAiReview, setIsRequestingAiReview] = useState(false);
-  const [isAiReviewConfirmOpen, setIsAiReviewConfirmOpen] = useState(false);
-  const [aiReviewStatus, setAiReviewStatus] = useState<string | null>(null);
-  const [selectedModelKey, setSelectedModelKey] = useState(getStoredAnalysisModelKey);
-  const { data: copilotConfigResponse } = useGetCopilotConfig();
-  const modelOptions = useMemo(
-    () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
-    [copilotConfigResponse?.data],
-  );
-  const selectedModel = resolveAnalysisModelOption(modelOptions, selectedModelKey);
 
   // Fetch task results
   const {
@@ -387,7 +289,6 @@ export function QubitGrid({
     isFetching: isFetchingTask,
     isError: isTaskError,
     error: taskError,
-    refetch: refetchTaskResults,
   } = useQubitTaskResults({
     chipId,
     task: selectedTask,
@@ -395,65 +296,20 @@ export function QubitGrid({
     startAt,
     endAt,
   });
-  const persistedPendingAiReviewTaskIds = useMemo(
-    () => getPendingAiReviewTaskIds(taskResponse?.data?.result),
-    [taskResponse?.data?.result],
-  );
-  const visiblePendingAiReviewCount = useMemo(() => {
-    const taskIds = new Set(pendingAiReviewTaskIds);
-    for (const taskId of persistedPendingAiReviewTaskIds) {
-      taskIds.add(taskId);
-    }
-    return taskIds.size;
-  }, [pendingAiReviewTaskIds, persistedPendingAiReviewTaskIds]);
   const downloadCounts = useMemo(() => {
     const counts: DownloadItemCounts = {
       figureImages: 0,
       jsonFigures: 0,
       rawData: 0,
-      aiReviewNotes: 0,
-      aiReviewReplayBundles: 0,
     };
     selectedForDownload.forEach((qid) => {
       const task = taskResponse?.data?.result?.[qid];
       counts.figureImages += toPathList(task?.figure_path).length;
       counts.jsonFigures += toPathList(task?.json_figure_path).length;
       counts.rawData += toNetcdfPathList(task?.raw_data_path).length;
-      if (task?.task_id && aiReviewBadgesByTaskId?.has(task.task_id)) {
-        counts.aiReviewNotes += 1;
-      }
-      if (task?.task_id) {
-        counts.aiReviewReplayBundles += 1;
-      }
     });
     return counts;
-  }, [aiReviewBadgesByTaskId, selectedForDownload, taskResponse?.data?.result]);
-
-  useEffect(() => {
-    if (!aiReviewBadgesByTaskId || pendingAiReviewTaskIds.size === 0) return;
-    setPendingAiReviewTaskIds((prev) => {
-      const next = new Set(prev);
-      for (const taskId of aiReviewBadgesByTaskId.keys()) {
-        next.delete(taskId);
-      }
-      return next.size === prev.size ? prev : next;
-    });
-  }, [aiReviewBadgesByTaskId, pendingAiReviewTaskIds.size]);
-
-  useEffect(() => {
-    if (visiblePendingAiReviewCount === 0) return;
-    void refetchTaskResults();
-    void queryClient.invalidateQueries({
-      queryKey: getGetChipNotesSummaryQueryKey(chipId),
-    });
-    const intervalId = window.setInterval(() => {
-      void refetchTaskResults();
-      void queryClient.invalidateQueries({
-        queryKey: getGetChipNotesSummaryQueryKey(chipId),
-      });
-    }, 5_000);
-    return () => window.clearInterval(intervalId);
-  }, [chipId, queryClient, refetchTaskResults, visiblePendingAiReviewCount]);
+  }, [selectedForDownload, taskResponse?.data?.result]);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
   const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
@@ -582,8 +438,6 @@ export function QubitGrid({
     if (selectedForDownload.size === 0) return;
 
     const paths: string[] = [];
-    const aiReviewTaskIds: string[] = [];
-    const aiReviewBundleTaskIds: string[] = [];
     selectedForDownload.forEach((qid) => {
       const task = taskResponse?.data?.result?.[qid];
       if (!task) return;
@@ -596,29 +450,14 @@ export function QubitGrid({
       if (downloadOptions.rawData) {
         paths.push(...toNetcdfPathList(task.raw_data_path));
       }
-      if (downloadOptions.aiReviewNotes && task.task_id) {
-        aiReviewTaskIds.push(task.task_id);
-      }
-      if (downloadOptions.aiReviewReplayBundles && task.task_id) {
-        aiReviewBundleTaskIds.push(task.task_id);
-      }
     });
 
-    if (paths.length === 0 && aiReviewTaskIds.length === 0 && aiReviewBundleTaskIds.length === 0)
-      return;
+    if (paths.length === 0) return;
 
     setIsDownloading(true);
     try {
       const filename = `${chipId}_${selectedTask}_${selectedDate}_artifacts.zip`;
-      const response = await downloadFiguresAsZip(
-        {
-          paths,
-          filename,
-          ai_review_task_ids: aiReviewTaskIds,
-          ai_review_bundle_task_ids: aiReviewBundleTaskIds,
-        },
-        { responseType: "blob" },
-      );
+      const response = await downloadFiguresAsZip({ paths, filename }, { responseType: "blob" });
 
       const blob = response.data as Blob;
       const url = window.URL.createObjectURL(blob);
@@ -645,8 +484,7 @@ export function QubitGrid({
     Boolean(
       toPathList(task?.figure_path).length ||
       toPathList(task?.json_figure_path).length ||
-      toPathList(task?.raw_data_path).length ||
-      task?.task_id,
+      toPathList(task?.raw_data_path).length,
     );
 
   const hasJsonFigures = (qid: string): boolean => {
@@ -657,89 +495,6 @@ export function QubitGrid({
   const availableForDownloadCount = Object.entries(taskResponse?.data?.result || {}).filter(
     ([, task]) => hasDownloadableArtifacts(task),
   ).length;
-  const availableForAiReviewCount = Object.values(taskResponse?.data?.result || {}).filter(
-    (task) => task.task_id,
-  ).length;
-  const copilotConfig = copilotConfigResponse?.data as
-    | {
-        enabled?: boolean;
-        analysis?: { enabled?: boolean; ai_review_tasks?: string[] };
-      }
-    | undefined;
-  const isAiReviewTaskConfigured = Boolean(
-    copilotConfig?.enabled &&
-    copilotConfig.analysis?.enabled &&
-    copilotConfig.analysis.ai_review_tasks?.includes(selectedTask),
-  );
-  const handleModelChange = (key: string) => {
-    setSelectedModelKey(key);
-    setStoredAnalysisModelKey(key);
-  };
-
-  const canAiReviewQid = (qid: string): boolean =>
-    Boolean(isAiReviewTaskConfigured && taskResponse?.data?.result?.[qid]?.task_id);
-
-  const toggleAiReviewSelection = (qid: string) => {
-    setSelectedForAiReview((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(qid)) {
-        newSet.delete(qid);
-      } else {
-        newSet.add(qid);
-      }
-      return newSet;
-    });
-  };
-
-  const selectAllForAiReview = () => {
-    const allQids = Object.keys(taskResponse?.data?.result || {}).filter(canAiReviewQid);
-    setSelectedForAiReview(new Set(allQids));
-  };
-
-  const clearAiReviewSelection = () => {
-    setSelectedForAiReview(new Set());
-  };
-
-  const handleBulkAiReview = async () => {
-    if (selectedForAiReview.size === 0 || !isAiReviewTaskConfigured) return;
-
-    const taskIds = Array.from(selectedForAiReview)
-      .map((qid) => taskResponse?.data?.result?.[qid]?.task_id)
-      .filter((taskId): taskId is string => Boolean(taskId));
-    if (taskIds.length === 0) return;
-
-    setIsRequestingAiReview(true);
-    try {
-      const response = await requestBulkAiReview({
-        chip_id: chipId,
-        task: selectedTask,
-        entity_type: "qubit",
-        date: selectedDate === "latest" ? null : selectedDate,
-        task_ids: taskIds,
-        model_override: selectedModel.model,
-      });
-      setAiReviewStatus(`AI review requested for ${response.data.requested_count} task results.`);
-      setPendingAiReviewTaskIds((prev) => {
-        const next = new Set(prev);
-        for (const taskId of response.data.task_ids) {
-          next.add(taskId);
-        }
-        return next;
-      });
-      void refetchTaskResults();
-      void queryClient.invalidateQueries({
-        queryKey: getGetChipNotesSummaryQueryKey(chipId),
-      });
-      setIsAiReviewConfirmOpen(false);
-      setAiReviewSelectionEnabled(false);
-      setSelectedForAiReview(new Set());
-    } catch (error) {
-      console.error("AI review request error:", error);
-      setAiReviewStatus("AI review request failed. Please try again.");
-    } finally {
-      setIsRequestingAiReview(false);
-    }
-  };
 
   // Calculate displayed grid size based on zoom mode
   const displayGridStart = selectedRegion
@@ -806,13 +561,6 @@ export function QubitGrid({
           : null;
         const isSelectedForDownload = selectedForDownload.has(qid);
         const canBeDownloaded = hasJsonFigures(qid);
-        const aiReviewBadge = task?.task_id
-          ? (aiReviewBadgesByTaskId?.get(task.task_id) ?? null)
-          : null;
-        const isAiReviewPending = Boolean(
-          task?.task_id &&
-          (pendingAiReviewTaskIds.has(task.task_id) || isAiReviewRequestPending(task)),
-        );
 
         return (
           <GridCell
@@ -827,19 +575,10 @@ export function QubitGrid({
             isDownloadMode={downloadSelectionEnabled}
             isSelectedForDownload={isSelectedForDownload}
             canBeDownloaded={canBeDownloaded}
-            isAiReviewMode={aiReviewSelectionEnabled}
-            isSelectedForAiReview={selectedForAiReview.has(qid)}
-            canBeAiReviewed={canAiReviewQid(qid)}
-            aiReviewBadge={aiReviewBadge}
-            isAiReviewPending={isAiReviewPending}
             onClick={() => {
               if (downloadSelectionEnabled) {
                 if (canBeDownloaded) {
                   toggleDownloadSelection(qid);
-                }
-              } else if (aiReviewSelectionEnabled) {
-                if (canAiReviewQid(qid)) {
-                  toggleAiReviewSelection(qid);
                 }
               } else {
                 setSelectedTaskInfo({ qid, taskName: selectedTask });
@@ -1063,64 +802,8 @@ export function QubitGrid({
                   <X size={16} />
                 </button>
               </div>
-            ) : aiReviewSelectionEnabled ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-base-content/70">
-                  {selectedForAiReview.size} / {availableForAiReviewCount} selected
-                </span>
-                <button
-                  className="btn btn-xs btn-ghost"
-                  onClick={selectAllForAiReview}
-                  title="Select all"
-                >
-                  All
-                </button>
-                <button
-                  className="btn btn-xs btn-ghost"
-                  onClick={clearAiReviewSelection}
-                  title="Clear selection"
-                >
-                  Clear
-                </button>
-                <button
-                  className="btn btn-sm btn-primary gap-1"
-                  onClick={() => setIsAiReviewConfirmOpen(true)}
-                  disabled={selectedForAiReview.size === 0 || isRequestingAiReview}
-                >
-                  {isRequestingAiReview ? (
-                    <span className="loading loading-spinner loading-xs" />
-                  ) : (
-                    <Bot size={16} />
-                  )}
-                  AI Review
-                </button>
-                <button
-                  className="btn btn-sm btn-ghost btn-circle"
-                  onClick={() => {
-                    setAiReviewSelectionEnabled(false);
-                    setSelectedForAiReview(new Set());
-                  }}
-                  title="Cancel"
-                >
-                  <X size={16} />
-                </button>
-              </div>
             ) : (
               <div className="flex items-center gap-2">
-                <button
-                  className="btn btn-sm btn-outline gap-2"
-                  onClick={() => {
-                    setAiReviewSelectionEnabled(true);
-                    setDownloadSelectionEnabled(false);
-                    setRegionSelectionEnabled(false);
-                    selectAllForAiReview();
-                  }}
-                  title="Request AI review for the displayed task results"
-                  disabled={availableForAiReviewCount === 0 || !isAiReviewTaskConfigured}
-                >
-                  <Bot size={16} />
-                  AI Review
-                </button>
                 <button
                   className="btn btn-sm btn-outline gap-2"
                   onClick={() => {
@@ -1139,30 +822,7 @@ export function QubitGrid({
           </>
         )}
       </div>
-      {(aiReviewStatus || visiblePendingAiReviewCount > 0) && (
-        <div className="text-xs text-base-content/70 text-right flex justify-end items-center gap-2">
-          {visiblePendingAiReviewCount > 0 && (
-            <LoaderCircle className="h-3 w-3 animate-spin text-info" />
-          )}
-          <span>
-            {visiblePendingAiReviewCount > 0
-              ? `${aiReviewStatus ?? "AI review is in progress."} Waiting for ${visiblePendingAiReviewCount} note update(s).`
-              : aiReviewStatus}
-          </span>
-        </div>
-      )}
 
-      <AiReviewConfirmModal
-        isOpen={isAiReviewConfirmOpen}
-        selectedCount={selectedForAiReview.size}
-        taskName={selectedTask}
-        modelOptions={modelOptions}
-        selectedModelKey={selectedModel.key}
-        isSubmitting={isRequestingAiReview}
-        onModelChange={handleModelChange}
-        onConfirm={handleBulkAiReview}
-        onClose={() => setIsAiReviewConfirmOpen(false)}
-      />
       <DownloadConfirmModal
         isOpen={isDownloadConfirmOpen}
         selectedCount={selectedForDownload.size}

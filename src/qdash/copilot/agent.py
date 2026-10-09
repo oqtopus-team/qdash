@@ -28,7 +28,10 @@ from qdash.copilot.agent_runtime.schemas import BLOCKS_RESPONSE_SCHEMA
 from qdash.copilot.agent_runtime.translation import (
     translate_analysis_response as _translate_analysis_response_impl,
 )
-from qdash.copilot.prompts.analysis import build_analysis_system_prompt
+from qdash.copilot.prompts.analysis import (
+    build_analysis_system_prompt,
+    build_language_instruction,
+)
 from qdash.copilot.prompts.chat import (
     CHART_SYSTEM_PROMPT,
     CHAT_COMPLETIONS_STRICT_EMULATION,
@@ -50,36 +53,8 @@ logger = logging.getLogger(__name__)
 
 
 def _build_language_instruction(config: CopilotConfig | None) -> str:
-    """Build language instruction based on copilot config.
-
-    Parameters
-    ----------
-    config : CopilotConfig | None
-        Copilot configuration. Falls back to default behavior if None.
-
-    """
-    if config is None:
-        return "Respond in the same language as the user's message."
-
-    response_lang = config.response_language
-    thinking_lang = config.thinking_language
-
-    parts: list[str] = []
-
-    if thinking_lang != response_lang and not config.model.disable_thinking_instruction:
-        parts.append(f"Think and reason internally in {thinking_lang} for technical precision.")
-
-    if response_lang == "ja":
-        parts.append(
-            "Always respond in Japanese (日本語). "
-            "Use technical terms in English where appropriate (e.g., T1, T2, fidelity)."
-        )
-    elif response_lang == "en":
-        parts.append("Always respond in English.")
-    else:
-        parts.append(f"Always respond in {response_lang}.")
-
-    return " ".join(parts)
+    """Build language instruction based on copilot config."""
+    return build_language_instruction(config)
 
 
 def _build_system_prompt(

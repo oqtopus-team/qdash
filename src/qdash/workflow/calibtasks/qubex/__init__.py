@@ -57,6 +57,7 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_hpi_pulse import Cr
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_pi_pulse import CreatePIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_hpi_pulse import CheckDRAGHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_pi_pulse import CheckDRAGPIPulse
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_chevron import CheckEFChevron
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_hpi_pulse import CreateDRAGHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_pi_pulse import CreateDRAGPIPulse
 from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state import CheckBellState
@@ -64,6 +65,7 @@ from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state_tomography impor
     CheckBellStateTomography,
 )
 from qdash.workflow.calibtasks.qubex.two_qubit.check_cross_resonance import CheckCrossResonance
+from qdash.workflow.calibtasks.qubex.two_qubit.check_jazz import CheckJAZZ
 from qdash.workflow.calibtasks.qubex.two_qubit.check_zx90 import CheckZX90
 from qdash.workflow.calibtasks.qubex.two_qubit.create_zx90 import CreateZX90
 
@@ -79,7 +81,9 @@ __all__ = [
     "CheckCrossResonance",
     "CheckDRAGHPIPulse",
     "CheckDRAGPIPulse",
+    "CheckEFChevron",
     "CheckHPIPulse",
+    "CheckJAZZ",
     "CheckNoise",
     "CheckOptimalReadoutAmplitude",
     "CheckOptimalReadoutFrequency",
