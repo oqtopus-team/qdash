@@ -166,11 +166,50 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
   assert.deepEqual(seen[0].images, [{ data: "png-bytes", mimeType: "image/png" }]);
   assert.equal(seen[0].context, "Rabi on Q05");
 
-  // Images the model passed itself are kept, and the transcript is not read.
-  const own = [{ data: "own-bytes", mimeType: "image/png" }];
+  // Real image bytes the model passed itself are kept, and the transcript is not read.
+  const own = [
+    {
+      data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      mimeType: "image/png",
+    },
+  ];
   await tool.execute({ context: "Rabi on Q05", images: own }, api, { abortSignal: undefined });
   assert.equal(scans.length, 1);
   assert.deepEqual(seen[1].images, own);
+
+  // `max_images` asks for the last N figures of the newest message that has any.
+  const twoFigures = {
+    ...api,
+    commit: async (change) =>
+      change({
+        scanEntries: async () => ({
+          items: [
+            {
+              model: [
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: "review this" },
+                    { type: "image", data: "expected", mimeType: "image/png" },
+                    { type: "image", data: "measured", mimeType: "image/png" },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      }),
+  };
+  await tool.execute({ context: "CheckRabi", max_images: 2 }, twoFigures, { abortSignal: undefined });
+  assert.deepEqual(
+    seen[2].images.map((image) => image.data),
+    ["expected", "measured"],
+  );
+  await tool.execute({ context: "CheckRabi" }, twoFigures, { abortSignal: undefined });
+  assert.deepEqual(
+    seen[3].images.map((image) => image.data),
+    ["measured"],
+  );
 });
 
 test("experimental write tools require opt-in and never run from the model's call", async () => {

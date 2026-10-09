@@ -19,7 +19,13 @@ import {
   isExperimentalWriteTool,
 } from "./allowed-tools.ts";
 import type { QDashConnection } from "./auth.ts";
-import { acceptsImages, hasImages, latestImages, withImages } from "./figure-context.ts";
+import {
+  acceptsImages,
+  hasImages,
+  latestImages,
+  requestedImageCount,
+  withImages,
+} from "./figure-context.ts";
 import { isLocalExtension } from "./local-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 
@@ -165,7 +171,10 @@ export function adaptCodingAgentTool(
           (tx) => tx.scanEntries({ conversationId: api.conversationId }, FIGURE_SCAN_LIMIT),
           context,
         );
-        callArgs = withImages(args as object, latestImages(page.items));
+        callArgs = withImages(
+          args as object,
+          latestImages(page.items, requestedImageCount(args)),
+        );
       }
       const result = await runCodingAgentTool(
         tool,
