@@ -5,6 +5,14 @@ import { Type } from "typebox";
 
 import { buildQDashExtension, decisionMessage } from "../src/durable-tools.ts";
 
+const connection = {
+  toolArgs: {
+    profile: "runtime",
+    configPath: "/private/config.ini",
+    useEnv: false,
+  },
+};
+
 function registered(name) {
   let calls = 0;
   return {
@@ -35,9 +43,13 @@ test("only explicitly reviewed pi-qdash tools enter the durable registry", () =>
     ],
     {},
     "/tmp/work",
+    connection,
   );
 
-  assert.deepEqual(extension.tools.map((tool) => tool.name), ["qdash_get_default_chip"]);
+  assert.deepEqual(
+    extension.tools.map((tool) => tool.name),
+    ["qdash_get_default_chip"],
+  );
 });
 
 test("experimental write tools require opt-in and never run from the model's call", async () => {
@@ -54,6 +66,7 @@ test("experimental write tools require opt-in and never run from the model's cal
     ],
     {},
     "/tmp/work",
+    connection,
     true,
   );
 
@@ -93,16 +106,25 @@ test("the model is not offered the confirmation flag", () => {
     [{ tools: new Map([["qdash_create_forum_post", tool]]) }],
     {},
     "/tmp/work",
+    connection,
     true,
   );
   assert.deepEqual(Object.keys(extension.tools[0].parameters.properties), ["title"]);
 });
 
 test("decision messages tell the model what happened", () => {
-  const approval = { id: "c", tool: "qdash_execute_agent_action", label: "Execute", args: {} };
+  const approval = {
+    id: "c",
+    tool: "qdash_execute_agent_action",
+    label: "Execute",
+    args: {},
+  };
   assert.match(decisionMessage(approval, { approved: false }), /declined .*It was not run/);
   assert.match(
-    decisionMessage(approval, { approved: true, result: '{"execution_status":"queued"}' }),
+    decisionMessage(approval, {
+      approved: true,
+      result: '{"execution_status":"queued"}',
+    }),
     /approved .*Result:\n\{"execution_status":"queued"\}/,
   );
   assert.match(decisionMessage(approval, { approved: true, error: "409" }), /failed:\n409/);

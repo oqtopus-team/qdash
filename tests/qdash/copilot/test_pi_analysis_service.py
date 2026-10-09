@@ -79,7 +79,8 @@ async def _collect(
 
     monkeypatch.setattr(pi_chat_service, "ensure_agent_session", ensure_agent_session)
 
-    async def fake_stream_payload(payload, *, step, extra_result=None):
+    async def fake_stream_payload(payload, *, step, auth, extra_result=None):
+        captured["auth"] = auth
         captured["payload"] = payload
         captured["step"] = step
 
@@ -99,6 +100,7 @@ async def _collect(
             _config(),
             _bundle(),
             username="alice",
+            auth=pi_chat_service.QDashAuth("alice-token", "alice-project"),
             language_instruction="Always respond in English.",
             images_sent=_IMAGES_SENT,
         )
@@ -176,6 +178,7 @@ class TestStream:
                 _config(),
                 _bundle(),
                 username="alice",
+                auth=pi_chat_service.QDashAuth("alice-token", "alice-project"),
                 language_instruction="",
                 images_sent=_IMAGES_SENT,
             )
@@ -205,6 +208,8 @@ class TestStream:
         ]
         assert payload["thinking_level"] == "off"
         assert captured["step"] == "run_analysis"
+        assert captured["auth"] == pi_chat_service.QDashAuth("alice-token", "alice-project")
+        assert "alice-token" not in json.dumps(payload)
 
     @pytest.mark.asyncio
     async def test_runtime_decides_whether_to_use_opening_context(
@@ -240,6 +245,7 @@ class TestStream:
                 _config(),
                 _bundle(),
                 username="alice",
+                auth=pi_chat_service.QDashAuth("alice-token", "alice-project"),
                 language_instruction="",
                 images_sent=_IMAGES_SENT,
             )

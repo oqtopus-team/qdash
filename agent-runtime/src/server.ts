@@ -7,6 +7,7 @@ import {
   type Conversation,
 } from "@earendil-works/pi-durable";
 
+import { requestQDashAuth } from "./auth.ts";
 import { WRAP_UP_MESSAGE } from "./budget.ts";
 import { encodeLine, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
 import { hasBearerToken, readJsonBody, RequestError } from "./http.ts";
@@ -138,7 +139,10 @@ async function handleReview(req: IncomingMessage, res: ServerResponse): Promise<
     if (result.review) {
       sendJson(res, 200, { review: result.review });
     } else {
-      sendJson(res, 200, { error: "submit_review was not called", text: result.text });
+      sendJson(res, 200, {
+        error: "submit_review was not called",
+        text: result.text,
+      });
     }
   } finally {
     release();
@@ -156,148 +160,193 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   const ownerId = body.owner_id;
   const conversationId = body.conversation_id;
   if (!ownerId || !conversationId || typeof body.message !== "string") {
-    sendJson(res, 400, { error: "owner_id, conversation_id and message are required" });
+    sendJson(res, 400, {
+      error: "owner_id, conversation_id and message are required",
+    });
+    return;
+  }
+
+  let auth;
+  try {
+    auth = requestQDashAuth(req.headers);
+  } catch {
+    sendJson(res, 401, { error: "QDash user authentication is required" });
     return;
   }
 
   const runKey = `${ownerId}\0${conversationId}`;
   if (running.has(runKey)) {
-    sendJson(res, 409, { error: "conversation is already processing a request" });
+    sendJson(res, 409, {
+      error: "conversation is already processing a request",
+    });
     return;
   }
   running.set(runKey, null);
 
   let opened;
   try {
-    opened = await runtime.openSession({
-      ownerId,
-      sessionId: conversationId,
-      requestId: body.request_id,
-      message: body.message,
-      provider: body.model?.provider,
-      modelName: body.model?.name,
-      thinkingLevel: body.thinking_level,
-      images: toImageContent(body.images),
-    });
+    opened = await runtime.openSession(
+      {
+        ownerId,
+        sessionId: conversationId,
+        requestId: body.request_id,
+        message: body.message,
+        provider: body.model?.provider,
+        modelName: body.model?.name,
+        thinkingLevel: body.thinking_level,
+        images: toImageContent(body.images),
+      },
+      auth,
+    );
   } catch (error) {
     running.delete(runKey);
-    sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+    sendJson(res, 400, {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return;
   }
 
   const { harness, conversation } = opened;
   running.set(runKey, conversation);
 
-  let approval: ApprovalRequest | undefined;
-  if (body.approval) {
-    approval = body.approval.id
-      ? await pendingApproval(conversation, body.approval.id)
-      : undefined;
-    if (!approval) {
-      await harness.close(BACKGROUND_CONTEXT);
-      running.delete(runKey);
-      sendJson(res, 400, { error: "This approval is no longer pending; ask the assistant again." });
-      return;
-    }
-  }
-
-  res.writeHead(200, {
-    "Content-Type": "application/x-ndjson",
-    "Cache-Control": "no-cache",
-    "X-Accel-Buffering": "no",
-  });
-  let connected = true;
-  res.on("close", () => {
-    // A dropped browser connection does not cancel durable work. Retrying with
-    // the same request_id recovers the committed answer instead of paying for
-    // a second model turn.
-    connected = false;
-  });
-  const write = (event: NdjsonEvent): void => {
-    if (connected && !res.writableEnded) res.write(encodeLine(event));
-  };
-  const ping = CHAT_PING_MS > 0 ? setInterval(() => write({ type: "ping" }), CHAT_PING_MS) : null;
-
-  const events = await watchEvents(harness, conversation.id, BACKGROUND_CONTEXT);
-  events.start(async (batch) => {
-    for (const event of batch) writeAgentEvent(event, write);
-  });
-
   try {
-    const view = await conversation.context(BACKGROUND_CONTEXT);
-    const isNew = !view.entries.some((entry) => UserEntry.is(entry));
-    let message = isNew && body.initial_message ? body.initial_message : body.message;
-    if (approval) {
-      // The runtime, not the model, runs the call the user approved, with the
-      // exact arguments the user saw. The model only learns the outcome.
-      if (body.approval?.approve === true) {
-        const id = `${approval.id}:approved`;
-        write({ type: "tool_start", name: approval.tool, id, args: approval.args });
-        try {
-          const result = await runtime.writeTools.runApproved(approval);
-          write({ type: "tool_end", name: approval.tool, id, isError: false });
-          message = decisionMessage(approval, { approved: true, result });
-        } catch (error) {
-          write({ type: "tool_end", name: approval.tool, id, isError: true });
-          const reason = error instanceof Error ? error.message : String(error);
-          message = decisionMessage(approval, { approved: true, error: reason });
-        }
-      } else {
-        message = decisionMessage(approval, { approved: false });
+    let approval: ApprovalRequest | undefined;
+    if (body.approval) {
+      approval = body.approval.id
+        ? await pendingApproval(conversation, body.approval.id)
+        : undefined;
+      if (!approval) {
+        sendJson(res, 400, {
+          error: "This approval is no longer pending; ask the assistant again.",
+        });
+        return;
       }
     }
-    const images = isNew ? toImageContent(body.images) : [];
-    const content = images.length
-      ? [{ type: "text" as const, text: message }, ...images]
-      : message;
-    const submission = await conversation.submit(
-      {
-        type: "input",
-        content,
-        ...(body.request_id ? { requestId: body.request_id } : {}),
-      },
-      BACKGROUND_CONTEXT,
-    );
-    // A steer is placed after the current tool round, so the model reads it
-    // before deciding on more tools and answers in the same run.
-    let wrapUp: ReturnType<typeof conversation.submit> | undefined;
-    const wrapUpTimer =
-      CHAT_WRAP_UP_MS > 0
-        ? setTimeout(() => {
-            wrapUp = conversation.submit(
-              { type: "input", content: WRAP_UP_MESSAGE, whenBusy: "steer" },
-              BACKGROUND_CONTEXT,
-            );
-            // Handled after the turn settles; keep the rejection from going unhandled meanwhile.
-            wrapUp.catch(() => undefined);
-          }, CHAT_WRAP_UP_MS)
-        : null;
-    const timeout =
-      CHAT_TIMEOUT_MS > 0
-        ? setTimeout(() => void conversation.abort(BACKGROUND_CONTEXT), CHAT_TIMEOUT_MS)
-        : null;
-    const settled = await submission.wait(BACKGROUND_CONTEXT).finally(() => {
-      if (wrapUpTimer) clearTimeout(wrapUpTimer);
-      if (timeout) clearTimeout(timeout);
+
+    res.writeHead(200, {
+      "Content-Type": "application/x-ndjson",
+      "Cache-Control": "no-cache",
+      "X-Accel-Buffering": "no",
     });
-    // A steer still queued when the run answered would start a new run.
-    await wrapUp
-      ?.then((placed) => placed.abort(BACKGROUND_CONTEXT))
-      .catch((error: unknown) => console.warn("[agent-runtime] wrap-up steer failed:", error));
-    await events.stop();
-    if (settled.status === "done" && settled.type === "input") {
-      write({ type: "done", text: await answerText(conversation, settled.answer) });
-    } else {
-      write({ type: "error", message: `conversation was not answered: ${settled.reason}` });
+    let connected = true;
+    res.on("close", () => {
+      // A dropped browser connection does not cancel durable work. Retrying with
+      // the same request_id recovers the committed answer instead of paying for
+      // a second model turn.
+      connected = false;
+    });
+    const write = (event: NdjsonEvent): void => {
+      if (connected && !res.writableEnded) res.write(encodeLine(event));
+    };
+    const ping = CHAT_PING_MS > 0 ? setInterval(() => write({ type: "ping" }), CHAT_PING_MS) : null;
+
+    const events = await watchEvents(harness, conversation.id, BACKGROUND_CONTEXT);
+    events.start(async (batch) => {
+      for (const event of batch) writeAgentEvent(event, write);
+    });
+
+    try {
+      const view = await conversation.context(BACKGROUND_CONTEXT);
+      const isNew = !view.entries.some((entry) => UserEntry.is(entry));
+      let message = isNew && body.initial_message ? body.initial_message : body.message;
+      if (approval) {
+        // The runtime, not the model, runs the call the user approved, with the
+        // exact arguments the user saw. The model only learns the outcome.
+        if (body.approval?.approve === true) {
+          const id = `${approval.id}:approved`;
+          write({
+            type: "tool_start",
+            name: approval.tool,
+            id,
+            args: approval.args,
+          });
+          try {
+            const result = await opened.writeTools.runApproved(approval);
+            write({
+              type: "tool_end",
+              name: approval.tool,
+              id,
+              isError: false,
+            });
+            message = decisionMessage(approval, { approved: true, result });
+          } catch (error) {
+            write({ type: "tool_end", name: approval.tool, id, isError: true });
+            const reason = error instanceof Error ? error.message : String(error);
+            message = decisionMessage(approval, {
+              approved: true,
+              error: reason,
+            });
+          }
+        } else {
+          message = decisionMessage(approval, { approved: false });
+        }
+      }
+      const images = isNew ? toImageContent(body.images) : [];
+      const content = images.length
+        ? [{ type: "text" as const, text: message }, ...images]
+        : message;
+      const submission = await conversation.submit(
+        {
+          type: "input",
+          content,
+          ...(body.request_id ? { requestId: body.request_id } : {}),
+        },
+        BACKGROUND_CONTEXT,
+      );
+      // A steer is placed after the current tool round, so the model reads it
+      // before deciding on more tools and answers in the same run.
+      let wrapUp: ReturnType<typeof conversation.submit> | undefined;
+      const wrapUpTimer =
+        CHAT_WRAP_UP_MS > 0
+          ? setTimeout(() => {
+              wrapUp = conversation.submit(
+                { type: "input", content: WRAP_UP_MESSAGE, whenBusy: "steer" },
+                BACKGROUND_CONTEXT,
+              );
+              // Handled after the turn settles; keep the rejection from going unhandled meanwhile.
+              wrapUp.catch(() => undefined);
+            }, CHAT_WRAP_UP_MS)
+          : null;
+      const timeout =
+        CHAT_TIMEOUT_MS > 0
+          ? setTimeout(() => void conversation.abort(BACKGROUND_CONTEXT), CHAT_TIMEOUT_MS)
+          : null;
+      const settled = await submission.wait(BACKGROUND_CONTEXT).finally(() => {
+        if (wrapUpTimer) clearTimeout(wrapUpTimer);
+        if (timeout) clearTimeout(timeout);
+      });
+      // A steer still queued when the run answered would start a new run.
+      await wrapUp
+        ?.then((placed) => placed.abort(BACKGROUND_CONTEXT))
+        .catch((error: unknown) => console.warn("[agent-runtime] wrap-up steer failed:", error));
+      await events.stop();
+      if (settled.status === "done" && settled.type === "input") {
+        write({
+          type: "done",
+          text: await answerText(conversation, settled.answer),
+        });
+      } else {
+        write({
+          type: "error",
+          message: `conversation was not answered: ${settled.reason}`,
+        });
+      }
+    } catch (error) {
+      write({
+        type: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      if (ping) clearInterval(ping);
+      await events.stop();
+      if (connected && !res.writableEnded) res.end();
     }
-  } catch (error) {
-    write({ type: "error", message: error instanceof Error ? error.message : String(error) });
   } finally {
-    if (ping) clearInterval(ping);
-    await events.stop();
-    await harness.close(BACKGROUND_CONTEXT);
-    running.delete(runKey);
-    if (connected && !res.writableEnded) res.end();
+    try {
+      await opened.close();
+    } finally {
+      running.delete(runKey);
+    }
   }
 }
 
@@ -346,7 +395,11 @@ function authorized(req: IncomingMessage): boolean {
 
 const server = createServer((req, res) => {
   if (req.method === "GET" && req.url === "/health") {
-    sendJson(res, 200, { status: "ok", running: running.size, reviews: reviewsInFlight });
+    sendJson(res, 200, {
+      status: "ok",
+      running: running.size,
+      reviews: reviewsInFlight,
+    });
     return;
   }
   if (req.method === "POST" && req.url === "/chat") {
