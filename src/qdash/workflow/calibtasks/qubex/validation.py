@@ -1,11 +1,26 @@
-"""Validation helpers for qubex calibration task outputs."""
+"""Validation helpers for qubex calibration tasks."""
 
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from qubex import Experiment
 
 DEFAULT_RABI_R2_THRESHOLD = 0.6
+
+
+def require_ef_configuration(exp: Experiment, label: str) -> None:
+    """Require actual GE and EF targets, not legacy aliases."""
+    try:
+        exp.targets[exp.ctx.resolve_ge_label(label)]
+        exp.targets[exp.ctx.resolve_ef_label(label)]
+    except (KeyError, ValueError) as exc:
+        raise ValueError(
+            f"GE/EF targets are not configured for {label}. Run ConfigureEF before "
+            "CheckEFChevron in the same session."
+        ) from exc
 
 
 def finite_value_error(

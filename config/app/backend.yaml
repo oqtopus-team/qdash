@@ -68,6 +68,7 @@ backends:
 
       Other:
         - Configure
+        - ConfigureEF
         - ConfigureAll
         - LinkUp
         - CheckStatus

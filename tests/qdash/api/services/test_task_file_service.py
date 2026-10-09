@@ -171,6 +171,19 @@ def test_ef_chevron_is_enabled_with_calibration_and_sweep_metadata() -> None:
     assert task.run_parameters["shots"]["value"] == 256
 
 
+def test_ef_configure_is_enabled_with_mode_metadata() -> None:
+    clear_backend_config_cache()
+    tasks = TaskFileService().list_task_info("qubex", enabled_only=True).tasks
+    task = next(task for task in tasks if task.name == "ConfigureEF")
+
+    assert task.enabled
+    assert task.category == "Other"
+    assert task.task_type == "qubit"
+    assert task.run_parameters["configuration_mode"]["value"] == "ge-ef-cr"
+    configure = next(task for task in tasks if task.name == "Configure")
+    assert configure.run_parameters["configuration_mode"]["value"] == "ge-cr-cr"
+
+
 def test_jazz_task_is_enabled_in_two_qubit_group() -> None:
     from qdash.common.config.backend import is_task_available
 
