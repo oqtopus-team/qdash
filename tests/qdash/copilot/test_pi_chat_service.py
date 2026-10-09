@@ -242,9 +242,17 @@ def test_attachments_are_limited_to_supported_image_types() -> None:
 
     with _pytest.raises(ValidationError):
         ChatRequest.model_validate(
-            {"message": "x", "session_id": "s1", "images": [{"data": "YQ==", "mimeType": "image/gif"}]}
+            {
+                "message": "x",
+                "session_id": "s1",
+                "images": [{"data": "YQ==", "mimeType": "image/gif"}],
+            }
         )
     with _pytest.raises(ValidationError):
         ChatRequest.model_validate(
-            {"message": "x", "session_id": "s1", "images": [{"data": "YQ==", "mimeType": "image/png"}] * 5}
+            {
+                "message": "x",
+                "session_id": "s1",
+                "images": [{"data": "YQ==", "mimeType": "image/png"}] * 5,
+            }
         )

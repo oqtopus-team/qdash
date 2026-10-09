@@ -170,7 +170,11 @@ def _request_payload(
         # Attached with this turn's message; the runtime fills figure-evaluation
         # tools from the newest image in the conversation.
         **(
-            {"images": [{"data": image.data, "mimeType": image.mime_type} for image in request.images]}
+            {
+                "images": [
+                    {"data": image.data, "mimeType": image.mime_type} for image in request.images
+                ]
+            }
             if request.images
             else {}
         ),

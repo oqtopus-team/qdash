@@ -13,7 +13,7 @@ import type { ChatImageAttachment } from "@/types/copilotChat";
 export const MAX_ATTACHMENTS = 4;
 /** Longest edge after downscaling, in pixels. */
 export const MAX_IMAGE_EDGE = 1600;
-export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg"] as const;
+const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg"] as const;
 export const ACCEPT_ATTRIBUTE = ACCEPTED_IMAGE_TYPES.join(",");
 
 /** An attachment staged in the composer. */
