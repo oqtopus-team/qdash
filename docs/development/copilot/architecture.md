@@ -116,6 +116,33 @@ through environment variables instead of committed template files.
 | `DS4_BASE_URL` | DeepSeek v4 OpenAI-compatible gateway base URL |
 | `DS4_API_KEY` | DeepSeek v4 API key |
 | `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
+| `AGENT_RUNTIME_EXTENSION_PATHS` | Development only; local pi extension checkouts the Agent Runtime loads (see below) |
+
+### Developing a pi extension against the runtime
+
+The Agent Runtime image installs `@oqtopus-team/pi-qdash` at a pinned version
+(`agent-runtime/Dockerfile`), so a published release is the only way an
+extension normally reaches it. While developing another extension (for example
+`pi-qcaleval`), clone it under `agent-runtime/extensions/` (gitignored) and start
+the runtime with the override:
+
+```bash
+git clone https://github.com/orangekame3/pi-qcaleval.git agent-runtime/extensions/pi-qcaleval
+docker compose -f compose.yaml -f compose.extensions.yaml up -d agent-runtime
+```
+
+`compose.extensions.yaml` mounts the directory at `/app/extensions` and sets
+`AGENT_RUNTIME_EXTENSION_PATHS`, which the runtime passes to pi's resource loader as
+additional extension paths. The checkout must use the pi package layout
+(`package.json` with a `pi.extensions` manifest, like pi-qdash) and may depend only
+on the packages the runtime already ships (`@earendil-works/pi-coding-agent`,
+`typebox`), because its imports resolve from the runtime's `node_modules`.
+
+Tools from these checkouts are offered to the model without the pi-qdash
+allowlist review (`agent-runtime/src/allowed-tools.ts`); their calls receive the
+same extension context as pi-qdash tools, including `modelRegistry` for calling a
+model other than the conversation's. Restart the runtime after editing the
+extension; the startup log lists the local paths and the tools they contributed.
 
 ## Two Modes
 

@@ -52,6 +52,30 @@ test("only explicitly reviewed pi-qdash tools enter the durable registry", () =>
   );
 });
 
+test("tools from local extension checkouts bypass the pi-qdash allowlist", () => {
+  const { extension } = buildQDashExtension(
+    [
+      {
+        tools: new Map([
+          ["qdash_get_default_chip", registered("qdash_get_default_chip")],
+          ["qcal_evaluate", registered("qcal_evaluate")],
+          ["qdash_future_unreviewed_tool", registered("qdash_future_unreviewed_tool")],
+        ]),
+      },
+    ],
+    {},
+    "/tmp/work",
+    connection,
+    false,
+    ["qcal_evaluate"],
+  );
+
+  assert.deepEqual(
+    extension.tools.map((tool) => tool.name).sort(),
+    ["qcal_evaluate", "qdash_get_default_chip"],
+  );
+});
+
 test("experimental write tools require opt-in and never run from the model's call", async () => {
   const write = registered("qdash_create_forum_post");
   const { extension, writeTools } = buildQDashExtension(

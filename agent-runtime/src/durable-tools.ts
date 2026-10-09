@@ -216,7 +216,12 @@ export class QDashWriteTools {
   }
 }
 
-/** Build the durable extension containing all permitted pi-qdash tools. */
+/**
+ * Build the durable extension containing all permitted pi-qdash tools.
+ *
+ * `extraAllowedTools` names tools from local extension checkouts
+ * (`AGENT_RUNTIME_EXTENSION_PATHS`), which bypass the pi-qdash allowlist.
+ */
 export function buildQDashExtension(
   extensions: ReadonlyArray<{
     tools?: Map<string, { definition: CodingAgentTool }>;
@@ -225,10 +230,12 @@ export function buildQDashExtension(
   cwd: string,
   connection: QDashConnection,
   enableExperimentalWriteTools = false,
+  extraAllowedTools: Iterable<string> = [],
 ): { extension: Extension; writeTools: QDashWriteTools } {
   const allowed = new Set<string>([
     ...ALLOWED_TOOL_NAMES,
     ...(enableExperimentalWriteTools ? EXPERIMENTAL_WRITE_TOOL_NAMES : []),
+    ...extraAllowedTools,
   ]);
   const tools = new Map<string, ToolRegistration>();
   const writes = new Map<string, CodingAgentTool>();

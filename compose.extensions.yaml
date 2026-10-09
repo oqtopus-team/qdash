@@ -1,0 +1,16 @@
+# Development override: load local pi extension checkouts into the Agent Runtime
+# without publishing them or rebuilding the image.
+#
+# Clone each extension under agent-runtime/extensions/ (gitignored), then:
+#
+#   docker compose -f compose.yaml -f compose.extensions.yaml up -d agent-runtime
+#
+# Every tool a listed checkout defines is offered to the model, bypassing the
+# pi-qdash allowlist, so only mount code you are developing.
+services:
+  agent-runtime:
+    volumes:
+      - ./agent-runtime/extensions:/app/extensions:ro
+    environment:
+      # Colon-separated package directories inside the container.
+      - AGENT_RUNTIME_EXTENSION_PATHS=${AGENT_RUNTIME_EXTENSION_PATHS:-/app/extensions/pi-qcaleval}
