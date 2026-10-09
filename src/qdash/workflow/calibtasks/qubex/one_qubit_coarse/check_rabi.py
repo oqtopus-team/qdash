@@ -168,7 +168,7 @@ class CheckRabi(QubexTask):
         "rabi_frequency": OutputParameterSpec(unit="MHz", description="Rabi oscillation frequency"),
         "rabi_phase": OutputParameterSpec(unit="a.u.", description="Rabi oscillation phase"),
         "rabi_offset": OutputParameterSpec(unit="a.u.", description="Rabi oscillation offset"),
-        "rabi_angle": OutputParameterSpec(unit="degree", description="Rabi angle (in degree)"),
+        "rabi_angle": OutputParameterSpec(unit="rad", description="Rabi angle (in radians)"),
         "rabi_noise": OutputParameterSpec(unit="a.u.", description="Rabi oscillation noise"),
         "rabi_distance": OutputParameterSpec(unit="a.u.", description="Rabi distance"),
         "rabi_reference_phase": OutputParameterSpec(

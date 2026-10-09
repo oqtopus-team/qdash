@@ -32,6 +32,11 @@ params_updater:
     zx90_gate_fidelity: zx90_gate_fidelity.yaml
     average_gate_fidelity: average_gate_fidelity.yaml
     average_readout_fidelity: average_readout_fidelity.yaml
+    purcell_filter_frequency: purcell_filter_frequency.yaml
+    resonator_purcell_filter_coupling: resonator_purcell_filter_coupling.yaml
+    purcell_filter_linewidth: purcell_filter_linewidth.yaml
+    dispersive_shift: dispersive_shift.yaml
+    critical_photon_number: critical_photon_number.yaml
 
   # Additional params/*.yaml files to update from the same output parameter.
   extra_file_map: {}
@@ -59,3 +64,8 @@ github:
     - zx90_gate_fidelity.yaml
     - bell_state_fidelity.yaml
     - readout_fidelity.yaml
+    - purcell_filter_frequency.yaml
+    - resonator_purcell_filter_coupling.yaml
+    - purcell_filter_linewidth.yaml
+    - dispersive_shift.yaml
+    - critical_photon_number.yaml

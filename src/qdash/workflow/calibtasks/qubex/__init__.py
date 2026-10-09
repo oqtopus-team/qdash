@@ -29,6 +29,7 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
     CheckResonatorSpectroscopy,
 )
 from qdash.workflow.calibtasks.qubex.cw.check_waveform import CheckWaveform
+from qdash.workflow.calibtasks.qubex.measurement.check_ckp import CheckCKP
 from qdash.workflow.calibtasks.qubex.measurement.readout_classification import ReadoutClassification
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_adaptive_chevron import (
     CheckAdaptiveChevron,
@@ -75,6 +76,7 @@ __all__ = [
     "CheckAdaptiveChevron",
     "CheckBellState",
     "CheckBellStateTomography",
+    "CheckCKP",
     "CheckChevron",
     "CheckCoarseReadoutParams",
     "CheckControlAmplitude",

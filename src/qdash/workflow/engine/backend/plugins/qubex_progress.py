@@ -40,6 +40,7 @@ _MULTI_PHASE_TASKS = {
     "CheckAdaptiveChevron",
     "CheckChevron",
     "CheckCrossResonance",
+    "CheckCKP",
     "CheckRamsey",
     "CheckT1Average",
     "CheckT2EchoAverage",
@@ -192,6 +193,7 @@ def _progress_description(task_name: str, description: str) -> str:
     task_labels = {
         "CheckAdaptiveChevron": "Adaptive Chevron sweep",
         "CheckChevron": "Chevron sweep",
+        "CheckCKP": "Filtered CKP sweep",
         "CheckRabi": "Rabi time sweep",
         "CheckCoarseReadoutParams": "Readout parameter search",
         "CheckRamsey": "Ramsey delay sweep",
@@ -215,10 +217,15 @@ def _install_adapter() -> None:
     if _installed:
         return
 
+    from qubex.contrib.experiment import ckp_characterization
     from qubex.experiment.services import characterization_service, measurement_service
 
-    characterization_service.__dict__["tqdm"] = ReportingTqdm
-    measurement_service.__dict__["tqdm"] = ReportingTqdm
+    for module in (
+        characterization_service,
+        measurement_service,
+        ckp_characterization,
+    ):
+        module.__dict__["tqdm"] = ReportingTqdm
     _installed = True
 
 

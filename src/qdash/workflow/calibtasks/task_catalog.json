@@ -1103,6 +1103,197 @@
         "task_type": "coupling"
       },
       {
+        "class_name": "CheckCKP",
+        "description": "Estimate readout-resonator and Purcell-filter parameters with filtered CKP.",
+        "file_path": "measurement/check_ckp.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "parameter_name": "control_amplitude",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_frequency": {
+            "default_value": null,
+            "description": "Calibrated GE control frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "hpi_amplitude": {
+            "default_value": null,
+            "description": "Calibrated half-pi pulse amplitude",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_duration": {
+            "default_value": null,
+            "description": "Calibrated half-pi pulse duration",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "maximum_rabi_frequency": {
+            "default_value": null,
+            "parameter_name": "maximum_rabi_frequency",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "MHz/a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_amplitude": {
+            "default_value": null,
+            "parameter_name": "rabi_amplitude",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_angle": {
+            "default_value": null,
+            "parameter_name": "rabi_angle",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "rad",
+            "user_override": "allowed"
+          },
+          "rabi_distance": {
+            "default_value": null,
+            "parameter_name": "rabi_distance",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_noise": {
+            "default_value": null,
+            "parameter_name": "rabi_noise",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_offset": {
+            "default_value": null,
+            "parameter_name": "rabi_offset",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_phase",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_r2": {
+            "default_value": null,
+            "parameter_name": "rabi_r2",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "",
+            "user_override": "allowed"
+          },
+          "rabi_reference_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_reference_phase",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "description": "Reference readout amplitude",
+            "greater_than": 0,
+            "less_than_or_equal": 1,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "description": "Readout-frequency sweep center",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckCKP",
+        "run_parameters": {
+          "interval": {
+            "description": "Shot interval",
+            "unit": "ns",
+            "value": 153600,
+            "value_type": "int"
+          },
+          "qubit_detuning_range": {
+            "description": "Qubit-frequency offsets. Uses Qubex's CKP default when unset.",
+            "unit": "GHz",
+            "value": null,
+            "value_type": "list"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "resonator_detuning_range": {
+            "description": "Readout-frequency offsets. Uses Qubex's CKP default when unset.",
+            "unit": "GHz",
+            "value": null,
+            "value_type": "list"
+          },
+          "shots": {
+            "description": "Shots per CKP point",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "target_min_qubit_detuning": {
+            "description": "Target minimum Stark-shift detuning during rough search",
+            "unit": "GHz",
+            "value": -0.02,
+            "value_type": "float"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckChevron",
         "description": "Measure one fixed-grid Chevron pattern and estimate the qubit frequency.",
         "file_path": "one_qubit_coarse/check_chevron.py",
@@ -1432,7 +1623,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "control_rabi_distance": {
@@ -1589,7 +1780,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "target_rabi_distance": {
@@ -1781,7 +1972,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -1955,7 +2146,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -2240,7 +2431,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -2415,7 +2606,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "control_rabi_distance": {
@@ -2561,7 +2752,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "target_rabi_distance": {
@@ -2815,7 +3006,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -3110,7 +3301,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -3344,7 +3535,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -3514,7 +3705,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -3703,7 +3894,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -3886,7 +4077,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -4179,7 +4370,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "control_rabi_distance": {
@@ -4357,7 +4548,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "target_rabi_distance": {
@@ -4560,7 +4751,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -4716,7 +4907,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -4872,7 +5063,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -5028,7 +5219,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -5265,7 +5456,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "control_rabi_distance": {
@@ -5443,7 +5634,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "target_rabi_distance": {
@@ -5643,7 +5834,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -5919,7 +6110,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -6093,7 +6284,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "rabi_distance": {
@@ -6330,7 +6521,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "control_rabi_distance": {
@@ -6535,7 +6726,7 @@
             "resolution": "database_required",
             "ui_group": "Rabi normalization",
             "ui_group_collapsed": true,
-            "unit": "degree",
+            "unit": "rad",
             "user_override": "allowed"
           },
           "target_rabi_distance": {

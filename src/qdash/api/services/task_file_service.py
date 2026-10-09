@@ -45,7 +45,7 @@ RABI_NORMALIZATION_INPUT_UNITS = {
     "rabi_amplitude": "a.u.",
     "rabi_phase": "a.u.",
     "rabi_offset": "a.u.",
-    "rabi_angle": "degree",
+    "rabi_angle": "rad",
     "rabi_noise": "a.u.",
     "rabi_distance": "a.u.",
     "rabi_reference_phase": "a.u.",
