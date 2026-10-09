@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 
 import {
@@ -7,26 +10,42 @@ import {
   isLocalExtension,
   isTrustedExtension,
   localToolNames,
-  parseExtensionPaths,
+  describeExtensionError,
+  discoverExtensionCheckouts,
+  trustedCheckoutRoots,
 } from "../src/local-extensions.ts";
 
-test("extension paths come from a colon- or comma-separated list", () => {
-  const cwd = "/app/workspace";
-  assert.deepEqual(parseExtensionPaths(undefined, cwd), []);
-  assert.deepEqual(parseExtensionPaths("  ", cwd), []);
-  assert.deepEqual(parseExtensionPaths("/app/extensions/pi-qcaleval", cwd), [
-    "/app/extensions/pi-qcaleval",
-  ]);
-  assert.deepEqual(
-    parseExtensionPaths("/app/extensions/a:/app/extensions/b, /app/extensions/a", cwd),
-    ["/app/extensions/a", "/app/extensions/b"],
-  );
+test("checkouts are the package directories with a pi manifest under the mount", () => {
+  const dir = mkdtempSync(join(tmpdir(), "qdash-extensions-"));
+  try {
+    const pkg = (name, manifest) => {
+      mkdirSync(join(dir, name), { recursive: true });
+      if (manifest !== undefined) writeFileSync(join(dir, name, "package.json"), manifest);
+    };
+    pkg("pi-qcaleval", JSON.stringify({ name: "@x/pi-qcaleval", pi: { extensions: ["./extensions/q.ts"] } }));
+    pkg("pi-other", JSON.stringify({ name: "@x/pi-other", pi: {} }));
+    pkg("plain-package", JSON.stringify({ name: "no-pi-manifest" }));
+    pkg("broken", "{not json");
+    pkg("no-manifest");
+    writeFileSync(join(dir, "README.md"), "a file, not a checkout");
+
+    assert.deepEqual(discoverExtensionCheckouts(dir), [
+      { path: join(dir, "pi-other"), name: "@x/pi-other" },
+      { path: join(dir, "pi-qcaleval"), name: "@x/pi-qcaleval" },
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
-test("relative extension paths resolve against the loader cwd, as pi does", () => {
-  assert.deepEqual(parseExtensionPaths("../extensions/pi-qcaleval", "/app/workspace"), [
-    "/app/extensions/pi-qcaleval",
-  ]);
+test("a missing or empty extensions directory yields no checkouts", () => {
+  assert.deepEqual(discoverExtensionCheckouts("/nonexistent/qdash-extensions"), []);
+  const dir = mkdtempSync(join(tmpdir(), "qdash-extensions-empty-"));
+  try {
+    assert.deepEqual(discoverExtensionCheckouts(dir), []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("an extension is local only when its file sits under a checkout root", () => {
@@ -120,4 +139,39 @@ test("an installed package is trusted by its name under pi's node_modules", () =
   assert.deepEqual(localToolNames(extensions, [], packages), ["qcal_evaluate"]);
   assert.deepEqual(localToolNames(extensions, [], []), []);
   assert.equal(buildLocalToolGuide(extensions, [], new Set(["qcal_evaluate"]), packages), "- `qcal_evaluate`: d");
+});
+
+test("checkouts of allowlisted packages load but are not trusted as a whole", () => {
+  const checkouts = [
+    { path: "/app/extensions/pi-qcaleval", name: "@orangekame3/pi-qcaleval" },
+    { path: "/app/extensions/pi-qdash", name: "@oqtopus-team/pi-qdash" },
+    { path: "/app/extensions/anonymous", name: null },
+  ];
+  assert.deepEqual(trustedCheckoutRoots(checkouts, ["@oqtopus-team/pi-qdash"]), [
+    "/app/extensions/pi-qcaleval",
+    "/app/extensions/anonymous",
+  ]);
+  assert.deepEqual(trustedCheckoutRoots(checkouts, []).length, 3);
+});
+
+test("an installed copy rejected in favour of a checkout is reported as a replacement", () => {
+  const checkouts = ["/app/extensions/pi-qcaleval"];
+  const installed = "/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval/extensions/qcaleval.ts";
+  assert.deepEqual(
+    describeExtensionError(
+      installed,
+      'Tool "qcal_evaluate" conflicts with /app/extensions/pi-qcaleval/extensions/qcaleval.ts',
+      checkouts,
+    ),
+    {
+      level: "info",
+      message: `[agent-runtime] local checkout /app/extensions/pi-qcaleval/extensions/qcaleval.ts replaces installed ${installed}`,
+    },
+  );
+  // A conflict between two checkouts, or any other failure, stays an error.
+  assert.equal(
+    describeExtensionError("/app/extensions/pi-qcaleval/extensions/b.ts", 'Tool "x" conflicts with /app/extensions/pi-qcaleval/extensions/a.ts', checkouts).level,
+    "error",
+  );
+  assert.equal(describeExtensionError(installed, "Extension path does not exist", checkouts).level, "error");
 });

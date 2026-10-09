@@ -98,3 +98,10 @@ export function isExperimentalWriteTool(name: string): boolean {
  * `agent-runtime/Dockerfile`.
  */
 export const TRUSTED_EXTENSION_PACKAGES = ["@orangekame3/pi-qcaleval"] as const;
+
+/**
+ * Packages whose tools go through the per-name allowlist above even when a
+ * local checkout of them is mounted for development: the checkout replaces
+ * the pinned copy, but does not widen what the model may call.
+ */
+export const ALLOWLISTED_PACKAGES = ["@oqtopus-team/pi-qdash"] as const;
