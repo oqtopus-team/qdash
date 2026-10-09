@@ -3,6 +3,9 @@
  *
  * The runtime authenticates as the user who submitted the turn. Newly added
  * extension tools still require review before they are exposed to the model.
+ *
+ * QDash no longer serves automatic AI reviews: pi-qdash's `qdash_query` actions
+ * `ai_reviews` / `ai_review_runs` / `ai_review_run` 404 until pi-qdash drops them.
  */
 export const ALLOWED_TOOL_NAMES = [
   "qdash_analyze_figure_json",
@@ -34,7 +37,6 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_investigate",
   "qdash_list_agent_action_candidates",
   "qdash_list_agent_actions",
-  "qdash_list_ai_reviews",
   "qdash_list_chip_couplings",
   "qdash_list_chip_qubits",
   "qdash_list_chips",

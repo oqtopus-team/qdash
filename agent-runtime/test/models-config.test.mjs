@@ -206,7 +206,7 @@ test("keep_alive rides along in samplingParams so ollama keeps the VLM resident"
 
 test("locally hosted models are declared image-capable", () => {
   // Pi defaults an unstated `input` to text-only and then drops image content
-  // while building the request, so AI review would silently lose its figures.
+  // while building the request, so figure analysis would silently lose its figures.
   const { providers } = buildModelsConfig(YAML, REVIEW_YAML, env);
   for (const model of providers.ollama.models) {
     assert.deepEqual(model.input, ["text", "image"]);

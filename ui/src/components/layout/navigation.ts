@@ -4,7 +4,6 @@ import {
   Bot,
   Brain,
   CircleDot,
-  ClipboardCheck,
   ClipboardList,
   Code,
   Cpu,
@@ -103,12 +102,6 @@ export function getNavigationSections({
           href: "/issue-knowledge",
           label: "Knowledge",
           icon: Brain,
-          match: "prefix",
-        },
-        {
-          href: "/ai-reviews",
-          label: "AI Reviews",
-          icon: ClipboardCheck,
           match: "prefix",
         },
         {

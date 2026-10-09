@@ -40,7 +40,12 @@ from qdash.api.services import pi_analysis_service, pi_chat_service
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
-from qdash.copilot.config import CopilotConfig, ModelConfig, load_copilot_config
+from qdash.copilot.config import (
+    CopilotConfig,
+    ModelConfig,
+    load_copilot_config,
+    select_analysis_model,
+)
 from qdash.copilot.contracts import (
     AnalysisResponse,
     AnalyzeRequest,
@@ -50,7 +55,6 @@ from qdash.copilot.contracts import (
     SandboxPythonRequest,
 )
 from qdash.copilot.prompts.analysis import build_language_instruction
-from qdash.copilot.review import select_analysis_model
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.datamodel.task_knowledge import get_task_knowledge
 

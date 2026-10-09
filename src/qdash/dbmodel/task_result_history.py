@@ -73,7 +73,7 @@ class TaskResultHistoryDocument(Document):
     )
     ai_review: AiReviewModel = Field(
         default_factory=AiReviewModel,
-        description="Persistent AI review request state for this task result",
+        description="Legacy, read-only AI review request state (automatic AI review was retired)",
     )
     figure_path: list[str] = Field(..., description="The path to the figure")
     json_figure_path: list[str] = Field([], description="The path to the JSON figure")

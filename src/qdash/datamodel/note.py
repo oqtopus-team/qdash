@@ -39,7 +39,11 @@ class NoteCommentModel(BaseModel):
 
 
 class AiReviewModel(BaseModel):
-    """Persistent state for an AI review run on a task result."""
+    """Persistent state for an AI review run on a task result.
+
+    Legacy, read-only: automatic AI review was retired. The model is kept so
+    that task results written by earlier releases still load unchanged.
+    """
 
     model_config = ConfigDict(protected_namespaces=())
 

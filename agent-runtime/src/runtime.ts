@@ -9,7 +9,6 @@ import {
   createRegistry,
   defineExtension,
   Harness,
-  MemoryStorage,
   section,
   ToolResultEntry,
   UserEntry,
@@ -32,7 +31,6 @@ import { compactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { askUserTool } from "./ask-tool.ts";
-import { formatSettledDetail } from "./events.ts";
 import {
   buildLocalToolGuide,
   localToolNames,
@@ -46,10 +44,9 @@ import {
   type QDashWriteTools,
 } from "./durable-tools.ts";
 import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
-import { buildReviewSystemPrompt, buildSystemPrompt } from "./prompt.ts";
+import { buildSystemPrompt } from "./prompt.ts";
 import { buildPythonTool } from "./python-tool.ts";
 import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
-import { submitReviewTool } from "./review-tool.ts";
 import { extractToolGuide, TOOL_GUIDE_SKILL } from "./tool-guide.ts";
 
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
@@ -85,13 +82,6 @@ export interface SessionRequest {
   images?: Array<{ type: "image"; data: string; mimeType: string }>;
 }
 
-export interface ReviewSessionRequest {
-  prompt: string;
-  provider?: string;
-  modelName?: string;
-  images?: Array<{ type: "image"; data: string; mimeType: string }>;
-}
-
 export interface OpenDurableSession {
   harness: DurableHarness;
   conversation: Conversation;
@@ -113,7 +103,6 @@ export class SharedRuntime {
       writeTools: QDashWriteTools;
     },
     private readonly toolNames: string[],
-    private readonly reviewRegistry: ReturnType<typeof createRegistry>,
   ) {}
 
   /** Load the Pi model catalog and adapt the installed pi-qdash extension once. */
@@ -242,26 +231,10 @@ export class SharedRuntime {
       ...(skills.length ? ["read_skill"] : []),
     ];
 
-    const reviewRegistry = createRegistry();
-    reviewRegistry.install(
-      defineExtension({
-        name: "qdash-review",
-        sections: [
-          section("qdash-review", () => buildReviewSystemPrompt(responseLanguage), {
-            tag: false,
-          }),
-        ],
-        tools: [submitReviewTool],
-      }),
-    );
-    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames, reviewRegistry);
+    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames);
   }
 
   /** Resolve a configured QDash model without allowing an invisible fallback. */
-  private resolveModel(provider: string | undefined, modelName: string | undefined): ModelRef {
-    return this.resolveModelWithLimits(provider, modelName).ref;
-  }
-
   private resolveModelWithLimits(
     provider: string | undefined,
     modelName: string | undefined,
@@ -338,50 +311,6 @@ export class SharedRuntime {
     } catch (error) {
       await close();
       throw error;
-    }
-  }
-
-  /** Run a stateless automatic review with durable task semantics in memory. */
-  async runReview(request: ReviewSessionRequest): Promise<{ review?: unknown; text: string }> {
-    const model = this.resolveModel(request.provider, request.modelName);
-    const harness = await Harness.open(
-      new MemoryStorage(),
-      { models: this.modelRuntime, registry: this.reviewRegistry },
-      BACKGROUND_CONTEXT,
-    );
-    try {
-      const conversation = await harness.root(BACKGROUND_CONTEXT, {
-        agent: { model, cwd: WORK_DIR },
-      });
-      const content = request.images?.length
-        ? [{ type: "text" as const, text: request.prompt }, ...request.images]
-        : request.prompt;
-      const submission = await conversation.submit({ type: "input", content }, BACKGROUND_CONTEXT);
-      const timeout = setTimeout(
-        () => void conversation.abort(BACKGROUND_CONTEXT),
-        Number(process.env.REVIEW_TIMEOUT_MS ?? 300_000),
-      );
-      const settled = await submission
-        .wait(BACKGROUND_CONTEXT)
-        .finally(() => clearTimeout(timeout));
-      if (settled.status !== "done" || settled.type !== "input") {
-        throw new Error(
-          `review was not answered: ${settled.reason}${formatSettledDetail(settled.detail)}`,
-        );
-      }
-
-      const view = await conversation.context(BACKGROUND_CONTEXT);
-      let review: unknown;
-      for (const entry of view.entries) {
-        if (!ToolResultEntry.is(entry)) continue;
-        const message = entry.model?.[0];
-        if (message?.role === "toolResult" && message.details) {
-          review = (message.details as { review?: unknown }).review ?? review;
-        }
-      }
-      return { review, text: await answerText(conversation, settled.answer) };
-    } finally {
-      await harness.close(BACKGROUND_CONTEXT);
     }
   }
 }
