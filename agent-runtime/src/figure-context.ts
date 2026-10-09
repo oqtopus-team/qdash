@@ -33,10 +33,40 @@ export function acceptsImages(parameters: TSchema): boolean {
   return properties !== undefined && "images" in properties;
 }
 
-/** Whether the model already passed at least one image. */
+/** Most figures a tool may ask the runtime to supply. */
+export const MAX_SUPPLIED_IMAGES = 4;
+
+/**
+ * How many of the newest figures the tool asked for via `max_images`
+ * (default 1); the tool's own limit still applies downstream.
+ */
+export function requestedImageCount(args: unknown, limit = MAX_SUPPLIED_IMAGES): number {
+  const value = (args as { max_images?: unknown } | null)?.max_images;
+  if (typeof value !== "number" || !Number.isFinite(value)) return 1;
+  return Math.min(Math.max(Math.floor(value), 1), limit);
+}
+
+/**
+ * Shortest payload accepted as image bytes. A model that invents an `images`
+ * argument writes placeholders such as "<image 1>" or "see attached", never a
+ * base64 string of a real PNG, whose header alone is longer than this.
+ */
+const MIN_IMAGE_BASE64_LENGTH = 64;
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/**
+ * Whether the model passed image bytes of its own. Placeholders are ignored
+ * so the transcript's real figures are used instead.
+ */
 export function hasImages(args: unknown): boolean {
   const images = (args as { images?: unknown } | null)?.images;
-  return Array.isArray(images) && images.length > 0;
+  if (!Array.isArray(images) || images.length === 0) return false;
+  return images.every((image) => {
+    const data = (image as { data?: unknown } | null)?.data;
+    return (
+      typeof data === "string" && data.length >= MIN_IMAGE_BASE64_LENGTH && BASE64.test(data)
+    );
+  });
 }
 
 /**
@@ -75,11 +105,20 @@ function imageBlocks(content: unknown): ImageBlock[] {
   return out;
 }
 
-/** The model's arguments with `images` filled in when it passed none. */
+/**
+ * The model's arguments with `images` filled in when it passed none (or only
+ * placeholders). Without transcript figures the placeholders are dropped, so
+ * the tool reports a missing plot instead of sending junk to its model.
+ */
 export function withImages<T extends object>(
   args: T,
   images: ReadonlyArray<ImageBlock>,
-): T | (T & { images: ImageArgument[] }) {
-  if (hasImages(args) || images.length === 0) return args;
+): T | (T & { images?: ImageArgument[] }) {
+  if (hasImages(args)) return args;
+  if (images.length === 0) {
+    if (!("images" in args)) return args;
+    const { images: _placeholders, ...rest } = args as T & { images?: unknown };
+    return rest as T;
+  }
   return { ...args, images: images.map(({ data, mimeType }) => ({ data, mimeType })) };
 }
