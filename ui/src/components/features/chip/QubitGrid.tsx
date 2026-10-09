@@ -303,6 +303,9 @@ const GridCell = memo(function GridCell({
   );
 });
 
+/**
+ * Qubit grid for a chip showing per-qubit task results, with region view, pan-zoom, and figure download modes
+ */
 export function QubitGrid({
   chipId,
   topologyId,
