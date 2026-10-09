@@ -35,6 +35,7 @@ import {
   buildLocalToolGuide,
   localToolNames,
   describeExtensionError,
+  withoutReplacedInstalls,
   discoverExtensionCheckouts,
   trustedCheckoutRoots,
 } from "./local-extensions.ts";
@@ -119,8 +120,13 @@ export class SharedRuntime {
       additionalExtensionPaths: CHECKOUT_PATHS,
     });
     await loader.reload();
+    // pi reports one conflict per tool name, so a checkout that replaces an
+    // installed package yields the same replacement notice dozens of times.
+    const reported = new Set<string>();
     for (const { path, error } of loader.getExtensions().errors) {
       const report = describeExtensionError(path, error, CHECKOUT_PATHS);
+      if (reported.has(report.message)) continue;
+      reported.add(report.message);
       if (report.level === "error") console.error(report.message);
       else console.log(report.message);
     }
@@ -147,7 +153,7 @@ export class SharedRuntime {
       `[agent-runtime] skills: ${skills.map((skill) => skill.name).join(", ") || "none"}`,
     );
 
-    const extensions = loader.getExtensions().extensions;
+    const extensions = withoutReplacedInstalls(loader.getExtensions().extensions, CHECKOUTS);
     // Local checkouts and trusted installed packages are trusted as a whole
     // (see buildQDashExtension); the experimental write opt-in still applies
     // to their tool names.

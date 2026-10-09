@@ -101,6 +101,23 @@ export function isInstalledPackage(extensionPath: string, packages: readonly str
   return packages.some((name) => normalized.includes(`/node_modules/${name}/`));
 }
 
+/**
+ * The extensions to register, without installed copies of packages that have a
+ * local checkout.
+ *
+ * pi rejects an installed extension's tools as conflicts with the checkout
+ * loaded before it, but still lists that extension with its full tool map.
+ * Registering the list as-is would let the installed copy, which comes last,
+ * overwrite the checkout's tools, so the checkout would never actually run.
+ */
+export function withoutReplacedInstalls<T extends { path: string }>(
+  extensions: ReadonlyArray<T>,
+  checkouts: ReadonlyArray<ExtensionCheckout>,
+): T[] {
+  const names = checkouts.flatMap((checkout) => (checkout.name ? [checkout.name] : []));
+  return extensions.filter((extension) => !isInstalledPackage(extension.path, names));
+}
+
 /** Whether an extension is trusted as a whole: a local checkout or a listed package. */
 export function isTrustedExtension(
   extensionPath: string,
