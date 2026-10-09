@@ -240,6 +240,9 @@ services:
     volumes:
       - ./agent-runtime/src:/app/src
       - ./config:/app/config # Read for copilot language and model settings only
+      # Local pi extension checkouts for development (gitignored, empty in
+      # production); the runtime trusts whatever package directories it finds.
+      - ./agent-runtime/extensions:/app/extensions:ro
       - agent-runtime-state:/app/state
     # Per-turn pi-qdash credential profiles are transient, including on crashes.
     tmpfs:

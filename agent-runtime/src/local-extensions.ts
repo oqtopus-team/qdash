@@ -1,36 +1,85 @@
 /**
  * Extensions trusted as a whole, next to the allowlisted pi-qdash package.
  *
- * Two sources qualify. Local checkouts: `AGENT_RUNTIME_EXTENSION_PATHS` names
- * package directories (the layout pi installs: a package.json with a `pi`
- * manifest) mounted into the runtime container during development, so an
- * extension can be iterated on without publishing it and rebuilding the image.
- * Installed packages: `TRUSTED_EXTENSION_PACKAGES` names pi packages the
+ * Two sources qualify. Local checkouts: package directories (the layout pi
+ * installs: a package.json with a `pi` manifest) placed under
+ * `agent-runtime/extensions/`, which compose mounts into the runtime container,
+ * so an extension can be iterated on without publishing it and rebuilding the
+ * image. Installed packages: `TRUSTED_EXTENSION_PACKAGES` names pi packages the
  * image installs at a pinned version, so the same extension runs in production.
- *
- * Pure functions only, so they can be tested without a running agent.
  */
 
-import { resolve, sep } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
+
+/** A local checkout found under the extensions mount. */
+export interface ExtensionCheckout {
+  /** Absolute package directory, passed to pi as an extension path. */
+  path: string;
+  /** The package name from its manifest, or null when it has none. */
+  name: string | null;
+}
 
 /**
- * Split the colon- or comma-separated environment value into absolute paths.
+ * Package directories under `dir` that carry a pi manifest, sorted by path.
  *
- * Relative entries resolve against `baseDir`, which must be the resource
- * loader's `cwd`: pi resolves `additionalExtensionPaths` there, and the roots
- * must name the same directories so loaded extensions can be matched to them.
+ * An empty or missing directory (production, or a clone without checkouts)
+ * yields nothing; a directory without a `pi` manifest is ignored rather than
+ * failing startup, since the mount may hold unrelated files.
  */
-export function parseExtensionPaths(value: string | undefined, baseDir: string): string[] {
-  if (!value) return [];
-  return [
-    ...new Set(
-      value
-        .split(/[:,]/)
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0)
-        .map((entry) => resolve(baseDir, entry)),
-    ),
-  ];
+export function discoverExtensionCheckouts(dir: string): ExtensionCheckout[] {
+  if (!existsSync(dir)) return [];
+  const checkouts: ExtensionCheckout[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+    const root = join(dir, entry.name);
+    const manifest = join(root, "package.json");
+    if (!existsSync(manifest)) continue;
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(manifest, "utf8"));
+      if (typeof parsed !== "object" || parsed === null || !("pi" in parsed)) continue;
+      const name = (parsed as { name?: unknown }).name;
+      checkouts.push({ path: resolve(root), name: typeof name === "string" ? name : null });
+    } catch {
+      // Not a package manifest; skip the directory.
+    }
+  }
+  return checkouts.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/**
+ * Checkouts trusted as a whole: every checkout except those of packages that
+ * keep a per-name allowlist (pi-qdash). Such a checkout still loads and
+ * replaces the pinned copy, so it can be developed in place, but its tools
+ * pass the same review gate as in production.
+ */
+export function trustedCheckoutRoots(
+  checkouts: ReadonlyArray<ExtensionCheckout>,
+  allowlistedPackages: readonly string[],
+): string[] {
+  return checkouts
+    .filter((checkout) => checkout.name === null || !allowlistedPackages.includes(checkout.name))
+    .map((checkout) => checkout.path);
+}
+
+/**
+ * How to report one pi extension load error.
+ *
+ * pi loads the checkouts before the installed packages and rejects an installed
+ * extension whose tool name a checkout already defines. That conflict is the
+ * intended replacement, not a fault, so it is reported as such.
+ */
+export function describeExtensionError(
+  path: string,
+  error: string,
+  checkoutPaths: readonly string[],
+): { level: "info" | "error"; message: string } {
+  const replacement = /conflicts with (\S+)/.exec(error);
+  const by = replacement?.[1];
+  if (by && isLocalExtension(by, checkoutPaths) && !isLocalExtension(path, checkoutPaths)) {
+    return { level: "info", message: `[agent-runtime] local checkout ${by} replaces installed ${path}` };
+  }
+  return { level: "error", message: `[agent-runtime] extension ${path}: ${error}` };
 }
 
 /** Whether an extension file lives inside one of the local checkout roots. */

@@ -241,7 +241,9 @@ docs/internal/*
 docs/papers/*
 config/qubex-config
 # Local pi extension checkouts mounted into the Agent Runtime during development.
-agent-runtime/extensions/
+# The directory itself is tracked (.gitkeep) so the compose bind mount always exists.
+agent-runtime/extensions/*
+!agent-runtime/extensions/.gitkeep
 scripts/estimate_qubit_frequency
 scripts/estimate-resonator-frequency
 .direnv

@@ -23,6 +23,7 @@ import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite
 import { createQDashConnection, type QDashAuth, type QDashConnection } from "./auth.ts";
 import {
   ALLOWED_TOOL_NAMES,
+  ALLOWLISTED_PACKAGES,
   EXPERIMENTAL_WRITE_TOOL_NAMES,
   TRUSTED_EXTENSION_PACKAGES,
   isExperimentalWriteTool,
@@ -35,7 +36,9 @@ import { formatSettledDetail } from "./events.ts";
 import {
   buildLocalToolGuide,
   localToolNames,
-  parseExtensionPaths,
+  describeExtensionError,
+  discoverExtensionCheckouts,
+  trustedCheckoutRoots,
 } from "./local-extensions.ts";
 import {
   buildQDashExtension,
@@ -60,9 +63,14 @@ const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 18
 const EXPERIMENTAL_WRITE_TOOLS_ENABLED = ["1", "true", "yes", "on"].includes(
   (process.env.AGENT_RUNTIME_ENABLE_WRITE_TOOLS ?? "").trim().toLowerCase(),
 );
-// Development only: local extension checkouts mounted into the container.
-// Relative entries resolve against WORK_DIR, the resource loader's cwd.
-const EXTENSION_PATHS = parseExtensionPaths(process.env.AGENT_RUNTIME_EXTENSION_PATHS, WORK_DIR);
+// Local extension checkouts: compose mounts agent-runtime/extensions/ here. It
+// is empty in production and in a clone without checkouts. Every checkout is
+// loaded (replacing an installed copy of the same package); only those outside
+// the allowlisted packages are trusted as a whole.
+const EXTENSIONS_DIR = "/app/extensions";
+const CHECKOUTS = discoverExtensionCheckouts(EXTENSIONS_DIR);
+const CHECKOUT_PATHS = CHECKOUTS.map((checkout) => checkout.path);
+const EXTENSION_PATHS = trustedCheckoutRoots(CHECKOUTS, ALLOWLISTED_PACKAGES);
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
 
@@ -119,11 +127,13 @@ export class SharedRuntime {
     const loader = new DefaultResourceLoader({
       cwd: WORK_DIR,
       agentDir: AGENT_DIR,
-      additionalExtensionPaths: EXTENSION_PATHS,
+      additionalExtensionPaths: CHECKOUT_PATHS,
     });
     await loader.reload();
     for (const { path, error } of loader.getExtensions().errors) {
-      console.error(`[agent-runtime] extension ${path}: ${error}`);
+      const report = describeExtensionError(path, error, CHECKOUT_PATHS);
+      if (report.level === "error") console.error(report.message);
+      else console.log(report.message);
     }
 
     const modelsPath = writeModelsConfig(
@@ -155,9 +165,9 @@ export class SharedRuntime {
     const localTools = localToolNames(extensions, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES).filter(
       (name) => EXPERIMENTAL_WRITE_TOOLS_ENABLED || !isExperimentalWriteTool(name),
     );
-    if (EXTENSION_PATHS.length || localTools.length) {
+    if (CHECKOUT_PATHS.length || localTools.length) {
       console.log(
-        `[agent-runtime] trusted extensions: packages=${TRUSTED_EXTENSION_PACKAGES.join(", ") || "none"}; local=${EXTENSION_PATHS.join(", ") || "none"} (tools: ${localTools.join(", ") || "none"})`,
+        `[agent-runtime] trusted extensions: packages=${TRUSTED_EXTENSION_PACKAGES.join(", ") || "none"}; local=${EXTENSION_PATHS.join(", ") || "none"} (tools: ${localTools.join(", ") || "none"}); allowlisted checkouts=${CHECKOUT_PATHS.filter((path) => !EXTENSION_PATHS.includes(path)).join(", ") || "none"}`,
       );
     }
     const allowed = new Set<string>([

@@ -116,7 +116,6 @@ through environment variables instead of committed template files.
 | `DS4_BASE_URL` | DeepSeek v4 OpenAI-compatible gateway base URL |
 | `DS4_API_KEY` | DeepSeek v4 API key |
 | `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
-| `AGENT_RUNTIME_EXTENSION_PATHS` | Development only; local pi extension checkouts the Agent Runtime loads (see below) |
 
 ### Developing a pi extension against the runtime
 
@@ -128,15 +127,22 @@ the runtime with the override:
 
 ```bash
 git clone https://github.com/orangekame3/pi-qcaleval.git agent-runtime/extensions/pi-qcaleval
-docker compose -f compose.yaml -f compose.extensions.yaml up -d agent-runtime
+docker compose up -d agent-runtime
 ```
 
-`compose.extensions.yaml` mounts the directory at `/app/extensions` and sets
-`AGENT_RUNTIME_EXTENSION_PATHS`, which the runtime passes to pi's resource loader as
-additional extension paths. Any `docker compose up -d` without the `-f` pair
-recreates the runtime without the checkout, so while developing an extension set
-`COMPOSE_FILE=compose.yaml:compose.extensions.yaml` in `.env`; Compose then
-applies the override to every invocation from the project directory. The checkout must use the pi package layout
+`compose.yaml` always mounts `agent-runtime/extensions/` at `/app/extensions`
+(read-only); the directory is tracked through a `.gitkeep`, so the mount exists in
+every clone and is empty in production. At startup the runtime takes every
+subdirectory whose `package.json` carries a `pi` manifest as a checkout and
+passes it to pi's resource loader as an additional extension path. No override
+file or environment variable is involved, so `task deploy` and a plain
+`docker compose up -d` behave the same. A checkout of a package the image also
+installs (pi-qcaleval once pinned, or pi-qdash) replaces the installed copy; pi
+rejects the installed one as a tool-name conflict, which the runtime logs as
+"local checkout ... replaces installed ...". A pi-qdash checkout keeps the
+per-name allowlist (`ALLOWLISTED_PACKAGES`), so developing it in place never
+exposes a tool that production would filter; run `bun install` inside the
+checkout first, since pi-qdash has dependencies of its own. The checkout must use the pi package layout
 (`package.json` with a `pi.extensions` manifest, like pi-qdash) and may depend only
 on the packages the runtime already ships (`@earendil-works/pi-coding-agent`,
 `typebox`), because its imports resolve from the runtime's `node_modules`.
@@ -172,8 +178,8 @@ The runtime's `/chat` body carries two image lists: `initial_images` (the
 analysis sidebar's opening figures, attached only when the conversation is new)
 and `images` (attachments of the current turn, attached every time). Restart the
 runtime after editing the extension; the startup log lists the local paths and
-the tools they contributed. Relative entries in `AGENT_RUNTIME_EXTENSION_PATHS`
-resolve against the runtime's `AGENT_WORK_DIR`, as pi does; prefer absolute paths.
+the tools they contributed. Anything placed under `agent-runtime/extensions/` on
+the host is trusted the same way, so keep that directory empty on production hosts.
 
 ## Two Modes
 
