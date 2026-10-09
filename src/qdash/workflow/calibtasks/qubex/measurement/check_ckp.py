@@ -34,8 +34,11 @@ class CheckCKP(QubexTask):
     # ``filtered_ckp_experiment`` normalizes IQ data with the stored Rabi fit,
     # and builds the |1> preparation pulse from the calibrated HPI pulse.
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
-        "qubit_frequency": InputParameterSpec.required_database(
-            unit="GHz", greater_than=0, description="Calibrated GE control frequency"
+        "control_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("qubit_frequency",),
+            unit="GHz",
+            greater_than=0,
+            description="Calibrated GE control frequency",
         ),
         "readout_frequency": InputParameterSpec.required_database(
             unit="GHz", greater_than=0, description="Readout-frequency sweep center"
@@ -54,19 +57,6 @@ class CheckCKP(QubexTask):
         ),
         # Qubex normalizes CKP IQ data with the persisted Rabi fit.
         **required_rabi_normalization_inputs(),
-        # Keep task-specific effective-input constraints for values that
-        # directly determine the restored Rabi context.
-        "control_amplitude": InputParameterSpec.required_database(
-            unit="a.u.", greater_than=0, less_than=1, description="Rabi control amplitude"
-        ),
-        "rabi_r2": InputParameterSpec.required_database(
-            unit="", greater_than_or_equal=0.6, description="Rabi-fit R²"
-        ),
-        "maximum_rabi_frequency": InputParameterSpec.required_database(
-            unit="MHz/a.u.",
-            greater_than=0,
-            description="Maximum Rabi frequency per control amplitude",
-        ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
@@ -82,38 +72,17 @@ class CheckCKP(QubexTask):
             default=None,
             description="Readout-frequency offsets. Uses Qubex's CKP default when unset.",
         ),
-        "qubit_drive_scale": RunParameterSpec(
-            unit="", value_type="float", default=0.8, description="Relative CKP qubit-drive area"
-        ),
-        "qubit_drive_duration": RunParameterSpec(
-            unit="ns", value_type="float", default=128.0, description="CKP qubit-drive duration"
-        ),
-        "resonator_settle_duration": RunParameterSpec(
-            unit="ns", value_type="float", default=512.0, description="Resonator settling time"
-        ),
         "shots": RunParameterSpec(
             unit="a.u.", value_type="int", default=1024, description="Shots per CKP point"
         ),
         "interval": RunParameterSpec(
             unit="ns", value_type="int", default=153600, description="Shot interval"
         ),
-        "enable_rough_search": RunParameterSpec(
-            unit="",
-            value_type="bool",
-            default=True,
-            description="Adjust drive amplitude before CKP",
-        ),
         "target_min_qubit_detuning": RunParameterSpec(
             unit="GHz",
             value_type="float",
             default=-0.02,
             description="Target minimum Stark-shift detuning during rough search",
-        ),
-        "max_rough_search_reductions": RunParameterSpec(
-            unit="a.u.", value_type="int", default=4, description="Maximum rough-search reductions"
-        ),
-        "max_rough_search_increases": RunParameterSpec(
-            unit="a.u.", value_type="int", default=4, description="Maximum rough-search increases"
         ),
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
@@ -147,65 +116,31 @@ class CheckCKP(QubexTask):
             raise ValueError(f"{name} must contain finite values")
         return values
 
-    def _rough_search_options(self) -> tuple[bool, float, int, int]:
-        enabled = bool(self.run_parameters["enable_rough_search"].get_value())
-        target = float(self.run_parameters["target_min_qubit_detuning"].get_value())
-        reductions = int(self.run_parameters["max_rough_search_reductions"].get_value())
-        increases = int(self.run_parameters["max_rough_search_increases"].get_value())
-        if reductions < 0 or increases < 0:
-            raise ValueError("Rough-search trial limits must be non-negative")
-        if enabled and (not math.isfinite(target) or target >= 0):
-            raise ValueError("target_min_qubit_detuning must be finite and negative")
-        return enabled, target, reductions, increases
-
     def get_progress_plan(self) -> ProgressPlan:
-        """Report four fixed CKP scans plus bounded rough-search sweeps."""
-        enabled, _, reductions, increases = self._rough_search_options()
-        if not enabled:
-            return ProgressPlan(4, 4)
-        # A reduction/increase limit terminates the rough-search loop on its
-        # final trial.  When both limits are nonzero, at most one can reach
-        # its limit, hence ``reductions + increases - 1`` attempts.  A rough
-        # CKP measurement may add one refinement sweep after its primary
-        # sweep, so each attempt accounts for up to two progress phases.
-        rough_attempts_max = max(1, reductions, increases, reductions + increases - 1)
-        return ProgressPlan(5, 4 + 2 * rough_attempts_max)
+        """Return the progress range for Qubex's default rough search."""
+        return ProgressPlan(5, 18)
 
     def _run_kwargs(self) -> dict[str, Any]:
-        qubit_drive_scale = float(self.run_parameters["qubit_drive_scale"].get_value())
-        qubit_drive_duration = float(self.run_parameters["qubit_drive_duration"].get_value())
-        resonator_settle_duration = float(
-            self.run_parameters["resonator_settle_duration"].get_value()
-        )
         n_shots = int(self.run_parameters["shots"].get_value())
         interval = float(self.run_parameters["interval"].get_value())
-        if not math.isfinite(qubit_drive_scale) or qubit_drive_scale <= 0:
-            raise ValueError("qubit_drive_scale must be finite and positive")
-        if not math.isfinite(qubit_drive_duration) or qubit_drive_duration <= 0:
-            raise ValueError("qubit_drive_duration must be finite and positive")
-        if not math.isfinite(resonator_settle_duration) or resonator_settle_duration <= 0:
-            raise ValueError("resonator_settle_duration must be finite and positive")
         if n_shots <= 0 or not math.isfinite(interval) or interval <= 0:
             raise ValueError("shots and interval must be finite and positive")
-
-        rough_enabled, rough_target, reductions, increases = self._rough_search_options()
+        target_min_qubit_detuning = float(
+            self.run_parameters["target_min_qubit_detuning"].get_value()
+        )
+        if not math.isfinite(target_min_qubit_detuning) or target_min_qubit_detuning >= 0:
+            raise ValueError("target_min_qubit_detuning must be finite and negative")
         return {
-            "control_frequency": self._get_calibration_value("qubit_frequency"),
+            "control_frequency": self._get_calibration_value("control_frequency"),
             "readout_frequency": self._get_calibration_value("readout_frequency"),
             "readout_amplitude": self._get_calibration_value("readout_amplitude"),
             "qubit_detuning_range": self._optional_sweep("qubit_detuning_range"),
-            "qubit_drive_scale": qubit_drive_scale,
-            "qubit_drive_duration": qubit_drive_duration,
             "resonator_detuning_range": self._optional_sweep("resonator_detuning_range"),
-            "resonator_settle_duration": resonator_settle_duration,
             "n_shots": n_shots,
             "shot_interval": interval,
             "plot": False,
             "save_image": False,
-            "enable_rough_search": rough_enabled,
-            "target_min_qubit_detuning": rough_target,
-            "max_rough_search_reductions": reductions,
-            "max_rough_search_increases": increases,
+            "target_min_qubit_detuning": target_min_qubit_detuning,
         }
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:

@@ -22,7 +22,7 @@ def test_rabi_distance_accepts_signed_iq_offset() -> None:
 @pytest.fixture
 def filtered_ckp(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     task = CheckCKP()
-    task.input_parameters["qubit_frequency"] = InputParameterModel(value=5.1, unit="GHz")
+    task.input_parameters["control_frequency"] = InputParameterModel(value=5.1, unit="GHz")
     task.input_parameters["readout_frequency"] = InputParameterModel(value=6.2, unit="GHz")
     task.input_parameters["readout_amplitude"] = InputParameterModel(value=0.2, unit="a.u.")
     task.run_parameters["qubit_detuning_range"].value = [-0.02, 0.0, 0.02]
@@ -85,6 +85,7 @@ def test_run_passes_calibration_inputs_and_disables_qubex_figure_side_effects(
     assert kwargs["plot"] is False
     assert kwargs["save_image"] is False
     assert "resonator_drive_amplitude" not in kwargs
+    assert kwargs["target_min_qubit_detuning"] == -0.02
     assert kwargs["qubit_detuning_range"].tolist() == [-0.02, 0.0, 0.02]
     assert kwargs["resonator_detuning_range"].tolist() == [-0.1, 0.0, 0.1]
 
@@ -130,16 +131,8 @@ def test_threshold_ckp_fit_r2_blocks_calibration_update(
     assert processed.validation_error == "Filtered CKP fit R² must be greater than 0.7: 0.7"
 
 
-def test_progress_accounts_for_optional_rough_search(filtered_ckp: SimpleNamespace) -> None:
-    task = filtered_ckp.task
-    assert task.get_progress_plan() == ProgressPlan(5, 18)
-
-    task.run_parameters["max_rough_search_reductions"].value = 0
-    task.run_parameters["max_rough_search_increases"].value = 0
-    assert task.get_progress_plan() == ProgressPlan(5, 6)
-
-    task.run_parameters["enable_rough_search"].value = False
-    assert task.get_progress_plan() == ProgressPlan(4, 4)
+def test_progress_uses_qubex_default_rough_search_plan(filtered_ckp: SimpleNamespace) -> None:
+    assert filtered_ckp.task.get_progress_plan() == ProgressPlan(5, 18)
 
 
 def test_qubex_package_registers_filtered_ckp_task() -> None:

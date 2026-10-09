@@ -1109,11 +1109,23 @@
         "input_parameters": {
           "control_amplitude": {
             "default_value": null,
-            "description": "Rabi control amplitude",
-            "greater_than": 0,
-            "less_than": 1,
+            "parameter_name": "control_amplitude",
+            "qid_role": "self",
             "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
             "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_frequency": {
+            "default_value": null,
+            "description": "Calibrated GE control frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
             "user_override": "allowed"
           },
           "hpi_amplitude": {
@@ -1134,18 +1146,12 @@
           },
           "maximum_rabi_frequency": {
             "default_value": null,
-            "description": "Maximum Rabi frequency per control amplitude",
-            "greater_than": 0,
+            "parameter_name": "maximum_rabi_frequency",
+            "qid_role": "self",
             "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
-            "user_override": "allowed"
-          },
-          "qubit_frequency": {
-            "default_value": null,
-            "description": "Calibrated GE control frequency",
-            "greater_than": 0,
-            "resolution": "database_required",
-            "unit": "GHz",
             "user_override": "allowed"
           },
           "rabi_amplitude": {
@@ -1210,9 +1216,11 @@
           },
           "rabi_r2": {
             "default_value": null,
-            "description": "Rabi-fit R²",
-            "greater_than_or_equal": 0.6,
+            "parameter_name": "rabi_r2",
+            "qid_role": "self",
             "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
             "unit": "",
             "user_override": "allowed"
           },
@@ -1246,28 +1254,10 @@
         },
         "name": "CheckCKP",
         "run_parameters": {
-          "enable_rough_search": {
-            "description": "Adjust drive amplitude before CKP",
-            "unit": "",
-            "value": true,
-            "value_type": "bool"
-          },
           "interval": {
             "description": "Shot interval",
             "unit": "ns",
             "value": 153600,
-            "value_type": "int"
-          },
-          "max_rough_search_increases": {
-            "description": "Maximum rough-search increases",
-            "unit": "a.u.",
-            "value": 4,
-            "value_type": "int"
-          },
-          "max_rough_search_reductions": {
-            "description": "Maximum rough-search reductions",
-            "unit": "a.u.",
-            "value": 4,
             "value_type": "int"
           },
           "qubit_detuning_range": {
@@ -1275,18 +1265,6 @@
             "unit": "GHz",
             "value": null,
             "value_type": "list"
-          },
-          "qubit_drive_duration": {
-            "description": "CKP qubit-drive duration",
-            "unit": "ns",
-            "value": 128.0,
-            "value_type": "float"
-          },
-          "qubit_drive_scale": {
-            "description": "Relative CKP qubit-drive area",
-            "unit": "",
-            "value": 0.8,
-            "value_type": "float"
           },
           "readout_duration": {
             "description": "Readout pulse duration shared by the Qubex calibration session.",
@@ -1299,12 +1277,6 @@
             "unit": "GHz",
             "value": null,
             "value_type": "list"
-          },
-          "resonator_settle_duration": {
-            "description": "Resonator settling time",
-            "unit": "ns",
-            "value": 512.0,
-            "value_type": "float"
           },
           "shots": {
             "description": "Shots per CKP point",
