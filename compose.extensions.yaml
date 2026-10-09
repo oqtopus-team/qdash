@@ -5,12 +5,14 @@
 #
 #   docker compose -f compose.yaml -f compose.extensions.yaml up -d agent-runtime
 #
-# Every tool a listed checkout defines is offered to the model, bypassing the
-# pi-qdash allowlist, so only mount code you are developing.
+# A listed checkout is trusted by its path: every tool it defines is offered to
+# the model without the pi-qdash allowlist review (experimental write names keep
+# their opt-in; a tool is replayed after an interruption only when annotated
+# read-only; a pinned tool name is replaced). Only mount code you are developing.
 services:
   agent-runtime:
     volumes:
       - ./agent-runtime/extensions:/app/extensions:ro
     environment:
-      # Colon-separated package directories inside the container.
+      # Colon-separated absolute package directories inside the container.
       - AGENT_RUNTIME_EXTENSION_PATHS=${AGENT_RUNTIME_EXTENSION_PATHS:-/app/extensions/pi-qcaleval}

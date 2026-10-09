@@ -19,7 +19,13 @@ import {
   isExperimentalWriteTool,
 } from "./allowed-tools.ts";
 import type { QDashConnection } from "./auth.ts";
+import { isLocalExtension } from "./local-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
+
+/** Whether an extension comes from a mounted development checkout. */
+function isLocal(extension: { path?: string }, roots: readonly string[]): boolean {
+  return extension.path !== undefined && isLocalExtension(extension.path, roots);
+}
 
 /** Convert a value returned by an extension into durable's strict JSON shape. */
 function asJson(value: unknown): JsonValue | undefined {
@@ -108,6 +114,7 @@ export function adaptCodingAgentTool(
   modelRuntime: ModelRuntime,
   cwd: string,
   connection: QDashConnection,
+  options: { replay?: "safe" | "unsafe" } = {},
 ): ToolRegistration {
   const writesQDash = isExperimentalWriteTool(tool.name);
   const parameters = withParameterOverrides(tool.name, tool.parameters);
@@ -117,9 +124,10 @@ export function adaptCodingAgentTool(
       ? `${tool.description} The user is shown the exact arguments and must approve before it runs.`
       : tool.description,
     parameters: withoutRuntimeArguments(parameters),
-    // A repeated read is harmless. A write never runs inside the harness, so
-    // replaying the call only re-issues the approval request.
-    replay: "safe",
+    // Reviewed pi-qdash tools default to safe: a repeated read is harmless,
+    // and a write never runs inside the harness, so replaying the call only
+    // re-issues the approval request.
+    replay: options.replay ?? "safe",
     ...(tool.prepareArguments ? { prepareArguments: tool.prepareArguments } : {}),
     ...(tool.executionMode ? { executionMode: tool.executionMode } : {}),
     execute: async (args, api: ToolExecutionApi, context: Context) => {
@@ -219,31 +227,49 @@ export class QDashWriteTools {
 /**
  * Build the durable extension containing all permitted pi-qdash tools.
  *
- * `extraAllowedTools` names tools from local extension checkouts
- * (`AGENT_RUNTIME_EXTENSION_PATHS`), which bypass the pi-qdash allowlist.
+ * Tools of the pinned package pass the reviewed allowlist by name. An
+ * extension whose file lies under one of `localExtensionRoots`
+ * (`AGENT_RUNTIME_EXTENSION_PATHS`, development only) is trusted by its path
+ * instead: every tool it defines is offered, except that an experimental
+ * write name still needs the opt-in, and a tool is replayed on recovery only
+ * when its annotations say it is read-only. A local tool that reuses a
+ * pinned name replaces the pinned implementation.
  */
 export function buildQDashExtension(
   extensions: ReadonlyArray<{
+    path?: string;
     tools?: Map<string, { definition: CodingAgentTool }>;
   }>,
   modelRuntime: ModelRuntime,
   cwd: string,
   connection: QDashConnection,
   enableExperimentalWriteTools = false,
-  extraAllowedTools: Iterable<string> = [],
+  localExtensionRoots: readonly string[] = [],
 ): { extension: Extension; writeTools: QDashWriteTools } {
   const allowed = new Set<string>([
     ...ALLOWED_TOOL_NAMES,
     ...(enableExperimentalWriteTools ? EXPERIMENTAL_WRITE_TOOL_NAMES : []),
-    ...extraAllowedTools,
   ]);
   const tools = new Map<string, ToolRegistration>();
   const writes = new Map<string, CodingAgentTool>();
-  for (const extension of extensions) {
+  // Pinned extensions first, so a local definition is the one that replaces.
+  const ordered = [...extensions].sort(
+    (a, b) => Number(isLocal(a, localExtensionRoots)) - Number(isLocal(b, localExtensionRoots)),
+  );
+  for (const extension of ordered) {
+    const local = isLocal(extension, localExtensionRoots);
     for (const [name, registered] of extension.tools ?? []) {
-      if (!allowed.has(name)) continue;
-      tools.set(name, adaptCodingAgentTool(registered.definition, modelRuntime, cwd, connection));
-      if (isExperimentalWriteTool(name)) writes.set(name, registered.definition);
+      const writeName = isExperimentalWriteTool(name);
+      if (local ? writeName && !enableExperimentalWriteTools : !allowed.has(name)) continue;
+      if (local && tools.has(name)) {
+        console.warn(`[agent-runtime] local extension ${extension.path} replaces tool ${name}`);
+      }
+      const replay = local && !registered.definition.annotations?.readOnlyHint ? "unsafe" : "safe";
+      tools.set(
+        name,
+        adaptCodingAgentTool(registered.definition, modelRuntime, cwd, connection, { replay }),
+      );
+      if (writeName) writes.set(name, registered.definition);
     }
   }
   return {

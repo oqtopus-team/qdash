@@ -52,28 +52,65 @@ test("only explicitly reviewed pi-qdash tools enter the durable registry", () =>
   );
 });
 
-test("tools from local extension checkouts bypass the pi-qdash allowlist", () => {
+test("local extension checkouts are trusted by path, not by tool name", () => {
+  const roots = ["/app/extensions/pi-qcaleval"];
+  const readOnly = registered("qcal_evaluate");
+  readOnly.definition.annotations = { readOnlyHint: true };
+  const pinned = {
+    path: "/app/.pi-agent/packages/pi-qdash/extensions/qdash.ts",
+    tools: new Map([
+      ["qdash_get_default_chip", registered("qdash_get_default_chip")],
+      ["qdash_future_unreviewed_tool", registered("qdash_future_unreviewed_tool")],
+    ]),
+  };
+  const local = {
+    path: "/app/extensions/pi-qcaleval/extensions/qcaleval.ts",
+    tools: new Map([
+      ["qcal_evaluate", readOnly],
+      ["qcal_store_result", registered("qcal_store_result")],
+      // An experimental write name keeps its opt-in even from a checkout.
+      ["qdash_create_forum_post", registered("qdash_create_forum_post")],
+    ]),
+  };
+  const { extension } = buildQDashExtension(
+    [local, pinned],
+    {},
+    "/tmp/work",
+    connection,
+    false,
+    roots,
+  );
+  const byName = new Map(extension.tools.map((tool) => [tool.name, tool]));
+
+  assert.deepEqual(
+    [...byName.keys()].sort(),
+    ["qcal_evaluate", "qcal_store_result", "qdash_get_default_chip"],
+  );
+  // Only a tool annotated read-only may rerun after an interruption.
+  assert.equal(byName.get("qcal_evaluate").replay, "safe");
+  assert.equal(byName.get("qcal_store_result").replay, "unsafe");
+  assert.equal(byName.get("qdash_get_default_chip").replay, "safe");
+});
+
+test("a checkout tool with a pinned name replaces the pinned implementation", async () => {
+  const pinnedTool = registered("qdash_get_default_chip");
+  const localTool = registered("qdash_get_default_chip");
   const { extension } = buildQDashExtension(
     [
-      {
-        tools: new Map([
-          ["qdash_get_default_chip", registered("qdash_get_default_chip")],
-          ["qcal_evaluate", registered("qcal_evaluate")],
-          ["qdash_future_unreviewed_tool", registered("qdash_future_unreviewed_tool")],
-        ]),
-      },
+      { path: "/app/.pi-agent/packages/pi-qdash/extensions/qdash.ts", tools: new Map([["qdash_get_default_chip", pinnedTool]]) },
+      { path: "/app/extensions/dev/extensions/dev.ts", tools: new Map([["qdash_get_default_chip", localTool]]) },
     ],
     {},
     "/tmp/work",
     connection,
     false,
-    ["qcal_evaluate"],
+    ["/app/extensions/dev"],
   );
 
-  assert.deepEqual(
-    extension.tools.map((tool) => tool.name).sort(),
-    ["qcal_evaluate", "qdash_get_default_chip"],
-  );
+  assert.equal(extension.tools.length, 1);
+  await extension.tools[0].execute({}, { callId: "call-1" }, { abortSignal: undefined });
+  assert.equal(localTool.calls(), 1);
+  assert.equal(pinnedTool.calls(), 0);
 });
 
 test("experimental write tools require opt-in and never run from the model's call", async () => {

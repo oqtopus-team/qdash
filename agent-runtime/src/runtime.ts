@@ -21,7 +21,11 @@ import {
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 
 import { createQDashConnection, type QDashAuth, type QDashConnection } from "./auth.ts";
-import { ALLOWED_TOOL_NAMES, EXPERIMENTAL_WRITE_TOOL_NAMES } from "./allowed-tools.ts";
+import {
+  ALLOWED_TOOL_NAMES,
+  EXPERIMENTAL_WRITE_TOOL_NAMES,
+  isExperimentalWriteTool,
+} from "./allowed-tools.ts";
 import { compactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
@@ -52,7 +56,8 @@ const EXPERIMENTAL_WRITE_TOOLS_ENABLED = ["1", "true", "yes", "on"].includes(
   (process.env.AGENT_RUNTIME_ENABLE_WRITE_TOOLS ?? "").trim().toLowerCase(),
 );
 // Development only: local extension checkouts mounted into the container.
-const EXTENSION_PATHS = parseExtensionPaths(process.env.AGENT_RUNTIME_EXTENSION_PATHS);
+// Relative entries resolve against WORK_DIR, the resource loader's cwd.
+const EXTENSION_PATHS = parseExtensionPaths(process.env.AGENT_RUNTIME_EXTENSION_PATHS, WORK_DIR);
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high";
 
@@ -139,7 +144,11 @@ export class SharedRuntime {
     );
 
     const extensions = loader.getExtensions().extensions;
-    const localTools = localToolNames(extensions, EXTENSION_PATHS);
+    // Local checkouts are trusted by path (see buildQDashExtension); the
+    // experimental write opt-in still applies to their tool names.
+    const localTools = localToolNames(extensions, EXTENSION_PATHS).filter(
+      (name) => EXPERIMENTAL_WRITE_TOOLS_ENABLED || !isExperimentalWriteTool(name),
+    );
     if (EXTENSION_PATHS.length) {
       console.log(
         `[agent-runtime] local extensions: ${EXTENSION_PATHS.join(", ")} (tools: ${localTools.join(", ") || "none"})`,
@@ -189,7 +198,7 @@ export class SharedRuntime {
         WORK_DIR,
         connection,
         EXPERIMENTAL_WRITE_TOOLS_ENABLED,
-        localTools,
+        EXTENSION_PATHS,
       );
       registry.install(qdash.extension);
       registry.install(copilotExtension);

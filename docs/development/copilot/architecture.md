@@ -138,11 +138,24 @@ additional extension paths. The checkout must use the pi package layout
 on the packages the runtime already ships (`@earendil-works/pi-coding-agent`,
 `typebox`), because its imports resolve from the runtime's `node_modules`.
 
-Tools from these checkouts are offered to the model without the pi-qdash
-allowlist review (`agent-runtime/src/allowed-tools.ts`); their calls receive the
-same extension context as pi-qdash tools, including `modelRegistry` for calling a
-model other than the conversation's. Restart the runtime after editing the
-extension; the startup log lists the local paths and the tools they contributed.
+A checkout is trusted by its path, not by tool name: every tool it defines is
+offered to the model without the pi-qdash allowlist review
+(`agent-runtime/src/allowed-tools.ts`), with three limits.
+
+- An experimental write name (`EXPERIMENTAL_WRITE_TOOL_NAMES`) still needs
+  `AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true`, and then goes through the same
+  approval card as the pinned tool.
+- A checkout tool is rerun after an interrupted turn only when its pi
+  `annotations.readOnlyHint` is `true`; other local tools are reported to the
+  model as interrupted instead, so a side-effecting tool never runs twice.
+- A checkout tool that reuses a pinned tool's name replaces the pinned
+  implementation; the runtime logs the replacement at startup.
+
+Checkout tools receive the same extension context as pi-qdash tools, including
+`modelRegistry` for calling a model other than the conversation's. Restart the
+runtime after editing the extension; the startup log lists the local paths and
+the tools they contributed. Relative entries in `AGENT_RUNTIME_EXTENSION_PATHS`
+resolve against the runtime's `AGENT_WORK_DIR`, as pi does; prefer absolute paths.
 
 ## Two Modes
 

@@ -8,14 +8,21 @@ import {
 } from "../src/local-extensions.ts";
 
 test("extension paths come from a colon- or comma-separated list", () => {
-  assert.deepEqual(parseExtensionPaths(undefined), []);
-  assert.deepEqual(parseExtensionPaths("  "), []);
-  assert.deepEqual(parseExtensionPaths("/app/extensions/pi-qcaleval"), [
+  const cwd = "/app/workspace";
+  assert.deepEqual(parseExtensionPaths(undefined, cwd), []);
+  assert.deepEqual(parseExtensionPaths("  ", cwd), []);
+  assert.deepEqual(parseExtensionPaths("/app/extensions/pi-qcaleval", cwd), [
     "/app/extensions/pi-qcaleval",
   ]);
-  assert.deepEqual(parseExtensionPaths("/app/extensions/a:/app/extensions/b, /app/extensions/a"), [
-    "/app/extensions/a",
-    "/app/extensions/b",
+  assert.deepEqual(
+    parseExtensionPaths("/app/extensions/a:/app/extensions/b, /app/extensions/a", cwd),
+    ["/app/extensions/a", "/app/extensions/b"],
+  );
+});
+
+test("relative extension paths resolve against the loader cwd, as pi does", () => {
+  assert.deepEqual(parseExtensionPaths("../extensions/pi-qcaleval", "/app/workspace"), [
+    "/app/extensions/pi-qcaleval",
   ]);
 });
 
