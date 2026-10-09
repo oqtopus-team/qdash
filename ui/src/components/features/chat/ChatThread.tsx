@@ -6,6 +6,12 @@ import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
 import { useCopilotChat } from "@/hooks/useCopilotChat";
+import {
+  MAX_ATTACHMENTS,
+  attachmentRoom,
+  stageAttachment,
+  type StagedAttachment,
+} from "@/lib/chatAttachments";
 import { withViewTransition } from "@/lib/viewTransition";
 import { ChatComposer, type ChatComposerHandle } from "@/components/features/chat/ChatComposer";
 import { ChatLinkPreviewProvider } from "@/components/features/chat/ChatLinkPreview";
@@ -181,8 +187,33 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     rateAnswer,
   } = useCopilotChat(sessionId);
   const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<StagedAttachment[]>([]);
   const composerRef = useRef<ChatComposerHandle>(null);
   useImperativeHandle(ref, () => ({ focus: () => composerRef.current?.focus() }), []);
+
+  // Stage picked, pasted, or dropped figures; files beyond the limit are left out.
+  const attach = useCallback(
+    (files: File[]) => {
+      void (async () => {
+        const staged: StagedAttachment[] = [];
+        for (const file of files.slice(0, attachmentRoom(attachments.length))) {
+          try {
+            staged.push(await stageAttachment(file));
+          } catch {
+            // An undecodable file is skipped; the others still attach.
+          }
+        }
+        if (staged.length) {
+          setAttachments((prev) => [...prev, ...staged].slice(0, MAX_ATTACHMENTS));
+        }
+      })();
+    },
+    [attachments.length],
+  );
+  const removeAttachment = useCallback(
+    (id: string) => setAttachments((prev) => prev.filter((a) => a.id !== id)),
+    [],
+  );
 
   const context = session?.context ?? null;
   const suggestions = useChatSuggestions(Boolean(context));
@@ -212,11 +243,13 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       const trimmed = text.trim();
       if (!trimmed || isStreaming || isLoadingMessages) return;
       setInput("");
+      const images = attachments.map(({ data, mimeType }) => ({ data, mimeType }));
+      setAttachments([]);
       // The first send turns the greeting into a thread; morph the mark and
       // the composer into their new places instead of swapping layouts.
-      withViewTransition(() => send(trimmed));
+      withViewTransition(() => send(trimmed, images));
     },
-    [isLoadingMessages, isStreaming, send],
+    [attachments, isLoadingMessages, isStreaming, send],
   );
 
   const focusComposer = useCallback(() => composerRef.current?.focus(), []);
@@ -231,6 +264,9 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       isStreaming={isStreaming}
       disabled={isLoadingMessages}
       placeholder={context ? "Ask about this result..." : "Ask about calibration data..."}
+      attachments={attachments}
+      onAttach={attach}
+      onRemoveAttachment={removeAttachment}
       modelOptions={model.options}
       selectedModelKey={model.selected.key}
       onModelChange={model.select}

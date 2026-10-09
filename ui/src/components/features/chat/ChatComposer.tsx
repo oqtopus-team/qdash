@@ -1,7 +1,14 @@
 "use client";
 
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
-import { ArrowUp, Check, ChevronDown, Cpu, Square } from "lucide-react";
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import { ArrowUp, Check, ChevronDown, Cpu, Paperclip, Square, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,6 +16,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import {
+  ACCEPT_ATTRIBUTE,
+  MAX_ATTACHMENTS,
+  acceptedImageFiles,
+  pastedImageFiles,
+  type StagedAttachment,
+} from "@/lib/chatAttachments";
 import type { ModelOption } from "@/lib/copilotModels";
 
 const MAX_HEIGHT_PX = 240;
@@ -24,6 +38,11 @@ interface ChatComposerProps {
   modelOptions: ModelOption[];
   selectedModelKey: string;
   onModelChange: (key: string) => void;
+  /** Figures staged for the next message; omit to hide attachments entirely. */
+  attachments?: StagedAttachment[];
+  /** Files picked, pasted, or dropped; the owner stages them. */
+  onAttach?: (files: File[]) => void;
+  onRemoveAttachment?: (id: string) => void;
   /** Narrow surfaces: smaller type and a shorter model label. */
   compact?: boolean;
 }
@@ -44,11 +63,16 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     modelOptions,
     selectedModelKey,
     onModelChange,
+    attachments,
+    onAttach,
+    onRemoveAttachment,
     compact = false,
   },
   ref,
 ) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
   useImperativeHandle(ref, () => ({ focus: () => textareaRef.current?.focus() }), []);
 
   // Grow with the content up to MAX_HEIGHT_PX, then scroll.
@@ -59,6 +83,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT_PX)}px`;
   }, [value]);
 
+  const canAttach = Boolean(onAttach) && !isStreaming && !disabled;
+  const attachmentsFull = (attachments?.length ?? 0) >= MAX_ATTACHMENTS;
   const canSend = value.trim().length > 0 && !isStreaming && !disabled;
 
   const handleKeyDown = useCallback(
@@ -72,22 +98,89 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     [canSend, onSubmit],
   );
 
+  // Screenshots pasted from the clipboard arrive as files; text pastes as usual.
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      if (!canAttach) return;
+      const files = pastedImageFiles(e.clipboardData);
+      if (files.length === 0) return;
+      e.preventDefault();
+      onAttach?.(files);
+    },
+    [canAttach, onAttach],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLFormElement>) => {
+      setDragging(false);
+      if (!canAttach) return;
+      const files = acceptedImageFiles(e.dataTransfer.files);
+      if (files.length === 0) return;
+      e.preventDefault();
+      onAttach?.(files);
+    },
+    [canAttach, onAttach],
+  );
+
+  const handleFilesPicked = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = acceptedImageFiles(e.target.files);
+      // Reset so picking the same file again fires a change event.
+      e.target.value = "";
+      if (files.length) onAttach?.(files);
+    },
+    [onAttach],
+  );
+
   const selected = modelOptions.find((o) => o.key === selectedModelKey) ?? modelOptions[0];
 
   return (
     <form
-      className="chat-composer"
+      className={`chat-composer ${dragging ? "ring-2 ring-primary/40" : ""}`}
       onSubmit={(e) => {
         e.preventDefault();
         if (canSend) onSubmit();
       }}
+      onDragOver={(e) => {
+        if (!canAttach) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={handleDrop}
     >
+      {attachments && attachments.length > 0 && (
+        <div className="flex flex-wrap gap-2 px-1 pb-2" aria-label="Attached figures">
+          {attachments.map((attachment) => (
+            <div key={attachment.id} className="relative group/thumb">
+              {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview */}
+              <img
+                src={attachment.previewUrl}
+                alt={attachment.name}
+                title={attachment.name}
+                className="h-16 w-16 rounded-lg object-cover border border-base-300 bg-base-200"
+              />
+              {onRemoveAttachment && (
+                <button
+                  type="button"
+                  onClick={() => onRemoveAttachment(attachment.id)}
+                  className="absolute -top-1.5 -right-1.5 btn btn-circle btn-xs h-5 w-5 min-h-0 bg-base-content text-base-100 border-none opacity-0 group-hover/thumb:opacity-100 focus:opacity-100"
+                  aria-label={`Remove ${attachment.name}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       <textarea
         ref={textareaRef}
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         placeholder={placeholder}
         rows={1}
         aria-label="Message"
@@ -96,6 +189,36 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         }`}
       />
       <div className="flex items-center gap-2 pt-1">
+        {onAttach && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPT_ATTRIBUTE}
+              multiple
+              hidden
+              onChange={handleFilesPicked}
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  disabled={!canAttach || attachmentsFull}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="btn btn-ghost btn-xs btn-circle h-7 w-7 text-base-content/60"
+                  aria-label="Attach a figure"
+                >
+                  <Paperclip className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {attachmentsFull
+                  ? `Up to ${MAX_ATTACHMENTS} figures per message`
+                  : "Attach a figure (PNG/JPEG, or paste a screenshot)"}
+              </TooltipContent>
+            </Tooltip>
+          </>
+        )}
         {modelOptions.length > 1 && selected && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

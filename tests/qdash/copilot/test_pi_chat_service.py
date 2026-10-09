@@ -211,3 +211,40 @@ class TestTranslate:
 class TestBuildBlocksResult:
     def test_empty_text_produces_no_text_block(self) -> None:
         assert build_blocks_result("", []) == {"blocks": [], "assessment": None}
+
+
+def test_user_attachments_are_forwarded_as_turn_images() -> None:
+    from qdash.api.services import pi_chat_service
+    from qdash.copilot.config import CopilotConfig, ModelConfig
+    from qdash.copilot.contracts.models import ChatRequest
+
+    config = CopilotConfig(model=ModelConfig(provider="vllm", name="m"))
+    request = ChatRequest.model_validate(
+        {
+            "message": "Evaluate this",
+            "session_id": "s1",
+            "images": [{"data": "cGxvdA==", "mimeType": "image/png"}],
+        }
+    )
+    payload = pi_chat_service._request_payload(request, config, "alice")
+
+    assert payload["images"] == [{"data": "cGxvdA==", "mimeType": "image/png"}]
+    # A turn without attachments carries no images key, so the runtime attaches nothing.
+    bare = ChatRequest.model_validate({"message": "hi", "session_id": "s1"})
+    assert "images" not in pi_chat_service._request_payload(bare, config, "alice")
+
+
+def test_attachments_are_limited_to_supported_image_types() -> None:
+    import pytest as _pytest
+    from pydantic import ValidationError
+
+    from qdash.copilot.contracts.models import ChatRequest
+
+    with _pytest.raises(ValidationError):
+        ChatRequest.model_validate(
+            {"message": "x", "session_id": "s1", "images": [{"data": "YQ==", "mimeType": "image/gif"}]}
+        )
+    with _pytest.raises(ValidationError):
+        ChatRequest.model_validate(
+            {"message": "x", "session_id": "s1", "images": [{"data": "YQ==", "mimeType": "image/png"}] * 5}
+        )

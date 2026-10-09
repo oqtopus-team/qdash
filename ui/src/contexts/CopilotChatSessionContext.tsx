@@ -21,6 +21,7 @@ import { buildHeaders, consumeSSEEvents, readErrorResponse } from "@/lib/sse-uti
 import type {
   AnalysisContext,
   AnswerFeedback,
+  ChatImageAttachment,
   ChatMessage,
   CopilotBlocksResult,
   LiveTurn,
@@ -54,6 +55,8 @@ export interface SendOptions {
   /** Messages before this turn; a retry passes them without the replaced exchange. */
   history?: ChatMessage[];
   modelOverride?: ModelOverride | null;
+  /** Figures the user attached to this message. */
+  images?: ChatImageAttachment[];
   /** The user's decision on the write operation the last answer asked approval for. */
   approval?: { id: string; approve: boolean };
 }
@@ -242,9 +245,11 @@ function buildTurnRequest(
   history: ChatMessage[],
   modelOverride: ModelOverride | null,
   approval: SendOptions["approval"],
+  images: ChatImageAttachment[] = [],
 ): { url: string; body: Record<string, unknown> } {
   const common = {
     ...(approval ? { approval } : {}),
+    ...(images.length ? { images } : {}),
     message,
     // Required by the Pi backend, which restores conversation state from the
     // persisted session rather than from the request body.
@@ -539,11 +544,18 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
 
       const controller = new AbortController();
       controllers.current.set(sessionId, controller);
-      // Only the first turn of an analysis carries the result figures.
+      // Only the first turn of an analysis carries the result figures; the
+      // user's own attachments go with whichever turn they were staged for.
+      const images = options?.images ?? [];
       const userMsg: ChatMessage = {
         role: "user",
         content: text,
-        attachedImage: Boolean(session?.context) && !history.some((m) => m.role === "user"),
+        attachedImage:
+          images.length > 0 ||
+          (Boolean(session?.context) && !history.some((m) => m.role === "user")),
+        ...(images.length
+          ? { attachments: images.map((i) => `data:${i.mimeType};base64,${i.data}`) }
+          : {}),
       };
       updateSessionMessages(sessionId, [...history, userMsg]);
 
@@ -576,6 +588,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
             history,
             options?.modelOverride ?? null,
             options?.approval,
+            images,
           );
           const response = await fetch(url, {
             method: "POST",

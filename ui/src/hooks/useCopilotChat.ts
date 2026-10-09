@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
-import type { AnswerFeedback, ChatMessage } from "@/types/copilotChat";
+import type { AnswerFeedback, ChatImageAttachment, ChatMessage } from "@/types/copilotChat";
 import {
   useCopilotChatSessionContext,
   type CopilotChatSession,
@@ -77,7 +77,8 @@ export function useCopilotChat(sessionId?: string | null) {
   const messages = useMemo(() => session?.messages ?? [], [session?.messages]);
 
   const send = useCallback(
-    (text: string) => sendMessage(text, { sessionId: id, modelOverride }),
+    (text: string, images?: ChatImageAttachment[]) =>
+      sendMessage(text, { sessionId: id, modelOverride, ...(images?.length ? { images } : {}) }),
     [id, modelOverride, sendMessage],
   );
 

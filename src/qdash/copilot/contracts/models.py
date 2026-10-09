@@ -6,9 +6,9 @@ Defines the structured context sent to the LLM and the expected response format.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 if TYPE_CHECKING:
     from qdash.copilot.config import ModelConfig
@@ -194,6 +194,20 @@ class ChatStopResponse(BaseModel):
     stopped: bool
 
 
+class ChatImageAttachment(BaseModel):
+    """One figure the user attached to a chat message."""
+
+    data: str = Field(
+        description="Base64 image bytes without a data: prefix",
+        min_length=1,
+        # 6 MB of base64: the UI downscales to 1600 px, so real plots are far smaller.
+        max_length=6 * 1024 * 1024,
+    )
+    mime_type: Literal["image/png", "image/jpeg"] = Field(alias="mimeType")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class ChatRequest(BaseModel):
     """Request body for POST /copilot/chat/stream."""
 
@@ -216,6 +230,11 @@ class ChatRequest(BaseModel):
         description="Previous conversation messages [{role, content}, ...]",
     )
     image_base64: str | None = None
+    images: list[ChatImageAttachment] = Field(
+        default_factory=list,
+        max_length=4,
+        description="Figures the user attached to this message; sent with the turn.",
+    )
     chat_model_override: ModelConfig | None = Field(
         default=None,
         alias="model_override",
