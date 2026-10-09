@@ -214,6 +214,9 @@ const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }
   return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
 });
 
+/**
+ * Qubit metrics heatmap grid that colors each qubit by its metric value, with region view and pan-zoom modes
+ */
 export function QubitMetricsGrid({
   metricData,
   title,
@@ -717,7 +720,7 @@ export function QubitMetricsGrid({
         className={`flex-1 relative flex justify-center ${
           viewMode === "pan-zoom"
             ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "bg-base-200/60 rounded-lg"
+            : "items-start bg-base-200/60 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
