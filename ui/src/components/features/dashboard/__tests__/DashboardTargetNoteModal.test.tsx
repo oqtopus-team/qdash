@@ -24,6 +24,11 @@ vi.mock("@/client/forum/forum", () => ({
   useListForumPosts: () => ({
     data: { data: { posts: [] } },
   }),
+  useListForumLabels: () => ({
+    data: { data: { labels: [] } },
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 afterEach(() => {
