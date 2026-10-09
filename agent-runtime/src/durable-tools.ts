@@ -28,6 +28,13 @@ import {
   requestedImageCount,
   withImages,
 } from "./figure-context.ts";
+import {
+  acceptsKnowledge,
+  fetchTaskKnowledge,
+  hasKnowledge,
+  requestedTaskName,
+  withKnowledge,
+} from "./knowledge-context.ts";
 import { isTrustedExtension } from "./local-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 
@@ -148,6 +155,8 @@ export function adaptCodingAgentTool(
     replay?: "safe" | "unsafe";
     /** Fill an omitted `images` argument from the newest figure in the transcript. */
     fillImages?: boolean;
+    /** Fill an omitted `knowledge` argument with QDash's review guide for `task_name`. */
+    fillKnowledge?: boolean;
   } = {},
 ): ToolRegistration {
   const writesQDash = isExperimentalWriteTool(tool.name);
@@ -195,6 +204,16 @@ export function adaptCodingAgentTool(
           args as object,
           latestImages(page.items, requestedImageCount(args)),
         );
+      }
+      const taskName = requestedTaskName(args);
+      if (options.fillKnowledge && taskName && !hasKnowledge(args)) {
+        // The model names the task; the reference it is judged against comes
+        // from QDash, as the user, so every evaluation reads the same guide.
+        const knowledge = await fetchTaskKnowledge(connection, taskName, context.abortSignal);
+        if (knowledge) {
+          console.log(`[agent-runtime] ${tool.name}: reference for ${taskName} (${knowledge.length} chars)`);
+        }
+        callArgs = withKnowledge(callArgs as object, knowledge);
       }
       const result = await runCodingAgentTool(
         tool,
@@ -317,11 +336,13 @@ export function buildQDashExtension(
       const replay = local && !registered.definition.annotations?.readOnlyHint ? "unsafe" : "safe";
       // Only trusted extensions evaluate figures; pi-qdash tools fetch them.
       const fillImages = local && acceptsImages(registered.definition.parameters);
+      const fillKnowledge = local && acceptsKnowledge(registered.definition.parameters);
       tools.set(
         name,
         adaptCodingAgentTool(registered.definition, modelRuntime, cwd, connection, {
           replay,
           fillImages,
+          fillKnowledge,
         }),
       );
       if (writeName) writes.set(name, registered.definition);

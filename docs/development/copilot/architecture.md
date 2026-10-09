@@ -168,6 +168,17 @@ conversation, whether a user attachment or a figure a pi-qdash tool returned, is
 taken from the durable transcript, so the model never has to copy image bytes
 into a call.
 
+A checkout tool that declares `task_name` and `knowledge` parameters (again
+`qcal_evaluate`) gets `knowledge` filled the same way: when the model names the
+task and passes no reference of its own, the runtime fetches the task's review
+guide from the QDash API as the user (`GET /tasks/{task_name}/knowledge`,
+`review_prompt_text`, or the full `prompt_text` for a task without a review
+guide, cut at 6000 characters) and passes it. Every evaluation of a task is thus
+read against the same host-maintained reference, kept in the task knowledge
+repository, rather than against a summary the planner improvised. The exact
+text the evaluation model received is stored in the tool result's
+`details.prompt`.
+
 The runtime's `/chat` body carries two image lists: `initial_images` (the
 analysis sidebar's opening figures, attached only when the conversation is new)
 and `images` (attachments of the current turn, attached every time). Restart the
