@@ -38,6 +38,7 @@ function badgeClass(status?: string | null) {
   return "badge-warning";
 }
 
+/** Task run form with chip/target selection and parameter overrides. */
 export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps) {
   const runDisabledReasonId = useId();
   const toast = useToast();
@@ -321,6 +322,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
       });
     }
   }
+  /** Render one input parameter override field. */
   const renderInputParameterField = ([name, parameter]: (typeof inputParameterEntries)[number]) => (
     <label key={name} className="form-control min-w-0">
       <span className="label-text mb-1 flex min-w-0 items-start justify-between gap-2">
@@ -332,6 +334,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
       <input
         className="input input-sm input-bordered font-mono"
         value={inputValues[name] ?? ""}
+        autoComplete="off"
         disabled={parameter.user_override === "forbidden"}
         onChange={(event) =>
           setInputValues((current) => ({
@@ -420,6 +423,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                   <input
                     className="input input-bordered w-full"
                     value={target}
+                    autoComplete="off"
                     onChange={(event) => setTargetQuery(event.target.value)}
                     disabled={isExecutionActive || Boolean(sourceTask)}
                     placeholder="e.g. 0 or 0-1"
@@ -495,6 +499,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                         <input
                           className="input input-sm input-bordered font-mono"
                           value={runValues[name] ?? ""}
+                          autoComplete="off"
                           onChange={(event) =>
                             setRunValues((current) => ({ ...current, [name]: event.target.value }))
                           }
