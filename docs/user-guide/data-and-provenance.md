@@ -29,8 +29,8 @@ ranges, distinguish the latest value from best or average aggregation.
 ## Chip and Task Artifacts
 
 **Chip** organizes calibration task results on the device topology. Select a task, then a qubit or
-coupling to open its details and history. Multi-select actions can request AI review or download
-figures for the displayed results.
+coupling to open its details and history. Multi-select actions can download figures for the
+displayed results.
 
 Task-result pages expose the stored parameters and artifacts for one measurement. Figure JSON and
 NetCDF raw data are downloadable when that task produced them.

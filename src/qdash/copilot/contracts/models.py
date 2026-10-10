@@ -5,10 +5,12 @@ Defines the structured context sent to the LLM and the expected response format.
 
 from __future__ import annotations
 
+import base64
+import binascii
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 if TYPE_CHECKING:
     from qdash.copilot.config import ModelConfig
@@ -140,7 +142,53 @@ class ApprovalDecision(BaseModel):
     approve: bool
 
 
-class AnalyzeRequest(BaseModel):
+class ChatImageAttachment(BaseModel):
+    """One figure the user attached to a chat message."""
+
+    data: str = Field(
+        description="Base64 image bytes without a data: prefix",
+        min_length=1,
+        # 6 MB of base64: the UI downscales to 1600 px, so real plots are far smaller.
+        max_length=6 * 1024 * 1024,
+    )
+    mime_type: Literal["image/png", "image/jpeg"] = Field(alias="mimeType")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="after")
+    def validate_image_data(self) -> ChatImageAttachment:
+        """Reject invalid base64 and bytes that do not match the declared image format."""
+        try:
+            decoded = base64.b64decode(self.data, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError("Image data must be valid base64") from exc
+        signature = b"\x89PNG\r\n\x1a\n" if self.mime_type == "image/png" else b"\xff\xd8\xff"
+        if not decoded.startswith(signature):
+            raise ValueError("Image bytes do not match the declared PNG or JPEG format")
+        return self
+
+
+class ImageAttachmentsRequest(BaseModel):
+    """Shared attachment validation for chat and analysis turns."""
+
+    images: list[ChatImageAttachment] = Field(
+        default_factory=list,
+        max_length=4,
+        description="Figures attached to this turn (at most 12 MiB of base64 in total).",
+    )
+
+    @field_validator("images")
+    @classmethod
+    def validate_total_image_size(
+        cls, images: list[ChatImageAttachment]
+    ) -> list[ChatImageAttachment]:
+        """Leave room for context below the runtime's default 20 MiB body limit."""
+        if sum(len(image.data) for image in images) > 12 * 1024 * 1024:
+            raise ValueError("Attached images exceed 12 MiB in total; use fewer or smaller images")
+        return images
+
+
+class AnalyzeRequest(ImageAttachmentsRequest):
     """Request body for POST /copilot/analyze."""
 
     task_name: str = Field(description="Task class name (e.g. CheckT1)")
@@ -194,7 +242,7 @@ class ChatStopResponse(BaseModel):
     stopped: bool
 
 
-class ChatRequest(BaseModel):
+class ChatRequest(ImageAttachmentsRequest):
     """Request body for POST /copilot/chat/stream."""
 
     message: str = Field(description="User question / message")

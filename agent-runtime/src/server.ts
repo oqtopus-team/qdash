@@ -7,8 +7,9 @@ import {
   type Conversation,
 } from "@earendil-works/pi-durable";
 
+import { requestQDashAuth } from "./auth.ts";
 import { WRAP_UP_MESSAGE } from "./budget.ts";
-import { encodeLine, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
+import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
 import { hasBearerToken, readJsonBody, RequestError } from "./http.ts";
 import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
 import {
@@ -30,8 +31,6 @@ const CHAT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 0);
 // A quiet turn (a tool polling an execution) sends a ping this often so the
 // proxies between here and the browser do not take silence for a dead stream.
 const CHAT_PING_MS = Number(process.env.CHAT_PING_MS ?? 15_000);
-const REVIEW_CONCURRENCY = Number(process.env.REVIEW_CONCURRENCY ?? 2);
-const REVIEW_QUEUE_TIMEOUT_MS = Number(process.env.REVIEW_QUEUE_TIMEOUT_MS ?? 30_000);
 const MAX_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES ?? 20 * 1024 * 1024);
 const RUNTIME_TOKEN = process.env.AGENT_RUNTIME_TOKEN;
 
@@ -48,15 +47,12 @@ interface ChatBody {
   initial_message?: string;
   model?: { provider?: string; name?: string };
   thinking_level?: SessionRequest["thinkingLevel"];
+  /** Figures attached to this turn's message. */
   images?: ImageBody[];
+  /** Figures of the opening context; attached only when the conversation is new. */
+  initial_images?: ImageBody[];
   /** The user's decision on a write call the previous turn asked approval for. */
   approval?: { id?: string; approve?: boolean };
-}
-
-interface ReviewBody {
-  prompt?: string;
-  images?: ImageBody[];
-  model?: { provider?: string; name?: string };
 }
 
 interface DeleteSessionBody {
@@ -80,36 +76,6 @@ function toImageContent(images: ImageBody[] | undefined) {
  */
 const running = new Map<string, Conversation | null>();
 
-/** Bound local-model review concurrency across API and worker callers. */
-const reviewQueue: Array<() => void> = [];
-let reviewsInFlight = 0;
-
-/** Wait for a review slot, rejecting before the caller's HTTP timeout. */
-async function acquireReviewSlot(): Promise<() => void> {
-  if (reviewsInFlight >= REVIEW_CONCURRENCY) {
-    await new Promise<void>((resolve, reject) => {
-      const resume = (): void => {
-        clearTimeout(timeout);
-        resolve();
-      };
-      const timeout = setTimeout(() => {
-        const index = reviewQueue.indexOf(resume);
-        if (index >= 0) reviewQueue.splice(index, 1);
-        reject(new RequestError(503, "review queue is busy; retry later"));
-      }, REVIEW_QUEUE_TIMEOUT_MS);
-      reviewQueue.push(resume);
-    });
-  }
-  reviewsInFlight++;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    reviewsInFlight--;
-    reviewQueue.shift()?.();
-  };
-}
-
 const runtime = await SharedRuntime.create();
 console.log(`[agent-runtime] tools: ${runtime.listToolNames().join(", ")}`);
 
@@ -117,32 +83,6 @@ console.log(`[agent-runtime] tools: ${runtime.listToolNames().join(", ")}`);
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
-}
-
-/** Run one automatic review and return its structured verdict. */
-async function handleReview(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = await readJsonBody<ReviewBody>(req, MAX_BODY_BYTES);
-  if (typeof body.prompt !== "string" || !body.prompt) {
-    sendJson(res, 400, { error: "prompt is required" });
-    return;
-  }
-
-  const release = await acquireReviewSlot();
-  try {
-    const result = await runtime.runReview({
-      prompt: body.prompt,
-      provider: body.model?.provider,
-      modelName: body.model?.name,
-      images: toImageContent(body.images),
-    });
-    if (result.review) {
-      sendJson(res, 200, { review: result.review });
-    } else {
-      sendJson(res, 200, { error: "submit_review was not called", text: result.text });
-    }
-  } finally {
-    release();
-  }
 }
 
 /** Translate one committed durable event to the existing NDJSON bridge. */
@@ -156,148 +96,200 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
   const ownerId = body.owner_id;
   const conversationId = body.conversation_id;
   if (!ownerId || !conversationId || typeof body.message !== "string") {
-    sendJson(res, 400, { error: "owner_id, conversation_id and message are required" });
+    sendJson(res, 400, {
+      error: "owner_id, conversation_id and message are required",
+    });
+    return;
+  }
+
+  let auth;
+  try {
+    auth = requestQDashAuth(req.headers);
+  } catch {
+    sendJson(res, 401, { error: "QDash user authentication is required" });
     return;
   }
 
   const runKey = `${ownerId}\0${conversationId}`;
   if (running.has(runKey)) {
-    sendJson(res, 409, { error: "conversation is already processing a request" });
+    sendJson(res, 409, {
+      error: "conversation is already processing a request",
+    });
     return;
   }
   running.set(runKey, null);
 
   let opened;
   try {
-    opened = await runtime.openSession({
-      ownerId,
-      sessionId: conversationId,
-      requestId: body.request_id,
-      message: body.message,
-      provider: body.model?.provider,
-      modelName: body.model?.name,
-      thinkingLevel: body.thinking_level,
-      images: toImageContent(body.images),
-    });
+    opened = await runtime.openSession(
+      {
+        ownerId,
+        sessionId: conversationId,
+        requestId: body.request_id,
+        message: body.message,
+        provider: body.model?.provider,
+        modelName: body.model?.name,
+        thinkingLevel: body.thinking_level,
+        images: toImageContent(body.images),
+      },
+      auth,
+    );
   } catch (error) {
     running.delete(runKey);
-    sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+    sendJson(res, 400, {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return;
   }
 
   const { harness, conversation } = opened;
   running.set(runKey, conversation);
 
-  let approval: ApprovalRequest | undefined;
-  if (body.approval) {
-    approval = body.approval.id
-      ? await pendingApproval(conversation, body.approval.id)
-      : undefined;
-    if (!approval) {
-      await harness.close(BACKGROUND_CONTEXT);
-      running.delete(runKey);
-      sendJson(res, 400, { error: "This approval is no longer pending; ask the assistant again." });
-      return;
-    }
-  }
-
-  res.writeHead(200, {
-    "Content-Type": "application/x-ndjson",
-    "Cache-Control": "no-cache",
-    "X-Accel-Buffering": "no",
-  });
-  let connected = true;
-  res.on("close", () => {
-    // A dropped browser connection does not cancel durable work. Retrying with
-    // the same request_id recovers the committed answer instead of paying for
-    // a second model turn.
-    connected = false;
-  });
-  const write = (event: NdjsonEvent): void => {
-    if (connected && !res.writableEnded) res.write(encodeLine(event));
-  };
-  const ping = CHAT_PING_MS > 0 ? setInterval(() => write({ type: "ping" }), CHAT_PING_MS) : null;
-
-  const events = await watchEvents(harness, conversation.id, BACKGROUND_CONTEXT);
-  events.start(async (batch) => {
-    for (const event of batch) writeAgentEvent(event, write);
-  });
-
   try {
-    const view = await conversation.context(BACKGROUND_CONTEXT);
-    const isNew = !view.entries.some((entry) => UserEntry.is(entry));
-    let message = isNew && body.initial_message ? body.initial_message : body.message;
-    if (approval) {
-      // The runtime, not the model, runs the call the user approved, with the
-      // exact arguments the user saw. The model only learns the outcome.
-      if (body.approval?.approve === true) {
-        const id = `${approval.id}:approved`;
-        write({ type: "tool_start", name: approval.tool, id, args: approval.args });
-        try {
-          const result = await runtime.writeTools.runApproved(approval);
-          write({ type: "tool_end", name: approval.tool, id, isError: false });
-          message = decisionMessage(approval, { approved: true, result });
-        } catch (error) {
-          write({ type: "tool_end", name: approval.tool, id, isError: true });
-          const reason = error instanceof Error ? error.message : String(error);
-          message = decisionMessage(approval, { approved: true, error: reason });
-        }
-      } else {
-        message = decisionMessage(approval, { approved: false });
+    let approval: ApprovalRequest | undefined;
+    if (body.approval) {
+      approval = body.approval.id
+        ? await pendingApproval(conversation, body.approval.id)
+        : undefined;
+      if (!approval) {
+        sendJson(res, 400, {
+          error: "This approval is no longer pending; ask the assistant again.",
+        });
+        return;
       }
     }
-    const images = isNew ? toImageContent(body.images) : [];
-    const content = images.length
-      ? [{ type: "text" as const, text: message }, ...images]
-      : message;
-    const submission = await conversation.submit(
-      {
-        type: "input",
-        content,
-        ...(body.request_id ? { requestId: body.request_id } : {}),
-      },
-      BACKGROUND_CONTEXT,
-    );
-    // A steer is placed after the current tool round, so the model reads it
-    // before deciding on more tools and answers in the same run.
-    let wrapUp: ReturnType<typeof conversation.submit> | undefined;
-    const wrapUpTimer =
-      CHAT_WRAP_UP_MS > 0
-        ? setTimeout(() => {
-            wrapUp = conversation.submit(
-              { type: "input", content: WRAP_UP_MESSAGE, whenBusy: "steer" },
-              BACKGROUND_CONTEXT,
-            );
-            // Handled after the turn settles; keep the rejection from going unhandled meanwhile.
-            wrapUp.catch(() => undefined);
-          }, CHAT_WRAP_UP_MS)
-        : null;
-    const timeout =
-      CHAT_TIMEOUT_MS > 0
-        ? setTimeout(() => void conversation.abort(BACKGROUND_CONTEXT), CHAT_TIMEOUT_MS)
-        : null;
-    const settled = await submission.wait(BACKGROUND_CONTEXT).finally(() => {
-      if (wrapUpTimer) clearTimeout(wrapUpTimer);
-      if (timeout) clearTimeout(timeout);
+
+    res.writeHead(200, {
+      "Content-Type": "application/x-ndjson",
+      "Cache-Control": "no-cache",
+      "X-Accel-Buffering": "no",
     });
-    // A steer still queued when the run answered would start a new run.
-    await wrapUp
-      ?.then((placed) => placed.abort(BACKGROUND_CONTEXT))
-      .catch((error: unknown) => console.warn("[agent-runtime] wrap-up steer failed:", error));
-    await events.stop();
-    if (settled.status === "done" && settled.type === "input") {
-      write({ type: "done", text: await answerText(conversation, settled.answer) });
-    } else {
-      write({ type: "error", message: `conversation was not answered: ${settled.reason}` });
+    let connected = true;
+    res.on("close", () => {
+      // A dropped browser connection does not cancel durable work. Retrying with
+      // the same request_id recovers the committed answer instead of paying for
+      // a second model turn.
+      connected = false;
+    });
+    const write = (event: NdjsonEvent): void => {
+      if (connected && !res.writableEnded) res.write(encodeLine(event));
+    };
+    const ping = CHAT_PING_MS > 0 ? setInterval(() => write({ type: "ping" }), CHAT_PING_MS) : null;
+
+    const events = await watchEvents(harness, conversation.id, BACKGROUND_CONTEXT);
+    events.start(async (batch) => {
+      for (const event of batch) writeAgentEvent(event, write);
+    });
+
+    try {
+      const view = await conversation.context(BACKGROUND_CONTEXT);
+      const isNew = !view.entries.some((entry) => UserEntry.is(entry));
+      let message = isNew && body.initial_message ? body.initial_message : body.message;
+      if (approval) {
+        // The runtime, not the model, runs the call the user approved, with the
+        // exact arguments the user saw. The model only learns the outcome.
+        if (body.approval?.approve === true) {
+          const id = `${approval.id}:approved`;
+          write({
+            type: "tool_start",
+            name: approval.tool,
+            id,
+            args: approval.args,
+          });
+          try {
+            const result = await opened.writeTools.runApproved(approval);
+            write({
+              type: "tool_end",
+              name: approval.tool,
+              id,
+              isError: false,
+            });
+            message = decisionMessage(approval, { approved: true, result });
+          } catch (error) {
+            write({ type: "tool_end", name: approval.tool, id, isError: true });
+            const reason = error instanceof Error ? error.message : String(error);
+            message = decisionMessage(approval, {
+              approved: true,
+              error: reason,
+            });
+          }
+        } else {
+          message = decisionMessage(approval, { approved: false });
+        }
+      }
+      // Opening figures go with the first turn only; attachments go with every turn.
+      const images = [
+        ...(isNew ? toImageContent(body.initial_images) : []),
+        ...toImageContent(body.images),
+      ];
+      const content = images.length
+        ? [{ type: "text" as const, text: message }, ...images]
+        : message;
+      const submission = await conversation.submit(
+        {
+          type: "input",
+          content,
+          ...(body.request_id ? { requestId: body.request_id } : {}),
+        },
+        BACKGROUND_CONTEXT,
+      );
+      // A steer is placed after the current tool round, so the model reads it
+      // before deciding on more tools and answers in the same run.
+      let wrapUp: ReturnType<typeof conversation.submit> | undefined;
+      const wrapUpTimer =
+        CHAT_WRAP_UP_MS > 0
+          ? setTimeout(() => {
+              wrapUp = conversation.submit(
+                { type: "input", content: WRAP_UP_MESSAGE, whenBusy: "steer" },
+                BACKGROUND_CONTEXT,
+              );
+              // Handled after the turn settles; keep the rejection from going unhandled meanwhile.
+              wrapUp.catch(() => undefined);
+            }, CHAT_WRAP_UP_MS)
+          : null;
+      const timeout =
+        CHAT_TIMEOUT_MS > 0
+          ? setTimeout(() => void conversation.abort(BACKGROUND_CONTEXT), CHAT_TIMEOUT_MS)
+          : null;
+      const settled = await submission.wait(BACKGROUND_CONTEXT).finally(() => {
+        if (wrapUpTimer) clearTimeout(wrapUpTimer);
+        if (timeout) clearTimeout(timeout);
+      });
+      // A steer still queued when the run answered would start a new run.
+      await wrapUp
+        ?.then((placed) => placed.abort(BACKGROUND_CONTEXT))
+        .catch((error: unknown) => console.warn("[agent-runtime] wrap-up steer failed:", error));
+      await events.stop();
+      if (settled.status === "done" && settled.type === "input") {
+        write({
+          type: "done",
+          text: await answerText(conversation, settled.answer),
+        });
+      } else {
+        // `detail` carries the provider's error text (HTTP status, vLLM message).
+        const detail = formatSettledDetail(settled.detail);
+        console.error(`[agent-runtime] chat not answered: ${settled.reason}${detail}`);
+        write({
+          type: "error",
+          message: `conversation was not answered: ${settled.reason}${detail}`,
+        });
+      }
+    } catch (error) {
+      write({
+        type: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      if (ping) clearInterval(ping);
+      await events.stop();
+      if (connected && !res.writableEnded) res.end();
     }
-  } catch (error) {
-    write({ type: "error", message: error instanceof Error ? error.message : String(error) });
   } finally {
-    if (ping) clearInterval(ping);
-    await events.stop();
-    await harness.close(BACKGROUND_CONTEXT);
-    running.delete(runKey);
-    if (connected && !res.writableEnded) res.end();
+    try {
+      await opened.close();
+    } finally {
+      running.delete(runKey);
+    }
   }
 }
 
@@ -346,7 +338,10 @@ function authorized(req: IncomingMessage): boolean {
 
 const server = createServer((req, res) => {
   if (req.method === "GET" && req.url === "/health") {
-    sendJson(res, 200, { status: "ok", running: running.size, reviews: reviewsInFlight });
+    sendJson(res, 200, {
+      status: "ok",
+      running: running.size,
+    });
     return;
   }
   if (req.method === "POST" && req.url === "/chat") {
@@ -363,14 +358,6 @@ const server = createServer((req, res) => {
       return;
     }
     handleAbortChat(req, res).catch((error: unknown) => handleRouteError(res, error, "abort"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/review") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleReview(req, res).catch((error: unknown) => handleRouteError(res, error, "review"));
     return;
   }
   if (req.method === "DELETE" && req.url === "/session") {

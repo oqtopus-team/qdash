@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildReviewSystemPrompt, buildSystemPrompt } from "../src/prompt.ts";
+import { buildSystemPrompt } from "../src/prompt.ts";
 
 test("Japanese language codes become an explicit user-facing instruction", () => {
   const prompt = buildSystemPrompt("ja", "en");
@@ -9,13 +9,8 @@ test("Japanese language codes become an explicit user-facing instruction", () =>
   assert.match(prompt, /entire reply.*Japanese \(日本語\)/);
 });
 
-test("review free-text fields use the configured natural language", () => {
-  assert.match(buildReviewSystemPrompt("ja"), /free-text field.*Japanese \(日本語\)/);
-});
-
 test("automatic language follows the latest user message", () => {
   assert.match(buildSystemPrompt("auto", "en"), /same language as the user's latest message/);
-  assert.match(buildReviewSystemPrompt("auto"), /language used by the review request/);
 });
 
 test("experimental write tools are approved by the user, not the model", () => {
@@ -42,4 +37,11 @@ test("the tool guide is inlined after the guidelines", () => {
   const prompt = buildSystemPrompt("auto", "en", false, [], "- `qdash_list_chips` for chips");
   assert.match(prompt, /Tool guide:\n- `qdash_list_chips` for chips/);
   assert.doesNotMatch(buildSystemPrompt("auto", "en"), /Tool guide/);
+});
+
+test("local extension tools are introduced after the pi-qdash tool guide", () => {
+  const guide = "- `qcal_evaluate`: Diagnose a calibration plot\n  - Use it for every figure.";
+  const prompt = buildSystemPrompt("auto", "en", false, [], "qdash guide", guide);
+  assert.match(prompt, /Tool guide:\nqdash guide\n\nAdditional tools:\n- `qcal_evaluate`/);
+  assert.doesNotMatch(buildSystemPrompt("auto", "en", false, [], "qdash guide"), /Additional tools/);
 });

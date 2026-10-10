@@ -24,6 +24,15 @@ export type NdjsonEvent =
   /** Keepalive while a turn is quiet (long tool calls); carries no content. */
   | { type: "ping" };
 
+/**
+ * Suffix for an unanswered submission's `detail`, which carries the provider's
+ * error text (HTTP status and body) behind reasons such as `model_error`.
+ */
+export function formatSettledDetail(detail: unknown): string {
+  if (detail === undefined || detail === null || detail === "") return "";
+  return `: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`;
+}
+
 /** Minimal shape of the Pi events we care about. */
 type SessionEventLike = {
   type: string;

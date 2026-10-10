@@ -43,11 +43,11 @@ Review or fill in these values before starting services:
 | `CONFIG_REPO_URL` / `GITHUB_TOKEN` / `GITHUB_USER` | Optional Qubex config repository sync settings |
 | `CLIENT_URL` | Public UI URL when the app is served through a domain or tunnel; Copilot also builds the links in its answers from it |
 | `TUNNEL_TOKEN` | Optional Cloudflare Tunnel token for remote access |
-| `QDASH_API_TOKEN` | Optional API token for automation or service-to-service access |
 | `AGENT_RUNTIME_TOKEN` | Shared secret for QDash API/workers to call the internal Pi Agent Runtime; required when `copilot_backend: pi`, and requests fail closed when it is empty |
 | `COMPOSE_PROFILES` | Set to `agent-runtime` when `copilot_backend: pi`; otherwise the Agent Runtime container is not created |
 | `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` | Experimental; set to `true` to expose the reviewed QDash write tools to Copilot (default: `false`) |
 | `OPENAI_COMPATIBLE_BASE_URL` / `OPENAI_COMPATIBLE_API_KEY` | Base URL and credential for the default vendor-neutral OpenAI Chat Completions endpoint |
+| `VLLM_BASE_URL` / `VLLM_API_KEY` | Base URL and bearer token of a vLLM endpoint; used by the `vllm` models in `config/copilot/*.yaml` such as `nvidia/Ising-Calibration-1.5-31B-NVFP4` |
 | `OPENAI_API_KEY` / `OLLAMA_BASE_URL` / `OLLAMA_API_KEY` | Optional settings for other Copilot AI providers |
 | `KNOWLEDGE_REPO_URL` | Optional external knowledge repository for Copilot context |
 | `SLACK_FORUM_NOTIFICATION` | Set to `true` to enable Slack notifications for forum thread creation, replies, and open/close status changes (optional) |
@@ -58,7 +58,8 @@ QDash application settings are committed under `config/app`, `config/domain`, an
 `config/copilot`; `CONFIG_PATH` is only for the Qubex backend configuration tree.
 
 `AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true` should be used only in a trusted experimental
-deployment. The runtime uses its service credential for these calls. Copilot never runs a write
+deployment. The runtime uses the logged-in user's token and selected project for these calls;
+QDash API endpoints enforce that user's permissions. Copilot never runs a write
 operation itself: when it calls one, the chat shows an approval card with the exact arguments, and
 the runtime runs the operation only after the user clicks **Approve**, with the arguments shown. A
 decision is accepted only for the approval the latest answer asked for, so it cannot run the same

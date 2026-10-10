@@ -164,9 +164,6 @@ services:
       - PREFECT_LOGGING_SETTINGS_PATH=/app/config/app/logging/prefect.yaml
       - PYTHONPATH=/app:/app/qdash:/app/qdash/workflow:/app/qdash/dbmodel
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
-      # Automatic AI review posts here when copilot_backend is pi.
-      - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
-      - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
     networks:
       - custom_net
   api:
@@ -226,9 +223,9 @@ services:
     networks:
       - custom_net
   agent-runtime:
-    # Pi Agent Runtime backing the Copilot chat page and automatic AI review
-    # when config/copilot/config.yaml sets copilot_backend: pi. Enable this
-    # opt-in service with COMPOSE_PROFILES=agent-runtime.
+    # Pi Agent Runtime backing the Copilot chat page and figure analysis when
+    # config/copilot/config.yaml sets copilot_backend: pi. Enable this opt-in
+    # service with COMPOSE_PROFILES=agent-runtime.
     profiles:
       - agent-runtime
     build:
@@ -240,7 +237,13 @@ services:
     volumes:
       - ./agent-runtime/src:/app/src
       - ./config:/app/config # Read for copilot language and model settings only
+      # Local pi extension checkouts for development (gitignored, empty in
+      # production); the runtime trusts whatever package directories it finds.
+      - ./agent-runtime/extensions:/app/extensions:ro
       - agent-runtime-state:/app/state
+    # Per-turn pi-qdash credential profiles are transient, including on crashes.
+    tmpfs:
+      - /tmp
     environment:
       - PORT=${AGENT_RUNTIME_PORT:-8002}
       - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
@@ -254,15 +257,8 @@ services:
       - CHAT_TIMEOUT_MS=${AGENT_RUNTIME_TIMEOUT_MS:-0}
       - CHAT_PING_MS=${AGENT_RUNTIME_PING_MS:-15000}
       - MODEL_STREAM_TIMEOUT_MS=${AGENT_RUNTIME_MODEL_STREAM_TIMEOUT_MS:-180000}
-      # Reviews arrive from two Python thread pools that do not know about each
-      # other and all land on one local VLM, so the cap lives here.
-      - REVIEW_CONCURRENCY=${AGENT_RUNTIME_REVIEW_CONCURRENCY:-2}
-      - REVIEW_QUEUE_TIMEOUT_MS=${AGENT_RUNTIME_REVIEW_QUEUE_TIMEOUT_MS:-30000}
-      - REVIEW_TIMEOUT_MS=${AGENT_RUNTIME_REVIEW_TIMEOUT_MS:-300000}
-      # pi-qdash reaches QDash with this. The runtime logs in as the QDash
-      # administrator at startup unless QDASH_API_TOKEN is already set, so no
-      # token has to be provisioned by hand. Raw GET access is always excluded;
-      # reviewed write tools require an explicit experimental opt-in above.
+      # The API forwards the logged-in user's token and project on each turn.
+      # No shared API token or administrator login is used by the runtime.
       - QDASH_BASE_URL=http://api:${API_PORT:-5715}
       # Links in Copilot answers point here. QDASH_BASE_URL is an internal
       # hostname, so the browser-facing UI address comes from CLIENT_URL.

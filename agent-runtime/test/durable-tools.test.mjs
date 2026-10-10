@@ -5,6 +5,14 @@ import { Type } from "typebox";
 
 import { buildQDashExtension, decisionMessage } from "../src/durable-tools.ts";
 
+const connection = {
+  toolArgs: {
+    profile: "runtime",
+    configPath: "/private/config.ini",
+    useEnv: false,
+  },
+};
+
 function registered(name) {
   let calls = 0;
   return {
@@ -35,9 +43,177 @@ test("only explicitly reviewed pi-qdash tools enter the durable registry", () =>
     ],
     {},
     "/tmp/work",
+    connection,
   );
 
-  assert.deepEqual(extension.tools.map((tool) => tool.name), ["qdash_get_default_chip"]);
+  assert.deepEqual(
+    extension.tools.map((tool) => tool.name),
+    ["qdash_get_default_chip"],
+  );
+});
+
+test("local extension checkouts are trusted by path, not by tool name", () => {
+  const roots = ["/app/extensions/pi-qcaleval"];
+  const readOnly = registered("qcal_evaluate");
+  readOnly.definition.annotations = { readOnlyHint: true };
+  const pinned = {
+    path: "/app/.pi-agent/packages/pi-qdash/extensions/qdash.ts",
+    tools: new Map([
+      ["qdash_get_default_chip", registered("qdash_get_default_chip")],
+      ["qdash_future_unreviewed_tool", registered("qdash_future_unreviewed_tool")],
+    ]),
+  };
+  const local = {
+    path: "/app/extensions/pi-qcaleval/extensions/qcaleval.ts",
+    tools: new Map([
+      ["qcal_evaluate", readOnly],
+      ["qcal_store_result", registered("qcal_store_result")],
+      // An experimental write name keeps its opt-in even from a checkout.
+      ["qdash_create_forum_post", registered("qdash_create_forum_post")],
+    ]),
+  };
+  const { extension } = buildQDashExtension(
+    [local, pinned],
+    {},
+    "/tmp/work",
+    connection,
+    false,
+    roots,
+  );
+  const byName = new Map(extension.tools.map((tool) => [tool.name, tool]));
+
+  assert.deepEqual(
+    [...byName.keys()].sort(),
+    ["qcal_evaluate", "qcal_store_result", "qdash_get_default_chip"],
+  );
+  // Only a tool annotated read-only may rerun after an interruption.
+  assert.equal(byName.get("qcal_evaluate").replay, "safe");
+  assert.equal(byName.get("qcal_store_result").replay, "unsafe");
+  assert.equal(byName.get("qdash_get_default_chip").replay, "safe");
+});
+
+test("a checkout tool with a pinned name replaces the pinned implementation", async () => {
+  const pinnedTool = registered("qdash_get_default_chip");
+  const localTool = registered("qdash_get_default_chip");
+  const { extension } = buildQDashExtension(
+    [
+      { path: "/app/.pi-agent/packages/pi-qdash/extensions/qdash.ts", tools: new Map([["qdash_get_default_chip", pinnedTool]]) },
+      { path: "/app/extensions/dev/extensions/dev.ts", tools: new Map([["qdash_get_default_chip", localTool]]) },
+    ],
+    {},
+    "/tmp/work",
+    connection,
+    false,
+    ["/app/extensions/dev"],
+  );
+
+  assert.equal(extension.tools.length, 1);
+  await extension.tools[0].execute({}, { callId: "call-1" }, { abortSignal: undefined });
+  assert.equal(localTool.calls(), 1);
+  assert.equal(pinnedTool.calls(), 0);
+});
+
+test("a checkout tool with an `images` parameter gets the newest transcript figure", async () => {
+  const seen = [];
+  const evaluate = {
+    definition: {
+      name: "qcal_evaluate",
+      label: "Evaluate",
+      description: "Evaluate a plot",
+      parameters: Type.Object({
+        context: Type.String(),
+        images: Type.Optional(Type.Array(Type.Object({ data: Type.String(), mimeType: Type.String() }))),
+      }),
+      execute: async (_id, params, _signal, _onUpdate, ctx) => {
+        seen.push({ ...params, ctxModel: ctx.model });
+        return { content: [], details: {} };
+      },
+    },
+  };
+  const qwen = { provider: "openai-compatible", id: "qwen3.8-flash-next", input: ["text", "image"] };
+  const { extension } = buildQDashExtension(
+    [{ path: "/app/extensions/pi-qcaleval/extensions/qcaleval.ts", tools: new Map([["qcal_evaluate", evaluate]]) }],
+    { getModel: (provider, id) => (provider === qwen.provider && id === qwen.id ? qwen : undefined) },
+    "/tmp/work",
+    connection,
+    false,
+    ["/app/extensions/pi-qcaleval"],
+  );
+  const scans = [];
+  const api = {
+    callId: "call-1",
+    conversationId: "conv-1",
+    // The conversation's model reaches the tool, so it can fall back to it.
+    agent: async () => ({ model: { provider: qwen.provider, modelId: qwen.id } }),
+    commit: async (change) =>
+      change({
+        scanEntries: async (query, limit) => {
+          scans.push({ query, limit });
+          return {
+            items: [
+              { model: [{ role: "user", content: "evaluate it" }] },
+              {
+                model: [
+                  { role: "toolResult", content: [{ type: "image", data: "png-bytes", mimeType: "image/png" }] },
+                ],
+              },
+            ],
+          };
+        },
+      }),
+  };
+  const tool = extension.tools[0];
+
+  await tool.execute({ context: "Rabi on Q05" }, api, { abortSignal: undefined });
+  assert.deepEqual(scans, [{ query: { conversationId: "conv-1" }, limit: 50 }]);
+  assert.deepEqual(seen[0].images, [{ data: "png-bytes", mimeType: "image/png" }]);
+  assert.equal(seen[0].context, "Rabi on Q05");
+  assert.equal(seen[0].ctxModel, qwen);
+
+  // Real image bytes the model passed itself are kept, and the transcript is not read.
+  const own = [
+    {
+      data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      mimeType: "image/png",
+    },
+  ];
+  await tool.execute({ context: "Rabi on Q05", images: own }, api, { abortSignal: undefined });
+  assert.equal(scans.length, 1);
+  assert.deepEqual(seen[1].images, own);
+
+  // `max_images` asks for the last N figures of the newest message that has any.
+  const twoFigures = {
+    ...api,
+    commit: async (change) =>
+      change({
+        scanEntries: async () => ({
+          items: [
+            {
+              model: [
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: "review this" },
+                    { type: "image", data: "expected", mimeType: "image/png" },
+                    { type: "image", data: "measured", mimeType: "image/png" },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      }),
+  };
+  await tool.execute({ context: "CheckRabi", max_images: 2 }, twoFigures, { abortSignal: undefined });
+  assert.deepEqual(
+    seen[2].images.map((image) => image.data),
+    ["expected", "measured"],
+  );
+  await tool.execute({ context: "CheckRabi" }, twoFigures, { abortSignal: undefined });
+  assert.deepEqual(
+    seen[3].images.map((image) => image.data),
+    ["measured"],
+  );
 });
 
 test("experimental write tools require opt-in and never run from the model's call", async () => {
@@ -54,6 +230,7 @@ test("experimental write tools require opt-in and never run from the model's cal
     ],
     {},
     "/tmp/work",
+    connection,
     true,
   );
 
@@ -93,17 +270,55 @@ test("the model is not offered the confirmation flag", () => {
     [{ tools: new Map([["qdash_create_forum_post", tool]]) }],
     {},
     "/tmp/work",
+    connection,
     true,
   );
   assert.deepEqual(Object.keys(extension.tools[0].parameters.properties), ["title"]);
 });
 
 test("decision messages tell the model what happened", () => {
-  const approval = { id: "c", tool: "qdash_execute_agent_action", label: "Execute", args: {} };
+  const approval = {
+    id: "c",
+    tool: "qdash_execute_agent_action",
+    label: "Execute",
+    args: {},
+  };
   assert.match(decisionMessage(approval, { approved: false }), /declined .*It was not run/);
   assert.match(
-    decisionMessage(approval, { approved: true, result: '{"execution_status":"queued"}' }),
+    decisionMessage(approval, {
+      approved: true,
+      result: '{"execution_status":"queued"}',
+    }),
     /approved .*Result:\n\{"execution_status":"queued"\}/,
   );
   assert.match(decisionMessage(approval, { approved: true, error: "409" }), /failed:\n409/);
+});
+
+test("a trusted installed package gets the checkout treatment", () => {
+  const readOnly = registered("qcal_evaluate");
+  readOnly.definition.annotations = { readOnlyHint: true };
+  const { extension } = buildQDashExtension(
+    [
+      {
+        path: "/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval/extensions/qcaleval.ts",
+        tools: new Map([["qcal_evaluate", readOnly]]),
+      },
+      {
+        path: "/app/.pi-agent/npm/node_modules/@someone/pi-other/extensions/other.ts",
+        tools: new Map([["other_tool", registered("other_tool")]]),
+      },
+    ],
+    {},
+    "/tmp/work",
+    connection,
+    false,
+    [],
+    ["@orangekame3/pi-qcaleval"],
+  );
+  // The listed package is offered; an unlisted installed package still needs the allowlist.
+  assert.deepEqual(
+    extension.tools.map((tool) => tool.name),
+    ["qcal_evaluate"],
+  );
+  assert.equal(extension.tools[0].replay, "safe");
 });

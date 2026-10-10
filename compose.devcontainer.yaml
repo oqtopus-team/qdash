@@ -38,6 +38,10 @@ services:
       - COVERAGE_FILE=/home/vscode/.cache/coverage/qdash
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-}
+      # Host path of this checkout, for `docker compose` run inside the
+      # container (see .devcontainer/post-start.sh). VS Code sets the same
+      # variable from devcontainer.json.
+      - QDASH_HOST_WORKSPACE=${PWD}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

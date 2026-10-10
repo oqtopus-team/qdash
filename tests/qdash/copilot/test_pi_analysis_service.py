@@ -68,6 +68,7 @@ async def _collect(
     *,
     stored: list[dict[str, Any]],
     ndjson: list[dict[str, Any]] | None = None,
+    request: AnalyzeRequest | None = None,
 ) -> tuple[dict[str, Any], list[tuple[str, dict[str, Any]]], list[list[dict[str, Any]]]]:
     """Run one turn against a stubbed runtime, returning payload, events and writes."""
     captured: dict[str, Any] = {}
@@ -79,7 +80,8 @@ async def _collect(
 
     monkeypatch.setattr(pi_chat_service, "ensure_agent_session", ensure_agent_session)
 
-    async def fake_stream_payload(payload, *, step, extra_result=None):
+    async def fake_stream_payload(payload, *, step, auth, extra_result=None):
+        captured["auth"] = auth
         captured["payload"] = payload
         captured["step"] = step
 
@@ -95,10 +97,11 @@ async def _collect(
     events = [
         _parse(sse)
         async for sse in pi_analysis_service.stream(
-            _request(),
+            request or _request(),
             _config(),
             _bundle(),
             username="alice",
+            auth=pi_chat_service.QDashAuth("alice-token", "alice-project"),
             language_instruction="Always respond in English.",
             images_sent=_IMAGES_SENT,
         )
@@ -176,6 +179,7 @@ class TestStream:
                 _config(),
                 _bundle(),
                 username="alice",
+                auth=pi_chat_service.QDashAuth("alice-token", "alice-project"),
                 language_instruction="",
                 images_sent=_IMAGES_SENT,
             )
@@ -199,12 +203,14 @@ class TestStream:
         assert payload["request_id"] == "request-1"
         assert payload["message"] == "Is this result trustworthy?"
         assert "knowledge-v1" in payload["initial_message"]
-        assert [image["data"] for image in payload["images"]] == [
+        assert [image["data"] for image in payload["initial_images"]] == [
             "expected-b64",
             "experiment-b64",
         ]
         assert payload["thinking_level"] == "off"
         assert captured["step"] == "run_analysis"
+        assert captured["auth"] == pi_chat_service.QDashAuth("alice-token", "alice-project")
+        assert "alice-token" not in json.dumps(payload)
 
     @pytest.mark.asyncio
     async def test_runtime_decides_whether_to_use_opening_context(
@@ -215,7 +221,7 @@ class TestStream:
         payload = captured["payload"]
         assert payload["message"] == "Is this result trustworthy?"
         assert "knowledge-v1" in payload["initial_message"]
-        assert payload["images"]
+        assert payload["initial_images"]
 
     @pytest.mark.asyncio
     async def test_images_sent_rides_on_the_result_event(
@@ -240,6 +246,7 @@ class TestStream:
                 _config(),
                 _bundle(),
                 username="alice",
+                auth=pi_chat_service.QDashAuth("alice-token", "alice-project"),
                 language_instruction="",
                 images_sent=_IMAGES_SENT,
             )
@@ -254,3 +261,19 @@ class TestStream:
                 },
             )
         ]
+
+
+@pytest.mark.asyncio
+async def test_analysis_forwards_turn_attachments_separately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """User attachments reach the runtime on follow-up turns as well as the opening turn."""
+    request = AnalyzeRequest.model_validate(
+        {
+            **_request().model_dump(),
+            "images": [{"data": "iVBORw0KGgo=", "mimeType": "image/png"}],
+        }
+    )
+    captured, _, _ = await _collect(monkeypatch, stored=[{"role": "user"}], request=request)
+    assert captured["payload"]["images"] == [{"data": "iVBORw0KGgo=", "mimeType": "image/png"}]
+    assert len(captured["payload"]["initial_images"]) == 2

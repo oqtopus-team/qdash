@@ -20,21 +20,32 @@ export interface CompactionBudget {
 }
 
 /**
+ * How far pi's character-based token estimate (4 chars per token) falls short
+ * of what the provider counts. Tool schemas and numeric JSON tokenize nearer 3
+ * chars per token, CJK text nearer 1, and an image is a flat 1200 tokens
+ * whatever its size. A qwen session that pi estimated below its threshold was
+ * counted at 53k tokens by vLLM.
+ */
+export const ESTIMATE_UNDERCOUNT = 1.5;
+
+/**
  * Compaction thresholds for one model.
  *
- * Pi compacts once the prompt passes `contextWindow - reserveTokens`, and the
- * request then asks for `maxTokens` more. Pi estimates tokens from characters,
- * which undercounts images and CJK text, so a reserve equal to `maxTokens`
- * still lets the provider reject the request. Leave a margin on top, scaled to
- * the window so small-context models are not compacted on every turn.
+ * Pi compacts once the estimated prompt passes `contextWindow - reserveTokens`,
+ * and the request then asks for `maxTokens` more. The thresholds are expressed
+ * in pi's estimated tokens, so the room the provider actually has
+ * (`contextWindow - maxTokens`) is divided by `ESTIMATE_UNDERCOUNT` before it is
+ * handed out. The reserve is capped at half the window so small-context models
+ * are not compacted on every turn.
  */
 export function compactionBudget(contextWindow: number, maxTokens: number): CompactionBudget {
-  const margin = Math.max(2048, Math.round(contextWindow * 0.1));
-  const reserveTokens = Math.min(maxTokens + margin, Math.floor(contextWindow / 2));
-  const quarter = Math.floor(contextWindow / 4);
+  const estimatedRoom = Math.floor(Math.max(contextWindow - maxTokens, 0) / ESTIMATE_UNDERCOUNT);
+  const reserveTokens = Math.min(contextWindow - estimatedRoom, Math.floor(contextWindow / 2));
+  // What survives a compaction must leave most of the room for new work.
+  const recent = Math.max(Math.floor(estimatedRoom / 4), 1024);
   return {
     reserveTokens,
-    keepRecentTokens: Math.min(20_000, quarter),
-    backgroundTokens: Math.min(32_768, quarter),
+    keepRecentTokens: Math.min(20_000, recent),
+    backgroundTokens: Math.min(32_768, recent),
   };
 }

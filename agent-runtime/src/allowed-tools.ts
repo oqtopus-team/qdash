@@ -1,9 +1,8 @@
 /**
  * Positive allowlist for the pinned pi-qdash package.
  *
- * The runtime authenticates to QDash with a service credential. A newly added
- * extension tool must therefore be reviewed here before the model can see it;
- * relying only on a denylist would silently expand that credential's surface.
+ * The runtime authenticates as the user who submitted the turn. Newly added
+ * extension tools still require review before they are exposed to the model.
  */
 export const ALLOWED_TOOL_NAMES = [
   "qdash_analyze_figure_json",
@@ -35,7 +34,6 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_investigate",
   "qdash_list_agent_action_candidates",
   "qdash_list_agent_actions",
-  "qdash_list_ai_reviews",
   "qdash_list_chip_couplings",
   "qdash_list_chip_qubits",
   "qdash_list_chips",
@@ -91,3 +89,18 @@ const EXPERIMENTAL_WRITE_TOOLS = new Set<string>(EXPERIMENTAL_WRITE_TOOL_NAMES);
 export function isExperimentalWriteTool(name: string): boolean {
   return EXPERIMENTAL_WRITE_TOOLS.has(name);
 }
+
+/**
+ * Installed pi packages trusted as a whole, like a local checkout: every tool
+ * they define is offered without a per-name entry above (the experimental
+ * write opt-in still applies). Reviewed per package, pinned by version in
+ * `agent-runtime/Dockerfile`.
+ */
+export const TRUSTED_EXTENSION_PACKAGES = ["@orangekame3/pi-qcaleval"] as const;
+
+/**
+ * Packages whose tools go through the per-name allowlist above even when a
+ * local checkout of them is mounted for development: the checkout replaces
+ * the pinned copy, but does not widen what the model may call.
+ */
+export const ALLOWLISTED_PACKAGES = ["@oqtopus-team/pi-qdash"] as const;

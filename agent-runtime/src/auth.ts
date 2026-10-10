@@ -1,48 +1,69 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+/** Supplied by the authenticated API request, never by the model or durable state. */
+export interface QDashAuth {
+  accessToken: string;
+  projectId?: string;
+}
+
+export interface QDashConnection {
+  readonly auth: QDashAuth;
+  readonly baseUrl: string;
+  readonly toolArgs: { profile: string; configPath: string; useEnv: false };
+  close(): Promise<void>;
+}
+
+export function requestQDashAuth(
+  headers: Record<string, string | string[] | undefined>,
+): QDashAuth {
+  const accessToken = headers["x-qdash-token"];
+  const projectId = headers["x-qdash-project-id"];
+  if (typeof accessToken !== "string" || !accessToken.trim()) {
+    throw new Error("QDash user token is required");
+  }
+  if (projectId !== undefined && (typeof projectId !== "string" || !projectId.trim())) {
+    throw new Error("Invalid QDash project ID");
+  }
+  return { accessToken, ...(projectId ? { projectId } : {}) };
+}
+
 /**
- * Obtain the QDash API token the pi-qdash extension authenticates with.
- *
- * QDash creates its administrator from QDASH_ADMIN_USERNAME/PASSWORD on API
- * startup, so the runtime can log in and derive a token instead of requiring an
- * operator to provision a service account and paste QDASH_API_TOKEN by hand.
- *
- * An explicit QDASH_API_TOKEN still wins, which is how a deployment can hand the
- * runtime a narrower account.
+ * The pinned pi-qdash accepts a config path, not an injected client. Give each
+ * open harness its own private, temporary profile, removed when it closes.
+ * Never read ambient tokens, passwords, projects, or local client profiles.
  */
-export async function resolveQDashApiToken(): Promise<void> {
-  if (process.env.QDASH_API_TOKEN) {
-    console.log("[agent-runtime] using QDASH_API_TOKEN from the environment");
-    return;
-  }
-
-  const baseUrl = process.env.QDASH_BASE_URL;
-  const username = process.env.QDASH_ADMIN_USERNAME;
-  const password = process.env.QDASH_ADMIN_PASSWORD;
-  if (!baseUrl || !username || !password) {
-    throw new Error(
-      "Cannot authenticate to QDash: set QDASH_API_TOKEN, or QDASH_BASE_URL with QDASH_ADMIN_USERNAME and QDASH_ADMIN_PASSWORD.",
+export async function createQDashConnection(auth: QDashAuth): Promise<QDashConnection> {
+  if (!auth.accessToken?.trim()) throw new Error("QDash user token is required");
+  const baseUrl = process.env.QDASH_BASE_URL?.replace(/\/$/, "");
+  if (!baseUrl) throw new Error("QDASH_BASE_URL is required");
+  const directory = await mkdtemp(join(tmpdir(), "qdash-auth-"));
+  const configPath = join(directory, "config.ini");
+  const close = () => rm(directory, { recursive: true, force: true });
+  try {
+    // JSON quoting is understood by the client's INI parser and prevents values
+    // from introducing extra keys or profiles.
+    const values = {
+      base_url: baseUrl,
+      api_token: auth.accessToken,
+      ...(auth.projectId ? { project_id: auth.projectId } : {}),
+    };
+    await writeFile(
+      configPath,
+      `[runtime]\n${Object.entries(values)
+        .map(([key, value]) => `${key} = ${JSON.stringify(value)}`)
+        .join("\n")}\n`,
+      { mode: 0o600 },
     );
+    return {
+      auth: { ...auth },
+      baseUrl,
+      toolArgs: { profile: "runtime", configPath, useEnv: false },
+      close,
+    };
+  } catch (error) {
+    await close();
+    throw error;
   }
-
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ username, password }),
-  });
-  if (!response.ok) {
-    throw new Error(`QDash login failed for ${username}: HTTP ${response.status}`);
-  }
-
-  const { access_token: accessToken, default_project_id: defaultProjectId } =
-    (await response.json()) as { access_token?: string; default_project_id?: string };
-  if (!accessToken) {
-    throw new Error("QDash login returned no access_token");
-  }
-
-  process.env.QDASH_API_TOKEN = accessToken;
-  if (!process.env.QDASH_PROJECT_ID && defaultProjectId) {
-    process.env.QDASH_PROJECT_ID = defaultProjectId;
-  }
-  console.log(
-    `[agent-runtime] authenticated to QDash as ${username} (project ${process.env.QDASH_PROJECT_ID ?? "unset"})`,
-  );
 }

@@ -53,7 +53,11 @@ LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose -f compose.devcontainer.yam
 ```
 
 The container mounts `/var/run/docker.sock` so devcontainer users can run the local Docker
-Compose tasks from inside the workspace. In the default VS Code session, tools under
+Compose tasks from inside the workspace. The Docker daemon resolves bind mounts on the host,
+so on start the container links the checkout's host path (`QDASH_HOST_WORKSPACE`, set by VS
+Code from `${localWorkspaceFolder}` or by `compose.devcontainer.yaml` from `$PWD`) to
+`/workspace/qdash`; run `docker compose` from that host path inside the container, never from
+`/workspace/qdash` directly. In the default VS Code session, tools under
 `/home/vscode/.local` and agent configuration under `/home/vscode/.claude` and
 `/home/vscode/.codex` are persisted in Docker volumes, so they survive container rebuilds.
 Codex itself is installed under `/opt/codex`, which remains writable by the `vscode` user for

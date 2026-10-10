@@ -19,7 +19,10 @@ RUN mkdir -p $PI_CODING_AGENT_DIR \
 # Install the QDash extension into the agent dir at build time so startup needs
 # no network access. The agent dir is also where the runtime generates
 # models.json from chat.yaml at startup.
-RUN bunx @earendil-works/pi-coding-agent install npm:@oqtopus-team/pi-qdash@0.1.10-beta.15
+RUN bunx @earendil-works/pi-coding-agent install npm:@oqtopus-team/pi-qdash@0.1.10-beta.16
+# pi-qcaleval is trusted as a whole (TRUSTED_EXTENSION_PACKAGES in
+# src/allowed-tools.ts), so this pin is its release gate.
+RUN bunx @earendil-works/pi-coding-agent install npm:@orangekame3/pi-qcaleval@0.0.1
 
 COPY agent-runtime/src ./src
 # The agent dir and workspace are written at runtime (models.json, agent files),

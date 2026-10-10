@@ -9,12 +9,24 @@ export interface AnalysisContext {
   taskId: string;
 }
 
+/** One figure sent with a chat turn, as the Copilot runtime receives it. */
+export interface ChatImageAttachment {
+  /** Base64 image bytes without a `data:` prefix. */
+  data: string;
+  mimeType: string;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   /** Plain text, or a JSON-encoded `CopilotBlocksResult` for assistant answers. */
   content: string;
-  /** The message went out with the task's result figures attached. */
+  /** The message went out with figures attached: the task's result figures or the user's own. */
   attachedImage?: boolean;
+  /**
+   * Thumbnails (data URLs) of the user's own attachments. Kept only for the
+   * browser session that sent them; the server stores presence, not bytes.
+   */
+  attachments?: string[];
 }
 
 /** A choice the assistant asks the user to make, shown as buttons. */

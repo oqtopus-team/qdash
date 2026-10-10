@@ -36,9 +36,6 @@ from qdash.client.services.models import (
     AgentCandidateListResponse,
     AgentCandidateResponse,
     AgentSessionResponse,
-    AiReviewListResponse,
-    AiReviewRunDetailResponse,
-    AiReviewRunListResponse,
     BodyReExecuteTaskResult,
     CancelExecutionResponse,
     CandidateGateResponse,
@@ -1045,50 +1042,6 @@ class QDashClient:
     def get_task_note(self, task_id: str) -> NoteModel:
         response = self._request("GET", f"/task-results/{task_id}/note")
         return self._validate_model_payload(NoteModel, response.data)
-
-    def list_task_result_ai_reviews(
-        self,
-        *,
-        chip_id: str | None = None,
-        task_name: str | None = None,
-        status: str | None = None,
-        decision: str | None = None,
-        latest_only: bool = False,
-        skip: int = 0,
-        limit: int = 50,
-    ) -> AiReviewListResponse:
-        params = self._query_params(
-            chip_id=chip_id,
-            task_name=task_name,
-            status=status,
-            decision=decision,
-            latest_only=latest_only,
-            skip=skip,
-            limit=limit,
-        )
-        response = self._request("GET", "/task-results/ai-review", params=params)
-        return self._validate_model_payload(AiReviewListResponse, response.data)
-
-    def list_task_result_ai_review_runs(
-        self,
-        *,
-        chip_id: str | None = None,
-        task_name: str | None = None,
-        skip: int = 0,
-        limit: int = 50,
-    ) -> AiReviewRunListResponse:
-        params = self._query_params(
-            chip_id=chip_id,
-            task_name=task_name,
-            skip=skip,
-            limit=limit,
-        )
-        response = self._request("GET", "/task-results/ai-review/runs", params=params)
-        return self._validate_model_payload(AiReviewRunListResponse, response.data)
-
-    def get_task_result_ai_review_run(self, review_run_id: str) -> AiReviewRunDetailResponse:
-        response = self._request("GET", f"/task-results/ai-review/runs/{review_run_id}")
-        return self._validate_model_payload(AiReviewRunDetailResponse, response.data)
 
     def cancel_execution(self, flow_run_id: str) -> CancelExecutionResponse:
         response = self._request("POST", f"/executions/{flow_run_id}/cancel", json={})
