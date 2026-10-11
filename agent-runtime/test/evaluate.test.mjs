@@ -58,6 +58,12 @@ function deps(results, knowledge = "Expect a damped cosine.") {
       calls.push({ name: "knowledge", args: { taskName } });
       return knowledge;
     },
+    fetchExamples: async (taskName) => {
+      calls.push({ name: "examples", args: { taskName } });
+      return [
+        { id: "e1", title: "Short T1", outcome: "suboptimal", label: "Outcome: suboptimal\nShort.", images: [{ data: PNG, mimeType: "image/png" }] },
+      ];
+    },
     evaluator: { name: "@orangekame3/pi-qcaleval", version: "0.0.2-beta.5", source: "checkout", commit: "042e454323b2" },
   };
 }
@@ -95,6 +101,26 @@ test("evidence feeds the evaluation: context text, figure bytes, task name and r
   assert.deepEqual(result.evaluation.usage, { input: 1200, output: 80 });
   assert.ok(result.evaluation.duration_ms >= 0);
   assert.equal(result.evaluator.commit, "042e454323b2");
+});
+
+test("with examples requested, the labeled examples are fetched, passed, and recorded by hash", async () => {
+  const d = deps({ [EVIDENCE_TOOL]: evidenceResult(), [EVALUATION_TOOL]: evaluationResult() });
+
+  const result = await evaluateTask({ taskId: "task-1", withExamples: true }, d);
+
+  assert.deepEqual(d.calls.map((call) => call.name), [EVIDENCE_TOOL, "knowledge", "examples", EVALUATION_TOOL]);
+  const evaluation = d.calls[3].args;
+  assert.equal(evaluation.use_examples, true);
+  assert.deepEqual(evaluation.examples, [{ label: "Outcome: suboptimal\nShort.", images: [{ data: PNG, mimeType: "image/png" }] }]);
+  assert.deepEqual(result.examples.map((e) => [e.id, e.outcome, e.figures.length, e.figures[0].bytes]), [["e1", "suboptimal", 1, 88]]);
+  assert.equal("id" in evaluation.examples[0], false);
+
+  // Not requested: no fetch, no flag, no record.
+  const zero = deps({ [EVIDENCE_TOOL]: evidenceResult(), [EVALUATION_TOOL]: evaluationResult() });
+  const plain = await evaluateTask({ taskId: "task-1" }, zero);
+  assert.equal(zero.calls.some((call) => call.name === "examples"), false);
+  assert.equal("use_examples" in zero.calls[2].args, false);
+  assert.deepEqual(plain.examples, []);
 });
 
 test("without a task name or reference, the evaluation runs on the evidence alone", async () => {
@@ -266,6 +292,11 @@ test("a planner turn's qcal_evaluate result yields the same record as a direct e
   assert.equal(prose.evaluation.diagnosis, null);
   assert.equal(prose.evaluation.raw, "It decays.");
   assert.equal(prose.planner, null);
+});
+
+test("the planner instruction asks for examples only when the request does", () => {
+  assert.doesNotMatch(plannerInstruction("task-1"), /use_examples/);
+  assert.match(plannerInstruction("task-1", undefined, true), /use_examples: true/);
 });
 
 test("the planner instruction names both tools and passes the question on", () => {

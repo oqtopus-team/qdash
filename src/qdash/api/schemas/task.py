@@ -85,6 +85,9 @@ class KnowledgeExampleResponse(BaseModel):
     source: str = ""
     figures: list[KnowledgeFigureResponse] = []
     diagnosis: str = ""
+    label: str = Field(
+        default="", description="The demonstration label: outcome, fit quality, verdict, diagnosis"
+    )
 
 
 class TaskKnowledgeResponse(BaseModel):

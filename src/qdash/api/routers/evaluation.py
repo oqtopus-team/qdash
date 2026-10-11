@@ -69,6 +69,7 @@ async def create_evaluation_run(
         question=body.question,
         trigger=body.trigger,
         mode=body.mode,
+        with_examples=body.with_examples,
         requested_by=ctx.user.username,
     )
     service.launch(

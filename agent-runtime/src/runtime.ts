@@ -65,7 +65,7 @@ import {
   type ToolRun,
 } from "./evaluate.ts";
 import { formatSettledDetail } from "./events.ts";
-import { fetchTaskKnowledge } from "./knowledge-context.ts";
+import { fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
 import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
 import { buildSystemPrompt } from "./prompt.ts";
 import { buildPythonTool } from "./python-tool.ts";
@@ -334,6 +334,7 @@ export class SharedRuntime {
           )) as ToolRun;
         },
         fetchKnowledge: (taskName) => fetchTaskKnowledge(connection, taskName, signal),
+        fetchExamples: (taskName) => fetchTaskExamples(connection, taskName, signal),
         evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
       });
     } finally {
@@ -387,7 +388,10 @@ export class SharedRuntime {
       let settled;
       try {
         const submission = await conversation.submit(
-          { type: "input", content: plannerInstruction(request.taskId, request.question) },
+          {
+            type: "input",
+            content: plannerInstruction(request.taskId, request.question, request.withExamples),
+          },
           BACKGROUND_CONTEXT,
         );
         settled = await submission.wait(BACKGROUND_CONTEXT);

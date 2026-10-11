@@ -36,6 +36,7 @@ async def evaluate_task_result(
     question: str | None = None,
     max_figures: int | None = None,
     mode: str = "direct",
+    with_examples: bool = False,
     model: dict[str, str] | None = None,
     thinking_level: str | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
@@ -49,6 +50,8 @@ async def evaluate_task_result(
     with an error, and `httpx.HTTPError` when it could not be reached.
     """
     payload: dict[str, Any] = {"task_id": task_id, "mode": mode}
+    if with_examples:
+        payload["with_examples"] = True
     if question:
         payload["question"] = question
     if max_figures:

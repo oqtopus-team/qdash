@@ -38,6 +38,10 @@ class CreateEvaluationRunRequest(BaseModel):
     trigger: EvaluationTrigger = Field(
         default="bulk", description='"bulk" from the chip page, "single" for one task result'
     )
+    with_examples: bool = Field(
+        default=False,
+        description="Show the task's expert-labeled example plots before the figure (in-context examples)",
+    )
     mode: EvaluationMode = Field(
         default="direct",
         description='"direct" runs the evaluation tools; "planner" lets the chat planner call them',
@@ -55,6 +59,7 @@ class EvaluationRunSummary(BaseModel):
     question: str | None = None
     trigger: EvaluationTrigger
     mode: EvaluationMode
+    with_examples: bool = False
     planner_model: str | None = None
     requested_by: str
     requested_at: datetime

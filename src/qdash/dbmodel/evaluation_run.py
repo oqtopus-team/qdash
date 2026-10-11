@@ -37,6 +37,9 @@ class EvaluationRunDocument(Document):
     )
     trigger: EvaluationTrigger = Field(default="bulk")
     mode: EvaluationMode = Field(default="direct")
+    with_examples: bool = Field(
+        default=False, description="Labeled examples were shown before each figure"
+    )
     planner_model: str | None = Field(
         default=None, description="provider/modelId of the planner, in planner mode"
     )

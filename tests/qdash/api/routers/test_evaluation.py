@@ -461,3 +461,53 @@ def test_chat_evaluations_are_filed_as_runs_of_one(test_client, service):
     assert sorted(e["run_id"] for e in for_task["evaluations"]) == sorted(
         [ids["run_id"], scoped_ids["run_id"]]
     )
+
+
+@pytest.mark.parametrize("mode", ["direct", "planner"])
+@pytest.mark.parametrize("with_examples", [False, True])
+def test_example_setting_reaches_runtime_and_records_are_persisted(
+    test_client, service, mode: str, with_examples: bool
+):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    examples = (
+        [
+            {
+                "id": "short-rabi",
+                "title": "Short Rabi decay",
+                "outcome": "suboptimal",
+                "figures": [{"sha256": "ef" * 32, "mime_type": "image/png", "bytes": 128}],
+            }
+        ]
+        if with_examples
+        else []
+    )
+    calls: list[dict[str, Any]] = []
+
+    async def evaluate(task_id: str, **kwargs: Any):
+        calls.append(kwargs)
+        return {**RECORD, "task_id": task_id, "examples": examples}
+
+    service._evaluate = evaluate
+    response = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={
+            "chip_id": "chip-1",
+            "task": "CheckRabi",
+            "mode": mode,
+            "with_examples": with_examples,
+        },
+    )
+    assert response.status_code == 202, response.text
+    run = response.json()["run"]
+    assert run["with_examples"] is with_examples
+
+    asyncio.run(service.execute_run(run["run_id"], AUTH))
+
+    assert len(calls) == 1
+    assert calls[0]["with_examples"] is with_examples
+    assert calls[0]["mode"] == mode
+    detail = test_client.get(f"/evaluations/runs/{run['run_id']}", headers=HEADERS).json()
+    assert detail["run"]["with_examples"] is with_examples
+    assert detail["evaluations"][0]["status"] == "completed"
+    assert detail["evaluations"][0]["input"]["examples"] == examples

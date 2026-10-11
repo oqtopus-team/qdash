@@ -34,6 +34,7 @@ from qdash.api.services.pi_evaluation_service import (
 from qdash.common.utils.datetime import end_of_day, now, parse_date, start_of_day
 from qdash.copilot.config import load_copilot_config
 from qdash.datamodel.evaluation import (
+    EvaluationExampleModel,
     EvaluationFigureModel,
     EvaluationInputModel,
     EvaluationOutputModel,
@@ -131,6 +132,7 @@ def _summary(
         question=run.question,
         trigger=run.trigger,
         mode=run.mode,
+        with_examples=run.with_examples,
         planner_model=run.planner_model,
         requested_by=run.requested_by,
         requested_at=run.requested_at,
@@ -158,16 +160,30 @@ def _input_from_record(record: dict[str, Any], question: str | None) -> Evaluati
         question=question,
         knowledge_chars=knowledge.get("chars"),
         knowledge_sha256=knowledge.get("sha256"),
-        figures=[
-            EvaluationFigureModel(
-                sha256=str(figure.get("sha256", "")),
-                mime_type=str(figure.get("mime_type", "")),
-                bytes=int(figure.get("bytes", 0)),
+        figures=_figures_from(record.get("figures")),
+        examples=[
+            EvaluationExampleModel(
+                id=str(example.get("id") or ""),
+                title=str(example.get("title") or ""),
+                outcome=str(example.get("outcome") or ""),
+                figures=_figures_from(example.get("figures")),
             )
-            for figure in record.get("figures") or []
-            if isinstance(figure, dict)
+            for example in record.get("examples") or []
+            if isinstance(example, dict)
         ],
     )
+
+
+def _figures_from(value: Any) -> list[EvaluationFigureModel]:
+    return [
+        EvaluationFigureModel(
+            sha256=str(figure.get("sha256", "")),
+            mime_type=str(figure.get("mime_type", "")),
+            bytes=int(figure.get("bytes", 0)),
+        )
+        for figure in value or []
+        if isinstance(figure, dict)
+    ]
 
 
 def _output_from_record(record: dict[str, Any]) -> EvaluationOutputModel:
@@ -241,6 +257,7 @@ class EvaluationService:
         question: str | None = None,
         trigger: str = "bulk",
         mode: str = "direct",
+        with_examples: bool = False,
         requested_by: str,
     ) -> RunSelection:
         """Create a run over the latest evaluable result of `task` per entity."""
@@ -283,6 +300,7 @@ class EvaluationService:
             question=(question or "").strip() or None,
             trigger=trigger,
             mode=mode,
+            with_examples=with_examples,
             planner_model=planner_model,
             requested_by=requested_by,
         )
@@ -434,6 +452,7 @@ class EvaluationService:
                 auth=auth,
                 question=run.question,
                 mode=run.mode,
+                with_examples=run.with_examples,
                 model=model,
                 thinking_level=thinking,
             )

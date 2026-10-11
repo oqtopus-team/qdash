@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { EvaluationExampleModel } from './evaluationExampleModel';
 import type { EvaluationFigureModel } from './evaluationFigureModel';
 import type { EvaluationInputModelKnowledgeChars } from './evaluationInputModelKnowledgeChars';
 import type { EvaluationInputModelKnowledgeSha256 } from './evaluationInputModelKnowledgeSha256';
@@ -26,4 +27,6 @@ export interface EvaluationInputModel {
   /** SHA-256 of the host-supplied reference text */
   knowledge_sha256?: EvaluationInputModelKnowledgeSha256;
   figures?: EvaluationFigureModel[];
+  /** Labeled examples shown before the figure; empty for a zero-shot evaluation */
+  examples?: EvaluationExampleModel[];
 }

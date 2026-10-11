@@ -55,6 +55,14 @@ function RunCard({ run }: { run: EvaluationRunSummary }) {
             <span className="badge badge-neutral">{run.entity_type}</span>
             <span className="badge badge-outline">{triggerLabel(run.trigger)}</span>
             <span className="badge badge-outline">{modeLabel(run.mode)}</span>
+            {run.with_examples && (
+              <span
+                className="badge badge-accent badge-outline"
+                title="Labeled examples were shown before each figure"
+              >
+                examples
+              </span>
+            )}
             {run.failed_count > 0 && (
               <span className="badge badge-error">{run.failed_count} failed</span>
             )}

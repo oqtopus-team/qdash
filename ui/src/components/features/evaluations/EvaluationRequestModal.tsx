@@ -51,11 +51,12 @@ const MODE_OPTIONS: ReadonlyArray<{ mode: EvaluationMode; title: string; descrip
   },
 ];
 
-/** The request body for one scope, mode and optional question. */
+/** The request body for one scope, mode, example setting and optional question. */
 export function buildEvaluationRunRequest(
   scope: EvaluationRequestScope,
   mode: EvaluationMode,
   question: string,
+  withExamples = false,
 ): CreateEvaluationRunRequest {
   const trimmed = question.trim();
   return {
@@ -64,6 +65,7 @@ export function buildEvaluationRunRequest(
     entity_type: scope.entityType,
     trigger: scope.trigger,
     mode,
+    ...(withExamples ? { with_examples: true } : {}),
     ...(scope.date ? { date: scope.date } : {}),
     ...(scope.taskIds?.length ? { task_ids: scope.taskIds } : {}),
     ...(trimmed ? { question: trimmed } : {}),
@@ -94,6 +96,7 @@ export function EvaluationRequestModal({
   const toast = useToast();
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<EvaluationMode>("direct");
+  const [withExamples, setWithExamples] = useState(false);
   const [question, setQuestion] = useState("");
   const create = useCreateEvaluationRun();
   const isSubmitting = create.isPending;
@@ -106,7 +109,7 @@ export function EvaluationRequestModal({
   const submit = async () => {
     try {
       const response = await create.mutateAsync({
-        data: buildEvaluationRunRequest(scope, mode, question),
+        data: buildEvaluationRunRequest(scope, mode, question, withExamples),
       });
       const created = response.data;
       const runId = created.run.run_id;
@@ -194,6 +197,23 @@ export function EvaluationRequestModal({
               </label>
             ))}
           </fieldset>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 p-3">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-primary checkbox-sm mt-0.5"
+              checked={withExamples}
+              onChange={(event) => setWithExamples(event.target.checked)}
+              disabled={isSubmitting}
+            />
+            <span>
+              <span className="font-medium">Show labeled examples</span>
+              <span className="block text-xs text-base-content/60">
+                The task&apos;s expert-labeled example plots are shown before each figure, each
+                followed by its diagnosis (in-context examples). Off: zero-shot, as before.
+              </span>
+            </span>
+          </label>
 
           <label className="form-control w-full">
             <span className="label-text mb-1">Question for the evaluation model (optional)</span>

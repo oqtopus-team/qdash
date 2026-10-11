@@ -22,4 +22,6 @@ export interface KnowledgeExampleResponse {
   source?: string;
   figures?: KnowledgeFigureResponse[];
   diagnosis?: string;
+  /** The demonstration label: outcome, fit quality, verdict, diagnosis */
+  label?: string;
 }

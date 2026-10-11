@@ -254,6 +254,7 @@ class TaskService:
                 KnowledgeExampleResponse(
                     **example.model_dump(exclude={"figures"}),
                     figures=[_figure(f) for f in example.figures],
+                    label=example.label(),
                 )
                 for example in knowledge.examples
             ],
