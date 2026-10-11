@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONCURRENCY = int(os.environ.get("EVALUATION_CONCURRENCY", "2"))
 # A task result is evaluable once the calibration has stopped touching it.
 TERMINAL_STATUSES = frozenset({"completed", "failed"})
-TRIGGERS = frozenset({"bulk", "single"})
+TRIGGERS = frozenset({"bulk", "single", "chat"})
 MODES = frozenset({"direct", "planner"})
 
 
@@ -252,7 +252,7 @@ class EvaluationService:
         if trigger not in TRIGGERS or mode not in MODES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="trigger must be 'bulk' or 'single' and mode 'direct' or 'planner'",
+                detail="trigger must be 'bulk', 'single' or 'chat' and mode 'direct' or 'planner'",
             )
         planner_model: str | None = None
         if mode == "planner":
@@ -479,6 +479,106 @@ class EvaluationService:
             run.completed_at = now()
         run.save()
 
+    # --- chat ------------------------------------------------------------------------------
+
+    def chat_recorder(
+        self,
+        *,
+        project_id: str,
+        username: str,
+        session_id: str | None,
+        planner_model: str,
+        task_id: str | None = None,
+    ) -> ChatEvaluationRecorder:
+        """A recorder for the evaluations one chat turn's planner makes.
+
+        `task_id` is the task result a task chat is about: the figures it opens
+        with are that result's, so a judgement of them without a tool-fetched
+        provenance is filed under it.
+        """
+        return ChatEvaluationRecorder(
+            self,
+            project_id=project_id,
+            username=username,
+            session_id=session_id,
+            planner_model=planner_model,
+            task_id=task_id,
+        )
+
+    def record_chat_evaluation(
+        self,
+        *,
+        project_id: str,
+        username: str,
+        planner_model: str,
+        record: dict[str, Any],
+    ) -> tuple[str, str] | None:
+        """Store one `qcal_evaluate` call the chat planner made, as a run of one.
+
+        The figures a chat judges come from a tool that fetched them for a task
+        result; its id rides on the record. A judgement of a figure with no
+        known task result (a user attachment) is not recorded.
+        """
+        task_id = record.get("task_id")
+        if not isinstance(task_id, str) or not task_id:
+            return None
+        docs = self._task_result_repo.find({"project_id": project_id, "task_id": task_id}, limit=1)
+        if not docs:
+            return None
+        doc = docs[0]
+        output = _output_from_record(record)
+        evaluator = _evaluator_from_record(record)
+        requested = now()
+        run = EvaluationRunDocument(
+            run_id=f"evr_{uuid.uuid4().hex}",
+            project_id=project_id,
+            chip_id=doc.chip_id,
+            task_name=doc.name,
+            entity_type="coupling" if "-" in (doc.qid or "") else "qubit",
+            trigger="chat",
+            mode="planner",
+            planner_model=planner_model,
+            requested_by=username,
+            requested_at=requested,
+            completed_at=requested,
+            status="completed",
+            total=1,
+            completed_count=1,
+            model=output.model,
+            evaluator=evaluator,
+        )
+        evaluation = EvaluationDocument(
+            evaluation_id=f"ev_{uuid.uuid4().hex}",
+            run_id=run.run_id,
+            project_id=project_id,
+            chip_id=doc.chip_id,
+            task_id=task_id,
+            task_name=doc.name,
+            qid=doc.qid or "",
+            execution_id=doc.execution_id or "",
+            status="completed",
+            requested_at=requested,
+            started_at=requested,
+            completed_at=requested,
+            input=_input_from_record(record, None),
+            output=output,
+            evaluator=evaluator,
+            planner=EvaluationPlannerModel(model=planner_model),
+        )
+        run.insert()
+        evaluation.insert()
+        return run.run_id, evaluation.evaluation_id
+
+    def attach_chat_answer(self, evaluation_ids: list[str], answer: str) -> None:
+        """Keep the planner's final answer with the evaluations it made in the turn."""
+        if not evaluation_ids or not answer:
+            return
+        for doc in EvaluationDocument.find({"evaluation_id": {"$in": evaluation_ids}}).to_list():
+            if doc.planner is None:
+                continue
+            doc.planner = doc.planner.model_copy(update={"answer": answer})
+            doc.save()
+
     # --- reads ---------------------------------------------------------------------------
 
     def summarize(self, run: EvaluationRunDocument) -> EvaluationRunSummary:
@@ -587,3 +687,58 @@ class EvaluationService:
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"evaluation run {run_id} not found"
             )
         return run
+
+
+class ChatEvaluationRecorder:
+    """Records the evaluations the planner makes during one chat turn.
+
+    `record` is called from the SSE translation on every `qcal_evaluate`
+    result; `finish` once the turn's answer is known. Failures are logged and
+    never interrupt the chat.
+    """
+
+    def __init__(
+        self,
+        service: EvaluationService,
+        *,
+        project_id: str,
+        username: str,
+        session_id: str | None,
+        planner_model: str,
+        task_id: str | None = None,
+    ) -> None:
+        self._service = service
+        self._project_id = project_id
+        self._username = username
+        self._session_id = session_id
+        self._planner_model = planner_model
+        self._task_id = task_id
+        self.evaluation_ids: list[str] = []
+
+    def record(self, record: dict[str, Any]) -> dict[str, str] | None:
+        """Store one evaluation; returns its run and evaluation ids, or None when not stored."""
+        if not record.get("task_id") and self._task_id:
+            # The opening figures of a task chat are the task's own.
+            record = {**record, "task_id": self._task_id}
+        try:
+            ids = self._service.record_chat_evaluation(
+                project_id=self._project_id,
+                username=self._username,
+                planner_model=self._planner_model,
+                record=record,
+            )
+        except Exception:
+            logger.exception("recording a chat evaluation failed (session %s)", self._session_id)
+            return None
+        if ids is None:
+            return None
+        run_id, evaluation_id = ids
+        self.evaluation_ids.append(evaluation_id)
+        return {"run_id": run_id, "evaluation_id": evaluation_id}
+
+    def finish(self, answer: str) -> None:
+        """Attach the planner's answer to the evaluations of this turn."""
+        try:
+            self._service.attach_chat_answer(self.evaluation_ids, answer)
+        except Exception:
+            logger.exception("attaching the chat answer failed (session %s)", self._session_id)

@@ -82,7 +82,7 @@ async def _collect(
 
     monkeypatch.setattr(pi_chat_service, "ensure_agent_session", ensure_agent_session)
 
-    async def fake_stream_payload(payload, *, step, auth, extra_result=None):
+    async def fake_stream_payload(payload, *, step, auth, extra_result=None, recorder=None):
         captured["auth"] = auth
         captured["payload"] = payload
         captured["step"] = step

@@ -54,7 +54,9 @@ export function modeLabel(mode: string): string {
 }
 
 export function triggerLabel(trigger: string): string {
-  return trigger === "single" ? "Single result" : "Chip";
+  if (trigger === "single") return "Single result";
+  if (trigger === "chat") return "Chat";
+  return "Chip";
 }
 
 /** `name@version`, with the checkout commit when the code came from a mounted checkout. */

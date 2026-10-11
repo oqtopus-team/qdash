@@ -211,3 +211,25 @@ test("formatSettledDetail appends the provider error text to an unanswered reaso
   );
   assert.equal(formatSettledDetail({ code: 400 }), ': {"code":400}');
 });
+
+test("a stamped evaluation result also carries the record the API stores", () => {
+  const [end] = toNdjsonEvents({
+    type: "tool_execution_end",
+    toolName: "qcal_evaluate",
+    toolCallId: "c1",
+    isError: false,
+    result: {
+      details: {
+        prompt: "p",
+        model: { provider: "vllm", modelId: "ising" },
+        diagnosis: { success: true },
+        host: { context: "ctx", task_name: "CheckRabi", figures: [], knowledge: null, task_id: "task-7", duration_ms: 12 },
+      },
+    },
+  });
+  assert.equal(end.evaluation.model, "vllm/ising");
+  assert.equal(end.evaluation.record.task_id, "task-7");
+  assert.equal(end.evaluation.record.mode, "planner");
+  assert.deepEqual(end.evaluation.record.evaluation.diagnosis, { success: true });
+  assert.equal(end.evaluation.record.evaluation.duration_ms, 12);
+});

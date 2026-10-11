@@ -10,6 +10,7 @@ import {
   latestImages,
   requestedImageCount,
   withImages,
+  latestFigures,
 } from "../src/figure-context.ts";
 
 test("the tool's max_images decides how many newest figures are supplied", () => {
@@ -98,4 +99,27 @@ test("placeholders the model invents for `images` are replaced or dropped", () =
     images: [{ data: "transcript", mimeType: "image/png" }],
   });
   assert.deepEqual(withImages(placeholders, []), { context: "Rabi" });
+});
+
+test("the newest figures remember the task result a tool fetched them for", () => {
+  const entries = [
+    { model: [{ role: "user", content: "evaluate it" }] },
+    {
+      model: [
+        {
+          role: "toolResult",
+          content: [{ type: "image", data: "png-bytes", mimeType: "image/png" }],
+          details: { tool: "qdash_build_qcal_evidence", taskId: "task-7" },
+        },
+      ],
+    },
+  ];
+  assert.deepEqual(latestFigures(entries), {
+    images: [{ type: "image", data: "png-bytes", mimeType: "image/png" }],
+    taskId: "task-7",
+  });
+  assert.deepEqual(latestFigures([{ model: [{ role: "user", content: [{ type: "image", data: "x", mimeType: "image/png" }] }] }]), {
+    images: [{ type: "image", data: "x", mimeType: "image/png" }],
+  });
+  assert.deepEqual(latestFigures([]), { images: [] });
 });

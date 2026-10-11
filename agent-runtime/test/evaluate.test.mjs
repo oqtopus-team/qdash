@@ -235,6 +235,8 @@ test("the host record captures what the host put into the call", () => {
 
   const bare = hostRecord({ context: "x", question: "  " }, undefined);
   assert.deepEqual(bare, { context: "x", question: null, task_name: null, figures: [], knowledge: null });
+  assert.equal(hostRecord({ context: "x" }, undefined, 5, "task-7").task_id, "task-7");
+  assert.equal(recordFromDetails("", { host: { task_id: "task-7", context: "x" } }, { mode: "planner" }).task_id, "task-7");
 });
 
 test("a planner turn's qcal_evaluate result yields the same record as a direct evaluation", () => {

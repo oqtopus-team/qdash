@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useState } from "react";
 import { Brain, Check, Loader2, Wrench, X, Code2, LineChart, Database } from "lucide-react";
 import type { ChatTrace as ChatTraceData, ToolEvaluation, TraceStep } from "@/types/copilotChat";
@@ -93,6 +95,14 @@ function EvaluationPanel({ evaluation }: { evaluation: ToolEvaluation }) {
         </span>
         {evaluation.fallback && (
           <span className="text-warning/80"> · fallback, no calibration VLM configured</span>
+        )}
+        {evaluation.runId && (
+          <>
+            {" · "}
+            <Link href={`/evaluations/${evaluation.runId}`} className="link link-hover">
+              recorded as an evaluation
+            </Link>
+          </>
         )}
       </div>
       <details className="mt-1">

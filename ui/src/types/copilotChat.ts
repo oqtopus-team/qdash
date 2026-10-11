@@ -73,6 +73,9 @@ export interface ToolEvaluation {
   model?: string;
   /** No calibration VLM was configured; the conversation's model judged instead. */
   fallback?: boolean;
+  /** The run the evaluation was recorded under, when the figure belonged to a task result. */
+  runId?: string;
+  evaluationId?: string;
 }
 
 export type TraceStep =

@@ -131,6 +131,8 @@ export interface HostRecord {
   knowledge: { chars: number; sha256: string } | null;
   /** Wall time of the tool call, when the wrapper measured it. */
   duration_ms?: number;
+  /** The task result the figures came from, when a tool fetched them. */
+  task_id?: string | null;
 }
 
 function textOf(content: ReadonlyArray<{ type: string }>): string {
@@ -190,7 +192,12 @@ export function evidenceSummary(details: unknown): {
 }
 
 /** The host record for one evaluation call, from its (filled) arguments. */
-export function hostRecord(args: unknown, knowledge: string | undefined, durationMs?: number): HostRecord {
+export function hostRecord(
+  args: unknown,
+  knowledge: string | undefined,
+  durationMs?: number,
+  taskId?: string,
+): HostRecord {
   const a = (args ?? {}) as {
     context?: unknown;
     question?: unknown;
@@ -211,6 +218,7 @@ export function hostRecord(args: unknown, knowledge: string | undefined, duratio
     figures: images.map(figureRecord),
     knowledge: knowledge ? { chars: knowledge.length, sha256: sha256(knowledge) } : null,
     ...(durationMs === undefined ? {} : { duration_ms: durationMs }),
+    ...(taskId ? { task_id: taskId } : {}),
   };
 }
 
@@ -245,7 +253,7 @@ export function recordFromDetails(
     d.model?.provider && d.model.modelId ? `${d.model.provider}/${d.model.modelId}` : null;
   const diagnosis = typeof d.diagnosis === "object" && d.diagnosis !== null ? d.diagnosis : null;
   return {
-    task_id: taskId,
+    task_id: taskId || host.task_id || "",
     mode: extra.mode,
     task_name: host.task_name ?? null,
     target: extra.target ?? null,

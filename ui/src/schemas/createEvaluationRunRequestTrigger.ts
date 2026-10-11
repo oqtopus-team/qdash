@@ -15,4 +15,5 @@ export type CreateEvaluationRunRequestTrigger = typeof CreateEvaluationRunReques
 export const CreateEvaluationRunRequestTrigger = {
   bulk: 'bulk',
   single: 'single',
+  chat: 'chat',
 } as const;

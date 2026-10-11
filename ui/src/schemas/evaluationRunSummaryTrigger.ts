@@ -12,4 +12,5 @@ export type EvaluationRunSummaryTrigger = typeof EvaluationRunSummaryTrigger[key
 export const EvaluationRunSummaryTrigger = {
   bulk: 'bulk',
   single: 'single',
+  chat: 'chat',
 } as const;

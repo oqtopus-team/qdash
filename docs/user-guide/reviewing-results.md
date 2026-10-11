@@ -56,7 +56,8 @@ success, extracted parameters), which model and extension version judged, the ex
 saw, and, in planner mode, the planner's tools and answer. Mark each evaluation **Agree** or
 **Disagree**, with a note when useful; the run's agreement rate is the ground truth for comparing
 runs made with different extension versions, models or task references. The task result page lists
-every evaluation of that result across runs.
+every evaluation of that result across runs, including judgements the chat planner made on its
+own while answering a question (shown as **Chat** runs).
 
 ## Ask Copilot
 
