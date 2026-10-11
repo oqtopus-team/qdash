@@ -62,7 +62,7 @@ See [Reviewing and Sharing Results](./reviewing-results.md) for how these record
 
 | Page | Purpose |
 | --- | --- |
-| **Config** | Edit the Qubex configuration files and use the Git integration. |
+| **Config** | Edit the Qubex configuration files, review all saved changes as diffs, and pull or open pull requests. |
 | **Settings** | Change appearance, account settings, active project, and project membership. |
 | **Admin** | Manage system users and administrative settings. |
 

@@ -32,7 +32,10 @@ next time. The page edits the knowledge repository the way **Config** edits the 
 configuration. **Edit** on a task opens its Markdown source; a save takes effect in this QDash at
 once (the task's JSON is regenerated), and **Create PR** opens a pull request so the change reaches
 every deployment after review. **Pull** fetches what others merged. **Browse files** opens the
-whole repository in the file editor for cases, images, and the README. The first heading of a
+whole repository in the file editor for cases, images, and the README; Markdown files there have
+a **Preview** and **Split** view, the explorer marks modified and untracked files, and the **Changes**
+tab shows every saved edit as a diff against the last commit before you create the pull request.
+**Pull** and the ZIP download sit in the repository menu (the branch button). The first heading of a
 task's file is its name, so keep it unchanged.
 
 ## Request an AI Evaluation

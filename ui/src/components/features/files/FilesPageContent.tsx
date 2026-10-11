@@ -9,8 +9,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
   Check,
+  Code2,
+  Columns2,
   Database,
-  GitCompareArrows,
+  Download,
+  Eye,
+  FileDiff,
+  FolderTree,
   GitPullRequestArrow,
   PanelLeft,
   Pencil,
@@ -20,14 +25,21 @@ import {
 
 import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { PierreFileTree } from "@/components/ui/PierreFileTree";
-import { FileDiffReviewDialog } from "@/components/ui/FileDiffReviewDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DropdownMenuItem } from "@/components/ui/DropdownMenu";
+import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { useToast } from "@/components/ui/Toast";
 import { type FileWorkspace, workspaceQueryKeys } from "@/lib/fileWorkspace";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
-import { FilesBulkDownloadButton } from "./FilesBulkDownloadButton";
+import { useConfigZipDownload } from "./FilesBulkDownloadButton";
 import { GitWorkspaceToolbar, PullRequestBanner } from "./GitWorkspaceToolbar";
+import {
+  WorkspaceChangesView,
+  changeSectionId,
+  changedPaths,
+  gitStatusEntries,
+} from "./WorkspaceChangesView";
 import { useGitWorkspace } from "./useGitWorkspace";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -41,6 +53,8 @@ function parseParamsFilePath(path: string): { chipId: string; paramName: string 
   }
   return null;
 }
+
+type MarkdownView = "code" | "split" | "preview";
 
 // Seed import response type
 interface SeedImportResponse {
@@ -73,7 +87,8 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
   const [pullConfirmationOpen, setPullConfirmationOpen] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
-  const [isDiffPreviewOpen, setIsDiffPreviewOpen] = useState(false);
+  const [showChanges, setShowChanges] = useState(false);
+  const [markdownView, setMarkdownView] = useState<MarkdownView>("code");
   const [importResult, setImportResult] = useState<SeedImportResponse | null>(null);
 
   // Check if selected file is a params YAML that can be imported
@@ -97,16 +112,17 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
     enabled: !!selectedFile,
   });
 
-  const hasSavedChanges = savedFileContent?.is_saved_change === true;
-
   const git = useGitWorkspace(workspace, { onPulled: () => setPullConfirmationOpen(false) });
+  const treeGitStatus = useMemo(() => gitStatusEntries(git.status), [git.status]);
+  const changedFiles = useMemo(() => changedPaths(git.status), [git.status]);
+  const zip = useConfigZipDownload((message) => toast.error(message));
+  const isMarkdown = !!selectedFile && /\.(md|markdown)$/i.test(selectedFile);
 
   const saveMutation = useMutation({
     mutationFn: ({ path, content }: { path: string; content: string }) =>
       workspace.saveContent(path, content),
     onSuccess: () => {
       setHasUnsavedChanges(false);
-      setIsDiffPreviewOpen(false);
       toast.success("File saved successfully!");
       queryClient.invalidateQueries({
         queryKey: workspaceQueryKeys.content(workspace, selectedFile),
@@ -154,6 +170,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
 
   const selectFile = (path: string) => {
     setSelectedFile(path);
+    setShowChanges(false);
     setHasUnsavedChanges(false);
     setIsEditorLocked(true); // Lock editor when opening new file
     setImportResult(null); // Clear import result when selecting new file
@@ -239,15 +256,6 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
 
   return (
     <>
-      {selectedFile && (
-        <FileDiffReviewDialog
-          filename={selectedFile}
-          newContent={String(savedFileContent?.content ?? "")}
-          oldContent={String(savedFileContent?.base_content ?? "")}
-          onClose={() => setIsDiffPreviewOpen(false)}
-          open={isDiffPreviewOpen}
-        />
-      )}
       <div className="h-[calc(100dvh-4rem)] flex flex-col bg-base-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
@@ -265,29 +273,15 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
             {hasUnsavedChanges && <span className="text-xs text-warning flex-shrink-0">●</span>}
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 overflow-x-auto">
-            {workspace.bulkDownload && (
-              <FilesBulkDownloadButton
-                disabled={!fileTreeData?.length}
-                onError={(message) => toast.error(message)}
-              />
-            )}
             <button
               onClick={toggleEditorLock}
               className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-warning"}`}
               title={isEditorLocked ? "Click to edit" : "Currently editing"}
+              disabled={showChanges || !selectedFile}
             >
               <Pencil size={16} />
               <span className="ml-1">{isEditorLocked ? "Edit" : "Editing"}</span>
             </button>
-            <GitWorkspaceToolbar
-              status={git.status}
-              onPull={handlePull}
-              onPush={handlePush}
-              isPulling={git.isPulling}
-              isPushing={git.isPushing}
-              hideOnMobile
-              pushTitle={`Create a pull request with ${workspace.key} changes`}
-            />
             <button
               onClick={handleSave}
               className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-success"}`}
@@ -304,15 +298,27 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                 </>
               )}
             </button>
-            <button
-              onClick={() => setIsDiffPreviewOpen(true)}
-              className="btn btn-sm btn-ghost hidden sm:flex"
-              disabled={!selectedFile || !hasSavedChanges || hasUnsavedChanges}
-              title={hasUnsavedChanges ? "Save changes before review" : "Review saved changes"}
-            >
-              <GitCompareArrows size={16} />
-              <span className="ml-1">Review</span>
-            </button>
+            <div className="mx-1 hidden h-5 w-px bg-base-300 sm:block" />
+            <GitWorkspaceToolbar
+              status={git.status}
+              onPull={handlePull}
+              onPush={handlePush}
+              isPulling={git.isPulling}
+              isPushing={git.isPushing}
+              hideOnMobile
+              pushTitle={`Create a pull request with ${workspace.key} changes`}
+              menuItems={
+                workspace.bulkDownload ? (
+                  <DropdownMenuItem
+                    onSelect={() => void zip.download()}
+                    disabled={zip.isDownloading || !fileTreeData?.length}
+                  >
+                    <Download size={16} />
+                    Download as ZIP
+                  </DropdownMenuItem>
+                ) : undefined
+              }
+            />
             {/* Import to QDash button - only show for params YAML files */}
             {paramsFileInfo && (
               <button
@@ -365,21 +371,71 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
             <div
               className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} flex flex-col transition-all duration-200 overflow-hidden`}
             >
-              <div className="flex min-h-0 flex-1 flex-col py-2">
-                <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
-                  EXPLORER
-                </h2>
-                <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
-                  {workspace.title}
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="flex border-b border-base-300" role="tablist">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={!showChanges}
+                    onClick={() => setShowChanges(false)}
+                    className={`flex flex-1 items-center justify-center gap-1 px-2 py-2 text-xs font-semibold tracking-wider ${showChanges ? "text-base-content/50 hover:text-base-content" : "border-b-2 border-primary text-base-content"}`}
+                  >
+                    <FolderTree size={14} />
+                    EXPLORER
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={showChanges}
+                    onClick={() => setShowChanges(true)}
+                    className={`flex flex-1 items-center justify-center gap-1 px-2 py-2 text-xs font-semibold tracking-wider ${showChanges ? "border-b-2 border-primary text-base-content" : "text-base-content/50 hover:text-base-content"}`}
+                    title="All saved changes against the last commit"
+                  >
+                    <FileDiff size={14} />
+                    CHANGES
+                    {changedFiles.length > 0 && (
+                      <span className="badge badge-xs badge-warning">{changedFiles.length}</span>
+                    )}
+                  </button>
                 </div>
-                {fileTreeData && (
-                  <div className="min-h-0 flex-1">
-                    <PierreFileTree
-                      nodes={fileTreeData}
-                      onSelectFile={handleFileSelect}
-                      selectedPath={selectedFile}
-                    />
-                  </div>
+                {showChanges ? (
+                  <ul className="min-h-0 flex-1 overflow-auto py-1">
+                    {changedFiles.length === 0 && (
+                      <li className="px-3 py-2 text-xs text-base-content/50">No saved changes</li>
+                    )}
+                    {changedFiles.map((path) => (
+                      <li key={path}>
+                        <button
+                          type="button"
+                          className="w-full truncate px-3 py-1 text-left font-mono text-xs hover:bg-base-200"
+                          title={path}
+                          onClick={() =>
+                            document
+                              .getElementById(changeSectionId(path))
+                              ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                          }
+                        >
+                          {path}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <>
+                    <div className="text-xs text-base-content/50 px-3 pt-2 mb-1 uppercase tracking-wide">
+                      {workspace.title}
+                    </div>
+                    {fileTreeData && (
+                      <div className="min-h-0 flex-1">
+                        <PierreFileTree
+                          nodes={fileTreeData}
+                          onSelectFile={handleFileSelect}
+                          selectedPath={selectedFile}
+                          gitStatus={treeGitStatus}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -397,12 +453,73 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col">
-            {selectedFile ? (
+          <div className="relative flex-1 flex flex-col min-w-0">
+            {isMarkdown && !showChanges && !isContentLoading && (
+              <div
+                className="join absolute right-4 top-2 z-10 hidden shadow sm:inline-flex"
+                role="group"
+                aria-label="Markdown view"
+              >
+                {(
+                  [
+                    ["code", Code2, "Code"],
+                    ["split", Columns2, "Split"],
+                    ["preview", Eye, "Preview"],
+                  ] as const
+                ).map(([view, Icon, label]) => (
+                  <button
+                    key={view}
+                    type="button"
+                    className={`btn btn-xs join-item ${markdownView === view ? "btn-active" : "bg-base-100"}`}
+                    onClick={() => setMarkdownView(view)}
+                    title={label}
+                    aria-label={label}
+                    aria-pressed={markdownView === view}
+                  >
+                    <Icon size={14} />
+                  </button>
+                ))}
+              </div>
+            )}
+            {showChanges ? (
+              <WorkspaceChangesView
+                workspace={workspace}
+                status={git.status}
+                onOpenFile={handleFileSelect}
+              />
+            ) : selectedFile ? (
               <>
                 {isContentLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <span className="loading loading-spinner loading-lg"></span>
+                  </div>
+                ) : isMarkdown && markdownView !== "code" ? (
+                  <div className="flex h-full min-h-0">
+                    {markdownView === "split" && (
+                      <div className="min-w-0 flex-1 border-r border-base-300">
+                        <Editor
+                          height="100%"
+                          language="markdown"
+                          theme="vs-dark"
+                          value={fileContent}
+                          onChange={handleContentChange}
+                          options={{
+                            minimap: { enabled: false },
+                            fontSize: 14,
+                            lineNumbers: "on",
+                            automaticLayout: true,
+                            scrollBeyondLastLine: false,
+                            padding: { top: 16, bottom: 16 },
+                            wordWrap: "on",
+                            readOnly: isEditorLocked,
+                            domReadOnly: isEditorLocked,
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1 overflow-auto bg-base-100 px-6 py-4">
+                      <MarkdownContent content={fileContent} />
+                    </div>
                   </div>
                 ) : (
                   <Editor

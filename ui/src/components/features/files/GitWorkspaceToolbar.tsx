@@ -1,7 +1,17 @@
 "use client";
 
-import { ArrowDown, ExternalLink, GitPullRequestArrow } from "lucide-react";
+import type { ReactNode } from "react";
 
+import { ArrowDown, ChevronDown, ExternalLink, GitBranch, GitPullRequestArrow } from "lucide-react";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/DropdownMenu";
 import type { GitWorkspaceStatus } from "@/lib/fileWorkspace";
 
 import type { PullRequestCreated } from "./useGitWorkspace";
@@ -15,9 +25,14 @@ interface GitWorkspaceToolbarProps {
   /** Hidden on small screens when the page has its own mobile controls. */
   hideOnMobile?: boolean;
   pushTitle?: string;
+  /** Extra entries for the repository menu (e.g. a download). */
+  menuItems?: ReactNode;
 }
 
-/** Branch and commit of a workspace with its Pull and Create PR actions. */
+/**
+ * The workspace's repository as one menu (branch @ commit, pull, extras) plus
+ * the primary Create PR action.
+ */
 export function GitWorkspaceToolbar({
   status,
   onPull,
@@ -26,46 +41,73 @@ export function GitWorkspaceToolbar({
   isPushing,
   hideOnMobile = false,
   pushTitle = "Create a pull request with the saved changes",
+  menuItems,
 }: GitWorkspaceToolbarProps) {
-  const responsive = hideOnMobile ? "hidden sm:flex" : "flex";
+  const responsive = hideOnMobile ? "hidden sm:inline-flex" : "inline-flex";
+  const attention = status?.has_remote_updates || status?.is_dirty;
   return (
     <>
-      {status?.is_git_repo && (
-        <div
-          className={`${hideOnMobile ? "hidden md:flex" : "flex"} items-center gap-2 px-2 sm:px-3 py-1 text-xs bg-base-100 border border-base-300 rounded`}
-          title={status.commit_message}
-        >
-          <span className="text-base-content/70">{status.branch || "main"}</span>
-          <span className="text-base-content/50">@</span>
-          <span className="text-info">{status.commit || "unknown"}</span>
-          {status.is_dirty && (
-            <span className="text-warning" title="Saved changes not yet in a pull request">
-              ●
-            </span>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={`btn btn-sm btn-ghost ${responsive} gap-1 font-normal`}
+            title={status?.commit_message ?? "Repository"}
+            aria-label="Repository menu"
+          >
+            <GitBranch size={16} className="shrink-0 opacity-70" />
+            {status?.is_git_repo ? (
+              <span className="hidden md:inline">
+                <span className="text-base-content/70">{status.branch || "main"}</span>
+                <span className="text-base-content/40"> @ </span>
+                <span className="font-mono text-info">{status.commit || "unknown"}</span>
+              </span>
+            ) : (
+              <span className="hidden md:inline text-base-content/60">No repository</span>
+            )}
+            {status?.has_remote_updates && (
+              <span
+                className="inline-flex h-2 w-2 rounded-full bg-warning"
+                title="Remote has new changes"
+              />
+            )}
+            {!status?.has_remote_updates && status?.is_dirty && (
+              <span
+                className="text-warning"
+                title="Saved changes not yet in a pull request"
+                aria-label="Saved changes not yet in a pull request"
+              >
+                ●
+              </span>
+            )}
+            <ChevronDown size={14} className={`shrink-0 opacity-60 ${attention ? "" : ""}`} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuLabel className="truncate text-xs text-base-content/60">
+            {status?.is_git_repo
+              ? `${status.branch || "main"} @ ${status.commit || "unknown"}`
+              : "Not cloned yet"}
+          </DropdownMenuLabel>
+          <DropdownMenuItem onSelect={onPull} disabled={isPulling}>
+            {isPulling ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <ArrowDown size={16} />
+            )}
+            <span className="flex-1">Pull latest</span>
+            {status?.has_remote_updates && (
+              <span className="badge badge-warning badge-xs">new</span>
+            )}
+          </DropdownMenuItem>
+          {menuItems && (
+            <>
+              <DropdownMenuSeparator />
+              {menuItems}
+            </>
           )}
-        </div>
-      )}
-      <button
-        type="button"
-        onClick={onPull}
-        className={`btn btn-sm ${responsive} ${status?.has_remote_updates ? "btn-warning" : "btn-info"}`}
-        disabled={isPulling}
-        title={
-          status?.has_remote_updates
-            ? "Remote has new changes - click to pull"
-            : "Pull latest changes from the Git repository"
-        }
-      >
-        {isPulling ? (
-          <span className="loading loading-spinner loading-xs"></span>
-        ) : (
-          <ArrowDown size={16} />
-        )}
-        <span className="ml-1">Pull</span>
-        {status?.has_remote_updates && (
-          <span className="inline-flex h-2 w-2 rounded-full bg-warning-content animate-ping"></span>
-        )}
-      </button>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <button
         type="button"
         onClick={onPush}
