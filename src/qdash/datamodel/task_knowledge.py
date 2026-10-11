@@ -1,12 +1,11 @@
 """Structured domain knowledge model for calibration tasks.
 
-Provides a ``TaskKnowledge`` Pydantic model and a central registry
-(``TASK_KNOWLEDGE_REGISTRY``) that maps task class names to their
-knowledge entries.
+Provides a ``TaskKnowledge`` Pydantic model and a registry that maps task
+class names to their knowledge entries.
 
 Knowledge is loaded from ``config/task-knowledge/task-knowledge.json``
-(cloned knowledge repo), which is generated from Markdown files by
-``scripts/generate_task_knowledge.py`` (run via ``task knowledge``).
+(cloned knowledge repo), which that repo's ``generate.py`` builds from the
+Markdown sources. The registry re-reads the file whenever it changes.
 
 The registry lives in ``datamodel`` so that both the API container and
 the workflow container can access it without cross-importing.
@@ -439,13 +438,8 @@ def _resolve_repo_dir() -> Path | None:
     return None
 
 
-def _build_registry() -> dict[str, TaskKnowledge]:
+def _build_registry(json_path: Path) -> dict[str, TaskKnowledge]:
     """Build the task knowledge registry from the generated JSON file."""
-    json_path = _resolve_json_path()
-    if json_path is None:
-        logger.warning("task-knowledge.json not found; run 'task knowledge' to generate it")
-        return {}
-
     raw = json.loads(json_path.read_text(encoding="utf-8"))
     registry: dict[str, TaskKnowledge] = {}
     for name, data in raw.items():
@@ -454,17 +448,71 @@ def _build_registry() -> dict[str, TaskKnowledge]:
     return registry
 
 
-TASK_KNOWLEDGE_REGISTRY: dict[str, TaskKnowledge] = _build_registry()
+# The registry follows the JSON file on disk: it is rebuilt whenever the file's
+# identity (path, mtime, size) changes, so a save through the knowledge editor,
+# a pull, or ``task knowledge-pull`` on the host reaches every API worker
+# without a restart.
+_REGISTRY_CACHE: tuple[tuple[str, int, int] | None, dict[str, TaskKnowledge]] = (None, {})
+_WARNED_MISSING = False
+
+
+def _registry() -> dict[str, TaskKnowledge]:
+    global _REGISTRY_CACHE, _WARNED_MISSING
+    json_path = _resolve_json_path()
+    if json_path is None:
+        if not _WARNED_MISSING:
+            logger.warning("task-knowledge.json not found; run 'task knowledge' to generate it")
+            _WARNED_MISSING = True
+        _REGISTRY_CACHE = (None, {})
+        return {}
+    stat = json_path.stat()
+    key = (str(json_path), stat.st_mtime_ns, stat.st_size)
+    cached_key, cached = _REGISTRY_CACHE
+    if cached_key == key:
+        return cached
+    registry = _build_registry(json_path)
+    _REGISTRY_CACHE = (key, registry)
+    return registry
+
+
+def regenerate_task_knowledge_json(repo_dir: Path | None = None) -> Path:
+    """Rebuild ``task-knowledge.json`` from the markdown sources with the repo's own generator.
+
+    The knowledge repository ships ``generate.py`` (the same script its CI runs on
+    merge); running it after an edit makes the edit visible to the API and the
+    runtime before a pull request is merged. Returns the JSON path.
+    """
+    import subprocess
+    import sys
+
+    repo_dir = repo_dir or _resolve_repo_dir()
+    if repo_dir is None:
+        raise RuntimeError("task-knowledge repository directory not found")
+    generator = repo_dir / "generate.py"
+    if not generator.is_file():
+        raise RuntimeError(f"generate.py not found in {repo_dir}")
+    output = repo_dir / "task-knowledge.json"
+    result = subprocess.run(  # noqa: S603 -- fixed argv: the repo's own generator, no user input
+        [sys.executable, "-I", str(generator), "--output", str(output)],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "generate.py failed")
+    return output
 
 
 def get_task_knowledge(task_name: str) -> TaskKnowledge | None:
     """Look up TaskKnowledge by task class name."""
-    return TASK_KNOWLEDGE_REGISTRY.get(task_name)
+    return _registry().get(task_name)
 
 
 def list_all_task_knowledge() -> list[TaskKnowledge]:
     """Return all task knowledge entries."""
-    return list(TASK_KNOWLEDGE_REGISTRY.values())
+    return list(_registry().values())
 
 
 def get_task_knowledge_repo_metadata() -> tuple[str | None, str | None]:
@@ -588,7 +636,7 @@ def get_task_category_dir(task_name: str) -> str:
     cat = TASK_TO_CATEGORY_DIR.get(task_name)
     if cat:
         return cat
-    entry = TASK_KNOWLEDGE_REGISTRY.get(task_name)
+    entry = _registry().get(task_name)
     if entry and entry.category:
         return entry.category
     return "other"

@@ -114,6 +114,9 @@ import type {
   GetGitStatus200,
   GetHistoricalCouplingTaskResultsParams,
   GetHistoricalQubitTaskResultsParams,
+  GetKnowledgeFileContent200,
+  GetKnowledgeFileContentParams,
+  GetKnowledgeGitStatus200,
   GetLatestCouplingTaskResultsParams,
   GetLatestQubitTaskResultsParams,
   GetMetricsConfig200,
@@ -129,7 +132,9 @@ import type {
   GetTimeseriesTaskResultsParams,
   GetTopologyById200,
   GitPullConfig200,
+  GitPullKnowledge200,
   GitPushConfig200,
+  GitPushKnowledge200,
   GitPushRequest,
   ImpactResponse,
   LatestTaskResultResponse,
@@ -226,6 +231,7 @@ import type {
   SaveFileRequest,
   SaveFlowRequest,
   SaveFlowResponse,
+  SaveKnowledgeFileContent200,
   ScheduleFlowRequest,
   ScheduleFlowResponse,
   SearchNoteEventsParams,
@@ -268,6 +274,7 @@ import type {
   UserWithToken,
   ValidateFileContent200,
   ValidateFileRequest,
+  ValidateKnowledgeFileContent200,
   ValidatePipelineRequest,
   ValidatePipelineResponse
 } from '../../../../ui/src/schemas';
@@ -1075,61 +1082,38 @@ const downloadZipFile = (
     }
 
 /**
- * Get file tree structure for entire config directory.
- *
- * Returns
- * -------
- *     File tree structure
- * @summary Get file tree for entire config directory
+ * @summary Get file tree of the config directory
  */
 const getFileTree = (
 
  options?: SecondParameter<typeof qdashRequest<FileTreeNode[]>>,) => {
       return qdashRequest<FileTreeNode[]>(
-      {url: `/files/tree`, method: 'GET'
+      {url: `/config/files/tree`, method: 'GET'
     },
       options);
     }
 
 /**
- * Get file content for editing.
- *
- * Args:
- * ----
- *     path: Relative path from CONFIG_BASE_PATH
- *
- * Returns:
- * -------
- *     File content and metadata
- * @summary Get file content for editing
+ * @summary Get config file content for editing
  */
 const getFileContent = (
     params: GetFileContentParams,
  options?: SecondParameter<typeof qdashRequest<GetFileContent200>>,) => {
       return qdashRequest<GetFileContent200>(
-      {url: `/files/content`, method: 'GET',
+      {url: `/config/files/content`, method: 'GET',
         params
     },
       options);
     }
 
 /**
- * Save file content.
- *
- * Args:
- * ----
- *     request: Save file request with path and content
- *
- * Returns:
- * -------
- *     Success message
- * @summary Save file content
+ * @summary Save config file content
  */
 const saveFileContent = (
     saveFileRequest: SaveFileRequest,
  options?: SecondParameter<typeof qdashRequest<SaveFileContent200>>,) => {
       return qdashRequest<SaveFileContent200>(
-      {url: `/files/content`, method: 'PUT',
+      {url: `/config/files/content`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
       data: saveFileRequest
     },
@@ -1137,22 +1121,13 @@ const saveFileContent = (
     }
 
 /**
- * Validate YAML or JSON content.
- *
- * Args:
- * ----
- *     request: Validation request with content and file_type
- *
- * Returns:
- * -------
- *     Validation result
  * @summary Validate file content (YAML/JSON)
  */
 const validateFileContent = (
     validateFileRequest: ValidateFileRequest,
  options?: SecondParameter<typeof qdashRequest<ValidateFileContent200>>,) => {
       return qdashRequest<ValidateFileContent200>(
-      {url: `/files/validate`, method: 'POST',
+      {url: `/config/files/validate`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: validateFileRequest
     },
@@ -1160,56 +1135,37 @@ const validateFileContent = (
     }
 
 /**
- * Get Git status of config directory.
- *
- * Returns
- * -------
- *     Git status information
- * @summary Get Git status of config directory
+ * @summary Get Git status of the config directory
  */
 const getGitStatus = (
 
  options?: SecondParameter<typeof qdashRequest<GetGitStatus200>>,) => {
       return qdashRequest<GetGitStatus200>(
-      {url: `/files/git/status`, method: 'GET'
+      {url: `/config/files/git/status`, method: 'GET'
     },
       options);
     }
 
 /**
- * Pull latest config from Git repository.
- *
- * Returns
- * -------
- *     Pull operation result
- * @summary Pull latest config from Git repository
+ * @summary Pull the latest config from its Git repository
  */
 const gitPullConfig = (
 
  options?: SecondParameter<typeof qdashRequest<GitPullConfig200>>,) => {
       return qdashRequest<GitPullConfig200>(
-      {url: `/files/git/pull`, method: 'POST'
+      {url: `/config/files/git/pull`, method: 'POST'
     },
       options);
     }
 
 /**
- * Push config changes to Git repository.
- *
- * Args:
- * ----
- *     request: Push request with commit message
- *
- * Returns:
- * -------
- *     Push operation result
- * @summary Push config changes to Git repository
+ * @summary Open a pull request with the config changes
  */
 const gitPushConfig = (
     gitPushRequest: GitPushRequest,
  options?: SecondParameter<typeof qdashRequest<GitPushConfig200>>,) => {
       return qdashRequest<GitPushConfig200>(
-      {url: `/files/git/push`, method: 'POST',
+      {url: `/config/files/git/push`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: gitPushRequest
     },
@@ -2399,6 +2355,97 @@ const getTaskKnowledge = (
       return qdashRequest<TaskKnowledgeResponse>(
       {url: `/tasks/${taskName}/knowledge`, method: 'GET',
         params
+    },
+      options);
+    }
+
+/**
+ * @summary Get file tree of the knowledge directory
+ */
+const getKnowledgeFileTree = (
+
+ options?: SecondParameter<typeof qdashRequest<FileTreeNode[]>>,) => {
+      return qdashRequest<FileTreeNode[]>(
+      {url: `/knowledge/files/tree`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Get knowledge file content for editing
+ */
+const getKnowledgeFileContent = (
+    params: GetKnowledgeFileContentParams,
+ options?: SecondParameter<typeof qdashRequest<GetKnowledgeFileContent200>>,) => {
+      return qdashRequest<GetKnowledgeFileContent200>(
+      {url: `/knowledge/files/content`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Save knowledge file content
+ */
+const saveKnowledgeFileContent = (
+    saveFileRequest: SaveFileRequest,
+ options?: SecondParameter<typeof qdashRequest<SaveKnowledgeFileContent200>>,) => {
+      return qdashRequest<SaveKnowledgeFileContent200>(
+      {url: `/knowledge/files/content`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: saveFileRequest
+    },
+      options);
+    }
+
+/**
+ * @summary Validate file content (YAML/JSON)
+ */
+const validateKnowledgeFileContent = (
+    validateFileRequest: ValidateFileRequest,
+ options?: SecondParameter<typeof qdashRequest<ValidateKnowledgeFileContent200>>,) => {
+      return qdashRequest<ValidateKnowledgeFileContent200>(
+      {url: `/knowledge/files/validate`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: validateFileRequest
+    },
+      options);
+    }
+
+/**
+ * @summary Get Git status of the knowledge directory
+ */
+const getKnowledgeGitStatus = (
+
+ options?: SecondParameter<typeof qdashRequest<GetKnowledgeGitStatus200>>,) => {
+      return qdashRequest<GetKnowledgeGitStatus200>(
+      {url: `/knowledge/files/git/status`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Pull the latest knowledge from its Git repository
+ */
+const gitPullKnowledge = (
+
+ options?: SecondParameter<typeof qdashRequest<GitPullKnowledge200>>,) => {
+      return qdashRequest<GitPullKnowledge200>(
+      {url: `/knowledge/files/git/pull`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * @summary Open a pull request with the knowledge changes
+ */
+const gitPushKnowledge = (
+    gitPushRequest: GitPushRequest,
+ options?: SecondParameter<typeof qdashRequest<GitPushKnowledge200>>,) => {
+      return qdashRequest<GitPushKnowledge200>(
+      {url: `/knowledge/files/git/push`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: gitPushRequest
     },
       options);
     }
@@ -4528,7 +4575,7 @@ const getRecalibrationRecommendations = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,getSystemUpdateStatus,startSystemUpdate,getSystemUpdateOperation,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCampaignCandidates,getAgentCampaignCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,getSettings,listChips,createChip,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,listEvaluations,setEvaluationVerdict,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,executeFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,getSystemUpdateStatus,startSystemUpdate,getSystemUpdateOperation,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCampaignCandidates,getAgentCampaignCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,getSettings,listChips,createChip,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,getTaskKnowledge,getKnowledgeFileTree,getKnowledgeFileContent,saveKnowledgeFileContent,validateKnowledgeFileContent,getKnowledgeGitStatus,gitPullKnowledge,gitPushKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,listEvaluations,setEvaluationVerdict,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,executeFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -4635,6 +4682,13 @@ export type GetTaskResultResult = NonNullable<Awaited<ReturnType<ReturnType<type
 export type ListTaskKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTaskKnowledge']>>>
 export type GetTaskKnowledgeMarkdownResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTaskKnowledgeMarkdown']>>>
 export type GetTaskKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTaskKnowledge']>>>
+export type GetKnowledgeFileTreeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getKnowledgeFileTree']>>>
+export type GetKnowledgeFileContentResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getKnowledgeFileContent']>>>
+export type SaveKnowledgeFileContentResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['saveKnowledgeFileContent']>>>
+export type ValidateKnowledgeFileContentResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['validateKnowledgeFileContent']>>>
+export type GetKnowledgeGitStatusResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getKnowledgeGitStatus']>>>
+export type GitPullKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['gitPullKnowledge']>>>
+export type GitPushKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['gitPushKnowledge']>>>
 export type GetTaskFileSettingsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTaskFileSettings']>>>
 export type ListTaskFileBackendsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTaskFileBackends']>>>
 export type GetBackendConfigResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getBackendConfig']>>>

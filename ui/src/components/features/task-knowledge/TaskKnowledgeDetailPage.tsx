@@ -67,7 +67,7 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
     return (
       <div className="p-6">
         <button
-          onClick={() => router.push("/task-knowledge")}
+          onClick={() => router.push("/knowledge")}
           className="btn btn-ghost btn-sm gap-1 mb-4"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -84,7 +84,7 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
     <div>
       <div className="flex items-center gap-3 mb-6">
         <button
-          onClick={() => router.push("/task-knowledge")}
+          onClick={() => router.push("/knowledge")}
           className="btn btn-ghost btn-sm btn-square"
         >
           <ArrowLeft className="h-4 w-4" />

@@ -25,10 +25,12 @@ multiple results. Threads can also be linked to a chip, a qubit or coupling, and
 
 ## Reuse Knowledge
 
-**Task Knowledge** contains the maintained baseline for each calibration task: its physics, expected
+**Knowledge** contains the maintained baseline for each calibration task: its physics, expected
 result, failure patterns, and analysis guidance. It is the reference the chat planner and the
 evaluation model read; keep it current when a forum thread settles something that should hold
-next time.
+next time. The page edits the knowledge repository the way **Config** edits the Qubex
+configuration: a save takes effect in this QDash at once (the task's JSON is regenerated), and
+**Create PR** opens a pull request so the change reaches every deployment after review.
 
 ## Request an AI Evaluation
 
