@@ -21542,42 +21542,6 @@
         "title": "KnowledgeFigureResponse",
         "description": "A figure of the knowledge, inlined so the UI can show it without another request."
       },
-      "KnowledgeOutcomeResponse": {
-        "properties": {
-          "outcome": {
-            "type": "string",
-            "title": "Outcome"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "outcome"
-        ],
-        "title": "KnowledgeOutcomeResponse"
-      },
-      "KnowledgeParameterResponse": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "title": "KnowledgeParameterResponse"
-      },
       "LatestTaskResultResponse": {
         "properties": {
           "task_name": {
@@ -27322,6 +27286,7 @@
           "category": {
             "type": "string",
             "title": "Category",
+            "description": "calibtasks package, e.g. one_qubit_coarse",
             "default": ""
           },
           "background": {
@@ -27329,33 +27294,12 @@
             "title": "Background",
             "default": ""
           },
-          "expected_plot": {
-            "type": "string",
-            "title": "Expected Plot",
-            "default": ""
-          },
-          "expected_figures": {
+          "figures": {
             "items": {
               "$ref": "#/components/schemas/KnowledgeFigureResponse"
             },
             "type": "array",
-            "title": "Expected Figures",
-            "default": []
-          },
-          "outcomes": {
-            "items": {
-              "$ref": "#/components/schemas/KnowledgeOutcomeResponse"
-            },
-            "type": "array",
-            "title": "Outcomes",
-            "default": []
-          },
-          "parameters": {
-            "items": {
-              "$ref": "#/components/schemas/KnowledgeParameterResponse"
-            },
-            "type": "array",
-            "title": "Parameters",
+            "title": "Figures",
             "default": []
           },
           "examples": {
@@ -27369,7 +27313,7 @@
           "prompt_text": {
             "type": "string",
             "title": "Prompt Text",
-            "description": "Background, expected plot, outcomes, parameters as Markdown"
+            "description": "The background as Markdown, headed by the experiment name"
           }
         },
         "type": "object",
@@ -27378,7 +27322,7 @@
           "prompt_text"
         ],
         "title": "TaskKnowledgeResponse",
-        "description": "Task knowledge: background, outcomes, parameters, labeled examples, and the rendered prompt."
+        "description": "Task knowledge: the background, its figures, labeled examples, and the rendered prompt."
       },
       "TaskKnowledgeSummaryResponse": {
         "properties": {
@@ -27394,11 +27338,6 @@
           "summary": {
             "type": "string",
             "title": "Summary"
-          },
-          "outcome_count": {
-            "type": "integer",
-            "title": "Outcome Count",
-            "default": 0
           },
           "example_count": {
             "type": "integer",

@@ -7,8 +7,6 @@ from qdash.api.services.task_service import TaskService
 from qdash.datamodel.task_knowledge import (
     KnowledgeExample,
     KnowledgeFigure,
-    KnowledgeOutcome,
-    KnowledgeParameter,
     TaskKnowledge,
 )
 
@@ -22,11 +20,10 @@ PNG = b"\x89PNG\r\n\x1a\n"
 
 def _knowledge_repo(tmp_path: Path) -> Path:
     """A knowledge checkout with one task: index.md, an expected figure, one example."""
-    task_dir = tmp_path / "task-knowledge" / "cw-characterization" / "CheckQubitSpectroscopy"
+    task_dir = tmp_path / "task-knowledge" / "cw" / "CheckQubitSpectroscopy"
     (task_dir / "examples" / "figures").mkdir(parents=True)
     (task_dir / "index.md").write_text(
-        "# CheckQubitSpectroscopy\n\nBackground.\n\n## Expected plot\n\n"
-        "![overview](./figures/overview.png)\n",
+        "# CheckQubitSpectroscopy\n\nBackground.\n\n![overview](./figures/overview.png)\n",
         encoding="utf-8",
     )
     (task_dir / "figures").mkdir()
@@ -38,15 +35,9 @@ def _knowledge_repo(tmp_path: Path) -> Path:
 def _qubit_knowledge() -> TaskKnowledge:
     return TaskKnowledge(
         name="CheckQubitSpectroscopy",
-        category="cw-characterization",
-        background="Background.\n\nMore background.",
-        expected_plot="A clear f01 peak.",
-        expected_figures=[KnowledgeFigure(alt="overview", path="figures/overview.png")],
-        outcomes=[
-            KnowledgeOutcome(outcome="expected", description="sharp peak"),
-            KnowledgeOutcome(outcome="apparatus", description="flat trace"),
-        ],
-        parameters=[KnowledgeParameter(name="qubit_frequency", description="f01 (GHz)")],
+        category="cw",
+        background="Background.\n\nMore background: a sharp f01 peak; a flat trace means apparatus.",
+        figures=[KnowledgeFigure(alt="overview", path="figures/overview.png")],
         examples=[
             KnowledgeExample(
                 id="2026-05-05_weak-f12",
@@ -82,9 +73,8 @@ def test_get_task_knowledge_markdown_falls_back_to_the_rendered_prompt(tmp_path:
     ):
         markdown = _service().get_task_knowledge_markdown("CheckQubitSpectroscopy")
 
-    assert "## Experiment: CheckQubitSpectroscopy" in markdown
-    assert "### Outcomes" in markdown
-    assert "- apparatus: flat trace" in markdown
+    assert markdown.startswith("## Experiment: CheckQubitSpectroscopy\nBackground.")
+    assert "flat trace means apparatus" in markdown
 
 
 def test_get_task_knowledge_response_inlines_example_figures(tmp_path: Path) -> None:
@@ -97,17 +87,17 @@ def test_get_task_knowledge_response_inlines_example_figures(tmp_path: Path) -> 
     ):
         response = _service().get_task_knowledge("CheckQubitSpectroscopy")
 
-    assert response.expected_figures[0].mime_type == "image/png"
-    assert response.expected_figures[0].base64_data
+    assert response.figures[0].mime_type == "image/png"
+    assert response.figures[0].base64_data
     example = response.examples[0]
     assert example.verdict == "pass_with_note"
     assert example.figures[0].mime_type == "image/jpeg"
     assert example.figures[0].path == "examples/figures/q12_raw.jpg"
     assert "### Labeled examples" not in response.prompt_text
-    assert "- qubit_frequency: f01 (GHz)" in response.prompt_text
+    assert response.prompt_text.endswith("means apparatus.")
 
 
-def test_list_task_knowledge_counts_outcomes_examples_and_figures() -> None:
+def test_list_task_knowledge_counts_examples_and_figures() -> None:
     with patch(
         "qdash.api.services.task_service._list_all_knowledge", return_value=[_qubit_knowledge()]
     ):
@@ -115,8 +105,8 @@ def test_list_task_knowledge_counts_outcomes_examples_and_figures() -> None:
 
     item = listing.items[0]
     assert item.summary == "Background."
-    assert (item.outcome_count, item.example_count, item.figure_count) == (2, 1, 2)
-    assert listing.categories["cw-characterization"] == "CW Characterization"
+    assert (item.example_count, item.figure_count) == (1, 2)
+    assert listing.categories["cw"] == "CW Characterization"
 
 
 def test_figure_paths_cannot_escape_the_task_directory(tmp_path: Path) -> None:

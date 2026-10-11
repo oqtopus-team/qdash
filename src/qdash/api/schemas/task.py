@@ -61,16 +61,6 @@ class KnowledgeFigureResponse(BaseModel):
     mime_type: str = ""
 
 
-class KnowledgeOutcomeResponse(BaseModel):
-    outcome: str
-    description: str = ""
-
-
-class KnowledgeParameterResponse(BaseModel):
-    name: str
-    description: str = ""
-
-
 class KnowledgeExampleResponse(BaseModel):
     """An expert-labeled example plot of the task."""
 
@@ -91,18 +81,15 @@ class KnowledgeExampleResponse(BaseModel):
 
 
 class TaskKnowledgeResponse(BaseModel):
-    """Task knowledge: background, outcomes, parameters, labeled examples, and the rendered prompt."""
+    """Task knowledge: the background, its figures, labeled examples, and the rendered prompt."""
 
     name: str
-    category: str = ""
+    category: str = Field(default="", description="calibtasks package, e.g. one_qubit_coarse")
     background: str = ""
-    expected_plot: str = ""
-    expected_figures: list[KnowledgeFigureResponse] = []
-    outcomes: list[KnowledgeOutcomeResponse] = []
-    parameters: list[KnowledgeParameterResponse] = []
+    figures: list[KnowledgeFigureResponse] = []
     examples: list[KnowledgeExampleResponse] = []
     prompt_text: str = Field(
-        description="Background, expected plot, outcomes, parameters as Markdown"
+        description="The background as Markdown, headed by the experiment name"
     )
 
 
@@ -112,7 +99,6 @@ class TaskKnowledgeSummaryResponse(BaseModel):
     name: str
     category: str = ""
     summary: str
-    outcome_count: int = 0
     example_count: int = 0
     figure_count: int = 0
 

@@ -110,7 +110,7 @@ class CopilotSupportService:
         if knowledge is None:
             return []
         result: list[tuple[str, str]] = []
-        for figure in knowledge.expected_figures:
+        for figure in knowledge.figures:
             loaded = knowledge.load_figure_base64(figure.path)
             if loaded:
                 result.append((loaded[0], figure.alt or "expected plot"))

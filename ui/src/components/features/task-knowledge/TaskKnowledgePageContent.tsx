@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FolderTree, Image as ImageIcon, ListChecks, Tag } from "lucide-react";
+import { FolderTree, Image as ImageIcon, Tag } from "lucide-react";
 import {
   GitWorkspaceToolbar,
   PullRequestBanner,
@@ -19,14 +19,17 @@ import { useListTaskKnowledge } from "@/client/task/task";
 import type { TaskKnowledgeSummaryResponse } from "@/schemas";
 
 // Category order for display
+// calibtasks packages, in calibration order
 const CATEGORY_ORDER = [
-  "box-setup",
+  "box_setup",
   "system",
-  "cw-characterization",
-  "td-characterization",
-  "one-qubit-gate-calibration",
-  "two-qubit-gate-calibration",
-  "benchmarking",
+  "cw",
+  "measurement",
+  "one_qubit_coarse",
+  "one_qubit_fine",
+  "two_qubit",
+  "benchmark",
+  "analysis",
 ];
 
 function TaskCard({ item }: { item: TaskKnowledgeSummaryResponse }) {
@@ -41,12 +44,6 @@ function TaskCard({ item }: { item: TaskKnowledgeSummaryResponse }) {
         <h3 className="text-sm font-semibold font-mono text-primary mb-1">{item.name}</h3>
         <p className="text-sm text-base-content/70 line-clamp-2 mb-2">{item.summary}</p>
         <div className="flex items-center gap-3 text-xs text-base-content/50">
-          {(item.outcome_count ?? 0) > 0 && (
-            <span className="flex items-center gap-1" title="Outcomes described for this plot">
-              <ListChecks className="h-3 w-3" />
-              {item.outcome_count} outcomes
-            </span>
-          )}
           {(item.example_count ?? 0) > 0 && (
             <span className="flex items-center gap-1" title="Expert-labeled example plots">
               <Tag className="h-3 w-3" />
@@ -109,7 +106,7 @@ export function TaskKnowledgePageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Knowledge"
-        description="What each calibration plot should look like, how its outcomes look, and expert-labeled examples. Edits apply here at once; a pull request shares them."
+        description="The background of each calibration task and its expert-labeled example plots, laid out like the calibtasks packages. Edits apply here at once; a pull request shares them."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {canEdit && (

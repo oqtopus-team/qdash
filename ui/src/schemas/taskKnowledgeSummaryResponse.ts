@@ -13,7 +13,6 @@ export interface TaskKnowledgeSummaryResponse {
   name: string;
   category?: string;
   summary: string;
-  outcome_count?: number;
   example_count?: number;
   figure_count?: number;
 }

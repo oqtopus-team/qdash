@@ -89,9 +89,9 @@ async def get_copilot_config() -> dict[str, Any]:
 def get_expected_image(task_name: str, index: int) -> Response:
     """Serve a reference/expected figure of a task's knowledge by index."""
     knowledge = get_task_knowledge(task_name)
-    if not knowledge or index < 0 or index >= len(knowledge.expected_figures):
+    if not knowledge or index < 0 or index >= len(knowledge.figures):
         raise HTTPException(status_code=404, detail="Image not found")
-    loaded = knowledge.load_figure(knowledge.expected_figures[index].path)
+    loaded = knowledge.load_figure(knowledge.figures[index].path)
     if loaded is None:
         raise HTTPException(status_code=404, detail="Image file not found")
     data, mime = loaded
