@@ -190,6 +190,13 @@ class ChatRequest(ImageAttachmentsRequest):
             "When unset, the configured chat_models[0]/model selection is used."
         ),
     )
+    thinking_level: Literal["off", "minimal", "low", "medium", "high"] | None = Field(
+        default=None,
+        description=(
+            "How much the planner thinks before answering, for this turn. "
+            "Unset keeps the chat model's configured reasoning_effort."
+        ),
+    )
     approval: ApprovalDecision | None = Field(
         default=None,
         description="Decision on the write operation the previous turn asked approval for.",

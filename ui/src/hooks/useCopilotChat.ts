@@ -9,6 +9,14 @@ import {
   type CopilotChatSession,
 } from "@/contexts/CopilotChatSessionContext";
 import {
+  getStoredThinkingChoice,
+  levelOfEffort,
+  setStoredThinkingChoice,
+  thinkingLevelForRequest,
+  type ChatThinkingChoice,
+  type ChatThinkingLevel,
+} from "@/lib/chatThinking";
+import {
   buildChatModelOptions,
   getStoredChatModelKey,
   resolveChatModelOption,
@@ -41,6 +49,23 @@ function useChatModel(): ChatModelSelection {
   return { options: chatOptions, selected: resolveChatModelOption(chatOptions, chatKey), select };
 }
 
+export interface ChatThinkingSelection {
+  choice: ChatThinkingChoice;
+  select: (choice: ChatThinkingChoice) => void;
+  /** What "auto" amounts to for the selected model, when its config says. */
+  modelDefault: ChatThinkingLevel | null;
+}
+
+/** Thinking menu for a chat; remembered across chats like the model. */
+function useChatThinking(model: ChatModelSelection): ChatThinkingSelection {
+  const [choice, setChoice] = useState<ChatThinkingChoice>(getStoredThinkingChoice);
+  const select = useCallback((next: ChatThinkingChoice) => {
+    setChoice(next);
+    setStoredThinkingChoice(next);
+  }, []);
+  return { choice, select, modelDefault: levelOfEffort(model.selected?.reasoningEffort) };
+}
+
 /** One chat (the active one by default) as seen by a chat surface. */
 export function useCopilotChat(sessionId?: string | null) {
   const ctx = useCopilotChatSessionContext();
@@ -51,21 +76,33 @@ export function useCopilotChat(sessionId?: string | null) {
   const run = session ? ctx.runs[session.id] : undefined;
   const model = useChatModel();
   const modelOverride = model.selected?.model ?? null;
+  const thinking = useChatThinking(model);
+  const thinkingLevel = thinkingLevelForRequest(thinking.choice);
   const { sendMessage, stop: stopSession } = ctx;
   const id = session?.id;
   const messages = useMemo(() => session?.messages ?? [], [session?.messages]);
 
   const send = useCallback(
     (text: string, images?: ChatImageAttachment[]) =>
-      sendMessage(text, { sessionId: id, modelOverride, ...(images?.length ? { images } : {}) }),
-    [id, modelOverride, sendMessage],
+      sendMessage(text, {
+        sessionId: id,
+        modelOverride,
+        thinkingLevel,
+        ...(images?.length ? { images } : {}),
+      }),
+    [id, modelOverride, thinkingLevel, sendMessage],
   );
 
   /** Answer the approval card on the last answer; the label is what the thread shows. */
   const decide = useCallback(
     (approvalId: string, approve: boolean, label: string) =>
-      sendMessage(label, { sessionId: id, modelOverride, approval: { id: approvalId, approve } }),
-    [id, modelOverride, sendMessage],
+      sendMessage(label, {
+        sessionId: id,
+        modelOverride,
+        thinkingLevel,
+        approval: { id: approvalId, approve },
+      }),
+    [id, modelOverride, thinkingLevel, sendMessage],
   );
 
   const stop = useCallback(() => {
@@ -85,8 +122,9 @@ export function useCopilotChat(sessionId?: string | null) {
       sessionId: id,
       history: messages.slice(0, lastUser),
       modelOverride,
+      thinkingLevel,
     });
-  }, [id, messages, modelOverride, run, sendMessage]);
+  }, [id, messages, modelOverride, thinkingLevel, run, sendMessage]);
 
   /** Replace the user message at `index` and everything after it with a new turn. */
   const editMessage = useCallback(
@@ -100,10 +138,11 @@ export function useCopilotChat(sessionId?: string | null) {
         sessionId: id,
         history: messages.slice(0, index),
         modelOverride,
+        thinkingLevel,
         images,
       });
     },
-    [id, messages, modelOverride, run, sendMessage],
+    [id, messages, modelOverride, thinkingLevel, run, sendMessage],
   );
 
   /** Rate the assistant message at `index`; rating it the same way again clears it. */
@@ -124,6 +163,7 @@ export function useCopilotChat(sessionId?: string | null) {
     liveTurn: run?.turn ?? null,
     statusMessage: run?.statusMessage ?? null,
     model,
+    thinking,
     send,
     decide,
     stop,

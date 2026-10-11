@@ -174,6 +174,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     liveTurn,
     statusMessage,
     model,
+    thinking,
     send,
     decide,
     stop,
@@ -249,6 +250,9 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       modelOptions={model.options}
       selectedModelKey={model.selected.key}
       onModelChange={model.select}
+      thinkingChoice={thinking.choice}
+      thinkingModelDefault={thinking.modelDefault}
+      onThinkingChange={thinking.select}
       compact={variant !== "page"}
     />
   );

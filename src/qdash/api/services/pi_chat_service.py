@@ -181,7 +181,8 @@ def _request_payload(
         "request_id": request.request_id,
         "message": request.message,
         "model": {"provider": config.model.provider, "name": config.model.name},
-        "thinking_level": thinking_level(config),
+        # The user's choice for this turn wins over the model's configured effort.
+        "thinking_level": request.thinking_level or thinking_level(config),
         # Attached with this turn's message; the runtime fills figure-evaluation
         # tools from the newest image in the conversation.
         **(

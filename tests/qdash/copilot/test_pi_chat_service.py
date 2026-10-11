@@ -514,3 +514,24 @@ class TestCompleteOnce:
                 scope="knowledge",
                 prompt="Extract",
             )
+
+
+def test_a_turns_thinking_level_overrides_the_models_configured_effort() -> None:
+    import pytest as _pytest
+    from pydantic import ValidationError
+
+    from qdash.api.services import pi_chat_service
+    from qdash.copilot.config import CopilotConfig, ModelConfig
+    from qdash.copilot.contracts.models import ChatRequest
+
+    config = CopilotConfig(model=ModelConfig(provider="vllm", name="m", reasoning_effort="high"))
+    chosen = ChatRequest.model_validate(
+        {"message": "hi", "session_id": "s1", "thinking_level": "off"}
+    )
+    auto = ChatRequest.model_validate({"message": "hi", "session_id": "s1"})
+
+    assert pi_chat_service._request_payload(chosen, config, "alice")["thinking_level"] == "off"
+    # Unset ("Auto" in the UI) keeps the model's configured reasoning effort.
+    assert pi_chat_service._request_payload(auto, config, "alice")["thinking_level"] == "high"
+    with _pytest.raises(ValidationError):
+        ChatRequest.model_validate({"message": "hi", "session_id": "s1", "thinking_level": "max"})

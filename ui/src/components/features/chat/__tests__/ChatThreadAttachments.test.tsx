@@ -12,6 +12,7 @@ vi.mock("@/hooks/useCopilotChat", () => ({
     isStreaming: false,
     liveTurn: null,
     model: { options: [], selected: { key: "default" }, select: vi.fn() },
+    thinking: { choice: "auto", select: vi.fn(), modelDefault: null },
     send,
     stop: vi.fn(),
   }),

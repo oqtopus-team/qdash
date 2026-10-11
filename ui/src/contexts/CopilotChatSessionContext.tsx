@@ -9,6 +9,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import type { ChatThinkingLevel } from "@/lib/chatThinking";
 import type { ModelOverride } from "@/lib/copilotModels";
 import {
   appendDelta,
@@ -55,6 +56,8 @@ export interface SendOptions {
   /** Messages before this turn; a retry passes them without the replaced exchange. */
   history?: ChatMessage[];
   modelOverride?: ModelOverride | null;
+  /** Thinking level for this turn; omitted to keep the model's configured default. */
+  thinkingLevel?: ChatThinkingLevel;
   /** Figures the user attached to this message. */
   images?: ChatImageAttachment[];
   /** The user's decision on the write operation the last answer asked approval for. */
@@ -246,6 +249,7 @@ function buildTurnRequest(
   modelOverride: ModelOverride | null,
   approval: SendOptions["approval"],
   images: ChatImageAttachment[] = [],
+  thinkingLevel?: ChatThinkingLevel,
 ): { url: string; body: Record<string, unknown> } {
   const context = session?.context;
   return {
@@ -271,6 +275,7 @@ function buildTurnRequest(
       request_id: crypto.randomUUID(),
       conversation_history: history.map((m) => ({ role: m.role, content: m.content })),
       model_override: modelOverride,
+      ...(thinkingLevel ? { thinking_level: thinkingLevel } : {}),
     },
   };
 }
@@ -588,6 +593,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
             options?.modelOverride ?? null,
             options?.approval,
             images,
+            options?.thinkingLevel,
           );
           const response = await fetch(url, {
             method: "POST",
