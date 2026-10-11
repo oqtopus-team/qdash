@@ -84,7 +84,13 @@ describe("EvaluationCard", () => {
     expect(screen.getByText("reference 1534 chars")).toBeTruthy();
     expect(screen.getByText("@orangekame3/pi-qcaleval@0.0.1 (042e45)")).toBeTruthy();
     expect(screen.getByText("What the model saw")).toBeTruthy();
+    // The full input renders (and loads its figures) only once opened.
+    expect(screen.queryByText(/Reference for this experiment/)).toBeNull();
+    const details = screen.getByText("What the model saw").closest("details") as HTMLDetailsElement;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
     expect(screen.getByText(/Reference for this experiment/)).toBeTruthy();
+    expect(screen.getByText("System prompt")).toBeTruthy();
     expect(screen.getByText("What the planner did")).toBeTruthy();
     expect(screen.getByText("qdash_build_qcal_evidence")).toBeTruthy();
     expect(screen.getByText("planner")).toBeTruthy();

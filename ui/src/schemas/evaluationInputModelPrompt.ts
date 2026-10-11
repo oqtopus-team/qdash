@@ -7,6 +7,6 @@
  */
 
 /**
- * The exact user turn sent to the evaluation model
+ * The exact user turn sent to the evaluation model; [figure] marks an image
  */
 export type EvaluationInputModelPrompt = string | null;

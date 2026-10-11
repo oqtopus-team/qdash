@@ -70,6 +70,8 @@ export interface LabeledExample {
   outcome: string;
   label: string;
   images: Array<{ data: string; mimeType: string }>;
+  /** Each image's path in the knowledge repository, in the same order, for the record. */
+  paths: string[];
 }
 
 /** The slice of QDash's task knowledge response the reference is taken from. */
@@ -81,7 +83,7 @@ export interface TaskKnowledgeLike {
     title?: string;
     outcome?: string;
     label?: string;
-    figures?: Array<{ base64_data?: string; mime_type?: string }>;
+    figures?: Array<{ base64_data?: string; mime_type?: string; path?: string }>;
   }>;
 }
 
@@ -98,11 +100,22 @@ export function examplesOf(knowledge: TaskKnowledgeLike, max = MAX_EXAMPLES): La
   for (const example of knowledge.examples ?? []) {
     if (examples.length >= max) break;
     const label = example.label?.trim();
-    const images = (example.figures ?? [])
-      .filter((figure) => typeof figure.base64_data === "string" && figure.base64_data.length > 0)
-      .map((figure) => ({ data: figure.base64_data as string, mimeType: figure.mime_type || "image/png" }));
+    const figures = (example.figures ?? []).filter(
+      (figure) => typeof figure.base64_data === "string" && figure.base64_data.length > 0,
+    );
+    const images = figures.map((figure) => ({
+      data: figure.base64_data as string,
+      mimeType: figure.mime_type || "image/png",
+    }));
     if (!label || images.length === 0) continue;
-    examples.push({ id: example.id ?? "", title: example.title ?? "", outcome: example.outcome ?? "", label, images });
+    examples.push({
+      id: example.id ?? "",
+      title: example.title ?? "",
+      outcome: example.outcome ?? "",
+      label,
+      images,
+      paths: figures.map((figure) => figure.path ?? ""),
+    });
   }
   return examples;
 }

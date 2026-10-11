@@ -157,6 +157,7 @@ def _input_from_record(record: dict[str, Any], question: str | None) -> Evaluati
     return EvaluationInputModel(
         context=str(record.get("context") or ""),
         prompt=evaluation.get("prompt"),
+        system_prompt=evaluation.get("system_prompt"),
         question=question,
         knowledge_chars=knowledge.get("chars"),
         knowledge_sha256=knowledge.get("sha256"),
@@ -180,6 +181,7 @@ def _figures_from(value: Any) -> list[EvaluationFigureModel]:
             sha256=str(figure.get("sha256", "")),
             mime_type=str(figure.get("mime_type", "")),
             bytes=int(figure.get("bytes", 0)),
+            path=figure.get("path") or None,
         )
         for figure in value or []
         if isinstance(figure, dict)

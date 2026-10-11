@@ -20,6 +20,7 @@ import {
   useSetEvaluationVerdict,
 } from "@/client/evaluation/evaluation";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { ModelInputView } from "./ModelInputView";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { EvaluationItem } from "@/schemas";
@@ -161,6 +162,8 @@ export function EvaluationCard({
   const jsonFigurePath = item.json_figure_path?.[0];
   const evaluator = evaluatorLabel(item.evaluator);
   const duration = formatDuration(output?.duration_ms);
+  // The full input loads its figures, so only once someone opens it.
+  const [showInput, setShowInput] = useState(false);
 
   return (
     <article className="rounded-lg border border-base-300 bg-base-100 p-4">
@@ -171,13 +174,8 @@ export function EvaluationCard({
           <div className="rounded-lg border border-base-300 bg-base-200/40 p-3">
             {figurePath ? (
               // White backdrop keeps matplotlib figures legible across themes.
-              <div className="flex h-[320px] items-center justify-center rounded-lg bg-white p-2">
-                <TaskFigure
-                  path={figurePath}
-                  jsonFigurePath={jsonFigurePath}
-                  qid={item.qid}
-                  className="max-h-full w-auto object-contain"
-                />
+              <div className="flex h-[320px] min-w-0 items-center justify-center overflow-hidden rounded-lg bg-white p-2">
+                <TaskFigure path={figurePath} jsonFigurePath={jsonFigurePath} qid={item.qid} fit />
               </div>
             ) : (
               <div className="flex h-[320px] flex-col items-center justify-center gap-2 text-sm text-base-content/50">
@@ -273,13 +271,26 @@ export function EvaluationCard({
           )}
 
           {input?.prompt && (
-            <details className="text-sm">
+            <details
+              className="text-sm"
+              onToggle={(event) => setShowInput((event.target as HTMLDetailsElement).open)}
+            >
               <summary className="cursor-pointer font-medium text-primary">
                 What the model saw
+                {(input.examples?.length ?? 0) > 0 && (
+                  <span className="ml-2 text-xs font-normal text-base-content/60">
+                    with {input.examples?.length} labeled example
+                    {input.examples?.length === 1 ? "" : "s"}
+                  </span>
+                )}
               </summary>
-              <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-base-300 bg-base-200/40 p-3 text-xs">
-                {input.prompt}
-              </pre>
+              {showInput && (
+                <ModelInputView
+                  input={input}
+                  taskName={item.task_name}
+                  figurePaths={item.figure_path ?? []}
+                />
+              )}
             </details>
           )}
 

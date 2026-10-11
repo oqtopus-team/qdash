@@ -41,7 +41,8 @@ export interface ExampleRecord {
   id: string;
   title: string;
   outcome: string;
-  figures: FigureRecord[];
+  /** Each figure's hash, plus its path in the knowledge repository so it can be shown again. */
+  figures: Array<FigureRecord & { path?: string }>;
 }
 
 /** How the evaluation was reached: the two tools run directly, or a planner turn. */
@@ -122,6 +123,8 @@ export interface EvaluateResult {
     fallback: boolean;
     /** The user turn the model was sent: reference, context, question. */
     prompt: string | null;
+    /** The system prompt the model was sent, when the evaluator reports it. */
+    system_prompt: string | null;
     diagnosis: Record<string, unknown> | null;
     /** The answer when it was not the requested JSON. */
     raw: string | null;
@@ -242,7 +245,15 @@ export function hostRecord(
 
 /** The record of one labeled example: identity and figure hashes. */
 export function exampleRecord(example: LabeledExample): ExampleRecord {
-  return { id: example.id, title: example.title, outcome: example.outcome, figures: example.images.map(figureRecord) };
+  return {
+    id: example.id,
+    title: example.title,
+    outcome: example.outcome,
+    figures: example.images.map((image, index) => {
+      const path = example.paths?.[index];
+      return { ...figureRecord(image), ...(path ? { path } : {}) };
+    }),
+  };
 }
 
 /**
@@ -269,6 +280,7 @@ export function recordFromDetails(
     diagnosis?: Record<string, unknown> | null;
     raw?: string;
     prompt?: string;
+    system_prompt?: string;
     host?: Partial<HostRecord>;
   };
   const host = d.host ?? {};
@@ -288,6 +300,7 @@ export function recordFromDetails(
       model,
       fallback: d.fallback === true,
       prompt: typeof d.prompt === "string" ? d.prompt : null,
+      system_prompt: typeof d.system_prompt === "string" ? d.system_prompt : null,
       diagnosis,
       raw: diagnosis ? null : (d.raw ?? extra.text) || null,
       duration_ms: extra.durationMs ?? host.duration_ms ?? 0,

@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { EvaluationFigureModelPath } from './evaluationFigureModelPath';
 
 /**
  * One figure the evaluation model saw, by hash rather than by bytes.
@@ -16,4 +17,6 @@ export interface EvaluationFigureModel {
   mime_type: string;
   /** Decoded image size in bytes */
   bytes: number;
+  /** Path in the knowledge repository, for an example figure */
+  path?: EvaluationFigureModelPath;
 }

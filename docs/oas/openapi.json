@@ -18833,6 +18833,18 @@
             "type": "integer",
             "title": "Bytes",
             "description": "Decoded image size in bytes"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path",
+            "description": "Path in the knowledge repository, for an example figure"
           }
         },
         "type": "object",
@@ -18861,7 +18873,19 @@
               }
             ],
             "title": "Prompt",
-            "description": "The exact user turn sent to the evaluation model"
+            "description": "The exact user turn sent to the evaluation model; [figure] marks an image"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt",
+            "description": "The system prompt sent to the evaluation model"
           },
           "question": {
             "anyOf": [
