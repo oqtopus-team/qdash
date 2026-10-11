@@ -13,6 +13,8 @@ export type NdjsonEvent =
       id?: string;
       /** QDash figure paths the tool fetched, for the chat to show inline. */
       figures?: string[];
+      /** What an evaluation tool sent its model, for the chat to show on request. */
+      evaluation?: EvaluationSummary;
     }
   | { type: "text_delta"; delta: string }
   | { type: "thinking_delta"; delta: string }
@@ -31,6 +33,19 @@ export type NdjsonEvent =
 export function formatSettledDetail(detail: unknown): string {
   if (detail === undefined || detail === null || detail === "") return "";
   return `: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`;
+}
+
+/**
+ * What an evaluation tool (`qcal_evaluate`) sent its model: the exact prompt,
+ * so the user can see which reference and context the verdict rests on, and
+ * the model that judged.
+ */
+export interface EvaluationSummary {
+  prompt: string;
+  /** `provider/modelId` of the judging model. */
+  model?: string;
+  /** True when no calibration VLM was configured and the conversation's model judged. */
+  fallback?: boolean;
 }
 
 /** Minimal shape of the Pi events we care about. */
@@ -94,10 +109,12 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
       if (details.approval) out.push({ type: "approval", approval: details.approval });
     }
     const figures = figuresFromDetails(details);
+    const evaluation = evaluationFromDetails(details);
     out.push({
       type: "tool_end",
       name: event.toolName ?? "unknown",
       ...(figures.length ? { figures } : {}),
+      ...(evaluation ? { evaluation } : {}),
       isError: event.isError === true || durableResult?.isError === true,
       ...(event.toolCallId ? { id: event.toolCallId } : {}),
     });
@@ -124,6 +141,23 @@ function figuresFromDetails(details: Record<string, unknown> | undefined): strin
     }
   }
   return out;
+}
+
+/** The prompt and model an evaluation tool recorded in its details, when it did. */
+function evaluationFromDetails(
+  details: Record<string, unknown> | undefined,
+): EvaluationSummary | undefined {
+  if (!details || typeof details.prompt !== "string" || !details.prompt) return undefined;
+  const spec = details.model as { provider?: unknown; modelId?: unknown } | undefined;
+  const model =
+    spec && typeof spec.provider === "string" && typeof spec.modelId === "string"
+      ? `${spec.provider}/${spec.modelId}`
+      : undefined;
+  return {
+    prompt: details.prompt,
+    ...(model ? { model } : {}),
+    ...(details.fallback === true ? { fallback: true } : {}),
+  };
 }
 
 function chartFromDetails(details: unknown): { data: unknown[]; layout: unknown } | undefined {

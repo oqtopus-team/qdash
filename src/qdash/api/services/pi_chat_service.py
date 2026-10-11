@@ -345,6 +345,7 @@ async def translate(
             )
         elif kind == "tool_end":
             figures = event.get("figures")
+            evaluation = event.get("evaluation")
             yield sse_event(
                 "tool_end",
                 {
@@ -354,6 +355,8 @@ async def translate(
                     "is_error": bool(event.get("isError")),
                     # Figure paths the tool fetched; the chat renders them inline.
                     **({"figures": figures} if isinstance(figures, list) and figures else {}),
+                    # What an evaluation tool sent its model; the chat shows it on request.
+                    **({"evaluation": evaluation} if isinstance(evaluation, dict) else {}),
                 },
             )
             yield sse_event(

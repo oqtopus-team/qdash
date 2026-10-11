@@ -163,10 +163,11 @@ Checkout tools receive the same extension context as pi-qdash tools, including
 `promptSnippet` and `promptGuidelines` are inlined into the system prompt under
 "Additional tools", since the pi-qdash tool guide does not know them. A checkout
 tool that declares an `images` parameter (for example `qcal_evaluate`) gets it
-filled by the runtime when the model omits it: the newest figure in the
-conversation, whether a user attachment or a figure a pi-qdash tool returned, is
-taken from the durable transcript, so the model never has to copy image bytes
-into a call.
+filled by the runtime: the newest figure in the conversation, whether a user
+attachment or a figure a pi-qdash tool returned, is taken from the durable
+transcript, so the model never has to copy image bytes into a call. Bytes the
+model copies anyway are replaced by that figure, since a retyped base64 string
+is usually corrupt; they are kept only when the conversation holds no figure.
 
 A checkout tool that declares `task_name` and `knowledge` parameters (again
 `qcal_evaluate`) gets `knowledge` filled the same way: when the model names the

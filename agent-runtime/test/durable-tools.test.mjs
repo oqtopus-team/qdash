@@ -170,7 +170,8 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
   assert.equal(seen[0].context, "Rabi on Q05");
   assert.equal(seen[0].ctxModel, qwen);
 
-  // Real image bytes the model passed itself are kept, and the transcript is not read.
+  // Bytes the model copied into the call are replaced by the transcript's figure:
+  // a retyped base64 string is corrupt more often than not.
   const own = [
     {
       data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
@@ -178,8 +179,16 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
     },
   ];
   await tool.execute({ context: "Rabi on Q05", images: own }, api, { abortSignal: undefined });
-  assert.equal(scans.length, 1);
-  assert.deepEqual(seen[1].images, own);
+  assert.equal(scans.length, 2);
+  assert.deepEqual(seen[1].images, [{ data: "png-bytes", mimeType: "image/png" }]);
+  // Only when the transcript holds no figure do bytes the model passed survive.
+  const noFigures = {
+    ...api,
+    commit: async (change) =>
+      change({ scanEntries: async () => ({ items: [{ model: [{ role: "user", content: "evaluate it" }] }] }) }),
+  };
+  await tool.execute({ context: "Rabi on Q05", images: own }, noFigures, { abortSignal: undefined });
+  assert.deepEqual(seen[2].images, own);
 
   // `max_images` asks for the last N figures of the newest message that has any.
   const twoFigures = {
@@ -206,12 +215,12 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
   };
   await tool.execute({ context: "CheckRabi", max_images: 2 }, twoFigures, { abortSignal: undefined });
   assert.deepEqual(
-    seen[2].images.map((image) => image.data),
+    seen[3].images.map((image) => image.data),
     ["expected", "measured"],
   );
   await tool.execute({ context: "CheckRabi" }, twoFigures, { abortSignal: undefined });
   assert.deepEqual(
-    seen[3].images.map((image) => image.data),
+    seen[4].images.map((image) => image.data),
     ["measured"],
   );
 });

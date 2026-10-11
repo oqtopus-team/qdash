@@ -86,6 +86,28 @@ class TestTranslate:
         assert "figures" not in ends[1]
 
     @pytest.mark.asyncio
+    async def test_tool_end_carries_what_the_evaluation_model_saw(self) -> None:
+        evaluation = {
+            "prompt": "Reference for this experiment:\n## Experiment: CheckRabi",
+            "model": "vllm/ising",
+        }
+        events = await _collect(
+            {"type": "tool_start", "name": "qcal_evaluate", "id": "c8"},
+            {
+                "type": "tool_end",
+                "name": "qcal_evaluate",
+                "id": "c8",
+                "isError": False,
+                "evaluation": evaluation,
+            },
+            {"type": "tool_end", "name": "qcal_evaluate", "isError": False, "evaluation": "bogus"},
+            {"type": "done", "text": "ok"},
+        )
+        ends = [data for name, data in events if name == "tool_end"]
+        assert ends[0]["evaluation"] == evaluation
+        assert "evaluation" not in ends[1]
+
+    @pytest.mark.asyncio
     async def test_tool_events_become_status_updates(self) -> None:
         events = await _collect(
             {"type": "tool_start", "name": "qdash_get_timeseries"},

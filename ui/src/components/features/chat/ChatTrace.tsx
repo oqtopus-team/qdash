@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Brain, Check, Loader2, Wrench, X, Code2, LineChart, Database } from "lucide-react";
-import type { ChatTrace as ChatTraceData, TraceStep } from "@/types/copilotChat";
+import type { ChatTrace as ChatTraceData, ToolEvaluation, TraceStep } from "@/types/copilotChat";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
 import { FigureStrip } from "@/components/features/chat/ChatFigures";
@@ -82,6 +82,31 @@ function ToolArgs({ args }: { args: unknown }) {
   return <CodeBlock language="json">{JSON.stringify(args, null, 2)}</CodeBlock>;
 }
 
+/** Which model judged a plot and, on request, exactly what it was sent. */
+function EvaluationPanel({ evaluation }: { evaluation: ToolEvaluation }) {
+  return (
+    <div className="mt-1.5 text-[11px] text-base-content/60">
+      <div>
+        Judged by{" "}
+        <span className="font-mono text-base-content/75">
+          {evaluation.model ?? "the conversation model"}
+        </span>
+        {evaluation.fallback && (
+          <span className="text-warning/80"> · fallback, no calibration VLM configured</span>
+        )}
+      </div>
+      <details className="mt-1">
+        <summary className="cursor-pointer select-none text-base-content/50 hover:text-base-content/80">
+          What the model saw
+        </summary>
+        <pre className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-base-200/60 p-2 font-mono text-[11px] leading-relaxed text-base-content/70">
+          {evaluation.prompt}
+        </pre>
+      </details>
+    </div>
+  );
+}
+
 function ToolStepRow({
   step,
   now,
@@ -139,6 +164,7 @@ function ToolStepRow({
       {step.figures && step.figures.length > 0 && (
         <FigureStrip paths={step.figures} compact className="mt-1.5" />
       )}
+      {step.evaluation && <EvaluationPanel evaluation={step.evaluation} />}
       {hasArgs && (
         <ChainOfThoughtContent>
           <ToolArgs args={step.args} />
