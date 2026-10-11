@@ -680,7 +680,7 @@ class EvaluationRunDocument(Document):
     entity_type: str                  # "qubit" | "coupling"
     date: str | None                  # YYYYMMDD for a historical day, None for latest
     question: str | None
-    trigger: str                      # "bulk" (chip page) | "single" (one task result)
+    trigger: str                      # "bulk" (chip page) | "single" (one task result) | "chat" (planner)
     mode: str                         # "direct" | "planner"
     planner_model: str | None         # provider/modelId of the planner, in planner mode
     requested_by: str

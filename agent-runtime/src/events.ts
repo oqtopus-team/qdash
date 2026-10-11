@@ -4,6 +4,8 @@
  * Pure functions only, so they can be tested without a running agent.
  */
 
+import { recordFromDetails, type EvaluateResult } from "./evaluate.ts";
+
 export type NdjsonEvent =
   | { type: "tool_start"; name: string; id?: string; args?: unknown }
   | {
@@ -46,6 +48,12 @@ export interface EvaluationSummary {
   model?: string;
   /** True when no calibration VLM was configured and the conversation's model judged. */
   fallback?: boolean;
+  /**
+   * The evaluation as a record (what the model saw and answered, the task the
+   * figures came from), when the durable wrapper stamped the result. The API
+   * stores it as a chat-triggered evaluation.
+   */
+  record?: EvaluateResult;
 }
 
 /** Minimal shape of the Pi events we care about. */
@@ -153,10 +161,16 @@ function evaluationFromDetails(
     spec && typeof spec.provider === "string" && typeof spec.modelId === "string"
       ? `${spec.provider}/${spec.modelId}`
       : undefined;
+  const host = details.host;
+  const record =
+    typeof host === "object" && host !== null
+      ? recordFromDetails("", details, { mode: "planner" })
+      : undefined;
   return {
     prompt: details.prompt,
     ...(model ? { model } : {}),
     ...(details.fallback === true ? { fallback: true } : {}),
+    ...(record ? { record } : {}),
   };
 }
 

@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 from qdash.api.dependencies import (
     get_copilot_chat_session_service,
     get_copilot_runtime,
+    get_evaluation_service,
 )
 from qdash.api.lib.ai_labels import STATUS_LABELS, TOOL_LABELS
 from qdash.api.lib.auth import bearer_scheme, get_current_active_user
@@ -40,6 +41,7 @@ from qdash.api.services import pi_chat_service
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
+from qdash.api.services.evaluation_service import EvaluationService
 from qdash.copilot.config import (
     CopilotConfig,
     load_copilot_config,
@@ -298,6 +300,7 @@ async def chat_stream(
     copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     project_id: Annotated[str | None, Depends(get_project_id_from_header)],
+    evaluation_service: Annotated[EvaluationService, Depends(get_evaluation_service)],
 ) -> StreamingResponse:
     """SSE streaming chat endpoint.
 
@@ -342,16 +345,31 @@ async def chat_stream(
             )
 
         if config.copilot_backend == "pi":
+            effective_project = project_id or current_user.default_project_id
+            # The planner's own qcal_evaluate calls are kept as evaluations
+            # (trigger "chat"), so every model judgement is on one ledger.
+            recorder = (
+                evaluation_service.chat_recorder(
+                    project_id=effective_project,
+                    username=current_user.username,
+                    session_id=request.session_id,
+                    planner_model=f"{chat_config.model.provider}/{chat_config.model.name}",
+                    task_id=request.task.task_id if request.task else None,
+                )
+                if effective_project
+                else None
+            )
             async for event in pi_chat_service.stream(
                 request,
                 chat_config,
                 username=current_user.username,
                 auth=pi_chat_service.QDashAuth(
                     access_token=credentials.credentials,
-                    project_id=project_id or current_user.default_project_id,
+                    project_id=effective_project,
                 ),
                 task=task_bundle,
                 images_sent=images_sent,
+                recorder=recorder,
             ):
                 yield event
             return

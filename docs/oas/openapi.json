@@ -19345,7 +19345,8 @@
             "type": "string",
             "enum": [
               "bulk",
-              "single"
+              "single",
+              "chat"
             ],
             "title": "Trigger",
             "description": "\"bulk\" from the chip page, \"single\" for one task result",
@@ -20328,7 +20329,8 @@
             "type": "string",
             "enum": [
               "bulk",
-              "single"
+              "single",
+              "chat"
             ],
             "title": "Trigger"
           },

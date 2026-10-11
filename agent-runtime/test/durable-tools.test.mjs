@@ -154,7 +154,11 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
               { model: [{ role: "user", content: "evaluate it" }] },
               {
                 model: [
-                  { role: "toolResult", content: [{ type: "image", data: "png-bytes", mimeType: "image/png" }] },
+                  {
+                    role: "toolResult",
+                    content: [{ type: "image", data: "png-bytes", mimeType: "image/png" }],
+                    details: { tool: "qdash_get_task_figures", taskId: "task-7" },
+                  },
                 ],
               },
             ],
@@ -175,6 +179,7 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
   assert.equal(result.details.host.figures.length, 1);
   assert.equal(result.details.host.figures[0].mime_type, "image/png");
   assert.equal(result.details.host.knowledge, null);
+  assert.equal(result.details.host.task_id, "task-7");
   assert.ok(result.details.host.duration_ms >= 0);
 
   // Bytes the model copied into the call are replaced by the transcript's figure:

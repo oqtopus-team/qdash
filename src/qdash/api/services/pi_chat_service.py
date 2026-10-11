@@ -12,7 +12,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import httpx
 
@@ -130,6 +130,18 @@ async def delete_runtime_session_state(username: str, session_id: str) -> None:
             username,
             exc_info=True,
         )
+
+
+class EvaluationRecorder(Protocol):
+    """Where the evaluations a chat turn's planner makes are stored."""
+
+    def record(self, record: dict[str, Any]) -> dict[str, str] | None:
+        """Store one evaluation record; return its ids, or None when it was not stored."""
+        ...
+
+    def finish(self, answer: str) -> None:
+        """The turn's final answer, kept with the evaluations it made."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -267,6 +279,7 @@ async def stream(
     auth: QDashAuth,
     task: TaskContextBundle | None = None,
     images_sent: dict[str, Any] | None = None,
+    recorder: EvaluationRecorder | None = None,
 ) -> AsyncGenerator[str, None]:
     """Proxy one chat turn through the Pi Agent Runtime as SSE events.
 
@@ -304,7 +317,7 @@ async def stream(
         extra_result = {"images_sent": images_sent or {}}
 
     async for event in stream_payload(
-        payload, step="run_chat", auth=auth, extra_result=extra_result
+        payload, step="run_chat", auth=auth, extra_result=extra_result, recorder=recorder
     ):
         yield event
 
@@ -315,6 +328,7 @@ async def stream_payload(
     step: str,
     auth: QDashAuth,
     extra_result: dict[str, Any] | None = None,
+    recorder: EvaluationRecorder | None = None,
 ) -> AsyncGenerator[str, None]:
     """POST one turn to the runtime and re-emit its NDJSON as SSE.
 
@@ -343,6 +357,7 @@ async def stream_payload(
                 response.aiter_lines(),
                 extra_result=extra_result,
                 step=step,
+                recorder=recorder,
             ):
                 yield event
     except httpx.HTTPError as exc:
@@ -374,12 +389,15 @@ async def translate(
     *,
     extra_result: dict[str, Any] | None = None,
     step: str = "run_chat",
+    recorder: EvaluationRecorder | None = None,
 ) -> AsyncGenerator[str, None]:
     """Turn a runtime NDJSON stream into QDash SSE events.
 
-    ``extra_result`` is merged into the final ``result`` event, which analysis
-    uses to carry ``images_sent``. Kept free of HTTP and database access so it
-    can be tested on plain strings.
+    ``extra_result`` is merged into the final ``result`` event, which a task
+    chat uses to carry ``images_sent``. ``recorder`` stores the evaluations the
+    planner makes (the `record` on an evaluation tool's ``tool_end``); the
+    chat is told where they were stored and sees the summary only. Kept free
+    of HTTP so it can be tested on plain strings.
     """
     charts: list[dict[str, Any]] = []
     # Questions and approval requests the turn ended on, rendered as cards.
@@ -447,7 +465,7 @@ async def translate(
             )
         elif kind == "tool_end":
             figures = event.get("figures")
-            evaluation = event.get("evaluation")
+            evaluation = _evaluation_for_chat(event.get("evaluation"), recorder)
             yield sse_event(
                 "tool_end",
                 {
@@ -478,6 +496,8 @@ async def translate(
             )
             return
         elif kind == "done":
+            if recorder is not None:
+                recorder.finish(str(event.get("text") or ""))
             result = build_blocks_result(event.get("text", ""), charts, interactions)
             # No text and no chart means the turn produced nothing renderable.
             # Local models do this when they emit a malformed tool call, and a
@@ -496,6 +516,21 @@ async def translate(
         "error",
         {"step": step, "detail": "Agent runtime closed the stream without a result"},
     )
+
+
+def _evaluation_for_chat(
+    evaluation: Any, recorder: EvaluationRecorder | None
+) -> dict[str, Any] | None:
+    """The evaluation summary the chat shows, with the record stored and replaced by its ids."""
+    if not isinstance(evaluation, dict):
+        return None
+    record = evaluation.get("record")
+    shown = {key: value for key, value in evaluation.items() if key != "record"}
+    if recorder is not None and isinstance(record, dict):
+        ids = recorder.record(record)
+        if ids:
+            shown.update(ids)
+    return shown
 
 
 def build_blocks_result(

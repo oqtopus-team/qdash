@@ -63,12 +63,14 @@ export function startTool(
 /** The evaluation summary of a tool_end payload, when it is well-formed. */
 function toolEvaluation(value: unknown): ToolEvaluation | undefined {
   if (!value || typeof value !== "object") return undefined;
-  const { prompt, model, fallback } = value as Record<string, unknown>;
+  const { prompt, model, fallback, run_id, evaluation_id } = value as Record<string, unknown>;
   if (typeof prompt !== "string" || !prompt) return undefined;
   return {
     prompt,
     ...(typeof model === "string" && model ? { model } : {}),
     ...(fallback === true ? { fallback: true } : {}),
+    ...(typeof run_id === "string" && run_id ? { runId: run_id } : {}),
+    ...(typeof evaluation_id === "string" && evaluation_id ? { evaluationId: evaluation_id } : {}),
   };
 }
 

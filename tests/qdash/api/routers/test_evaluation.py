@@ -407,3 +407,57 @@ def test_a_single_planner_run_records_the_planner_turn(test_client, service):
         json={"chip_id": "chip-1", "task": "CheckRabi", "mode": "autopilot"},
     )
     assert bad.status_code == 422
+
+
+def test_chat_evaluations_are_filed_as_runs_of_one(test_client, service):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    recorder = service.chat_recorder(
+        project_id="eval_project",
+        username="eval_user",
+        session_id="s1",
+        planner_model="openai-compatible/qwen",
+    )
+
+    ids = recorder.record({**RECORD, "task_id": "task-q0-new", "mode": "planner"})
+    assert ids is not None
+    assert recorder.record({**RECORD, "task_id": "task-unknown"}) is None
+    assert recorder.record({**RECORD, "task_id": ""}) is None
+    recorder.finish("fit_quality good; I agree.")
+
+    # In a chat about a task result, a judgement of its opening figures is filed under it.
+    scoped = service.chat_recorder(
+        project_id="eval_project",
+        username="eval_user",
+        session_id="s2",
+        planner_model="openai-compatible/qwen",
+        task_id="task-q0-new",
+    )
+    scoped_ids = scoped.record({**RECORD, "task_id": ""})
+    assert scoped_ids is not None
+    assert scoped.record({**RECORD, "task_id": "task-unknown"}) is None
+
+    detail = test_client.get(f"/evaluations/runs/{ids['run_id']}", headers=HEADERS).json()
+    run = detail["run"]
+    assert (run["trigger"], run["mode"], run["status"], run["total"]) == (
+        "chat",
+        "planner",
+        "completed",
+        1,
+    )
+    assert run["planner_model"] == "openai-compatible/qwen"
+    assert run["model"] == "vllm/nvidia/Ising-Calibration"
+    item = detail["evaluations"][0]
+    assert item["evaluation_id"] == ids["evaluation_id"]
+    assert item["qid"] == "0"
+    assert item["status"] == "completed"
+    assert item["input"]["prompt"].startswith("Reference for this experiment")
+    assert item["output"]["diagnosis"] == {"fit_quality": "good", "success": True}
+    assert item["planner"]["answer"] == "fit_quality good; I agree."
+    assert item["figure_path"] == ["/figures/x.png"]
+
+    for_task = test_client.get(
+        "/evaluations", headers=HEADERS, params={"task_id": "task-q0-new"}
+    ).json()
+    assert sorted(e["run_id"] for e in for_task["evaluations"]) == sorted(
+        [ids["run_id"], scoped_ids["run_id"]]
+    )

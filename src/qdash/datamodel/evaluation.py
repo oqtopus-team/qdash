@@ -15,8 +15,9 @@ from pydantic import BaseModel, Field
 
 EvaluationStatus = Literal["pending", "running", "completed", "failed"]
 EvaluationRunStatus = Literal["running", "completed"]
-# Who asked: the chip page for every entity, or a person for one task result.
-EvaluationTrigger = Literal["bulk", "single"]
+# Who asked: the chip page for every entity, a person for one task result, or
+# the chat planner judging a figure on its own.
+EvaluationTrigger = Literal["bulk", "single", "chat"]
 # How the evaluation was reached: the two tools run directly, or a planner turn that calls them.
 EvaluationMode = Literal["direct", "planner"]
 

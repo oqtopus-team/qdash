@@ -278,3 +278,85 @@ def test_attachments_are_limited_to_supported_image_types() -> None:
                 "images": [{"data": "iVBORw0KGgo=", "mimeType": "image/png"}] * 5,
             }
         )
+
+
+class _Recorder:
+    def __init__(self, ids: dict[str, str] | None) -> None:
+        self.ids = ids
+        self.records: list[dict[str, Any]] = []
+        self.answers: list[str] = []
+
+    def record(self, record: dict[str, Any]) -> dict[str, str] | None:
+        self.records.append(record)
+        return self.ids
+
+    def finish(self, answer: str) -> None:
+        self.answers.append(answer)
+
+
+@pytest.mark.asyncio
+async def test_chat_evaluations_are_recorded_and_the_chat_sees_where() -> None:
+    recorder = _Recorder({"run_id": "evr_1", "evaluation_id": "ev_1"})
+    record = {"task_id": "task-7", "evaluation": {"diagnosis": {"success": True}}}
+    events = [
+        _parse(sse)
+        async for sse in translate(
+            _lines(
+                {
+                    "type": "tool_end",
+                    "name": "qcal_evaluate",
+                    "id": "c8",
+                    "isError": False,
+                    "evaluation": {"prompt": "p", "model": "vllm/ising", "record": record},
+                },
+                {"type": "done", "text": "Looks good"},
+            ),
+            recorder=recorder,
+        )
+    ]
+
+    assert recorder.records == [record]
+    assert recorder.answers == ["Looks good"]
+    end = next(data for name, data in events if name == "tool_end")
+    assert end["evaluation"] == {
+        "prompt": "p",
+        "model": "vllm/ising",
+        "run_id": "evr_1",
+        "evaluation_id": "ev_1",
+    }
+
+
+@pytest.mark.asyncio
+async def test_an_unrecorded_evaluation_keeps_only_its_summary() -> None:
+    recorder = _Recorder(None)
+    events = [
+        _parse(sse)
+        async for sse in translate(
+            _lines(
+                {
+                    "type": "tool_end",
+                    "name": "qcal_evaluate",
+                    "isError": False,
+                    "evaluation": {"prompt": "p", "record": {"task_id": ""}},
+                },
+                {"type": "done", "text": "ok"},
+            ),
+            recorder=recorder,
+        )
+    ]
+    end = next(data for name, data in events if name == "tool_end")
+    assert end["evaluation"] == {"prompt": "p"}
+    assert len(recorder.records) == 1
+
+    # Without a recorder the record is still not forwarded to the chat.
+    events = await _collect(
+        {
+            "type": "tool_end",
+            "name": "qcal_evaluate",
+            "isError": False,
+            "evaluation": {"prompt": "p", "record": {"task_id": "t"}},
+        },
+        {"type": "done", "text": "ok"},
+    )
+    end = next(data for name, data in events if name == "tool_end")
+    assert end["evaluation"] == {"prompt": "p"}

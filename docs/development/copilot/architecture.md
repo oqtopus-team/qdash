@@ -240,6 +240,15 @@ progress and the records; `GET /evaluations?task_id=` lists every evaluation
 of one task result across runs; `PUT /evaluations/{id}/verdict` stores a
 person's agreement or disagreement, the ground truth for comparing runs.
 
+The chat is the third entry. When the planner calls `qcal_evaluate` during a
+chat, the durable tool wrapper's `host` record (which also names the task
+result the figures were fetched for) rides on the runtime's `tool_end` event,
+and the API files it as a run of one with `trigger: "chat"` and the planner's
+final answer; the trace shows "recorded as an evaluation" with a link. A
+judgement of a figure that no tool fetched (a user attachment) is not recorded.
+So every judgement the evaluation model makes, from the chip page, a single
+result or a chat, is on one ledger.
+
 A run is a snapshot: the same selection evaluated again after a change to
 the extension, the model, or the task's reference yields a second run with
 the same shape, so parse rate, success rate, agreement rate and duration

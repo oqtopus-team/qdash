@@ -22,6 +22,7 @@ describe("ChatTrace", () => {
               prompt:
                 "Reference for this experiment:\n## Experiment: CheckRabi\n\nExperiment context:\nRabi on Q05",
               model: "vllm/nvidia/Ising-Calibration-1.5-31B-NVFP4",
+              runId: "evr_1",
             },
           },
         ]}
@@ -29,6 +30,9 @@ describe("ChatTrace", () => {
     );
     expect(screen.getByText("vllm/nvidia/Ising-Calibration-1.5-31B-NVFP4")).toBeTruthy();
     expect(screen.getByText("What the model saw")).toBeTruthy();
+    expect(screen.getByText("recorded as an evaluation").getAttribute("href")).toBe(
+      "/evaluations/evr_1",
+    );
     expect(screen.getByText(/## Experiment: CheckRabi/)).toBeTruthy();
     expect(screen.queryByText(/fallback/)).toBeNull();
   });

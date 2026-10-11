@@ -24,7 +24,7 @@ import type { QDashConnection } from "./auth.ts";
 import {
   acceptsImages,
   hasImages,
-  latestImages,
+  latestFigures,
   requestedImageCount,
   withImages,
 } from "./figure-context.ts";
@@ -194,6 +194,7 @@ export function adaptCodingAgentTool(
         };
       }
       let callArgs: unknown = args;
+      let figureTaskId: string | undefined;
       if (options.fillImages) {
         // The model names the figure it wants evaluated by having fetched or
         // received it; the bytes are taken from the transcript, not its call.
@@ -204,8 +205,11 @@ export function adaptCodingAgentTool(
           (tx) => tx.scanEntries({ conversationId: api.conversationId }, FIGURE_SCAN_LIMIT),
           context,
         );
-        const found = latestImages(page.items, requestedImageCount(args));
-        if (found.length || !hasImages(args)) callArgs = withImages(args as object, found);
+        const found = latestFigures(page.items, requestedImageCount(args));
+        figureTaskId = found.taskId;
+        if (found.images.length || !hasImages(args)) {
+          callArgs = withImages(args as object, found.images);
+        }
       }
       const taskName = requestedTaskName(args);
       let knowledge: string | undefined;
@@ -240,6 +244,7 @@ export function adaptCodingAgentTool(
                 callArgs,
                 knowledge ?? ((callArgs as { knowledge?: unknown }).knowledge as string | undefined),
                 Date.now() - started,
+                figureTaskId,
               ),
             }
           : result.details;

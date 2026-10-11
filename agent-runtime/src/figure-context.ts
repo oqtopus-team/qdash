@@ -24,8 +24,15 @@ export interface ImageArgument {
   mimeType: string;
 }
 
-type MessageLike = { content?: unknown };
+type MessageLike = { content?: unknown; details?: unknown };
 type EntryLike = { model?: readonly MessageLike[] };
+
+/** The newest figures of a conversation and, when a tool fetched them, the task result they belong to. */
+export interface LatestFigures {
+  images: ImageBlock[];
+  /** `details.taskId` of the tool result that carried the figures (pi-qdash figure tools set it). */
+  taskId?: string;
+}
 
 /** Whether a tool declares an `images` parameter the runtime may fill. */
 export function acceptsImages(parameters: TSchema): boolean {
@@ -78,13 +85,24 @@ export function hasImages(args: unknown): boolean {
  * last `max` are kept.
  */
 export function latestImages(entries: ReadonlyArray<EntryLike>, max = 1): ImageBlock[] {
+  return latestFigures(entries, max).images;
+}
+
+/** Like `latestImages`, with the task result the figures came from when known. */
+export function latestFigures(entries: ReadonlyArray<EntryLike>, max = 1): LatestFigures {
   for (const entry of entries) {
     for (const message of [...(entry.model ?? [])].reverse()) {
       const images = imageBlocks(message.content);
-      if (images.length) return images.slice(-max);
+      if (images.length) {
+        const taskId = (message.details as { taskId?: unknown } | null | undefined)?.taskId;
+        return {
+          images: images.slice(-max),
+          ...(typeof taskId === "string" && taskId ? { taskId } : {}),
+        };
+      }
     }
   }
-  return [];
+  return { images: [] };
 }
 
 function imageBlocks(content: unknown): ImageBlock[] {
