@@ -23,6 +23,24 @@ The assistant can use the project tools exposed by QDash to inspect records such
 metrics, task results, forum threads, workflows, and provenance. Keep the active project and selected chip
 in mind when interpreting an answer. Open referenced records to confirm important conclusions.
 
+### Thinking and your own instructions
+
+The **Thinking** menu next to the model picker sets how much the model reasons before it answers:
+**Auto** (the model's configured default), **Off**, **Low**, **Medium**, or **High**. The choice
+applies from the next message and is remembered in your browser.
+
+**Settings → Copilot → Your instructions** holds instructions added to every chat you start, after
+QDash's own rules: language, tone, and formats such as "answer in Japanese, conclusion first" or
+"put numbers in a table with units". They are stored with your account, so they follow you across
+devices. They do not apply to AI evaluations or forum replies, which stay the same for everyone,
+and they cannot skip the approval of write operations. A **Your instructions** link in the chat
+composer shows when they are on.
+
+**What Copilot is told**, below the instructions, shows read-only what the application sends the
+chat model: QDash's system prompt, your instructions as they are appended to it, and the tools the
+chat offers. It is the running text, so it reflects the current skills, tools, and language
+settings; the application's part is edited in the deployment, not in Settings.
+
 ### Run a calibration pipeline from chat
 
 With the Pi backend and write tools enabled (`AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true`), the

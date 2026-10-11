@@ -31,7 +31,11 @@ import { getGetCurrentUserQueryKey, useUpdateCurrentUserProfile } from "@/client
 import { AVATAR_PRESETS, UserAvatar } from "@/components/ui/UserAvatar";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
-type Tab = "appearance" | "project" | "copilot" | "account" | "api";
+import { CopilotInstructionsSettings } from "./CopilotInstructionsSettings";
+import { CopilotSystemPromptView } from "./CopilotSystemPromptView";
+
+const TABS = ["appearance", "project", "copilot", "account", "api"] as const;
+type Tab = (typeof TABS)[number];
 
 const editableProjectRoles: ProjectRole[] = ["viewer", "editor"];
 
@@ -97,6 +101,12 @@ function CopilotSettingsPanel() {
                 : selectedModel.label}
             </div>
           </div>
+
+          <div className="divider my-0" />
+
+          <CopilotInstructionsSettings />
+
+          <CopilotSystemPromptView />
         </div>
       </div>
     </div>
@@ -546,6 +556,14 @@ function ProjectMembersPanel() {
 export function SettingsPageContent() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("appearance");
+
+  // `?tab=copilot` opens a tab directly (the chat links to its instructions).
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested && (TABS as readonly string[]).includes(requested)) {
+      setActiveTab(requested as Tab);
+    }
+  }, []);
 
   useEffect(() => {
     if (user?.must_change_password) {

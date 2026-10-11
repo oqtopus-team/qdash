@@ -4445,6 +4445,105 @@
         }
       }
     },
+    "/copilot/preferences": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Get the current user's Copilot preferences",
+        "description": "The instructions this user added to their chats.",
+        "operationId": "getCopilotPreferences",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopilotPreferences"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Update the current user's Copilot preferences",
+        "description": "Replace this user's chat instructions; an empty text clears them.",
+        "operationId": "updateCopilotPreferences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopilotPreferencesUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopilotPreferences"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/copilot/system-prompt": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Show what QDash tells the chat model",
+        "description": "QDash's chat system prompt and this user's instructions as appended to it (read-only).",
+        "operationId": "getCopilotSystemPrompt",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopilotSystemPrompt"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/settings": {
       "get": {
         "tags": [
@@ -17959,6 +18058,74 @@
         ],
         "title": "CopilotChatSessionSummary",
         "description": "Lightweight session entry used in the session list."
+      },
+      "CopilotPreferences": {
+        "properties": {
+          "instructions": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Instructions",
+            "description": "Instructions added to every chat of this user (style, language, formats). They apply to chat only, not to evaluations or forum replies, and cannot override the approval of write operations.",
+            "default": ""
+          },
+          "max_instructions_chars": {
+            "type": "integer",
+            "title": "Max Instructions Chars",
+            "description": "Longest instructions accepted",
+            "default": 2000
+          }
+        },
+        "type": "object",
+        "title": "CopilotPreferences",
+        "description": "The current user's Copilot preferences."
+      },
+      "CopilotPreferencesUpdate": {
+        "properties": {
+          "instructions": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Instructions",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "CopilotPreferencesUpdate",
+        "description": "Replace the current user's Copilot instructions; empty clears them."
+      },
+      "CopilotSystemPrompt": {
+        "properties": {
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt",
+            "description": "QDash's system prompt for chats, set by the application"
+          },
+          "user_preferences": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Preferences",
+            "description": "This user's instructions as they are appended to it, or None when unset"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools",
+            "description": "Tools offered to the chat; their descriptions are sent with each request"
+          }
+        },
+        "type": "object",
+        "required": [
+          "system_prompt"
+        ],
+        "title": "CopilotSystemPrompt",
+        "description": "What QDash tells the chat model, read-only: its system prompt and this user's part."
       },
       "Coupling": {
         "properties": {

@@ -67,7 +67,7 @@ import {
 import { formatSettledDetail } from "./events.ts";
 import { fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
 import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
-import { buildSystemPrompt } from "./prompt.ts";
+import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
 import { buildPythonTool } from "./python-tool.ts";
 import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
 import { extractToolGuide, TOOL_GUIDE_SKILL } from "./tool-guide.ts";
@@ -104,6 +104,36 @@ export interface SessionRequest {
   modelName?: string;
   thinkingLevel?: ThinkingLevel;
   images?: Array<{ type: "image"; data: string; mimeType: string }>;
+  /** The user's own chat instructions from QDash; a chat only, never an evaluation. */
+  userInstructions?: string;
+}
+
+/** Section key of the user's preferences in the system prompt. */
+const USER_PREFERENCES_SECTION = "user-preferences";
+
+/** What `chatSystemPrompt` returns. */
+export interface ChatSystemPrompt {
+  system_prompt: string;
+  /** The user's preferences section, or null when they set none. */
+  user_preferences: string | null;
+  /** Tools offered to the chat; their descriptions travel with the request, not in this text. */
+  tools: string[];
+}
+
+/** The system prompt a chat receives, with the user's preferences as the harness tags them. */
+export function chatSystemPromptOf(
+  systemPrompt: string,
+  toolNames: readonly string[],
+  userInstructions?: string,
+): ChatSystemPrompt {
+  const preferences = buildUserInstructionsSection(userInstructions);
+  return {
+    system_prompt: systemPrompt,
+    user_preferences: preferences
+      ? `<${USER_PREFERENCES_SECTION}>\n${preferences}\n</${USER_PREFERENCES_SECTION}>`
+      : null,
+    tools: [...toolNames].sort(),
+  };
 }
 
 export interface OpenDurableSession {
@@ -128,14 +158,25 @@ interface EnabledTool {
 export class SharedRuntime {
   private constructor(
     private readonly modelRuntime: ModelRuntime,
-    private readonly buildChatRegistry: (connection: QDashConnection) => {
+    private readonly buildChatRegistry: (connection: QDashConnection, userInstructions?: string) => {
       registry: ReturnType<typeof createRegistry>;
       writeTools: QDashWriteTools;
     },
     private readonly toolNames: string[],
     /** The same tools the chat registry adapts, for running outside a conversation. */
     private readonly enabledTools: ReadonlyMap<string, EnabledTool>,
+    /** QDash's system prompt for chats, as built at startup. */
+    private readonly systemPrompt: string,
   ) {}
+
+  /**
+   * The system prompt a chat of this user gets, as the model receives it:
+   * QDash's own section, then the user's preferences wrapped the way the
+   * harness wraps a tagged section. Read-only, for Settings.
+   */
+  chatSystemPrompt(userInstructions?: string): ChatSystemPrompt {
+    return chatSystemPromptOf(this.systemPrompt, this.toolNames, userInstructions);
+  }
 
   /** Load the Pi model catalog and adapt the installed pi-qdash extension once. */
   static async create(): Promise<SharedRuntime> {
@@ -220,26 +261,21 @@ export class SharedRuntime {
       TRUSTED_EXTENSION_PACKAGES,
     );
 
+    // Built once: the same text every chat gets and Settings shows read-only.
+    const systemPrompt = buildSystemPrompt(
+      responseLanguage,
+      thinkingLanguage,
+      EXPERIMENTAL_WRITE_TOOLS_ENABLED,
+      skills,
+      toolGuide,
+      localToolGuide,
+    );
     const copilotExtension = defineExtension({
       name: "qdash-copilot",
-      sections: [
-        section(
-          "qdash-copilot",
-          () =>
-            buildSystemPrompt(
-              responseLanguage,
-              thinkingLanguage,
-              EXPERIMENTAL_WRITE_TOOLS_ENABLED,
-              skills,
-              toolGuide,
-              localToolGuide,
-            ),
-          { tag: false },
-        ),
-      ],
+      sections: [section("qdash-copilot", () => systemPrompt, { tag: false })],
       tools: [chartTool, askUserTool, ...(skills.length ? [buildSkillTool(skills)] : [])],
     });
-    const buildChatRegistry = (connection: QDashConnection) => {
+    const buildChatRegistry = (connection: QDashConnection, userInstructions?: string) => {
       const registry = createRegistry();
       const qdash = buildQDashExtension(
         extensions,
@@ -252,6 +288,17 @@ export class SharedRuntime {
       );
       registry.install(qdash.extension);
       registry.install(copilotExtension);
+      // After QDash's own rules, so they come first and the user's preferences
+      // read as adjustments to them.
+      const preferences = buildUserInstructionsSection(userInstructions);
+      if (preferences) {
+        registry.install(
+          defineExtension({
+            name: "qdash-user-preferences",
+            sections: [section(USER_PREFERENCES_SECTION, () => preferences)],
+          }),
+        );
+      }
       registry.install(
         defineExtension({
           name: "qdash-python",
@@ -277,7 +324,7 @@ export class SharedRuntime {
       }
     }
 
-    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames, enabledTools);
+    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames, enabledTools, systemPrompt);
   }
 
   /** A configured model named by the request, or none when the request names none. */
@@ -482,7 +529,7 @@ export class SharedRuntime {
       }
     };
     try {
-      const { registry, writeTools } = this.buildChatRegistry(connection);
+      const { registry, writeTools } = this.buildChatRegistry(connection, request.userInstructions);
       harness = await Harness.open(
         await openNodeSqliteStorage(path),
         {

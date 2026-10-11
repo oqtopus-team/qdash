@@ -74,3 +74,14 @@ describe("thinkingLabel", () => {
     expect(thinkingLabel("auto", "low", true)).toBe("Auto · low");
   });
 });
+
+describe("ChatComposer instructions indicator", () => {
+  it("links to the user's instructions only when they apply", () => {
+    const { rerender } = render(<ChatComposer {...props()} />);
+    expect(screen.queryByRole("link", { name: "Your instructions apply" })).toBeNull();
+    rerender(<ChatComposer {...props()} instructionsActive />);
+    expect(screen.getByRole("link", { name: "Your instructions apply" }).getAttribute("href")).toBe(
+      "/settings?tab=copilot",
+    );
+  });
+});

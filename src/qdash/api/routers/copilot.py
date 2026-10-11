@@ -30,6 +30,11 @@ from qdash.api.schemas.copilot_chat_session import (
     ListCopilotChatSessionsResponse,
     UpdateCopilotChatSessionRequest,
 )
+from qdash.api.schemas.copilot_preferences import (
+    CopilotPreferences,
+    CopilotPreferencesUpdate,
+    CopilotSystemPrompt,
+)
 from qdash.api.services import pi_chat_service
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
@@ -306,3 +311,59 @@ async def delete_copilot_chat_session(
     service.delete_session(username=current_user.username, session_id=session_id)
     await pi_chat_service.delete_runtime_session_state(current_user.username, session_id)
     return {"deleted": True}
+
+
+@router.get(
+    "/preferences",
+    response_model=CopilotPreferences,
+    summary="Get the current user's Copilot preferences",
+    operation_id="getCopilotPreferences",
+)
+def get_copilot_preferences(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> CopilotPreferences:
+    """The instructions this user added to their chats."""
+    from qdash.dbmodel.user import UserDocument
+
+    user = UserDocument.find_one({"username": current_user.username}).run()
+    return CopilotPreferences(instructions=(user.copilot_instructions or "") if user else "")
+
+
+@router.put(
+    "/preferences",
+    response_model=CopilotPreferences,
+    summary="Update the current user's Copilot preferences",
+    operation_id="updateCopilotPreferences",
+)
+def update_copilot_preferences(
+    body: CopilotPreferencesUpdate,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> CopilotPreferences:
+    """Replace this user's chat instructions; an empty text clears them."""
+    from qdash.dbmodel.user import UserDocument
+
+    user = UserDocument.find_one({"username": current_user.username}).run()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    text = body.instructions.strip()
+    user.copilot_instructions = text or None
+    user.save()
+    return CopilotPreferences(instructions=text)
+
+
+@router.get(
+    "/system-prompt",
+    response_model=CopilotSystemPrompt,
+    summary="Show what QDash tells the chat model",
+    operation_id="getCopilotSystemPrompt",
+)
+async def get_copilot_system_prompt(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> CopilotSystemPrompt:
+    """QDash's chat system prompt and this user's instructions as appended to it (read-only)."""
+    try:
+        result = await pi_chat_service.system_prompt(current_user.username)
+    except Exception as exc:
+        logger.warning("system prompt unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="The Copilot runtime is not reachable") from exc
+    return CopilotSystemPrompt(**result)

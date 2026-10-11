@@ -54,6 +54,8 @@ interface ChatBody {
   initial_images?: ImageBody[];
   /** The user's decision on a write call the previous turn asked approval for. */
   approval?: { id?: string; approve?: boolean };
+  /** The user's own chat instructions, set in QDash's Settings. */
+  user_instructions?: string;
 }
 
 interface DeleteSessionBody {
@@ -148,6 +150,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
         modelName: body.model?.name,
         thinkingLevel: body.thinking_level,
         images: toImageContent(body.images),
+        ...(typeof body.user_instructions === "string" ? { userInstructions: body.user_instructions } : {}),
       },
       auth,
     );
@@ -436,6 +439,24 @@ const server = createServer((req, res) => {
       return;
     }
     handleChat(req, res).catch((error: unknown) => handleRouteError(res, error, "request"));
+    return;
+  }
+  if (req.method === "POST" && req.url === "/system-prompt") {
+    if (!authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    readJsonBody<{ user_instructions?: unknown }>(req, MAX_BODY_BYTES)
+      .then((body) =>
+        sendJson(
+          res,
+          200,
+          runtime.chatSystemPrompt(
+            typeof body.user_instructions === "string" ? body.user_instructions : undefined,
+          ),
+        ),
+      )
+      .catch((error: unknown) => handleRouteError(res, error, "system prompt"));
     return;
   }
   if (req.method === "POST" && req.url === "/chat/abort") {

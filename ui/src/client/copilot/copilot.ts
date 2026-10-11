@@ -26,6 +26,9 @@ import type {
 
 import type {
   CopilotChatSessionResponse,
+  CopilotPreferences,
+  CopilotPreferencesUpdate,
+  CopilotSystemPrompt,
   CreateCopilotChatSessionRequest,
   DeleteCopilotChatSession200,
   GetCopilotConfig200,
@@ -539,3 +542,248 @@ export const useDeleteCopilotChatSession = <TError = HTTPValidationError,
       > => {
       return useMutation(getDeleteCopilotChatSessionMutationOptions(options), queryClient);
     }
+    /**
+ * The instructions this user added to their chats.
+ * @summary Get the current user's Copilot preferences
+ */
+export const getCopilotPreferences = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CopilotPreferences>(
+      {url: `/copilot/preferences`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetCopilotPreferencesQueryKey = () => {
+    return [
+    `/copilot/preferences`
+    ] as const;
+    }
+
+
+export const getGetCopilotPreferencesQueryOptions = <TData = Awaited<ReturnType<typeof getCopilotPreferences>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCopilotPreferencesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCopilotPreferences>>> = ({ signal }) => getCopilotPreferences(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCopilotPreferencesQueryResult = NonNullable<Awaited<ReturnType<typeof getCopilotPreferences>>>
+export type GetCopilotPreferencesQueryError = unknown
+
+
+export function useGetCopilotPreferences<TData = Awaited<ReturnType<typeof getCopilotPreferences>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotPreferences>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotPreferences>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotPreferences<TData = Awaited<ReturnType<typeof getCopilotPreferences>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotPreferences>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotPreferences>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotPreferences<TData = Awaited<ReturnType<typeof getCopilotPreferences>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the current user's Copilot preferences
+ */
+
+export function useGetCopilotPreferences<TData = Awaited<ReturnType<typeof getCopilotPreferences>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCopilotPreferencesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Replace this user's chat instructions; an empty text clears them.
+ * @summary Update the current user's Copilot preferences
+ */
+export const updateCopilotPreferences = (
+    copilotPreferencesUpdate: CopilotPreferencesUpdate,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CopilotPreferences>(
+      {url: `/copilot/preferences`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: copilotPreferencesUpdate, signal
+    },
+      options);
+    }
+
+
+
+
+export const getUpdateCopilotPreferencesMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCopilotPreferences>>, TError,{data: CopilotPreferencesUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCopilotPreferences>>, TError,{data: CopilotPreferencesUpdate}, TContext> => {
+
+const mutationKey = ['updateCopilotPreferences'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCopilotPreferences>>, {data: CopilotPreferencesUpdate}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateCopilotPreferences(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCopilotPreferencesMutationResult = NonNullable<Awaited<ReturnType<typeof updateCopilotPreferences>>>
+    export type UpdateCopilotPreferencesMutationBody = CopilotPreferencesUpdate
+    export type UpdateCopilotPreferencesMutationError = HTTPValidationError
+
+    /**
+ * @summary Update the current user's Copilot preferences
+ */
+export const useUpdateCopilotPreferences = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCopilotPreferences>>, TError,{data: CopilotPreferencesUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateCopilotPreferences>>,
+        TError,
+        {data: CopilotPreferencesUpdate},
+        TContext
+      > => {
+      return useMutation(getUpdateCopilotPreferencesMutationOptions(options), queryClient);
+    }
+    /**
+ * QDash's chat system prompt and this user's instructions as appended to it (read-only).
+ * @summary Show what QDash tells the chat model
+ */
+export const getCopilotSystemPrompt = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CopilotSystemPrompt>(
+      {url: `/copilot/system-prompt`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetCopilotSystemPromptQueryKey = () => {
+    return [
+    `/copilot/system-prompt`
+    ] as const;
+    }
+
+
+export const getGetCopilotSystemPromptQueryOptions = <TData = Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCopilotSystemPromptQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCopilotSystemPrompt>>> = ({ signal }) => getCopilotSystemPrompt(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCopilotSystemPromptQueryResult = NonNullable<Awaited<ReturnType<typeof getCopilotSystemPrompt>>>
+export type GetCopilotSystemPromptQueryError = unknown
+
+
+export function useGetCopilotSystemPrompt<TData = Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotSystemPrompt>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotSystemPrompt>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotSystemPrompt<TData = Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotSystemPrompt>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotSystemPrompt>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotSystemPrompt<TData = Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Show what QDash tells the chat model
+ */
+
+export function useGetCopilotSystemPrompt<TData = Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCopilotSystemPromptQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
