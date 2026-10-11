@@ -64,13 +64,17 @@ test("malformed image blocks and non-array content are ignored", () => {
 // A real PNG header in base64 is longer than any placeholder a model invents.
 const REAL = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
-test("images are added only when the model passed none", () => {
+test("transcript figures replace whatever the model passed; its own bytes survive only without them", () => {
   const given = { context: "Rabi", images: [{ data: REAL, mimeType: "image/png" }] };
   assert.equal(hasImages(given), true);
   assert.equal(hasImages({ context: "Rabi", images: [] }), false);
   assert.equal(hasImages(null), false);
 
-  assert.equal(withImages(given, [image("transcript")]), given);
+  assert.deepEqual(withImages(given, [image("transcript")]), {
+    context: "Rabi",
+    images: [{ data: "transcript", mimeType: "image/png" }],
+  });
+  assert.equal(withImages(given, []), given);
   assert.deepEqual(withImages({ context: "Rabi" }, [image("transcript")]), {
     context: "Rabi",
     images: [{ data: "transcript", mimeType: "image/png" }],

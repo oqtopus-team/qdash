@@ -106,17 +106,18 @@ function imageBlocks(content: unknown): ImageBlock[] {
 }
 
 /**
- * The model's arguments with `images` filled in when it passed none (or only
- * placeholders). Without transcript figures the placeholders are dropped, so
- * the tool reports a missing plot instead of sending junk to its model.
+ * The model's arguments with `images` set to the transcript's figures. They
+ * replace whatever the model passed: bytes it copied into the call are
+ * usually corrupt. Without transcript figures, bytes the model passed are
+ * kept and placeholders are dropped, so the tool reports a missing plot
+ * instead of sending junk to its model.
  */
 export function withImages<T extends object>(
   args: T,
   images: ReadonlyArray<ImageBlock>,
 ): T | (T & { images?: ImageArgument[] }) {
-  if (hasImages(args)) return args;
   if (images.length === 0) {
-    if (!("images" in args)) return args;
+    if (hasImages(args) || !("images" in args)) return args;
     const { images: _placeholders, ...rest } = args as T & { images?: unknown };
     return rest as T;
   }

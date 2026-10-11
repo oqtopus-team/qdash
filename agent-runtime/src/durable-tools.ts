@@ -193,17 +193,18 @@ export function adaptCodingAgentTool(
         };
       }
       let callArgs: unknown = args;
-      if (options.fillImages && !hasImages(args)) {
+      if (options.fillImages) {
         // The model names the figure it wants evaluated by having fetched or
         // received it; the bytes are taken from the transcript, not its call.
+        // Bytes the model copied into the call itself are replaced too: a
+        // model retyping base64 drops or alters characters, and the provider
+        // then rejects the whole request.
         const page = await api.commit(
           (tx) => tx.scanEntries({ conversationId: api.conversationId }, FIGURE_SCAN_LIMIT),
           context,
         );
-        callArgs = withImages(
-          args as object,
-          latestImages(page.items, requestedImageCount(args)),
-        );
+        const found = latestImages(page.items, requestedImageCount(args));
+        if (found.length || !hasImages(args)) callArgs = withImages(args as object, found);
       }
       const taskName = requestedTaskName(args);
       if (options.fillKnowledge && taskName && !hasKnowledge(args)) {

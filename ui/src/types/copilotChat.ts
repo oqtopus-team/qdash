@@ -65,6 +65,16 @@ export interface BlocksResult {
   };
 }
 
+/** What an evaluation tool sent its model, shown in the trace on request. */
+export interface ToolEvaluation {
+  /** The exact prompt: the host's reference, the planner's context, the question. */
+  prompt: string;
+  /** `provider/modelId` of the judging model. */
+  model?: string;
+  /** No calibration VLM was configured; the conversation's model judged instead. */
+  fallback?: boolean;
+}
+
 export type TraceStep =
   | { kind: "thinking"; text: string; startedAt: number; endedAt?: number }
   | {
@@ -78,6 +88,8 @@ export type TraceStep =
       endedAt?: number;
       /** QDash figure paths the tool fetched, shown inline in the chat. */
       figures?: string[];
+      /** What an evaluation tool sent its model (qcal_evaluate). */
+      evaluation?: ToolEvaluation;
     }
   | { kind: "text"; text: string };
 

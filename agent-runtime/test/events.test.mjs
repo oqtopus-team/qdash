@@ -38,6 +38,41 @@ test("a chart in tool details is emitted before tool_end", () => {
   );
 });
 
+test("an evaluation tool's prompt and model travel with tool_end", () => {
+  const details = {
+    prompt: "Reference for this experiment:\n## Experiment: CheckRabi",
+    model: { provider: "vllm", modelId: "nvidia/Ising-Calibration-1.5-31B-NVFP4" },
+    diagnosis: { success: true },
+  };
+  assert.deepEqual(
+    toNdjsonEvents({ type: "tool_execution_end", toolName: "qcal_evaluate", result: { details } }),
+    [
+      {
+        type: "tool_end",
+        name: "qcal_evaluate",
+        evaluation: {
+          prompt: details.prompt,
+          model: "vllm/nvidia/Ising-Calibration-1.5-31B-NVFP4",
+        },
+        isError: false,
+      },
+    ],
+  );
+  // A fallback judge is flagged; details without a prompt add nothing.
+  const [withFallback] = toNdjsonEvents({
+    type: "tool_execution_end",
+    toolName: "qcal_evaluate",
+    result: { details: { prompt: "p", fallback: true } },
+  });
+  assert.deepEqual(withFallback.evaluation, { prompt: "p", fallback: true });
+  const [plain] = toNdjsonEvents({
+    type: "tool_execution_end",
+    toolName: "qdash_query",
+    result: { details: { model: { provider: "a", modelId: "b" } } },
+  });
+  assert.equal("evaluation" in plain, false);
+});
+
 test("failed tools keep the error flag", () => {
   const [event] = toNdjsonEvents({
     type: "tool_execution_end",
