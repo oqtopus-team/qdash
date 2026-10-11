@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import logging
 from typing import TYPE_CHECKING, Annotated, Any
 
@@ -88,14 +87,15 @@ async def get_copilot_config() -> dict[str, Any]:
 
 @public_router.get("/expected-image", include_in_schema=False)
 def get_expected_image(task_name: str, index: int) -> Response:
-    """Serve a reference/expected image from TaskKnowledge by index."""
+    """Serve a reference/expected figure of a task's knowledge by index."""
     knowledge = get_task_knowledge(task_name)
-    if not knowledge or not knowledge.images or index < 0 or index >= len(knowledge.images):
+    if not knowledge or index < 0 or index >= len(knowledge.expected_figures):
         raise HTTPException(status_code=404, detail="Image not found")
-    img = knowledge.images[index]
-    if not img.base64_data:
-        raise HTTPException(status_code=404, detail="Image has no data")
-    return Response(content=base64.b64decode(img.base64_data), media_type="image/png")
+    loaded = knowledge.load_figure(knowledge.expected_figures[index].path)
+    if loaded is None:
+        raise HTTPException(status_code=404, detail="Image file not found")
+    data, mime = loaded
+    return Response(content=data, media_type=mime)
 
 
 @router.post("/sandbox/python", include_in_schema=False)

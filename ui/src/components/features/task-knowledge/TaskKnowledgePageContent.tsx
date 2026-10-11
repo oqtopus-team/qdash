@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, BookOpen, FolderTree, Image as ImageIcon, FileText } from "lucide-react";
+import { FolderTree, Image as ImageIcon, ListChecks, Tag } from "lucide-react";
 import {
   GitWorkspaceToolbar,
   PullRequestBanner,
@@ -41,28 +41,22 @@ function TaskCard({ item }: { item: TaskKnowledgeSummaryResponse }) {
         <h3 className="text-sm font-semibold font-mono text-primary mb-1">{item.name}</h3>
         <p className="text-sm text-base-content/70 line-clamp-2 mb-2">{item.summary}</p>
         <div className="flex items-center gap-3 text-xs text-base-content/50">
-          {(item.failure_mode_count ?? 0) > 0 && (
-            <span className="flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" />
-              {item.failure_mode_count} failure modes
+          {(item.outcome_count ?? 0) > 0 && (
+            <span className="flex items-center gap-1" title="Outcomes described for this plot">
+              <ListChecks className="h-3 w-3" />
+              {item.outcome_count} outcomes
             </span>
           )}
-          {(item.case_count ?? 0) > 0 && (
-            <span className="flex items-center gap-1">
-              <FileText className="h-3 w-3" />
-              {item.case_count} cases
+          {(item.example_count ?? 0) > 0 && (
+            <span className="flex items-center gap-1" title="Expert-labeled example plots">
+              <Tag className="h-3 w-3" />
+              {item.example_count} examples
             </span>
           )}
-          {(item.image_count ?? 0) > 0 && (
+          {(item.figure_count ?? 0) > 0 && (
             <span className="flex items-center gap-1">
               <ImageIcon className="h-3 w-3" />
-              {item.image_count} images
-            </span>
-          )}
-          {item.has_analysis_guide && (
-            <span className="flex items-center gap-1">
-              <BookOpen className="h-3 w-3" />
-              Guide
+              {item.figure_count} figures
             </span>
           )}
         </div>
@@ -115,7 +109,7 @@ export function TaskKnowledgePageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Knowledge"
-        description="Calibration task knowledge base — physics, expected results, failure patterns, and analysis guides. Edits apply here at once; a pull request shares them."
+        description="What each calibration plot should look like, how its outcomes look, and expert-labeled examples. Edits apply here at once; a pull request shares them."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {canEdit && (

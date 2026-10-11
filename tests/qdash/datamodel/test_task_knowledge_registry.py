@@ -15,13 +15,7 @@ if TYPE_CHECKING:
 
 
 def _entry(name: str, summary: str) -> dict[str, object]:
-    return {
-        "name": name,
-        "category": "td-characterization",
-        "summary": summary,
-        "what_it_measures": "T1",
-        "physical_principle": "decay",
-    }
+    return {"name": name, "category": "td-characterization", "background": summary}
 
 
 @pytest.fixture
@@ -76,7 +70,7 @@ def test_regenerate_runs_the_repository_generator(knowledge_repo: Path) -> None:
     output = tk.regenerate_task_knowledge_json(knowledge_repo)
 
     assert output == knowledge_repo / "task-knowledge.json"
-    assert json.loads(output.read_text())["CheckT1"]["summary"] == "generated"
+    assert json.loads(output.read_text())["CheckT1"]["background"] == "generated"
 
 
 def test_regenerate_reports_a_failing_generator(knowledge_repo: Path) -> None:
@@ -91,3 +85,66 @@ def test_regenerate_reports_a_failing_generator(knowledge_repo: Path) -> None:
 def test_regenerate_requires_the_generator(knowledge_repo: Path) -> None:
     with pytest.raises(RuntimeError, match=r"generate\.py not found"):
         tk.regenerate_task_knowledge_json(knowledge_repo)
+
+
+def test_previous_format_entries_still_load(knowledge_repo: Path) -> None:
+    (knowledge_repo / "task-knowledge.json").write_text(
+        json.dumps(
+            {
+                "CheckRabi": {
+                    "name": "CheckRabi",
+                    "category": "td-characterization",
+                    "summary": "Rabi oscillation.",
+                    "what_it_measures": "Drive amplitude calibration.",
+                    "physical_principle": "ignored",
+                    "expected_result": {"description": "A damped cosine."},
+                    "images": [
+                        {"alt_text": "expected", "relative_path": "./rabi.png", "base64_data": "x"}
+                    ],
+                    "failure_modes": [{"severity": "critical", "description": "no oscillation"}],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    tk._REGISTRY_CACHE = (None, {})
+
+    knowledge = tk.get_task_knowledge("CheckRabi")
+
+    assert knowledge is not None
+    assert knowledge.summary == "Rabi oscillation."
+    assert knowledge.background == "Rabi oscillation.\n\nDrive amplitude calibration."
+    assert knowledge.expected_plot == "A damped cosine."
+    assert knowledge.expected_figures[0].path == "./rabi.png"
+    assert knowledge.outcomes == []
+
+
+def test_prompt_rendering_and_example_labels() -> None:
+    knowledge = tk.TaskKnowledge(
+        name="CheckT1",
+        background="Measures T1.",
+        expected_plot="Exponential decay.",
+        outcomes=[tk.KnowledgeOutcome(outcome="expected", description="clean decay")],
+        parameters=[tk.KnowledgeParameter(name="t1", description="T1 (μs)")],
+        examples=[
+            tk.KnowledgeExample(
+                id="e1",
+                title="Short T1",
+                outcome="suboptimal",
+                fit_quality="good",
+                verdict="pass_with_note",
+                diagnosis="T1 = 14 μs with a clean fit.",
+            )
+        ],
+    )
+
+    prompt = knowledge.to_prompt()
+    assert prompt.splitlines()[0] == "## Experiment: CheckT1"
+    assert "### Labeled examples" not in prompt
+    assert "- t1: T1 (μs)" in prompt
+    assert "Short T1 (suboptimal, pass_with_note): T1 = 14 μs" in knowledge.to_prompt(
+        include_examples=True
+    )
+    assert knowledge.examples[0].label() == (
+        "Outcome: suboptimal\nFit quality: good\nVerdict: pass_with_note\nT1 = 14 μs with a clean fit."
+    )

@@ -5,33 +5,23 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ExpectedResultResponse } from './expectedResultResponse';
-import type { FailureModeResponse } from './failureModeResponse';
-import type { KnowledgeCaseResponse } from './knowledgeCaseResponse';
-import type { KnowledgeImageResponse } from './knowledgeImageResponse';
-import type { OutputParameterInfoResponse } from './outputParameterInfoResponse';
+import type { KnowledgeExampleResponse } from './knowledgeExampleResponse';
+import type { KnowledgeFigureResponse } from './knowledgeFigureResponse';
+import type { KnowledgeOutcomeResponse } from './knowledgeOutcomeResponse';
+import type { KnowledgeParameterResponse } from './knowledgeParameterResponse';
 
 /**
- * Response model for task knowledge (LLM-oriented domain knowledge).
+ * Task knowledge: background, outcomes, parameters, labeled examples, and the rendered prompt.
  */
 export interface TaskKnowledgeResponse {
   name: string;
   category?: string;
-  summary: string;
-  what_it_measures: string;
-  physical_principle: string;
-  expected_result: ExpectedResultResponse;
-  evaluation_criteria: string;
-  check_questions?: string[];
-  failure_modes: FailureModeResponse[];
-  tips: string[];
-  output_parameters_info?: OutputParameterInfoResponse[];
-  analysis_guide?: string[];
-  prerequisites?: string[];
-  images?: KnowledgeImageResponse[];
-  review_markdown?: string;
-  review_images?: KnowledgeImageResponse[];
-  cases?: KnowledgeCaseResponse[];
+  background?: string;
+  expected_plot?: string;
+  expected_figures?: KnowledgeFigureResponse[];
+  outcomes?: KnowledgeOutcomeResponse[];
+  parameters?: KnowledgeParameterResponse[];
+  examples?: KnowledgeExampleResponse[];
+  /** Background, expected plot, outcomes, parameters as Markdown */
   prompt_text: string;
-  review_prompt_text?: string;
 }

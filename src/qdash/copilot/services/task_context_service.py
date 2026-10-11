@@ -11,6 +11,13 @@ if TYPE_CHECKING:
     from qdash.copilot.contracts import TaskContextBundle
 
 
+HISTORY_LAST_N = 5
+"""Recent runs of the same task shown when a chat opens on a result."""
+
+COUPLING_PARAMS = ("zx_rate", "coupling_strength")
+"""Coupling parameters shown for a two-qubit target."""
+
+
 class TaskContextBuilder:
     """Build a task result's context from task knowledge and repository-backed loaders."""
 
@@ -100,7 +107,7 @@ class TaskContextBuilder:
         """Build the prompt prefix from task knowledge or fall back to the task name."""
         if not knowledge:
             return f"Task: {task_name}"
-        return str(knowledge.to_prompt())
+        return str(knowledge.to_prompt(include_examples=True))
 
     @staticmethod
     def _extract_task_result_payload(
@@ -124,25 +131,18 @@ class TaskContextBuilder:
         qid: str,
         knowledge: Any,
     ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-        """Load history and neighborhood context declared by task knowledge."""
-        history_results: list[dict[str, Any]] = []
+        """Load the result's recent history and, for a coupling target, its coupling parameters.
+
+        The knowledge text is declarative and no longer says what to load:
+        every task chat gets the last runs of the same task; two-qubit tasks
+        also get the coupling's parameters. The planner fetches anything else.
+        """
+        del knowledge
+        history_results = self._load_task_history(task_name, chip_id, qid, HISTORY_LAST_N)
         neighbor_qubit_params: dict[str, dict[str, Any]] = {}
         coupling_params: dict[str, dict[str, Any]] = {}
-        if not knowledge or not knowledge.related_context:
-            return history_results, neighbor_qubit_params, coupling_params
-
-        for related_context in knowledge.related_context:
-            if related_context.type == "history":
-                history_results = self._load_task_history(
-                    task_name, chip_id, qid, related_context.last_n
-                )
-            elif related_context.type == "neighbor_qubits":
-                neighbor_qubit_params = self._load_neighbor_qubit_params(
-                    chip_id, qid, related_context.params
-                )
-            elif related_context.type == "coupling":
-                coupling_params = self._load_coupling_params(chip_id, qid, related_context.params)
-
+        if "-" in qid:
+            coupling_params = self._load_coupling_params(chip_id, qid, list(COUPLING_PARAMS))
         return history_results, neighbor_qubit_params, coupling_params
 
     def _resolve_images(
@@ -164,12 +164,8 @@ class TaskContextBuilder:
             experiment_images = self._load_figures_as_base64(figure_paths)
         if not image_base64:
             image_base64 = self._load_figure_as_base64(figure_paths)
-        # Case images illustrate past outcomes; the review guide's images are
-        # not sent (they were only used by the retired automatic review).
+        # Example figures illustrate labeled outcomes; they follow the expected plot.
         expected_images = self._collect_expected_images(
-            knowledge,
-            config.task_chat.max_expected_images,
-            include_case_images=True,
-            include_review_images=False,
+            knowledge, config.task_chat.max_expected_images, include_example_images=True
         )
         return image_base64, expected_images, experiment_images

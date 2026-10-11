@@ -102,14 +102,10 @@ class CopilotRuntime:
         knowledge: Any,
         max_images: int | None = None,
         *,
-        include_case_images: bool = True,
-        include_review_images: bool = True,
+        include_example_images: bool = True,
     ) -> list[tuple[str, str]]:
         return self.collect_expected_images(
-            knowledge,
-            max_images=max_images,
-            include_case_images=include_case_images,
-            include_review_images=include_review_images,
+            knowledge, max_images=max_images, include_example_images=include_example_images
         )
 
     def load_default_chip_id(self) -> str | None:
@@ -137,15 +133,11 @@ class CopilotRuntime:
         knowledge: Any,
         max_images: int | None = None,
         *,
-        include_case_images: bool = True,
-        include_review_images: bool = True,
+        include_example_images: bool = True,
     ) -> list[tuple[str, str]]:
         """Reference images from the task's knowledge, as (base64, alt text)."""
         return self._support_service.collect_expected_images(
-            knowledge,
-            max_images=max_images,
-            include_case_images=include_case_images,
-            include_review_images=include_review_images,
+            knowledge, max_images=max_images, include_example_images=include_example_images
         )
 
     def load_task_history(

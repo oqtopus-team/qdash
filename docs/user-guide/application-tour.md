@@ -54,7 +54,7 @@ permission. See [Running Calibrations](./running-calibrations.md) for the end-to
 | --- | --- |
 | **Inbox** | Review mentions, replies, and system notifications. |
 | **Forum** | Hold project-wide discussions that are not tied to one result. |
-| **Knowledge** | Read and edit task physics, expected results, failure patterns, and analysis guidance; pull and open pull requests against the knowledge repository. |
+| **Knowledge** | Read and edit each task's background, expected plot, outcomes, and expert-labeled example plots; pull and open pull requests against the knowledge repository. |
 
 See [Reviewing and Sharing Results](./reviewing-results.md) for how these records relate.
 
