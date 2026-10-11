@@ -5,8 +5,12 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.security import (
+    HTTPAuthorizationCredentials,  # noqa: TC002 - FastAPI resolves annotations
+)
 
 from qdash.api.dependencies import get_issue_knowledge_service, get_issue_service
+from qdash.api.lib.auth import bearer_scheme
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
@@ -18,6 +22,7 @@ from qdash.api.schemas.issue_knowledge import (
     ListIssueKnowledgeResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
+from qdash.api.services import pi_chat_service
 from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
 from qdash.api.services.issue_service import IssueService
 
@@ -77,12 +82,15 @@ async def extract_issue_knowledge(
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[IssueKnowledgeService, Depends(get_issue_knowledge_service)],
     issue_service: Annotated[IssueService, Depends(get_issue_service)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
 ) -> IssueKnowledgeResponse:
     """Generate an AI knowledge draft from a closed issue thread."""
     return await service.generate_draft(
         project_id=ctx.project_id,
         issue_id=issue_id,
         issue_service=issue_service,
+        username=ctx.user.username,
+        auth=pi_chat_service.QDashAuth(credentials.credentials, ctx.project_id),
     )
 
 

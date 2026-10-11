@@ -31,7 +31,7 @@ class TaskContext(BaseModel):
     """Full context of one task result for a chat about it.
 
     Built from DB data and TaskKnowledge when a chat opens on a task result;
-    rendered into the opening message (Pi) or the system prompt (LiteLLM).
+    rendered into the opening message of the chat.
     """
 
     # Task knowledge (pre-rendered prompt)
@@ -76,63 +76,6 @@ class TaskContext(BaseModel):
         default_factory=dict,
         description="Coupling parameters: {coupling_id: {param: value}}",
     )
-
-
-class AnalysisResponse(BaseModel):
-    """Structured analysis returned by the LLM."""
-
-    summary: str = Field(description="One-line result summary")
-    assessment: str = Field(description="Overall assessment: good / warning / bad")
-    explanation: str = Field(description="Detailed analysis and interpretation")
-    potential_issues: list[str] = Field(
-        default_factory=list,
-        description="Detected potential issues",
-    )
-    recommendations: list[str] = Field(
-        default_factory=list,
-        description="Recommended next actions",
-    )
-
-    @field_validator("potential_issues", "recommendations", mode="before")
-    @classmethod
-    def _coerce_list(cls, v: Any) -> Any:
-        if v is None or v == "":
-            return []
-        if isinstance(v, str):
-            return [v]
-        return v
-
-    @field_validator("assessment", mode="before")
-    @classmethod
-    def _coerce_assessment(cls, v: Any) -> Any:
-        if v is None:
-            return "warning"
-        return str(v).strip().lower()
-
-
-class ContentBlock(BaseModel):
-    """A single content block in a blocks response."""
-
-    type: str = Field(description="Block type: 'text' or 'chart'")
-    content: str | None = Field(default=None, description="Text content (for text blocks)")
-    chart: dict[str, Any] | None = Field(
-        default=None,
-        description="Plotly chart spec with 'data' and 'layout' keys (for chart blocks)",
-    )
-
-
-class BlocksAnalysisResponse(BaseModel):
-    """Extended analysis response with mixed text/chart content blocks."""
-
-    blocks: list[ContentBlock] = Field(description="Ordered list of content blocks")
-    assessment: str | None = Field(
-        default=None,
-        description="Overall assessment: good / warning / bad / null",
-    )
-
-
-# Backward-compatible alias used by API imports and older tests.
-BlocksResponse = BlocksAnalysisResponse
 
 
 class ApprovalDecision(BaseModel):
@@ -186,48 +129,6 @@ class ImageAttachmentsRequest(BaseModel):
         if sum(len(image.data) for image in images) > 12 * 1024 * 1024:
             raise ValueError("Attached images exceed 12 MiB in total; use fewer or smaller images")
         return images
-
-
-class AnalyzeRequest(ImageAttachmentsRequest):
-    """Request body for POST /copilot/analyze."""
-
-    task_name: str = Field(description="Task class name (e.g. CheckT1)")
-    chip_id: str
-    qid: str
-    execution_id: str
-    task_id: str
-    message: str = Field(description="User question / message")
-    session_id: str | None = Field(
-        default=None,
-        description=(
-            "Analysis session identifier. Required by the Pi backend, which "
-            "restores conversation state from the persisted session."
-        ),
-    )
-    request_id: str | None = Field(
-        default=None,
-        description="Idempotency key for recovering or retrying one Pi submission.",
-    )
-    image_base64: str | None = Field(
-        default=None,
-        description="Base64-encoded result figure (for multimodal analysis)",
-    )
-    conversation_history: list[dict[str, str]] = Field(
-        default_factory=list,
-        description="Previous conversation messages [{role, content}, ...]",
-    )
-    analysis_model_override: ModelConfig | None = Field(
-        default=None,
-        alias="model_override",
-        description=(
-            "Optional per-request planner override for a task-result chat. "
-            "When unset, the first entry of chat_models (else model) is used."
-        ),
-    )
-    approval: ApprovalDecision | None = Field(
-        default=None,
-        description="Decision on the write operation the previous turn asked approval for.",
-    )
 
 
 class ChatStopRequest(BaseModel):
@@ -304,7 +205,6 @@ class SandboxPythonRequest(BaseModel):
 def _rebuild_models() -> None:
     from qdash.copilot.config import ModelConfig as _RuntimeModelConfig
 
-    AnalyzeRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
     ChatRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
 
 

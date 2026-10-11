@@ -13,6 +13,7 @@ from qdash.api.schemas.issue_knowledge import (
 )
 from qdash.api.schemas.success import SuccessResponse
 from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
+from qdash.api.services.pi_chat_service import QDashAuth
 
 # Valid 24-character hex strings for ObjectId
 VALID_OID = "6640a1b2c3d4e5f6a7b8c9d0"
@@ -828,6 +829,9 @@ class TestDocToMarkdown:
         assert "## Thread images" not in md
 
 
+_AUTH = QDashAuth("t", "p")
+
+
 class TestCallLlmExtract:
     """Tests for IssueKnowledgeService._call_llm_extract."""
 
@@ -850,7 +854,7 @@ class TestCallLlmExtract:
 
         with patch("qdash.copilot.config.load_copilot_config", return_value=config):
             result = await IssueKnowledgeService._call_llm_extract(
-                "CheckT1", "chip-A", "Q0", "Title", "Thread text"
+                "CheckT1", "chip-A", "Q0", "Title", "Thread text", username="u", auth=_AUTH
             )
 
         assert result == {}
@@ -867,20 +871,18 @@ class TestCallLlmExtract:
             "lesson_learned": ["Check T1"],
         }
 
-        async def _completion(_config, **_kwargs):
-            message = MagicMock()
-            message.content = json.dumps(expected)
-            return MagicMock(choices=[MagicMock(message=message)])
+        async def _complete(**_kwargs):
+            return json.dumps(expected)
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
             patch(
-                "qdash.api.services.issue_knowledge_service.litellm_completion",
-                new=_completion,
+                "qdash.api.services.pi_chat_service.complete_once",
+                new=_complete,
             ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
-                "CheckT1", "chip-A", "Q0", "T1 issue", "Thread"
+                "CheckT1", "chip-A", "Q0", "T1 issue", "Thread", username="u", auth=_AUTH
             )
 
         assert result == expected
@@ -891,20 +893,18 @@ class TestCallLlmExtract:
         payload = '{"title": "Fenced response", "severity": "info"}'
         raw_response = f"```json\n{payload}\n```"
 
-        async def _completion(_config, **_kwargs):
-            message = MagicMock()
-            message.content = raw_response
-            return MagicMock(choices=[MagicMock(message=message)])
+        async def _complete(**_kwargs):
+            return raw_response
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
             patch(
-                "qdash.api.services.issue_knowledge_service.litellm_completion",
-                new=_completion,
+                "qdash.api.services.pi_chat_service.complete_once",
+                new=_complete,
             ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
-                "CheckT1", "chip-A", "Q0", "Title", "Thread"
+                "CheckT1", "chip-A", "Q0", "Title", "Thread", username="u", auth=_AUTH
             )
 
         assert result["title"] == "Fenced response"
@@ -914,20 +914,18 @@ class TestCallLlmExtract:
     async def test_returns_empty_on_invalid_json(self, mock_config):
         """Returns empty dict when LLM returns invalid JSON."""
 
-        async def _completion(_config, **_kwargs):
-            message = MagicMock()
-            message.content = "This is not valid JSON at all"
-            return MagicMock(choices=[MagicMock(message=message)])
+        async def _complete(**_kwargs):
+            return "This is not valid JSON at all"
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
             patch(
-                "qdash.api.services.issue_knowledge_service.litellm_completion",
-                new=_completion,
+                "qdash.api.services.pi_chat_service.complete_once",
+                new=_complete,
             ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
-                "CheckT1", "chip-A", "Q0", "Title", "Thread"
+                "CheckT1", "chip-A", "Q0", "Title", "Thread", username="u", auth=_AUTH
             )
 
         assert result == {}
@@ -936,18 +934,18 @@ class TestCallLlmExtract:
     async def test_returns_empty_on_api_error(self, mock_config):
         """Returns empty dict when the LLM API raises an exception."""
 
-        async def _completion(_config, **_kwargs):
+        async def _complete(**_kwargs):
             raise RuntimeError("API unreachable")
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
             patch(
-                "qdash.api.services.issue_knowledge_service.litellm_completion",
-                new=_completion,
+                "qdash.api.services.pi_chat_service.complete_once",
+                new=_complete,
             ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
-                "CheckT1", "chip-A", "Q0", "Title", "Thread"
+                "CheckT1", "chip-A", "Q0", "Title", "Thread", username="u", auth=_AUTH
             )
 
         assert result == {}
@@ -956,20 +954,18 @@ class TestCallLlmExtract:
     async def test_returns_empty_on_empty_response(self, mock_config):
         """Returns empty dict when the LLM returns empty content."""
 
-        async def _completion(_config, **_kwargs):
-            message = MagicMock()
-            message.content = ""
-            return MagicMock(choices=[MagicMock(message=message)])
+        async def _complete(**_kwargs):
+            return ""
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
             patch(
-                "qdash.api.services.issue_knowledge_service.litellm_completion",
-                new=_completion,
+                "qdash.api.services.pi_chat_service.complete_once",
+                new=_complete,
             ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
-                "CheckT1", "chip-A", "Q0", "Title", "Thread"
+                "CheckT1", "chip-A", "Q0", "Title", "Thread", username="u", auth=_AUTH
             )
 
         assert result == {}
@@ -980,20 +976,18 @@ class TestCallLlmExtract:
         payload = '{"title": "Plain fences"}'
         raw_response = f"```\n{payload}\n```"
 
-        async def _completion(_config, **_kwargs):
-            message = MagicMock()
-            message.content = raw_response
-            return MagicMock(choices=[MagicMock(message=message)])
+        async def _complete(**_kwargs):
+            return raw_response
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
             patch(
-                "qdash.api.services.issue_knowledge_service.litellm_completion",
-                new=_completion,
+                "qdash.api.services.pi_chat_service.complete_once",
+                new=_complete,
             ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
-                "CheckT1", "chip-A", "Q0", "Title", "Thread"
+                "CheckT1", "chip-A", "Q0", "Title", "Thread", username="u", auth=_AUTH
             )
 
         assert result["title"] == "Plain fences"
@@ -1002,20 +996,18 @@ class TestCallLlmExtract:
     async def test_returns_empty_on_none_content(self, mock_config):
         """Returns empty dict when the LLM message content is None."""
 
-        async def _completion(_config, **_kwargs):
-            message = MagicMock()
-            message.content = None
-            return MagicMock(choices=[MagicMock(message=message)])
+        async def _complete(**_kwargs):
+            return None
 
         with (
             patch("qdash.copilot.config.load_copilot_config", return_value=mock_config),
             patch(
-                "qdash.api.services.issue_knowledge_service.litellm_completion",
-                new=_completion,
+                "qdash.api.services.pi_chat_service.complete_once",
+                new=_complete,
             ),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
-                "CheckT1", "chip-A", "Q0", "Title", "Thread"
+                "CheckT1", "chip-A", "Q0", "Title", "Thread", username="u", auth=_AUTH
             )
 
         assert result == {}

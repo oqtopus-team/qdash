@@ -7,9 +7,9 @@ QDash Copilot is an AI-powered assistant that helps experimentalists interpret q
 1. **Chat about a task result** (sidebar or floating window) -- Opened from a task result with that result's context and figures, for questions about one calibration result (e.g., CheckT1, CheckRabi).
 2. **Chat Page** -- A dedicated chat interface for chip-wide questions, cross-qubit comparisons, and exploratory data analysis.
 
-Both are the same chat with the same planner; the first just opens with a task result as its context. The evaluation model's recorded judgements are a separate thing (see "Planner-less evaluation runs").
+Both are the same chat with the same planner; the first just opens with a task result as its context. The evaluation model's recorded judgements are a separate thing (see "Planner-less evaluation runs"). Issue and forum AI replies and issue knowledge extraction are one planner turn each on the same runtime.
 
-Both modes use the same underlying LLM agent with tool-calling capabilities, sandboxed Python execution, and SSE streaming for real-time progress feedback.
+Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a sandboxed Python tool served by the API, and SSE streaming for progress.
 
 ## Component Diagram
 
@@ -19,19 +19,18 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 
 | File | Responsibility |
 |------|---------------|
-| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/chat/stream` (general and task chats), `/analyze` (LiteLLM, non-streaming) endpoints; SSE event generation via `SSETaskBridge` |
-| `src/qdash/copilot/runtime.py` | Data loading runtime: `build_task_context()`, `build_images_sent_metadata()`, qubit/task/history queries, tool executor wiring |
-| `src/qdash/api/services/pi_chat_service.py` | Pi backend bridge: request payloads, the task chat's opening message and figures, NDJSON to SSE translation |
-| `src/qdash/api/lib/copilot_agent.py` | LLM agent: system prompt construction, OpenAI Responses API calls, tool call loop, response parsing |
+| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/chat/stream` (general and task chats), `/sandbox/python`, chat sessions |
+| `src/qdash/copilot/runtime.py` | Data loading: `build_task_context()`, `build_images_sent_metadata()`, qubit/task/history queries |
+| `src/qdash/api/services/pi_chat_service.py` | Runtime bridge: request payloads, the task chat's opening message and figures, NDJSON to SSE translation, `thread_reply` / `complete_once` for issue, forum and knowledge turns |
 | `src/qdash/copilot/` | Shared Copilot runtime used outside the API process |
-| `src/qdash/api/lib/copilot_sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
-| `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`), `AnalysisResponse`; request schemas |
-| `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter, `SSETaskBridge` for queue-poll-heartbeat-drain pattern |
-| `src/qdash/api/lib/copilot_config.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `ScoringThreshold` models; YAML loading with local override |
+| `src/qdash/copilot/tooling/sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
+| `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`); request schemas |
+| `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter |
+| `src/qdash/copilot/config/settings.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `TaskChatConfig`; YAML loading with local override |
 | `src/qdash/datamodel/task_knowledge.py` | `TaskKnowledge` model with domain-specific knowledge per calibration task |
-| `config/copilot/config.yaml` | Shared enablement, language, and default model settings |
-| `config/copilot/chat.yaml` | Planner models for every chat, prompt, initial message, and suggestions |
-| `config/copilot/evaluation.yaml` | Evaluation model (calibration VLM) and scoring thresholds |
+| `config/copilot/config.yaml` | Enablement, languages, how a task chat opens |
+| `config/copilot/chat.yaml` | Planner models for every chat |
+| `config/copilot/evaluation.yaml` | Evaluation model (calibration VLM) |
 | `agent-runtime/src/evaluate.ts`                           | Planner-less evaluation of one task result: evidence tool, then `qcal_evaluate`, as one record                                     |
 | `src/qdash/api/services/evaluation_service.py`             | Bulk evaluation runs: selection per chip, background execution through the runtime, records and verdicts                          |
 | `ui/src/hooks/useCopilotChat.ts` | React hook for the chat page: session management, SSE consumption, localStorage persistence |
@@ -50,66 +49,37 @@ The pinned pi-qdash version accepts a configuration file rather than an injected
 
 ### `config/copilot/`
 
+Three small files, each with an optional `*.local.yaml` overlay, deep-merged by `ConfigLoader`:
+
 ```yaml
 # config.yaml
 enabled: true
-copilot_backend: pi       # Also requires COMPOSE_PROFILES=agent-runtime for Docker Compose
-
-# Language settings
 thinking_language: en      # Internal reasoning language
 response_language: auto    # Follow the latest user message; use ja/en to pin it
+task_chat:                 # How a chat about a task result opens
+  multimodal: true
+  max_expected_images: 2
 
-# Model settings
-model:
-  provider: openai         # openai | ollama
-  name: gpt-4.1
-  temperature: 0.7
-  max_output_tokens: 2048
-
-# chat.yaml
+# chat.yaml: the planner models every chat can use; the first is the default
 chat_models:
-  - provider: ollama
-    name: gemma4:26b
-    base_url: env:OLLAMA_BASE_URL
-    api_key_env: OLLAMA_API_KEY
-system_prompt: |
-  You are QDash Copilot...
+  - provider: openai-compatible
+    name: qwen3.8-flash-next
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL
+    api_key_env: OPENAI_COMPATIBLE_API_KEY
 
-# evaluation.yaml
-# The model that judges calibration plots (pi-qcaleval's qcal_evaluate)
+# evaluation.yaml: the model pi-qcaleval judges calibration plots with
 evaluation_models:
   - provider: vllm
     name: nvidia/Ising-Calibration-1.5-31B-NVFP4
     base_url: env:VLLM_BASE_URL
     api_key_env: VLLM_API_KEY
-
-# Metrics for chip health evaluation
-evaluation_metrics:
-  qubit: [qubit_frequency, anharmonicity, t1, t2_echo, ...]
-  coupling: [zx90_gate_fidelity, bell_state_fidelity]
-
-# Scoring thresholds per metric
-scoring:
-  t1:
-    good: 50
-    excellent: 100
-    bad: 20
-    unit: "μs"
-    higher_is_better: true
-  # ... (see config/copilot/evaluation.yaml for full list)
-
-# How a chat about a task result opens
-task_chat:
-  enabled: true
-  multimodal: true
-  max_expected_images: 2
-  max_conversation_turns: 10
 ```
 
-Configuration is loaded via `ConfigLoader` by deep-merging `config.yaml`, `chat.yaml`, and
-`evaluation.yaml`. YAML string values support shell-style environment variable references such
+YAML string values support shell-style environment variable references such
 as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be supplied
-through environment variables instead of committed template files.
+through environment variables instead of committed template files. The Pi runtime
+builds its `models.json` from `chat_models` and `evaluation_models` at startup.
 
 ### Environment Variables
 

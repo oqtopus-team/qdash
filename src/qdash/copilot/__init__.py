@@ -1,21 +1,20 @@
-"""Shared Copilot package used by the API and workflow worker.
+"""Shared Copilot package used by the API.
 
 Package layout:
 
-- ``agent``: public LLM-agent entrypoint
-- ``runtime``: public data/runtime entrypoint
+- ``runtime``: data loading for a chat about one task result
 - ``config``: configuration models and loaders
 - ``contracts``: request/response models shared across layers
 - ``prompts`` / ``tooling`` / ``services``: implementation details grouped by role
+- ``blocks``: the answer format rendered as markdown for issue and forum replies
 """
 
-from qdash.copilot.agent import blocks_to_markdown, run_analysis, run_chat
+from qdash.copilot.blocks import blocks_to_markdown
 from qdash.copilot.config import CopilotConfig, ModelConfig, load_copilot_config
-from qdash.copilot.contracts import AnalysisResponse, ChatRequest, TaskContext
+from qdash.copilot.contracts import ChatRequest, TaskContext
 from qdash.copilot.runtime import CopilotRuntime
 
 __all__ = [
-    "AnalysisResponse",
     "ChatRequest",
     "CopilotConfig",
     "CopilotRuntime",
@@ -23,6 +22,4 @@ __all__ = [
     "TaskContext",
     "blocks_to_markdown",
     "load_copilot_config",
-    "run_analysis",
-    "run_chat",
 ]

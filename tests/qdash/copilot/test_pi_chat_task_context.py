@@ -23,7 +23,6 @@ _IMAGES_SENT = {
 def _config() -> CopilotConfig:
     return CopilotConfig(
         enabled=True,
-        copilot_backend="pi",
         model=ModelConfig(provider="ollama", name="gemma4:31b", reasoning_effort="none"),
     )
 

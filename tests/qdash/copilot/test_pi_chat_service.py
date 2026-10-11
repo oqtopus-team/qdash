@@ -360,3 +360,157 @@ async def test_an_unrecorded_evaluation_keeps_only_its_summary() -> None:
     )
     end = next(data for name, data in events if name == "tool_end")
     assert end["evaluation"] == {"prompt": "p"}
+
+
+def _sse(name: str, data: dict[str, Any]) -> str:
+    return f"event: {name}\ndata: {json.dumps(data)}\n\n"
+
+
+def test_parse_sse_reads_this_modules_events() -> None:
+    from qdash.api.services.pi_chat_service import parse_sse
+
+    assert parse_sse(_sse("result", {"blocks": []})) == ("result", {"blocks": []})
+    assert parse_sse(":\n\n") is None
+    assert parse_sse("event: x\ndata: not json\n\n") is None
+
+
+class TestThreadReply:
+    @pytest.mark.asyncio
+    async def test_one_turn_opens_with_the_thread_and_ends_with_the_result(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from qdash.api.services import pi_chat_service
+        from qdash.copilot.config import CopilotConfig, ModelConfig
+
+        captured: dict[str, Any] = {}
+        deleted: list[tuple[str, str]] = []
+
+        async def fake_stream_payload(payload, *, step, auth, extra_result=None, recorder=None):
+            captured["payload"] = payload
+            captured["auth"] = auth
+            yield _sse("status", {"step": "tool_call", "tool": "qdash_get_task_result"})
+            yield _sse("status", {"step": "complete", "message": "Done"})
+            yield _sse("result", {"blocks": [{"type": "text", "content": "Reply", "chart": None}]})
+
+        async def fake_delete(username: str, session_id: str) -> None:
+            deleted.append((username, session_id))
+
+        monkeypatch.setattr(pi_chat_service, "stream_payload", fake_stream_payload)
+        monkeypatch.setattr(pi_chat_service, "delete_runtime_session_state", fake_delete)
+        config = CopilotConfig(
+            enabled=True, chat_models=[ModelConfig(provider="openai-compatible", name="qwen")]
+        )
+
+        events = [
+            event
+            async for event in pi_chat_service.thread_reply(
+                username="alice",
+                auth=pi_chat_service.QDashAuth("alice-token", "p1"),
+                config=config,
+                scope="issue",
+                instruction="Reply in the thread.",
+                history=[
+                    {"role": "user", "content": "T1 dropped"},
+                    {"role": "assistant", "content": "Check the fit"},
+                ],
+                user_message="Why?",
+            )
+        ]
+
+        payload = captured["payload"]
+        assert payload["owner_id"] == "alice"
+        assert payload["conversation_id"].startswith("issue-")
+        assert payload["message"] == "Why?"
+        assert payload["model"] == {"provider": "openai-compatible", "name": "qwen"}
+        assert "[User] T1 dropped" in payload["initial_message"]
+        assert "[AI] Check the fit" in payload["initial_message"]
+        assert payload["initial_message"].endswith("## Latest post to answer\n\nWhy?")
+        assert captured["auth"] == pi_chat_service.QDashAuth("alice-token", "p1")
+        # Progress is forwarded, the completion status is not, the result comes last as a dict.
+        assert [e for e in events if isinstance(e, str)] == [
+            _sse("status", {"step": "tool_call", "tool": "qdash_get_task_result"})
+        ]
+        assert events[-1] == {"blocks": [{"type": "text", "content": "Reply", "chart": None}]}
+        assert deleted == [("alice", payload["conversation_id"])]
+
+    @pytest.mark.asyncio
+    async def test_a_failed_turn_forwards_the_error_and_yields_no_result(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from qdash.api.services import pi_chat_service
+        from qdash.copilot.config import CopilotConfig
+
+        async def fake_stream_payload(payload, *, step, auth, extra_result=None, recorder=None):
+            yield _sse("error", {"step": step, "detail": "runtime down"})
+
+        async def fake_delete(username: str, session_id: str) -> None:
+            return None
+
+        monkeypatch.setattr(pi_chat_service, "stream_payload", fake_stream_payload)
+        monkeypatch.setattr(pi_chat_service, "delete_runtime_session_state", fake_delete)
+
+        events = [
+            event
+            async for event in pi_chat_service.thread_reply(
+                username="alice",
+                auth=pi_chat_service.QDashAuth("t", "p"),
+                config=CopilotConfig(enabled=True),
+                scope="forum",
+                instruction="x",
+                history=[],
+                user_message="hi",
+            )
+        ]
+        assert events == [_sse("error", {"step": "run_chat", "detail": "runtime down"})]
+
+
+class TestCompleteOnce:
+    @pytest.mark.asyncio
+    async def test_returns_the_answer_text(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from qdash.api.services import pi_chat_service
+        from qdash.copilot.config import CopilotConfig
+
+        async def fake_stream_payload(payload, *, step, auth, extra_result=None, recorder=None):
+            assert payload["message"] == "Extract"
+            yield _sse(
+                "result",
+                {"blocks": [{"type": "text", "content": '{"title": "x"}', "chart": None}]},
+            )
+
+        async def fake_delete(username: str, session_id: str) -> None:
+            return None
+
+        monkeypatch.setattr(pi_chat_service, "stream_payload", fake_stream_payload)
+        monkeypatch.setattr(pi_chat_service, "delete_runtime_session_state", fake_delete)
+
+        text = await pi_chat_service.complete_once(
+            username="alice",
+            auth=pi_chat_service.QDashAuth("t", "p"),
+            config=CopilotConfig(enabled=True),
+            scope="knowledge",
+            prompt="Extract",
+        )
+        assert text == '{"title": "x"}'
+
+    @pytest.mark.asyncio
+    async def test_raises_with_the_runtime_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from qdash.api.services import pi_chat_service
+        from qdash.copilot.config import CopilotConfig
+
+        async def fake_stream_payload(payload, *, step, auth, extra_result=None, recorder=None):
+            yield _sse("error", {"step": step, "detail": "model error"})
+
+        async def fake_delete(username: str, session_id: str) -> None:
+            return None
+
+        monkeypatch.setattr(pi_chat_service, "stream_payload", fake_stream_payload)
+        monkeypatch.setattr(pi_chat_service, "delete_runtime_session_state", fake_delete)
+
+        with pytest.raises(RuntimeError, match="model error"):
+            await pi_chat_service.complete_once(
+                username="alice",
+                auth=pi_chat_service.QDashAuth("t", "p"),
+                config=CopilotConfig(enabled=True),
+                scope="knowledge",
+                prompt="Extract",
+            )

@@ -5,17 +5,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from qdash.copilot.config import CopilotConfig, ScoringThreshold
+    from qdash.copilot.config import CopilotConfig
     from qdash.copilot.prompts.models import TaskChatPromptOptions
 
 
 def build_language_instruction(config: CopilotConfig | None) -> str:
     """Build the response/thinking language instruction for a prompt.
 
-    Lives here rather than in ``agent.py`` so the Pi backend can build a prompt
-    without importing the LiteLLM agent.
+    Folded into the opening message, since the runtime has no separate
+    system-prompt channel for it.
     """
     if config is None:
         return "Respond in the same language as the user's message."
@@ -75,45 +73,6 @@ In execute_python_analysis, access stored data via data["<data_key>"]
 (e.g., data["t1"]). Do NOT pass context_data manually.
 """
 
-RESPONSE_FORMAT_INSTRUCTION = """\
-
-You MUST respond with a valid JSON object (no prose, no code fences) matching this schema:
-{
-  "summary": "One-line result summary",
-  "assessment": "good" | "warning" | "bad",
-  "explanation": "Detailed analysis and interpretation",
-  "potential_issues": ["issue1", "issue2"],
-  "recommendations": ["action1", "action2"]
-}
-
-Rules:
-- `potential_issues` and `recommendations` MUST be JSON arrays of strings. Use an empty array `[]` when nothing applies — never a single string or null.
-- `assessment` MUST be exactly one of `good`, `warning`, `bad` (lowercase).
-- Write the user-facing text fields (`summary`, `explanation`, items in `potential_issues` and `recommendations`) in the user's response language as instructed above. Keep technical terms like T1, T2, fidelity in English.
-- Put the review fields inside `explanation`; do not add extra JSON keys for them.
-- Keep `assessment` consistent with the review decision: `good` for `PASS`, `warning` for `PASS_WITH_NOTE` or `REVIEW`, and `bad` for `FAIL`.
-- Keep the response concise for interactive use: after the review block, write at most 6 short bullets or 3 short paragraphs in `explanation`, at most 3 potential issues, and at most 3 recommendations.
-- Do not add keys outside this schema.
-"""
-
-
-def _build_scoring_threshold_section(scoring: Mapping[str, ScoringThreshold] | None) -> str | None:
-    """Render deployment-specific scoring thresholds for prompts."""
-    if not scoring:
-        return None
-
-    threshold_lines = ["\n## Scoring thresholds (deployment-specific)"]
-    for metric, thresh in scoring.items():
-        range_parts = []
-        if thresh.bad is not None:
-            range_parts.append(f"bad < {thresh.bad} {thresh.unit}")
-        range_parts.append(f"good > {thresh.good} {thresh.unit}")
-        range_parts.append(f"excellent > {thresh.excellent} {thresh.unit}")
-        if not thresh.higher_is_better:
-            range_parts.append("(lower is better)")
-        threshold_lines.append(f"- {metric}: {', '.join(range_parts)}")
-    return "\n".join(threshold_lines)
-
 
 def build_task_chat_prompt(options: TaskChatPromptOptions) -> str:
     """Build the full system prompt for a chat about a task result."""
@@ -141,10 +100,6 @@ def build_task_chat_prompt(options: TaskChatPromptOptions) -> str:
         parts.append("\n".join(img_instructions))
 
     parts.append(context.task_knowledge_prompt)
-
-    scoring_section = _build_scoring_threshold_section(options.scoring)
-    if scoring_section:
-        parts.append(scoring_section)
 
     lines = [f"\n## Target: Qubit {context.qid} (Chip: {context.chip_id})"]
     if context.qubit_params:
@@ -215,8 +170,5 @@ def build_task_chat_prompt(options: TaskChatPromptOptions) -> str:
                 else:
                     cp_lines.append(f"- {key}: {val}")
         parts.append("\n".join(cp_lines))
-
-    if options.include_response_format:
-        parts.append(RESPONSE_FORMAT_INSTRUCTION)
 
     return "\n\n".join(parts)
