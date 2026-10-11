@@ -2304,13 +2304,12 @@
         }
       }
     },
-    "/files/tree": {
+    "/config/files/tree": {
       "get": {
         "tags": [
           "file"
         ],
-        "summary": "Get file tree for entire config directory",
-        "description": "Get file tree structure for entire config directory.\n\nReturns\n-------\n    File tree structure",
+        "summary": "Get file tree of the config directory",
         "operationId": "getFileTree",
         "responses": {
           "200": {
@@ -2330,13 +2329,12 @@
         }
       }
     },
-    "/files/content": {
+    "/config/files/content": {
       "get": {
         "tags": [
           "file"
         ],
-        "summary": "Get file content for editing",
-        "description": "Get file content for editing.\n\nArgs:\n----\n    path: Relative path from CONFIG_BASE_PATH\n\nReturns:\n-------\n    File content and metadata",
+        "summary": "Get config file content for editing",
         "operationId": "getFileContent",
         "parameters": [
           {
@@ -2378,8 +2376,7 @@
         "tags": [
           "file"
         ],
-        "summary": "Save file content",
-        "description": "Save file content.\n\nArgs:\n----\n    request: Save file request with path and content\n\nReturns:\n-------\n    Success message",
+        "summary": "Save config file content",
         "operationId": "saveFileContent",
         "security": [
           {
@@ -2424,13 +2421,12 @@
         }
       }
     },
-    "/files/validate": {
+    "/config/files/validate": {
       "post": {
         "tags": [
           "file"
         ],
         "summary": "Validate file content (YAML/JSON)",
-        "description": "Validate YAML or JSON content.\n\nArgs:\n----\n    request: Validation request with content and file_type\n\nReturns:\n-------\n    Validation result",
         "operationId": "validateFileContent",
         "requestBody": {
           "content": {
@@ -2468,13 +2464,12 @@
         }
       }
     },
-    "/files/git/status": {
+    "/config/files/git/status": {
       "get": {
         "tags": [
           "file"
         ],
-        "summary": "Get Git status of config directory",
-        "description": "Get Git status of config directory.\n\nReturns\n-------\n    Git status information",
+        "summary": "Get Git status of the config directory",
         "operationId": "getGitStatus",
         "responses": {
           "200": {
@@ -2492,13 +2487,12 @@
         }
       }
     },
-    "/files/git/pull": {
+    "/config/files/git/pull": {
       "post": {
         "tags": [
           "file"
         ],
-        "summary": "Pull latest config from Git repository",
-        "description": "Pull latest config from Git repository.\n\nReturns\n-------\n    Pull operation result",
+        "summary": "Pull the latest config from its Git repository",
         "operationId": "gitPullConfig",
         "responses": {
           "200": {
@@ -2521,13 +2515,12 @@
         ]
       }
     },
-    "/files/git/push": {
+    "/config/files/git/push": {
       "post": {
         "tags": [
           "file"
         ],
-        "summary": "Push config changes to Git repository",
-        "description": "Push config changes to Git repository.\n\nArgs:\n----\n    request: Push request with commit message\n\nReturns:\n-------\n    Push operation result",
+        "summary": "Open a pull request with the config changes",
         "operationId": "gitPushConfig",
         "requestBody": {
           "content": {
@@ -6393,6 +6386,285 @@
             }
           }
         }
+      }
+    },
+    "/knowledge/files/tree": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Get file tree of the knowledge directory",
+        "operationId": "getKnowledgeFileTree",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FileTreeNode"
+                  },
+                  "type": "array",
+                  "title": "Response Getknowledgefiletree"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/knowledge/files/content": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Get knowledge file content for editing",
+        "operationId": "getKnowledgeFileContent",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Getknowledgefilecontent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Save knowledge file content",
+        "operationId": "saveKnowledgeFileContent",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveFileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Saveknowledgefilecontent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/knowledge/files/validate": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Validate file content (YAML/JSON)",
+        "operationId": "validateKnowledgeFileContent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateFileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Validateknowledgefilecontent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/knowledge/files/git/status": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Get Git status of the knowledge directory",
+        "operationId": "getKnowledgeGitStatus",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Getknowledgegitstatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/knowledge/files/git/pull": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Pull the latest knowledge from its Git repository",
+        "operationId": "gitPullKnowledge",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Gitpullknowledge"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/knowledge/files/git/push": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Open a pull request with the knowledge changes",
+        "operationId": "gitPushKnowledge",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitPushRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Gitpushknowledge"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/task-files/settings": {
@@ -21098,7 +21370,7 @@
           "commit_message": {
             "type": "string",
             "title": "Commit Message",
-            "default": "Update config files from UI"
+            "default": "Update files from UI"
           }
         },
         "type": "object",

@@ -22,7 +22,7 @@ src/app/
 │   ├── cryo/page.tsx           # /cryo
 │   ├── dashboard/page.tsx      # /dashboard
 │   ├── execution/page.tsx      # /execution
-│   ├── files/page.tsx          # /files
+│   ├── config/page.tsx         # /config (Qubex config editor)
 │   ├── forum/
 │   │   ├── page.tsx            # /forum
 │   │   └── [postId]/page.tsx   # /forum/:postId
@@ -32,9 +32,9 @@ src/app/
 │   ├── metrics/page.tsx        # /metrics
 │   ├── provenance/page.tsx     # /provenance
 │   ├── settings/page.tsx       # /settings
-│   ├── task-knowledge/
-│   │   ├── page.tsx            # /task-knowledge
-│   │   └── [taskName]/page.tsx # /task-knowledge/:taskName
+│   ├── knowledge/
+│   │   ├── page.tsx            # /knowledge
+│   │   └── [taskName]/page.tsx # /knowledge/:taskName
 │   ├── task-results/
 │   │   ├── page.tsx            # /task-results
 │   │   └── [taskId]/page.tsx   # /task-results/:taskId
@@ -105,7 +105,7 @@ components/
 │   ├── cryo/               # Cryostat monitoring components
 │   ├── dashboard/          # Dashboard components
 │   ├── execution/          # Execution page components
-│   ├── files/              # File management components
+│   ├── files/              # Config editor (git workspace) components
 │   ├── flow/               # Flow editor components
 │   ├── forum/              # Forum components
 │   ├── import/             # Data import components

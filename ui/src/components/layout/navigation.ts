@@ -103,8 +103,8 @@ export function getNavigationSections({
           match: "prefix",
         },
         {
-          href: "/task-knowledge",
-          label: "Task Knowledge",
+          href: "/knowledge",
+          label: "Knowledge",
           icon: BookMarked,
           match: "prefix",
         },
@@ -114,8 +114,8 @@ export function getNavigationSections({
       label: "Manage",
       items: [
         {
-          href: "/files",
-          label: "Files",
+          href: "/config",
+          label: "Config",
           icon: Files,
           match: "prefix",
           visible: canEdit,

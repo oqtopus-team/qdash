@@ -272,12 +272,7 @@ export function useDownloadZipFile<TData = Awaited<ReturnType<typeof downloadZip
 
 
 /**
- * Get file tree structure for entire config directory.
- *
- * Returns
- * -------
- *     File tree structure
- * @summary Get file tree for entire config directory
+ * @summary Get file tree of the config directory
  */
 export const getFileTree = (
 
@@ -286,7 +281,7 @@ export const getFileTree = (
 
 
       return customInstance<FileTreeNode[]>(
-      {url: `/files/tree`, method: 'GET', signal
+      {url: `/config/files/tree`, method: 'GET', signal
     },
       options);
     }
@@ -296,7 +291,7 @@ export const getFileTree = (
 
 export const getGetFileTreeQueryKey = () => {
     return [
-    `/files/tree`
+    `/config/files/tree`
     ] as const;
     }
 
@@ -348,7 +343,7 @@ export function useGetFileTree<TData = Awaited<ReturnType<typeof getFileTree>>, 
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get file tree for entire config directory
+ * @summary Get file tree of the config directory
  */
 
 export function useGetFileTree<TData = Awaited<ReturnType<typeof getFileTree>>, TError = unknown>(
@@ -369,16 +364,7 @@ export function useGetFileTree<TData = Awaited<ReturnType<typeof getFileTree>>, 
 
 
 /**
- * Get file content for editing.
- *
- * Args:
- * ----
- *     path: Relative path from CONFIG_BASE_PATH
- *
- * Returns:
- * -------
- *     File content and metadata
- * @summary Get file content for editing
+ * @summary Get config file content for editing
  */
 export const getFileContent = (
     params: GetFileContentParams,
@@ -387,7 +373,7 @@ export const getFileContent = (
 
 
       return customInstance<GetFileContent200>(
-      {url: `/files/content`, method: 'GET',
+      {url: `/config/files/content`, method: 'GET',
         params, signal
     },
       options);
@@ -398,7 +384,7 @@ export const getFileContent = (
 
 export const getGetFileContentQueryKey = (params?: GetFileContentParams,) => {
     return [
-    `/files/content`, ...(params ? [params] : [])
+    `/config/files/content`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -450,7 +436,7 @@ export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileConte
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get file content for editing
+ * @summary Get config file content for editing
  */
 
 export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = HTTPValidationError>(
@@ -471,16 +457,7 @@ export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileConte
 
 
 /**
- * Save file content.
- *
- * Args:
- * ----
- *     request: Save file request with path and content
- *
- * Returns:
- * -------
- *     Success message
- * @summary Save file content
+ * @summary Save config file content
  */
 export const saveFileContent = (
     saveFileRequest: SaveFileRequest,
@@ -489,7 +466,7 @@ export const saveFileContent = (
 
 
       return customInstance<SaveFileContent200>(
-      {url: `/files/content`, method: 'PUT',
+      {url: `/config/files/content`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
       data: saveFileRequest, signal
     },
@@ -531,7 +508,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SaveFileContentMutationError = HTTPValidationError
 
     /**
- * @summary Save file content
+ * @summary Save config file content
  */
 export const useSaveFileContent = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFileContent>>, TError,{data: SaveFileRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -544,15 +521,6 @@ export const useSaveFileContent = <TError = HTTPValidationError,
       return useMutation(getSaveFileContentMutationOptions(options), queryClient);
     }
     /**
- * Validate YAML or JSON content.
- *
- * Args:
- * ----
- *     request: Validation request with content and file_type
- *
- * Returns:
- * -------
- *     Validation result
  * @summary Validate file content (YAML/JSON)
  */
 export const validateFileContent = (
@@ -562,7 +530,7 @@ export const validateFileContent = (
 
 
       return customInstance<ValidateFileContent200>(
-      {url: `/files/validate`, method: 'POST',
+      {url: `/config/files/validate`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: validateFileRequest, signal
     },
@@ -617,12 +585,7 @@ export const useValidateFileContent = <TError = HTTPValidationError,
       return useMutation(getValidateFileContentMutationOptions(options), queryClient);
     }
     /**
- * Get Git status of config directory.
- *
- * Returns
- * -------
- *     Git status information
- * @summary Get Git status of config directory
+ * @summary Get Git status of the config directory
  */
 export const getGitStatus = (
 
@@ -631,7 +594,7 @@ export const getGitStatus = (
 
 
       return customInstance<GetGitStatus200>(
-      {url: `/files/git/status`, method: 'GET', signal
+      {url: `/config/files/git/status`, method: 'GET', signal
     },
       options);
     }
@@ -641,7 +604,7 @@ export const getGitStatus = (
 
 export const getGetGitStatusQueryKey = () => {
     return [
-    `/files/git/status`
+    `/config/files/git/status`
     ] as const;
     }
 
@@ -693,7 +656,7 @@ export function useGetGitStatus<TData = Awaited<ReturnType<typeof getGitStatus>>
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get Git status of config directory
+ * @summary Get Git status of the config directory
  */
 
 export function useGetGitStatus<TData = Awaited<ReturnType<typeof getGitStatus>>, TError = unknown>(
@@ -714,12 +677,7 @@ export function useGetGitStatus<TData = Awaited<ReturnType<typeof getGitStatus>>
 
 
 /**
- * Pull latest config from Git repository.
- *
- * Returns
- * -------
- *     Pull operation result
- * @summary Pull latest config from Git repository
+ * @summary Pull the latest config from its Git repository
  */
 export const gitPullConfig = (
 
@@ -728,7 +686,7 @@ export const gitPullConfig = (
 
 
       return customInstance<GitPullConfig200>(
-      {url: `/files/git/pull`, method: 'POST', signal
+      {url: `/config/files/git/pull`, method: 'POST', signal
     },
       options);
     }
@@ -768,7 +726,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type GitPullConfigMutationError = unknown
 
     /**
- * @summary Pull latest config from Git repository
+ * @summary Pull the latest config from its Git repository
  */
 export const useGitPullConfig = <TError = unknown,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gitPullConfig>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -781,16 +739,7 @@ export const useGitPullConfig = <TError = unknown,
       return useMutation(getGitPullConfigMutationOptions(options), queryClient);
     }
     /**
- * Push config changes to Git repository.
- *
- * Args:
- * ----
- *     request: Push request with commit message
- *
- * Returns:
- * -------
- *     Push operation result
- * @summary Push config changes to Git repository
+ * @summary Open a pull request with the config changes
  */
 export const gitPushConfig = (
     gitPushRequest: GitPushRequest,
@@ -799,7 +748,7 @@ export const gitPushConfig = (
 
 
       return customInstance<GitPushConfig200>(
-      {url: `/files/git/push`, method: 'POST',
+      {url: `/config/files/git/push`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: gitPushRequest, signal
     },
@@ -841,7 +790,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type GitPushConfigMutationError = HTTPValidationError
 
     /**
- * @summary Push config changes to Git repository
+ * @summary Open a pull request with the config changes
  */
 export const useGitPushConfig = <TError = HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gitPushConfig>>, TError,{data: GitPushRequest}, TContext>, request?: SecondParameter<typeof customInstance>}

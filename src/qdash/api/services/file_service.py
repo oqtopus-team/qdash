@@ -1,4 +1,10 @@
-"""Service for config file operations and Git integration."""
+"""Service for a git-backed file workspace: browsing, editing, pull, and push as a PR.
+
+Two workspaces are served: the Qubex config tree (``CONFIG_REPO_URL``) and the
+task knowledge repository (``KNOWLEDGE_REPO_URL``). The same service drives
+both; the workspace sets the directory, the repository, and what happens after
+a save or a pull.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +13,7 @@ import os
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from fastapi import BackgroundTasks, HTTPException
@@ -21,22 +27,125 @@ from qdash.common.config.path_resolver import resolve_config_base_path
 from qdash.common.utils.commit_message import format_machine_commit_message
 from qdash.common.utils.datetime import now_iso
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+
 logger = logging.getLogger(__name__)
 
 
 class FileService:
     """Service for config file browsing, editing, and Git operations."""
 
-    def __init__(self, config_base_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        config_base_path: Path | None = None,
+        *,
+        label: str = "config",
+        repo_url_env: str = "CONFIG_REPO_URL",
+        after_save: Callable[[], None] | None = None,
+        after_pull: Callable[[], None] | None = None,
+        push_exclude: tuple[str, ...] = (),
+    ) -> None:
         """Initialize the service.
 
         Parameters
         ----------
         config_base_path : Path | None
-            Base path for config files. Defaults to QUBEX_CONFIG_BASE.
+            Base path of the workspace. Defaults to the Qubex config tree.
+        label : str
+            Workspace name used in branch names, PR text, and messages.
+        repo_url_env : str
+            Environment variable holding the workspace's GitHub repository URL.
+        after_save : Callable[[], None] | None
+            Hook run after a file is saved (the knowledge workspace regenerates its JSON).
+        after_pull : Callable[[], None] | None
+            Hook run after a pull succeeds.
+        push_exclude : tuple[str, ...]
+            Workspace-relative paths left out of pushes (generated files CI rebuilds).
 
         """
         self._base_path = config_base_path or resolve_config_base_path()
+        self._label = label
+        self._repo_url_env = repo_url_env
+        self._after_save = after_save
+        self._after_pull = after_pull
+        self._push_exclude = set(push_exclude)
+
+    @property
+    def label(self) -> str:
+        """Workspace name."""
+        return self._label
+
+    def _git_env(self) -> dict[str, str]:
+        """Environment for git commands on this workspace.
+
+        The directory is a bind mount owned by the host user while the API runs
+        as root, which git refuses as "dubious ownership"; mark it safe for this
+        process only instead of writing a global git config. GitHub credentials
+        go through a one-shot credential helper so the token never lands in the
+        remote URL (which ``.git/config`` would keep in plain text on the mount).
+        """
+        entries = [("safe.directory", str(self._base_path))]
+        github_user = os.getenv("GITHUB_USER")
+        github_token = os.getenv("GITHUB_TOKEN")
+        env = {"GIT_TERMINAL_PROMPT": "0"}
+        if github_user and github_token:
+            env["QDASH_GIT_USER"] = github_user
+            env["QDASH_GIT_TOKEN"] = github_token
+            entries.append(
+                (
+                    "credential.helper",
+                    '!f() { echo "username=$QDASH_GIT_USER"; echo "password=$QDASH_GIT_TOKEN"; }; f',
+                )
+            )
+        env["GIT_CONFIG_COUNT"] = str(len(entries))
+        for index, (key, value) in enumerate(entries):
+            env[f"GIT_CONFIG_KEY_{index}"] = key
+            env[f"GIT_CONFIG_VALUE_{index}"] = value
+        return env
+
+    def _open_repo(self) -> Repo:
+        """Open the workspace repository with :meth:`_git_env` applied."""
+        repo = Repo(self._base_path)
+        repo.git.update_environment(**self._git_env())
+        return repo
+
+    def _match_owner(self, file_path: Path) -> None:
+        """Give a file the owner of its directory when running as root.
+
+        Files the API writes into a bind mount would otherwise be root-owned on
+        the host and break the host-side pull.
+        """
+        if os.name != "posix" or os.geteuid() != 0:
+            return
+        try:
+            parent = file_path.parent.stat()
+            os.chown(file_path, parent.st_uid, parent.st_gid)
+        except OSError as exc:
+            logger.debug("Could not match owner for %s: %s", file_path, exc)
+
+    def _run_hook(self, hook: Callable[[], None] | None, stage: str) -> None:
+        """Run a workspace hook; a failing hook fails the request, the file change stays."""
+        if hook is None:
+            return
+        try:
+            hook()
+        except Exception as e:
+            logger.error("%s workspace %s hook failed: %s", self._label, stage, e)
+            raise HTTPException(
+                status_code=500,
+                detail=f"{self._label.capitalize()} {stage} done, but applying it failed: {e!s}",
+            )
+
+    def _workspace_files(self) -> Iterator[Path]:
+        """Files to push, relative to the workspace, without git internals and excluded paths."""
+        for item in sorted(self._base_path.rglob("*")):
+            if ".git" in item.parts or not item.is_file():
+                continue
+            rel_path = item.relative_to(self._base_path)
+            if rel_path.as_posix() in self._push_exclude:
+                continue
+            yield rel_path
 
     def download_file(self, path: str) -> FileResponse:
         """Download a raw data file.
@@ -180,7 +289,7 @@ class FileService:
             is_saved_change = False
             git_dir = self._base_path / ".git"
             if git_dir.exists():
-                repo = Repo(self._base_path)
+                repo = self._open_repo()
                 if repo.head.is_valid():
                     try:
                         blob = repo.head.commit.tree / Path(path).as_posix()
@@ -230,14 +339,16 @@ class FileService:
         try:
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_text(content, encoding="utf-8")
+            self._match_owner(file_path)
             logger.info(f"File saved successfully: {file_path}")
-            return {
-                "message": "File saved successfully",
-                "path": path,
-            }
         except Exception as e:
             logger.error(f"Error saving file {file_path}: {e}")
             raise HTTPException(status_code=500, detail=f"Error saving file: {e!s}")
+        self._run_hook(self._after_save, "save")
+        return {
+            "message": "File saved successfully",
+            "path": path,
+        }
 
     def validate_file_content(self, content: str, file_type: str) -> dict[str, Any]:
         """Validate YAML or JSON content.
@@ -296,17 +407,18 @@ class FileService:
         try:
             if not self._base_path.exists():
                 raise HTTPException(
-                    status_code=404, detail=f"Config directory not found: {self._base_path}"
+                    status_code=404,
+                    detail=f"{self._label.capitalize()} directory not found: {self._base_path}",
                 )
 
             git_dir = self._base_path / ".git"
             if not git_dir.exists():
                 return {
                     "is_git_repo": False,
-                    "message": "Config directory is not a Git repository",
+                    "message": f"{self._label.capitalize()} directory is not a Git repository",
                 }
 
-            repo = Repo(self._base_path)
+            repo = self._open_repo()
 
             current_branch = repo.active_branch.name
             current_commit = repo.head.commit.hexsha[:8]
@@ -317,6 +429,10 @@ class FileService:
 
             has_remote_updates = False
             try:
+                # Private repositories need the credentials; without them the
+                # fetch would fail on every status poll.
+                if not os.getenv("GITHUB_TOKEN"):
+                    raise RuntimeError("no GitHub credentials configured")
                 repo.remotes.origin.fetch()
                 local_sha = repo.head.commit.hexsha
                 remote_sha = repo.remotes.origin.refs.main.commit.hexsha
@@ -351,7 +467,7 @@ class FileService:
         import shutil
         from urllib.parse import urlparse, urlunparse
 
-        repo_url = os.getenv("CONFIG_REPO_URL")
+        repo_url = os.getenv(self._repo_url_env)
 
         try:
             github_user = os.getenv("GITHUB_USER")
@@ -362,29 +478,25 @@ class FileService:
                     status_code=500,
                     detail=(
                         "Missing required environment variables:"
-                        " GITHUB_USER, GITHUB_TOKEN, CONFIG_REPO_URL"
+                        f" GITHUB_USER, GITHUB_TOKEN, {self._repo_url_env}"
                     ),
                 )
 
             assert repo_url is not None
 
-            parsed = urlparse(repo_url)
-            auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-            auth_url: str = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
-
             if (self._base_path / ".git").exists():
                 logger.info("Fetching latest changes from remote")
-                repo = Repo(self._base_path)
-                repo.remotes.origin.set_url(auth_url)
+                repo = self._open_repo()
+                repo.remotes.origin.set_url(repo_url)
                 repo.remotes.origin.fetch()
                 repo.git.reset("--hard", "origin/main")
                 repo.git.clean("-fd")
             else:
-                logger.info("Cloning repository to config directory")
+                logger.info(f"Cloning repository to the {self._label} directory")
                 if self._base_path.exists():
                     shutil.rmtree(self._base_path)
                 self._base_path.parent.mkdir(parents=True, exist_ok=True)
-                repo = Repo.clone_from(auth_url, str(self._base_path), depth=1)
+                repo = Repo.clone_from(repo_url, str(self._base_path), depth=1, env=self._git_env())
 
             current = repo.head.commit
             commit_sha = current.hexsha[:8]
@@ -395,13 +507,14 @@ class FileService:
             ).strip()
 
             logger.info(f"Updated to commit: {commit_sha} - {commit_msg}")
-            logger.info(f"Config files updated successfully in: {self._base_path}")
+            logger.info(f"{self._label.capitalize()} files updated in: {self._base_path}")
+            self._run_hook(self._after_pull, "pull")
 
             return {
                 "success": True,
                 "commit": commit_sha,
                 "commit_message": commit_msg,
-                "message": "Config files updated successfully",
+                "message": f"{self._label.capitalize()} files updated successfully",
             }
 
         except GitCommandError as e:
@@ -444,7 +557,7 @@ class FileService:
 
         import httpx
 
-        repo_url = os.getenv("CONFIG_REPO_URL")
+        repo_url = os.getenv(self._repo_url_env)
 
         try:
             github_user = os.getenv("GITHUB_USER")
@@ -455,7 +568,7 @@ class FileService:
                     status_code=500,
                     detail=(
                         "Missing required environment variables:"
-                        " GITHUB_USER, GITHUB_TOKEN, CONFIG_REPO_URL"
+                        f" GITHUB_USER, GITHUB_TOKEN, {self._repo_url_env}"
                     ),
                 )
 
@@ -463,36 +576,29 @@ class FileService:
 
             match = re.match(r"https?://[^/]+/([^/]+)/([^/]+?)(?:\.git)?$", repo_url)
             if not match:
-                raise HTTPException(status_code=500, detail="Invalid CONFIG_REPO_URL format")
+                raise HTTPException(status_code=500, detail=f"Invalid {self._repo_url_env} format")
             owner = match.group(1)
             repo_name = match.group(2)
-
-            parsed = urlparse(repo_url)
-            auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-            auth_url: str = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
 
             temp_dir = tempfile.mkdtemp()
             temp_dir_path = Path(temp_dir)
 
             try:
                 logger.info("Cloning repository to temporary directory")
-                repo = Repo.clone_from(auth_url, temp_dir, branch="main", depth=1)
-
-                branch_name = (
-                    f"config-update/{datetime.now(tz=timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+                repo = Repo.clone_from(
+                    repo_url, temp_dir, branch="main", depth=1, env=self._git_env()
                 )
+
+                stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
+                branch_name = f"{self._label}-update/{stamp}"
                 repo.git.checkout("-b", branch_name)
 
                 added_files = []
-                for item in self._base_path.rglob("*"):
-                    if ".git" in item.parts:
-                        continue
-                    if item.is_file():
-                        rel_path = item.relative_to(self._base_path)
-                        destination = temp_dir_path / rel_path
-                        destination.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(item, destination)
-                        added_files.append(str(rel_path))
+                for rel_path in self._workspace_files():
+                    destination = temp_dir_path / rel_path
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(self._base_path / rel_path, destination)
+                    added_files.append(str(rel_path))
 
                 if not added_files:
                     logger.info("No files to commit")
@@ -537,7 +643,7 @@ class FileService:
                         "head": branch_name,
                         "base": "main",
                         "body": (
-                            f"Config update from QDash UI\n\n"
+                            f"{self._label.capitalize()} update from QDash UI\n\n"
                             f"- Commit: `{commit_sha}`\n"
                             f"- Timestamp: {now_jst}\n"
                         ),

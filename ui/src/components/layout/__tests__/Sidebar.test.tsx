@@ -94,7 +94,7 @@ describe("Sidebar", () => {
     const { container } = render(<Sidebar />);
 
     const { mobile } = getAsides(container);
-    const label = within(mobile as HTMLElement).getByText("Task Knowledge");
+    const label = within(mobile as HTMLElement).getByText("Knowledge");
 
     expect(label.className).toContain("truncate");
   });

@@ -26,7 +26,7 @@ function TaskCard({ item }: { item: TaskKnowledgeSummaryResponse }) {
 
   return (
     <div
-      onClick={() => router.push(`/task-knowledge/${item.name}`)}
+      onClick={() => router.push(`/knowledge/${item.name}`)}
       className="bg-base-100 rounded-lg border border-base-300 cursor-pointer hover:border-primary/50 transition-colors"
     >
       <div className="p-4">
