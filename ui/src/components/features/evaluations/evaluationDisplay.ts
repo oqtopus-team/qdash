@@ -57,13 +57,6 @@ export function triggerLabel(trigger: string): string {
   return trigger === "single" ? "Single result" : "Chip";
 }
 
-export function statusBadgeClass(status: string): string {
-  if (status === "completed") return "badge-success";
-  if (status === "failed") return "badge-error";
-  if (status === "running") return "badge-info";
-  return "badge-ghost";
-}
-
 /** `name@version`, with the checkout commit when the code came from a mounted checkout. */
 export function evaluatorLabel(
   evaluator: { name: string; version: string; commit?: string | null } | null | undefined,
