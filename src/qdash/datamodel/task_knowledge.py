@@ -52,20 +52,6 @@ class KnowledgeFigure(BaseModel):
     path: str = Field(description="Path relative to the task directory")
 
 
-class KnowledgeOutcome(BaseModel):
-    """How one of the four outcomes looks on this task's plot."""
-
-    outcome: str = Field(description="expected | suboptimal | anomalous | apparatus")
-    description: str = Field(default="")
-
-
-class KnowledgeParameter(BaseModel):
-    """A value the evaluation model should read off the plot."""
-
-    name: str
-    description: str = Field(default="")
-
-
 class KnowledgeExample(BaseModel):
     """One expert-labeled plot: a demonstration for in-context evaluation."""
 
@@ -94,23 +80,23 @@ class KnowledgeExample(BaseModel):
 class TaskKnowledge(BaseModel):
     """What the knowledge repository says about one calibration task.
 
-    The shape follows the QCalEval / Ising-Calibration papers: a short
-    background, the outcome vocabulary described for this plot, parameters to
-    extract, and labeled example plots. Old-format entries (summary,
-    what_it_measures, ...) are read for their background only.
+    The shape follows the QCalEval / Ising-Calibration papers: a prose
+    background for the experiment (the task's ``index.md``) and labeled
+    example plots. The category is the calibtasks package the task lives in.
+    Old-format entries (summary, what_it_measures, ...) are read for their
+    background only.
     """
 
     model_config = ConfigDict(extra="ignore")
 
     name: str = Field(description="Task name (e.g. CheckT1)")
-    category: str = Field(default="", description="Category slug (e.g. td-characterization)")
+    category: str = Field(default="", description="calibtasks package (e.g. one_qubit_coarse)")
     background: str = Field(
-        default="", description="What the experiment does and what the plot shows"
+        default="", description="The task's index.md: what the experiment does and shows"
     )
-    expected_plot: str = Field(default="", description="What a good result looks like")
-    expected_figures: list[KnowledgeFigure] = Field(default_factory=list)
-    outcomes: list[KnowledgeOutcome] = Field(default_factory=list)
-    parameters: list[KnowledgeParameter] = Field(default_factory=list)
+    figures: list[KnowledgeFigure] = Field(
+        default_factory=list, description="Figures index.md references"
+    )
     examples: list[KnowledgeExample] = Field(default_factory=list)
 
     @model_validator(mode="before")
@@ -121,12 +107,8 @@ class TaskKnowledge(BaseModel):
         data = dict(data)
         parts = [data.get("summary", ""), data.get("what_it_measures", "")]
         data["background"] = "\n\n".join(p for p in parts if p)
-        expected = data.get("expected_result") or {}
         data.setdefault(
-            "expected_plot", expected.get("description", "") if isinstance(expected, dict) else ""
-        )
-        data.setdefault(
-            "expected_figures",
+            "figures",
             [
                 {"alt": img.get("alt_text", ""), "path": img.get("relative_path", "")}
                 for img in data.get("images", [])
@@ -141,23 +123,12 @@ class TaskKnowledge(BaseModel):
         return self.background.split("\n\n", 1)[0].strip()
 
     def to_prompt(self, *, include_examples: bool = False) -> str:
-        """Render the task's reference text for a model.
+        """Render the task's reference text for a model: the background as written.
 
         Examples are appended as text only on request (the chat opens with
         them); the evaluation path shows them as figure + label pairs instead.
         """
         lines = [f"## Experiment: {self.name}", self.background.strip()]
-        if self.expected_plot.strip():
-            lines += ["", "### Expected plot", self.expected_plot.strip()]
-        if self.outcomes:
-            lines += ["", "### Outcomes"]
-            lines += [f"- {o.outcome}: {o.description}" for o in self.outcomes]
-        if self.parameters:
-            lines += ["", "### Parameters to extract"]
-            lines += [
-                f"- {p.name}: {p.description}" if p.description else f"- {p.name}"
-                for p in self.parameters
-            ]
         if include_examples and self.examples:
             lines += ["", "### Labeled examples"]
             for example in self.examples:
@@ -345,109 +316,21 @@ def get_task_knowledge_repo_metadata() -> tuple[str | None, str | None]:
         return repo_url, None
 
 
-# Category slug → display name mapping
+# Category = the calibtasks package the task lives in → display name.
 CATEGORY_DISPLAY_NAMES: dict[str, str] = {
-    "box-setup": "Box Setup",
+    "box_setup": "Box Setup",
     "system": "System",
-    "cw-characterization": "CW Characterization",
-    "td-characterization": "TD Characterization",
-    "one-qubit-gate-calibration": "One-Qubit Gate Calibration",
-    "two-qubit-gate-calibration": "Two-Qubit Gate Calibration",
-    "benchmarking": "Benchmarking",
+    "cw": "CW Characterization",
+    "measurement": "Measurement",
+    "one_qubit_coarse": "One-Qubit Coarse",
+    "one_qubit_fine": "One-Qubit Fine",
+    "two_qubit": "Two-Qubit",
+    "benchmark": "Benchmark",
+    "analysis": "Analysis",
 }
-
-# Canonical task → category directory mapping.
-# This is the single source of truth used by both the API and the
-# ``generate_task_knowledge.py`` script.
-TASK_TO_CATEGORY_DIR: dict[str, str] = {}
-_CATEGORIES: list[tuple[str, str, list[str]]] = [
-    (
-        "Box Setup",
-        "box-setup",
-        [
-            "CheckStatus",
-            "LinkUp",
-            "DumpBox",
-            "CheckNoise",
-            "Configure",
-            "ConfigureAll",
-            "ReadoutConfigure",
-        ],
-    ),
-    (
-        "CW Characterization",
-        "cw-characterization",
-        [
-            "CheckResonatorSpectroscopy",
-            "CheckQubitSpectroscopy",
-        ],
-    ),
-    (
-        "TD Characterization",
-        "td-characterization",
-        [
-            "CheckRabi",
-            "CheckT1",
-            "CheckT2Echo",
-            "CheckRamsey",
-            "CheckOptimalReadoutAmplitude",
-            "ReadoutClassification",
-            "CheckFineChevron",
-        ],
-    ),
-    (
-        "One-Qubit Gate Calibration",
-        "one-qubit-gate-calibration",
-        [
-            "CheckPIPulse",
-            "CheckHPIPulse",
-            "CheckDRAGPIPulse",
-            "CheckDRAGHPIPulse",
-            "CreatePIPulse",
-            "CreateHPIPulse",
-            "CreateDRAGPIPulse",
-            "CreateDRAGHPIPulse",
-        ],
-    ),
-    (
-        "Two-Qubit Gate Calibration",
-        "two-qubit-gate-calibration",
-        [
-            "CheckCrossResonance",
-            "CheckZX90",
-            "CreateZX90",
-            "CheckBellState",
-            "CheckBellStateTomography",
-        ],
-    ),
-    (
-        "Benchmarking",
-        "benchmarking",
-        [
-            "RandomizedBenchmarking",
-            "X90InterleavedRandomizedBenchmarking",
-            "X180InterleavedRandomizedBenchmarking",
-            "ZX90InterleavedRandomizedBenchmarking",
-        ],
-    ),
-]
-for _cat_name, _cat_dir, _cat_tasks in _CATEGORIES:
-    for _t in _cat_tasks:
-        TASK_TO_CATEGORY_DIR[_t] = _cat_dir
 
 
 def get_task_category_dir(task_name: str) -> str:
-    """Return the category directory slug for a task name.
-
-    First checks the static ``TASK_TO_CATEGORY_DIR`` mapping (covers
-    all known tasks even without a knowledge entry), then falls back
-    to the loaded registry's ``category`` field.
-    Returns ``"other"`` if the task is completely unknown.
-    """
-    cat = TASK_TO_CATEGORY_DIR.get(task_name)
-    if cat:
-        return cat
+    """The calibtasks package a task's knowledge lives under, or ``"other"``."""
     entry = _registry().get(task_name)
-    if entry and entry.category:
-        return entry.category
-    return "other"
+    return entry.category if entry and entry.category else "other"

@@ -25,9 +25,10 @@ multiple results. Threads can also be linked to a chip, a qubit or coupling, and
 
 ## Reuse Knowledge
 
-**Knowledge** contains the maintained baseline for each calibration task: its background, the
-expected plot, how each outcome (expected, suboptimal, anomalous, apparatus) looks, the parameters
-to extract, and expert-labeled example plots. It is the reference the chat planner and the
+**Knowledge** contains the maintained baseline for each calibration task: its background and
+expert-labeled example plots. Every task's background follows the same template: a short intro,
+**Expected plot**, **Common failures**, and **Parameters to extract**. Tasks are grouped by the
+calibtasks package they live in. It is the reference the chat planner and the
 evaluation model read; keep it current when a forum thread settles something that should hold
 next time. The page edits the knowledge repository the way **Config** edits the Qubex
 configuration. **Edit** on a task opens its Markdown source; a save takes effect in this QDash at
@@ -37,7 +38,8 @@ whole repository in the file editor for cases, images, and the README; Markdown 
 a **Preview** and **Split** view, the explorer marks modified and untracked files, and the **Changes**
 tab shows every saved edit as a diff against the last commit before you create the pull request.
 **Pull** and the ZIP download sit in the repository menu (the branch button). The first heading of a
-task's file is its name, so keep it unchanged.
+task's file is its name, so keep it unchanged; the knowledge repository rejects headings outside the
+template.
 
 ## Request an AI Evaluation
 

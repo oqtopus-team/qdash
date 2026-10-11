@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 def _entry(name: str, summary: str) -> dict[str, object]:
-    return {"name": name, "category": "td-characterization", "background": summary}
+    return {"name": name, "category": "one_qubit_coarse", "background": summary}
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ def test_previous_format_entries_still_load(knowledge_repo: Path) -> None:
             {
                 "CheckRabi": {
                     "name": "CheckRabi",
-                    "category": "td-characterization",
+                    "category": "one_qubit_coarse",
                     "summary": "Rabi oscillation.",
                     "what_it_measures": "Drive amplitude calibration.",
                     "physical_principle": "ignored",
@@ -114,18 +114,14 @@ def test_previous_format_entries_still_load(knowledge_repo: Path) -> None:
     assert knowledge is not None
     assert knowledge.summary == "Rabi oscillation."
     assert knowledge.background == "Rabi oscillation.\n\nDrive amplitude calibration."
-    assert knowledge.expected_plot == "A damped cosine."
-    assert knowledge.expected_figures[0].path == "./rabi.png"
-    assert knowledge.outcomes == []
+    assert knowledge.figures[0].path == "./rabi.png"
+    assert knowledge.examples == []
 
 
 def test_prompt_rendering_and_example_labels() -> None:
     knowledge = tk.TaskKnowledge(
         name="CheckT1",
-        background="Measures T1.",
-        expected_plot="Exponential decay.",
-        outcomes=[tk.KnowledgeOutcome(outcome="expected", description="clean decay")],
-        parameters=[tk.KnowledgeParameter(name="t1", description="T1 (μs)")],
+        background="Measures T1.\n\nExponential decay; extract t1 (μs).",
         examples=[
             tk.KnowledgeExample(
                 id="e1",
@@ -139,12 +135,16 @@ def test_prompt_rendering_and_example_labels() -> None:
     )
 
     prompt = knowledge.to_prompt()
-    assert prompt.splitlines()[0] == "## Experiment: CheckT1"
+    assert prompt == "## Experiment: CheckT1\nMeasures T1.\n\nExponential decay; extract t1 (μs)."
     assert "### Labeled examples" not in prompt
-    assert "- t1: T1 (μs)" in prompt
     assert "Short T1 (suboptimal, pass_with_note): T1 = 14 μs" in knowledge.to_prompt(
         include_examples=True
     )
     assert knowledge.examples[0].label() == (
         "Outcome: suboptimal\nFit quality: good\nVerdict: pass_with_note\nT1 = 14 μs with a clean fit."
     )
+
+
+def test_category_is_the_calibtasks_package_of_the_knowledge_entry(knowledge_repo: Path) -> None:
+    assert tk.get_task_category_dir("CheckT1") == "one_qubit_coarse"
+    assert tk.get_task_category_dir("Nope") == "other"

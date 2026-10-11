@@ -371,8 +371,6 @@ export * from './inputParameterModel';
 export * from './inputParameterModelValue';
 export * from './knowledgeExampleResponse';
 export * from './knowledgeFigureResponse';
-export * from './knowledgeOutcomeResponse';
-export * from './knowledgeParameterResponse';
 export * from './latestTaskResultResponse';
 export * from './latestTaskResultResponseResult';
 export * from './lineageEdgeResponse';

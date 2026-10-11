@@ -13,8 +13,6 @@ from qdash.api.schemas.task import (
     InputParameterModel,
     KnowledgeExampleResponse,
     KnowledgeFigureResponse,
-    KnowledgeOutcomeResponse,
-    KnowledgeParameterResponse,
     ListTaskKnowledgeResponse,
     ListTaskResponse,
     ReExecutionEntry,
@@ -215,9 +213,8 @@ class TaskService:
                 name=k.name,
                 category=k.category,
                 summary=k.summary,
-                outcome_count=len(k.outcomes),
                 example_count=len(k.examples),
-                figure_count=len(k.expected_figures) + sum(len(e.figures) for e in k.examples),
+                figure_count=len(k.figures) + sum(len(e.figures) for e in k.examples),
             )
             for k in _list_all_knowledge()
         ]
@@ -246,10 +243,7 @@ class TaskService:
             name=knowledge.name,
             category=knowledge.category,
             background=knowledge.background,
-            expected_plot=knowledge.expected_plot,
-            expected_figures=[_figure(f) for f in knowledge.expected_figures],
-            outcomes=[KnowledgeOutcomeResponse(**o.model_dump()) for o in knowledge.outcomes],
-            parameters=[KnowledgeParameterResponse(**p.model_dump()) for p in knowledge.parameters],
+            figures=[_figure(f) for f in knowledge.figures],
             examples=[
                 KnowledgeExampleResponse(
                     **example.model_dump(exclude={"figures"}),

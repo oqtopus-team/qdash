@@ -7,21 +7,17 @@
  */
 import type { KnowledgeExampleResponse } from './knowledgeExampleResponse';
 import type { KnowledgeFigureResponse } from './knowledgeFigureResponse';
-import type { KnowledgeOutcomeResponse } from './knowledgeOutcomeResponse';
-import type { KnowledgeParameterResponse } from './knowledgeParameterResponse';
 
 /**
- * Task knowledge: background, outcomes, parameters, labeled examples, and the rendered prompt.
+ * Task knowledge: the background, its figures, labeled examples, and the rendered prompt.
  */
 export interface TaskKnowledgeResponse {
   name: string;
+  /** calibtasks package, e.g. one_qubit_coarse */
   category?: string;
   background?: string;
-  expected_plot?: string;
-  expected_figures?: KnowledgeFigureResponse[];
-  outcomes?: KnowledgeOutcomeResponse[];
-  parameters?: KnowledgeParameterResponse[];
+  figures?: KnowledgeFigureResponse[];
   examples?: KnowledgeExampleResponse[];
-  /** Background, expected plot, outcomes, parameters as Markdown */
+  /** The background as Markdown, headed by the experiment name */
   prompt_text: string;
 }
