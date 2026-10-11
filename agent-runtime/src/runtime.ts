@@ -1,9 +1,14 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { DefaultResourceLoader, ModelRuntime } from "@earendil-works/pi-coding-agent";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import {
+  DefaultResourceLoader,
+  ModelRuntime,
+  type ToolDefinition as CodingAgentTool,
+} from "@earendil-works/pi-coding-agent";
 import {
   AssistantEntry,
   createRegistry,
@@ -35,15 +40,32 @@ import {
   buildLocalToolGuide,
   localToolNames,
   describeExtensionError,
+  extensionPackage,
+  isTrustedExtension,
   withoutReplacedInstalls,
   discoverExtensionCheckouts,
   trustedCheckoutRoots,
 } from "./local-extensions.ts";
 import {
   buildQDashExtension,
+  runCodingAgentTool,
   type ApprovalRequest,
   type QDashWriteTools,
 } from "./durable-tools.ts";
+import {
+  EVALUATION_TOOL,
+  EVIDENCE_TOOL,
+  EvaluationError,
+  evaluateTask,
+  plannerInstruction,
+  plannerOutcome,
+  recordFromDetails,
+  type EvaluateRequest,
+  type EvaluateResult,
+  type ToolRun,
+} from "./evaluate.ts";
+import { formatSettledDetail } from "./events.ts";
+import { fetchTaskKnowledge } from "./knowledge-context.ts";
 import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
 import { buildSystemPrompt } from "./prompt.ts";
 import { buildPythonTool } from "./python-tool.ts";
@@ -55,7 +77,8 @@ const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
 const STATE_DIR = process.env.AGENT_STATE_DIR ?? "/app/state";
 const COPILOT_CONFIG_PATH = process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
 const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
-const REVIEW_CONFIG_PATH = process.env.REVIEW_CONFIG_PATH ?? "/app/config/copilot/review.yaml";
+const EVALUATION_CONFIG_PATH =
+  process.env.EVALUATION_CONFIG_PATH ?? "/app/config/copilot/evaluation.yaml";
 // One model request; a whole turn is bounded by the server's own timers.
 const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 180_000);
 const EXPERIMENTAL_WRITE_TOOLS_ENABLED = ["1", "true", "yes", "on"].includes(
@@ -95,6 +118,12 @@ export function sessionStorageName(ownerId: string, sessionId: string): string {
   return `${createHash("sha256").update(ownerId).update("\0").update(sessionId).digest("hex")}.sqlite`;
 }
 
+/** An enabled extension tool and the file that defines it. */
+interface EnabledTool {
+  definition: CodingAgentTool;
+  path?: string;
+}
+
 /** Process-wide model, extension, and durable-harness configuration. */
 export class SharedRuntime {
   private constructor(
@@ -104,6 +133,8 @@ export class SharedRuntime {
       writeTools: QDashWriteTools;
     },
     private readonly toolNames: string[],
+    /** The same tools the chat registry adapts, for running outside a conversation. */
+    private readonly enabledTools: ReadonlyMap<string, EnabledTool>,
   ) {}
 
   /** Load the Pi model catalog and adapt the installed pi-qdash extension once. */
@@ -133,7 +164,7 @@ export class SharedRuntime {
 
     const modelsPath = writeModelsConfig(
       CHAT_CONFIG_PATH,
-      REVIEW_CONFIG_PATH,
+      EVALUATION_CONFIG_PATH,
       join(AGENT_DIR, "models.json"),
     );
     const modelRuntime = await ModelRuntime.create({
@@ -236,8 +267,166 @@ export class SharedRuntime {
       "ask_user",
       ...(skills.length ? ["read_skill"] : []),
     ];
+    // Pinned definitions first so a trusted one replaces, as in buildQDashExtension.
+    const enabledTools = new Map<string, EnabledTool>();
+    const trusted = (extension: { path: string }) =>
+      isTrustedExtension(extension.path, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES);
+    for (const extension of [...extensions].sort((a, b) => Number(trusted(a)) - Number(trusted(b)))) {
+      for (const [name, registered] of extension.tools) {
+        if (allowed.has(name)) enabledTools.set(name, { definition: registered.definition, path: extension.path });
+      }
+    }
 
-    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames);
+    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames, enabledTools);
+  }
+
+  /** A configured model named by the request, or none when the request names none. */
+  private resolveModel(provider: string | undefined, modelName: string | undefined): Model<Api> | undefined {
+    if (!provider && !modelName) return undefined;
+    if (!provider || !modelName) {
+      throw new EvaluationError("request", "model needs both provider and name", 400);
+    }
+    const providerId = PROVIDER_ALIASES[provider] ?? provider;
+    const model = this.modelRuntime.getModel(providerId, modelName);
+    if (!model) {
+      throw new EvaluationError(
+        "request",
+        `unknown model ${providerId}/${modelName}: not declared in chat.yaml or evaluation.yaml`,
+        400,
+      );
+    }
+    return model;
+  }
+
+  /**
+   * Evaluate one task result's figure without a conversation: evidence from
+   * pi-qdash, judgement from pi-qcaleval, QDash's reference in between. The
+   * optional model only serves pi-qcaleval's fallback when no calibration VLM
+   * is configured.
+   */
+  async evaluateTask(
+    request: EvaluateRequest & { provider?: string; modelName?: string },
+    auth: QDashAuth,
+    signal?: AbortSignal,
+  ): Promise<EvaluateResult> {
+    const evidence = this.enabledTools.get(EVIDENCE_TOOL);
+    const evaluation = this.enabledTools.get(EVALUATION_TOOL);
+    if (!evidence || !evaluation) {
+      const missing = [!evidence && EVIDENCE_TOOL, !evaluation && EVALUATION_TOOL].filter(Boolean);
+      throw new EvaluationError("request", `evaluation tools not loaded: ${missing.join(", ")}`, 503);
+    }
+    const model = this.resolveModel(request.provider, request.modelName);
+    const connection = await createQDashConnection(auth);
+    try {
+      return await evaluateTask(request, {
+        runTool: async (name, args) => {
+          const tool = this.enabledTools.get(name);
+          if (!tool) throw new EvaluationError("request", `tool ${name} is not enabled`, 503);
+          return (await runCodingAgentTool(
+            tool.definition,
+            `evaluate:${randomUUID()}`,
+            args,
+            signal,
+            this.modelRuntime,
+            WORK_DIR,
+            connection,
+            model,
+          )) as ToolRun;
+        },
+        fetchKnowledge: (taskName) => fetchTaskKnowledge(connection, taskName, signal),
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
+      });
+    } finally {
+      await connection.close();
+    }
+  }
+
+  /**
+   * Evaluate one task result the way the chat does: a planner turn in a
+   * throwaway conversation, told to summarise the result and judge its figure.
+   * The record comes from the `qcal_evaluate` result the durable wrapper
+   * stamped (see evaluate.ts), so it has the same shape as a direct
+   * evaluation, plus what the planner did and answered. The conversation's
+   * state is removed afterwards.
+   */
+  async evaluateWithPlanner(
+    request: EvaluateRequest & {
+      provider?: string;
+      modelName?: string;
+      thinkingLevel?: ThinkingLevel;
+    },
+    auth: QDashAuth,
+    signal?: AbortSignal,
+  ): Promise<EvaluateResult> {
+    if (!request.provider || !request.modelName) {
+      throw new EvaluationError("request", "planner mode needs a model provider and name", 400);
+    }
+    this.resolveModel(request.provider, request.modelName);
+    const evaluation = this.enabledTools.get(EVALUATION_TOOL);
+    if (!evaluation) {
+      throw new EvaluationError("request", `evaluation tools not loaded: ${EVALUATION_TOOL}`, 503);
+    }
+    const ownerId = "evaluation";
+    const sessionId = `planner-${randomUUID()}`;
+    const started = Date.now();
+    const opened = await this.openSession(
+      {
+        ownerId,
+        sessionId,
+        message: "",
+        provider: request.provider,
+        modelName: request.modelName,
+        thinkingLevel: request.thinkingLevel,
+      },
+      auth,
+    );
+    try {
+      const { conversation } = opened;
+      const onAbort = () => void conversation.abort(BACKGROUND_CONTEXT);
+      signal?.addEventListener("abort", onAbort, { once: true });
+      let settled;
+      try {
+        const submission = await conversation.submit(
+          { type: "input", content: plannerInstruction(request.taskId, request.question) },
+          BACKGROUND_CONTEXT,
+        );
+        settled = await submission.wait(BACKGROUND_CONTEXT);
+      } finally {
+        signal?.removeEventListener("abort", onAbort);
+      }
+      const view = await conversation.context(BACKGROUND_CONTEXT);
+      const outcome = plannerOutcome(view.entries);
+      const answer =
+        settled.status === "done" && settled.type === "input"
+          ? await answerText(conversation, settled.answer)
+          : "";
+      if (outcome.error) throw new EvaluationError("evaluation", outcome.error);
+      if (!outcome.details) {
+        const why =
+          settled.status === "done"
+            ? `the planner did not call ${EVALUATION_TOOL}${answer ? `: ${answer.slice(0, 300)}` : ""}`
+            : `planner turn ${settled.reason}${formatSettledDetail(settled.detail)}`;
+        throw new EvaluationError("evaluation", why);
+      }
+      const providerId = PROVIDER_ALIASES[request.provider] ?? request.provider;
+      return recordFromDetails(request.taskId, outcome.details, {
+        mode: "planner",
+        usage: outcome.usage,
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
+        planner: {
+          model: `${providerId}/${request.modelName}`,
+          answer,
+          tool_calls: outcome.toolCalls,
+          duration_ms: Date.now() - started,
+        },
+      });
+    } finally {
+      try {
+        await opened.close();
+      } finally {
+        this.deleteSessionState(ownerId, sessionId);
+      }
+    }
   }
 
   /** Resolve a configured QDash model without allowing an invisible fallback. */
@@ -250,7 +439,7 @@ export class SharedRuntime {
     const model = this.modelRuntime.getModel(providerId, modelName);
     if (!model) {
       throw new Error(
-        `unknown model ${providerId}/${modelName}: not declared in chat.yaml or review.yaml`,
+        `unknown model ${providerId}/${modelName}: not declared in chat.yaml or evaluation.yaml`,
       );
     }
     return {

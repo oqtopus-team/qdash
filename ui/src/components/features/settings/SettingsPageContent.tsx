@@ -21,10 +21,10 @@ import {
   useUpdateProjectMember,
 } from "@/client/projects/projects";
 import {
-  buildAnalysisModelOptions,
-  getStoredAnalysisModelKey,
-  resolveAnalysisModelOption,
-  setStoredAnalysisModelKey,
+  buildChatModelOptions,
+  getStoredChatModelKey,
+  resolveChatModelOption,
+  setStoredChatModelKey,
 } from "@/lib/copilotModels";
 import type { MemberResponse, ProjectRole } from "@/schemas";
 import { getGetCurrentUserQueryKey, useUpdateCurrentUserProfile } from "@/client/auth/auth";
@@ -42,17 +42,17 @@ function roleBadgeClass(role: ProjectRole) {
 }
 
 function CopilotSettingsPanel() {
-  const [selectedModelKey, setSelectedModelKey] = useState(getStoredAnalysisModelKey);
+  const [selectedModelKey, setSelectedModelKey] = useState(getStoredChatModelKey);
   const { data: copilotConfigResponse, isLoading } = useGetCopilotConfig();
   const modelOptions = useMemo(
-    () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
+    () => buildChatModelOptions(copilotConfigResponse?.data ?? null),
     [copilotConfigResponse?.data],
   );
-  const selectedModel = resolveAnalysisModelOption(modelOptions, selectedModelKey);
+  const selectedModel = resolveChatModelOption(modelOptions, selectedModelKey);
 
   const handleModelChange = (key: string) => {
     setSelectedModelKey(key);
-    setStoredAnalysisModelKey(key);
+    setStoredChatModelKey(key);
   };
 
   return (
@@ -61,7 +61,7 @@ function CopilotSettingsPanel() {
         <h2 className="card-title text-xl mb-4">Copilot Settings</h2>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
-            <label className="text-sm font-medium">Default analysis model</label>
+            <label className="text-sm font-medium">Default chat model</label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <select
                 className="select select-bordered w-full sm:max-w-md"

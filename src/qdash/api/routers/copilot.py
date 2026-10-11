@@ -42,9 +42,8 @@ from qdash.api.services.copilot_chat_session_service import (
 )
 from qdash.copilot.config import (
     CopilotConfig,
-    ModelConfig,
     load_copilot_config,
-    select_analysis_model,
+    select_chat_model,
 )
 from qdash.copilot.contracts import (
     AnalysisResponse,
@@ -64,31 +63,21 @@ logger = logging.getLogger(__name__)
 
 
 def _config_with_request_model(config: CopilotConfig, request: AnalyzeRequest) -> CopilotConfig:
-    """Apply a per-request analysis model override when one is provided."""
-    if request.analysis_model_override is None:
-        return config
-    return config.model_copy(update={"analysis_model": request.analysis_model_override})
+    """Resolve the planner for a task-result chat into ``config.model``.
 
-
-def _resolve_chat_model(config: CopilotConfig, override: ModelConfig | None) -> ModelConfig | None:
-    """Pick the chat model to use for a request.
-
-    Priority: per-request override > first entry of `chat_models` > None (caller
-    uses ``config.model`` as-is).
+    A chat about a task result uses the same planner list as any other chat:
+    a per-request override, else the first entry of ``chat_models``.
     """
-    if override is not None:
-        return override
-    if config.chat_models:
-        return config.chat_models[0]
-    return None
+    return config.model_copy(
+        update={"model": select_chat_model(config, request.analysis_model_override)}
+    )
 
 
 def _config_with_chat_model(config: CopilotConfig, request: ChatRequest) -> CopilotConfig:
-    """Apply the resolved chat model to ``config.model`` for this request."""
-    resolved = _resolve_chat_model(config, request.chat_model_override)
-    if resolved is None:
-        return config
-    return config.model_copy(update={"model": resolved})
+    """Resolve the planner for a general chat into ``config.model``."""
+    return config.model_copy(
+        update={"model": select_chat_model(config, request.chat_model_override)}
+    )
 
 
 @router.get(
@@ -266,11 +255,7 @@ async def analyze_task_result_stream(
         yield sse_event("status", {"step": "run_analysis", "message": "AIが分析中..."})
 
         if config.copilot_backend == "pi":
-            # The Pi runtime owns the model selection, so the analysis model has
-            # to be resolved into `config.model` before the payload is built.
-            pi_config = analysis_config.model_copy(
-                update={"model": select_analysis_model(analysis_config)}
-            )
+            pi_config = analysis_config
             async for event in pi_analysis_service.stream(
                 request,
                 pi_config,

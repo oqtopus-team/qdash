@@ -9,13 +9,9 @@ import {
   type CopilotChatSession,
 } from "@/contexts/CopilotChatSessionContext";
 import {
-  buildAnalysisModelOptions,
   buildChatModelOptions,
-  getStoredAnalysisModelKey,
   getStoredChatModelKey,
-  resolveAnalysisModelOption,
   resolveChatModelOption,
-  setStoredAnalysisModelKey,
   setStoredChatModelKey,
   type ModelOption,
 } from "@/lib/copilotModels";
@@ -29,38 +25,20 @@ export interface ChatModelSelection {
 }
 
 /**
- * Model menu for a chat. Analysis chats pick from `analysis_models`, general
- * chats from `chat_models`; each remembers its own choice.
+ * Model menu for a chat. Every chat, with or without a task result as its
+ * context, picks the planner from `chat_models`; the evaluation model is not a
+ * planner and is configured separately (evaluation.yaml).
  */
-function useChatModel(isAnalysis: boolean): ChatModelSelection {
+function useChatModel(): ChatModelSelection {
   const { data } = useGetCopilotConfig();
   const config = data?.data ?? null;
   const [chatKey, setChatKey] = useState(getStoredChatModelKey);
-  const [analysisKey, setAnalysisKey] = useState(getStoredAnalysisModelKey);
-
   const chatOptions = useMemo(() => buildChatModelOptions(config), [config]);
-  const analysisOptions = useMemo(() => buildAnalysisModelOptions(config), [config]);
-
-  const select = useCallback(
-    (key: string) => {
-      if (isAnalysis) {
-        setAnalysisKey(key);
-        setStoredAnalysisModelKey(key);
-      } else {
-        setChatKey(key);
-        setStoredChatModelKey(key);
-      }
-    },
-    [isAnalysis],
-  );
-
-  return isAnalysis
-    ? {
-        options: analysisOptions,
-        selected: resolveAnalysisModelOption(analysisOptions, analysisKey),
-        select,
-      }
-    : { options: chatOptions, selected: resolveChatModelOption(chatOptions, chatKey), select };
+  const select = useCallback((key: string) => {
+    setChatKey(key);
+    setStoredChatModelKey(key);
+  }, []);
+  return { options: chatOptions, selected: resolveChatModelOption(chatOptions, chatKey), select };
 }
 
 /** One chat (the active one by default) as seen by a chat surface. */
@@ -71,7 +49,7 @@ export function useCopilotChat(sessionId?: string | null) {
       ? ctx.activeSession
       : (ctx.sessions.find((s) => s.id === sessionId) ?? null);
   const run = session ? ctx.runs[session.id] : undefined;
-  const model = useChatModel(Boolean(session?.context));
+  const model = useChatModel();
   const modelOverride = model.selected?.model ?? null;
   const { sendMessage, stop: stopSession } = ctx;
   const id = session?.id;

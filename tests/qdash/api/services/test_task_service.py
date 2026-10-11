@@ -196,6 +196,6 @@ def test_get_task_knowledge_includes_review_prompt_and_case_images() -> None:
     assert response.review_images[0].base64_data == "review-image-b64"
     assert response.cases[0].images[0].base64_data == "case-image-b64"
     assert response.prompt_text
-    assert "### AI review guidance" in response.review_prompt_text
+    assert "### Review guide" in response.review_prompt_text
     assert "Use REVIEW when peak assignment is ambiguous." in response.review_prompt_text
     assert "![AI review example]" not in response.review_prompt_text

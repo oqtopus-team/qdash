@@ -27,8 +27,10 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 | `src/qdash/api/lib/copilot_config.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `ScoringThreshold` models; YAML loading with local override |
 | `src/qdash/datamodel/task_knowledge.py` | `TaskKnowledge` model with domain-specific knowledge per calibration task |
 | `config/copilot/config.yaml` | Shared enablement, language, and default model settings |
-| `config/copilot/chat.yaml` | General chat models, prompt, initial message, and suggestions |
-| `config/copilot/review.yaml` | Task result analysis models and scoring thresholds |
+| `config/copilot/chat.yaml` | Planner models for every chat, prompt, initial message, and suggestions |
+| `config/copilot/evaluation.yaml` | Evaluation model (calibration VLM) and scoring thresholds |
+| `agent-runtime/src/evaluate.ts`                           | Planner-less evaluation of one task result: evidence tool, then `qcal_evaluate`, as one record                                     |
+| `src/qdash/api/services/evaluation_service.py`             | Bulk evaluation runs: selection per chip, background execution through the runtime, records and verdicts                          |
 | `ui/src/hooks/useCopilotChat.ts` | React hook for the chat page: session management, SSE consumption, localStorage persistence |
 | `ui/src/hooks/useAnalysisChat.ts` | React hook for the analysis sidebar: task-scoped SSE streaming, message management |
 | `ui/src/components/features/chat/CopilotChatPage.tsx` | Chat page UI: session list, message rendering, blocks/chart display |
@@ -71,7 +73,14 @@ chat_models:
 system_prompt: |
   You are QDash Copilot...
 
-# review.yaml
+# evaluation.yaml
+# The model that judges calibration plots (pi-qcaleval's qcal_evaluate)
+evaluation_models:
+  - provider: vllm
+    name: nvidia/Ising-Calibration-1.5-31B-NVFP4
+    base_url: env:VLLM_BASE_URL
+    api_key_env: VLLM_API_KEY
+
 # Metrics for chip health evaluation
 evaluation_metrics:
   qubit: [qubit_frequency, anharmonicity, t1, t2_echo, ...]
@@ -85,7 +94,7 @@ scoring:
     bad: 20
     unit: "μs"
     higher_is_better: true
-  # ... (see config/copilot/review.yaml for full list)
+  # ... (see config/copilot/evaluation.yaml for full list)
 
 # Task analysis settings
 analysis:
@@ -96,7 +105,7 @@ analysis:
 ```
 
 Configuration is loaded via `ConfigLoader` by deep-merging `config.yaml`, `chat.yaml`, and
-`review.yaml`. YAML string values support shell-style environment variable references such
+`evaluation.yaml`. YAML string values support shell-style environment variable references such
 as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be supplied
 through environment variables instead of committed template files.
 
@@ -186,6 +195,54 @@ and `images` (attachments of the current turn, attached every time). Restart the
 runtime after editing the extension; the startup log lists the local paths and
 the tools they contributed. Anything placed under `agent-runtime/extensions/` on
 the host is trusted the same way, so keep that directory empty on production hosts.
+
+## Planner-less evaluation runs
+
+The chat is one entry point to the evaluation core; a bulk request from the
+chip page is another, and it does not need a planner. The runtime's
+`POST /evaluate` route (`agent-runtime/src/evaluate.ts`) runs, for one task
+result, exactly the two tools the planner would call: `qdash_build_qcal_evidence`
+(evidence text plus the task figure) and then `qcal_evaluate`, with the same
+auto-fill as in chat (figure bytes from the evidence, QDash's reference for
+the task name the evidence reports). It answers with a record of what the
+evaluation model saw and said: the evidence context, the figure hashes, the
+reference's size and hash, the exact prompt, the parsed diagnosis or the raw
+answer, the model, the duration, and the extension that judged (package name,
+version, and the checkout commit when a mounted checkout is in use). The route
+is synchronous and needs the same headers as `/chat`; concurrency is the
+caller's to limit.
+
+The route has two modes. `direct` (the default) runs the two tools as such.
+`planner` opens a throwaway conversation on the given chat model, tells it
+to summarise the result and judge its figure, and reads the record off the
+`qcal_evaluate` result it produced; the durable tool wrapper stamps every
+evaluation result with a `host` record (figure hashes, the reference's size
+and hash, the context, the call's duration), so a planner turn leaves the
+same record as a direct evaluation, plus the planner's answer and the tools
+it called. The two modes differ in what reaches the evaluation model (the
+planner writes its own context and may pass its own reference), which is
+exactly what the stored records make comparable.
+
+The API turns that into runs (`src/qdash/api/services/evaluation_service.py`,
+router `src/qdash/api/routers/evaluation.py`): `POST /evaluations/runs`
+selects the latest evaluable result of one task per qubit or coupling of a
+chip (or that of one day, or a given list of task results), stores one
+pending `evaluation` record per task result under an `evaluation_run` (with
+its `trigger`, `bulk` from the chip page or `single` for one task result, and
+its `mode`, `direct` or `planner` with the chat's planner model), and
+executes them in the background of the API worker as the requesting user, a
+few at a time (`EVALUATION_CONCURRENCY`, default 2). Entities without an
+evaluable result (no result, no figure, still running) are reported as
+skipped. `GET /evaluations/runs` and `GET /evaluations/runs/{run_id}` show
+progress and the records; `GET /evaluations?task_id=` lists every evaluation
+of one task result across runs; `PUT /evaluations/{id}/verdict` stores a
+person's agreement or disagreement, the ground truth for comparing runs.
+
+A run is a snapshot: the same selection evaluated again after a change to
+the extension, the model, or the task's reference yields a second run with
+the same shape, so parse rate, success rate, agreement rate and duration
+can be compared run against run. A run interrupted by an API restart keeps
+its unfinished records as pending; request it again rather than resuming it.
 
 ## Two Modes
 

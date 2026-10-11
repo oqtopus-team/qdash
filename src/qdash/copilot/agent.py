@@ -367,13 +367,9 @@ async def run_analysis(
         Blocks-format response: {"blocks": [...], "assessment": ...}
 
     """
-    # Allow a dedicated analysis model (e.g. calibration-specialized LLM) to
-    # override the general chat model for task result analysis.
-    analysis_model = config.analysis_model
-    if analysis_model is None and config.analysis_models:
-        analysis_model = config.analysis_models[0]
-    if analysis_model is not None:
-        config = config.model_copy(update={"model": analysis_model})
+    # A task-result chat uses the same planner list as any other chat.
+    if config.chat_models:
+        config = config.model_copy(update={"model": config.chat_models[0]})
     api_style = config.model.api_style
 
     has_expected = bool(expected_images)

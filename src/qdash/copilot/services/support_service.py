@@ -114,7 +114,7 @@ class CopilotSupportService:
         if include_review_images:
             for img in getattr(knowledge, "review_images", []):
                 if img.base64_data:
-                    result.append((img.base64_data, f"[AI review guide] {img.alt_text}"))
+                    result.append((img.base64_data, f"[Review guide] {img.alt_text}"))
         if include_case_images:
             for case in knowledge.cases:
                 for img in case.images:

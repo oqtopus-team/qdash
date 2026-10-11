@@ -37,6 +37,8 @@ between MongoDB, active execution state, and Qubex parameter files.
 | `note_event`          | NoteEventDocument         | Audit log for every note edit (write-through)   |
 | `cryostat`            | CryostatDocument          | Cryostat (dilution refrigerator) entity         |
 | `cooldown`            | CooldownDocument          | One cool-down cycle of one cryostat             |
+| `evaluation_run`      | EvaluationRunDocument     | One bulk calibration evaluation request          |
+| `evaluation`          | EvaluationDocument        | One `qcal_evaluate` snapshot and its human verdict |
 
 ---
 
@@ -655,6 +657,78 @@ class TaskResultHistoryDocument(Document):
 
 - `note` (existing) - Workflow internal calibration metadata (`dict`). Used by orchestrator / qubex backend.
 - `user_note` (NEW) - Dashboard free-form note attached to this measurement. Edited via `PUT /task-results/{task_id}/note`. Indexed via partial sparse index for cheap chip-wide listing.
+
+---
+
+### EvaluationRunDocument
+
+**Collection:** `evaluation_run`
+
+One bulk calibration evaluation request: the latest result of one task for every qubit or coupling of a chip (or one day's results), judged by the evaluation model through the Pi Agent Runtime without a planner. Runs are the unit of comparison between extension versions, models and task references.
+
+**Indexes:**
+
+- `(run_id)` - Unique
+- `(project_id, chip_id, requested_at)` - Runs of a chip, newest first
+
+```python
+class EvaluationRunDocument(Document):
+    run_id: str                       # evr_<hex>
+    project_id: str
+    chip_id: str
+    task_name: str
+    entity_type: str                  # "qubit" | "coupling"
+    date: str | None                  # YYYYMMDD for a historical day, None for latest
+    question: str | None
+    trigger: str                      # "bulk" (chip page) | "single" (one task result)
+    mode: str                         # "direct" | "planner"
+    planner_model: str | None         # provider/modelId of the planner, in planner mode
+    requested_by: str
+    requested_at: datetime
+    completed_at: datetime | None
+    status: str                       # "running" | "completed"
+    total: int
+    completed_count: int
+    failed_count: int
+    model: str | None                 # provider/modelId of the first evaluation
+    evaluator: EvaluatorModel | None  # extension name, version, source, commit
+```
+
+---
+
+### EvaluationDocument
+
+**Collection:** `evaluation`
+
+One `qcal_evaluate` call for one task result, stored as the runtime reported it so the record stands on its own after the extension, model or task knowledge changes: what the model saw (evidence context, exact prompt, reference size and hash, figure hashes), what it answered (diagnosis or raw text, model, duration, usage), which extension judged, and the human verdict added afterwards.
+
+**Indexes:**
+
+- `(evaluation_id)` - Unique
+- `(run_id, qid)` - Records of one run
+- `(project_id, task_id, requested_at)` - Evaluations of one task result across runs
+
+```python
+class EvaluationDocument(Document):
+    evaluation_id: str                # ev_<hex>
+    run_id: str
+    project_id: str
+    chip_id: str
+    task_id: str
+    task_name: str
+    qid: str
+    execution_id: str
+    status: str                       # "pending" | "running" | "completed" | "failed"
+    requested_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+    error: str | None
+    input: EvaluationInputModel | None    # context, prompt, question, knowledge_chars/sha256, figures[]
+    output: EvaluationOutputModel | None  # model, fallback, diagnosis, raw, parsed, duration_ms, usage
+    evaluator: EvaluatorModel | None
+    planner: EvaluationPlannerModel | None  # model, answer, tool_calls, duration_ms (planner mode)
+    verdict: EvaluationVerdictModel | None  # agree, note, username, updated_at
+```
 
 ---
 

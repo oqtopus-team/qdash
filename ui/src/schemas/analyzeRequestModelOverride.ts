@@ -8,6 +8,6 @@
 import type { ModelConfig } from './modelConfig';
 
 /**
- * Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used.
+ * Optional per-request planner override for a task-result chat. When unset, the first entry of chat_models (else model) is used.
  */
 export type AnalyzeRequestModelOverride = ModelConfig | null;

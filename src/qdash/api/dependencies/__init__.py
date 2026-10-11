@@ -28,6 +28,7 @@ from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEvent
 from qdash.api.services.copilot_chat_session_service import CopilotChatSessionService
 from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.device_topology_service import DeviceTopologyService
+from qdash.api.services.evaluation_service import EvaluationService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
 from qdash.api.services.forum_service import ForumService
@@ -250,6 +251,19 @@ def get_task_result_service() -> TaskResultService:
 
     """
     return TaskResultService(
+        chip_repository=get_chip_repository(),
+        task_result_repository=get_task_result_repository(),
+    )
+
+
+@cached_dependency_provider
+def get_evaluation_service() -> EvaluationService:
+    """Get the calibration evaluation service instance.
+
+    Cached so background runs stay referenced by one service for the
+    lifetime of the worker.
+    """
+    return EvaluationService(
         chip_repository=get_chip_repository(),
         task_result_repository=get_task_result_repository(),
     )

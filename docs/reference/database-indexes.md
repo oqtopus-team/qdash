@@ -148,18 +148,12 @@ db.task_result_history.create_index([
     ("project_id", 1), ("chip_id", 1), ("name", 1), ("qid", 1), ("start_at", -1)
 ])  # Latest task result queries
 
-# Partial sparse indexes for the dashboard notes summary — only index rows
-# that have a user-authored note or a legacy AI review note (feature retired;
-# notes stay readable).
+# Partial sparse index for the dashboard notes summary — only index rows
+# that have a user-authored note.
 db.task_result_history.create_index(
     [("project_id", 1), ("chip_id", 1), ("user_note.updated_at", -1)],
     name="project_chip_user_note_idx",
     partialFilterExpression={"user_note.updated_at": {"$type": "date"}},
-)
-db.task_result_history.create_index(
-    [("project_id", 1), ("chip_id", 1), ("ai_review_note.updated_at", -1)],
-    name="project_chip_ai_review_note_idx",
-    partialFilterExpression={"ai_review_note.updated_at": {"$type": "date"}},
 )
 
 # Cool-down filter — list task results for a specific cool-down cycle.
@@ -181,6 +175,26 @@ TaskResultHistoryDocument.find({
     "execution_id": execution_id,
 }).sort([("start_at", ASCENDING)])
 ```
+
+### EvaluationRunDocument / EvaluationDocument
+
+Bulk calibration evaluation runs and their per-task-result records (planner-less `qcal_evaluate`).
+
+```python
+db.evaluation_run.create_index([("run_id", 1)], unique=True, name="evaluation_run_id_unique_idx")
+db.evaluation_run.create_index(
+    [("project_id", 1), ("chip_id", 1), ("requested_at", -1)],
+    name="evaluation_run_chip_requested_idx",
+)
+db.evaluation.create_index([("evaluation_id", 1)], unique=True, name="evaluation_id_unique_idx")
+db.evaluation.create_index([("run_id", 1), ("qid", 1)], name="evaluation_run_qid_idx")
+db.evaluation.create_index(
+    [("project_id", 1), ("task_id", 1), ("requested_at", -1)],
+    name="evaluation_task_requested_idx",
+)
+```
+
+**Usage**: `GET /evaluations/runs` lists a chip's runs newest first; `GET /evaluations/runs/{run_id}` loads a run's records; `GET /evaluations?task_id=` lists every evaluation of one task result across runs. Background execution updates records by `evaluation_id`.
 
 ### CryostatDocument
 

@@ -100,24 +100,6 @@ chat_models:
   #   reasoning_effort: high
   #   max_output_tokens: 4096
 
-  # NVIDIA Ising-Calibration: Gemma 4 31B fine-tuned on qubit calibration plots.
-  # Served by vLLM; set VLLM_BASE_URL / VLLM_API_KEY. It is tuned for plot
-  # analysis, so review.yaml is its main home; it is offered here for ad-hoc
-  # questions about figures.
-  - provider: vllm
-    name: nvidia/Ising-Calibration-1.5-31B-NVFP4
-    api_style: completion
-    base_url: env:VLLM_BASE_URL
-    api_key_env: VLLM_API_KEY
-    # Must not exceed the server's max_model_len (16384 on llm.qiqb.dev).
-    num_ctx: 16384
-    temperature: 0.2
-    reasoning_effort: none
-    disable_thinking_instruction: true
-    # The prompt (system prompt + tool schemas) already takes roughly half of
-    # the context, so leave the model card's 8192 for larger deployments.
-    max_output_tokens: 2048
-
   # - provider: bedrock
   #   name: jp.anthropic.claude-sonnet-4-6
   #   api_style: responses

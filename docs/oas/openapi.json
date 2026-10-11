@@ -7769,6 +7769,378 @@
         }
       }
     },
+    "/evaluations/runs": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Start a bulk calibration evaluation run",
+        "description": "Queue the latest evaluable result of a task for every entity on a chip.\n\nThe evaluations run in the background as the requesting user; poll the run\nfor progress. Entities without an evaluable result are reported as skipped.",
+        "operationId": "createEvaluationRun",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEvaluationRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateEvaluationRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "List calibration evaluation runs",
+        "description": "List runs of the project, newest first.",
+        "operationId": "listEvaluationRuns",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only runs on this chip",
+              "title": "Chip Id"
+            },
+            "description": "Only runs on this chip"
+          },
+          {
+            "name": "task",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only runs of this task",
+              "title": "Task"
+            },
+            "description": "Only runs of this task"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Newest runs to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Newest runs to return"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEvaluationRunsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get a calibration evaluation run",
+        "description": "One run with every evaluation, including what the model saw and answered.",
+        "operationId": "getEvaluationRun",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationRunDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "List evaluations of a task result",
+        "description": "Every evaluation of one task result across runs, newest first.",
+        "operationId": "listEvaluations",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Task result ID",
+              "title": "Task Id"
+            },
+            "description": "Task result ID"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListEvaluationsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/{evaluation_id}/verdict": {
+      "put": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Judge a calibration evaluation",
+        "description": "Record whether a person agrees with an evaluation; null agree and no note clears it.",
+        "operationId": "setEvaluationVerdict",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "evaluation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evaluation Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetEvaluationVerdictRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/forum/categories": {
       "get": {
         "tags": [
@@ -17298,7 +17670,7 @@
                 "type": "null"
               }
             ],
-            "description": "Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used."
+            "description": "Optional per-request planner override for a task-result chat. When unset, the first entry of chat_models (else model) is used."
           },
           "approval": {
             "anyOf": [
@@ -18911,6 +19283,123 @@
         "title": "CreateCopilotChatSessionRequest",
         "description": "Body for POST /copilot/chat/sessions."
       },
+      "CreateEvaluationRunRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Chip ID"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task",
+            "description": "Calibration task name"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type",
+            "description": "\"qubit\" or \"coupling\"",
+            "default": "qubit"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date",
+            "description": "YYYYMMDD to evaluate that day's results instead of the latest ones"
+          },
+          "task_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Ids",
+            "description": "Restrict the run to these task results"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question",
+            "description": "A specific question for the evaluation model, on top of the diagnosis"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "bulk",
+              "single"
+            ],
+            "title": "Trigger",
+            "description": "\"bulk\" from the chip page, \"single\" for one task result",
+            "default": "bulk"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "planner"
+            ],
+            "title": "Mode",
+            "description": "\"direct\" runs the evaluation tools; \"planner\" lets the chat planner call them",
+            "default": "direct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "task"
+        ],
+        "title": "CreateEvaluationRunRequest",
+        "description": "Evaluate the latest result of one task for every entity on a chip."
+      },
+      "CreateEvaluationRunResponse": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/EvaluationRunSummary"
+          },
+          "task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Task Ids",
+            "description": "Task results queued for evaluation"
+          },
+          "skipped": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Skipped",
+            "description": "Entities not queued, by id, with the reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run",
+          "task_ids"
+        ],
+        "title": "CreateEvaluationRunResponse",
+        "description": "The run that was started and what it covers."
+      },
       "CryostatCreateRequest": {
         "properties": {
           "cryo_id": {
@@ -19410,6 +19899,653 @@
         ],
         "title": "EvaluateCandidateGateRequest",
         "description": "Evaluate one numeric candidate against session-owned parameter bounds."
+      },
+      "EvaluationFigureModel": {
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "title": "Sha256",
+            "description": "SHA-256 of the decoded image bytes"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type",
+            "description": "Image media type"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes",
+            "description": "Decoded image size in bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sha256",
+          "mime_type",
+          "bytes"
+        ],
+        "title": "EvaluationFigureModel",
+        "description": "One figure the evaluation model saw, by hash rather than by bytes."
+      },
+      "EvaluationInputModel": {
+        "properties": {
+          "context": {
+            "type": "string",
+            "title": "Context",
+            "description": "Evidence text passed as the experiment context"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt",
+            "description": "The exact user turn sent to the evaluation model"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question",
+            "description": "Specific question, when one was asked"
+          },
+          "knowledge_chars": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Chars",
+            "description": "Length of the host-supplied reference, when one was found"
+          },
+          "knowledge_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Sha256",
+            "description": "SHA-256 of the host-supplied reference text"
+          },
+          "figures": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationFigureModel"
+            },
+            "type": "array",
+            "title": "Figures"
+          }
+        },
+        "type": "object",
+        "required": [
+          "context"
+        ],
+        "title": "EvaluationInputModel",
+        "description": "What the evaluation model was given."
+      },
+      "EvaluationItem": {
+        "properties": {
+          "evaluation_id": {
+            "type": "string",
+            "title": "Evaluation Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "figure_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Figure Path",
+            "description": "The task result's figures, for display"
+          },
+          "json_figure_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Json Figure Path"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationInputModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "output": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationOutputModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evaluator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluatorModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "planner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationPlannerModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationVerdictModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluation_id",
+          "run_id",
+          "task_id",
+          "task_name",
+          "qid",
+          "execution_id",
+          "status",
+          "requested_at"
+        ],
+        "title": "EvaluationItem",
+        "description": "One evaluation of one task result."
+      },
+      "EvaluationOutputModel": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "provider/modelId that judged the plot"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "description": "True when no calibration VLM was configured and another model judged",
+            "default": false
+          },
+          "diagnosis": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnosis",
+            "description": "The parsed JSON diagnosis, when the answer was JSON"
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw",
+            "description": "The answer text when it was not JSON"
+          },
+          "parsed": {
+            "type": "boolean",
+            "title": "Parsed",
+            "description": "Whether the answer parsed as the JSON object",
+            "default": false
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms",
+            "description": "Wall time of the model call",
+            "default": 0
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage",
+            "description": "Token usage, as pi reports it"
+          }
+        },
+        "type": "object",
+        "title": "EvaluationOutputModel",
+        "description": "What the evaluation model answered."
+      },
+      "EvaluationPlannerModel": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "provider/modelId of the planner"
+          },
+          "answer": {
+            "type": "string",
+            "title": "Answer",
+            "description": "The planner's final answer",
+            "default": ""
+          },
+          "tool_calls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tool Calls",
+            "description": "Tools the planner called, in order"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms",
+            "description": "Wall time of the whole planner turn",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "model"
+        ],
+        "title": "EvaluationPlannerModel",
+        "description": "What the planner did around the evaluation, in planner mode."
+      },
+      "EvaluationRunDetailResponse": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/EvaluationRunSummary"
+          },
+          "evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationItem"
+            },
+            "type": "array",
+            "title": "Evaluations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run",
+          "evaluations"
+        ],
+        "title": "EvaluationRunDetailResponse",
+        "description": "One run with every evaluation in it."
+      },
+      "EvaluationRunSummary": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "bulk",
+              "single"
+            ],
+            "title": "Trigger"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "planner"
+            ],
+            "title": "Mode"
+          },
+          "planner_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planner Model"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed"
+            ],
+            "title": "Status"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "completed_count": {
+            "type": "integer",
+            "title": "Completed Count"
+          },
+          "failed_count": {
+            "type": "integer",
+            "title": "Failed Count"
+          },
+          "pending_count": {
+            "type": "integer",
+            "title": "Pending Count",
+            "description": "Evaluations not finished yet"
+          },
+          "parsed_count": {
+            "type": "integer",
+            "title": "Parsed Count",
+            "description": "Completed evaluations whose answer was JSON"
+          },
+          "success_count": {
+            "type": "integer",
+            "title": "Success Count",
+            "description": "Completed evaluations whose diagnosis reports success"
+          },
+          "agree_count": {
+            "type": "integer",
+            "title": "Agree Count",
+            "description": "Evaluations a person agreed with"
+          },
+          "disagree_count": {
+            "type": "integer",
+            "title": "Disagree Count",
+            "description": "Evaluations a person disagreed with"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "evaluator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluatorModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "chip_id",
+          "task_name",
+          "entity_type",
+          "trigger",
+          "mode",
+          "requested_by",
+          "requested_at",
+          "status",
+          "total",
+          "completed_count",
+          "failed_count",
+          "pending_count",
+          "parsed_count",
+          "success_count",
+          "agree_count",
+          "disagree_count"
+        ],
+        "title": "EvaluationRunSummary",
+        "description": "One run with its progress and agreement counts."
+      },
+      "EvaluationVerdictModel": {
+        "properties": {
+          "agree": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agree",
+            "description": "True when the person agrees with the evaluation, False when not, None to clear"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Why, in the person's words"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "Who judged"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "When the verdict was last changed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "updated_at"
+        ],
+        "title": "EvaluationVerdictModel",
+        "description": "A person's judgement of one evaluation, the ground truth for comparing runs."
+      },
+      "EvaluatorModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Package name, e.g. @orangekame3/pi-qcaleval"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Package version from its manifest"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "\"checkout\" (mounted) or \"package\" (pinned install)"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit",
+            "description": "Checkout HEAD commit, when known"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "version",
+          "source"
+        ],
+        "title": "EvaluatorModel",
+        "description": "The extension that produced the evaluation."
       },
       "ExecuteAgentActionRequest": {
         "properties": {
@@ -22481,6 +23617,40 @@
           "cryostats"
         ],
         "title": "ListCryostatsResponse"
+      },
+      "ListEvaluationRunsResponse": {
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationRunSummary"
+            },
+            "type": "array",
+            "title": "Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs"
+        ],
+        "title": "ListEvaluationRunsResponse",
+        "description": "Runs, newest first."
+      },
+      "ListEvaluationsResponse": {
+        "properties": {
+          "evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationItem"
+            },
+            "type": "array",
+            "title": "Evaluations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluations"
+        ],
+        "title": "ListEvaluationsResponse",
+        "description": "Evaluations of one task result, newest first."
       },
       "ListExecutionsResponse": {
         "properties": {
@@ -26996,6 +28166,41 @@
         "title": "SeedImportSource",
         "description": "Source of seed parameters."
       },
+      "SetEvaluationVerdictRequest": {
+        "properties": {
+          "agree": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agree",
+            "description": "True to agree, False to disagree, null to clear the verdict"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Why"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agree"
+        ],
+        "title": "SetEvaluationVerdictRequest",
+        "description": "A person's judgement of one evaluation."
+      },
       "SettingsResponse": {
         "properties": {
           "env": {
@@ -28241,10 +29446,6 @@
           },
           "note": {
             "$ref": "#/components/schemas/NoteModel"
-          },
-          "ai_review_note": {
-            "$ref": "#/components/schemas/NoteModel",
-            "description": "AI-generated review note for this task result"
           }
         },
         "type": "object",
@@ -29426,10 +30627,6 @@
               }
             ],
             "title": "Elapsed Time"
-          },
-          "ai_review_note": {
-            "$ref": "#/components/schemas/NoteModel",
-            "description": "AI-generated review note for this task result"
           }
         },
         "type": "object",

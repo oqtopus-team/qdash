@@ -28,6 +28,7 @@ import {
   requestedImageCount,
   withImages,
 } from "./figure-context.ts";
+import { hostRecord } from "./evaluate.ts";
 import {
   acceptsKnowledge,
   fetchTaskKnowledge,
@@ -103,7 +104,7 @@ function withoutRuntimeArguments(parameters: TSchema): TSchema {
 }
 
 /** Run a pi-coding-agent tool with the non-interactive context this runtime provides. */
-async function runCodingAgentTool(
+export async function runCodingAgentTool(
   tool: CodingAgentTool,
   callId: string,
   args: unknown,
@@ -207,15 +208,17 @@ export function adaptCodingAgentTool(
         if (found.length || !hasImages(args)) callArgs = withImages(args as object, found);
       }
       const taskName = requestedTaskName(args);
+      let knowledge: string | undefined;
       if (options.fillKnowledge && taskName && !hasKnowledge(args)) {
         // The model names the task; the reference it is judged against comes
         // from QDash, as the user, so every evaluation reads the same guide.
-        const knowledge = await fetchTaskKnowledge(connection, taskName, context.abortSignal);
+        knowledge = await fetchTaskKnowledge(connection, taskName, context.abortSignal);
         if (knowledge) {
           console.log(`[agent-runtime] ${tool.name}: reference for ${taskName} (${knowledge.length} chars)`);
         }
         callArgs = withKnowledge(callArgs as object, knowledge);
       }
+      const started = Date.now();
       const result = await runCodingAgentTool(
         tool,
         api.callId,
@@ -226,9 +229,23 @@ export function adaptCodingAgentTool(
         connection,
         await conversationModel(api, context, modelRuntime),
       );
+      // An evaluation result records what the host put into the call (figure
+      // hashes, the reference, the context), so a planner turn leaves the
+      // same record as a direct evaluation (see evaluate.ts).
+      const details =
+        options.fillImages && result.details !== undefined && typeof result.details === "object"
+          ? {
+              ...(result.details as object),
+              host: hostRecord(
+                callArgs,
+                knowledge ?? ((callArgs as { knowledge?: unknown }).knowledge as string | undefined),
+                Date.now() - started,
+              ),
+            }
+          : result.details;
       return {
         content: result.content,
-        ...(result.details === undefined ? {} : { details: asJson(result.details) }),
+        ...(details === undefined ? {} : { details: asJson(details) }),
         ...(result.isError === undefined ? {} : { isError: result.isError }),
         ...(result.usage === undefined ? {} : { usage: result.usage }),
         ...(result.terminate ? { control: { terminate: true as const } } : {}),

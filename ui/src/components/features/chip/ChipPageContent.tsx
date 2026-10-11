@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Bot, Plus } from "lucide-react";
 
 import { dateToDateTimeLocal, formatDateTime, toIsoSeconds } from "@/lib/utils/datetime";
 
@@ -20,6 +20,7 @@ import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
 import { useListTaskInfo, useGetTaskFileSettings } from "@/client/task-file/task-file";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
+import { EvaluationRequestModal } from "@/components/features/evaluations/EvaluationRequestModal";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
@@ -78,6 +79,7 @@ export function ChipPageContent() {
   } = useChipUrlState();
 
   const [gridSize, setGridSize] = useState<number>(8);
+  const [isEvaluateOpen, setIsEvaluateOpen] = useState(false);
   const selectedDate = useMemo(() => {
     if (selectedCooldownId || hasTimeRangeParams) return dateTimeLocalToDateKey(endDate);
     return legacySelectedDate;
@@ -500,6 +502,20 @@ export function ChipPageContent() {
                   disabled={viewMode === "mux"}
                 />
               </PageFiltersBar.Item>
+              {canEdit && (
+                <PageFiltersBar.Item>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline gap-1"
+                    onClick={() => setIsEvaluateOpen(true)}
+                    disabled={!selectedChip || !selectedTask || viewMode === "mux"}
+                    title="Evaluate the latest result of this task for every qubit or coupling with the calibration evaluation model"
+                  >
+                    <Bot className="h-4 w-4" />
+                    Evaluate
+                  </button>
+                </PageFiltersBar.Item>
+              )}
             </PageFiltersBar.Group>
           </PageFiltersBar>
 
@@ -775,6 +791,21 @@ export function ChipPageContent() {
           completed={tutorialCompleted}
           restartKey={tutorialRestartKey}
           onDismiss={finishTutorial}
+        />
+      )}
+
+      {selectedChip && selectedTask && viewMode !== "mux" && (
+        <EvaluationRequestModal
+          isOpen={isEvaluateOpen}
+          onClose={() => setIsEvaluateOpen(false)}
+          scope={{
+            chipId: selectedChip,
+            taskName: selectedTask,
+            entityType: viewMode === "2q" ? "coupling" : "qubit",
+            date: selectedDate && selectedDate !== "latest" ? selectedDate : null,
+            trigger: "bulk",
+          }}
+          scopeLabel={`${viewMode === "2q" ? "all couplings" : "all qubits"} on ${selectedChip}`}
         />
       )}
 

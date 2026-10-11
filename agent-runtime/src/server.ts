@@ -12,6 +12,7 @@ import { WRAP_UP_MESSAGE } from "./budget.ts";
 import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
 import { hasBearerToken, readJsonBody, RequestError } from "./http.ts";
 import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
+import { EvaluationError } from "./evaluate.ts";
 import {
   answerText,
   pendingApproval,
@@ -59,6 +60,20 @@ interface DeleteSessionBody {
   owner_id?: string;
   conversation_id?: string;
 }
+
+interface EvaluateBody {
+  task_id?: string;
+  question?: string;
+  max_figures?: number;
+  /** "direct" (default) runs the two tools; "planner" runs a planner turn that calls them. */
+  mode?: "direct" | "planner";
+  /** The planner in planner mode; in direct mode only pi-qcaleval's fallback model. */
+  model?: { provider?: string; name?: string };
+  thinking_level?: SessionRequest["thinkingLevel"];
+}
+
+/** Planner-less evaluations in flight, for /health. */
+let evaluating = 0;
 
 /** Convert wire images into Pi image-content blocks. */
 function toImageContent(images: ImageBody[] | undefined) {
@@ -315,6 +330,65 @@ async function handleAbortChat(req: IncomingMessage, res: ServerResponse): Promi
   sendJson(res, 200, { aborted: true });
 }
 
+/**
+ * Evaluate one task result's figure without a planner (see evaluate.ts).
+ *
+ * Synchronous: the response is the evaluation record, after the calibration
+ * VLM has answered. A caller that gives up closes the connection, which
+ * aborts the evaluation; concurrency is the caller's to limit.
+ */
+async function handleEvaluate(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody<EvaluateBody>(req, MAX_BODY_BYTES);
+  if (typeof body.task_id !== "string" || !body.task_id.trim()) {
+    sendJson(res, 400, { error: "task_id is required" });
+    return;
+  }
+  let auth;
+  try {
+    auth = requestQDashAuth(req.headers);
+  } catch {
+    sendJson(res, 401, { error: "QDash user authentication is required" });
+    return;
+  }
+  const controller = new AbortController();
+  res.on("close", () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  if (body.mode !== undefined && body.mode !== "direct" && body.mode !== "planner") {
+    sendJson(res, 400, { error: "mode must be direct or planner" });
+    return;
+  }
+  evaluating += 1;
+  try {
+    const request = {
+      taskId: body.task_id,
+      question: typeof body.question === "string" ? body.question : undefined,
+      maxFigures: body.max_figures,
+      provider: body.model?.provider,
+      modelName: body.model?.name,
+      thinkingLevel: body.thinking_level,
+    };
+    const result =
+      body.mode === "planner"
+        ? await runtime.evaluateWithPlanner(request, auth, controller.signal)
+        : await runtime.evaluateTask(request, auth, controller.signal);
+    sendJson(res, 200, result);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      console.warn(`[agent-runtime] evaluation of ${body.task_id} abandoned by the caller`);
+      return;
+    }
+    if (error instanceof EvaluationError) {
+      console.warn(`[agent-runtime] evaluation of ${body.task_id} failed at ${error.stage}: ${error.message}`);
+      sendJson(res, error.status, { error: error.message, stage: error.stage });
+      return;
+    }
+    throw error;
+  } finally {
+    evaluating -= 1;
+  }
+}
+
 /** Remove durable state after the owning QDash session has been deleted. */
 async function handleDeleteSession(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readJsonBody<DeleteSessionBody>(req, MAX_BODY_BYTES);
@@ -341,7 +415,16 @@ const server = createServer((req, res) => {
     sendJson(res, 200, {
       status: "ok",
       running: running.size,
+      evaluating,
     });
+    return;
+  }
+  if (req.method === "POST" && req.url === "/evaluate") {
+    if (!authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    handleEvaluate(req, res).catch((error: unknown) => handleRouteError(res, error, "evaluate"));
     return;
   }
   if (req.method === "POST" && req.url === "/chat") {

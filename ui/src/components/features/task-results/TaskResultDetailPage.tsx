@@ -21,12 +21,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
+import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { SpectroscopyManualCorrection } from "@/components/features/task-results/SpectroscopyManualCorrection";
 import { CalibrationGitHubSyncNotice } from "@/components/features/task-results/CalibrationGitHubSyncNotice";
 import { TaskResultHistoryNavigation } from "@/components/features/task-results/TaskResultHistoryNavigation";
 import type { CalibrationGitHubSync } from "@/schemas";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
-import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
@@ -499,7 +499,12 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         />
       </div>
 
-      <TaskResultAiReviewNote note={taskResult.ai_review_note} hideWhenEmpty />
+      <TaskResultEvaluations
+        taskId={taskId}
+        chipId={taskResult.chip_id}
+        taskName={taskResult.task_name}
+        qid={taskResult.qid}
+      />
       <TaskResultMemo taskId={taskId} chipId={taskResult.chip_id} />
 
       {/* Divider: Issues */}

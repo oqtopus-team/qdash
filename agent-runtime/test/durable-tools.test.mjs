@@ -164,11 +164,18 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
   };
   const tool = extension.tools[0];
 
-  await tool.execute({ context: "Rabi on Q05" }, api, { abortSignal: undefined });
+  const result = await tool.execute({ context: "Rabi on Q05" }, api, { abortSignal: undefined });
   assert.deepEqual(scans, [{ query: { conversationId: "conv-1" }, limit: 50 }]);
   assert.deepEqual(seen[0].images, [{ data: "png-bytes", mimeType: "image/png" }]);
   assert.equal(seen[0].context, "Rabi on Q05");
   assert.equal(seen[0].ctxModel, qwen);
+  // The result records what the host put into the call, so a planner turn
+  // leaves the same evaluation record as a direct evaluation.
+  assert.equal(result.details.host.context, "Rabi on Q05");
+  assert.equal(result.details.host.figures.length, 1);
+  assert.equal(result.details.host.figures[0].mime_type, "image/png");
+  assert.equal(result.details.host.knowledge, null);
+  assert.ok(result.details.host.duration_ms >= 0);
 
   // Bytes the model copied into the call are replaced by the transcript's figure:
   // a retyped base64 string is corrupt more often than not.

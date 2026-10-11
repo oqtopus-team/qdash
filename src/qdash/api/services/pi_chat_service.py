@@ -259,7 +259,7 @@ def _status_detail(response: httpx.Response) -> str:
     if response.status_code == httpx.codes.CONFLICT:
         return "Another request is already running for this conversation"
     if response.status_code == httpx.codes.BAD_REQUEST:
-        # The runtime rejects models missing from chat.yaml / review.yaml.
+        # The runtime rejects models missing from chat.yaml / evaluation.yaml.
         try:
             return str(response.json().get("error", response.text))
         except ValueError:

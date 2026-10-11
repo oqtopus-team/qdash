@@ -16,7 +16,6 @@ export interface ModelOption {
   isConfiguredDefault?: boolean;
 }
 
-const ANALYSIS_MODEL_STORAGE_KEY = "qdash_analysis_model_key";
 const CHAT_MODEL_STORAGE_KEY = "qdash_chat_model_key";
 
 function readModel(value: unknown): ModelOverride | null {
@@ -45,74 +44,6 @@ function readModel(value: unknown): ModelOverride | null {
 
 function modelIdentity(model: ModelOverride): string {
   return `${model.provider}:${model.name}`;
-}
-
-export function buildAnalysisModelOptions(config: Record<string, unknown> | null): ModelOption[] {
-  if (!config) {
-    return [
-      {
-        key: "default",
-        label: "Configured model",
-        model: null,
-        isConfiguredDefault: true,
-      },
-    ];
-  }
-
-  const analysisModels = Array.isArray(config.analysis_models) ? config.analysis_models : [];
-  const configuredModel =
-    readModel(analysisModels[0]) ?? readModel(config.analysis_model) ?? readModel(config.model);
-  const options: ModelOption[] = [
-    {
-      key: "default",
-      label: configuredModel ? `Configured: ${configuredModel.name}` : "Configured model",
-      model: null,
-      isConfiguredDefault: true,
-    },
-  ];
-  const seen = new Set<string>();
-  if (configuredModel) {
-    seen.add(modelIdentity(configuredModel));
-  }
-
-  const addOption = (key: string, label: string, value: unknown) => {
-    const model = readModel(value);
-    if (!model) return;
-    const identity = modelIdentity(model);
-    if (seen.has(identity)) return;
-    seen.add(identity);
-    options.push({
-      key,
-      label: `${label}: ${model.name}`,
-      model,
-    });
-  };
-
-  analysisModels.forEach((model, index) => {
-    addOption(`analysis-${index}`, `Analysis ${index + 1}`, model);
-  });
-  addOption("legacy-analysis", "Analysis", config.analysis_model);
-  addOption("general", "General", config.model);
-
-  return options;
-}
-
-export function getStoredAnalysisModelKey(): string {
-  if (typeof window === "undefined") return "default";
-  return localStorage.getItem(ANALYSIS_MODEL_STORAGE_KEY) || "default";
-}
-
-export function setStoredAnalysisModelKey(key: string) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(ANALYSIS_MODEL_STORAGE_KEY, key);
-}
-
-export function resolveAnalysisModelOption(options: ModelOption[], key: string): ModelOption {
-  return (
-    options.find((option) => option.key === key) ??
-    options.find((option) => option.isConfiguredDefault) ??
-    options[0]
-  );
 }
 
 export function buildChatModelOptions(config: Record<string, unknown> | null): ModelOption[] {
