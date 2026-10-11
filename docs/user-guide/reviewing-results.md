@@ -29,8 +29,11 @@ multiple results. Threads can also be linked to a chip, a qubit or coupling, and
 result, failure patterns, and analysis guidance. It is the reference the chat planner and the
 evaluation model read; keep it current when a forum thread settles something that should hold
 next time. The page edits the knowledge repository the way **Config** edits the Qubex
-configuration: a save takes effect in this QDash at once (the task's JSON is regenerated), and
-**Create PR** opens a pull request so the change reaches every deployment after review.
+configuration. **Edit** on a task opens its Markdown source; a save takes effect in this QDash at
+once (the task's JSON is regenerated), and **Create PR** opens a pull request so the change reaches
+every deployment after review. **Pull** fetches what others merged. **Browse files** opens the
+whole repository in the file editor for cases, images, and the README. The first heading of a
+task's file is its name, so keep it unchanged.
 
 ## Request an AI Evaluation
 

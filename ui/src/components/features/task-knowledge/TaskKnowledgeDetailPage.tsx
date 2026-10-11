@@ -1,10 +1,25 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Image as ImageIcon } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { ArrowLeft, FileCode2, GitCompareArrows, Image as ImageIcon, Pencil } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getListTaskKnowledgeQueryKey } from "@/client/task/task";
+import {
+  GitWorkspaceToolbar,
+  PullRequestBanner,
+} from "@/components/features/files/GitWorkspaceToolbar";
+import { useGitWorkspace } from "@/components/features/files/useGitWorkspace";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FileDiffReviewDialog } from "@/components/ui/FileDiffReviewDialog";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
+import { useToast } from "@/components/ui/Toast";
+import { useProject } from "@/contexts/ProjectContext";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
+import { KNOWLEDGE_WORKSPACE, knowledgeIndexPath, workspaceQueryKeys } from "@/lib/fileWorkspace";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 type KnowledgeImage = {
   alt_text: string;
@@ -23,6 +38,7 @@ type KnowledgeCase = {
 };
 
 type TaskKnowledgeDetail = {
+  category?: string;
   review_markdown?: string;
   review_images?: KnowledgeImage[];
   cases?: KnowledgeCase[];
@@ -50,10 +66,146 @@ function useTaskKnowledgeDetail(taskName: string) {
   });
 }
 
+/**
+ * Editor of the task's ``index.md`` in the knowledge repository. Saving applies
+ * the change to this QDash at once; the git toolbar turns it into a PR.
+ */
+function KnowledgeIndexEditor({
+  taskName,
+  path,
+  onClose,
+}: {
+  taskName: string;
+  path: string;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [draft, setDraft] = useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+
+  const { data: file, isLoading } = useQuery({
+    queryKey: workspaceQueryKeys.content(KNOWLEDGE_WORKSPACE, path),
+    queryFn: () => KNOWLEDGE_WORKSPACE.getContent(path),
+  });
+  useEffect(() => {
+    if (file && draft === null) setDraft(file.content);
+  }, [file, draft]);
+
+  const saveMutation = useMutation({
+    mutationFn: (content: string) => KNOWLEDGE_WORKSPACE.saveContent(path, content),
+    onSuccess: () => {
+      toast.success(`Saved ${taskName}; it is in effect here. Create a PR to share it.`);
+      queryClient.invalidateQueries({ queryKey: ["task-knowledge-markdown", taskName] });
+      queryClient.invalidateQueries({ queryKey: ["task-knowledge-detail", taskName] });
+      queryClient.invalidateQueries({ queryKey: getListTaskKnowledgeQueryKey() });
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.content(KNOWLEDGE_WORKSPACE, path),
+      });
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.gitStatus(KNOWLEDGE_WORKSPACE),
+      });
+      setDraft(null);
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to save: ${getApiErrorMessage(error, "Unknown error")}`);
+    },
+  });
+
+  const dirty = file !== undefined && draft !== null && draft !== file.content;
+  const requestClose = () => (dirty ? setDiscardOpen(true) : onClose());
+
+  if (isLoading || draft === null) {
+    return (
+      <div className="flex justify-center py-8">
+        <span className="loading loading-spinner loading-md"></span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-base-300 bg-base-100 p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">Edit knowledge</div>
+          <div className="truncate font-mono text-xs text-base-content/50">{path}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost gap-1"
+            onClick={() => setReviewOpen(true)}
+            disabled={!file?.is_saved_change || dirty}
+            title={
+              dirty ? "Save before reviewing" : "Review the saved changes against the last commit"
+            }
+          >
+            <GitCompareArrows size={16} />
+            Review
+          </button>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={requestClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            onClick={() => saveMutation.mutate(draft)}
+            disabled={!dirty || saveMutation.isPending}
+          >
+            {saveMutation.isPending ? (
+              <span className="loading loading-spinner loading-xs"></span>
+            ) : (
+              "Save"
+            )}
+          </button>
+        </div>
+      </div>
+      <p className="mb-3 text-xs text-base-content/60">
+        The first heading is the task name. Relative image paths resolve after saving; add images
+        with the file browser.
+      </p>
+      <MarkdownEditor
+        value={draft}
+        onChange={setDraft}
+        rows={28}
+        placeholder="Task knowledge in Markdown"
+        disabled={saveMutation.isPending}
+      />
+      {file && (
+        <FileDiffReviewDialog
+          filename={path}
+          newContent={file.content}
+          oldContent={file.base_content}
+          onClose={() => setReviewOpen(false)}
+          open={reviewOpen}
+        />
+      )}
+      <ConfirmDialog
+        open={discardOpen}
+        title="Discard unsaved changes?"
+        description="Your edits to this task's knowledge will be lost."
+        confirmLabel="Discard"
+        onConfirm={() => {
+          setDiscardOpen(false);
+          onClose();
+        }}
+        onOpenChange={setDiscardOpen}
+        destructive
+      />
+    </div>
+  );
+}
+
 export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
   const router = useRouter();
+  const { canEdit } = useProject();
+  const [editing, setEditing] = useState(false);
   const { data: markdown, isLoading: markdownLoading, error } = useTaskKnowledgeMarkdown(taskName);
   const { data: detail, isLoading: detailLoading } = useTaskKnowledgeDetail(taskName);
+  const git = useGitWorkspace(KNOWLEDGE_WORKSPACE);
+  const indexPath = detail?.category ? knowledgeIndexPath(detail.category, taskName) : null;
 
   if (markdownLoading || detailLoading) {
     return (
@@ -82,7 +234,7 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <button
           onClick={() => router.push("/knowledge")}
           className="btn btn-ghost btn-sm btn-square"
@@ -90,8 +242,46 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <h1 className="text-xl font-bold font-mono">{taskName}</h1>
+        {canEdit && indexPath && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Link
+              href={`${KNOWLEDGE_WORKSPACE.editorPath}?path=${encodeURIComponent(indexPath)}`}
+              className="btn btn-sm btn-ghost gap-1"
+              title="Open this task's folder in the file browser (cases, images)"
+            >
+              <FileCode2 size={16} />
+              Files
+            </Link>
+            <button
+              type="button"
+              className={`btn btn-sm gap-1 ${editing ? "btn-warning" : "btn-outline"}`}
+              onClick={() => setEditing(true)}
+              disabled={editing}
+            >
+              <Pencil size={16} />
+              Edit
+            </button>
+            <GitWorkspaceToolbar
+              status={git.status}
+              onPull={git.pull}
+              onPush={() => git.push(`Update knowledge for ${taskName}`)}
+              isPulling={git.isPulling}
+              isPushing={git.isPushing}
+              pushTitle="Create a pull request with the saved knowledge changes"
+            />
+          </div>
+        )}
       </div>
-      <MarkdownContent content={markdown} />
+      <PullRequestBanner pr={git.prResult} onDismiss={git.dismissPr} />
+      {editing && indexPath ? (
+        <KnowledgeIndexEditor
+          taskName={taskName}
+          path={indexPath}
+          onClose={() => setEditing(false)}
+        />
+      ) : (
+        <MarkdownContent content={markdown} />
+      )}
 
       {detail?.review_markdown?.trim() && (
         <section className="mt-10">

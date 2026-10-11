@@ -34,6 +34,7 @@ src/app/
 │   ├── settings/page.tsx       # /settings
 │   ├── knowledge/
 │   │   ├── page.tsx            # /knowledge
+│   │   ├── files/page.tsx      # /knowledge/files (knowledge repo file editor)
 │   │   └── [taskName]/page.tsx # /knowledge/:taskName
 │   ├── task-results/
 │   │   ├── page.tsx            # /task-results
@@ -105,7 +106,7 @@ components/
 │   ├── cryo/               # Cryostat monitoring components
 │   ├── dashboard/          # Dashboard components
 │   ├── execution/          # Execution page components
-│   ├── files/              # Config editor (git workspace) components
+│   ├── files/              # Git workspace editor + toolbar (config and knowledge)
 │   ├── flow/               # Flow editor components
 │   ├── forum/              # Forum components
 │   ├── import/             # Data import components
