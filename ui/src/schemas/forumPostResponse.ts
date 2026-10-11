@@ -15,6 +15,8 @@ import type { ForumPostResponseParentId } from './forumPostResponseParentId';
 import type { ForumPostResponseStatus } from './forumPostResponseStatus';
 import type { ForumPostResponseTargetId } from './forumPostResponseTargetId';
 import type { ForumPostResponseTargetType } from './forumPostResponseTargetType';
+import type { ForumPostResponseTaskId } from './forumPostResponseTaskId';
+import type { ForumPostResponseTaskResult } from './forumPostResponseTaskResult';
 import type { ForumPostResponseTitle } from './forumPostResponseTitle';
 import type { ForumPostResponseUserId } from './forumPostResponseUserId';
 
@@ -58,6 +60,10 @@ export interface ForumPostResponse {
   target_id?: ForumPostResponseTargetId;
   /** Linked cool-down ID */
   cooldown_id?: ForumPostResponseCooldownId;
+  /** Task result this thread is about */
+  task_id?: ForumPostResponseTaskId;
+  /** Summary of that task result, on threads and listings */
+  task_result?: ForumPostResponseTaskResult;
   /** Number of replies to this thread */
   reply_count?: number;
   /** Whether this post is archived/deleted */

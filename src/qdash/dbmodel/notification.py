@@ -9,8 +9,8 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 
 from qdash.common.utils.datetime import now
 
-NotificationKind = Literal["mention", "issue_reply", "note_mention", "forum_mention", "forum_reply"]
-NotificationSourceType = Literal["issue", "note_event", "forum_post"]
+NotificationKind = Literal["mention", "note_mention", "forum_mention", "forum_reply"]
+NotificationSourceType = Literal["note_event", "forum_post"]
 
 
 class NotificationDocument(Document):
@@ -21,8 +21,8 @@ class NotificationDocument(Document):
     recipient_username: str = Field(..., description="Recipient username snapshot")
     actor_user_id: str | None = Field(default=None, description="Actor user ID")
     actor_username: str = Field(..., description="Actor username snapshot")
-    kind: str = Field(..., description="mention | issue_reply | note_mention | forum_*")
-    source_type: str = Field(..., description="issue | note_event | forum_post")
+    kind: str = Field(..., description="mention | note_mention | forum_*")
+    source_type: str = Field(..., description="note_event | forum_post")
     source_id: str = Field(..., description="Source document identifier")
     target_url: str = Field(..., description="Frontend URL to open from the inbox")
     title: str = Field(..., description="Notification title")

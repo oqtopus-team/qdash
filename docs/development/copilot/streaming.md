@@ -33,17 +33,13 @@ All events follow the SSE format: `event: <type>\ndata: <json>\n\n`
 | `complete` | All processing finished |
 | `load_config` | Loading copilot config (chat mode) |
 | `load_qubit_params` | Fetching qubit parameters from DB (chat mode) |
-| `load_issue` | Loading issue thread (issue AI reply) |
-| `build_history` | Building conversation history from thread (issue AI reply) |
-| `load_context` | Loading task context (issue AI reply) |
-| `save_reply` | Saving AI reply as issue (issue AI reply) |
+| `load_forum` / `build_history` / `save_reply` | Forum AI reply: loading the thread, building its history, saving the reply |
 
 ## Runtime turns
 
-Every streaming endpoint (`/copilot/chat/stream`, `/issues/{id}/ai-reply/stream`,
-`/forum/posts/{id}/ai-reply/stream`) proxies one planner turn through the Pi Agent
+Every streaming endpoint (`/copilot/chat/stream`, `/forum/posts/{id}/ai-reply/stream`) proxies one planner turn through the Pi Agent
 Runtime: `pi_chat_service.stream_payload` POSTs the turn and `translate` turns the
-runtime's NDJSON events into the SSE events above. Issue and forum replies use
+runtime's NDJSON events into the SSE events above. Forum replies use
 `pi_chat_service.thread_reply`, which runs the turn in a throwaway conversation
 and yields the final blocks result for the router to save.
 

@@ -13,7 +13,7 @@ import {
   type ExecutionHistoryMobileTab,
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
-import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
+import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useChatDock } from "@/contexts/ChatDockContext";
@@ -352,7 +352,7 @@ export function ExecutionTaskDetailModal({
         </div>
       )}
 
-      {selectedTask?.task_id && <TaskResultIssues taskId={selectedTask.task_id} />}
+      {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
     </div>
   );
 

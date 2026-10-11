@@ -29,13 +29,6 @@ src/app/
 │   ├── import/page.tsx         # /import
 │   ├── home/page.tsx           # /home (default landing page)
 │   ├── inbox/page.tsx          # /inbox
-│   ├── issue-knowledge/
-│   │   ├── page.tsx            # /issue-knowledge
-│   │   └── [knowledgeId]/page.tsx # /issue-knowledge/:knowledgeId
-│   ├── issues/
-│   │   ├── page.tsx            # /issues
-│   │   └── [issueId]/
-│   │       └── page.tsx        # /issues/:issueId
 │   ├── metrics/page.tsx        # /metrics
 │   ├── provenance/page.tsx     # /provenance
 │   ├── settings/page.tsx       # /settings
@@ -117,8 +110,6 @@ components/
 │   ├── forum/              # Forum components
 │   ├── import/             # Data import components
 │   ├── inbox/              # Inbox components
-│   ├── issue-knowledge/    # Issue-derived knowledge components
-│   ├── issues/             # Issue tracking components
 │   ├── metrics/            # Metrics dashboard components
 │   ├── provenance/         # Data provenance components
 │   ├── qubit/              # Qubit detail components

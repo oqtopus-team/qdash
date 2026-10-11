@@ -213,13 +213,6 @@ export default withMermaid(
                 { text: "Tool Result Compression", link: "/development/copilot/tool-result-compression" },
               ],
             },
-            {
-              text: "Issues",
-              collapsed: true,
-              items: [
-                { text: "Architecture", link: "/development/issues/architecture" },
-              ],
-            },
             { text: "Datetime Handling", link: "/development/datetime" },
             { text: "Logging", link: "/development/logging" },
             { text: "QID Validation", link: "/development/qid-validation" },

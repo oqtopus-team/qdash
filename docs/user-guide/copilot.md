@@ -20,7 +20,7 @@ Open **AI Chat** for a project-wide conversation. Start a new session when the c
 or goal changes substantially. QDash stores sessions so you can return to prior analysis.
 
 The assistant can use the project tools exposed by QDash to inspect records such as chips,
-metrics, task results, issues, workflows, and provenance. Keep the active project and selected chip
+metrics, task results, forum threads, workflows, and provenance. Keep the active project and selected chip
 in mind when interpreting an answer. Open referenced records to confirm important conclusions.
 
 ### Run a calibration pipeline from chat
@@ -49,10 +49,10 @@ Treat AI output as supporting evidence. Before changing calibration state, exclu
 starting another hardware run:
 
 - open the underlying task result and artifacts;
-- compare the finding with task knowledge and known issue cases;
+- compare the finding with task knowledge;
 - confirm the project, chip, target, and time context;
 - use deterministic quality gates where the workflow provides them;
-- record the decision in a note, issue, or discussion when others need the context.
+- record the decision in a note or a forum thread when others need the context.
 
 Provider availability and model selection depend on the deployment configuration. Operators
 configure those providers in `.env`; missing provider credentials disable the corresponding AI

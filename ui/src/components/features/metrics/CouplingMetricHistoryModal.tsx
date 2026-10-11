@@ -30,7 +30,7 @@ import { useUpdateCalibrationParameters } from "@/client/calibration/calibration
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
-import { TaskResultIssues } from "./TaskResultIssues";
+import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
 import type { TaskChatContext } from "@/types/copilotChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
@@ -666,8 +666,8 @@ export function CouplingMetricHistoryModal({
         </div>
       )}
 
-      {/* Issues */}
-      {selectedTask?.task_id && <TaskResultIssues taskId={selectedTask.task_id} />}
+      {/* Forum threads about this result */}
+      {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
     </div>
   );
 

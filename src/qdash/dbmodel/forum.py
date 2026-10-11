@@ -79,6 +79,9 @@ class ForumPostDocument(Document):
         default=None, description="Linked target type: qubit or coupling"
     )
     target_id: str | None = Field(default=None, description="Linked target identifier")
+    task_id: str | None = Field(
+        default=None, description="Linked task result; the thread is about that result"
+    )
     cooldown_id: str | None = Field(default=None, description="Linked cool-down identifier")
     parent_id: str | None = Field(
         default=None, description="Parent forum post ID for replies. None for root threads."
@@ -119,6 +122,16 @@ class ForumPostDocument(Document):
                     ("system_info.created_at", ASCENDING),
                 ],
                 name="project_parent_deleted_status_created_idx",
+            ),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("task_id", ASCENDING),
+                    ("is_deleted", ASCENDING),
+                    ("system_info.created_at", DESCENDING),
+                ],
+                name="project_task_deleted_created_idx",
+                partialFilterExpression={"task_id": {"$type": "string"}},
             ),
             IndexModel(
                 [

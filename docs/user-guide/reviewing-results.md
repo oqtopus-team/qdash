@@ -1,6 +1,6 @@
 # Reviewing and Sharing Results
 
-QDash connects task results, notes, issues, discussions, knowledge, and notifications inside the
+QDash connects task results, notes, forum threads, knowledge, and notifications inside the
 active project.
 
 ## Record Result Context
@@ -14,28 +14,21 @@ task results. See [Dashboard](./dashboard.md) for note scopes and fallback behav
 
 ## Track a Problem
 
-Create an issue from a task result when a finding needs discussion or follow-up. The issue retains
-the task-result context, including the execution, target, parameters, and output used during the
-investigation. Participants can reply, mention other members, close the issue, and reopen it when
-work resumes.
+Start a forum thread from a task result when a finding needs discussion or follow-up: **New thread**
+on the result page opens the forum composer with the result, its chip and target prefilled, and the
+thread links back to the result. The result page lists every thread about it, whatever its status.
+Participants can reply, mention other members, move the thread through its workflow status, and
+close it when the work is done.
 
-Use **Issues** to filter and review these result-specific discussions. Use **Forum** for broader
-project topics such as control-stack behavior, system policy, or work spanning multiple results.
+Use **Forum** for everything else as well: control-stack behavior, system policy, or work spanning
+multiple results. Threads can also be linked to a chip, a qubit or coupling, and a cool-down.
 
 ## Reuse Knowledge
 
-Resolved investigations can be represented as issue-derived knowledge cases. **Knowledge** lets
-users browse those cases by calibration task. **Task Knowledge** contains the maintained baseline
-for each task: its physics, expected result, failure patterns, and analysis guidance.
-
-These sources have different roles:
-
-| Source | Scope | Best use |
-| --- | --- | --- |
-| Task Knowledge | Maintained task-level guidance | Understand expected behavior before analysis. |
-| Issue Knowledge | Curated cases from investigations | Compare a result with known failure cases. |
-| Issue | One task result and its discussion | Coordinate diagnosis and follow-up. |
-| Forum | Project-wide topic | Discuss work not anchored to one result. |
+**Task Knowledge** contains the maintained baseline for each calibration task: its physics, expected
+result, failure patterns, and analysis guidance. It is the reference the chat planner and the
+evaluation model read; keep it current when a forum thread settles something that should hold
+next time.
 
 ## Request an AI Evaluation
 

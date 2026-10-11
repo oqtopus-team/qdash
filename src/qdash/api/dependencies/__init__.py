@@ -32,8 +32,6 @@ from qdash.api.services.evaluation_service import EvaluationService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
 from qdash.api.services.forum_service import ForumService
-from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
-from qdash.api.services.issue_service import IssueService
 from qdash.api.services.manual_update_service import ManualUpdateService
 from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.note_service import NoteService
@@ -351,12 +349,6 @@ def get_provenance_service() -> ProvenanceService:
 
 
 @cached_dependency_provider
-def get_issue_service() -> IssueService:
-    """Get the issue service instance."""
-    return IssueService(notification_service=get_notification_service())
-
-
-@cached_dependency_provider
 def get_forum_service() -> ForumService:
     """Get the forum service instance."""
     return ForumService(
@@ -369,12 +361,6 @@ def get_forum_service() -> ForumService:
 def get_slack_notification_service() -> SlackNotificationService:
     """Get the Slack notification service instance."""
     return SlackNotificationService()
-
-
-@cached_dependency_provider
-def get_issue_knowledge_service() -> IssueKnowledgeService:
-    """Get the issue knowledge service instance."""
-    return IssueKnowledgeService()
 
 
 @cached_dependency_provider

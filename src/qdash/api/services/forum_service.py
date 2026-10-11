@@ -17,6 +17,7 @@ from starlette.exceptions import HTTPException
 from qdash.api.schemas.forum import (
     ForumCategoryResponse,
     ForumPostResponse,
+    ForumTaskResultSummary,
     ForumThreadStatus,
     ListForumCategoriesResponse,
     ListForumPostsResponse,
@@ -32,6 +33,7 @@ from qdash.dbmodel.forum import (
     ForumPostDocument,
 )
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
+from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
 
 if TYPE_CHECKING:
@@ -107,6 +109,17 @@ def _normalize_forum_target(
     if not (chip and kind and target):
         return None, None, None
     return chip[:128], kind, target[:128]
+
+
+def _linked_task_result(project_id: str, task_id: str | None) -> TaskResultHistoryDocument | None:
+    """The task result a thread is about, when one is named; unknown ids are rejected."""
+    value = task_id.strip() if isinstance(task_id, str) and task_id.strip() else None
+    if value is None:
+        return None
+    doc = TaskResultHistoryDocument.find_one({"project_id": project_id, "task_id": value}).run()
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Task result {value} not found")
+    return doc
 
 
 def _normalize_forum_cooldown(cooldown_id: str | None) -> str | None:
@@ -295,7 +308,36 @@ class ForumService:
         )
 
     @staticmethod
-    def _to_response(doc: ForumPostDocument, reply_count: int = 0) -> ForumPostResponse:
+    def _task_result_summaries(
+        project_id: str, task_ids: list[str | None]
+    ) -> dict[str, ForumTaskResultSummary]:
+        """Summaries of the task results the given threads are about, in one query."""
+        wanted = sorted({task_id for task_id in task_ids if task_id})
+        if not wanted:
+            return {}
+        docs = TaskResultHistoryDocument.find(
+            {"project_id": project_id, "task_id": {"$in": wanted}}
+        ).to_list()
+        return {
+            doc.task_id: ForumTaskResultSummary(
+                task_id=doc.task_id,
+                task_name=doc.name,
+                qid=doc.qid or "",
+                chip_id=doc.chip_id,
+                status=doc.status,
+                end_at=doc.end_at,
+                figure_path=list(doc.figure_path or []),
+                json_figure_path=list(doc.json_figure_path or []),
+            )
+            for doc in docs
+        }
+
+    @staticmethod
+    def _to_response(
+        doc: ForumPostDocument,
+        reply_count: int = 0,
+        task_result: ForumTaskResultSummary | None = None,
+    ) -> ForumPostResponse:
         """Convert a document to an API response."""
         user = UserDocument.find_one({"user_id": doc.user_id}).run() if doc.user_id else None
         return ForumPostResponse(
@@ -316,6 +358,8 @@ class ForumService:
             target_type=getattr(doc, "target_type", None),
             target_id=getattr(doc, "target_id", None),
             cooldown_id=getattr(doc, "cooldown_id", None),
+            task_id=getattr(doc, "task_id", None),
+            task_result=task_result,
             reply_count=reply_count,
             status=_normalize_forum_status(getattr(doc, "status", None)),
             is_deleted=doc.is_deleted,
@@ -341,10 +385,25 @@ class ForumService:
 
     @staticmethod
     def format_ai_response_as_markdown(result: dict[str, Any]) -> str | None:
-        """Convert an AI response dict to Markdown."""
-        from qdash.api.services.issue_service import IssueService
+        """Convert an AI response dict to Markdown via ``blocks_to_markdown``.
 
-        return IssueService.format_ai_response_as_markdown(result)
+        Falls back to a JSON code block when the conversion returns empty.
+        Returns ``None`` only if even the fallback fails.
+        """
+        from qdash.copilot.blocks import blocks_to_markdown
+
+        markdown_content = blocks_to_markdown(result)
+        if markdown_content:
+            return markdown_content
+
+        logger.warning("blocks_to_markdown returned empty, full result=%s", result)
+        try:
+            import json
+
+            raw_json = json.dumps(result, indent=2, ensure_ascii=False)
+            return f"```json\n{raw_json}\n```"
+        except (TypeError, ValueError):
+            return None
 
     @staticmethod
     def _make_category_key(name: str) -> str:
@@ -509,16 +568,21 @@ class ForumService:
         target_type: str | None = None,
         target_id: str | None = None,
         cooldown_id: str | None = None,
+        task_id: str | None = None,
         number: int | None = None,
         status: str | None = "open",
         q: str | None = None,
     ) -> ListForumPostsResponse:
-        """List root forum threads with reply counts."""
+        """List root forum threads with reply counts; ``status`` "all" or None lists every status."""
         query: dict[str, object] = {
             "project_id": project_id,
             "parent_id": None,
             "is_deleted": False,
         }
+        if task_id:
+            query["task_id"] = task_id
+        if isinstance(status, str) and status.strip().lower() == "all":
+            status = None
         if category:
             query["category"] = category
         if label:
@@ -564,6 +628,9 @@ class ForumService:
             .limit(limit)
             .to_list()
         )
+        summaries = self._task_result_summaries(
+            project_id, [getattr(doc, "task_id", None) for doc in docs]
+        )
 
         root_ids = [str(doc.id) for doc in docs]
         reply_counts: dict[str, int] = {}
@@ -584,7 +651,12 @@ class ForumService:
 
         return ListForumPostsResponse(
             posts=[
-                self._to_response(doc, reply_count=reply_counts.get(str(doc.id), 0)) for doc in docs
+                self._to_response(
+                    doc,
+                    reply_count=reply_counts.get(str(doc.id), 0),
+                    task_result=summaries.get(getattr(doc, "task_id", None) or ""),
+                )
+                for doc in docs
             ],
             total=total,
             skip=skip,
@@ -605,7 +677,10 @@ class ForumService:
                 {"project_id": project_id, "parent_id": post_id, "is_deleted": False}
             ).count()
 
-        return self._to_response(doc, reply_count=reply_count)
+        task_result = self._task_result_summaries(project_id, [getattr(doc, "task_id", None)]).get(
+            getattr(doc, "task_id", None) or ""
+        )
+        return self._to_response(doc, reply_count=reply_count, task_result=task_result)
 
     def get_replies(
         self, *, project_id: str, post_id: str, skip: int = 0, limit: int = 100
@@ -648,11 +723,17 @@ class ForumService:
         target_type: str | None = None,
         target_id: str | None = None,
         cooldown_id: str | None = None,
+        task_id: str | None = None,
         assignee_username: str | None = None,
         status: str | None = "open",
         background_tasks: BackgroundTasks | None = None,
     ) -> ForumPostResponse:
-        """Create a new forum thread or reply."""
+        """Create a new forum thread or reply.
+
+        A root thread may be about one task result (``task_id``); its chip and
+        target are then taken from that result unless given explicitly, and
+        replies inherit the link.
+        """
         if parent_id is None and not title:
             raise HTTPException(status_code=422, detail="Title is required for forum threads")
 
@@ -671,6 +752,11 @@ class ForumService:
         else:
             self._ensure_active_category(project_id, category)
 
+        linked_task = None if root_doc else _linked_task_result(project_id, task_id)
+        if linked_task is not None and not (chip_id and target_id):
+            chip_id = linked_task.chip_id
+            target_id = linked_task.qid or None
+            target_type = "coupling" if "-" in (linked_task.qid or "") else "qubit"
         normalized_chip_id, normalized_target_type, normalized_target_id = (
             (root_doc.chip_id, root_doc.target_type, root_doc.target_id)
             if root_doc
@@ -679,6 +765,11 @@ class ForumService:
                 target_type=target_type,
                 target_id=target_id,
             )
+        )
+        normalized_task_id = (
+            getattr(root_doc, "task_id", None)
+            if root_doc
+            else (linked_task.task_id if linked_task is not None else None)
         )
         thread_number = (
             self._ensure_root_thread_number(root_doc)
@@ -702,6 +793,7 @@ class ForumService:
             cooldown_id=root_doc.cooldown_id
             if root_doc
             else _normalize_forum_cooldown(cooldown_id),
+            task_id=normalized_task_id,
             assignee_username=root_doc.assignee_username
             if root_doc
             else self._ensure_project_assignee(project_id, assignee_username),
@@ -753,7 +845,12 @@ class ForumService:
                         actor_username=username,
                     )
 
-        return self._to_response(doc)
+        return self._to_response(
+            doc,
+            task_result=self._task_result_summaries(project_id, [normalized_task_id]).get(
+                normalized_task_id or ""
+            ),
+        )
 
     def build_ai_reply_context(self, *, project_id: str, post_id: str) -> dict[str, Any]:
         """Build conversation context for a forum AI reply."""
