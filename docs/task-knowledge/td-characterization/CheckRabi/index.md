@@ -59,7 +59,7 @@ Rabi amplitude should be high; frequency should be consistent with calibrated dr
 - rabi_frequency: Rabi oscillation frequency (MHz)
 - rabi_phase: Rabi oscillation phase (a.u.)
 - rabi_offset: Rabi oscillation offset (a.u.)
-- rabi_angle: Rabi angle (in degree) (degree)
+- rabi_angle: Rabi angle (in radians) (rad)
 - rabi_noise: Rabi oscillation noise (a.u.)
 - rabi_distance: Rabi distance (a.u.)
 - rabi_reference_phase: Rabi reference phase (a.u.)
