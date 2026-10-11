@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type IssueKnowledgeUpdateBoundaryCriteria = string | null;
+/**
+ * Task result this thread is about
+ */
+export type ForumPostResponseTaskId = string | null;

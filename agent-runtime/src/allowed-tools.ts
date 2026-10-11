@@ -44,7 +44,6 @@ export const ALLOWED_TOOL_NAMES = [
   "qdash_list_flows",
   "qdash_list_forum_posts",
   "qdash_list_forum_replies",
-  "qdash_list_issues",
   "qdash_list_task_results",
   "qdash_plan_calibration",
   "qdash_plan_pipeline",

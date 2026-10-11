@@ -2,8 +2,6 @@ import {
   BarChart3,
   BookMarked,
   Bot,
-  Brain,
-  CircleDot,
   ClipboardCheck,
   ClipboardList,
   Code,
@@ -98,17 +96,10 @@ export function getNavigationSections({
           icon: Inbox,
           badge: unreadNotifications,
         },
-        { href: "/issues", label: "Issues", icon: CircleDot, match: "prefix" },
         {
           href: "/forum",
           label: "Forum",
           icon: MessagesSquare,
-          match: "prefix",
-        },
-        {
-          href: "/issue-knowledge",
-          label: "Knowledge",
-          icon: Brain,
           match: "prefix",
         },
         {

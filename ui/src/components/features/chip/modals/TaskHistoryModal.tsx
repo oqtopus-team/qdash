@@ -24,7 +24,7 @@ import {
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
-import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
+import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import type { TaskChatContext } from "@/types/copilotChat";
 import { useChatDock } from "@/contexts/ChatDockContext";
@@ -584,8 +584,8 @@ export function TaskHistoryModal({
         </div>
       )}
 
-      {/* Issues */}
-      {selectedTask?.task_id && <TaskResultIssues taskId={selectedTask.task_id} />}
+      {/* Forum threads about this result */}
+      {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
     </div>
   );
 

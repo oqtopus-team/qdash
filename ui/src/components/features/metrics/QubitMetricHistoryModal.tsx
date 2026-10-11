@@ -22,7 +22,7 @@ import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
-import { TaskResultIssues } from "./TaskResultIssues";
+import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "./TaskResultMemo";
 import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
 import type { TaskChatContext } from "@/types/copilotChat";
@@ -625,11 +625,11 @@ export function QubitMetricHistoryModal({
         </div>
       )}
 
-      {/* Notes (above issues) */}
+      {/* Notes (above threads) */}
       {selectedTask?.task_id && <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} />}
 
-      {/* Issues */}
-      {selectedTask?.task_id && <TaskResultIssues taskId={selectedTask.task_id} />}
+      {/* Forum threads about this result */}
+      {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
     </div>
   );
 

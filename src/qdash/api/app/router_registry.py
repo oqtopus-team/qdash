@@ -30,8 +30,6 @@ from qdash.api.routers import (
     file,
     flow,
     forum,
-    issue,
-    issue_knowledge,
     metrics,
     note,
     notification,
@@ -68,7 +66,6 @@ PUBLIC_ROUTERS: tuple[RouterRegistration, ...] = (
         tags=("copilot",),
         requires_auth=False,
     ),
-    RouterRegistration(issue.public_router, tags=("issue",), requires_auth=False),
     RouterRegistration(forum.public_router, tags=("forum",), requires_auth=False),
 )
 
@@ -84,8 +81,6 @@ PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(task_result.router, tags=("task-result",)),
     RouterRegistration(evaluation.router, tags=("evaluation",)),
     RouterRegistration(forum.router, tags=("forum",)),
-    RouterRegistration(issue.router, tags=("issue",)),
-    RouterRegistration(issue_knowledge.router, tags=("issue-knowledge",)),
     RouterRegistration(tag.router, tags=("tag",)),
     RouterRegistration(device_topology.router, tags=("device-topology",)),
     RouterRegistration(backend.router, tags=("backend",)),

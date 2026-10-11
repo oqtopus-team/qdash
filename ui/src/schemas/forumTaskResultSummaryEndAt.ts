@@ -6,7 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-/**
- * Updated lessons
- */
-export type IssueKnowledgeUpdateLessonLearned = string[] | null;
+export type ForumTaskResultSummaryEndAt = string | null;

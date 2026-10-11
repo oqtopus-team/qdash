@@ -21,7 +21,7 @@ an observation with another user.
 
 **Dashboard** presents all configured metrics with coverage, heatmaps, distributions, and scoped
 notes. **Metrics** focuses on a selected metric and provides qubit or coupling history, parameter
-details, notes, issues, report export, and data export where available.
+details, notes, forum threads, report export, and data export where available.
 
 For directional coupling data, verify the displayed direction before comparing values. For time
 ranges, distinguish the latest value from best or average aggregation.

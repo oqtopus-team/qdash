@@ -171,6 +171,10 @@ def list_forum_posts(
         str | None,
         Query(max_length=128, description="Filter by linked cool-down ID"),
     ] = None,
+    task_id: Annotated[
+        str | None,
+        Query(max_length=128, description="Only threads about this task result"),
+    ] = None,
     number: Annotated[
         int | None,
         Query(ge=1, description="Filter by project-scoped forum thread number"),
@@ -178,11 +182,8 @@ def list_forum_posts(
     status: Annotated[
         str | None,
         Query(
-            pattern=r"^(open|investigating|identified|resolved)$",
-            description=(
-                "Filter by workflow status. Default open. "
-                "Use null/omit at the client layer for all."
-            ),
+            pattern=r"^(open|investigating|identified|resolved|all)$",
+            description="Filter by workflow status. Default open; 'all' lists every status.",
         ),
     ] = "open",
     q: Annotated[
@@ -203,6 +204,7 @@ def list_forum_posts(
         target_type=target_type,
         target_id=target_id,
         cooldown_id=cooldown_id,
+        task_id=task_id,
         number=number,
         status=status,
         q=q,
@@ -236,6 +238,7 @@ def create_forum_post(
         target_type=body.target_type,
         target_id=body.target_id,
         cooldown_id=body.cooldown_id,
+        task_id=body.task_id,
         assignee_username=body.assignee_username,
         status=body.status,
         background_tasks=background_tasks,

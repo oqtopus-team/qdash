@@ -49,7 +49,6 @@ ui/
 │   │   │   ├── files/          # File management
 │   │   │   ├── home/           # Home (default landing page)
 │   │   │   ├── inbox/          # Notification inbox
-│   │   │   ├── issues/         # Issue tracking
 │   │   │   ├── metrics/        # Metrics dashboard
 │   │   │   ├── provenance/     # Data provenance
 │   │   │   ├── settings/       # Settings page

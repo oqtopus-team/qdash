@@ -56,7 +56,7 @@ to inspect:
 - execution and target context;
 - input, output, and run parameters;
 - figures and downloadable raw data;
-- user notes and linked issues;
+- user notes and linked forum threads;
 - re-execution and exclusion controls when available.
 
 Use the Execution detail when the dependency graph matters. Use Task Results when you know the

@@ -602,11 +602,10 @@ Business logic lives in service classes under `src/qdash/api/services/`. Routers
 src/qdash/api/
 ├── routers/           # HTTP layer: request/response, DI, status codes
 │   ├── copilot.py
-│   ├── issue.py
+│   ├── forum.py
 │   └── auth.py
 ├── services/          # Business logic: data loading, validation, orchestration
 │   ├── copilot_data_service.py
-│   ├── issue_service.py
 │   └── auth_service.py
 ├── lib/               # Shared utilities: SSE formatting, auth helpers, config
 │   ├── sse.py
@@ -641,10 +640,10 @@ def register_user(
 
 ### Guidelines
 
-- **One service per domain** -- `IssueService` handles issues, `AuthService` handles auth.
+- **One service per domain** -- `ForumService` handles the forum, `AuthService` handles auth.
 - **Routers stay thin** -- No DB queries, no business rules, no data transformation in routers.
 - **Services are framework-agnostic** -- Services raise `HTTPException` for now but don't depend on `Request`/`Response`.
-- **Static methods for pure logic** -- Use `@staticmethod` for functions that don't need instance state (e.g., `IssueService.strip_mention()`).
+- **Static methods for pure logic** -- Use `@staticmethod` for functions that don't need instance state (e.g., `ForumService.strip_mention()`).
 - **Compose via constructor injection** -- If service A needs service B, inject B through `__init__`.
 
 ---
