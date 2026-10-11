@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from unittest.mock import MagicMock, patch
 
-from qdash.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
+from qdash.copilot.config import CopilotConfig, ModelConfig, TaskChatConfig
 from qdash.copilot.runtime import FALLBACK_QUERY_LIMIT, CopilotRuntime
 
 
@@ -360,14 +360,14 @@ class TestLoadChipSummary:
         assert result["qubits"] == [{"qid": "0", "t2": 7.0}]
 
 
-class TestBuildAnalysisContext:
-    """Tests for analysis context assembly."""
+class TestBuildTaskContext:
+    """Tests for task context assembly."""
 
     def _config(self, *, multimodal: bool) -> CopilotConfig:
         return CopilotConfig(
             enabled=True,
             model=ModelConfig(provider="openai", name="gpt-4.1"),
-            analysis=AnalysisConfig(enabled=True, multimodal=multimodal, max_expected_images=2),
+            task_chat=TaskChatConfig(enabled=True, multimodal=multimodal, max_expected_images=2),
         )
 
     def test_builds_context_with_related_knowledge(self):
@@ -396,7 +396,7 @@ class TestBuildAnalysisContext:
             patch.object(service, "load_coupling_params", return_value={"0-1": {"g": 0.02}}),
             patch("qdash.datamodel.task_knowledge.get_task_knowledge", return_value=knowledge),
         ):
-            result = service.build_analysis_context(
+            result = service.build_task_context(
                 task_name="CheckT1",
                 chip_id="chip-1",
                 qid="0",
@@ -445,7 +445,7 @@ class TestBuildAnalysisContext:
             ) as collect_expected,
             patch("qdash.datamodel.task_knowledge.get_task_knowledge", return_value=knowledge),
         ):
-            result = service.build_analysis_context(
+            result = service.build_task_context(
                 task_name="CheckT1",
                 chip_id="chip-1",
                 qid="0",

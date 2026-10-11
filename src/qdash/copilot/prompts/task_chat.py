@@ -1,4 +1,4 @@
-"""Prompt builders for chats about a task result."""
+"""Prompt builders for a chat about one task result."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from qdash.copilot.config import CopilotConfig, ScoringThreshold
-    from qdash.copilot.prompts.models import AnalysisPromptOptions
+    from qdash.copilot.prompts.models import TaskChatPromptOptions
 
 
 def build_language_instruction(config: CopilotConfig | None) -> str:
@@ -115,7 +115,7 @@ def _build_scoring_threshold_section(scoring: Mapping[str, ScoringThreshold] | N
     return "\n".join(threshold_lines)
 
 
-def build_analysis_system_prompt(options: AnalysisPromptOptions) -> str:
+def build_task_chat_prompt(options: TaskChatPromptOptions) -> str:
     """Build the full system prompt for a chat about a task result."""
     context = options.context
     parts = [ANALYSIS_SYSTEM_PROMPT_BASE, options.language_instruction]

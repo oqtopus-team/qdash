@@ -32,9 +32,9 @@ import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { ParametersTable } from "./ParametersTable";
 import { TaskResultIssues } from "./TaskResultIssues";
 import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
-import type { AnalysisContext } from "@/types/copilotChat";
+import type { TaskChatContext } from "@/types/copilotChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 interface CouplingMetricHistoryModalProps {
@@ -74,7 +74,7 @@ export function CouplingMetricHistoryModal({
     type: "success" | "error";
     text: string;
   } | null>(null);
-  const { openMiniChat } = useAnalysisChatContext();
+  const { openMiniChat } = useChatDock();
   const queryClient = useQueryClient();
   const updateParamsMutation = useUpdateCalibrationParameters();
 
@@ -208,8 +208,8 @@ export function CouplingMetricHistoryModal({
     return selectedGroup.items[0] ?? null;
   }, [selectedGroup, selectedTask?.task_id]);
 
-  // Build analysis context for the AI chat panel
-  const analysisContext: AnalysisContext | null = useMemo(() => {
+  // The task result this chat is about
+  const chatContext: TaskChatContext | null = useMemo(() => {
     if (!selectedTask || !selectedExecutionId) return null;
     return {
       taskName: selectedTask.name || "",
@@ -598,9 +598,9 @@ export function CouplingMetricHistoryModal({
               <GitBranch className="h-3 w-3" />
               View Provenance Lineage
             </Link>
-            {analysisContext && (
+            {chatContext && (
               <button
-                onClick={() => openMiniChat(analysisContext)}
+                onClick={() => openMiniChat(chatContext)}
                 className="btn btn-xs btn-primary gap-1"
               >
                 <Bot className="h-3 w-3" />

@@ -1,7 +1,7 @@
 /** Shared types for every Copilot chat surface (page, sidebar, floating window). */
 
-/** The calibration result a chat is about; its first turn goes to the analyze endpoint. */
-export interface AnalysisContext {
+/** The task result a chat is about; its first turn opens with the result's context and figures. */
+export interface TaskChatContext {
   taskName: string;
   chipId: string;
   qid: string;

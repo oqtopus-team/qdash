@@ -2,33 +2,33 @@
 
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
-import type { AnalysisContext } from "@/types/copilotChat";
+import type { TaskChatContext } from "@/types/copilotChat";
 
 /**
  * Where the in-app chat is shown outside the /chat page: the docked sidebar or
  * the floating window that sits above modals. Both render the active session
  * of CopilotChatSessionProvider, so a chat moves between them mid-stream.
  */
-interface AnalysisChatContextValue {
+interface ChatDockValue {
   /** Resume the chat about this result, or start one, without opening a surface. */
-  focusAnalysisChat: (context: AnalysisContext) => void;
+  focusTaskChat: (context: TaskChatContext) => void;
   isOpen: boolean;
-  openAnalysisChat: (context: AnalysisContext) => void;
+  openTaskChat: (context: TaskChatContext) => void;
   openGeneralChat: () => void;
   /** Show the active session in the sidebar. */
   openSidebar: () => void;
-  closeAnalysisChat: () => void;
+  closeSidebar: () => void;
 
   miniChat: { isOpen: boolean };
-  openMiniChat: (context: AnalysisContext) => void;
+  openMiniChat: (context: TaskChatContext) => void;
   /** Show this session in the floating window, e.g. to follow a streaming answer. */
   openMiniChatForSession: (sessionId: string) => void;
   closeMiniChat: () => void;
 }
 
-const AnalysisChatCtx = createContext<AnalysisChatContextValue | null>(null);
+const ChatDockCtx = createContext<ChatDockValue | null>(null);
 
-export function AnalysisChatProvider({ children }: { children: React.ReactNode }) {
+export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const { activeSession, findSessionByContext, switchSession, createNewSession } =
     useCopilotChatSessionContext();
   const [isOpen, setIsOpen] = useState(false);
@@ -36,7 +36,7 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
 
   /** Resume the chat about this result, or start one. */
   const focusContext = useCallback(
-    (context: AnalysisContext) => {
+    (context: TaskChatContext) => {
       const existing = findSessionByContext(context);
       if (existing) switchSession(existing.id);
       else createNewSession(context);
@@ -44,8 +44,8 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
     [createNewSession, findSessionByContext, switchSession],
   );
 
-  const openAnalysisChat = useCallback(
-    (context: AnalysisContext) => {
+  const openTaskChat = useCallback(
+    (context: TaskChatContext) => {
       focusContext(context);
       setMiniOpen(false);
       setIsOpen(true);
@@ -65,10 +65,10 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
     setIsOpen(true);
   }, []);
 
-  const closeAnalysisChat = useCallback(() => setIsOpen(false), []);
+  const closeSidebar = useCallback(() => setIsOpen(false), []);
 
   const openMiniChat = useCallback(
-    (context: AnalysisContext) => {
+    (context: TaskChatContext) => {
       focusContext(context);
       setMiniOpen(true);
     },
@@ -88,12 +88,12 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
 
   const value = useMemo(
     () => ({
-      focusAnalysisChat: focusContext,
+      focusTaskChat: focusContext,
       isOpen,
-      openAnalysisChat,
+      openTaskChat,
       openGeneralChat,
       openSidebar,
-      closeAnalysisChat,
+      closeSidebar,
       miniChat: { isOpen: miniOpen },
       openMiniChat,
       openMiniChatForSession,
@@ -102,10 +102,10 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
     [
       focusContext,
       isOpen,
-      openAnalysisChat,
+      openTaskChat,
       openGeneralChat,
       openSidebar,
-      closeAnalysisChat,
+      closeSidebar,
       miniOpen,
       openMiniChat,
       openMiniChatForSession,
@@ -113,13 +113,13 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
     ],
   );
 
-  return <AnalysisChatCtx.Provider value={value}>{children}</AnalysisChatCtx.Provider>;
+  return <ChatDockCtx.Provider value={value}>{children}</ChatDockCtx.Provider>;
 }
 
-export function useAnalysisChatContext() {
-  const ctx = useContext(AnalysisChatCtx);
+export function useChatDock() {
+  const ctx = useContext(ChatDockCtx);
   if (!ctx) {
-    throw new Error("useAnalysisChatContext must be used within AnalysisChatProvider");
+    throw new Error("useChatDock must be used within ChatDockProvider");
   }
   return ctx;
 }

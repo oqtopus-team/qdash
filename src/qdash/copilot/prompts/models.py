@@ -8,13 +8,13 @@ from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from qdash.copilot.config import ScoringThreshold
-    from qdash.copilot.contracts import TaskAnalysisContext
+    from qdash.copilot.contracts import TaskContext
 
 
-class AnalysisPromptOptions(BaseModel):
-    """Normalized inputs for rendering a task-analysis system prompt."""
+class TaskChatPromptOptions(BaseModel):
+    """Normalized inputs for rendering the prompt of a chat about one task result."""
 
-    context: TaskAnalysisContext
+    context: TaskContext
     language_instruction: str
     scoring: dict[str, ScoringThreshold] = Field(default_factory=dict)
     include_response_format: bool = False
@@ -34,13 +34,13 @@ class ChatPromptContext(BaseModel):
 
 def _rebuild_models() -> None:
     from qdash.copilot.config import ScoringThreshold as _ScoringThreshold
-    from qdash.copilot.contracts import TaskAnalysisContext as _TaskAnalysisContext
+    from qdash.copilot.contracts import TaskContext as _TaskContext
 
     namespace = {
-        "TaskAnalysisContext": _TaskAnalysisContext,
+        "TaskContext": _TaskContext,
         "ScoringThreshold": _ScoringThreshold,
     }
-    AnalysisPromptOptions.model_rebuild(_types_namespace=namespace)
+    TaskChatPromptOptions.model_rebuild(_types_namespace=namespace)
     ChatPromptContext.model_rebuild(_types_namespace=namespace)
 
 

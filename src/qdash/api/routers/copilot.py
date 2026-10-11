@@ -36,7 +36,7 @@ from qdash.api.schemas.copilot_chat_session import (
     ListCopilotChatSessionsResponse,
     UpdateCopilotChatSessionRequest,
 )
-from qdash.api.services import pi_analysis_service, pi_chat_service
+from qdash.api.services import pi_chat_service
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
@@ -52,8 +52,8 @@ from qdash.copilot.contracts import (
     ChatStopRequest,
     ChatStopResponse,
     SandboxPythonRequest,
+    TaskContextBundle,
 )
-from qdash.copilot.prompts.analysis import build_language_instruction
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
@@ -149,7 +149,7 @@ async def analyze_task_result(
     analysis_config = _config_with_request_model(config, request)
 
     # Build analysis context (resolves knowledge, qubit params, images, etc.)
-    ctx = copilot_runtime.build_analysis_context(
+    ctx = copilot_runtime.build_task_context(
         task_name=request.task_name,
         chip_id=request.chip_id,
         qid=request.qid,
@@ -193,135 +193,6 @@ async def analyze_task_result(
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
 
 
-@router.post("/analyze/stream", include_in_schema=False)
-async def analyze_task_result_stream(
-    request: AnalyzeRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
-    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
-) -> StreamingResponse:
-    """SSE streaming version of analyze_task_result.
-
-    Sends status events as each step progresses, then a final result or error event.
-    """
-
-    async def event_generator() -> AsyncGenerator[str, None]:
-        config = load_copilot_config()
-        if not config.enabled:
-            yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
-            return
-        analysis_config = _config_with_request_model(config, request)
-
-        # Build analysis context
-        yield sse_event(
-            "status",
-            {"step": "build_context", "message": "分析コンテキストを構築中..."},
-        )
-        await asyncio.sleep(0)
-        ctx = copilot_runtime.build_analysis_context(
-            task_name=request.task_name,
-            chip_id=request.chip_id,
-            qid=request.qid,
-            task_id=request.task_id,
-            image_base64=request.image_base64,
-            config=analysis_config,
-        )
-
-        # Emit image loading status
-        has_experiment = bool(ctx.image_base64)
-        num_expected = len(ctx.expected_images)
-        if has_experiment and num_expected > 0:
-            img_msg = f"実験結果画像と参照画像{num_expected}枚をAIに送信中..."
-        elif has_experiment:
-            img_msg = "実験結果画像をAIに送信中..."
-        elif num_expected > 0:
-            img_msg = f"参照画像{num_expected}枚をAIに送信中..."
-        else:
-            img_msg = None
-        if img_msg:
-            yield sse_event("status", {"step": "load_images", "message": img_msg})
-            await asyncio.sleep(0)
-
-        images_sent = CopilotRuntime.build_images_sent_metadata(
-            ctx.image_base64,
-            ctx.figure_paths,
-            ctx.expected_images,
-            request.task_name,
-            ctx.experiment_images,
-        )
-
-        # Run analysis with tool progress streaming
-        yield sse_event("status", {"step": "run_analysis", "message": "AIが分析中..."})
-
-        if config.copilot_backend == "pi":
-            pi_config = analysis_config
-            async for event in pi_analysis_service.stream(
-                request,
-                pi_config,
-                ctx,
-                username=current_user.username,
-                auth=pi_chat_service.QDashAuth(
-                    access_token=credentials.credentials,
-                    project_id=project_id or current_user.default_project_id,
-                ),
-                language_instruction=build_language_instruction(pi_config),
-                images_sent=images_sent,
-            ):
-                yield event
-            return
-
-        tool_executors = copilot_runtime.build_tool_executors()
-        bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
-
-        try:
-            from qdash.copilot.agent import run_analysis
-
-            coro = partial(
-                run_analysis,
-                context=ctx.context,
-                user_message=request.message,
-                config=analysis_config,
-                image_base64=ctx.image_base64,
-                expected_images=ctx.expected_images,
-                experiment_images=ctx.experiment_images,
-                conversation_history=request.conversation_history,
-                tool_executors=tool_executors,
-            )
-
-            result: dict[str, Any] = {}
-            async for event in bridge.drain(coro):
-                if isinstance(event, str):
-                    yield event
-                else:
-                    result = event
-        except ImportError:
-            yield sse_event(
-                "error",
-                {
-                    "step": "run_analysis",
-                    "detail": "openai is not installed. Install with: pip install openai",
-                },
-            )
-            return
-        except Exception as e:
-            logger.exception("Analysis failed")
-            yield sse_event("error", {"step": "run_analysis", "detail": f"Analysis failed: {e}"})
-            return
-
-        result["images_sent"] = images_sent
-
-        # Complete
-        yield sse_event("status", {"step": "complete", "message": "分析完了"})
-        yield sse_event("result", result)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
-
-
 @router.post("/sandbox/python", include_in_schema=False)
 async def run_sandboxed_python(
     request: SandboxPythonRequest,
@@ -355,6 +226,71 @@ async def chat_stop(
     return ChatStopResponse(stopped=stopped)
 
 
+def _figures_status(bundle: TaskContextBundle) -> str | None:
+    """Status line for the figures a task chat opens with."""
+    has_experiment = bool(bundle.image_base64)
+    num_expected = len(bundle.expected_images)
+    if has_experiment and num_expected > 0:
+        return f"実験結果画像と参照画像{num_expected}枚をAIに送信中..."
+    if has_experiment:
+        return "実験結果画像をAIに送信中..."
+    if num_expected > 0:
+        return f"参照画像{num_expected}枚をAIに送信中..."
+    return None
+
+
+async def _litellm_task_chat(
+    request: ChatRequest,
+    config: CopilotConfig,
+    bundle: TaskContextBundle,
+    images_sent: dict[str, Any],
+    copilot_runtime: CopilotRuntime,
+) -> AsyncGenerator[str, None]:
+    """A task chat turn on the in-process LiteLLM agent, as SSE events."""
+    yield sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
+    tool_executors = copilot_runtime.build_tool_executors()
+    bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
+
+    try:
+        from qdash.copilot.agent import run_analysis
+
+        coro = partial(
+            run_analysis,
+            context=bundle.context,
+            user_message=request.message,
+            config=config,
+            image_base64=bundle.image_base64,
+            expected_images=bundle.expected_images,
+            experiment_images=bundle.experiment_images,
+            conversation_history=request.conversation_history,
+            tool_executors=tool_executors,
+        )
+
+        result: dict[str, Any] = {}
+        async for event in bridge.drain(coro):
+            if isinstance(event, str):
+                yield event
+            else:
+                result = event
+    except ImportError:
+        yield sse_event(
+            "error",
+            {
+                "step": "run_chat",
+                "detail": "openai is not installed. Install with: pip install openai",
+            },
+        )
+        return
+    except Exception as e:
+        logger.exception("Task chat failed")
+        yield sse_event("error", {"step": "run_chat", "detail": f"Chat failed: {e}"})
+        return
+
+    result["images_sent"] = images_sent
+    yield sse_event("status", {"step": "complete", "message": "完了"})
+    yield sse_event("result", result)
+
+
 @router.post("/chat/stream", include_in_schema=False)
 async def chat_stream(
     request: ChatRequest,
@@ -363,9 +299,11 @@ async def chat_stream(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     project_id: Annotated[str | None, Depends(get_project_id_from_header)],
 ) -> StreamingResponse:
-    """SSE streaming generic chat endpoint.
+    """SSE streaming chat endpoint.
 
-    Does not require task context. Optionally accepts chip_id/qid for scoped queries.
+    A chat is about one task result when ``task`` is set: its first turn then
+    opens with the result's context and figures. Otherwise it is a general
+    chat, optionally scoped by chip_id/qid.
     """
 
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -374,6 +312,34 @@ async def chat_stream(
             yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
             return
         chat_config = _config_with_chat_model(config, request)
+
+        task_bundle = None
+        images_sent: dict[str, Any] | None = None
+        if request.task is not None:
+            yield sse_event(
+                "status",
+                {"step": "build_context", "message": "タスク結果のコンテキストを構築中..."},
+            )
+            await asyncio.sleep(0)
+            task_bundle = copilot_runtime.build_task_context(
+                task_name=request.task.task_name,
+                chip_id=request.task.chip_id,
+                qid=request.task.qid,
+                task_id=request.task.task_id,
+                image_base64=request.image_base64,
+                config=chat_config,
+            )
+            img_msg = _figures_status(task_bundle)
+            if img_msg:
+                yield sse_event("status", {"step": "load_images", "message": img_msg})
+                await asyncio.sleep(0)
+            images_sent = CopilotRuntime.build_images_sent_metadata(
+                task_bundle.image_base64,
+                task_bundle.figure_paths,
+                task_bundle.expected_images,
+                request.task.task_name,
+                task_bundle.experiment_images,
+            )
 
         if config.copilot_backend == "pi":
             async for event in pi_chat_service.stream(
@@ -384,6 +350,15 @@ async def chat_stream(
                     access_token=credentials.credentials,
                     project_id=project_id or current_user.default_project_id,
                 ),
+                task=task_bundle,
+                images_sent=images_sent,
+            ):
+                yield event
+            return
+
+        if task_bundle is not None:
+            async for event in _litellm_task_chat(
+                request, chat_config, task_bundle, images_sent or {}, copilot_runtime
             ):
                 yield event
             return

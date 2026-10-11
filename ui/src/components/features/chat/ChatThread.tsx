@@ -16,7 +16,7 @@ import {
   LiveAssistantMessage,
   UserMessage,
 } from "@/components/features/chat/ChatMessages";
-import type { AnalysisContext } from "@/types/copilotChat";
+import type { TaskChatContext } from "@/types/copilotChat";
 
 /**
  * - page: the /chat page, roomy, greeting centered with the composer
@@ -26,7 +26,7 @@ import type { AnalysisContext } from "@/types/copilotChat";
 type ChatThreadVariant = "page" | "panel" | "compact";
 
 /** "CheckT1 · Q00" badge for chats about one result. */
-export function ContextChip({ context }: { context: AnalysisContext }) {
+export function ContextChip({ context }: { context: TaskChatContext }) {
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium max-w-full"
@@ -69,7 +69,7 @@ function EmptyState({
   onPick,
 }: {
   variant: ChatThreadVariant;
-  context: AnalysisContext | null;
+  context: TaskChatContext | null;
   suggestions: ChatSuggestion[];
   onPick: (text: string) => void;
 }) {

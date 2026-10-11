@@ -21,7 +21,7 @@ from qdash.copilot.agent_runtime.execution import (
 from qdash.copilot.agent_runtime.parsing import parse_response
 from qdash.copilot.agent_runtime.schemas import BLOCKS_RESPONSE_SCHEMA
 from qdash.copilot.config import CopilotConfig, ModelConfig
-from qdash.copilot.contracts import TaskAnalysisContext
+from qdash.copilot.contracts import TaskContext
 
 
 def test_parse_response_takes_json_as_it_is() -> None:
@@ -442,7 +442,7 @@ async def test_run_analysis_uses_litellm_completion_for_completion_api_style() -
             )
         ],
     )
-    context = TaskAnalysisContext(
+    context = TaskContext(
         task_knowledge_prompt="knowledge",
         chip_id="chip",
         qid="0",

@@ -16,8 +16,8 @@ import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
-import type { AnalysisContext } from "@/types/copilotChat";
+import { useChatDock } from "@/contexts/ChatDockContext";
+import type { TaskChatContext } from "@/types/copilotChat";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 interface ExecutionTaskDetailModalProps {
@@ -66,7 +66,7 @@ export function ExecutionTaskDetailModal({
 }: ExecutionTaskDetailModalProps) {
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(initialTaskIndex);
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("tasks");
-  const { openMiniChat } = useAnalysisChatContext();
+  const { openMiniChat } = useChatDock();
 
   const selectedTask = tasks[selectedTaskIndex] ?? null;
 
@@ -86,7 +86,7 @@ export function ExecutionTaskDetailModal({
         : []
     : [];
 
-  const analysisContext: AnalysisContext | null = useMemo(() => {
+  const chatContext: TaskChatContext | null = useMemo(() => {
     if (!selectedTask?.task_id) return null;
     return {
       taskName: selectedTask.name || "",
@@ -310,9 +310,9 @@ export function ExecutionTaskDetailModal({
               <GitBranch className="h-3 w-3" />
               View Provenance Lineage
             </Link>
-            {analysisContext && (
+            {chatContext && (
               <button
-                onClick={() => openMiniChat(analysisContext)}
+                onClick={() => openMiniChat(chatContext)}
                 className="btn btn-xs btn-primary gap-1"
               >
                 <Bot className="h-3 w-3" />

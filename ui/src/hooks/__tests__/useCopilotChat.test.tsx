@@ -6,7 +6,7 @@ import {
   CopilotChatSessionProvider,
   useCopilotChatSessionContext,
 } from "@/contexts/CopilotChatSessionContext";
-import type { AnalysisContext, CopilotBlocksResult } from "@/types/copilotChat";
+import type { TaskChatContext, CopilotBlocksResult } from "@/types/copilotChat";
 
 import { useCopilotChat } from "../useCopilotChat";
 
@@ -41,7 +41,7 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   <CopilotChatSessionProvider>{children}</CopilotChatSessionProvider>
 );
 
-const CONTEXT: AnalysisContext = {
+const CONTEXT: TaskChatContext = {
   taskName: "CheckT1",
   chipId: "64Q",
   qid: "0",
@@ -352,7 +352,7 @@ describe("useCopilotChat streaming", () => {
     expect(messages[messages.length - 1].content).toMatch(/^Error: .*closed before/);
   });
 
-  it("sends analysis chats through the analyze endpoint with their result", async () => {
+  it("sends a task chat through the chat endpoint naming its task result", async () => {
     const result = await renderChat();
 
     act(() => {
@@ -364,12 +364,9 @@ describe("useCopilotChat streaming", () => {
     await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
 
     const { url, body } = streamRequest();
-    expect(url).toMatch(/\/copilot\/analyze\/stream$/);
+    expect(url).toMatch(/\/copilot\/chat\/stream$/);
     expect(body).toMatchObject({
-      task_name: "CheckT1",
-      qid: "0",
-      execution_id: "exec-1",
-      task_id: "task-1",
+      task: { task_name: "CheckT1", qid: "0", execution_id: "exec-1", task_id: "task-1" },
       message: "Is this fit good?",
       session_id: result.current.chat.session?.id,
     });
@@ -462,7 +459,7 @@ describe("image turn replay", () => {
   });
 });
 
-it("keeps retry available for locally known analysis context figures", async () => {
+it("keeps retry available for locally known task chat figures", async () => {
   const result = await renderChat();
   act(() => result.current.store.createNewSession(CONTEXT));
   act(() => result.current.chat.send("Is this fit good?"));

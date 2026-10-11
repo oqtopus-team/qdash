@@ -64,8 +64,8 @@ class Suggestion(BaseModel):
     prompt: str
 
 
-class AnalysisConfig(BaseModel):
-    """Task analysis configuration (side-panel chat in metrics modal)."""
+class TaskChatConfig(BaseModel):
+    """How a chat about one task result opens (figures, turns)."""
 
     enabled: bool = True
     multimodal: bool = True
@@ -95,7 +95,7 @@ class CopilotConfig(BaseModel):
     system_prompt: str = ""
     initial_message: str = ""
     suggestions: list[Suggestion] = Field(default_factory=list)
-    analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
+    task_chat: TaskChatConfig = Field(default_factory=TaskChatConfig)
 
 
 def select_chat_model(config: CopilotConfig, override: ModelConfig | None = None) -> ModelConfig:
@@ -129,6 +129,9 @@ def load_copilot_config() -> CopilotConfig:
         return CopilotConfig(enabled=False)
 
     try:
+        # `analysis` was the key's name before task chats were called that.
+        if "analysis" in data and "task_chat" not in data:
+            data["task_chat"] = data.pop("analysis")
         # Transform scoring dict to use ScoringThreshold models
         if "scoring" in data:
             scoring = {}
