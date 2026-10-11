@@ -30,9 +30,7 @@ def test_pi_receives_current_user_token_and_project(monkeypatch, with_task, sele
     monkeypatch.setattr(
         auth, "get_user_by_token", lambda token: user if token == user.access_token else None
     )
-    monkeypatch.setattr(
-        copilot, "load_copilot_config", lambda: CopilotConfig(enabled=True, copilot_backend="pi")
-    )
+    monkeypatch.setattr(copilot, "load_copilot_config", lambda: CopilotConfig(enabled=True))
 
     async def stream(*args, **kwargs):
         captured.append(kwargs)

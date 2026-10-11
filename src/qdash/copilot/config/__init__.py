@@ -2,10 +2,7 @@
 
 from qdash.copilot.config.settings import (
     CopilotConfig,
-    EvaluationMetrics,
     ModelConfig,
-    ScoringThreshold,
-    Suggestion,
     TaskChatConfig,
     clear_copilot_config_cache,
     load_copilot_config,
@@ -14,10 +11,7 @@ from qdash.copilot.config.settings import (
 
 __all__ = [
     "CopilotConfig",
-    "EvaluationMetrics",
     "ModelConfig",
-    "ScoringThreshold",
-    "Suggestion",
     "TaskChatConfig",
     "clear_copilot_config_cache",
     "load_copilot_config",

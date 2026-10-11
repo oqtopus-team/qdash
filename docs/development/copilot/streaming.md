@@ -38,67 +38,14 @@ All events follow the SSE format: `event: <type>\ndata: <json>\n\n`
 | `load_context` | Loading task context (issue AI reply) |
 | `save_reply` | Saving AI reply as issue (issue AI reply) |
 
-## SSETaskBridge
+## Runtime turns
 
-Both streaming endpoints (`/copilot/chat/stream`, `/issues/{id}/ai-reply/stream`) share the same queue-poll-heartbeat-drain pattern. This is encapsulated in the `SSETaskBridge` dataclass in `lib/sse.py`.
-
-```python
-from qdash.api.lib.sse import SSETaskBridge
-
-bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
-
-coro = partial(
-    run_analysis,
-    context=ctx.context,
-    user_message=request.message,
-    config=config,
-    tool_executors=tool_executors,
-)
-
-result: dict[str, Any] = {}
-async for event in bridge.drain(coro):
-    if isinstance(event, str):
-        yield event          # SSE status event or heartbeat
-    else:
-        result = event       # Final result dict (last yielded value)
-
-yield sse_event("result", result)
-```
-
-### How it works
-
-1. `SSETaskBridge` creates an `asyncio.Queue` and builds `on_tool_call` / `on_status` callbacks that push events into it.
-2. `drain(coro)` calls `coro(on_tool_call=..., on_status=...)` as a background `asyncio.Task`.
-3. While the task runs, `drain` polls the queue with a 0.3-second timeout. Each queued event is yielded as a formatted SSE string. On timeout, a heartbeat comment (`:\n\n`) is yielded.
-4. After the task completes, remaining queue events are drained and the task result is yielded as-is (not formatted) so the caller can post-process it.
-
-### Parameters
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `tool_labels` | `dict[str, str]` | `{}` | Tool name to label mapping |
-| `status_labels` | `dict[str, str]` | `{}` | Status key to label mapping |
-| `heartbeat_timeout` | `float` | `0.3` | Seconds before sending heartbeat |
-
-## Tool Progress Labels
-
-The router maps tool names and status codes to user-facing labels:
-
-### `TOOL_LABELS`
-
-| Tool Name | Label |
-|-----------|-------|
-| `get_qubit_params` | キュービットパラメータを取得中 |
-| `get_latest_task_result` | 最新タスク結果を取得中 |
-| `get_task_history` | タスク履歴を取得中 |
-| `get_parameter_timeseries` | パラメータ時系列を取得中 |
-| `execute_python_analysis` | Python分析コードを実行中 |
-
-### `STATUS_LABELS`
-
-| Status | Label |
-|--------|-------|
-| `thinking` | AIが考え中... |
+Every streaming endpoint (`/copilot/chat/stream`, `/issues/{id}/ai-reply/stream`,
+`/forum/posts/{id}/ai-reply/stream`) proxies one planner turn through the Pi Agent
+Runtime: `pi_chat_service.stream_payload` POSTs the turn and `translate` turns the
+runtime's NDJSON events into the SSE events above. Issue and forum replies use
+`pi_chat_service.thread_reply`, which runs the turn in a throwaway conversation
+and yields the final blocks result for the router to save.
 
 ## Frontend Integration
 

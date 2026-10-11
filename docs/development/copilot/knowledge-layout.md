@@ -20,7 +20,7 @@ The split follows what changes together. A skill that names `qdash_list_cooldown
 
 ## Chat prompts
 
-The Pi Agent Runtime is the chat backend this layout describes. `src/qdash/copilot/prompts/chat.py` holds the system prompt of the earlier LiteLLM chat backend (`copilot_backend: litellm`); it is kept for that backend and does not receive new guidance. Analysis prompts in `src/qdash/copilot/prompts/analysis.py` are shared by both backends.
+The Pi Agent Runtime is the only chat backend. Its system prompt lives in `agent-runtime/src/prompt.ts`; the opening message of a chat about a task result is rendered by `src/qdash/copilot/prompts/task_chat.py`.
 
 ## Implementation Files
 

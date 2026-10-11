@@ -25,8 +25,6 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  AnalysisResponse,
-  AnalyzeRequest,
   CopilotChatSessionResponse,
   CreateCopilotChatSessionRequest,
   DeleteCopilotChatSession200,
@@ -63,10 +61,8 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
  *
  * Retrieves the Copilot configuration from YAML, including:
  * - enabled: Whether Copilot is enabled
- * - evaluation_metrics: Which metrics to use for multi-metric evaluation
- * - scoring: Thresholds for good/excellent ratings per metric
- * - system_prompt: The AI assistant's system prompt
- * - initial_message: The initial greeting message
+ * - chat_models: The planner models the UI offers
+ * - evaluation_models: The calibration evaluation model
  *
  * Returns
  * -------
@@ -164,84 +160,6 @@ export function useGetCopilotConfig<TData = Awaited<ReturnType<typeof getCopilot
 
 
 /**
- * Analyze a calibration task result using LLM.
- *
- * Constructs a rich context from task knowledge, qubit parameters,
- * and experimental data, then sends it to the configured LLM for analysis.
- *
- * Parameters
- * ----------
- * request : AnalyzeRequest
- *     The analysis request containing task info, IDs, and user message.
- *
- * Returns
- * -------
- * AnalysisResponse
- *     Structured analysis from the LLM.
- * @summary Analyze calibration result with AI
- */
-export const analyzeCopilot = (
-    analyzeRequest: AnalyzeRequest,
- options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
-) => {
-
-
-      return customInstance<AnalysisResponse>(
-      {url: `/copilot/analyze`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: analyzeRequest, signal
-    },
-      options);
-    }
-
-
-
-
-export const getAnalyzeCopilotMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeCopilot>>, TError,{data: AnalyzeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof analyzeCopilot>>, TError,{data: AnalyzeRequest}, TContext> => {
-
-const mutationKey = ['analyzeCopilot'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeCopilot>>, {data: AnalyzeRequest}> = (props) => {
-          const {data} = props ?? {};
-
-          return  analyzeCopilot(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AnalyzeCopilotMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeCopilot>>>
-    export type AnalyzeCopilotMutationBody = AnalyzeRequest
-    export type AnalyzeCopilotMutationError = HTTPValidationError
-
-    /**
- * @summary Analyze calibration result with AI
- */
-export const useAnalyzeCopilot = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeCopilot>>, TError,{data: AnalyzeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof analyzeCopilot>>,
-        TError,
-        {data: AnalyzeRequest},
-        TContext
-      > => {
-      return useMutation(getAnalyzeCopilotMutationOptions(options), queryClient);
-    }
-    /**
  * Return all persisted chat sessions owned by the current user.
  * @summary List the current user's chat sessions
  */

@@ -23,8 +23,8 @@ from qdash.api.schemas.issue_knowledge import (
     ListIssueKnowledgeResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
+from qdash.api.services import pi_chat_service
 from qdash.common.config.path_resolver import resolve_calib_data_path
-from qdash.copilot.agent_runtime.client import litellm_completion
 from qdash.copilot.prompts.issue_knowledge import ISSUE_KNOWLEDGE_EXTRACTION_PROMPT
 from qdash.dbmodel.issue_knowledge import IssueKnowledgeDocument
 from qdash.dbmodel.user import UserDocument
@@ -103,6 +103,9 @@ class IssueKnowledgeService:
         project_id: str,
         issue_id: str,
         issue_service: IssueService,
+        *,
+        username: str,
+        auth: pi_chat_service.QDashAuth,
     ) -> IssueKnowledgeResponse:
         """Generate an AI knowledge draft from a closed issue thread.
 
@@ -186,6 +189,8 @@ class IssueKnowledgeService:
             qid=qid,
             issue_title=root_doc.title or "",
             thread_text=thread_text,
+            username=username,
+            auth=auth,
         )
 
         if not extracted:
@@ -302,8 +307,11 @@ class IssueKnowledgeService:
         qid: str,
         issue_title: str,
         thread_text: str,
+        *,
+        username: str,
+        auth: pi_chat_service.QDashAuth,
     ) -> dict[str, Any]:
-        """Call LLM to extract structured knowledge from issue thread."""
+        """Ask the planner to extract structured knowledge from the issue thread."""
         from qdash.copilot.config import load_copilot_config
 
         config = load_copilot_config()
@@ -320,22 +328,22 @@ class IssueKnowledgeService:
         )
 
         try:
-            response = await litellm_completion(
-                config,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=1000,
+            raw = await pi_chat_service.complete_once(
+                username=username,
+                auth=auth,
+                config=config,
+                scope="knowledge",
+                prompt=prompt,
             )
-            if isinstance(response, dict):
-                raw = response.get("choices", [{}])[0].get("message", {}).get("content") or ""
-            else:
-                raw = response.choices[0].message.content or ""
-            # Strip markdown code fences if present
+            # The answer is the JSON object, possibly inside a code fence or prose.
             raw = raw.strip()
             if raw.startswith("```"):
                 raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
             if raw.endswith("```"):
                 raw = raw[: raw.rfind("```")]
+            start_brace, end_brace = raw.find("{"), raw.rfind("}")
+            if start_brace >= 0 and end_brace > start_brace:
+                raw = raw[start_brace : end_brace + 1]
             result: dict[str, Any] = json.loads(raw.strip())
             if not isinstance(result, dict):
                 logger.warning("LLM returned non-dict JSON: %s", type(result).__name__)

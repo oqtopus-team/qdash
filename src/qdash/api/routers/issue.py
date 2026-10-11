@@ -3,21 +3,23 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
-from functools import partial
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.security import (
+    HTTPAuthorizationCredentials,  # noqa: TC002 - FastAPI resolves annotations
+)
 
 from qdash.api.dependencies import get_issue_service
-from qdash.api.lib.ai_labels import STATUS_LABELS as _AI_STATUS_LABELS
-from qdash.api.lib.ai_labels import TOOL_LABELS as _AI_TOOL_LABELS
+from qdash.api.lib.auth import bearer_scheme
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
 )
-from qdash.api.lib.sse import SSETaskBridge, sse_event
+from qdash.api.lib.sse import sse_event
 from qdash.api.schemas.issue import (
     IssueAiReplyRequest,
     IssueCreate,
@@ -26,6 +28,7 @@ from qdash.api.schemas.issue import (
     ListIssuesResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
+from qdash.api.services import pi_chat_service
 from qdash.api.services.issue_service import IssueService
 
 if TYPE_CHECKING:
@@ -266,19 +269,42 @@ def get_issue_image(filename: str) -> FileResponse:
 # =============================================================================
 
 
+def _issue_reply_instruction(
+    chip_id: str | None, qid: str | None, qubit_params: dict[str, Any], task_id: str
+) -> str:
+    """What the planner is told before it answers inside an issue thread."""
+    lines = [
+        "You are replying inside a QDash issue thread about one calibration task result.",
+        "Answer the latest post as a reply: concise markdown, grounded in the thread and in",
+        "QDash data (use your tools when the question needs data that is not in the thread).",
+        "Do not repeat the thread or restate the question.",
+        "",
+        f"Task result: {task_id}",
+    ]
+    if chip_id:
+        lines.append(f"Chip: {chip_id}")
+    if qid:
+        lines.append(f"Target: {qid}")
+    if qubit_params:
+        lines.append("Current parameters of the target:")
+        lines.append(json.dumps(qubit_params, ensure_ascii=False, default=str)[:4000])
+    return "\n".join(lines)
+
+
 @router.post("/issues/{issue_id}/ai-reply/stream", include_in_schema=False)
 async def issue_ai_reply_stream(
     issue_id: str,
     body: IssueAiReplyRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[IssueService, Depends(get_issue_service)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
 ) -> StreamingResponse:
     """SSE endpoint that generates an AI reply in an issue thread.
 
     1. Loads copilot config, checks enabled
     2. Fetches root issue and thread replies as conversation history
     3. Resolves chip_id/qid from the task result
-    4. Calls run_chat() with tool executors
+    4. Runs one planner turn on the Pi Agent Runtime as the current user
     5. Saves AI reply as IssueDocument
     6. Streams status events and final result via SSE
     """
@@ -327,56 +353,30 @@ async def issue_ai_reply_stream(
         )
         await asyncio.sleep(0)
 
-        # Build tool executors
-        from qdash.copilot.runtime import CopilotRuntime
-
-        copilot_data_svc = CopilotRuntime()
-        tool_executors = copilot_data_svc.build_tool_executors()
-
-        # Strip @qdash mention from user message before sending to LLM
+        # Strip @qdash mention from user message before sending to the planner
         clean_message = IssueService.strip_mention(body.user_message)
         if not clean_message:
             clean_message = "この Issue について教えてください"
         logger.info("AI reply: original=%r, clean=%r", body.user_message, clean_message)
 
         yield sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
-        bridge = SSETaskBridge(
-            tool_labels=_AI_TOOL_LABELS,
-            status_labels=_AI_STATUS_LABELS,
-        )
-
-        try:
-            from qdash.copilot.agent import run_chat
-
-            coro = partial(
-                run_chat,
-                user_message=clean_message,
-                config=config,
-                chip_id=chip_id,
-                qid=qid,
-                qubit_params=qubit_params if qubit_params else None,
-                conversation_history=conversation_history,
-                tool_executors=tool_executors,
-            )
-
-            result: dict[str, Any] = {}
-            async for event in bridge.drain(coro):
-                if isinstance(event, str):
-                    yield event
-                else:
-                    result = event
-        except ImportError:
-            yield sse_event(
-                "error",
-                {
-                    "step": "run_chat",
-                    "detail": "openai is not installed. Install with: pip install openai",
-                },
-            )
-            return
-        except Exception as e:
-            logger.exception("AI reply failed")
-            yield sse_event("error", {"step": "run_chat", "detail": f"AI reply failed: {e}"})
+        instruction = _issue_reply_instruction(chip_id, qid, qubit_params, task_id)
+        result: dict[str, Any] | None = None
+        async for event in pi_chat_service.thread_reply(
+            username=ctx.user.username,
+            auth=pi_chat_service.QDashAuth(credentials.credentials, ctx.project_id),
+            config=config,
+            scope="issue",
+            instruction=instruction,
+            history=conversation_history,
+            user_message=clean_message,
+        ):
+            if isinstance(event, dict):
+                result = event
+            else:
+                yield event
+        if result is None:
+            # The runtime's error event has already been forwarded.
             return
 
         # Convert blocks to markdown and save as issue reply

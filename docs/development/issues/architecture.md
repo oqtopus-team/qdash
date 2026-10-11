@@ -16,7 +16,7 @@ QDash Issues is a lightweight discussion system attached to task results. It ena
 
 | File | Responsibility |
 |------|---------------|
-| `src/qdash/api/routers/issue.py` | FastAPI router: CRUD endpoints, AI reply SSE streaming via `SSETaskBridge`, image upload/serving |
+| `src/qdash/api/routers/issue.py` | FastAPI router: CRUD endpoints, AI reply SSE streaming through the Pi Agent Runtime, image upload/serving |
 | `src/qdash/api/services/issue_service.py` | Business logic: CRUD operations, permission checks, AI reply context building, mention stripping, message deduplication, markdown formatting |
 | `src/qdash/api/schemas/issue.py` | Pydantic schemas: `IssueCreate`, `IssueUpdate`, `IssueResponse`, `IssueAiReplyRequest`, `ListIssuesResponse` |
 | `src/qdash/dbmodel/issue.py` | Bunnet document model: `IssueDocument` with MongoDB indexes |
@@ -109,14 +109,14 @@ Images can be attached via the MarkdownEditor toolbar, clipboard paste, or drag-
 
 ## AI Reply
 
-Users can mention `@qdash` in a reply to trigger an AI-generated response. The AI reply endpoint (`POST /issues/{issue_id}/ai-reply/stream`) streams progress via SSE using `SSETaskBridge`.
+Users can mention `@qdash` in a reply to trigger an AI-generated response. The AI reply endpoint (`POST /issues/{issue_id}/ai-reply/stream`) streams progress via SSE from one planner turn on the Pi Agent Runtime (`pi_chat_service.thread_reply`).
 
 The request processing pipeline in `IssueService`:
 
 1. `build_ai_reply_context()` -- loads the root issue, thread replies, and resolves chip/qubit context from the linked task result. Strips `@qdash` mentions from conversation history via `strip_mention()`.
 2. `deduplicate_last_message()` -- removes the last history entry if it duplicates the current user message (prevents the same message appearing twice in the LLM context).
 3. `strip_mention()` -- removes `@qdash` from the user's message before sending to the LLM.
-4. The router calls `run_chat()` via `SSETaskBridge.drain()` with the cleaned message and conversation history.
+4. The router runs one planner turn with `pi_chat_service.thread_reply()`: the thread so far and the cleaned message open a throwaway conversation on the runtime, as the current user.
 5. `format_ai_response_as_markdown()` -- converts the LLM blocks response to Markdown. Falls back to a JSON code block if the conversion returns empty.
 6. `save_ai_reply()` -- persists the AI response as an `IssueDocument` with `is_ai_reply=True`.
 

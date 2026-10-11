@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import os
+import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -251,13 +252,8 @@ def task_opening_message(
         TaskChatPromptOptions(
             context=bundle.context,
             language_instruction=language_instruction,
-            scoring=config.scoring,
             has_expected_images=expected_count > 0,
             has_experiment_image=experiment_count > 0,
-            # Pi answers in free text and calls `render_chart`; the blocks are
-            # reassembled from that. Asking for JSON here would land the raw
-            # JSON string inside a text block.
-            include_response_format=False,
         )
     )
 
@@ -540,8 +536,8 @@ def build_blocks_result(
 ) -> dict[str, Any]:
     """Assemble the blocks payload the chat UI renders.
 
-    ``assessment`` stays null: the Pi backend returns free-form text rather than
-    the structured verdict the LiteLLM path enforces through a response schema.
+    ``assessment`` stays null: the runtime answers in free-form text, not a
+    structured verdict.
     """
     blocks: list[dict[str, Any]] = [
         {"type": "chart", "content": None, "chart": chart} for chart in charts
@@ -550,3 +546,124 @@ def build_blocks_result(
         blocks.append({"type": "text", "content": text, "chart": None})
     blocks.extend(interactions or [])
     return {"blocks": blocks, "assessment": None}
+
+
+def parse_sse(chunk: str) -> tuple[str, dict[str, Any]] | None:
+    """The (event, data) of one SSE chunk this module produced, or None for comments."""
+    name: str | None = None
+    data: str | None = None
+    for line in chunk.strip().splitlines():
+        if line.startswith("event: "):
+            name = line[len("event: ") :]
+        elif line.startswith("data: "):
+            data = line[len("data: ") :]
+    if name is None or data is None:
+        return None
+    try:
+        parsed = json.loads(data)
+    except ValueError:
+        return None
+    return (name, parsed) if isinstance(parsed, dict) else None
+
+
+def _thread_transcript(history: list[dict[str, str]]) -> str:
+    lines = []
+    for message in history:
+        who = "AI" if message.get("role") == "assistant" else "User"
+        content = (message.get("content") or "").strip()
+        if content:
+            lines.append(f"[{who}] {content}")
+    return "\n\n".join(lines) or "(no earlier posts)"
+
+
+async def thread_reply(
+    *,
+    username: str,
+    auth: QDashAuth,
+    config: CopilotConfig,
+    scope: str,
+    instruction: str,
+    history: list[dict[str, str]],
+    user_message: str,
+) -> AsyncGenerator[str | dict[str, Any], None]:
+    """One planner turn that answers the latest post of a thread.
+
+    Yields the runtime's SSE events for progress (tool calls, thinking) as
+    strings, then the final blocks result as a dict. The turn runs in a
+    throwaway conversation whose state is removed afterwards; the thread
+    itself is the memory, passed in as ``history``. When the runtime fails,
+    its error event is yielded and no dict follows.
+    """
+    conversation_id = f"{scope}-{uuid.uuid4().hex}"
+    opening = (
+        f"{instruction}\n\n{build_language_instruction(config)}\n\n"
+        f"## Thread so far\n\n{_thread_transcript(history)}\n\n"
+        f"## Latest post to answer\n\n{user_message}"
+    )
+    payload: dict[str, Any] = {
+        "owner_id": username,
+        "conversation_id": conversation_id,
+        "request_id": uuid.uuid4().hex,
+        "message": user_message,
+        "initial_message": opening,
+        "model": {"provider": config.model.provider, "name": config.model.name},
+        "thinking_level": thinking_level(config),
+    }
+    result: dict[str, Any] | None = None
+    try:
+        async for sse in stream_payload(payload, step="run_chat", auth=auth):
+            parsed = parse_sse(sse)
+            if parsed is not None and parsed[0] == "result":
+                result = parsed[1]
+                continue
+            if parsed is not None and parsed[0] == "status" and parsed[1].get("step") == "complete":
+                # The caller reports completion once the reply is saved.
+                continue
+            yield sse
+    finally:
+        await delete_runtime_session_state(username, conversation_id)
+    if result is not None:
+        yield result
+
+
+async def complete_once(
+    *,
+    username: str,
+    auth: QDashAuth,
+    config: CopilotConfig,
+    scope: str,
+    prompt: str,
+) -> str:
+    """One planner turn on ``prompt`` with no history; returns the answer text.
+
+    Raises RuntimeError with the runtime's error detail when the turn fails.
+    """
+    conversation_id = f"{scope}-{uuid.uuid4().hex}"
+    payload: dict[str, Any] = {
+        "owner_id": username,
+        "conversation_id": conversation_id,
+        "request_id": uuid.uuid4().hex,
+        "message": prompt,
+        "model": {"provider": config.model.provider, "name": config.model.name},
+        "thinking_level": thinking_level(config),
+    }
+    error: str | None = None
+    result: dict[str, Any] | None = None
+    try:
+        async for sse in stream_payload(payload, step="run_chat", auth=auth):
+            parsed = parse_sse(sse)
+            if parsed is None:
+                continue
+            if parsed[0] == "result":
+                result = parsed[1]
+            elif parsed[0] == "error":
+                error = str(parsed[1].get("detail") or "Agent runtime error")
+    finally:
+        await delete_runtime_session_state(username, conversation_id)
+    if result is None:
+        raise RuntimeError(error or "Agent runtime closed the stream without a result")
+    return "\n\n".join(
+        str(block.get("content"))
+        for block in result.get("blocks", [])
+        if block.get("type") == "text" and block.get("content")
+    )
