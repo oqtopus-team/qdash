@@ -28,6 +28,9 @@ class EvaluationFigureModel(BaseModel):
     sha256: str = Field(..., description="SHA-256 of the decoded image bytes")
     mime_type: str = Field(..., description="Image media type")
     bytes: int = Field(..., description="Decoded image size in bytes")
+    path: str | None = Field(
+        default=None, description="Path in the knowledge repository, for an example figure"
+    )
 
 
 class EvaluationExampleModel(BaseModel):
@@ -44,7 +47,11 @@ class EvaluationInputModel(BaseModel):
 
     context: str = Field(..., description="Evidence text passed as the experiment context")
     prompt: str | None = Field(
-        default=None, description="The exact user turn sent to the evaluation model"
+        default=None,
+        description="The exact user turn sent to the evaluation model; [figure] marks an image",
+    )
+    system_prompt: str | None = Field(
+        default=None, description="The system prompt sent to the evaluation model"
     )
     question: str | None = Field(default=None, description="Specific question, when one was asked")
     knowledge_chars: int | None = Field(

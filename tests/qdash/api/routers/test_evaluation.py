@@ -35,10 +35,26 @@ RECORD: dict[str, Any] = {
     "context": "Task: CheckRabi\nTarget: Q00",
     "figures": [{"sha256": "ab" * 32, "mime_type": "image/png", "bytes": 33088}],
     "knowledge": {"chars": 1534, "sha256": "cd" * 32},
+    "examples": [
+        {
+            "id": "short-t1",
+            "title": "Short T1",
+            "outcome": "suboptimal",
+            "figures": [
+                {
+                    "sha256": "ef" * 32,
+                    "mime_type": "image/png",
+                    "bytes": 2048,
+                    "path": "examples/figures/t1.png",
+                }
+            ],
+        }
+    ],
     "evaluation": {
         "model": "vllm/nvidia/Ising-Calibration",
         "fallback": False,
         "prompt": "Reference for this experiment ...\nExperiment context:\nTask: CheckRabi",
+        "system_prompt": "You evaluate superconducting qubit calibration experiment plots.",
         "diagnosis": {"fit_quality": "good", "success": True},
         "raw": None,
         "duration_ms": 31000,
@@ -223,6 +239,11 @@ def test_execution_records_what_the_model_saw_and_answered(test_client, service)
     assert good["input"]["question"] == "Why?"
     assert good["input"]["knowledge_chars"] == 1534
     assert good["input"]["figures"][0]["bytes"] == 33088
+    assert good["input"]["figures"][0]["path"] is None
+    assert good["input"]["system_prompt"].startswith("You evaluate")
+    example = good["input"]["examples"][0]
+    assert (example["id"], example["outcome"]) == ("short-t1", "suboptimal")
+    assert example["figures"][0]["path"] == "examples/figures/t1.png"
     assert good["output"]["diagnosis"] == {"fit_quality": "good", "success": True}
     assert good["output"]["parsed"] is True
     assert good["output"]["duration_ms"] == 31000
@@ -475,7 +496,14 @@ def test_example_setting_reaches_runtime_and_records_are_persisted(
                 "id": "short-rabi",
                 "title": "Short Rabi decay",
                 "outcome": "suboptimal",
-                "figures": [{"sha256": "ef" * 32, "mime_type": "image/png", "bytes": 128}],
+                "figures": [
+                    {
+                        "sha256": "ef" * 32,
+                        "mime_type": "image/png",
+                        "bytes": 128,
+                        "path": "examples/figures/rabi.png",
+                    }
+                ],
             }
         ]
         if with_examples

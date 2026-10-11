@@ -11,6 +11,7 @@ import type { EvaluationInputModelKnowledgeChars } from './evaluationInputModelK
 import type { EvaluationInputModelKnowledgeSha256 } from './evaluationInputModelKnowledgeSha256';
 import type { EvaluationInputModelPrompt } from './evaluationInputModelPrompt';
 import type { EvaluationInputModelQuestion } from './evaluationInputModelQuestion';
+import type { EvaluationInputModelSystemPrompt } from './evaluationInputModelSystemPrompt';
 
 /**
  * What the evaluation model was given.
@@ -18,8 +19,10 @@ import type { EvaluationInputModelQuestion } from './evaluationInputModelQuestio
 export interface EvaluationInputModel {
   /** Evidence text passed as the experiment context */
   context: string;
-  /** The exact user turn sent to the evaluation model */
+  /** The exact user turn sent to the evaluation model; [figure] marks an image */
   prompt?: EvaluationInputModelPrompt;
+  /** The system prompt sent to the evaluation model */
+  system_prompt?: EvaluationInputModelSystemPrompt;
   /** Specific question, when one was asked */
   question?: EvaluationInputModelQuestion;
   /** Length of the host-supplied reference, when one was found */

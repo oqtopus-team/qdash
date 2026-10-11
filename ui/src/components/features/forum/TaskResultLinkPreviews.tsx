@@ -69,7 +69,7 @@ function TaskResultLinkPreview({ taskId }: { taskId: string }) {
             path={figurePath ?? jsonFigurePath}
             jsonFigurePath={jsonFigurePath}
             qid={taskResult.qid}
-            className="max-h-full max-w-full object-contain"
+            fit
             hideExpandButton
           />
         </div>

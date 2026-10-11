@@ -86,15 +86,15 @@ test("a task without knowledge, or an unreachable API, yields no reference", asy
 test("labeled examples come from the knowledge response, figures first, without empties", () => {
   const knowledge = {
     examples: [
-      { id: "e1", title: "Short T1", outcome: "suboptimal", label: "Outcome: suboptimal\nT1 = 14 μs.", figures: [{ base64_data: "AAA", mime_type: "image/png" }] },
+      { id: "e1", title: "Short T1", outcome: "suboptimal", label: "Outcome: suboptimal\nT1 = 14 μs.", figures: [{ base64_data: "AAA", mime_type: "image/png", path: "examples/figures/t1.png" }] },
       { id: "no-figure", title: "x", outcome: "expected", label: "L", figures: [{ base64_data: "" }] },
       { id: "no-label", title: "y", outcome: "expected", label: "  ", figures: [{ base64_data: "BBB" }] },
       { id: "e2", title: "Flat", outcome: "apparatus", label: "Outcome: apparatus", figures: [{ base64_data: "CCC" }, { base64_data: "DDD", mime_type: "image/jpeg" }] },
     ],
   };
   assert.deepEqual(examplesOf(knowledge), [
-    { id: "e1", title: "Short T1", outcome: "suboptimal", label: "Outcome: suboptimal\nT1 = 14 μs.", images: [{ data: "AAA", mimeType: "image/png" }] },
-    { id: "e2", title: "Flat", outcome: "apparatus", label: "Outcome: apparatus", images: [{ data: "CCC", mimeType: "image/png" }, { data: "DDD", mimeType: "image/jpeg" }] },
+    { id: "e1", title: "Short T1", outcome: "suboptimal", label: "Outcome: suboptimal\nT1 = 14 μs.", images: [{ data: "AAA", mimeType: "image/png" }], paths: ["examples/figures/t1.png"] },
+    { id: "e2", title: "Flat", outcome: "apparatus", label: "Outcome: apparatus", images: [{ data: "CCC", mimeType: "image/png" }, { data: "DDD", mimeType: "image/jpeg" }], paths: ["", ""] },
   ]);
   assert.equal(examplesOf(knowledge, 1).length, 1);
   assert.deepEqual(examplesOf({}), []);
@@ -108,7 +108,7 @@ test("examples are filled only when the model asks and the tool takes them", () 
   assert.equal(wantsExamples({ use_examples: "yes" }), false);
   assert.equal(hasExamples({ examples: [{ label: "x" }] }), true);
   assert.equal(hasExamples({ examples: [] }), false);
-  const example = { id: "e1", title: "t", outcome: "expected", label: "L", images: [{ data: "A", mimeType: "image/png" }] };
+  const example = { id: "e1", title: "t", outcome: "expected", label: "L", images: [{ data: "A", mimeType: "image/png" }], paths: ["p.png"] };
   // Only what pi-qcaleval declares is passed on; the identity stays with the host.
   assert.deepEqual(withExamples({ context: "c" }, [example]), { context: "c", examples: [{ label: "L", images: example.images }] });
   assert.deepEqual(withExamples({ context: "c" }, []), { context: "c" });

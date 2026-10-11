@@ -61,7 +61,7 @@ function deps(results, knowledge = "Expect a damped cosine.") {
     fetchExamples: async (taskName) => {
       calls.push({ name: "examples", args: { taskName } });
       return [
-        { id: "e1", title: "Short T1", outcome: "suboptimal", label: "Outcome: suboptimal\nShort.", images: [{ data: PNG, mimeType: "image/png" }] },
+        { id: "e1", title: "Short T1", outcome: "suboptimal", label: "Outcome: suboptimal\nShort.", images: [{ data: PNG, mimeType: "image/png" }], paths: ["examples/figures/t1.png"] },
       ];
     },
     evaluator: { name: "@orangekame3/pi-qcaleval", version: "0.0.2-beta.5", source: "checkout", commit: "042e454323b2" },
@@ -112,7 +112,7 @@ test("with examples requested, the labeled examples are fetched, passed, and rec
   const evaluation = d.calls[3].args;
   assert.equal(evaluation.use_examples, true);
   assert.deepEqual(evaluation.examples, [{ label: "Outcome: suboptimal\nShort.", images: [{ data: PNG, mimeType: "image/png" }] }]);
-  assert.deepEqual(result.examples.map((e) => [e.id, e.outcome, e.figures.length, e.figures[0].bytes]), [["e1", "suboptimal", 1, 88]]);
+  assert.deepEqual(result.examples.map((e) => [e.id, e.outcome, e.figures.length, e.figures[0].bytes, e.figures[0].path]), [["e1", "suboptimal", 1, 88, "examples/figures/t1.png"]]);
   assert.equal("id" in evaluation.examples[0], false);
 
   // Not requested: no fetch, no flag, no record.
@@ -121,6 +121,12 @@ test("with examples requested, the labeled examples are fetched, passed, and rec
   assert.equal(zero.calls.some((call) => call.name === "examples"), false);
   assert.equal("use_examples" in zero.calls[2].args, false);
   assert.deepEqual(plain.examples, []);
+});
+
+test("the evaluator's system prompt is recorded when it reports one", () => {
+  const record = recordFromDetails("task-1", { system_prompt: "You evaluate plots.", prompt: "p" }, { mode: "direct" });
+  assert.equal(record.evaluation.system_prompt, "You evaluate plots.");
+  assert.equal(recordFromDetails("task-1", {}, { mode: "direct" }).evaluation.system_prompt, null);
 });
 
 test("without a task name or reference, the evaluation runs on the evidence alone", async () => {
