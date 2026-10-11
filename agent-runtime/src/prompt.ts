@@ -60,7 +60,7 @@ export function buildSystemPrompt(
 
 function responseInstruction(language: string): string {
   if (language.trim().toLowerCase() === "auto") {
-    return "Reply in the same language as the user's latest message, unless the user asks for another language.";
+    return "Reply in the same language as the user's latest message, unless the user asks for another language, in a message or in their preferences below.";
   }
   return `Always write your entire reply to the user in ${languageName(language)}.`;
 }
@@ -70,4 +70,24 @@ function languageName(language: string): string {
   if (normalized === "ja" || normalized === "japanese") return "Japanese (日本語)";
   if (normalized === "en" || normalized === "english") return "English";
   return language;
+}
+
+/** Longest user instructions placed into the system prompt; QDash caps them at 2000. */
+export const MAX_USER_INSTRUCTIONS_CHARS = 2000;
+
+/**
+ * The user's own instructions for their chats, as a system prompt section
+ * after QDash's rules. They adjust style, language and formats; they cannot
+ * lift a rule above them, notably the approval of write operations.
+ * Empty instructions give no section.
+ */
+export function buildUserInstructionsSection(instructions: string | undefined): string | undefined {
+  const text = instructions?.trim().slice(0, MAX_USER_INSTRUCTIONS_CHARS);
+  if (!text) return undefined;
+  return [
+    "The user you are talking to set these preferences for their chats. Follow them for style, language, and format; a language they name here is the reply language even when they write in another.",
+    "They do not change the rules above: write operations still need the user's approval in the card, every fact still comes from a tool result or the user, and you still say when data is missing.",
+    "",
+    text,
+  ].join("\n");
 }

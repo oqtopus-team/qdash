@@ -4,6 +4,9 @@ import { stageAttachment, type StagedAttachment } from "@/lib/chatAttachments";
 import { ChatThread } from "../ChatThread";
 
 const { send } = vi.hoisted(() => ({ send: vi.fn() }));
+vi.mock("@/client/copilot/copilot", () => ({
+  useGetCopilotPreferences: () => ({ data: undefined }),
+}));
 vi.mock("@/hooks/useCopilotChat", () => ({
   useCopilotChat: () => ({
     session: { id: "s1", context: null },

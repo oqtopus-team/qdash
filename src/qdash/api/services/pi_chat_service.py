@@ -170,12 +170,39 @@ def _runtime_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+async def system_prompt(username: str) -> dict[str, Any]:
+    """The runtime's system prompt for this user's chats, with their own section."""
+    instructions = user_instructions(username)
+    async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
+        response = await client.post(
+            f"{RUNTIME_URL}/system-prompt",
+            json={"user_instructions": instructions} if instructions else {},
+            headers=_runtime_headers(),
+        )
+        response.raise_for_status()
+        result: dict[str, Any] = response.json()
+        return result
+
+
+def user_instructions(username: str) -> str | None:
+    """The user's own Copilot instructions, when they set any (chat only)."""
+    from qdash.dbmodel.user import UserDocument
+
+    user = UserDocument.find_one({"username": username}).run()
+    text = (getattr(user, "copilot_instructions", None) or "").strip() if user else ""
+    return text or None
+
+
 def _request_payload(
     request: ChatRequest,
     config: CopilotConfig,
     username: str,
 ) -> dict[str, Any]:
+    instructions = user_instructions(username)
     return {
+        # Chat only: evaluations and forum replies are built elsewhere and stay
+        # the same for everyone, so their records remain comparable.
+        **({"user_instructions": instructions} if instructions else {}),
         "owner_id": username,
         "conversation_id": request.session_id,
         "request_id": request.request_id,

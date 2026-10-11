@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useGetCopilotPreferences } from "@/client/copilot/copilot";
 import { ArrowDown, FlaskConical } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -184,6 +185,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     editMessage,
     rateAnswer,
   } = useCopilotChat(sessionId);
+  const { data: preferences } = useGetCopilotPreferences({ query: { staleTime: 60_000 } });
   const [input, setInput] = useState("");
   const { attachments, attach, remove, clear, isStaging, notice, isPending } = useChatAttachments(
     session?.id,
@@ -253,6 +255,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       thinkingChoice={thinking.choice}
       thinkingModelDefault={thinking.modelDefault}
       onThinkingChange={thinking.select}
+      instructionsActive={Boolean(preferences?.data.instructions)}
       compact={variant !== "page"}
     />
   );

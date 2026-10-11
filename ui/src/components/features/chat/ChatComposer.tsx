@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import React, {
   forwardRef,
   useCallback,
@@ -8,7 +10,17 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { ArrowUp, Check, ChevronDown, Cpu, Paperclip, Square, X, Brain } from "lucide-react";
+import {
+  ArrowUp,
+  Check,
+  ChevronDown,
+  Cpu,
+  Paperclip,
+  Square,
+  X,
+  Brain,
+  UserCog,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +74,8 @@ interface ChatComposerProps {
   /** What "Auto" amounts to for the selected model. */
   thinkingModelDefault?: ChatThinkingLevel | null;
   onThinkingChange?: (choice: ChatThinkingChoice) => void;
+  /** The user's own instructions apply to this chat; shows a link to edit them. */
+  instructionsActive?: boolean;
   /** Figures staged for the next message; omit to hide attachments entirely. */
   attachments?: StagedAttachment[];
   isStaging?: boolean;
@@ -92,6 +106,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     thinkingChoice,
     thinkingModelDefault,
     onThinkingChange,
+    instructionsActive = false,
     attachments,
     isStaging = false,
     attachmentNotice,
@@ -334,6 +349,21 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+        )}
+        {instructionsActive && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href="/settings?tab=copilot"
+                className="btn btn-ghost btn-xs h-7 gap-1 rounded-lg font-normal text-base-content/60"
+                aria-label="Your instructions apply"
+              >
+                <UserCog className="w-3.5 h-3.5 shrink-0" />
+                {!compact && <span>Your instructions</span>}
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>Your instructions from Settings apply to this chat</TooltipContent>
+          </Tooltip>
         )}
         <div className="flex-1" />
         {isStreaming ? (
