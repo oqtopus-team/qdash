@@ -40,3 +40,37 @@ describe("ChatComposer attachments", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Preparing images");
   });
 });
+
+describe("ChatComposer thinking menu", () => {
+  it("shows what Auto resolves to and reports the chosen level", async () => {
+    const onThinkingChange = vi.fn();
+    render(
+      <ChatComposer
+        {...props()}
+        thinkingChoice="auto"
+        thinkingModelDefault="high"
+        onThinkingChange={onThinkingChange}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "Thinking level" });
+    expect(trigger.textContent).toContain("Thinking: Auto (high)");
+
+    fireEvent.pointerDown(trigger);
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Off/ }));
+    expect(onThinkingChange).toHaveBeenCalledWith("off");
+  });
+
+  it("is absent where the surface does not offer it", () => {
+    render(<ChatComposer {...props()} />);
+    expect(screen.queryByRole("button", { name: "Thinking level" })).toBeNull();
+  });
+});
+
+describe("thinkingLabel", () => {
+  it("names the level, and Auto with its default when known", async () => {
+    const { thinkingLabel } = await import("../ChatComposer");
+    expect(thinkingLabel("medium", "high")).toBe("Thinking: Medium");
+    expect(thinkingLabel("auto", null)).toBe("Thinking: Auto");
+    expect(thinkingLabel("auto", "low", true)).toBe("Auto · low");
+  });
+});

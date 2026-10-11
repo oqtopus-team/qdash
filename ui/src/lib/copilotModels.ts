@@ -14,6 +14,8 @@ export interface ModelOption {
   label: string;
   model: ModelOverride | null;
   isConfiguredDefault?: boolean;
+  /** The configured reasoning effort of the model this option runs, for the thinking menu. */
+  reasoningEffort?: string | null;
 }
 
 const CHAT_MODEL_STORAGE_KEY = "qdash_chat_model_key";
@@ -66,6 +68,7 @@ export function buildChatModelOptions(config: Record<string, unknown> | null): M
       label: configuredModel ? `Configured: ${configuredModel.name}` : "Configured model",
       model: null,
       isConfiguredDefault: true,
+      reasoningEffort: configuredModel?.reasoning_effort ?? null,
     },
   ];
   const seen = new Set<string>();
@@ -83,6 +86,7 @@ export function buildChatModelOptions(config: Record<string, unknown> | null): M
       key,
       label: `${label}: ${model.name}`,
       model,
+      reasoningEffort: model.reasoning_effort ?? null,
     });
   };
 
