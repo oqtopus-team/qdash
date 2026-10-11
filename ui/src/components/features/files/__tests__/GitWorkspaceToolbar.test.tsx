@@ -6,7 +6,7 @@ import { GitWorkspaceToolbar, PullRequestBanner } from "../GitWorkspaceToolbar";
 afterEach(cleanup);
 
 describe("GitWorkspaceToolbar", () => {
-  it("shows the branch and commit and wires the pull and PR actions", () => {
+  it("shows the branch and commit, pulls from the repository menu, and creates a PR", async () => {
     const onPull = vi.fn();
     const onPush = vi.fn();
     render(
@@ -16,19 +16,25 @@ describe("GitWorkspaceToolbar", () => {
         onPush={onPush}
         isPulling={false}
         isPushing={false}
+        menuItems={<div role="menuitem">Download as ZIP</div>}
       />,
     );
 
-    expect(screen.getByText("main")).toBeTruthy();
-    expect(screen.getByText("b4023c48")).toBeTruthy();
-    expect(screen.getByTitle("Saved changes not yet in a pull request")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /pull/i }));
-    fireEvent.click(screen.getByRole("button", { name: /create pr/i }));
+    const trigger = screen.getByRole("button", { name: /repository menu/i });
+    expect(trigger.textContent).toContain("main");
+    expect(trigger.textContent).toContain("b4023c48");
+    expect(screen.getByLabelText("Saved changes not yet in a pull request")).toBeTruthy();
+
+    fireEvent.pointerDown(trigger);
+    fireEvent.click(await screen.findByRole("menuitem", { name: /pull latest/i }));
     expect(onPull).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Download as ZIP")).toBeNull(); // menu closed after the pull
+
+    fireEvent.click(screen.getByRole("button", { name: /create pr/i }));
     expect(onPush).toHaveBeenCalledTimes(1);
   });
 
-  it("flags remote updates on the pull button and hides the chip outside a repo", () => {
+  it("flags remote updates on the trigger and says when nothing is cloned", async () => {
     render(
       <GitWorkspaceToolbar
         status={{ is_git_repo: false }}
@@ -38,7 +44,9 @@ describe("GitWorkspaceToolbar", () => {
         isPushing={false}
       />,
     );
-    expect(screen.queryByText("@")).toBeNull();
+    expect(screen.getByRole("button", { name: /repository menu/i }).textContent).toContain(
+      "No repository",
+    );
     cleanup();
 
     render(
@@ -50,7 +58,12 @@ describe("GitWorkspaceToolbar", () => {
         isPushing={false}
       />,
     );
-    expect(screen.getByRole("button", { name: /pull/i }).className).toContain("btn-warning");
+    const trigger = screen.getByRole("button", { name: /repository menu/i });
+    expect(screen.getByTitle("Remote has new changes")).toBeTruthy();
+    fireEvent.pointerDown(trigger);
+    expect((await screen.findByRole("menuitem", { name: /pull latest/i })).textContent).toContain(
+      "new",
+    );
   });
 });
 
