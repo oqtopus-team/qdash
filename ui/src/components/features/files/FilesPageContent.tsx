@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,7 +10,6 @@ import {
   ArrowDown,
   Check,
   Database,
-  ExternalLink,
   GitCompareArrows,
   GitPullRequestArrow,
   PanelLeft,
@@ -19,33 +18,17 @@ import {
   Save,
 } from "lucide-react";
 
-import type {
-  FileTreeNode,
-  SaveFileRequest,
-  GetFileContent200,
-  GetGitStatus200,
-  SaveFileContent200,
-  GitPullConfig200,
-  GitPushConfig200,
-} from "@/schemas";
-import type { AxiosResponse } from "axios";
-
-import {
-  getFileTree,
-  getFileContent,
-  saveFileContent,
-  getGitStatus,
-  gitPullConfig,
-  gitPushConfig,
-} from "@/client/file/file";
 import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { PierreFileTree } from "@/components/ui/PierreFileTree";
 import { FileDiffReviewDialog } from "@/components/ui/FileDiffReviewDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
+import { type FileWorkspace, workspaceQueryKeys } from "@/lib/fileWorkspace";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 import { FilesBulkDownloadButton } from "./FilesBulkDownloadButton";
+import { GitWorkspaceToolbar, PullRequestBanner } from "./GitWorkspaceToolbar";
+import { useGitWorkspace } from "./useGitWorkspace";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -59,30 +42,6 @@ function parseParamsFilePath(path: string): { chipId: string; paramName: string 
   return null;
 }
 
-// Extended git status type (API returns generic dict)
-interface GitStatusExtended {
-  is_git_repo?: boolean;
-  branch?: string;
-  commit?: string;
-  is_dirty?: boolean;
-  has_remote_updates?: boolean;
-}
-
-interface FileContentExtended {
-  base_content?: unknown;
-  content?: unknown;
-  is_saved_change?: unknown;
-}
-
-// Extended git push result type (API returns generic dict)
-interface GitPushResult {
-  pr_url?: string;
-  pr_number?: number;
-  branch?: string;
-  commit?: string;
-  message?: string;
-}
-
 // Seed import response type
 interface SeedImportResponse {
   chip_id: string;
@@ -93,118 +52,69 @@ interface SeedImportResponse {
   provenance_activity_id?: string | null;
 }
 
-export function FilesPageContent() {
+/**
+ * Tree editor of one git workspace (the Qubex config or the knowledge repo):
+ * browse, edit with Monaco, review the saved diff, pull, and open a PR.
+ * `?path=` opens a file on load.
+ */
+export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const toast = useToast();
 
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<string | null>(
+    () => searchParams.get("path") || null,
+  );
   const [fileContent, setFileContent] = useState("");
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
   const [pullConfirmationOpen, setPullConfirmationOpen] = useState(false);
-  const [commitMessage, setCommitMessage] = useState("");
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isDiffPreviewOpen, setIsDiffPreviewOpen] = useState(false);
   const [importResult, setImportResult] = useState<SeedImportResponse | null>(null);
-  const [prResult, setPrResult] = useState<{
-    pr_url: string;
-    pr_number: number;
-    branch: string;
-  } | null>(null);
 
   // Check if selected file is a params YAML that can be imported
   const paramsFileInfo = useMemo(() => {
-    if (!selectedFile) return null;
+    if (!selectedFile || !workspace.seedImport) return null;
     return parseParamsFilePath(selectedFile);
-  }, [selectedFile]);
+  }, [selectedFile, workspace.seedImport]);
 
   const {
     data: fileTreeData,
     isLoading: isTreeLoading,
     error: treeError,
   } = useQuery({
-    queryKey: ["fileTree"],
-    queryFn: () => getFileTree().then((res: AxiosResponse<FileTreeNode[]>) => res.data),
+    queryKey: workspaceQueryKeys.tree(workspace),
+    queryFn: workspace.getTree,
   });
 
-  const { data: fileContentData, isLoading: isContentLoading } = useQuery({
-    queryKey: ["fileContent", selectedFile],
-    queryFn: () =>
-      getFileContent({ path: selectedFile || "" }).then(
-        (res: AxiosResponse<GetFileContent200>) => res.data,
-      ),
+  const { data: savedFileContent, isLoading: isContentLoading } = useQuery({
+    queryKey: workspaceQueryKeys.content(workspace, selectedFile),
+    queryFn: () => workspace.getContent(selectedFile || ""),
     enabled: !!selectedFile,
   });
 
-  const savedFileContent = fileContentData as FileContentExtended | undefined;
   const hasSavedChanges = savedFileContent?.is_saved_change === true;
 
-  const { data: gitStatusData, refetch: refetchGitStatus } = useQuery({
-    queryKey: ["gitStatus"],
-    queryFn: () => getGitStatus().then((res: AxiosResponse<GetGitStatus200>) => res.data),
-    refetchInterval: 10000, // Refresh every 10 seconds
-  });
+  const git = useGitWorkspace(workspace, { onPulled: () => setPullConfirmationOpen(false) });
 
   const saveMutation = useMutation({
-    mutationFn: (request: SaveFileRequest) =>
-      saveFileContent(request).then((res: AxiosResponse<SaveFileContent200>) => res.data),
+    mutationFn: ({ path, content }: { path: string; content: string }) =>
+      workspace.saveContent(path, content),
     onSuccess: () => {
       setHasUnsavedChanges(false);
       setIsDiffPreviewOpen(false);
       toast.success("File saved successfully!");
       queryClient.invalidateQueries({
-        queryKey: ["fileContent", selectedFile],
+        queryKey: workspaceQueryKeys.content(workspace, selectedFile),
       });
-      refetchGitStatus();
+      git.refetchStatus();
     },
     onError: (error: Error) => {
       toast.error(`Failed to save file: ${getApiErrorMessage(error, "Unknown error")}`);
-    },
-  });
-
-  const pullMutation = useMutation({
-    mutationFn: () => gitPullConfig().then((res: AxiosResponse<GitPullConfig200>) => res.data),
-    onSuccess: (data: GitPullConfig200) => {
-      setPullConfirmationOpen(false);
-      toast.success(
-        `Git pull successful! Updated to commit: ${(data.commit as string) || "unknown"}`,
-      );
-      queryClient.invalidateQueries({ queryKey: ["fileTree"] });
-      queryClient.invalidateQueries({ queryKey: ["fileContent"] });
-      refetchGitStatus();
-    },
-    onError: (error: Error) => {
-      toast.error(`Git pull failed: ${getApiErrorMessage(error, "Unknown error")}`);
-    },
-  });
-
-  const pushMutation = useMutation({
-    mutationFn: (message: string) =>
-      gitPushConfig({ commit_message: message }).then(
-        (res: AxiosResponse<GitPushConfig200>) => res.data,
-      ),
-    onSuccess: (data: GitPushConfig200) => {
-      const result = data as GitPushResult;
-      if (result.pr_url) {
-        toast.success(`Pull request #${result.pr_number} created!`);
-        setPrResult({
-          pr_url: result.pr_url,
-          pr_number: result.pr_number ?? 0,
-          branch: result.branch ?? "",
-        });
-      } else if (result.commit) {
-        toast.success(`Pushed commit: ${result.commit}`);
-      } else {
-        toast.info(String(result.message) || "No changes to commit");
-      }
-      setCommitMessage("");
-      refetchGitStatus();
-    },
-    onError: (error: Error) => {
-      toast.error(`Git push failed: ${getApiErrorMessage(error, "Unknown error")}`);
     },
   });
 
@@ -236,11 +146,11 @@ export function FilesPageContent() {
   });
 
   useEffect(() => {
-    if (fileContentData?.content !== undefined && fileContentData?.content !== null) {
-      setFileContent(String(fileContentData.content));
+    if (savedFileContent?.content !== undefined && savedFileContent?.content !== null) {
+      setFileContent(String(savedFileContent.content));
       setHasUnsavedChanges(false);
     }
-  }, [fileContentData]);
+  }, [savedFileContent]);
 
   const selectFile = (path: string) => {
     setSelectedFile(path);
@@ -286,13 +196,10 @@ export function FilesPageContent() {
       setPullConfirmationOpen(true);
       return;
     }
-    pullMutation.mutate();
+    git.pull();
   };
 
-  const handlePush = () => {
-    const message = commitMessage.trim() || "Update config files from UI";
-    pushMutation.mutate(message);
-  };
+  const handlePush = () => git.push();
 
   const handleContentChange = (value: string | undefined) => {
     setFileContent(value || "");
@@ -308,6 +215,8 @@ export function FilesPageContent() {
     if (filename.endsWith(".yaml") || filename.endsWith(".yml")) return "yaml";
     if (filename.endsWith(".json")) return "json";
     if (filename.endsWith(".toml")) return "toml";
+    if (filename.endsWith(".md")) return "markdown";
+    if (filename.endsWith(".py")) return "python";
     return "plaintext";
   };
 
@@ -344,7 +253,7 @@ export function FilesPageContent() {
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
               <span className="text-sm font-medium flex-shrink-0 hidden sm:inline">
-                Config Files
+                {workspace.title}
               </span>
               {selectedFile && (
                 <>
@@ -356,10 +265,12 @@ export function FilesPageContent() {
             {hasUnsavedChanges && <span className="text-xs text-warning flex-shrink-0">●</span>}
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 overflow-x-auto">
-            <FilesBulkDownloadButton
-              disabled={!fileTreeData?.length}
-              onError={(message) => toast.error(message)}
-            />
+            {workspace.bulkDownload && (
+              <FilesBulkDownloadButton
+                disabled={!fileTreeData?.length}
+                onError={(message) => toast.error(message)}
+              />
+            )}
             <button
               onClick={toggleEditorLock}
               className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-warning"}`}
@@ -368,40 +279,15 @@ export function FilesPageContent() {
               <Pencil size={16} />
               <span className="ml-1">{isEditorLocked ? "Edit" : "Editing"}</span>
             </button>
-            {(gitStatusData as GitStatusExtended | undefined)?.is_git_repo && (
-              <div className="hidden md:flex items-center gap-2 px-2 sm:px-3 py-1 text-xs bg-base-100 border border-base-300 rounded">
-                <span className="text-base-content/70">
-                  {(gitStatusData as GitStatusExtended | undefined)?.branch || "main"}
-                </span>
-                <span className="text-base-content/50">@</span>
-                <span className="text-info">
-                  {(gitStatusData as GitStatusExtended | undefined)?.commit || "unknown"}
-                </span>
-                {(gitStatusData as GitStatusExtended | undefined)?.is_dirty && (
-                  <span className="text-warning">●</span>
-                )}
-              </div>
-            )}
-            <button
-              onClick={handlePull}
-              className={`btn btn-sm hidden sm:flex ${(gitStatusData as GitStatusExtended | undefined)?.has_remote_updates ? "btn-warning" : "btn-info"}`}
-              disabled={pullMutation.isPending}
-              title={
-                (gitStatusData as GitStatusExtended | undefined)?.has_remote_updates
-                  ? "Remote has new changes - click to pull"
-                  : "Pull latest changes from Git repository"
-              }
-            >
-              {pullMutation.isPending ? (
-                <span className="loading loading-spinner loading-xs"></span>
-              ) : (
-                <ArrowDown size={16} />
-              )}
-              <span className="ml-1">Pull</span>
-              {(gitStatusData as GitStatusExtended | undefined)?.has_remote_updates && (
-                <span className="inline-flex h-2 w-2 rounded-full bg-warning-content animate-ping"></span>
-              )}
-            </button>
+            <GitWorkspaceToolbar
+              status={git.status}
+              onPull={handlePull}
+              onPush={handlePush}
+              isPulling={git.isPulling}
+              isPushing={git.isPushing}
+              hideOnMobile
+              pushTitle={`Create a pull request with ${workspace.key} changes`}
+            />
             <button
               onClick={handleSave}
               className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-success"}`}
@@ -427,19 +313,6 @@ export function FilesPageContent() {
               <GitCompareArrows size={16} />
               <span className="ml-1">Review</span>
             </button>
-            <button
-              onClick={handlePush}
-              className="btn btn-sm btn-secondary hidden sm:flex"
-              disabled={pushMutation.isPending}
-              title="Create a pull request with config changes"
-            >
-              {pushMutation.isPending ? (
-                <span className="loading loading-spinner loading-xs"></span>
-              ) : (
-                <GitPullRequestArrow size={16} />
-              )}
-              <span className="ml-1">Create PR</span>
-            </button>
             {/* Import to QDash button - only show for params YAML files */}
             {paramsFileInfo && (
               <button
@@ -461,31 +334,7 @@ export function FilesPageContent() {
           </div>
         </div>
 
-        {/* PR created banner */}
-        {prResult && (
-          <div className="px-4 py-2 bg-secondary/20 border-b border-secondary/30 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm">
-              <GitPullRequestArrow size={16} className="text-secondary" />
-              <span>
-                Pull request <strong>#{prResult.pr_number}</strong> created on branch{" "}
-                <strong>{prResult.branch}</strong>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <a
-                href={prResult.pr_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-xs btn-ghost gap-1"
-              >
-                Open PR <ExternalLink size={12} />
-              </a>
-              <button onClick={() => setPrResult(null)} className="btn btn-xs btn-ghost">
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
+        <PullRequestBanner pr={git.prResult} onDismiss={git.dismissPr} />
 
         {/* Import success banner */}
         {importResult && (
@@ -521,7 +370,7 @@ export function FilesPageContent() {
                   EXPLORER
                 </h2>
                 <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
-                  Config Files
+                  {workspace.title}
                 </div>
                 {fileTreeData && (
                   <div className="min-h-0 flex-1">
@@ -642,10 +491,10 @@ export function FilesPageContent() {
             <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">Pull</span>
             <button
               onClick={handlePull}
-              className={`btn btn-circle shadow-lg ${(gitStatusData as GitStatusExtended | undefined)?.has_remote_updates ? "btn-warning" : "btn-info"}`}
-              disabled={pullMutation.isPending}
+              className={`btn btn-circle shadow-lg ${git.status?.has_remote_updates ? "btn-warning" : "btn-info"}`}
+              disabled={git.isPulling}
             >
-              {pullMutation.isPending ? (
+              {git.isPulling ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
                 <ArrowDown size={20} />
@@ -659,9 +508,9 @@ export function FilesPageContent() {
             <button
               onClick={handlePush}
               className="btn btn-circle btn-secondary shadow-lg"
-              disabled={pushMutation.isPending}
+              disabled={git.isPushing}
             >
-              {pushMutation.isPending ? (
+              {git.isPushing ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
                 <GitPullRequestArrow size={20} />
@@ -703,9 +552,9 @@ export function FilesPageContent() {
         title="Discard changes and pull?"
         description="Git pull will overwrite your unsaved changes."
         confirmLabel="Discard and pull"
-        onConfirm={() => pullMutation.mutate()}
+        onConfirm={() => git.pull()}
         onOpenChange={setPullConfirmationOpen}
-        pending={pullMutation.isPending}
+        pending={git.isPulling}
         destructive
       />
     </>
