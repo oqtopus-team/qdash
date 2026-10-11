@@ -1,7 +1,8 @@
 """Copilot configuration loader.
 
-This module loads CopilotKit settings from YAML configuration file.
-The configuration provides settings for the CopilotKit-powered metrics analysis assistant.
+This module loads Copilot settings from the YAML configuration files:
+config.yaml (shared), chat.yaml (planner models and prompts) and
+evaluation.yaml (the calibration evaluation model and scoring thresholds).
 
 Uses ConfigLoader for unified configuration loading with local override support.
 """
@@ -79,16 +80,13 @@ class CopilotConfig(BaseModel):
     response_language: str = "en"
     thinking_language: str = "en"
     model: ModelConfig = Field(default_factory=ModelConfig)
-    # Optional override used only for task result analysis (image/chevron etc.).
-    # When unset, `model` is used for both chat and analysis.
-    analysis_model: ModelConfig | None = None
-    # Optional list of selectable task result analysis models. The first entry
-    # is used as the default when `analysis_model` is unset. `analysis_model`
-    # remains for backward compatibility with existing copilot config files.
-    analysis_models: list[ModelConfig] = Field(default_factory=list)
-    # Optional list of selectable models for general chat. The first entry is
-    # used as the default. When unset, the configured `model` above is used.
+    # Selectable planner models for every chat, with or without a task result
+    # as context. The first entry is the default; when unset, `model` is used.
     chat_models: list[ModelConfig] = Field(default_factory=list)
+    # Models that judge calibration plots (evaluation.yaml). They are not
+    # planners: the pi runtime declares them so pi-qcaleval can find the
+    # calibration VLM; nothing in the API calls them directly.
+    evaluation_models: list[ModelConfig] = Field(default_factory=list)
     # Backend serving the chat page and the analysis side panel: "pi" (Pi Agent
     # Runtime) or "litellm" (in-process).
     copilot_backend: str = "litellm"
@@ -100,11 +98,11 @@ class CopilotConfig(BaseModel):
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
 
 
-def select_analysis_model(config: CopilotConfig) -> ModelConfig:
-    """Return the effective model used for task-result analysis."""
-    return config.analysis_model or (
-        config.analysis_models[0] if config.analysis_models else config.model
-    )
+def select_chat_model(config: CopilotConfig, override: ModelConfig | None = None) -> ModelConfig:
+    """The planner for a chat: a per-request override, else the first chat model, else `model`."""
+    if override is not None:
+        return override
+    return config.chat_models[0] if config.chat_models else config.model
 
 
 @lru_cache(maxsize=1)
@@ -113,7 +111,7 @@ def load_copilot_config() -> CopilotConfig:
 
     Uses ConfigLoader for unified loading with local override support.
     Configuration is loaded by merging copilot/config.yaml, copilot/chat.yaml,
-    and copilot/review.yaml, each with optional local overlays.
+    and copilot/evaluation.yaml, each with optional local overlays.
 
     Returns
     -------

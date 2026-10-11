@@ -24,51 +24,34 @@ from qdash.copilot.config import CopilotConfig, ModelConfig
 from qdash.copilot.contracts import TaskAnalysisContext
 
 
-def test_parse_response_accepts_ai_review_markdown_without_json() -> None:
+def test_parse_response_takes_json_as_it_is() -> None:
     response = parse_response(
-        "\n".join(
-            [
-                "**AI review**",
-                "- Decision: `PASS_WITH_NOTE`",
-                "- Human label suggestion: `CORRECT`",
-                "- Accepted parameter(s): f01",
-                "- Needs review: none",
-                "- Primary reason: f01 is visually supported.",
-                "- Closest knowledge case: q61",
-                "- Suggested labels: weak_f12",
-                "- Recommended action: Update f01 and keep note.",
-                "- Optional note: f12 is weak.",
-            ]
-        )
+        '{"summary":"f01 is visually supported.","assessment":"good",'
+        '"explanation":"The chevron is centred.","potential_issues":[],"recommendations":[]}'
     )
 
-    assert response.assessment == "warning"
+    assert response.assessment == "good"
     assert response.summary == "f01 is visually supported."
-    assert response.potential_issues == []
-    assert response.recommendations == ["Update f01 and keep note."]
-    assert "- Decision: PASS_WITH_NOTE" in response.explanation
+    assert response.explanation == "The chevron is centred."
 
 
-def test_parse_response_converts_missing_review_json_to_safe_review() -> None:
+def test_parse_response_finds_json_inside_prose() -> None:
     response = parse_response(
-        '{"summary":"解析完了","assessment":"warning","explanation":"解析完了"}'
+        'Here is my answer:\n{"summary":"ok","assessment":"warning","explanation":"weak f12"}'
     )
 
     assert response.assessment == "warning"
-    assert response.summary == "AI review response did not include the required review block."
-    assert response.explanation.startswith("**AI review**")
-    assert "- Decision: `REVIEW`" in response.explanation
-    assert "- Suggested labels: `model_format_error`" in response.explanation
+    assert response.explanation == "weak f12"
 
 
-def test_parse_response_converts_plain_missing_review_text_to_safe_review() -> None:
-    response = parse_response("解析完了")
+def test_parse_response_keeps_plain_text_as_an_unverified_answer() -> None:
+    response = parse_response("解析完了\n\n詳細はこちら")
 
     assert response.assessment == "warning"
-    assert response.summary == "AI review response did not include the required review block."
-    assert response.explanation.startswith("**AI review**")
-    assert "- Decision: `REVIEW`" in response.explanation
-    assert "- Suggested labels: `model_format_error`" in response.explanation
+    assert response.summary == "解析完了"
+    assert response.explanation == "解析完了\n\n詳細はこちら"
+    assert response.potential_issues == []
+    assert response.recommendations == []
 
 
 def test_blocks_response_schema_uses_nullable_assessment() -> None:
@@ -450,12 +433,14 @@ async def test_run_analysis_uses_litellm_completion_for_completion_api_style() -
             temperature=0,
             api_style="completion",
         ),
-        analysis_model=ModelConfig(
-            provider="ollama",
-            name="gemma4:26b",
-            temperature=0,
-            api_style="completion",
-        ),
+        chat_models=[
+            ModelConfig(
+                provider="ollama",
+                name="gemma4:26b",
+                temperature=0,
+                api_style="completion",
+            )
+        ],
     )
     context = TaskAnalysisContext(
         task_knowledge_prompt="knowledge",

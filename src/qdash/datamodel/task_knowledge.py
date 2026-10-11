@@ -157,7 +157,7 @@ class TaskKnowledge(BaseModel):
     )
     evaluation_criteria: str = Field(
         default="",
-        description="Qualitative evaluation criteria (thresholds are in copilot/review.yaml)",
+        description="Qualitative evaluation criteria (thresholds are in copilot/evaluation.yaml)",
     )
     check_questions: list[str] = Field(
         default_factory=list,
@@ -358,7 +358,7 @@ class TaskKnowledge(BaseModel):
         return "\n".join(normalized_lines).strip()
 
     def to_review_prompt(self) -> str:
-        """Build a compact prompt focused on AI review decisions."""
+        """Build a compact prompt focused on the review guide (what a reviewer checks)."""
         lines = [
             f"## Experiment: {self.name}",
             self.summary,
@@ -393,7 +393,7 @@ class TaskKnowledge(BaseModel):
 
         review_markdown = self._normalize_markdown_block(self.review_markdown)
         if review_markdown:
-            lines += ["", "### AI review guidance", review_markdown]
+            lines += ["", "### Review guide", review_markdown]
 
         return "\n".join(lines)
 

@@ -1,4 +1,4 @@
-"""Prompt builders for task-result analysis and AI review flows."""
+"""Prompt builders for chats about a task result."""
 
 from __future__ import annotations
 
@@ -75,71 +75,6 @@ In execute_python_analysis, access stored data via data["<data_key>"]
 (e.g., data["t1"]). Do NOT pass context_data manually.
 """
 
-AI_REVIEW_INSTRUCTION = """\
-## AI review output
-
-When answering about a calibration task result, begin your first text block with
-a short AI review summary before the detailed explanation. Keep it concise
-and use the following markdown shape:
-
-**AI review**
-- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
-- Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
-- Accepted parameter(s): parameter names and values that are well supported, or `none`
-- Needs review: parameter names and values that are weak, ambiguous, or risky, or `none`
-- Primary reason: one short sentence grounded in the plot/data
-- Closest knowledge case: case title or `none`
-- Suggested labels: comma-separated labels such as `weak_signal`, `boundary_case`, `model_overconservative`, `model_missed_issue`, or `none`
-- Recommended action: one short operator action
-- Optional note: one short caveat only when useful, otherwise `none`
-
-For reliable parsing, the JSON `explanation` string MUST start exactly with
-`**AI review**`. Every review field line MUST begin with hyphen-space
-(`- `). Do not omit the hyphens, do not bold the field names, and do not put
-ordinary prose before the review block. Use this exact skeleton before any
-detailed explanation:
-
-**AI review**
-- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
-- Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
-- Accepted parameter(s): ...
-- Needs review: ...
-- Primary reason: ...
-- Closest knowledge case: ...
-- Suggested labels: ...
-- Recommended action: ...
-- Optional note: ...
-
-Keep the review fields internally consistent:
-- Use `PASS` only when all important output parameters are visually and physically supported.
-  For `PASS`, set `Needs review: none`, `Suggested labels: none`, and make the recommended
-  action an accept/use action rather than a remeasurement action.
-- Use `PASS_WITH_NOTE` only when all output parameters that would be updated are
-  acceptable without human intervention, but there is a minor caveat or optional
-  follow-up. Put non-blocking caveats in `Optional note`, not in `Needs review`.
-- Use `REVIEW` when any important output parameter should not be auto-accepted without a
-  human check. If you use labels such as `weak_signal`, `boundary_case`, `ambiguous_doublet`,
-  or `frequency_offset` for a parameter that affects acceptance, prefer `REVIEW`.
-- If the detailed explanation says a parameter should be treated cautiously, maintained
-  from history, not overwritten, rechecked before update, or used only as a reference value,
-  then that parameter MUST appear in `Needs review` and the decision MUST be `REVIEW`.
-- Do not set `Needs review: none` if the recommended action includes rechecking,
-  maintaining, withholding, or not overwriting any output parameter.
-- In `Accepted parameter(s)`, list only parameters you would allow the workflow to update
-  automatically from this result. If a parameter is plausible but not update-safe, put it
-  in `Needs review`, not in `Accepted parameter(s)`.
-- Use `FAIL` for no visible signal, clear misassignment, measurement failure, or anomaly.
-- Assessment consistency: set the top-level assessment to `good` for `PASS`,
-  `warning` for `PASS_WITH_NOTE` or `REVIEW`, and `bad` for `FAIL`.
-
-Then continue with the detailed explanation. In the detailed explanation:
-- Separate visual support for each key parameter instead of giving one blended confidence.
-- If f01/f12, resonator/Purcell, or similar paired features are involved, evaluate each feature independently.
-- Use past cases as operational knowledge: state which case is closest, which lessons apply, and which lessons do not apply.
-- Avoid overclaiming from visual plausibility alone; distinguish "visually supported", "plausible from history/physics", and "needs review".
-- End with action-oriented recommendations that an operator can execute.
-"""
-
 RESPONSE_FORMAT_INSTRUCTION = """\
 
 You MUST respond with a valid JSON object (no prose, no code fences) matching this schema:
@@ -155,7 +90,6 @@ Rules:
 - `potential_issues` and `recommendations` MUST be JSON arrays of strings. Use an empty array `[]` when nothing applies — never a single string or null.
 - `assessment` MUST be exactly one of `good`, `warning`, `bad` (lowercase).
 - Write the user-facing text fields (`summary`, `explanation`, items in `potential_issues` and `recommendations`) in the user's response language as instructed above. Keep technical terms like T1, T2, fidelity in English.
-- The `explanation` field MUST begin with the exact AI review markdown described above, starting with `**AI review**`.
 - Put the review fields inside `explanation`; do not add extra JSON keys for them.
 - Keep `assessment` consistent with the review decision: `good` for `PASS`, `warning` for `PASS_WITH_NOTE` or `REVIEW`, and `bad` for `FAIL`.
 - Keep the response concise for interactive use: after the review block, write at most 6 short bullets or 3 short paragraphs in `explanation`, at most 3 potential issues, and at most 3 recommendations.
@@ -182,7 +116,7 @@ def _build_scoring_threshold_section(scoring: Mapping[str, ScoringThreshold] | N
 
 
 def build_analysis_system_prompt(options: AnalysisPromptOptions) -> str:
-    """Build the full system prompt for task analysis and AI review."""
+    """Build the full system prompt for a chat about a task result."""
     context = options.context
     parts = [ANALYSIS_SYSTEM_PROMPT_BASE, options.language_instruction]
 
@@ -207,7 +141,6 @@ def build_analysis_system_prompt(options: AnalysisPromptOptions) -> str:
         parts.append("\n".join(img_instructions))
 
     parts.append(context.task_knowledge_prompt)
-    parts.append(AI_REVIEW_INSTRUCTION)
 
     scoring_section = _build_scoring_threshold_section(options.scoring)
     if scoring_section:

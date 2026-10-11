@@ -38,7 +38,7 @@ export interface AnalyzeRequest {
   image_base64?: AnalyzeRequestImageBase64;
   /** Previous conversation messages [{role, content}, ...] */
   conversation_history?: AnalyzeRequestConversationHistoryItem[];
-  /** Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used. */
+  /** Optional per-request planner override for a task-result chat. When unset, the first entry of chat_models (else model) is used. */
   model_override?: AnalyzeRequestModelOverride;
   /** Decision on the write operation the previous turn asked approval for. */
   approval?: AnalyzeRequestApproval;

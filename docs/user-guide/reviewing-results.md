@@ -37,14 +37,32 @@ These sources have different roles:
 | Issue | One task result and its discussion | Coordinate diagnosis and follow-up. |
 | Forum | Project-wide topic | Discuss work not anchored to one result. |
 
+## Request an AI Evaluation
+
+The calibration evaluation model can judge the figure of a task result against the task's
+maintained reference. Two entry points lead to the same record:
+
+- **Chip page → Evaluate** evaluates the latest result of the selected task for every qubit or
+  coupling of the chip (or the results of the selected day) as one run.
+- **Task result → AI evaluation → Evaluate** evaluates that one result as a run of one.
+
+Choose how to evaluate. **Direct** runs the evidence and evaluation tools as such, so the same
+reference reaches the model every time. **Planner** lets the chat planner summarise the result and
+call the evaluation itself, as Ask AI does, and records what it did and answered. An optional
+question is passed to the evaluation model on top of the standard diagnosis.
+
+Open **AI Evaluations** to follow a run and read each evaluation: the diagnosis (fit quality,
+success, extracted parameters), which model and extension version judged, the exact text the model
+saw, and, in planner mode, the planner's tools and answer. Mark each evaluation **Agree** or
+**Disagree**, with a note when useful; the run's agreement rate is the ground truth for comparing
+runs made with different extension versions, models or task references. The task result page lists
+every evaluation of that result across runs.
+
 ## Ask Copilot
 
 AI output is supporting evidence, not an automatic calibration decision. Confirm findings against
 the task result, raw artifacts, task knowledge, and current calibration context before changing
 parameters or excluding data. See [Copilot](./copilot.md) for the chat and analysis workflows.
-
-AI review notes created before the automatic review feature was retired still show on their task
-results as read-only archived notes.
 
 ## Follow Notifications
 

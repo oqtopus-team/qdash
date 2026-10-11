@@ -9,7 +9,7 @@ from qdash.copilot.config.settings import (
     Suggestion,
     clear_copilot_config_cache,
     load_copilot_config,
-    select_analysis_model,
+    select_chat_model,
 )
 
 __all__ = [
@@ -21,5 +21,5 @@ __all__ = [
     "Suggestion",
     "clear_copilot_config_cache",
     "load_copilot_config",
-    "select_analysis_model",
+    "select_chat_model",
 ]

@@ -13,7 +13,6 @@ import {
   type ExecutionHistoryMobileTab,
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
-import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -324,9 +323,6 @@ export function ExecutionTaskDetailModal({
         </div>
       )}
 
-      {selectedTask?.task_id && (
-        <TaskResultAiReviewNote taskId={selectedTask.task_id} hideWhenEmpty />
-      )}
       {selectedTask?.task_id && (
         <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} hideWhenEmpty />
       )}

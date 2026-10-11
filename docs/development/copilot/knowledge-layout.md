@@ -31,4 +31,4 @@ The Pi Agent Runtime is the chat backend this layout describes. `src/qdash/copil
 | `agent-runtime/src/skill-tool.ts` | `read_skill`, which serves the pi-qdash skills to the model |
 | `agent-runtime/src/allowed-tools.ts` | Which pi-qdash tools the runtime exposes |
 | `src/qdash/datamodel/task_knowledge.py` | Loads `task-knowledge.json` |
-| `config/copilot/chat.yaml`, `config/copilot/review.yaml` | Models and scoring thresholds |
+| `config/copilot/chat.yaml`, `config/copilot/evaluation.yaml` | Planner models; evaluation model and scoring thresholds |

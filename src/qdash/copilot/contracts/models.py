@@ -220,8 +220,8 @@ class AnalyzeRequest(ImageAttachmentsRequest):
         default=None,
         alias="model_override",
         description=(
-            "Optional per-request model override for task result analysis. "
-            "When unset, the configured analysis_model/model selection is used."
+            "Optional per-request planner override for a task-result chat. "
+            "When unset, the first entry of chat_models (else model) is used."
         ),
     )
     approval: ApprovalDecision | None = Field(

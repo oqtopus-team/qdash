@@ -197,7 +197,6 @@ class TaskService:
                 if task_result.elapsed_time is not None
                 else None
             ),
-            ai_review_note=task_result.ai_review_note,
         )
 
     def get_task_knowledge_markdown(self, task_name: str) -> str:

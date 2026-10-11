@@ -149,7 +149,7 @@ class TestBuildAnalysisPrompt:
 
         assert "valid JSON object" not in prompt
 
-    def test_keeps_the_ai_review_markdown_skeleton(self) -> None:
+    def test_no_longer_demands_a_review_block(self) -> None:
         prompt = pi_analysis_service.build_analysis_prompt(
             bundle=_bundle(),
             config=_config(),
@@ -157,7 +157,8 @@ class TestBuildAnalysisPrompt:
             language_instruction="",
         )
 
-        assert "**AI review**" in prompt
+        assert "**AI review**" not in prompt
+        assert "knowledge" in prompt
 
 
 class TestStream:

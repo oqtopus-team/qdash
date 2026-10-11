@@ -27,44 +27,23 @@ if TYPE_CHECKING:
 class TestAnalysisRendering:
     """Tests for analysis response rendering."""
 
-    def test_legacy_response_keeps_ai_review_first(self):
+    def test_legacy_response_renders_assessment_then_explanation(self):
         response = AnalysisResponse(
             summary="f01 is accepted, f12 needs review",
             assessment="warning",
-            explanation=(
-                "**AI review**\n"
-                "- Decision: `REVIEW`\n"
-                "- Accepted parameter(s): qubit_frequency = 7.94 GHz\n"
-                "- Needs review: anharmonicity = -0.185 GHz\n\n"
-                "f01 is visually supported, but f12 is not visible."
-            ),
-            potential_issues=[],
-            recommendations=[],
+            explanation="f01 is visually supported, but f12 is not visible.",
+            potential_issues=["f12 is weak"],
+            recommendations=["Re-run with a finer sweep"],
         )
 
         result = legacy_to_blocks(response)
 
-        assert result["blocks"][0]["content"].startswith("**AI review**")
-        assert "評価" in result["blocks"][1]["content"]
-
-    def test_legacy_response_keeps_japanese_ai_review_first(self):
-        response = AnalysisResponse(
-            summary="f01 は受理、f12 は要レビュー",
-            assessment="warning",
-            explanation=(
-                "AIレビュー\n\n"
-                "判定: REVIEW\n"
-                "受理されたパラメータ: qubit_frequency = 7.94 GHz\n"
-                "要レビュー: anharmonicity = -0.185 GHz"
-            ),
-            potential_issues=[],
-            recommendations=[],
-        )
-
-        result = legacy_to_blocks(response)
-
-        assert result["blocks"][0]["content"].startswith("AIレビュー")
-        assert "評価" in result["blocks"][1]["content"]
+        contents = [block["content"] for block in result["blocks"]]
+        assert "評価" in contents[0]
+        assert "f01 is accepted, f12 needs review" in contents[0]
+        assert contents[1].endswith("f01 is visually supported, but f12 is not visible.")
+        assert any("f12 is weak" in content for content in contents)
+        assert result["assessment"] == "warning"
 
 
 class TestProvenanceLineageGraphValidation:

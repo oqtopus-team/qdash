@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from typing import TYPE_CHECKING, Any
 
 from qdash.copilot.agent_runtime.rendering import legacy_to_blocks
@@ -14,20 +13,6 @@ if TYPE_CHECKING:
     from qdash.copilot.config import CopilotConfig
 
 logger = logging.getLogger(__name__)
-
-_REVIEW_DECISIONS = ("PASS_WITH_NOTE", "PASS", "REVIEW", "FAIL")
-_REVIEW_ASSESSMENT = {
-    "PASS": "good",
-    "PASS_WITH_NOTE": "warning",
-    "REVIEW": "warning",
-    "FAIL": "bad",
-}
-_REVIEW_BLOCK_PREFIXES = (
-    "**ai review**",
-    "ai review",
-    "**aiレビュー**",
-    "aiレビュー",
-)
 
 
 def strip_code_fences(text: str) -> str:
@@ -42,100 +27,27 @@ def strip_code_fences(text: str) -> str:
     return text
 
 
-def extract_review_fallback(content: str) -> AnalysisResponse | None:
-    """Build a legacy response from a free-form AI review block."""
-    fields = {
-        "Decision": "",
-        "Human label suggestion": "",
-        "Accepted parameter(s)": "",
-        "Needs review": "",
-        "Primary reason": "",
-        "Closest knowledge case": "",
-        "Suggested labels": "",
-        "Recommended action": "",
-        "Optional note": "",
-    }
-    for field in fields:
-        match = re.search(rf"^\s*[-*]\s+{re.escape(field)}:\s*(.*)$", content, re.M)
-        if not match:
-            continue
-        value = match.group(1).strip().strip("`")
-        if field == "Decision":
-            for decision in _REVIEW_DECISIONS:
-                if re.search(rf"\b{decision}\b", value):
-                    value = decision
-                    break
-        fields[field] = value
-
-    decision = fields["Decision"]
-    if not decision:
-        return None
-
-    review = "\n".join(
-        ["**AI review**", *(f"- {field}: {value or 'none'}" for field, value in fields.items())]
-    )
-    return AnalysisResponse(
-        summary=fields["Primary reason"] or "Analysis complete",
-        assessment=_REVIEW_ASSESSMENT.get(decision, "warning"),
-        explanation=review,
-        potential_issues=[]
-        if decision in {"PASS", "PASS_WITH_NOTE"}
-        else [fields["Primary reason"]],
-        recommendations=[fields["Recommended action"]] if fields["Recommended action"] else [],
-    )
-
-
-def has_review_block(text: str) -> bool:
-    """Return True when text starts with the required AI review block."""
-    return text.lower().lstrip().startswith(_REVIEW_BLOCK_PREFIXES)
-
-
-def missing_review_response(_content: str) -> AnalysisResponse:
-    """Return a safe review note when a local model omits required review fields."""
-    summary = "AI review response did not include the required review block."
-    review = "\n".join(
-        [
-            "**AI review**",
-            "- Decision: `REVIEW`",
-            "- Human label suggestion: `SUSPICIOUS`",
-            "- Accepted parameter(s): `none`",
-            "- Needs review: `all output parameters`",
-            f"- Primary reason: {summary}",
-            "- Closest knowledge case: `none`",
-            "- Suggested labels: `model_format_error`",
-            "- Recommended action: Open the task result and review the plot manually.",
-            "- Optional note: The raw local-model response was missing the review block.",
-        ]
-    )
-    return AnalysisResponse(
-        summary=summary,
-        assessment="warning",
-        explanation=review,
-        potential_issues=[summary],
-        recommendations=["Open the task result and review the plot manually."],
-    )
-
-
 def parse_response(content: str) -> AnalysisResponse:
-    """Parse LLM response into AnalysisResponse, handling JSON and plain text."""
+    """Parse an LLM answer into AnalysisResponse: its JSON when it is, else as plain text."""
     text = strip_code_fences(content)
-
     try:
-        data = json.loads(text)
-        response = AnalysisResponse(**data)
-        if response.explanation and has_review_block(response.explanation):
-            return response
-        fallback_response = extract_review_fallback(response.explanation or content)
-        if fallback_response is not None:
-            return fallback_response
-        logger.warning("Local model response omitted required AI review block: %s", content)
-        return missing_review_response(content)
-    except (json.JSONDecodeError, ValueError):
-        fallback_response = extract_review_fallback(content)
-        if fallback_response is not None:
-            return fallback_response
-        logger.warning("Local model response omitted required AI review block: %s", content)
-        return missing_review_response(content)
+        return AnalysisResponse(**json.loads(text))
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+    data = extract_first_json_object(text)
+    if data is not None:
+        try:
+            return AnalysisResponse(**data)
+        except ValueError:
+            pass
+    summary = text.strip().splitlines()[0].strip() if text.strip() else "Analysis complete"
+    return AnalysisResponse(
+        summary=summary[:200],
+        assessment="warning",
+        explanation=text.strip(),
+        potential_issues=[],
+        recommendations=[],
+    )
 
 
 def extract_first_json_object(text: str) -> dict[str, Any] | None:
