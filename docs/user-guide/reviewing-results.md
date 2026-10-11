@@ -25,8 +25,9 @@ multiple results. Threads can also be linked to a chip, a qubit or coupling, and
 
 ## Reuse Knowledge
 
-**Knowledge** contains the maintained baseline for each calibration task: its physics, expected
-result, failure patterns, and analysis guidance. It is the reference the chat planner and the
+**Knowledge** contains the maintained baseline for each calibration task: its background, the
+expected plot, how each outcome (expected, suboptimal, anomalous, apparatus) looks, the parameters
+to extract, and expert-labeled example plots. It is the reference the chat planner and the
 evaluation model read; keep it current when a forum thread settles something that should hold
 next time. The page edits the knowledge repository the way **Config** edits the Qubex
 configuration. **Edit** on a task opens its Markdown source; a save takes effect in this QDash at

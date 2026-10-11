@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, FileCode2, GitCompareArrows, Image as ImageIcon, Pencil } from "lucide-react";
+import { ArrowLeft, FileCode2, GitCompareArrows, Pencil } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getListTaskKnowledgeQueryKey } from "@/client/task/task";
 import {
@@ -21,27 +21,37 @@ import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 import { KNOWLEDGE_WORKSPACE, knowledgeIndexPath, workspaceQueryKeys } from "@/lib/fileWorkspace";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
-type KnowledgeImage = {
-  alt_text: string;
-  relative_path: string;
+type KnowledgeFigure = {
+  alt: string;
+  path: string;
   base64_data?: string;
+  mime_type?: string;
 };
 
-type KnowledgeCase = {
+type KnowledgeExample = {
+  id: string;
   title: string;
   date?: string;
-  severity?: string;
-  human_review_decision?: string;
-  boundary_criteria?: string;
-  lesson_learned?: string[];
-  images?: KnowledgeImage[];
+  chip?: string;
+  qid?: string;
+  outcome: string;
+  fit_quality?: string;
+  verdict?: string;
+  source?: string;
+  figures?: KnowledgeFigure[];
+  diagnosis?: string;
 };
 
 type TaskKnowledgeDetail = {
   category?: string;
-  review_markdown?: string;
-  review_images?: KnowledgeImage[];
-  cases?: KnowledgeCase[];
+  examples?: KnowledgeExample[];
+};
+
+const OUTCOME_BADGE: Record<string, string> = {
+  expected: "badge-success",
+  suboptimal: "badge-warning",
+  anomalous: "badge-error",
+  apparatus: "badge-neutral",
 };
 
 function useTaskKnowledgeMarkdown(taskName: string) {
@@ -247,7 +257,7 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
             <Link
               href={`${KNOWLEDGE_WORKSPACE.editorPath}?path=${encodeURIComponent(indexPath)}`}
               className="btn btn-sm btn-ghost gap-1"
-              title="Open this task's folder in the file browser (cases, images)"
+              title="Open this task's folder in the file browser (examples, figures)"
             >
               <FileCode2 size={16} />
               Files
@@ -283,111 +293,70 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
         <MarkdownContent content={markdown} />
       )}
 
-      {detail?.review_markdown?.trim() && (
+      {(detail?.examples?.length ?? 0) > 0 && (
         <section className="mt-10">
           <div className="mb-3">
-            <h2 className="text-lg font-semibold">Review Guide</h2>
+            <h2 className="text-lg font-semibold">Labeled examples</h2>
             <p className="text-sm text-base-content/60">
-              Operational guidance for reviewing results of this task.
-            </p>
-          </div>
-          <div className="rounded-xl border border-base-300 bg-base-100 p-5">
-            <MarkdownContent content={detail.review_markdown} />
-          </div>
-        </section>
-      )}
-
-      {(detail?.cases?.length ?? 0) > 0 && (
-        <section className="mt-10">
-          <div className="mb-3">
-            <h2 className="text-lg font-semibold">Cases</h2>
-            <p className="text-sm text-base-content/60">
-              Operational cases and counterexamples linked to this task.
+              Plots with the diagnosis an expert validated. The evaluation model sees them as
+              demonstrations.
             </p>
           </div>
           <div className="space-y-4">
-            {detail?.cases?.map((knowledgeCase) => (
+            {detail?.examples?.map((example) => (
               <article
-                key={`${knowledgeCase.title}-${knowledgeCase.date ?? ""}`}
+                key={example.id}
                 className="rounded-xl border border-base-300 bg-base-100 p-5"
               >
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <h3 className="text-base font-semibold">{knowledgeCase.title}</h3>
-                  {knowledgeCase.severity && (
-                    <span className="badge badge-outline badge-sm">{knowledgeCase.severity}</span>
+                  <h3 className="text-base font-semibold">{example.title}</h3>
+                  <span
+                    className={`badge badge-sm ${OUTCOME_BADGE[example.outcome] ?? "badge-ghost"}`}
+                  >
+                    {example.outcome}
+                  </span>
+                  {example.fit_quality && (
+                    <span className="badge badge-outline badge-sm">fit {example.fit_quality}</span>
                   )}
-                  {knowledgeCase.date && (
-                    <span className="text-xs text-base-content/50">{knowledgeCase.date}</span>
+                  {example.verdict && (
+                    <span className="badge badge-outline badge-sm">{example.verdict}</span>
+                  )}
+                  {(example.chip || example.qid) && (
+                    <span className="text-xs text-base-content/50">
+                      {[example.chip, example.qid && `Q${example.qid}`].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                  {example.date && (
+                    <span className="text-xs text-base-content/50">{example.date}</span>
                   )}
                 </div>
-
-                {knowledgeCase.human_review_decision && (
-                  <div className="mb-3">
-                    <div className="text-xs font-medium uppercase tracking-wide text-base-content/50 mb-1">
-                      Human Review Decision
-                    </div>
-                    <p className="text-sm text-base-content/80">
-                      {knowledgeCase.human_review_decision}
-                    </p>
+                {(example.figures?.length ?? 0) > 0 && (
+                  <div className="grid gap-3 md:grid-cols-2 mb-3">
+                    {example.figures?.map((figure) => (
+                      <figure
+                        key={figure.path}
+                        className="rounded-lg border border-base-300 bg-base-200/40 p-3"
+                      >
+                        {figure.base64_data ? (
+                          /* eslint-disable-next-line @next/next/no-img-element -- knowledge figures are API-provided base64 assets */
+                          <img
+                            src={`data:${figure.mime_type || "image/png"};base64,${figure.base64_data}`}
+                            alt={figure.alt}
+                            className="w-full h-auto rounded"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center rounded border border-dashed border-base-300 bg-base-100 px-3 py-8 text-sm text-base-content/50">
+                            Figure unavailable
+                          </div>
+                        )}
+                        <figcaption className="mt-2 text-xs text-base-content/60">
+                          {figure.alt || figure.path}
+                        </figcaption>
+                      </figure>
+                    ))}
                   </div>
                 )}
-
-                {knowledgeCase.boundary_criteria && (
-                  <div className="mb-3">
-                    <div className="text-xs font-medium uppercase tracking-wide text-base-content/50 mb-1">
-                      Boundary Criteria
-                    </div>
-                    <p className="text-sm text-base-content/80">
-                      {knowledgeCase.boundary_criteria}
-                    </p>
-                  </div>
-                )}
-
-                {(knowledgeCase.lesson_learned?.length ?? 0) > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs font-medium uppercase tracking-wide text-base-content/50 mb-1">
-                      Lessons
-                    </div>
-                    <ul className="list-disc pl-5 text-sm text-base-content/80 space-y-1">
-                      {knowledgeCase.lesson_learned?.map((lesson) => (
-                        <li key={lesson}>{lesson}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {(knowledgeCase.images?.length ?? 0) > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-base-content/50 mb-2">
-                      <ImageIcon className="h-3.5 w-3.5" />
-                      Case Figures
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {knowledgeCase.images?.map((image) => (
-                        <figure
-                          key={`${knowledgeCase.title}-${image.relative_path}`}
-                          className="rounded-lg border border-base-300 bg-base-200/40 p-3"
-                        >
-                          {image.base64_data ? (
-                            /* eslint-disable-next-line @next/next/no-img-element -- task knowledge images are API-provided base64 assets */
-                            <img
-                              src={`data:image/png;base64,${image.base64_data}`}
-                              alt={image.alt_text}
-                              className="w-full h-auto rounded"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-center rounded border border-dashed border-base-300 bg-base-100 px-3 py-8 text-sm text-base-content/50">
-                              Image asset unavailable
-                            </div>
-                          )}
-                          <figcaption className="mt-2 text-xs text-base-content/60">
-                            {image.alt_text}
-                          </figcaption>
-                        </figure>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {example.diagnosis && <MarkdownContent content={example.diagnosis} />}
               </article>
             ))}
           </div>

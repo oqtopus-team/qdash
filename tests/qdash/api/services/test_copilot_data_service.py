@@ -18,14 +18,10 @@ class TestBuildTaskContext:
             task_chat=TaskChatConfig(multimodal=multimodal, max_expected_images=2),
         )
 
-    def test_builds_context_with_related_knowledge(self):
+    def test_builds_context_with_history_and_coupling_params(self):
         service = CopilotRuntime(data_access=MagicMock())
         knowledge = MagicMock()
         knowledge.to_prompt.return_value = "Prompt body"
-        history_context = MagicMock(type="history", last_n=3)
-        neighbor_context = MagicMock(type="neighbor_qubits", params=["t1"])
-        coupling_context = MagicMock(type="coupling", params=["g"])
-        knowledge.related_context = [history_context, neighbor_context, coupling_context]
 
         with (
             patch.object(service, "load_qubit_params", return_value={"f01": 5.0}),
@@ -45,21 +41,23 @@ class TestBuildTaskContext:
             patch("qdash.datamodel.task_knowledge.get_task_knowledge", return_value=knowledge),
         ):
             result = service.build_task_context(
-                task_name="CheckT1",
+                task_name="CheckZX90",
                 chip_id="chip-1",
-                qid="0",
+                qid="0-1",
                 task_id="task-1",
                 image_base64=None,
                 config=self._config(multimodal=False),
             )
 
+        knowledge.to_prompt.assert_called_once_with(include_examples=True)
         assert result.context.task_knowledge_prompt == "Prompt body"
         assert result.context.qubit_params == {"f01": 5.0}
         assert result.context.input_parameters == {"drive_amp": 0.1}
         assert result.context.output_parameters == {"t1": {"value": 12.0}}
         assert result.context.run_parameters == {"shots": 1024}
+        # Every chat gets the task's recent runs; a coupling target also gets its parameters.
         assert result.context.history_results == [{"task_id": "older"}]
-        assert result.context.neighbor_qubit_params == {"1": {"t1": 9.0}}
+        assert result.context.neighbor_qubit_params == {}
         assert result.context.coupling_params == {"0-1": {"g": 0.02}}
         assert result.figure_paths == ["/tmp/figure.png"]
         assert result.image_base64 is None
@@ -69,7 +67,6 @@ class TestBuildTaskContext:
         service = CopilotRuntime(data_access=MagicMock())
         knowledge = MagicMock()
         knowledge.to_prompt.return_value = "Prompt body"
-        knowledge.related_context = []
 
         with (
             patch.object(service, "load_qubit_params", return_value={}),
@@ -104,10 +101,7 @@ class TestBuildTaskContext:
 
         load_fig.assert_called_once_with(["/tmp/figure.png"])
         collect_expected.assert_called_once_with(
-            knowledge,
-            max_images=2,
-            include_case_images=True,
-            include_review_images=False,
+            knowledge, max_images=2, include_example_images=True
         )
         assert result.image_base64 == "encoded-image"
         assert result.expected_images == [("img-1", "expected alt")]

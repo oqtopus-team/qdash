@@ -20038,89 +20038,6 @@
         "title": "ExecutionResponseSummary",
         "description": "ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    execution_id (str): The ID of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    user_id (str | None): Internal ID of the user who started the execution.\n    username (str): Username snapshot of the user who started the execution.\n    tags (list[str]): Tags associated with the execution.\n    note (dict): Notes for the execution."
       },
-      "ExpectedResultResponse": {
-        "properties": {
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "result_type": {
-            "type": "string",
-            "title": "Result Type",
-            "default": ""
-          },
-          "x_axis": {
-            "type": "string",
-            "title": "X Axis",
-            "default": ""
-          },
-          "y_axis": {
-            "type": "string",
-            "title": "Y Axis",
-            "default": ""
-          },
-          "z_axis": {
-            "type": "string",
-            "title": "Z Axis",
-            "default": ""
-          },
-          "fit_model": {
-            "type": "string",
-            "title": "Fit Model",
-            "default": ""
-          },
-          "typical_range": {
-            "type": "string",
-            "title": "Typical Range",
-            "default": ""
-          },
-          "good_visual": {
-            "type": "string",
-            "title": "Good Visual",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "description"
-        ],
-        "title": "ExpectedResultResponse",
-        "description": "Response model for expected result description."
-      },
-      "FailureModeResponse": {
-        "properties": {
-          "severity": {
-            "type": "string",
-            "title": "Severity"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "cause": {
-            "type": "string",
-            "title": "Cause",
-            "default": ""
-          },
-          "visual": {
-            "type": "string",
-            "title": "Visual",
-            "default": ""
-          },
-          "next_action": {
-            "type": "string",
-            "title": "Next Action",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "severity",
-          "description"
-        ],
-        "title": "FailureModeResponse",
-        "description": "Response model for a structured failure mode."
-      },
       "FidelityCondition": {
         "properties": {
           "min": {
@@ -21473,8 +21390,12 @@
         "title": "InputParameterModel",
         "description": "Input parameter class."
       },
-      "KnowledgeCaseResponse": {
+      "KnowledgeExampleResponse": {
         "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -21484,14 +21405,9 @@
             "title": "Date",
             "default": ""
           },
-          "severity": {
+          "chip": {
             "type": "string",
-            "title": "Severity",
-            "default": "warning"
-          },
-          "chip_id": {
-            "type": "string",
-            "title": "Chip Id",
+            "title": "Chip",
             "default": ""
           },
           "qid": {
@@ -21499,139 +21415,112 @@
             "title": "Qid",
             "default": ""
           },
-          "status": {
+          "outcome": {
             "type": "string",
-            "title": "Status",
-            "default": "resolved"
+            "title": "Outcome"
           },
-          "human_label": {
+          "fit_quality": {
             "type": "string",
-            "title": "Human Label",
+            "title": "Fit Quality",
             "default": ""
           },
-          "failure_mode_labels": {
+          "verdict": {
+            "type": "string",
+            "title": "Verdict",
+            "default": ""
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": ""
+          },
+          "figures": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/KnowledgeFigureResponse"
             },
             "type": "array",
-            "title": "Failure Mode Labels",
+            "title": "Figures",
             "default": []
           },
-          "case_type": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Case Type",
-            "default": []
-          },
-          "model_error_type": {
+          "diagnosis": {
             "type": "string",
-            "title": "Model Error Type",
+            "title": "Diagnosis",
             "default": ""
-          },
-          "resolution_label": {
-            "type": "string",
-            "title": "Resolution Label",
-            "default": ""
-          },
-          "symptom": {
-            "type": "string",
-            "title": "Symptom",
-            "default": ""
-          },
-          "model_prediction": {
-            "type": "string",
-            "title": "Model Prediction",
-            "default": ""
-          },
-          "human_review_decision": {
-            "type": "string",
-            "title": "Human Review Decision",
-            "default": ""
-          },
-          "root_cause": {
-            "type": "string",
-            "title": "Root Cause",
-            "default": ""
-          },
-          "resolution": {
-            "type": "string",
-            "title": "Resolution",
-            "default": ""
-          },
-          "boundary_criteria": {
-            "type": "string",
-            "title": "Boundary Criteria",
-            "default": ""
-          },
-          "lesson_learned": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Lesson Learned",
-            "default": []
-          },
-          "applicability": {
-            "type": "string",
-            "title": "Applicability",
-            "default": ""
-          },
-          "counterexample": {
-            "type": "string",
-            "title": "Counterexample",
-            "default": ""
-          },
-          "prompt_guidance": {
-            "type": "string",
-            "title": "Prompt Guidance",
-            "default": ""
-          },
-          "images": {
-            "items": {
-              "$ref": "#/components/schemas/KnowledgeImageResponse"
-            },
-            "type": "array",
-            "title": "Images",
-            "default": []
           }
         },
         "type": "object",
         "required": [
-          "title"
+          "id",
+          "title",
+          "outcome"
         ],
-        "title": "KnowledgeCaseResponse",
-        "description": "Response model for a knowledge case (postmortem)."
+        "title": "KnowledgeExampleResponse",
+        "description": "An expert-labeled example plot of the task."
       },
-      "KnowledgeImageResponse": {
+      "KnowledgeFigureResponse": {
         "properties": {
-          "alt_text": {
+          "alt": {
             "type": "string",
-            "title": "Alt Text"
+            "title": "Alt",
+            "default": ""
           },
-          "relative_path": {
+          "path": {
             "type": "string",
-            "title": "Relative Path"
-          },
-          "section": {
-            "type": "string",
-            "title": "Section"
+            "title": "Path"
           },
           "base64_data": {
             "type": "string",
             "title": "Base64 Data",
             "default": ""
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type",
+            "default": ""
           }
         },
         "type": "object",
         "required": [
-          "alt_text",
-          "relative_path",
-          "section"
+          "path"
         ],
-        "title": "KnowledgeImageResponse",
-        "description": "Response model for a task knowledge image reference."
+        "title": "KnowledgeFigureResponse",
+        "description": "A figure of the knowledge, inlined so the UI can show it without another request."
+      },
+      "KnowledgeOutcomeResponse": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "title": "KnowledgeOutcomeResponse"
+      },
+      "KnowledgeParameterResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "KnowledgeParameterResponse"
       },
       "LatestTaskResultResponse": {
         "properties": {
@@ -24017,25 +23906,6 @@
         "type": "object",
         "title": "NumericBounds",
         "description": "Inclusive numeric bounds for one agent-controlled parameter."
-      },
-      "OutputParameterInfoResponse": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "description"
-        ],
-        "title": "OutputParameterInfoResponse",
-        "description": "Response model for output parameter description."
       },
       "ParameterChangeResponse": {
         "properties": {
@@ -27398,124 +27268,61 @@
             "title": "Category",
             "default": ""
           },
-          "summary": {
+          "background": {
             "type": "string",
-            "title": "Summary"
-          },
-          "what_it_measures": {
-            "type": "string",
-            "title": "What It Measures"
-          },
-          "physical_principle": {
-            "type": "string",
-            "title": "Physical Principle"
-          },
-          "expected_result": {
-            "$ref": "#/components/schemas/ExpectedResultResponse"
-          },
-          "evaluation_criteria": {
-            "type": "string",
-            "title": "Evaluation Criteria"
-          },
-          "check_questions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Check Questions",
-            "default": []
-          },
-          "failure_modes": {
-            "items": {
-              "$ref": "#/components/schemas/FailureModeResponse"
-            },
-            "type": "array",
-            "title": "Failure Modes"
-          },
-          "tips": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Tips"
-          },
-          "output_parameters_info": {
-            "items": {
-              "$ref": "#/components/schemas/OutputParameterInfoResponse"
-            },
-            "type": "array",
-            "title": "Output Parameters Info",
-            "default": []
-          },
-          "analysis_guide": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Analysis Guide",
-            "default": []
-          },
-          "prerequisites": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Prerequisites",
-            "default": []
-          },
-          "images": {
-            "items": {
-              "$ref": "#/components/schemas/KnowledgeImageResponse"
-            },
-            "type": "array",
-            "title": "Images",
-            "default": []
-          },
-          "review_markdown": {
-            "type": "string",
-            "title": "Review Markdown",
+            "title": "Background",
             "default": ""
           },
-          "review_images": {
+          "expected_plot": {
+            "type": "string",
+            "title": "Expected Plot",
+            "default": ""
+          },
+          "expected_figures": {
             "items": {
-              "$ref": "#/components/schemas/KnowledgeImageResponse"
+              "$ref": "#/components/schemas/KnowledgeFigureResponse"
             },
             "type": "array",
-            "title": "Review Images",
+            "title": "Expected Figures",
             "default": []
           },
-          "cases": {
+          "outcomes": {
             "items": {
-              "$ref": "#/components/schemas/KnowledgeCaseResponse"
+              "$ref": "#/components/schemas/KnowledgeOutcomeResponse"
             },
             "type": "array",
-            "title": "Cases",
+            "title": "Outcomes",
+            "default": []
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeParameterResponse"
+            },
+            "type": "array",
+            "title": "Parameters",
+            "default": []
+          },
+          "examples": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeExampleResponse"
+            },
+            "type": "array",
+            "title": "Examples",
             "default": []
           },
           "prompt_text": {
             "type": "string",
-            "title": "Prompt Text"
-          },
-          "review_prompt_text": {
-            "type": "string",
-            "title": "Review Prompt Text",
-            "default": ""
+            "title": "Prompt Text",
+            "description": "Background, expected plot, outcomes, parameters as Markdown"
           }
         },
         "type": "object",
         "required": [
           "name",
-          "summary",
-          "what_it_measures",
-          "physical_principle",
-          "expected_result",
-          "evaluation_criteria",
-          "failure_modes",
-          "tips",
           "prompt_text"
         ],
         "title": "TaskKnowledgeResponse",
-        "description": "Response model for task knowledge (LLM-oriented domain knowledge)."
+        "description": "Task knowledge: background, outcomes, parameters, labeled examples, and the rendered prompt."
       },
       "TaskKnowledgeSummaryResponse": {
         "properties": {
@@ -27532,30 +27339,20 @@
             "type": "string",
             "title": "Summary"
           },
-          "failure_mode_count": {
+          "outcome_count": {
             "type": "integer",
-            "title": "Failure Mode Count",
+            "title": "Outcome Count",
             "default": 0
           },
-          "case_count": {
+          "example_count": {
             "type": "integer",
-            "title": "Case Count",
+            "title": "Example Count",
             "default": 0
           },
-          "image_count": {
+          "figure_count": {
             "type": "integer",
-            "title": "Image Count",
+            "title": "Figure Count",
             "default": 0
-          },
-          "has_analysis_guide": {
-            "type": "boolean",
-            "title": "Has Analysis Guide",
-            "default": false
-          },
-          "has_review_guide": {
-            "type": "boolean",
-            "title": "Has Review Guide",
-            "default": false
           }
         },
         "type": "object",

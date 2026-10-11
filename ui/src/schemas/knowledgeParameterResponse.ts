@@ -6,10 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-/**
- * Response model for output parameter description.
- */
-export interface OutputParameterInfoResponse {
+export interface KnowledgeParameterResponse {
   name: string;
-  description: string;
+  description?: string;
 }
