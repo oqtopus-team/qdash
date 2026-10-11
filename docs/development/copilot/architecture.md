@@ -4,8 +4,10 @@
 
 QDash Copilot is an AI-powered assistant that helps experimentalists interpret qubit calibration results. It provides two interaction modes:
 
-1. **Analysis Sidebar** -- Task-scoped analysis within the metrics modal, providing contextual interpretation of individual calibration results (e.g., CheckT1, CheckRabi).
+1. **Chat about a task result** (sidebar or floating window) -- Opened from a task result with that result's context and figures, for questions about one calibration result (e.g., CheckT1, CheckRabi).
 2. **Chat Page** -- A dedicated chat interface for chip-wide questions, cross-qubit comparisons, and exploratory data analysis.
+
+Both are the same chat with the same planner; the first just opens with a task result as its context. The evaluation model's recorded judgements are a separate thing (see "Planner-less evaluation runs").
 
 Both modes use the same underlying LLM agent with tool-calling capabilities, sandboxed Python execution, and SSE streaming for real-time progress feedback.
 
@@ -17,12 +19,13 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 
 | File | Responsibility |
 |------|---------------|
-| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/analyze`, `/analyze/stream`, `/chat/stream` endpoints; SSE event generation via `SSETaskBridge` |
-| `src/qdash/api/services/copilot_data_service.py` | Data loading service: `build_analysis_context()`, `build_images_sent_metadata()`, qubit/task/history queries, tool executor wiring |
+| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/chat/stream` (general and task chats), `/analyze` (LiteLLM, non-streaming) endpoints; SSE event generation via `SSETaskBridge` |
+| `src/qdash/copilot/runtime.py` | Data loading runtime: `build_task_context()`, `build_images_sent_metadata()`, qubit/task/history queries, tool executor wiring |
+| `src/qdash/api/services/pi_chat_service.py` | Pi backend bridge: request payloads, the task chat's opening message and figures, NDJSON to SSE translation |
 | `src/qdash/api/lib/copilot_agent.py` | LLM agent: system prompt construction, OpenAI Responses API calls, tool call loop, response parsing |
 | `src/qdash/copilot/` | Shared Copilot runtime used outside the API process |
 | `src/qdash/api/lib/copilot_sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
-| `src/qdash/api/lib/copilot_analysis.py` | Pydantic models: `TaskAnalysisContext`, `AnalysisResponse`, `AnalysisContextResult`; request schemas |
+| `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`), `AnalysisResponse`; request schemas |
 | `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter, `SSETaskBridge` for queue-poll-heartbeat-drain pattern |
 | `src/qdash/api/lib/copilot_config.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `ScoringThreshold` models; YAML loading with local override |
 | `src/qdash/datamodel/task_knowledge.py` | `TaskKnowledge` model with domain-specific knowledge per calibration task |
@@ -32,9 +35,8 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 | `agent-runtime/src/evaluate.ts`                           | Planner-less evaluation of one task result: evidence tool, then `qcal_evaluate`, as one record                                     |
 | `src/qdash/api/services/evaluation_service.py`             | Bulk evaluation runs: selection per chip, background execution through the runtime, records and verdicts                          |
 | `ui/src/hooks/useCopilotChat.ts` | React hook for the chat page: session management, SSE consumption, localStorage persistence |
-| `ui/src/hooks/useAnalysisChat.ts` | React hook for the analysis sidebar: task-scoped SSE streaming, message management |
+| `ui/src/contexts/ChatDockContext.tsx` | Where the chat is shown outside the chat page: the docked sidebar (`ChatSidebar`) or the floating window, and opening a chat about a task result |
 | `ui/src/components/features/chat/CopilotChatPage.tsx` | Chat page UI: session list, message rendering, blocks/chart display |
-| `ui/src/components/features/metrics/AnalysisChatPanel.tsx` | Analysis sidebar UI within the metrics modal |
 
 ## Pi runtime authentication
 
@@ -96,8 +98,8 @@ scoring:
     higher_is_better: true
   # ... (see config/copilot/evaluation.yaml for full list)
 
-# Task analysis settings
-analysis:
+# How a chat about a task result opens
+task_chat:
   enabled: true
   multimodal: true
   max_expected_images: 2
@@ -190,7 +192,7 @@ text the evaluation model received is stored in the tool result's
 `details.prompt`.
 
 The runtime's `/chat` body carries two image lists: `initial_images` (the
-analysis sidebar's opening figures, attached only when the conversation is new)
+task chat's opening figures, attached only when the conversation is new)
 and `images` (attachments of the current turn, attached every time). Restart the
 runtime after editing the extension; the startup log lists the local paths and
 the tools they contributed. Anything placed under `agent-runtime/extensions/` on
@@ -246,13 +248,12 @@ its unfinished records as pending; request it again rather than resuming it.
 
 ## Two Modes
 
-### Analysis Sidebar
+### Chat about a task result
 
-Activated from the metrics modal when viewing a specific task result (e.g., CheckT1 for qubit Q03).
+Opened from a task result (metrics modal, task history, execution detail) with "Ask AI".
 
-- **Endpoint**: `POST /copilot/analyze/stream`
-- **Hook**: `useAnalysisChat`
-- **Context**: Full `TaskAnalysisContext` including task knowledge, qubit parameters, experiment results, historical data, neighbor qubit data, and coupling parameters
+- **Endpoint**: `POST /copilot/chat/stream` with `task: {task_name, chip_id, qid, execution_id, task_id}`
+- **Context**: Full `TaskContext` including task knowledge, qubit parameters, experiment results, historical data, neighbor qubit data, and coupling parameters, rendered into the opening message together with the result's figures
 - **Use case**: "Is this T1 result normal?", "Why does the fit R² look low?"
 
 ### Chat Page

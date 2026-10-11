@@ -11,7 +11,7 @@ Package layout:
 
 from qdash.copilot.agent import blocks_to_markdown, run_analysis, run_chat
 from qdash.copilot.config import CopilotConfig, ModelConfig, load_copilot_config
-from qdash.copilot.contracts import AnalysisResponse, ChatRequest, TaskAnalysisContext
+from qdash.copilot.contracts import AnalysisResponse, ChatRequest, TaskContext
 from qdash.copilot.runtime import CopilotRuntime
 
 __all__ = [
@@ -20,7 +20,7 @@ __all__ = [
     "CopilotConfig",
     "CopilotRuntime",
     "ModelConfig",
-    "TaskAnalysisContext",
+    "TaskContext",
     "blocks_to_markdown",
     "load_copilot_config",
     "run_analysis",

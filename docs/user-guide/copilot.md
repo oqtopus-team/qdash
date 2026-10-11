@@ -39,9 +39,9 @@ every task result is judged by the same gates as a saved workflow. The execution
 
 ## Metrics Analysis
 
-The Metrics page includes a chat panel with the current analysis context. Use it when a question
-depends on the selected chip, metric, target direction, or time range. Changing those filters can
-change the records available to the analysis; state the intended comparison explicitly.
+The Metrics page includes a chat panel that opens with the selected task result as its context. Use it
+when a question depends on the selected chip, metric, target direction, or time range. Changing those
+filters can change the records available to the chat; state the intended comparison explicitly.
 
 ## Evaluate Findings
 

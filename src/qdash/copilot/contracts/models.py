@@ -17,21 +17,21 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class AnalysisContextResult:
-    """Result of building a full analysis context for a copilot analysis request."""
+class TaskContextBundle:
+    """Everything a chat about one task result opens with: context text and figures."""
 
-    context: TaskAnalysisContext
+    context: TaskContext
     image_base64: str | None
     expected_images: list[tuple[str, str]]
     experiment_images: list[tuple[str, str]] = field(default_factory=list)
     figure_paths: list[str] = field(default_factory=list)
 
 
-class TaskAnalysisContext(BaseModel):
-    """Full context for LLM-based task result analysis.
+class TaskContext(BaseModel):
+    """Full context of one task result for a chat about it.
 
-    Constructed by the analysis endpoint from DB data and TaskKnowledge,
-    then injected into the Pydantic AI agent as ``deps``.
+    Built from DB data and TaskKnowledge when a chat opens on a task result;
+    rendered into the opening message (Pi) or the system prompt (LiteLLM).
     """
 
     # Task knowledge (pre-rendered prompt)
@@ -242,10 +242,27 @@ class ChatStopResponse(BaseModel):
     stopped: bool
 
 
+class TaskChatTarget(BaseModel):
+    """The task result a chat is about; its first turn opens with the result's context."""
+
+    task_name: str = Field(description="Task class name (e.g. CheckT1)")
+    chip_id: str
+    qid: str
+    execution_id: str
+    task_id: str
+
+
 class ChatRequest(ImageAttachmentsRequest):
     """Request body for POST /copilot/chat/stream."""
 
     message: str = Field(description="User question / message")
+    task: TaskChatTarget | None = Field(
+        default=None,
+        description=(
+            "The task result this chat is about. When set, a new conversation opens "
+            "with the result's context and figures; later turns carry it for scoping."
+        ),
+    )
     session_id: str | None = Field(
         default=None,
         description=(

@@ -28,16 +28,16 @@ from qdash.copilot.agent_runtime.schemas import BLOCKS_RESPONSE_SCHEMA
 from qdash.copilot.agent_runtime.translation import (
     translate_analysis_response as _translate_analysis_response_impl,
 )
-from qdash.copilot.prompts.analysis import (
-    build_analysis_system_prompt,
-    build_language_instruction,
-)
 from qdash.copilot.prompts.chat import (
     CHART_SYSTEM_PROMPT,
     CHAT_COMPLETIONS_STRICT_EMULATION,
     build_chat_system_prompt,
 )
-from qdash.copilot.prompts.models import AnalysisPromptOptions, ChatPromptContext
+from qdash.copilot.prompts.models import ChatPromptContext, TaskChatPromptOptions
+from qdash.copilot.prompts.task_chat import (
+    build_language_instruction,
+    build_task_chat_prompt,
+)
 
 if TYPE_CHECKING:
     from qdash.copilot.agent_runtime.types import (
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
         ToolExecutors,
     )
     from qdash.copilot.config import CopilotConfig, ModelConfig
-    from qdash.copilot.contracts import AnalysisResponse, TaskAnalysisContext
+    from qdash.copilot.contracts import AnalysisResponse, TaskContext
     from qdash.copilot.tooling.sandbox import SandboxChartSpec
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ def _build_language_instruction(config: CopilotConfig | None) -> str:
 
 
 def _build_system_prompt(
-    context: TaskAnalysisContext,
+    context: TaskContext,
     *,
     config: CopilotConfig | None = None,
     include_response_format: bool = False,
@@ -66,8 +66,8 @@ def _build_system_prompt(
     has_experiment_image: bool = False,
 ) -> str:
     """Build the full system prompt from prompt assets and analysis context."""
-    return build_analysis_system_prompt(
-        AnalysisPromptOptions(
+    return build_task_chat_prompt(
+        TaskChatPromptOptions(
             context=context,
             language_instruction=_build_language_instruction(config),
             scoring=config.scoring if config else {},
@@ -323,7 +323,7 @@ async def _run_litellm_completion(
 
 
 async def run_analysis(
-    context: TaskAnalysisContext,
+    context: TaskContext,
     user_message: str,
     config: CopilotConfig,
     image_base64: str | None = None,
@@ -343,7 +343,7 @@ async def run_analysis(
 
     Parameters
     ----------
-    context : TaskAnalysisContext
+    context : TaskContext
         Structured context including task knowledge, qubit params, and results.
     user_message : str
         The user's question about the calibration result.
@@ -514,7 +514,7 @@ async def run_chat(
 ) -> dict[str, Any]:
     """Run a generic chat using the configured LiteLLM API style.
 
-    Lightweight version of run_analysis that does not require TaskAnalysisContext.
+    Lightweight version of run_analysis that does not require TaskContext.
     Optionally includes chip_id/qid context if provided.
 
     Returns

@@ -7,11 +7,11 @@ import { FolderLock, Settings, ShieldCheck } from "lucide-react";
 
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
-import { AnalysisSidebar } from "./AnalysisSidebar";
+import { ChatSidebar } from "./ChatSidebar";
 import { MiniChatWindow } from "./MiniChatWindow";
 
 import { SidebarProvider } from "@/contexts/SidebarContext";
-import { AnalysisChatProvider } from "@/contexts/AnalysisChatContext";
+import { ChatDockProvider } from "@/contexts/ChatDockContext";
 import { CopilotChatSessionProvider } from "@/contexts/CopilotChatSessionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
@@ -84,7 +84,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <SidebarProvider>
       <CopilotChatSessionProvider>
-        <AnalysisChatProvider>
+        <ChatDockProvider>
           <div className="flex w-full h-screen overflow-hidden">
             <Sidebar />
             <div className="flex-1 flex flex-col h-screen w-0 min-w-0 transition-[flex] duration-300 ease-in-out">
@@ -95,10 +95,10 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </div>
               </main>
             </div>
-            <AnalysisSidebar />
+            <ChatSidebar />
           </div>
           {!showProjectAccessState && <MiniChatWindow />}
-        </AnalysisChatProvider>
+        </ChatDockProvider>
       </CopilotChatSessionProvider>
     </SidebarProvider>
   );

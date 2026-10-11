@@ -19,7 +19,7 @@ import {
 } from "@/lib/copilotChatStream";
 import { buildHeaders, consumeSSEEvents, readErrorResponse } from "@/lib/sse-utils";
 import type {
-  AnalysisContext,
+  TaskChatContext,
   AnswerFeedback,
   ChatImageAttachment,
   ChatMessage,
@@ -35,7 +35,7 @@ export interface CopilotChatSession {
   id: string;
   title: string;
   /** Set when the chat is about one calibration result. */
-  context: AnalysisContext | null;
+  context: TaskChatContext | null;
   messages: ChatMessage[];
   createdAt: number;
   updatedAt: number;
@@ -69,12 +69,12 @@ interface CopilotChatSessionContextValue {
   runs: Record<string, SessionRun>;
 
   switchSession: (sessionId: string | null) => void;
-  createNewSession: (context?: AnalysisContext | null) => string;
+  createNewSession: (context?: TaskChatContext | null) => string;
   deleteSession: (sessionId: string) => void;
   renameSession: (sessionId: string, title: string) => void;
   /** Rate the assistant message at `index`; null clears the rating. */
   setMessageFeedback: (sessionId: string, index: number, feedback: AnswerFeedback | null) => void;
-  findSessionByContext: (context: AnalysisContext) => CopilotChatSession | null;
+  findSessionByContext: (context: TaskChatContext) => CopilotChatSession | null;
 
   sendMessage: (text: string, options?: SendOptions) => boolean;
   stop: (sessionId: string) => void;
@@ -98,11 +98,11 @@ function toTimestamp(iso: string | undefined | null): number {
   return Number.isNaN(t) ? Date.now() : t;
 }
 
-function sameContext(a: AnalysisContext | null, b: AnalysisContext): boolean {
+function sameContext(a: TaskChatContext | null, b: TaskChatContext): boolean {
   return a !== null && a.taskId === b.taskId && a.executionId === b.executionId && a.qid === b.qid;
 }
 
-function contextTitle(context: AnalysisContext): string {
+function contextTitle(context: TaskChatContext): string {
   return `${context.taskName} / ${context.qid}`;
 }
 
@@ -121,7 +121,7 @@ interface ServerMessage {
 interface ServerSessionSummary {
   session_id: string;
   title: string;
-  context?: AnalysisContext | null;
+  context?: TaskChatContext | null;
   message_count: number;
   created_at: string;
   updated_at: string;
@@ -237,7 +237,7 @@ async function apiDeleteSession(sessionId: string): Promise<void> {
   }
 }
 
-/** Request for one turn: analysis sessions go through the analyze endpoint. */
+/** Request for one turn; a chat about a task result names it in `task`. */
 function buildTurnRequest(
   session: CopilotChatSession | undefined,
   sessionId: string,
@@ -247,31 +247,30 @@ function buildTurnRequest(
   approval: SendOptions["approval"],
   images: ChatImageAttachment[] = [],
 ): { url: string; body: Record<string, unknown> } {
-  const common = {
-    ...(approval ? { approval } : {}),
-    ...(images.length ? { images } : {}),
-    message,
-    // Required by the Pi backend, which restores conversation state from the
-    // persisted session rather than from the request body.
-    session_id: sessionId,
-    request_id: crypto.randomUUID(),
-    conversation_history: history.map((m) => ({ role: m.role, content: m.content })),
-    model_override: modelOverride,
-  };
   const context = session?.context;
-  if (!context) {
-    return { url: `${BASE_URL}/copilot/chat/stream`, body: common };
-  }
   return {
-    url: `${BASE_URL}/copilot/analyze/stream`,
+    url: `${BASE_URL}/copilot/chat/stream`,
     body: {
-      ...common,
-      task_name: context.taskName,
-      chip_id: context.chipId,
-      qid: context.qid,
-      execution_id: context.executionId,
-      task_id: context.taskId,
-      image_base64: null,
+      ...(approval ? { approval } : {}),
+      ...(images.length ? { images } : {}),
+      ...(context
+        ? {
+            task: {
+              task_name: context.taskName,
+              chip_id: context.chipId,
+              qid: context.qid,
+              execution_id: context.executionId,
+              task_id: context.taskId,
+            },
+          }
+        : {}),
+      message,
+      // Required by the Pi backend, which restores conversation state from the
+      // persisted session rather than from the request body.
+      session_id: sessionId,
+      request_id: crypto.randomUUID(),
+      conversation_history: history.map((m) => ({ role: m.role, content: m.content })),
+      model_override: modelOverride,
     },
   };
 }
@@ -386,7 +385,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
     setActiveSessionId(sessionId);
   }, []);
 
-  const createNewSession = useCallback((context: AnalysisContext | null = null): string => {
+  const createNewSession = useCallback((context: TaskChatContext | null = null): string => {
     const id = generateId();
     const ts = Date.now();
     const local: CopilotChatSession = {
@@ -419,7 +418,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
   }, []);
 
   const findSessionByContext = useCallback(
-    (context: AnalysisContext) => sessions.find((s) => sameContext(s.context, context)) ?? null,
+    (context: TaskChatContext) => sessions.find((s) => sameContext(s.context, context)) ?? null,
     [sessions],
   );
 
@@ -544,7 +543,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
 
       const controller = new AbortController();
       controllers.current.set(sessionId, controller);
-      // Only the first turn of an analysis carries the result figures; the
+      // Only the first turn of a task chat carries the result figures; the
       // user's own attachments go with whichever turn they were staged for.
       const images = options?.images ?? [];
       const userMsg: ChatMessage = {
@@ -553,7 +552,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
         attachedImage:
           images.length > 0 ||
           (Boolean(session?.context) && !history.some((m) => m.role === "user")),
-        // An empty local list distinguishes server-provided analysis figures
+        // An empty local list distinguishes server-provided task figures
         // from user attachments whose bytes were lost after a reload.
         attachments: images.map((i) => `data:${i.mimeType};base64,${i.data}`),
       };

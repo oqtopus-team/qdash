@@ -1,4 +1,4 @@
-"""Analysis-context assembly helpers for Copilot task review flows."""
+"""Context assembly for a chat about one task result."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from qdash.copilot.config import CopilotConfig
-    from qdash.copilot.contracts import AnalysisContextResult
+    from qdash.copilot.contracts import TaskContextBundle
 
 
-class AnalysisContextBuilder:
-    """Build task-analysis context from task knowledge and repository-backed loaders."""
+class TaskContextBuilder:
+    """Build a task result's context from task knowledge and repository-backed loaders."""
 
     def __init__(
         self,
@@ -37,7 +37,7 @@ class AnalysisContextBuilder:
         self._load_figures_as_base64 = load_figures_as_base64
         self._collect_expected_images = collect_expected_images
 
-    def build_analysis_context(
+    def build_task_context(
         self,
         *,
         task_name: str,
@@ -46,11 +46,11 @@ class AnalysisContextBuilder:
         task_id: str,
         image_base64: str | None,
         config: CopilotConfig,
-    ) -> AnalysisContextResult:
-        """Build the full analysis context consumed by Copilot analysis flows."""
+    ) -> TaskContextBundle:
+        """Build the full context a chat about this task result opens with."""
         from qdash.copilot.contracts import (
-            AnalysisContextResult,
-            TaskAnalysisContext,
+            TaskContext,
+            TaskContextBundle,
         )
         from qdash.datamodel.task_knowledge import get_task_knowledge
 
@@ -61,15 +61,13 @@ class AnalysisContextBuilder:
         input_params, output_params, run_params, figure_paths = self._extract_task_result_payload(
             task_result
         )
-        history_results, neighbor_qubit_params, coupling_params = (
-            self._load_related_analysis_context(
-                task_name=task_name,
-                chip_id=chip_id,
-                qid=qid,
-                knowledge=knowledge,
-            )
+        history_results, neighbor_qubit_params, coupling_params = self._load_related_context(
+            task_name=task_name,
+            chip_id=chip_id,
+            qid=qid,
+            knowledge=knowledge,
         )
-        image_base64, expected_images, experiment_images = self._resolve_analysis_images(
+        image_base64, expected_images, experiment_images = self._resolve_images(
             knowledge=knowledge,
             task_result=task_result,
             figure_paths=figure_paths,
@@ -77,7 +75,7 @@ class AnalysisContextBuilder:
             config=config,
         )
 
-        context = TaskAnalysisContext(
+        context = TaskContext(
             task_knowledge_prompt=knowledge_prompt,
             chip_id=chip_id,
             qid=qid,
@@ -89,7 +87,7 @@ class AnalysisContextBuilder:
             neighbor_qubit_params=neighbor_qubit_params,
             coupling_params=coupling_params,
         )
-        return AnalysisContextResult(
+        return TaskContextBundle(
             context=context,
             image_base64=image_base64,
             expected_images=expected_images,
@@ -108,7 +106,7 @@ class AnalysisContextBuilder:
     def _extract_task_result_payload(
         task_result: dict[str, Any] | None,
     ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], list[str]]:
-        """Extract task-result fields used by analysis context assembly."""
+        """Extract the task-result fields the context is built from."""
         if not task_result:
             return {}, {}, {}, []
         return (
@@ -118,7 +116,7 @@ class AnalysisContextBuilder:
             task_result.get("figure_path", []),
         )
 
-    def _load_related_analysis_context(
+    def _load_related_context(
         self,
         *,
         task_name: str,
@@ -147,7 +145,7 @@ class AnalysisContextBuilder:
 
         return history_results, neighbor_qubit_params, coupling_params
 
-    def _resolve_analysis_images(
+    def _resolve_images(
         self,
         *,
         knowledge: Any,
@@ -156,22 +154,21 @@ class AnalysisContextBuilder:
         image_base64: str | None,
         config: CopilotConfig,
     ) -> tuple[str | None, list[tuple[str, str]], list[tuple[str, str]]]:
-        """Resolve experiment and expected images for multimodal analysis."""
+        """Resolve the measured and expected figures the chat opens with."""
         expected_images: list[tuple[str, str]] = []
         experiment_images: list[tuple[str, str]] = []
-        if not config.analysis.multimodal:
+        if not config.task_chat.multimodal:
             return image_base64, expected_images, experiment_images
 
         if task_result:
             experiment_images = self._load_figures_as_base64(figure_paths)
         if not image_base64:
             image_base64 = self._load_figure_as_base64(figure_paths)
-        # Case images illustrate past outcomes for the Ask AI sidebar; the
-        # task-knowledge review guide images were only used by the retired
-        # automatic review and are left out of the analysis context.
+        # Case images illustrate past outcomes; the review guide's images are
+        # not sent (they were only used by the retired automatic review).
         expected_images = self._collect_expected_images(
             knowledge,
-            config.analysis.max_expected_images,
+            config.task_chat.max_expected_images,
             include_case_images=True,
             include_review_images=False,
         )

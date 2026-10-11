@@ -129,7 +129,7 @@ components/
 │
 ├── layout/                 # Layout components
 │   ├── AppLayout.tsx       # Main app layout
-│   └── AnalysisSidebar.tsx # Analysis page sidebar
+│   └── ChatSidebar.tsx     # Docked chat sidebar (Ask AI)
 │
 └── selectors/              # Selection/input components
     ├── ChipSelector/       # Chip dropdown

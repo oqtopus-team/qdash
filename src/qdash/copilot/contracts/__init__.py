@@ -1,7 +1,6 @@
 """Shared request/response models for Copilot APIs and workflows."""
 
 from qdash.copilot.contracts.models import (
-    AnalysisContextResult,
     AnalysisResponse,
     AnalyzeRequest,
     BlocksAnalysisResponse,
@@ -11,11 +10,12 @@ from qdash.copilot.contracts.models import (
     ChatStopResponse,
     ContentBlock,
     SandboxPythonRequest,
-    TaskAnalysisContext,
+    TaskChatTarget,
+    TaskContext,
+    TaskContextBundle,
 )
 
 __all__ = [
-    "AnalysisContextResult",
     "AnalysisResponse",
     "AnalyzeRequest",
     "BlocksAnalysisResponse",
@@ -25,5 +25,7 @@ __all__ = [
     "ChatStopResponse",
     "ContentBlock",
     "SandboxPythonRequest",
-    "TaskAnalysisContext",
+    "TaskChatTarget",
+    "TaskContext",
+    "TaskContextBundle",
 ]

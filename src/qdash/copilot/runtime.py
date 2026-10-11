@@ -27,7 +27,6 @@ from qdash.copilot.formatters.compact import (
 from qdash.copilot.formatters.compact import (
     compact_timestamp as _compact_timestamp,
 )
-from qdash.copilot.services.analysis_context_service import AnalysisContextBuilder
 from qdash.copilot.services.chip_overview_service import ChipOverviewLoader
 from qdash.copilot.services.data_access import CopilotDataAccess
 from qdash.copilot.services.heatmap_service import ChipHeatmapLoader
@@ -37,12 +36,13 @@ from qdash.copilot.services.provenance_context_service import (
     ProvenanceServiceProtocol,
 )
 from qdash.copilot.services.support_service import CopilotSupportService
+from qdash.copilot.services.task_context_service import TaskContextBuilder
 from qdash.copilot.services.topology_context_service import TopologyContextLoader
 from qdash.copilot.tooling.registry import ToolExecutorRegistryBuilder
 
 if TYPE_CHECKING:
     from qdash.copilot.config import CopilotConfig
-    from qdash.copilot.contracts import AnalysisContextResult
+    from qdash.copilot.contracts import TaskContextBundle
 
 logger = logging.getLogger(__name__)
 
@@ -65,15 +65,15 @@ class CopilotRuntime:
             logger=logger,
             max_figure_size=MAX_FIGURE_SIZE,
         )
-        self._analysis_context_builder = AnalysisContextBuilder(
-            load_qubit_params=self._analysis_load_qubit_params,
-            load_task_result=self._analysis_load_task_result,
-            load_task_history=self._analysis_load_task_history,
-            load_neighbor_qubit_params=self._analysis_load_neighbor_qubit_params,
-            load_coupling_params=self._analysis_load_coupling_params,
-            load_figure_as_base64=self._analysis_load_figure_as_base64,
-            load_figures_as_base64=self._analysis_load_figures_as_base64,
-            collect_expected_images=self._analysis_collect_expected_images,
+        self._task_context_builder = TaskContextBuilder(
+            load_qubit_params=self._context_load_qubit_params,
+            load_task_result=self._context_load_task_result,
+            load_task_history=self._context_load_task_history,
+            load_neighbor_qubit_params=self._context_load_neighbor_qubit_params,
+            load_coupling_params=self._context_load_coupling_params,
+            load_figure_as_base64=self._context_load_figure_as_base64,
+            load_figures_as_base64=self._context_load_figures_as_base64,
+            collect_expected_images=self._context_collect_expected_images,
         )
         self._heatmap_loader = ChipHeatmapLoader(
             data_access=self._data_access,
@@ -102,51 +102,51 @@ class CopilotRuntime:
         )
         self._tool_executor_registry_builder = ToolExecutorRegistryBuilder(self)
 
-    def _analysis_load_qubit_params(self, chip_id: str, qid: str) -> dict[str, Any]:
-        """Forward qubit-param lookup for analysis context assembly."""
+    def _context_load_qubit_params(self, chip_id: str, qid: str) -> dict[str, Any]:
+        """Forward qubit-param lookup for task context assembly."""
         return self.load_qubit_params(chip_id, qid)
 
-    def _analysis_load_task_result(self, task_id: str) -> dict[str, Any] | None:
-        """Forward task-result lookup for analysis context assembly."""
+    def _context_load_task_result(self, task_id: str) -> dict[str, Any] | None:
+        """Forward task-result lookup for task context assembly."""
         return self.load_task_result(task_id)
 
-    def _analysis_load_task_history(
+    def _context_load_task_history(
         self,
         task_name: str,
         chip_id: str,
         qid: str,
         last_n: int,
     ) -> list[dict[str, Any]]:
-        """Forward task-history lookup for analysis context assembly."""
+        """Forward task-history lookup for task context assembly."""
         return self.load_task_history(task_name, chip_id, qid, last_n)
 
-    def _analysis_load_neighbor_qubit_params(
+    def _context_load_neighbor_qubit_params(
         self,
         chip_id: str,
         qid: str,
         params: list[str] | None,
     ) -> dict[str, dict[str, Any]]:
-        """Forward neighbor-qubit lookup for analysis context assembly."""
+        """Forward neighbor-qubit lookup for task context assembly."""
         return self.load_neighbor_qubit_params(chip_id, qid, params or [])
 
-    def _analysis_load_coupling_params(
+    def _context_load_coupling_params(
         self,
         chip_id: str,
         qid: str,
         params: list[str] | None,
     ) -> dict[str, dict[str, Any]]:
-        """Forward coupling lookup for analysis context assembly."""
+        """Forward coupling lookup for task context assembly."""
         return self.load_coupling_params(chip_id, qid, params or [])
 
-    def _analysis_load_figure_as_base64(self, figure_paths: list[str]) -> str | None:
-        """Forward figure loading for analysis context assembly."""
+    def _context_load_figure_as_base64(self, figure_paths: list[str]) -> str | None:
+        """Forward figure loading for task context assembly."""
         return self.load_figure_as_base64(figure_paths)
 
-    def _analysis_load_figures_as_base64(self, figure_paths: list[str]) -> list[tuple[str, str]]:
-        """Forward target figure loading for analysis context assembly."""
+    def _context_load_figures_as_base64(self, figure_paths: list[str]) -> list[tuple[str, str]]:
+        """Forward target figure loading for task context assembly."""
         return self.load_figures_as_base64(figure_paths)
 
-    def _analysis_collect_expected_images(
+    def _context_collect_expected_images(
         self,
         knowledge: Any,
         max_images: int | None,
@@ -154,7 +154,7 @@ class CopilotRuntime:
         include_case_images: bool = True,
         include_review_images: bool = True,
     ) -> list[tuple[str, str]]:
-        """Forward expected-image lookup for analysis context assembly."""
+        """Forward expected-image lookup for task context assembly."""
         return self.collect_expected_images(
             knowledge,
             max_images=max_images,
@@ -442,7 +442,7 @@ class CopilotRuntime:
         """List distinct output parameter names recorded for a chip."""
         return self._support_service.load_available_parameters(chip_id, qid=qid)
 
-    def build_analysis_context(
+    def build_task_context(
         self,
         task_name: str,
         chip_id: str,
@@ -450,14 +450,9 @@ class CopilotRuntime:
         task_id: str,
         image_base64: str | None,
         config: CopilotConfig,
-    ) -> AnalysisContextResult:
-        """Build a full analysis context from DB data and TaskKnowledge.
-
-        Consolidates the duplicated context-building logic that was
-        previously inlined in both ``analyze_task_result`` and
-        ``analyze_task_result_stream``.
-        """
-        return self._analysis_context_builder.build_analysis_context(
+    ) -> TaskContextBundle:
+        """Build the context a chat about one task result opens with."""
+        return self._task_context_builder.build_task_context(
             task_name=task_name,
             chip_id=chip_id,
             qid=qid,
@@ -474,7 +469,7 @@ class CopilotRuntime:
         task_name: str,
         experiment_images: list[tuple[str, str]] | None = None,
     ) -> dict[str, Any]:
-        """Build the ``images_sent`` metadata dict for analysis responses."""
+        """Build the ``images_sent`` metadata dict for a task chat answer."""
         return CopilotSupportService.build_images_sent_metadata(
             image_base64=image_base64,
             figure_paths=figure_paths,

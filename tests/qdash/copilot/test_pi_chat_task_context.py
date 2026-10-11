@@ -1,4 +1,4 @@
-"""Tests for the Pi backend of the analysis sidebar."""
+"""Tests for a chat about one task result on the Pi backend."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ from typing import Any
 
 import pytest
 
-from qdash.api.services import pi_analysis_service, pi_chat_service
+from qdash.api.services import pi_chat_service
 from qdash.copilot.config import CopilotConfig, ModelConfig
-from qdash.copilot.contracts import AnalysisContextResult, AnalyzeRequest, TaskAnalysisContext
-from qdash.copilot.prompts.analysis import build_language_instruction
+from qdash.copilot.contracts import ChatRequest, TaskChatTarget, TaskContext, TaskContextBundle
+from qdash.copilot.prompts.task_chat import build_language_instruction
 
 _IMAGES_SENT = {
     "experiment_figure": True,
@@ -28,9 +28,9 @@ def _config() -> CopilotConfig:
     )
 
 
-def _bundle() -> AnalysisContextResult:
-    return AnalysisContextResult(
-        context=TaskAnalysisContext(
+def _bundle() -> TaskContextBundle:
+    return TaskContextBundle(
+        context=TaskContext(
             task_knowledge_prompt="knowledge-v1",
             chip_id="chip-1",
             qid="4",
@@ -42,13 +42,15 @@ def _bundle() -> AnalysisContextResult:
     )
 
 
-def _request(message: str = "Is this result trustworthy?") -> AnalyzeRequest:
-    return AnalyzeRequest(
-        task_name="CheckQubitSpectroscopy",
-        chip_id="chip-1",
-        qid="4",
-        execution_id="exec-1",
-        task_id="task-1",
+def _request(message: str = "Is this result trustworthy?") -> ChatRequest:
+    return ChatRequest(
+        task=TaskChatTarget(
+            task_name="CheckQubitSpectroscopy",
+            chip_id="chip-1",
+            qid="4",
+            execution_id="exec-1",
+            task_id="task-1",
+        ),
         message=message,
         session_id="session-1",
         request_id="request-1",
@@ -68,7 +70,7 @@ async def _collect(
     *,
     stored: list[dict[str, Any]],
     ndjson: list[dict[str, Any]] | None = None,
-    request: AnalyzeRequest | None = None,
+    request: ChatRequest | None = None,
 ) -> tuple[dict[str, Any], list[tuple[str, dict[str, Any]]], list[list[dict[str, Any]]]]:
     """Run one turn against a stubbed runtime, returning payload, events and writes."""
     captured: dict[str, Any] = {}
@@ -96,13 +98,12 @@ async def _collect(
 
     events = [
         _parse(sse)
-        async for sse in pi_analysis_service.stream(
+        async for sse in pi_chat_service.stream(
             request or _request(),
             _config(),
-            _bundle(),
             username="alice",
             auth=pi_chat_service.QDashAuth("alice-token", "alice-project"),
-            language_instruction="Always respond in English.",
+            task=_bundle(),
             images_sent=_IMAGES_SENT,
         )
     ]
@@ -114,9 +115,9 @@ def _parse(sse: str) -> tuple[str, dict[str, Any]]:
     return name.removeprefix("event: "), json.loads(data.removeprefix("data: "))
 
 
-class TestBuildAnalysisPrompt:
+class TestTaskOpeningMessage:
     def test_carries_context_task_and_figure_counts(self) -> None:
-        prompt = pi_analysis_service.build_analysis_prompt(
+        prompt = pi_chat_service.task_opening_message(
             bundle=_bundle(),
             config=_config(),
             user_message="Is this trustworthy?",
@@ -128,7 +129,7 @@ class TestBuildAnalysisPrompt:
         assert prompt.endswith("## Your task\n\nIs this trustworthy?")
 
     def test_tells_the_model_to_answer_from_the_provided_context(self) -> None:
-        prompt = pi_analysis_service.build_analysis_prompt(
+        prompt = pi_chat_service.task_opening_message(
             bundle=_bundle(),
             config=_config(),
             user_message="hi",
@@ -140,7 +141,7 @@ class TestBuildAnalysisPrompt:
         assert "Do not re-fetch this result" in prompt
 
     def test_does_not_request_the_blocks_json_schema(self) -> None:
-        prompt = pi_analysis_service.build_analysis_prompt(
+        prompt = pi_chat_service.task_opening_message(
             bundle=_bundle(),
             config=_config(),
             user_message="hi",
@@ -150,7 +151,7 @@ class TestBuildAnalysisPrompt:
         assert "valid JSON object" not in prompt
 
     def test_no_longer_demands_a_review_block(self) -> None:
-        prompt = pi_analysis_service.build_analysis_prompt(
+        prompt = pi_chat_service.task_opening_message(
             bundle=_bundle(),
             config=_config(),
             user_message="hi",
@@ -175,13 +176,12 @@ class TestStream:
 
         events = [
             _parse(sse)
-            async for sse in pi_analysis_service.stream(
+            async for sse in pi_chat_service.stream(
                 _request(),
                 _config(),
-                _bundle(),
                 username="alice",
                 auth=pi_chat_service.QDashAuth("alice-token", "alice-project"),
-                language_instruction="",
+                task=_bundle(),
                 images_sent=_IMAGES_SENT,
             )
         ]
@@ -189,7 +189,7 @@ class TestStream:
         assert events == [
             (
                 "error",
-                {"step": "init", "detail": "Could not persist the analysis session"},
+                {"step": "init", "detail": "Could not persist the chat session"},
             )
         ]
 
@@ -209,7 +209,7 @@ class TestStream:
             "experiment-b64",
         ]
         assert payload["thinking_level"] == "off"
-        assert captured["step"] == "run_analysis"
+        assert captured["step"] == "run_chat"
         assert captured["auth"] == pi_chat_service.QDashAuth("alice-token", "alice-project")
         assert "alice-token" not in json.dumps(payload)
 
@@ -242,13 +242,12 @@ class TestStream:
 
         events = [
             _parse(sse)
-            async for sse in pi_analysis_service.stream(
+            async for sse in pi_chat_service.stream(
                 request,
                 _config(),
-                _bundle(),
                 username="alice",
                 auth=pi_chat_service.QDashAuth("alice-token", "alice-project"),
-                language_instruction="",
+                task=_bundle(),
                 images_sent=_IMAGES_SENT,
             )
         ]
@@ -258,20 +257,20 @@ class TestStream:
                 "error",
                 {
                     "step": "init",
-                    "detail": "session_id is required by the Pi analysis backend",
+                    "detail": "session_id is required by the Pi chat backend",
                 },
             )
         ]
 
 
 @pytest.mark.asyncio
-async def test_analysis_forwards_turn_attachments_separately(
+async def test_task_chat_forwards_turn_attachments_separately(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """User attachments reach the runtime on follow-up turns as well as the opening turn."""
-    request = AnalyzeRequest.model_validate(
+    request = ChatRequest.model_validate(
         {
-            **_request().model_dump(),
+            **_request().model_dump(by_alias=True),
             "images": [{"data": "iVBORw0KGgo=", "mimeType": "image/png"}],
         }
     )

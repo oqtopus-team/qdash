@@ -11,14 +11,14 @@ from qdash.api.dependencies import get_copilot_runtime
 from qdash.api.lib import auth
 from qdash.api.routers import copilot
 from qdash.api.schemas.auth import UserInDB
-from qdash.api.services import pi_analysis_service, pi_chat_service
+from qdash.api.services import pi_chat_service
 from qdash.copilot.config import CopilotConfig
-from qdash.copilot.contracts import AnalysisContextResult, TaskAnalysisContext
+from qdash.copilot.contracts import TaskContext, TaskContextBundle
 
 
-@pytest.mark.parametrize("path", ["/chat/stream", "/analyze/stream"])
+@pytest.mark.parametrize("with_task", [False, True])
 @pytest.mark.parametrize("selected_project", [None, "selected-project"])
-def test_pi_receives_current_user_token_and_project(monkeypatch, path, selected_project):
+def test_pi_receives_current_user_token_and_project(monkeypatch, with_task, selected_project):
     captured = []
     user = UserInDB(
         user_id="alice-id",
@@ -39,43 +39,45 @@ def test_pi_receives_current_user_token_and_project(monkeypatch, path, selected_
         yield 'event: result\ndata: {"blocks": []}\n\n'
 
     monkeypatch.setattr(pi_chat_service, "stream", stream)
-    monkeypatch.setattr(pi_analysis_service, "stream", stream)
     app = FastAPI()
     app.include_router(copilot.router)
     app.dependency_overrides[get_copilot_runtime] = lambda: SimpleNamespace(
-        build_analysis_context=lambda **kwargs: AnalysisContextResult(
-            context=TaskAnalysisContext(task_knowledge_prompt="", chip_id="chip", qid="0"),
+        build_task_context=lambda **kwargs: TaskContextBundle(
+            context=TaskContext(task_knowledge_prompt="", chip_id="chip", qid="0"),
             image_base64=None,
             expected_images=[],
         ),
     )
-    body: dict[str, object] = {
-        "message": "Analyze",
-        "session_id": "s1",
-        "task_name": "CheckRabi",
-        "chip_id": "chip",
-        "qid": "0",
-        "execution_id": "e1",
-        "task_id": "t1",
-    }
+    body: dict[str, object] = {"message": "Analyze", "session_id": "s1"}
+    if with_task:
+        body["task"] = {
+            "task_name": "CheckRabi",
+            "chip_id": "chip",
+            "qid": "0",
+            "execution_id": "e1",
+            "task_id": "t1",
+        }
     headers = {"Authorization": "Bearer alice-token"}
     if selected_project:
         headers["X-Project-Id"] = selected_project
     with TestClient(app) as client:
-        response = client.post(path, json=body, headers=headers)
+        response = client.post("/chat/stream", json=body, headers=headers)
         assert response.status_code == 200
         assert captured[0]["username"] == "alice"
         assert captured[0]["auth"] == pi_chat_service.QDashAuth(
             "alice-token", selected_project or "default-project"
         )
+        assert (captured[0]["task"] is not None) is with_task
         assert "alice-token" not in response.text
         # A later request must supply valid credentials again, including approvals.
         body["approval"] = {"id": "write-1", "approve": True}
-        rejected = client.post(path, json=body, headers={"Authorization": "Bearer revoked-token"})
+        rejected = client.post(
+            "/chat/stream", json=body, headers={"Authorization": "Bearer revoked-token"}
+        )
         assert rejected.status_code == 401
         assert len(captured) == 1
         user.disabled = True
-        assert client.post(path, json=body, headers=headers).status_code == 403
+        assert client.post("/chat/stream", json=body, headers=headers).status_code == 403
         assert len(captured) == 1
 
 

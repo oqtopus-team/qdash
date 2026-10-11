@@ -25,9 +25,9 @@ All events follow the SSE format: `event: <type>\ndata: <json>\n\n`
 
 | Step | When |
 |------|------|
-| `build_context` | Building analysis context (knowledge, qubit params, task result, images) |
+| `build_context` | Building a task chat's context (knowledge, qubit params, task result, images) |
 | `load_images` | Sending experiment/reference images to AI |
-| `run_analysis` / `run_chat` | Starting LLM interaction |
+| `run_chat` | Starting LLM interaction |
 | `tool_call` | Agent is calling a tool |
 | `thinking` | Agent is processing/reasoning |
 | `complete` | All processing finished |
@@ -40,7 +40,7 @@ All events follow the SSE format: `event: <type>\ndata: <json>\n\n`
 
 ## SSETaskBridge
 
-All three streaming endpoints (`/copilot/analyze/stream`, `/copilot/chat/stream`, `/issues/{id}/ai-reply/stream`) share the same queue-poll-heartbeat-drain pattern. This is encapsulated in the `SSETaskBridge` dataclass in `lib/sse.py`.
+Both streaming endpoints (`/copilot/chat/stream`, `/issues/{id}/ai-reply/stream`) share the same queue-poll-heartbeat-drain pattern. This is encapsulated in the `SSETaskBridge` dataclass in `lib/sse.py`.
 
 ```python
 from qdash.api.lib.sse import SSETaskBridge
@@ -138,18 +138,17 @@ while (true) {
 }
 ```
 
-### `useAnalysisChat` (Analysis Sidebar)
+### Chats about a task result
 
-Located in `ui/src/hooks/useAnalysisChat.ts`. Similar SSE handling but:
-- Uses `flushSync` for immediate status message updates
-- Requires `AnalysisContext` (taskName, chipId, qid, executionId, taskId)
-- Supports `imageBase64` parameter for multimodal analysis
-- No session persistence (messages reset on context switch)
-- Includes legacy `AnalysisResult` fallback formatting
+A chat opened from a task result uses the same hook and the same endpoint, with
+`task: {task_name, chip_id, qid, execution_id, task_id}` in the request body. The
+API builds the result's context and figures (`build_context`, `load_images`
+status events) and the Pi runtime attaches them to the first turn only; the
+final `result` event carries `images_sent`.
 
 ### SSE Parser: `consumeSSEEvents`
 
-Both hooks share the same SSE parsing logic:
+Every chat surface shares the same SSE parsing logic:
 
 1. Find the last `\n\n` boundary in the buffer (complete events only)
 2. Split the complete portion into blocks by `\n\n`

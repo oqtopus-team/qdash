@@ -17,13 +17,15 @@ from typing import TYPE_CHECKING, Any
 import httpx
 
 from qdash.api.lib.sse import sse_event
+from qdash.copilot.prompts.models import TaskChatPromptOptions
+from qdash.copilot.prompts.task_chat import build_language_instruction, build_task_chat_prompt
 from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterable
 
     from qdash.copilot.config import CopilotConfig
-    from qdash.copilot.contracts import ChatRequest
+    from qdash.copilot.contracts import ChatRequest, TaskContextBundle
     from qdash.copilot.contracts.models import ApprovalDecision
 
 logger = logging.getLogger(__name__)
@@ -187,14 +189,92 @@ def approval_payload(approval: ApprovalDecision | None) -> dict[str, Any]:
     return {"approval": approval.model_dump()} if approval else {}
 
 
+# A task chat's opening message already holds the result, its parameters,
+# task knowledge and figures. Without this, local models re-fetch all of it
+# through tools before answering and run out of time or context.
+_ANSWERING_GUIDANCE = """\
+## How to answer
+
+Everything about this result is already above: its parameters, the task \
+knowledge, past cases and the attached figures. Answer from them first. Call a \
+tool only when the question needs data that is not here, such as history, \
+other qubits or other executions, and keep it to a few targeted calls. Do not \
+re-fetch this result, its figures or its task knowledge."""
+
+
+def collect_task_figures(bundle: TaskContextBundle) -> list[dict[str, str]]:
+    """Flatten a task context's figures into Pi image attachments.
+
+    Expected reference images come first, then the measured ones. Pi's
+    ``ImageContent`` carries no alt text, so the prompt states the counts and the
+    order instead.
+    """
+    experiment = bundle.experiment_images or (
+        [(bundle.image_base64, "result figure")] if bundle.image_base64 else []
+    )
+    return [
+        {"data": data, "mimeType": "image/png"}
+        for data, _alt in [*bundle.expected_images, *experiment]
+        if data
+    ]
+
+
+def task_opening_message(
+    *,
+    bundle: TaskContextBundle,
+    config: CopilotConfig,
+    user_message: str,
+    language_instruction: str,
+) -> str:
+    """The first message of a chat about one task result, carrying its whole context.
+
+    The system prompt body and the language instruction are folded into this
+    first message, because the Pi runtime has no separate system-prompt
+    channel for it.
+    """
+    expected_count = len(bundle.expected_images)
+    experiment_count = len(collect_task_figures(bundle)) - expected_count
+
+    body = build_task_chat_prompt(
+        TaskChatPromptOptions(
+            context=bundle.context,
+            language_instruction=language_instruction,
+            scoring=config.scoring,
+            has_expected_images=expected_count > 0,
+            has_experiment_image=experiment_count > 0,
+            # Pi answers in free text and calls `render_chart`; the blocks are
+            # reassembled from that. Asking for JSON here would land the raw
+            # JSON string inside a text block.
+            include_response_format=False,
+        )
+    )
+
+    image_note = (
+        f"\n\n## Attached figures\n\n"
+        f"{expected_count} expected reference figure(s) first, "
+        f"then {experiment_count} figure(s) measured in this run."
+        if expected_count or experiment_count
+        else ""
+    )
+    return f"{body}{image_note}\n\n{_ANSWERING_GUIDANCE}\n\n## Your task\n\n{user_message}"
+
+
 async def stream(
     request: ChatRequest,
     config: CopilotConfig,
     *,
     username: str,
     auth: QDashAuth,
+    task: TaskContextBundle | None = None,
+    images_sent: dict[str, Any] | None = None,
 ) -> AsyncGenerator[str, None]:
-    """Proxy one chat turn through the Pi Agent Runtime as SSE events."""
+    """Proxy one chat turn through the Pi Agent Runtime as SSE events.
+
+    With ``task``, the turn belongs to a chat about one task result: a new
+    conversation opens with the result's context and figures (the runtime
+    attaches them only when the conversation is new), and the final result
+    reports which figures were sent.
+    """
     if not request.session_id:
         yield sse_event(
             "error",
@@ -203,7 +283,29 @@ async def stream(
         return
 
     payload = _request_payload(request, config, username)
-    async for event in stream_payload(payload, step="run_chat", auth=auth):
+    extra_result: dict[str, Any] | None = None
+    if task is not None:
+        try:
+            await ensure_agent_session(username, request.session_id)
+        except Exception:
+            logger.exception("Failed to ensure persisted Pi chat session")
+            yield sse_event(
+                "error",
+                {"step": "init", "detail": "Could not persist the chat session"},
+            )
+            return
+        payload["initial_message"] = task_opening_message(
+            bundle=task,
+            config=config,
+            user_message=request.message,
+            language_instruction=build_language_instruction(config),
+        )
+        payload["initial_images"] = collect_task_figures(task)
+        extra_result = {"images_sent": images_sent or {}}
+
+    async for event in stream_payload(
+        payload, step="run_chat", auth=auth, extra_result=extra_result
+    ):
         yield event
 
 

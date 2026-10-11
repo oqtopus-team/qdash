@@ -27,8 +27,8 @@ import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
-import type { AnalysisContext } from "@/types/copilotChat";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
+import type { TaskChatContext } from "@/types/copilotChat";
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
@@ -63,7 +63,7 @@ export function CouplingTaskHistoryModal({
     type: "success" | "error";
     text: string;
   } | null>(null);
-  const { openMiniChat } = useAnalysisChatContext();
+  const { openMiniChat } = useChatDock();
   const queryClient = useQueryClient();
   const updateParamsMutation = useUpdateCalibrationParameters();
   const manualOverrides = useManualOverrides(couplingId);
@@ -203,7 +203,7 @@ export function CouplingTaskHistoryModal({
   const hasJsonFigures = jsonFigures.length > 0;
   const rawDataPaths = selectedTask?.raw_data_path ?? [];
 
-  const analysisContext: AnalysisContext | null = useMemo(() => {
+  const chatContext: TaskChatContext | null = useMemo(() => {
     if (!selectedTask?.task_id) return null;
     return {
       taskName: selectedTask.name || taskName,
@@ -551,9 +551,9 @@ export function CouplingTaskHistoryModal({
               <GitBranch className="h-3 w-3" />
               View Provenance Lineage
             </Link>
-            {analysisContext && (
+            {chatContext && (
               <button
-                onClick={() => openMiniChat(analysisContext)}
+                onClick={() => openMiniChat(chatContext)}
                 className="btn btn-xs btn-primary gap-1"
               >
                 <Bot className="h-3 w-3" />
