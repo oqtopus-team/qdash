@@ -18231,6 +18231,12 @@
             "description": "\"bulk\" from the chip page, \"single\" for one task result",
             "default": "bulk"
           },
+          "with_examples": {
+            "type": "boolean",
+            "title": "With Examples",
+            "description": "Show the task's expert-labeled example plots before the figure (in-context examples)",
+            "default": false
+          },
           "mode": {
             "type": "string",
             "enum": [
@@ -18780,6 +18786,37 @@
         "title": "EvaluateCandidateGateRequest",
         "description": "Evaluate one numeric candidate against session-owned parameter bounds."
       },
+      "EvaluationExampleModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Example file stem in the knowledge repository",
+            "default": ""
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "description": "The example's labeled outcome",
+            "default": ""
+          },
+          "figures": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationFigureModel"
+            },
+            "type": "array",
+            "title": "Figures"
+          }
+        },
+        "type": "object",
+        "title": "EvaluationExampleModel",
+        "description": "One labeled example shown before the figure, by identity and figure hashes."
+      },
       "EvaluationFigureModel": {
         "properties": {
           "sha256": {
@@ -18868,6 +18905,14 @@
             },
             "type": "array",
             "title": "Figures"
+          },
+          "examples": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationExampleModel"
+            },
+            "type": "array",
+            "title": "Examples",
+            "description": "Labeled examples shown before the figure; empty for a zero-shot evaluation"
           }
         },
         "type": "object",
@@ -19220,6 +19265,11 @@
               "planner"
             ],
             "title": "Mode"
+          },
+          "with_examples": {
+            "type": "boolean",
+            "title": "With Examples",
+            "default": false
           },
           "planner_model": {
             "anyOf": [
@@ -21445,6 +21495,12 @@
           "diagnosis": {
             "type": "string",
             "title": "Diagnosis",
+            "default": ""
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "The demonstration label: outcome, fit quality, verdict, diagnosis",
             "default": ""
           }
         },

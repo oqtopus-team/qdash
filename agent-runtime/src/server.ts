@@ -70,6 +70,8 @@ interface EvaluateBody {
   /** The planner in planner mode; in direct mode only pi-qcaleval's fallback model. */
   model?: { provider?: string; name?: string };
   thinking_level?: SessionRequest["thinkingLevel"];
+  /** Show the task's labeled example plots before the figure (in-context examples). */
+  with_examples?: boolean;
 }
 
 /** Planner-less evaluations in flight, for /health. */
@@ -364,6 +366,7 @@ async function handleEvaluate(req: IncomingMessage, res: ServerResponse): Promis
       taskId: body.task_id,
       question: typeof body.question === "string" ? body.question : undefined,
       maxFigures: body.max_figures,
+      withExamples: body.with_examples === true,
       provider: body.model?.provider,
       modelName: body.model?.name,
       thinkingLevel: body.thinking_level,

@@ -186,6 +186,7 @@ export * from './downloadMetricsPdfParams';
 export * from './downloadMetricsPdfSelectionMode';
 export * from './downloadZipFileParams';
 export * from './evaluateCandidateGateRequest';
+export * from './evaluationExampleModel';
 export * from './evaluationFigureModel';
 export * from './evaluationInputModel';
 export * from './evaluationInputModelKnowledgeChars';

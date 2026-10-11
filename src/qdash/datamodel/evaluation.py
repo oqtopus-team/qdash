@@ -30,6 +30,15 @@ class EvaluationFigureModel(BaseModel):
     bytes: int = Field(..., description="Decoded image size in bytes")
 
 
+class EvaluationExampleModel(BaseModel):
+    """One labeled example shown before the figure, by identity and figure hashes."""
+
+    id: str = Field(default="", description="Example file stem in the knowledge repository")
+    title: str = Field(default="")
+    outcome: str = Field(default="", description="The example's labeled outcome")
+    figures: list[EvaluationFigureModel] = Field(default_factory=list)
+
+
 class EvaluationInputModel(BaseModel):
     """What the evaluation model was given."""
 
@@ -45,6 +54,10 @@ class EvaluationInputModel(BaseModel):
         default=None, description="SHA-256 of the host-supplied reference text"
     )
     figures: list[EvaluationFigureModel] = Field(default_factory=list)
+    examples: list[EvaluationExampleModel] = Field(
+        default_factory=list,
+        description="Labeled examples shown before the figure; empty for a zero-shot evaluation",
+    )
 
 
 class EvaluationOutputModel(BaseModel):

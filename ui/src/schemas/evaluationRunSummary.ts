@@ -27,6 +27,7 @@ export interface EvaluationRunSummary {
   question?: EvaluationRunSummaryQuestion;
   trigger: EvaluationRunSummaryTrigger;
   mode: EvaluationRunSummaryMode;
+  with_examples?: boolean;
   planner_model?: EvaluationRunSummaryPlannerModel;
   requested_by: string;
   requested_at: string;

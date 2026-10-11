@@ -15,6 +15,7 @@
 
 import { createHash } from "node:crypto";
 
+import type { LabeledExample } from "./knowledge-context.ts";
 import type { ExtensionPackage } from "./local-extensions.ts";
 
 /** The pi-qdash tool that turns a task result into evidence text plus its figure. */
@@ -31,6 +32,16 @@ export interface EvaluateRequest {
   question?: string;
   /** Figures of the task result to embed, newest first in pi-qdash's order (default 1). */
   maxFigures?: number;
+  /** Show the task's expert-labeled example plots before the figure (in-context examples). */
+  withExamples?: boolean;
+}
+
+/** One labeled example the model saw, by identity and figure hashes rather than bytes. */
+export interface ExampleRecord {
+  id: string;
+  title: string;
+  outcome: string;
+  figures: FigureRecord[];
 }
 
 /** How the evaluation was reached: the two tools run directly, or a planner turn. */
@@ -66,6 +77,8 @@ export interface EvaluateDeps {
   runTool(name: string, args: Record<string, unknown>): Promise<ToolRun>;
   /** QDash's review guide for a task, as the user; undefined when it has none. */
   fetchKnowledge(taskName: string): Promise<string | undefined>;
+  /** QDash's labeled examples for a task, as the user; empty when it has none. */
+  fetchExamples?(taskName: string): Promise<LabeledExample[]>;
   /** The package that provides the evaluation tool, for the record. */
   evaluator?: ExtensionPackage;
 }
@@ -101,6 +114,8 @@ export interface EvaluateResult {
   figures: FigureRecord[];
   /** The reference the host supplied, by size and hash; the prompt holds the text. */
   knowledge: { chars: number; sha256: string } | null;
+  /** The labeled examples shown before the figure; empty for a zero-shot evaluation. */
+  examples: ExampleRecord[];
   evaluation: {
     /** `provider/modelId` of the model that judged the plot. */
     model: string | null;
@@ -129,6 +144,7 @@ export interface HostRecord {
   task_name: string | null;
   figures: FigureRecord[];
   knowledge: { chars: number; sha256: string } | null;
+  examples?: ExampleRecord[];
   /** Wall time of the tool call, when the wrapper measured it. */
   duration_ms?: number;
   /** The task result the figures came from, when a tool fetched them. */
@@ -197,6 +213,7 @@ export function hostRecord(
   knowledge: string | undefined,
   durationMs?: number,
   taskId?: string,
+  examples?: LabeledExample[],
 ): HostRecord {
   const a = (args ?? {}) as {
     context?: unknown;
@@ -217,9 +234,15 @@ export function hostRecord(
     task_name: typeof a.task_name === "string" && a.task_name.trim() ? a.task_name : null,
     figures: images.map(figureRecord),
     knowledge: knowledge ? { chars: knowledge.length, sha256: sha256(knowledge) } : null,
+    ...(examples && examples.length > 0 ? { examples: examples.map(exampleRecord) } : {}),
     ...(durationMs === undefined ? {} : { duration_ms: durationMs }),
     ...(taskId ? { task_id: taskId } : {}),
   };
+}
+
+/** The record of one labeled example: identity and figure hashes. */
+export function exampleRecord(example: LabeledExample): ExampleRecord {
+  return { id: example.id, title: example.title, outcome: example.outcome, figures: example.images.map(figureRecord) };
 }
 
 /**
@@ -260,6 +283,7 @@ export function recordFromDetails(
     context: host.context ?? "",
     figures: host.figures ?? [],
     knowledge: host.knowledge ?? null,
+    examples: host.examples ?? [],
     evaluation: {
       model,
       fallback: d.fallback === true,
@@ -275,11 +299,16 @@ export function recordFromDetails(
 }
 
 /** The turn a planner is given to evaluate one task result the way the chat does. */
-export function plannerInstruction(taskId: string, question?: string): string {
+export function plannerInstruction(taskId: string, question?: string, withExamples = false): string {
   const lines = [
     `Evaluate QDash task result ${taskId} with pi-qcaleval.`,
     `First call ${EVIDENCE_TOOL} for it, then ${EVALUATION_TOOL} with task_name set to the task's name and that summary as context.`,
   ];
+  if (withExamples) {
+    lines.push(
+      `Pass use_examples: true to ${EVALUATION_TOOL}: the figure is to be judged against the task's labeled reference examples.`,
+    );
+  }
   if (question?.trim()) lines.push(`Pass this question to ${EVALUATION_TOOL}: ${question.trim()}`);
   lines.push("Report fit_quality and success, and say in one or two sentences whether you agree with the diagnosis.");
   return lines.join("\n");
@@ -369,12 +398,16 @@ export async function evaluateTask(
   const { taskName, target } = evidenceSummary(evidence.details);
 
   const knowledge = taskName ? await deps.fetchKnowledge(taskName) : undefined;
+  const examples =
+    request.withExamples && taskName && deps.fetchExamples ? await deps.fetchExamples(taskName) : [];
   const question = request.question?.trim();
   const args = {
     context,
     ...(question ? { question } : {}),
     ...(taskName ? { task_name: taskName } : {}),
     ...(knowledge ? { knowledge } : {}),
+    ...(request.withExamples ? { use_examples: true } : {}),
+    ...(examples.length > 0 ? { examples: examples.map(({ label, images }) => ({ label, images })) } : {}),
     images,
   };
   const started = Date.now();
@@ -385,7 +418,7 @@ export async function evaluateTask(
   }
   const details = {
     ...((evaluation.details ?? {}) as object),
-    host: hostRecord(args, knowledge, duration),
+    host: hostRecord(args, knowledge, duration, undefined, examples),
   };
   return recordFromDetails(taskId, details, {
     mode: "direct",

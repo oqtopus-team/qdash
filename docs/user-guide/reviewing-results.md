@@ -53,6 +53,11 @@ reference reaches the model every time. **Planner** lets the chat planner summar
 call the evaluation itself, as Ask AI does, and records what it did and answered. An optional
 question is passed to the evaluation model on top of the standard diagnosis.
 
+**Show labeled examples** adds the task's expert-labeled example plots from Knowledge before the
+figure, each followed by its diagnosis, the way the QCalEval papers evaluate in context. Off is
+zero-shot. The run records which examples were shown, so two runs of the same results, with and
+without examples, compare the two settings on the same ground truth.
+
 Open **AI Evaluations** to follow a run and read each evaluation: the diagnosis (fit quality,
 success, extracted parameters), which model and extension version judged, the exact text the model
 saw, and, in planner mode, the planner's tools and answer. Mark each evaluation **Agree** or

@@ -236,6 +236,11 @@ export function EvaluationCard({
                   : "no reference"}
               </span>
             )}
+            {input?.examples && input.examples.length > 0 && (
+              <span title={input.examples.map((e) => `${e.title} (${e.outcome})`).join("\n")}>
+                {input.examples.length} labeled example{input.examples.length === 1 ? "" : "s"}
+              </span>
+            )}
           </div>
 
           {item.status === "failed" && (

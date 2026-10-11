@@ -29,6 +29,8 @@ export interface CreateEvaluationRunRequest {
   question?: CreateEvaluationRunRequestQuestion;
   /** "bulk" from the chip page, "single" for one task result */
   trigger?: CreateEvaluationRunRequestTrigger;
+  /** Show the task's expert-labeled example plots before the figure (in-context examples) */
+  with_examples?: boolean;
   /** "direct" runs the evaluation tools; "planner" lets the chat planner call them */
   mode?: CreateEvaluationRunRequestMode;
 }

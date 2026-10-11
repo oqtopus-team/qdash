@@ -32,6 +32,11 @@ afterEach(() => {
 });
 
 describe("buildEvaluationRunRequest", () => {
+  it("asks for labeled examples only when the box is ticked", () => {
+    expect(buildEvaluationRunRequest(scope, "direct", "", true).with_examples).toBe(true);
+    expect("with_examples" in buildEvaluationRunRequest(scope, "direct", "")).toBe(false);
+  });
+
   it("carries scope, mode and a trimmed question; omits what is not set", () => {
     expect(buildEvaluationRunRequest(scope, "direct", "  ")).toEqual({
       chip_id: "64Qv3",

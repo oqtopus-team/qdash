@@ -31,11 +31,16 @@ import {
 import { hostRecord } from "./evaluate.ts";
 import {
   acceptsKnowledge,
+  fetchTaskExamples,
   fetchTaskKnowledge,
+  hasExamples,
   hasKnowledge,
   requestedTaskName,
+  wantsExamples,
+  withExamples,
   withKnowledge,
 } from "./knowledge-context.ts";
+import type { LabeledExample } from "./knowledge-context.ts";
 import { isTrustedExtension } from "./local-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 
@@ -222,6 +227,14 @@ export function adaptCodingAgentTool(
         }
         callArgs = withKnowledge(callArgs as object, knowledge);
       }
+      let examples: LabeledExample[] | undefined;
+      if (options.fillKnowledge && taskName && wantsExamples(args) && !hasExamples(args)) {
+        // The model only asks for examples; the figures and labels come from
+        // QDash's knowledge, never from the model's own call.
+        examples = await fetchTaskExamples(connection, taskName, context.abortSignal);
+        console.log(`[agent-runtime] ${tool.name}: ${examples.length} labeled example(s) for ${taskName}`);
+        callArgs = withExamples(callArgs as object, examples);
+      }
       const started = Date.now();
       const result = await runCodingAgentTool(
         tool,
@@ -245,6 +258,7 @@ export function adaptCodingAgentTool(
                 knowledge ?? ((callArgs as { knowledge?: unknown }).knowledge as string | undefined),
                 Date.now() - started,
                 figureTaskId,
+                examples,
               ),
             }
           : result.details;
