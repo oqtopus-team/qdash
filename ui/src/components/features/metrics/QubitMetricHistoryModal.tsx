@@ -22,13 +22,12 @@ import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
-import { TaskResultAiReviewNote } from "./TaskResultAiReviewNote";
-import { TaskResultIssues } from "./TaskResultIssues";
+import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "./TaskResultMemo";
 import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
-import type { AnalysisContext } from "@/types/copilotChat";
+import type { TaskChatContext } from "@/types/copilotChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 interface QubitMetricHistoryModalProps {
@@ -68,7 +67,7 @@ export function QubitMetricHistoryModal({
     type: "success" | "error";
     text: string;
   } | null>(null);
-  const { openMiniChat } = useAnalysisChatContext();
+  const { openMiniChat } = useChatDock();
   const queryClient = useQueryClient();
   const updateParamsMutation = useUpdateCalibrationParameters();
   const manualOverrides = useManualOverrides(qid);
@@ -186,8 +185,8 @@ export function QubitMetricHistoryModal({
     return selectedGroup.items[0] ?? null;
   }, [selectedGroup, selectedTask?.task_id]);
 
-  // Build analysis context for the AI chat panel
-  const analysisContext: AnalysisContext | null = useMemo(() => {
+  // The task result this chat is about
+  const chatContext: TaskChatContext | null = useMemo(() => {
     if (!selectedTask || !selectedExecutionId) return null;
     return {
       taskName: selectedTask.name || "",
@@ -558,9 +557,9 @@ export function QubitMetricHistoryModal({
               <GitBranch className="h-3 w-3" />
               View Provenance Lineage
             </Link>
-            {analysisContext && (
+            {chatContext && (
               <button
-                onClick={() => openMiniChat(analysisContext)}
+                onClick={() => openMiniChat(chatContext)}
                 className="btn btn-xs btn-primary gap-1"
               >
                 <Bot className="h-3 w-3" />
@@ -626,14 +625,11 @@ export function QubitMetricHistoryModal({
         </div>
       )}
 
-      {/* Notes (above issues) */}
-      {selectedTask?.task_id && (
-        <TaskResultAiReviewNote taskId={selectedTask.task_id} hideWhenEmpty />
-      )}
+      {/* Notes (above threads) */}
       {selectedTask?.task_id && <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} />}
 
-      {/* Issues */}
-      {selectedTask?.task_id && <TaskResultIssues taskId={selectedTask.task_id} />}
+      {/* Forum threads about this result */}
+      {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
     </div>
   );
 

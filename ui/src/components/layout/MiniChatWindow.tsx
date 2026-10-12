@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { GripHorizontal, Minus, PanelRight, SquarePen, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
 import { CHAT_PAGE_PATH, sessionToFollow } from "@/lib/followStreamingChat";
 import { ChatThread } from "@/components/features/chat/ChatThread";
@@ -102,7 +102,7 @@ const MARGIN = 16;
  * the sidebar, so expanding it keeps a streaming answer going.
  */
 export function MiniChatWindow() {
-  const { miniChat, closeMiniChat, openSidebar, openMiniChatForSession } = useAnalysisChatContext();
+  const { miniChat, closeMiniChat, openSidebar, openMiniChatForSession } = useChatDock();
   const { createNewSession, activeSession, activeSessionId, runs } = useCopilotChatSessionContext();
   const router = useRouter();
   const pathname = usePathname();

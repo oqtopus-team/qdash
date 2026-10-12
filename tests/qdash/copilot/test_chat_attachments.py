@@ -5,7 +5,7 @@ import base64
 import pytest
 from pydantic import ValidationError
 
-from qdash.copilot.contracts.models import AnalyzeRequest, ChatImageAttachment, ChatRequest
+from qdash.copilot.contracts.models import ChatImageAttachment, ChatRequest
 
 PNG = b"\x89PNG\r\n\x1a\n"
 JPEG = b"\xff\xd8\xff"
@@ -34,10 +34,8 @@ def test_rejects_oversized_single_image() -> None:
         ChatImageAttachment.model_validate({"data": data, "mimeType": "image/png"})
 
 
-@pytest.mark.parametrize("request_type", [ChatRequest, AnalyzeRequest])
-def test_total_budget_applies_to_both_chat_surfaces(
-    request_type: type[ChatRequest] | type[AnalyzeRequest],
-) -> None:
+def test_total_budget_applies_to_chat_requests() -> None:
+    request_type = ChatRequest
     """Individually valid images cannot exceed the aggregate runtime budget."""
     data = base64.b64encode(PNG + b"x" * (3 * 1024 * 1024 - len(PNG))).decode()
     image = {"data": data, "mimeType": "image/png"}

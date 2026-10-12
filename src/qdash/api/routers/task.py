@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import logging
-import math
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
 from qdash.api.dependencies import get_flow_service, get_task_file_service, get_task_service
@@ -23,78 +22,14 @@ from qdash.api.schemas.task import (
     TaskKnowledgeResponse,
     TaskResultResponse,
 )
-from qdash.api.schemas.task_file import TaskInfo
+from qdash.api.services.catalog_task_run import resolve_catalog_task, run_catalog_task
 from qdash.api.services.flow_service import FlowService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_service import TaskService
-from qdash.common.config.backend import (
-    get_available_backends,
-    get_default_backend,
-    is_task_available,
-)
-from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
 
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
-
-
-def _matches_parameter_type(value: object, value_type: object) -> bool:
-    """Return whether a JSON value matches a known task parameter type."""
-    if value_type == "int":
-        return isinstance(value, int) and not isinstance(value, bool)
-    if value_type == "float":
-        return (
-            isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-        )
-    if value_type == "bool":
-        return isinstance(value, bool)
-    if value_type == "list":
-        return isinstance(value, list)
-    if value_type in {"np.linspace", "np.logspace", "np.arange", "range"}:
-        return isinstance(value, list) and len(value) == 3
-    if value_type in {"str", "string"}:
-        return isinstance(value, str)
-    return True
-
-
-def _validate_quick_run_overrides(task: TaskInfo, body: QuickRunTaskRequest) -> None:
-    """Reject overrides that the selected task cannot apply."""
-    unknown_inputs = set(body.input_parameter_overrides) - set(task.input_parameters)
-    unknown_run_parameters = set(body.run_parameter_overrides) - set(task.run_parameters)
-    forbidden_inputs = {
-        name
-        for name in body.input_parameter_overrides
-        if task.input_parameters.get(name, {}).get("user_override") == "forbidden"
-    }
-    invalid_types = []
-    for kind, overrides, parameters in (
-        ("input", body.input_parameter_overrides, task.input_parameters),
-        ("run", body.run_parameter_overrides, task.run_parameters),
-    ):
-        for name, value in overrides.items():
-            metadata = parameters.get(name)
-            if metadata is not None and not _matches_parameter_type(
-                value, metadata.get("value_type")
-            ):
-                invalid_types.append(f"{kind}.{name} must be {metadata.get('value_type')}")
-
-    errors = []
-    if unknown_inputs:
-        errors.append(f"unknown input parameters: {', '.join(sorted(unknown_inputs))}")
-    if unknown_run_parameters:
-        errors.append(f"unknown run parameters: {', '.join(sorted(unknown_run_parameters))}")
-    if forbidden_inputs:
-        errors.append(
-            f"input parameters do not allow overrides: {', '.join(sorted(forbidden_inputs))}"
-        )
-    if invalid_types:
-        errors.append("invalid parameter types: " + ", ".join(sorted(invalid_types)))
-    if errors:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid parameter overrides: " + "; ".join(errors),
-        )
 
 
 @router.get(
@@ -143,32 +78,7 @@ async def quick_run_task(
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> ExecuteFlowResponse:
     """Execute one task without requiring a previous execution snapshot."""
-    backend_name = body.backend_name or get_default_backend()
-    if backend_name not in get_available_backends():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown backend: {backend_name}",
-        )
-    if not is_task_available(task_name, backend_name):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Task '{task_name}' is not enabled for backend '{backend_name}'",
-        )
-
-    task = next(
-        (
-            task
-            for task in task_file_service.list_task_info(backend_name, enabled_only=True).tasks
-            if task.name == task_name
-        ),
-        None,
-    )
-    if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Task metadata for '{task_name}' is not available in backend '{backend_name}'",
-        )
-    _validate_quick_run_overrides(task, body)
+    task, backend_name = resolve_catalog_task(task_file_service, task_name, body.backend_name)
 
     source = None
     if body.source_task_id:
@@ -182,43 +92,22 @@ async def quick_run_task(
                 status_code=400, detail="Source task does not match the task and target"
             )
 
-    readout_duration = (
-        body.run_parameter_overrides.get("readout_duration", DEFAULT_READOUT_DURATION)
-        if "readout_duration" in task.run_parameters
-        else None
-    )
-    default_run_parameters = (
-        {
-            "readout_duration": {
-                "value": readout_duration,
-                "value_type": "float",
-            }
-        }
-        if readout_duration is not None
-        else None
-    )
-
-    return await flow_service.execute_single_task_from_snapshot(
-        task_name=task_name,
-        qid=body.qid,
+    return await run_catalog_task(
+        flow_service=flow_service,
+        task=task,
+        backend_name=backend_name,
         chip_id=body.chip_id,
-        source_execution_id=None,
-        source_task_id=body.source_task_id,
-        tags=source.tags if source else None,
+        qid=body.qid,
         username=ctx.user.username,
         project_id=ctx.project_id,
-        backend_name=backend_name,
-        default_run_parameters=default_run_parameters,
-        parameter_overrides={"input": body.input_parameter_overrides},
-        task_run_parameters={
-            task_name: {
-                name: {"value": value} for name, value in body.run_parameter_overrides.items()
-            }
-        },
+        input_overrides=body.input_parameter_overrides,
+        run_overrides=body.run_parameter_overrides,
         persist_output_parameters=body.persist_output_parameters,
         update_params=body.update_params,
         reconfigure=body.reconfigure,
         execution_name=f"quick-run:{task_name}",
+        source_task_id=body.source_task_id,
+        tags=source.tags if source else None,
     )
 
 

@@ -10,6 +10,7 @@ import {
   latestImages,
   requestedImageCount,
   withImages,
+  latestFigures,
 } from "../src/figure-context.ts";
 
 test("the tool's max_images decides how many newest figures are supplied", () => {
@@ -64,13 +65,17 @@ test("malformed image blocks and non-array content are ignored", () => {
 // A real PNG header in base64 is longer than any placeholder a model invents.
 const REAL = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
-test("images are added only when the model passed none", () => {
+test("transcript figures replace whatever the model passed; its own bytes survive only without them", () => {
   const given = { context: "Rabi", images: [{ data: REAL, mimeType: "image/png" }] };
   assert.equal(hasImages(given), true);
   assert.equal(hasImages({ context: "Rabi", images: [] }), false);
   assert.equal(hasImages(null), false);
 
-  assert.equal(withImages(given, [image("transcript")]), given);
+  assert.deepEqual(withImages(given, [image("transcript")]), {
+    context: "Rabi",
+    images: [{ data: "transcript", mimeType: "image/png" }],
+  });
+  assert.equal(withImages(given, []), given);
   assert.deepEqual(withImages({ context: "Rabi" }, [image("transcript")]), {
     context: "Rabi",
     images: [{ data: "transcript", mimeType: "image/png" }],
@@ -94,4 +99,27 @@ test("placeholders the model invents for `images` are replaced or dropped", () =
     images: [{ data: "transcript", mimeType: "image/png" }],
   });
   assert.deepEqual(withImages(placeholders, []), { context: "Rabi" });
+});
+
+test("the newest figures remember the task result a tool fetched them for", () => {
+  const entries = [
+    { model: [{ role: "user", content: "evaluate it" }] },
+    {
+      model: [
+        {
+          role: "toolResult",
+          content: [{ type: "image", data: "png-bytes", mimeType: "image/png" }],
+          details: { tool: "qdash_build_qcal_evidence", taskId: "task-7" },
+        },
+      ],
+    },
+  ];
+  assert.deepEqual(latestFigures(entries), {
+    images: [{ type: "image", data: "png-bytes", mimeType: "image/png" }],
+    taskId: "task-7",
+  });
+  assert.deepEqual(latestFigures([{ model: [{ role: "user", content: [{ type: "image", data: "x", mimeType: "image/png" }] }] }]), {
+    images: [{ type: "image", data: "x", mimeType: "image/png" }],
+  });
+  assert.deepEqual(latestFigures([]), { images: [] });
 });

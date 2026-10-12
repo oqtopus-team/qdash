@@ -25,7 +25,10 @@ from qdash.api.schemas.task_result import (
     TimeSeriesData,
     TimeSeriesProjection,
 )
-from qdash.common.config.path_resolver import resolve_calib_data_path
+from qdash.common.config.path_resolver import (
+    PathOutsideCalibData,
+    resolve_served_calib_data_path,
+)
 from qdash.common.utils.datetime import (
     end_of_day,
     now,
@@ -482,8 +485,17 @@ class TaskResultService:
         if not paths:
             raise HTTPException(status_code=400, detail="No files provided")
 
-        resolved_paths = [(p, resolve_calib_data_path(p)) for p in paths]
-        missing = [p for p, resolved in resolved_paths if not resolved.exists()]
+        def contained(path: str) -> Path | None:
+            # Only calibration data can be archived; anything else counts as missing.
+            try:
+                return resolve_served_calib_data_path(path)
+            except PathOutsideCalibData:
+                return None
+
+        resolved_paths = [(p, contained(p)) for p in paths]
+        missing = [
+            p for p, resolved in resolved_paths if resolved is None or not resolved.is_file()
+        ]
         if missing:
             detail = f"Files not found: {', '.join(missing[:5])}"
             if len(missing) > 5:
@@ -501,6 +513,7 @@ class TaskResultService:
         try:
             with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
                 for _, path in resolved_paths:
+                    assert path is not None  # missing paths were rejected above
                     zf.write(path, path.name)
         except Exception:
             archive_path.unlink(missing_ok=True)

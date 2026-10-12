@@ -1028,3 +1028,112 @@ def test_upload_forum_image_rejects_unsupported_content_type(test_client, init_d
 
     assert upload.status_code == 400
     assert "Unsupported image type" in upload.json()["detail"]
+
+
+def _create_task_result(task_id: str, qid: str = "12", chip_id: str = "chip-1") -> None:
+    from datetime import UTC, datetime
+
+    from qdash.datamodel.note import NoteModel
+    from qdash.datamodel.system_info import SystemInfoModel
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+    TaskResultHistoryDocument(
+        project_id="test_project",
+        username="owner",
+        task_id=task_id,
+        name="CheckT1",
+        upstream_id="",
+        status="completed",
+        message="",
+        input_parameters={},
+        output_parameters={},
+        output_parameter_names=[],
+        note={},
+        user_note=NoteModel(),
+        figure_path=[],
+        json_figure_path=[],
+        raw_data_path=[],
+        start_at=datetime(2026, 1, 1, tzinfo=UTC),
+        end_at=datetime(2026, 1, 1, tzinfo=UTC),
+        elapsed_time=1.0,
+        task_type="qubit",
+        system_info=SystemInfoModel(),
+        qid=qid,
+        execution_id="exec-1",
+        tags=[],
+        chip_id=chip_id,
+    ).insert()
+
+
+def test_forum_thread_about_a_task_result(test_client, init_db):
+    """A thread may be about one task result: linked, filterable, inherited by replies."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+    _create_task_result("task-1", qid="4-6")
+
+    body = {
+        "category": "qubit",
+        "title": "ZX90 fidelity looks off",
+        "content": "The interleaved curve decays too fast.",
+        "parent_id": None,
+        "task_id": "task-1",
+    }
+    created = test_client.post("/forum/posts", headers=headers, json=body)
+    assert created.status_code == 201, created.text
+    root = created.json()
+    assert root["task_id"] == "task-1"
+    assert root["task_result"]["task_name"] == "CheckT1"
+    # Chip and target come from the task result when not given.
+    assert (root["chip_id"], root["target_type"], root["target_id"]) == (
+        "chip-1",
+        "coupling",
+        "4-6",
+    )
+
+    reply = _create_post(test_client, headers, title=None, content="Agreed", parent_id=root["id"])
+    assert reply.status_code == 201, reply.text
+    assert reply.json()["task_id"] == "task-1"
+
+    listed = test_client.get("/forum/posts", headers=headers, params={"task_id": "task-1"})
+    assert [post["id"] for post in listed.json()["posts"]] == [root["id"]]
+    # Listings and the thread carry the result's summary, so the forum shows its state.
+    summary = listed.json()["posts"][0]["task_result"]
+    assert (summary["task_name"], summary["qid"], summary["status"]) == (
+        "CheckT1",
+        "4-6",
+        "completed",
+    )
+    fetched = test_client.get(f"/forum/posts/{root['id']}", headers=headers).json()
+    assert fetched["task_result"]["task_id"] == "task-1"
+    assert (
+        test_client.get("/forum/posts", headers=headers, params={"task_id": "other"}).json()[
+            "posts"
+        ]
+        == []
+    )
+
+    # A closed thread about the result still shows up with status=all.
+    closed = test_client.patch(f"/forum/posts/{root['id']}/close", headers=headers)
+    assert closed.status_code == 200, closed.text
+    assert (
+        test_client.get("/forum/posts", headers=headers, params={"task_id": "task-1"}).json()[
+            "posts"
+        ]
+        == []
+    )
+    everything = test_client.get(
+        "/forum/posts", headers=headers, params={"task_id": "task-1", "status": "all"}
+    ).json()["posts"]
+    assert [post["id"] for post in everything] == [root["id"]]
+
+    unknown = test_client.post("/forum/posts", headers=headers, json={**body, "task_id": "nope"})
+    assert unknown.status_code == 404
+
+    explicit = test_client.post(
+        "/forum/posts",
+        headers=headers,
+        json={**body, "chip_id": "chip-9", "target_type": "qubit", "target_id": "0"},
+    )
+    assert explicit.status_code == 201, explicit.text
+    assert (explicit.json()["chip_id"], explicit.json()["target_id"]) == ("chip-9", "0")

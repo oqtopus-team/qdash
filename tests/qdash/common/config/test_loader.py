@@ -75,14 +75,14 @@ def test_load_copilot_reads_copilot_config_yaml(monkeypatch, tmp_path):
     ConfigLoader.clear_cache()
 
 
-def test_load_copilot_merges_chat_and_review_yaml(monkeypatch, tmp_path):
+def test_load_copilot_merges_chat_and_evaluation_yaml(monkeypatch, tmp_path):
     _write_yaml(tmp_path / "copilot" / "config.yaml", "enabled: true\n")
     _write_yaml(
         tmp_path / "copilot" / "chat.yaml",
         "chat_models:\n  - provider: openai\n    name: gpt-5.4\n",
     )
     _write_yaml(
-        tmp_path / "copilot" / "review.yaml",
+        tmp_path / "copilot" / "evaluation.yaml",
         "analysis:\n  max_expected_images: 2\n",
     )
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)

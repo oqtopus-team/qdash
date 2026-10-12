@@ -13,6 +13,7 @@ import type { ForumPostCreateParentId } from './forumPostCreateParentId';
 import type { ForumPostCreateStatus } from './forumPostCreateStatus';
 import type { ForumPostCreateTargetId } from './forumPostCreateTargetId';
 import type { ForumPostCreateTargetType } from './forumPostCreateTargetType';
+import type { ForumPostCreateTaskId } from './forumPostCreateTaskId';
 import type { ForumPostCreateTitle } from './forumPostCreateTitle';
 
 /**
@@ -55,4 +56,6 @@ export interface ForumPostCreate {
   target_id?: ForumPostCreateTargetId;
   /** Linked cool-down ID */
   cooldown_id?: ForumPostCreateCooldownId;
+  /** Task result this thread is about. Chip and target are filled from it when not given. */
+  task_id?: ForumPostCreateTaskId;
 }

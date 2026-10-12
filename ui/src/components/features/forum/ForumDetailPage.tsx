@@ -14,6 +14,7 @@ import {
   Tag,
   Trash2,
   UserRound,
+  ClipboardList,
 } from "lucide-react";
 
 import { useListChips } from "@/client/chip/chip";
@@ -257,6 +258,7 @@ function PostBody({
           content={post.content}
           contentBlocks={post.content_blocks}
           markdownClassName="text-sm text-base-content/80"
+          aboutTaskId={post.parent_id ? null : post.task_id}
         />
       )}
     </div>
@@ -719,7 +721,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               </div>
             ) : (
               <h1 className="min-w-0 flex-1 truncate text-xl font-bold">
-                {post.title || "Untitled topic"}
+                {post.title || "Untitled thread"}
               </h1>
             )}
             {canManageMetadata && !editingTitle && (
@@ -907,6 +909,20 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <Crosshair className="h-3.5 w-3.5" />
               Target
             </div>
+            {post.task_id && (
+              <Link
+                href={`/task-results/${encodeURIComponent(post.task_id)}`}
+                className="btn btn-outline btn-sm w-full justify-start gap-2 rounded-md normal-case"
+                title={post.task_id}
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                <span className="min-w-0 truncate">
+                  {post.task_result
+                    ? `${post.task_result.task_name} · Q${post.task_result.qid} · ${post.task_result.status}`
+                    : `Task result ${post.task_id.slice(0, 8)}`}
+                </span>
+              </Link>
+            )}
             {targetContext && (
               <Link
                 href={dashboardTargetHref(targetContext)}
@@ -1020,7 +1036,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                         className="block rounded-md border border-base-300 px-2 py-1.5 text-xs hover:border-primary/50"
                       >
                         <div className="truncate font-medium">
-                          {formatForumPostNumber(thread.number)} {thread.title || "Untitled topic"}
+                          {formatForumPostNumber(thread.number)} {thread.title || "Untitled thread"}
                         </div>
                         <div className="mt-0.5 text-base-content/55">
                           {getForumStatus(thread.status).label}

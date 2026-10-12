@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useGetCopilotPreferences } from "@/client/copilot/copilot";
 import { ArrowDown, FlaskConical } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +17,7 @@ import {
   LiveAssistantMessage,
   UserMessage,
 } from "@/components/features/chat/ChatMessages";
-import type { AnalysisContext } from "@/types/copilotChat";
+import type { TaskChatContext } from "@/types/copilotChat";
 
 /**
  * - page: the /chat page, roomy, greeting centered with the composer
@@ -26,7 +27,7 @@ import type { AnalysisContext } from "@/types/copilotChat";
 type ChatThreadVariant = "page" | "panel" | "compact";
 
 /** "CheckT1 · Q00" badge for chats about one result. */
-export function ContextChip({ context }: { context: AnalysisContext }) {
+export function ContextChip({ context }: { context: TaskChatContext }) {
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium max-w-full"
@@ -69,7 +70,7 @@ function EmptyState({
   onPick,
 }: {
   variant: ChatThreadVariant;
-  context: AnalysisContext | null;
+  context: TaskChatContext | null;
   suggestions: ChatSuggestion[];
   onPick: (text: string) => void;
 }) {
@@ -174,6 +175,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     liveTurn,
     statusMessage,
     model,
+    thinking,
     send,
     decide,
     stop,
@@ -183,6 +185,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
     editMessage,
     rateAnswer,
   } = useCopilotChat(sessionId);
+  const { data: preferences } = useGetCopilotPreferences({ query: { staleTime: 60_000 } });
   const [input, setInput] = useState("");
   const { attachments, attach, remove, clear, isStaging, notice, isPending } = useChatAttachments(
     session?.id,
@@ -249,6 +252,10 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       modelOptions={model.options}
       selectedModelKey={model.selected.key}
       onModelChange={model.select}
+      thinkingChoice={thinking.choice}
+      thinkingModelDefault={thinking.modelDefault}
+      onThinkingChange={thinking.select}
+      instructionsActive={Boolean(preferences?.data.instructions)}
       compact={variant !== "page"}
     />
   );

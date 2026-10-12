@@ -32,7 +32,7 @@ QDash supports six levels of notes, all sharing the same `NoteModel` schema (`co
 - Edit **Chip note** above Target Summaries to record chip-level context for the selected cool-down or time range.
 - Click any qubit cell or coupling chip on a metric → opens the metric history modal.
   - The side panel shows / lets you edit the **pinned target summary** for the selected cool-down or time range.
-  - The body of the modal includes a **Note** section (above issues) for the **task result** currently selected.
+  - The body of the modal includes a **Note** section (above forum threads) for the **task result** currently selected.
 - Cells with an existing note show a sticky-note icon. A faint outlined icon indicates a note exists on **another** metric for the same qubit.
 - Hovering a cell reveals a tooltip listing **all notes on that target across metrics**, plus the value and unit.
 

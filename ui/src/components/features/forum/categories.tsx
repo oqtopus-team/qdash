@@ -90,7 +90,7 @@ export function formatForumPostTitle(
   number: number | null | undefined,
 ): string {
   const displayNumber = formatForumPostNumber(number);
-  const displayTitle = title || "Untitled topic";
+  const displayTitle = title || "Untitled thread";
   return displayNumber ? `${displayNumber} · ${displayTitle}` : displayTitle;
 }
 

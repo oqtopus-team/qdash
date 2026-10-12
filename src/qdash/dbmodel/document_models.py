@@ -17,6 +17,8 @@ from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 from qdash.dbmodel.cryostat import CryostatDocument
+from qdash.dbmodel.evaluation import EvaluationDocument
+from qdash.dbmodel.evaluation_run import EvaluationRunDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
@@ -27,8 +29,6 @@ from qdash.dbmodel.forum import (
     ForumLabelDocument,
     ForumPostDocument,
 )
-from qdash.dbmodel.issue import IssueDocument
-from qdash.dbmodel.issue_knowledge import IssueKnowledgeDocument
 from qdash.dbmodel.metric_note import MetricNoteDocument
 from qdash.dbmodel.note_event import NoteEventDocument
 from qdash.dbmodel.notification import NotificationDocument
@@ -80,10 +80,10 @@ def document_models() -> list[Any]:
         ForumPostDocument,
         ForumCounterDocument,
         ForumLabelDocument,
-        IssueDocument,
-        IssueKnowledgeDocument,
         MetricNoteDocument,
         TargetNoteDocument,
+        EvaluationRunDocument,
+        EvaluationDocument,
         NoteEventDocument,
         NotificationDocument,
         CryostatDocument,

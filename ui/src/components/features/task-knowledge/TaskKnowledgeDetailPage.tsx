@@ -1,31 +1,57 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Image as ImageIcon } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { ArrowLeft, FileCode2, GitCompareArrows, Pencil } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getListTaskKnowledgeQueryKey } from "@/client/task/task";
+import {
+  GitWorkspaceToolbar,
+  PullRequestBanner,
+} from "@/components/features/files/GitWorkspaceToolbar";
+import { useGitWorkspace } from "@/components/features/files/useGitWorkspace";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FileDiffReviewDialog } from "@/components/ui/FileDiffReviewDialog";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
+import { useToast } from "@/components/ui/Toast";
+import { useProject } from "@/contexts/ProjectContext";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
+import { KNOWLEDGE_WORKSPACE, knowledgeIndexPath, workspaceQueryKeys } from "@/lib/fileWorkspace";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
-type KnowledgeImage = {
-  alt_text: string;
-  relative_path: string;
+type KnowledgeFigure = {
+  alt: string;
+  path: string;
   base64_data?: string;
+  mime_type?: string;
 };
 
-type KnowledgeCase = {
+type KnowledgeExample = {
+  id: string;
   title: string;
   date?: string;
-  severity?: string;
-  human_review_decision?: string;
-  boundary_criteria?: string;
-  lesson_learned?: string[];
-  images?: KnowledgeImage[];
+  chip?: string;
+  qid?: string;
+  outcome: string;
+  fit_quality?: string;
+  verdict?: string;
+  source?: string;
+  figures?: KnowledgeFigure[];
+  diagnosis?: string;
 };
 
 type TaskKnowledgeDetail = {
-  review_markdown?: string;
-  review_images?: KnowledgeImage[];
-  cases?: KnowledgeCase[];
+  category?: string;
+  examples?: KnowledgeExample[];
+};
+
+const OUTCOME_BADGE: Record<string, string> = {
+  expected: "badge-success",
+  suboptimal: "badge-warning",
+  anomalous: "badge-error",
+  apparatus: "badge-neutral",
 };
 
 function useTaskKnowledgeMarkdown(taskName: string) {
@@ -50,10 +76,146 @@ function useTaskKnowledgeDetail(taskName: string) {
   });
 }
 
+/**
+ * Editor of the task's ``index.md`` in the knowledge repository. Saving applies
+ * the change to this QDash at once; the git toolbar turns it into a PR.
+ */
+function KnowledgeIndexEditor({
+  taskName,
+  path,
+  onClose,
+}: {
+  taskName: string;
+  path: string;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [draft, setDraft] = useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+
+  const { data: file, isLoading } = useQuery({
+    queryKey: workspaceQueryKeys.content(KNOWLEDGE_WORKSPACE, path),
+    queryFn: () => KNOWLEDGE_WORKSPACE.getContent(path),
+  });
+  useEffect(() => {
+    if (file && draft === null) setDraft(file.content);
+  }, [file, draft]);
+
+  const saveMutation = useMutation({
+    mutationFn: (content: string) => KNOWLEDGE_WORKSPACE.saveContent(path, content),
+    onSuccess: () => {
+      toast.success(`Saved ${taskName}; it is in effect here. Create a PR to share it.`);
+      queryClient.invalidateQueries({ queryKey: ["task-knowledge-markdown", taskName] });
+      queryClient.invalidateQueries({ queryKey: ["task-knowledge-detail", taskName] });
+      queryClient.invalidateQueries({ queryKey: getListTaskKnowledgeQueryKey() });
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.content(KNOWLEDGE_WORKSPACE, path),
+      });
+      queryClient.invalidateQueries({
+        queryKey: workspaceQueryKeys.gitStatus(KNOWLEDGE_WORKSPACE),
+      });
+      setDraft(null);
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to save: ${getApiErrorMessage(error, "Unknown error")}`);
+    },
+  });
+
+  const dirty = file !== undefined && draft !== null && draft !== file.content;
+  const requestClose = () => (dirty ? setDiscardOpen(true) : onClose());
+
+  if (isLoading || draft === null) {
+    return (
+      <div className="flex justify-center py-8">
+        <span className="loading loading-spinner loading-md"></span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-base-300 bg-base-100 p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">Edit knowledge</div>
+          <div className="truncate font-mono text-xs text-base-content/50">{path}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost gap-1"
+            onClick={() => setReviewOpen(true)}
+            disabled={!file?.is_saved_change || dirty}
+            title={
+              dirty ? "Save before reviewing" : "Review the saved changes against the last commit"
+            }
+          >
+            <GitCompareArrows size={16} />
+            Review
+          </button>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={requestClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            onClick={() => saveMutation.mutate(draft)}
+            disabled={!dirty || saveMutation.isPending}
+          >
+            {saveMutation.isPending ? (
+              <span className="loading loading-spinner loading-xs"></span>
+            ) : (
+              "Save"
+            )}
+          </button>
+        </div>
+      </div>
+      <p className="mb-3 text-xs text-base-content/60">
+        The first heading is the task name. Relative image paths resolve after saving; add images
+        with the file browser.
+      </p>
+      <MarkdownEditor
+        value={draft}
+        onChange={setDraft}
+        rows={28}
+        placeholder="Task knowledge in Markdown"
+        disabled={saveMutation.isPending}
+      />
+      {file && (
+        <FileDiffReviewDialog
+          filename={path}
+          newContent={file.content}
+          oldContent={file.base_content}
+          onClose={() => setReviewOpen(false)}
+          open={reviewOpen}
+        />
+      )}
+      <ConfirmDialog
+        open={discardOpen}
+        title="Discard unsaved changes?"
+        description="Your edits to this task's knowledge will be lost."
+        confirmLabel="Discard"
+        onConfirm={() => {
+          setDiscardOpen(false);
+          onClose();
+        }}
+        onOpenChange={setDiscardOpen}
+        destructive
+      />
+    </div>
+  );
+}
+
 export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
   const router = useRouter();
+  const { canEdit } = useProject();
+  const [editing, setEditing] = useState(false);
   const { data: markdown, isLoading: markdownLoading, error } = useTaskKnowledgeMarkdown(taskName);
   const { data: detail, isLoading: detailLoading } = useTaskKnowledgeDetail(taskName);
+  const git = useGitWorkspace(KNOWLEDGE_WORKSPACE);
+  const indexPath = detail?.category ? knowledgeIndexPath(detail.category, taskName) : null;
 
   if (markdownLoading || detailLoading) {
     return (
@@ -67,7 +229,7 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
     return (
       <div className="p-6">
         <button
-          onClick={() => router.push("/task-knowledge")}
+          onClick={() => router.push("/knowledge")}
           className="btn btn-ghost btn-sm gap-1 mb-4"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -82,122 +244,119 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <button
-          onClick={() => router.push("/task-knowledge")}
+          onClick={() => router.push("/knowledge")}
           className="btn btn-ghost btn-sm btn-square"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <h1 className="text-xl font-bold font-mono">{taskName}</h1>
+        {canEdit && indexPath && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Link
+              href={`${KNOWLEDGE_WORKSPACE.editorPath}?path=${encodeURIComponent(indexPath)}`}
+              className="btn btn-sm btn-ghost gap-1"
+              title="Open this task's folder in the file browser (examples, figures)"
+            >
+              <FileCode2 size={16} />
+              Files
+            </Link>
+            <button
+              type="button"
+              className={`btn btn-sm gap-1 ${editing ? "btn-warning" : "btn-outline"}`}
+              onClick={() => setEditing(true)}
+              disabled={editing}
+            >
+              <Pencil size={16} />
+              Edit
+            </button>
+            <GitWorkspaceToolbar
+              status={git.status}
+              onPull={git.pull}
+              onPush={() => git.push(`Update knowledge for ${taskName}`)}
+              isPulling={git.isPulling}
+              isPushing={git.isPushing}
+              pushTitle="Create a pull request with the saved knowledge changes"
+            />
+          </div>
+        )}
       </div>
-      <MarkdownContent content={markdown} />
-
-      {detail?.review_markdown?.trim() && (
-        <section className="mt-10">
-          <div className="mb-3">
-            <h2 className="text-lg font-semibold">Review Guide</h2>
-            <p className="text-sm text-base-content/60">
-              Operational guidance for reviewing results of this task.
-            </p>
-          </div>
-          <div className="rounded-xl border border-base-300 bg-base-100 p-5">
-            <MarkdownContent content={detail.review_markdown} />
-          </div>
-        </section>
+      <PullRequestBanner pr={git.prResult} onDismiss={git.dismissPr} />
+      {editing && indexPath ? (
+        <KnowledgeIndexEditor
+          taskName={taskName}
+          path={indexPath}
+          onClose={() => setEditing(false)}
+        />
+      ) : (
+        <MarkdownContent content={markdown} />
       )}
 
-      {(detail?.cases?.length ?? 0) > 0 && (
+      {(detail?.examples?.length ?? 0) > 0 && (
         <section className="mt-10">
           <div className="mb-3">
-            <h2 className="text-lg font-semibold">Cases</h2>
+            <h2 className="text-lg font-semibold">Labeled examples</h2>
             <p className="text-sm text-base-content/60">
-              Operational cases and counterexamples linked to this task.
+              Plots with the diagnosis an expert validated. The evaluation model sees them as
+              demonstrations.
             </p>
           </div>
           <div className="space-y-4">
-            {detail?.cases?.map((knowledgeCase) => (
+            {detail?.examples?.map((example) => (
               <article
-                key={`${knowledgeCase.title}-${knowledgeCase.date ?? ""}`}
+                key={example.id}
                 className="rounded-xl border border-base-300 bg-base-100 p-5"
               >
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <h3 className="text-base font-semibold">{knowledgeCase.title}</h3>
-                  {knowledgeCase.severity && (
-                    <span className="badge badge-outline badge-sm">{knowledgeCase.severity}</span>
+                  <h3 className="text-base font-semibold">{example.title}</h3>
+                  <span
+                    className={`badge badge-sm ${OUTCOME_BADGE[example.outcome] ?? "badge-ghost"}`}
+                  >
+                    {example.outcome}
+                  </span>
+                  {example.fit_quality && (
+                    <span className="badge badge-outline badge-sm">fit {example.fit_quality}</span>
                   )}
-                  {knowledgeCase.date && (
-                    <span className="text-xs text-base-content/50">{knowledgeCase.date}</span>
+                  {example.verdict && (
+                    <span className="badge badge-outline badge-sm">{example.verdict}</span>
+                  )}
+                  {(example.chip || example.qid) && (
+                    <span className="text-xs text-base-content/50">
+                      {[example.chip, example.qid && `Q${example.qid}`].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                  {example.date && (
+                    <span className="text-xs text-base-content/50">{example.date}</span>
                   )}
                 </div>
-
-                {knowledgeCase.human_review_decision && (
-                  <div className="mb-3">
-                    <div className="text-xs font-medium uppercase tracking-wide text-base-content/50 mb-1">
-                      Human Review Decision
-                    </div>
-                    <p className="text-sm text-base-content/80">
-                      {knowledgeCase.human_review_decision}
-                    </p>
+                {(example.figures?.length ?? 0) > 0 && (
+                  <div className="grid gap-3 md:grid-cols-2 mb-3">
+                    {example.figures?.map((figure) => (
+                      <figure
+                        key={figure.path}
+                        className="rounded-lg border border-base-300 bg-base-200/40 p-3"
+                      >
+                        {figure.base64_data ? (
+                          /* eslint-disable-next-line @next/next/no-img-element -- knowledge figures are API-provided base64 assets */
+                          <img
+                            src={`data:${figure.mime_type || "image/png"};base64,${figure.base64_data}`}
+                            alt={figure.alt}
+                            className="w-full h-auto rounded"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center rounded border border-dashed border-base-300 bg-base-100 px-3 py-8 text-sm text-base-content/50">
+                            Figure unavailable
+                          </div>
+                        )}
+                        <figcaption className="mt-2 text-xs text-base-content/60">
+                          {figure.alt || figure.path}
+                        </figcaption>
+                      </figure>
+                    ))}
                   </div>
                 )}
-
-                {knowledgeCase.boundary_criteria && (
-                  <div className="mb-3">
-                    <div className="text-xs font-medium uppercase tracking-wide text-base-content/50 mb-1">
-                      Boundary Criteria
-                    </div>
-                    <p className="text-sm text-base-content/80">
-                      {knowledgeCase.boundary_criteria}
-                    </p>
-                  </div>
-                )}
-
-                {(knowledgeCase.lesson_learned?.length ?? 0) > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs font-medium uppercase tracking-wide text-base-content/50 mb-1">
-                      Lessons
-                    </div>
-                    <ul className="list-disc pl-5 text-sm text-base-content/80 space-y-1">
-                      {knowledgeCase.lesson_learned?.map((lesson) => (
-                        <li key={lesson}>{lesson}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {(knowledgeCase.images?.length ?? 0) > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-base-content/50 mb-2">
-                      <ImageIcon className="h-3.5 w-3.5" />
-                      Case Figures
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {knowledgeCase.images?.map((image) => (
-                        <figure
-                          key={`${knowledgeCase.title}-${image.relative_path}`}
-                          className="rounded-lg border border-base-300 bg-base-200/40 p-3"
-                        >
-                          {image.base64_data ? (
-                            /* eslint-disable-next-line @next/next/no-img-element -- task knowledge images are API-provided base64 assets */
-                            <img
-                              src={`data:image/png;base64,${image.base64_data}`}
-                              alt={image.alt_text}
-                              className="w-full h-auto rounded"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-center rounded border border-dashed border-base-300 bg-base-100 px-3 py-8 text-sm text-base-content/50">
-                              Image asset unavailable
-                            </div>
-                          )}
-                          <figcaption className="mt-2 text-xs text-base-content/60">
-                            {image.alt_text}
-                          </figcaption>
-                        </figure>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {example.diagnosis && <MarkdownContent content={example.diagnosis} />}
               </article>
             ))}
           </div>

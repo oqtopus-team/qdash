@@ -43,11 +43,15 @@ target_id?: string | null;
  */
 cooldown_id?: string | null;
 /**
+ * Only threads about this task result
+ */
+task_id?: string | null;
+/**
  * Filter by project-scoped forum thread number
  */
 number?: number | null;
 /**
- * Filter by workflow status. Default open. Use null/omit at the client layer for all.
+ * Filter by workflow status. Default open; 'all' lists every status.
  */
 status?: string | null;
 /**
