@@ -13,7 +13,7 @@
         "yaml": "^2.8.0",
       },
       "devDependencies": {
-        "@oqtopus-team/pi-qdash": "0.1.10-beta.15",
+        "@oqtopus-team/pi-qdash": "0.1.11-beta.19",
         "@types/node": "^22.0.0",
         "typescript": "^5.8.0",
       },
@@ -134,9 +134,9 @@
 
     "@google/genai": ["@google/genai@2.21.0", "", { "dependencies": { "google-auth-library": "^10.3.0", "p-retry": "^4.6.2", "protobufjs": "^7.5.4", "ws": "^8.18.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.2" }, "optionalPeers": ["@modelcontextprotocol/sdk"] }, "sha512-+PDtco2/Z0ONdzCGekCoCT+O1VJS9xJQNN4XzQpXG/t3El/SWWMkCWlFRO1KmivOHPa4Q0VjUYu1HBKCZ/v33Q=="],
 
-    "@oqtopus-team/pi-qdash": ["@oqtopus-team/pi-qdash@0.1.10-beta.15", "", { "dependencies": { "@oqtopus-team/qdash-client": "1.9.21-beta.171" }, "peerDependencies": { "@earendil-works/pi-coding-agent": "*", "typebox": "*" } }, "sha512-RPf+Gc58AW2PlU7uSozv258YFGi+tO9BYaHCesACzH/eirc/Xwt2q/1vuTliItF8/XfJoVnmTaiDg3pvc4OIYg=="],
+    "@oqtopus-team/pi-qdash": ["@oqtopus-team/pi-qdash@0.1.11-beta.19", "", { "dependencies": { "@oqtopus-team/qdash-client": "1.9.21-beta.203" }, "peerDependencies": { "@earendil-works/pi-coding-agent": "*", "typebox": "*" } }, "sha512-pHCc22vboqzop9ipMrKUIKokk4qeWKx0nOpG6oHed0oBwF7n89fY2+X0ytkbq73O58Dt535DLy3alUZSG6muyg=="],
 
-    "@oqtopus-team/qdash-client": ["@oqtopus-team/qdash-client@1.9.21-beta.171", "", { "dependencies": { "axios": "^1.11.0", "ini": "^6.0.0" } }, "sha512-EH/C1/9PBVgNDcubkAiPgY3Dbf5bpXVyy4+0wU/uRk1RHT2LHckl8UckteyGn7pamjC4yy+wIjiIQkO7bQMozw=="],
+    "@oqtopus-team/qdash-client": ["@oqtopus-team/qdash-client@1.9.21-beta.203", "", { "dependencies": { "axios": "^1.11.0", "ini": "^6.0.0" } }, "sha512-q0mc82DywecgAc4Y4lfZF1gjC9MaSaxrhi+6VRpe3DK8a9U/ZWOiTGvHQszn+LoGzAWlzRv476IXFI2siqRhVQ=="],
 
     "@protobufjs/aspromise": ["@protobufjs/aspromise@1.1.2", "", {}, "sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ=="],
 
