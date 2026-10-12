@@ -105,7 +105,15 @@ class ListAgentActionsResponse(BaseModel):
 class ExecuteAgentActionRequest(BaseModel):
     """Dispatch one authorized run-task action as a staged measurement."""
 
-    source_execution_id: str = Field(min_length=1, max_length=200)
+    source_execution_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=(
+            "Execution the action was decided from, kept for provenance. The run reads the "
+            "current calibration state, as a Task Workbench run does."
+        ),
+    )
     update_params: bool = False
     reconfigure: bool = False
 

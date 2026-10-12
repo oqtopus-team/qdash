@@ -19672,10 +19672,18 @@
       "ExecuteAgentActionRequest": {
         "properties": {
           "source_execution_id": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Source Execution Id"
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Execution Id",
+            "description": "Execution the action was decided from, kept for provenance. The run reads the current calibration state, as a Task Workbench run does."
           },
           "update_params": {
             "type": "boolean",
@@ -19689,9 +19697,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "source_execution_id"
-        ],
         "title": "ExecuteAgentActionRequest",
         "description": "Dispatch one authorized run-task action as a staged measurement."
       },
