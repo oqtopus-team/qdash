@@ -2240,6 +2240,11 @@
         "summary": "Download file",
         "description": "Download a raw data file from the server.\n\nParameters\n----------\npath : str\n    Absolute file path to the file to download\n\nReturns\n-------\nFileResponse\n    The file as a downloadable response",
         "operationId": "downloadFile",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "path",
@@ -2276,6 +2281,11 @@
         "summary": "Download file or directory as zip",
         "description": "Download a file or directory as a ZIP archive.\n\nParameters\n----------\npath : str\n    Absolute path to the file or directory to archive\n\nReturns\n-------\nFileResponse\n    ZIP archive as a downloadable response",
         "operationId": "downloadZipFile",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "path",
@@ -2326,7 +2336,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/config/files/content": {
@@ -2336,6 +2351,11 @@
         ],
         "summary": "Get config file content for editing",
         "operationId": "getFileContent",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "path",
@@ -2461,7 +2481,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/config/files/git/status": {
@@ -2484,7 +2509,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/config/files/git/pull": {
