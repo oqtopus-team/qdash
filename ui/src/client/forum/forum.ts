@@ -450,7 +450,7 @@ export function useListForumLabels<TData = Awaited<ReturnType<typeof listForumLa
 
 
 /**
- * Create a forum label. Only project owners can manage labels.
+ * Create a forum label. Only project owners can manage labels; the key is server-generated.
  * @summary Create a forum label
  */
 export const createForumLabel = (

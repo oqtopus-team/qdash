@@ -1,5 +1,7 @@
 """Tests for forum router endpoints."""
 
+import re
+
 from qdash.api.services import forum_service
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
@@ -212,7 +214,7 @@ def test_owner_can_create_update_and_delete_forum_label(test_client, init_db):
     duplicate = test_client.post(
         "/forum/labels",
         headers=headers,
-        json={"key": "hardware", "name": "Hardware again", "color": "#111111"},
+        json={"name": "hardware", "color": "#111111"},
     )
     assert duplicate.status_code == 409
 
@@ -230,6 +232,59 @@ def test_owner_can_create_update_and_delete_forum_label(test_client, init_db):
 
     listed = test_client.get("/forum/labels", headers=headers)
     assert "hardware" not in {item["key"] for item in listed.json()["labels"]}
+
+
+def test_create_forum_label_with_japanese_only_name_gets_random_key(test_client, init_db):
+    """A name with no usable ASCII characters falls back to a random ``label-`` key."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = test_client.post(
+        "/forum/labels",
+        headers=headers,
+        json={"name": "異常", "color": "#123456"},
+    )
+
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["name"] == "異常"
+    assert re.fullmatch(r"label-[a-z0-9]{6}", body["key"])
+
+
+def test_create_forum_label_ignores_client_supplied_key(test_client, init_db):
+    """A ``key`` sent in the request body is ignored; it is always derived from the name."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = test_client.post(
+        "/forum/labels",
+        headers=headers,
+        json={"key": "totally-custom", "name": "Firmware", "color": "#123456"},
+    )
+
+    assert created.status_code == 201, created.text
+    assert created.json()["key"] == "firmware"
+
+
+def test_create_forum_label_slug_collision_gets_numeric_suffix(test_client, init_db):
+    """A name whose slug collides with an existing label's key gets a ``-2`` suffix."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    first = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Bug?", "color": "#111111"}
+    )
+    assert first.status_code == 201, first.text
+    assert first.json()["key"] == "bug"
+
+    second = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Bug!", "color": "#222222"}
+    )
+    assert second.status_code == 201, second.text
+    assert second.json()["key"] == "bug-2"
 
 
 def test_editor_and_viewer_cannot_create_forum_label(test_client, init_db):

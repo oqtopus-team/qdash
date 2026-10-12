@@ -1,5 +1,6 @@
 "use client";
 
+import Axios from "axios";
 import {
   Activity,
   CalendarCheck2,
@@ -15,6 +16,14 @@ import {
 } from "lucide-react";
 
 import type { ForumCategoryResponse, ForumLabelResponse } from "@/schemas";
+
+/** Returns a friendlier message for a forum label API error (e.g. a 409 duplicate name), falling back to the given default. */
+export function getForumLabelErrorMessage(error: unknown, fallback: string): string {
+  if (Axios.isAxiosError(error) && error.response?.status === 409) {
+    return "A label with this name already exists";
+  }
+  return fallback;
+}
 
 /** Neutral fallback color for labels that no longer exist in the project. */
 export const NEUTRAL_FORUM_LABEL_COLOR = "#6b7280";

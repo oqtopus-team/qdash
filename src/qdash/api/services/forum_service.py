@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import re
+import secrets
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
@@ -611,13 +612,33 @@ class ForumService:
         )
 
     @staticmethod
-    def _make_label_key(name: str) -> str:
-        """Create a stable label key from a display name."""
-        key = re.sub(r"[^a-z0-9_-]+", "-", name.strip().lower())
-        key = re.sub(r"-+", "-", key).strip("-_")
-        if not key:
-            raise HTTPException(status_code=422, detail="Label key is required")
-        return key[:32]
+    def _make_label_key(name: str, existing_keys: set[str]) -> str:
+        """Create a stable, project-unique label key from a display name.
+
+        Slugifies the name; when nothing usable remains (e.g. a Japanese-only
+        name), falls back to a random ``label-xxxxxx`` key. Either way, a
+        collision with *existing_keys* is resolved with a ``-2``, ``-3``, ...
+        suffix (or a fresh random key) rather than failing the request.
+        """
+        base = re.sub(r"[^a-z0-9_-]+", "-", name.strip().lower())
+        base = re.sub(r"-+", "-", base).strip("-_")[:32]
+
+        if not base:
+            for _ in range(20):
+                candidate = f"label-{secrets.token_hex(3)}"
+                if candidate not in existing_keys:
+                    return candidate
+            raise HTTPException(status_code=500, detail="Failed to generate a label key")
+
+        if base not in existing_keys:
+            return base
+
+        for suffix in range(2, 1000):
+            suffix_text = f"-{suffix}"
+            candidate = f"{base[: 32 - len(suffix_text)]}{suffix_text}"
+            if candidate not in existing_keys and LABEL_KEY_RE.match(candidate):
+                return candidate
+        raise HTTPException(status_code=500, detail="Failed to generate a unique label key")
 
     def _ensure_default_labels(self, project_id: str) -> None:
         """Create the default labels for a project when none exist."""
@@ -676,16 +697,18 @@ class ForumService:
         self,
         *,
         project_id: str,
-        key: str | None,
         name: str,
         description: str,
         color: str,
     ) -> ForumLabelResponse:
-        """Create a forum label."""
+        """Create a forum label; the key is always generated from the name, never from a client."""
         self._ensure_default_labels(project_id)
-        label_key = key or self._make_label_key(name)
-        if not LABEL_KEY_RE.match(label_key):
-            raise HTTPException(status_code=422, detail="Invalid label key")
+        existing = ForumLabelDocument.find({"project_id": project_id}).to_list()
+        normalized_name = name.strip().lower()
+        if any(doc.name.strip().lower() == normalized_name for doc in existing):
+            raise HTTPException(status_code=409, detail="Forum label already exists")
+
+        label_key = self._make_label_key(name, {doc.key for doc in existing})
 
         doc = ForumLabelDocument(
             project_id=project_id,

@@ -292,7 +292,6 @@ export * from './forumCategoryUpdateName';
 export * from './forumCategoryUpdateSortOrder';
 export * from './forumImageUploadResponse';
 export * from './forumLabelCreate';
-export * from './forumLabelCreateKey';
 export * from './forumLabelResponse';
 export * from './forumLabelUpdate';
 export * from './forumLabelUpdateColor';

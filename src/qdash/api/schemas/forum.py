@@ -12,7 +12,6 @@ FORUM_CATEGORY_COLOR_PATTERN = (
 FORUM_CATEGORY_ICON_PATTERN = r"^[a-z0-9][a-z0-9-]{0,63}$"
 FORUM_TARGET_TYPE_PATTERN = r"^(qubit|coupling)$"
 FORUM_THREAD_STATUS_PATTERN = r"^(open|investigating|identified|resolved)$"
-FORUM_LABEL_KEY_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,31}$"
 FORUM_LABEL_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
 ForumThreadStatus = Literal["open", "investigating", "identified", "resolved"]
 
@@ -92,13 +91,6 @@ class ListForumCategoriesResponse(BaseModel):
 class ForumLabelCreate(BaseModel):
     """Request schema for creating a forum label."""
 
-    key: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=32,
-        pattern=FORUM_LABEL_KEY_PATTERN,
-        description="Stable label key. Generated from name when omitted.",
-    )
     name: str = Field(..., min_length=1, max_length=80, description="Display name")
     description: str = Field(default="", max_length=200, description="Short description")
     color: str = Field(..., pattern=FORUM_LABEL_COLOR_PATTERN, description="Display hex color")

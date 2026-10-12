@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   getListForumLabelsQueryKey,
@@ -12,16 +13,57 @@ import {
   useUpdateForumLabel,
 } from "@/client/forum/forum";
 
-import { NEUTRAL_FORUM_LABEL_COLOR, type ForumLabelDefinition } from "./categories";
-import { ForumLabelBadge } from "./ForumLabelBadge";
+import {
+  getForumLabelErrorMessage,
+  NEUTRAL_FORUM_LABEL_COLOR,
+  type ForumLabelDefinition,
+} from "./categories";
+import { ForumLabelBadge, getReadableTextColor } from "./ForumLabelBadge";
+
+type ForumLabelColorInputProps = {
+  value: string;
+  onChange: (value: string) => void;
+  size?: "xs" | "sm";
+  className?: string;
+};
+
+/** Color picker whose whole field is filled with the selected color, with the hex value overlaid for contrast. */
+function ForumLabelColorInput({
+  value,
+  onChange,
+  size = "sm",
+  className = "",
+}: ForumLabelColorInputProps) {
+  const sizeClass = size === "xs" ? "input-xs h-7" : "input-sm h-9";
+  return (
+    <label
+      className={`input input-bordered relative flex items-center justify-center overflow-hidden px-1 ${sizeClass} ${className}`}
+      style={{ backgroundColor: value }}
+    >
+      <span
+        className="pointer-events-none select-none truncate font-mono text-xs"
+        style={{ color: getReadableTextColor(value) }}
+      >
+        {value}
+      </span>
+      <input
+        type="color"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="absolute inset-0 cursor-pointer opacity-0"
+        aria-label="Label color"
+      />
+    </label>
+  );
+}
 
 type ForumLabelManagerProps = {
   labels: ForumLabelDefinition[];
 };
 
+/** Owner-only CRUD panel for forum labels: create, edit, and delete (system labels are protected). */
 export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
   const queryClient = useQueryClient();
-  const [labelKey, setLabelKey] = useState("");
   const [labelName, setLabelName] = useState("");
   const [labelDescription, setLabelDescription] = useState("");
   const [labelColor, setLabelColor] = useState(NEUTRAL_FORUM_LABEL_COLOR);
@@ -42,19 +84,21 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
   const submitLabel = async () => {
     const trimmedName = labelName.trim();
     if (!trimmedName) return;
-    await createMutation.mutateAsync({
-      data: {
-        key: labelKey.trim() || null,
-        name: trimmedName,
-        description: labelDescription.trim() || undefined,
-        color: labelColor,
-      },
-    });
-    setLabelKey("");
-    setLabelName("");
-    setLabelDescription("");
-    setLabelColor(NEUTRAL_FORUM_LABEL_COLOR);
-    invalidateLabels();
+    try {
+      await createMutation.mutateAsync({
+        data: {
+          name: trimmedName,
+          description: labelDescription.trim() || undefined,
+          color: labelColor,
+        },
+      });
+      setLabelName("");
+      setLabelDescription("");
+      setLabelColor(NEUTRAL_FORUM_LABEL_COLOR);
+      invalidateLabels();
+    } catch (error) {
+      toast.error(getForumLabelErrorMessage(error, "Failed to create label"));
+    }
   };
 
   const startEdit = (label: ForumLabelDefinition) => {
@@ -72,21 +116,33 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
     if (!editingKey) return;
     const trimmedName = editName.trim();
     if (!trimmedName) return;
-    await updateMutation.mutateAsync({
-      labelKey: editingKey,
-      data: {
-        name: trimmedName,
-        description: editDescription.trim(),
-        color: editColor,
-      },
-    });
-    setEditingKey(null);
-    invalidateLabels();
+    try {
+      await updateMutation.mutateAsync({
+        labelKey: editingKey,
+        data: {
+          name: trimmedName,
+          description: editDescription.trim(),
+          color: editColor,
+        },
+      });
+      setEditingKey(null);
+      invalidateLabels();
+    } catch (error) {
+      toast.error(getForumLabelErrorMessage(error, "Failed to update label"));
+    }
   };
 
   const removeLabel = (label: ForumLabelDefinition) => {
     if (label.isSystem) return;
-    deleteMutation.mutate({ labelKey: label.id }, { onSuccess: () => invalidateLabels() });
+    deleteMutation.mutate(
+      { labelKey: label.id },
+      {
+        onSuccess: () => invalidateLabels(),
+        onError: (error) => {
+          toast.error(getForumLabelErrorMessage(error, "Failed to delete label"));
+        },
+      },
+    );
   };
 
   return (
@@ -98,13 +154,7 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
             System labels are managed automatically and cannot be deleted.
           </span>
         </div>
-        <div className="mb-4 grid gap-2 sm:grid-cols-[130px_150px_1fr_72px_80px]">
-          <input
-            className="input input-bordered input-sm"
-            value={labelKey}
-            onChange={(event) => setLabelKey(event.target.value)}
-            placeholder="key (optional)"
-          />
+        <div className="mb-4 grid gap-2 sm:grid-cols-[150px_1fr_96px_80px]">
           <input
             className="input input-bordered input-sm"
             value={labelName}
@@ -117,13 +167,7 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
             onChange={(event) => setLabelDescription(event.target.value)}
             placeholder="Description"
           />
-          <input
-            type="color"
-            className="input input-bordered input-sm h-9 w-full p-1"
-            value={labelColor}
-            onChange={(event) => setLabelColor(event.target.value)}
-            aria-label="Label color"
-          />
+          <ForumLabelColorInput value={labelColor} onChange={setLabelColor} className="w-full" />
           <button
             className="btn btn-primary btn-sm"
             onClick={submitLabel}
@@ -143,12 +187,11 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
                 {isEditing ? (
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        className="input input-bordered input-xs h-7 w-10 p-0.5"
+                      <ForumLabelColorInput
                         value={editColor}
-                        onChange={(event) => setEditColor(event.target.value)}
-                        aria-label="Label color"
+                        onChange={setEditColor}
+                        size="xs"
+                        className="w-24"
                       />
                       <input
                         className="input input-bordered input-xs min-w-0 flex-1"

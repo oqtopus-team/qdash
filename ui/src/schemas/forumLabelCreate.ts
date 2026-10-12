@@ -5,14 +5,11 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ForumLabelCreateKey } from './forumLabelCreateKey';
 
 /**
  * Request schema for creating a forum label.
  */
 export interface ForumLabelCreate {
-  /** Stable label key. Generated from name when omitted. */
-  key?: ForumLabelCreateKey;
   /**
      * Display name
      * @minLength 1

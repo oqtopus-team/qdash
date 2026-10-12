@@ -3140,7 +3140,7 @@ const listForumLabels = (
     }
 
 /**
- * Create a forum label. Only project owners can manage labels.
+ * Create a forum label. Only project owners can manage labels; the key is server-generated.
  * @summary Create a forum label
  */
 const createForumLabel = (

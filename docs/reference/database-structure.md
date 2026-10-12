@@ -1113,7 +1113,8 @@ Collection: `forum_label`
 ```python
 class ForumLabelDocument(Document):
     project_id: str
-    key: str              # Stable label key, e.g. "review" or "task-result"
+    key: str              # Stable label key, e.g. "review" or "task-result".
+                           # Server-generated from name; never set by the client.
     name: str              # Display name
     description: str = ""
     color: str             # Lowercase hex color, e.g. "#3b82f6"

@@ -156,10 +156,9 @@ def create_forum_label(
     ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> ForumLabelResponse:
-    """Create a forum label. Only project owners can manage labels."""
+    """Create a forum label. Only project owners can manage labels; the key is server-generated."""
     return service.create_label(
         project_id=ctx.project_id,
-        key=body.key,
         name=body.name,
         description=body.description,
         color=body.color,

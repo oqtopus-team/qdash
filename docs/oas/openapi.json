@@ -8916,7 +8916,7 @@
           "forum"
         ],
         "summary": "Create a forum label",
-        "description": "Create a forum label. Only project owners can manage labels.",
+        "description": "Create a forum label. Only project owners can manage labels; the key is server-generated.",
         "operationId": "createForumLabel",
         "security": [
           {
@@ -21201,21 +21201,6 @@
       },
       "ForumLabelCreate": {
         "properties": {
-          "key": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 32,
-                "minLength": 1,
-                "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Key",
-            "description": "Stable label key. Generated from name when omitted."
-          },
           "name": {
             "type": "string",
             "maxLength": 80,
