@@ -5,8 +5,8 @@ import { useMemo, useState } from "react";
 import { MessageSquare, StickyNote } from "lucide-react";
 
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
-import { getForumLabel, type ForumLabelDefinition } from "../forum/categories";
-import { getReadableTextColor } from "../forum/ForumLabelBadge";
+import type { ForumLabelDefinition } from "../forum/categories";
+import { getForumMarkerStyle } from "../forum/ForumLabelBadge";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 
 import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
@@ -203,9 +203,7 @@ export function DashboardQubitGrid({
         const hasTargetNote = targetNotedQids?.has(qid) ?? false;
         const forumLabel = forumLinkedQids?.[qid];
         const hasForumDiscussion = !!forumLabel;
-        const forumMarkerColor = forumLabel
-          ? getForumLabel(forumLabel, forumLabels).color
-          : undefined;
+        const forumMarkerStyle = getForumMarkerStyle(forumLabel, forumLabels);
         const hasCrossMetricNote =
           !hasNote && !hasTargetNote && (crossMetricNotedQids?.has(qid) ?? false);
         const handleClick = () => onQubitClick?.(qid);
@@ -279,10 +277,7 @@ export function DashboardQubitGrid({
             {hasForumDiscussion && (
               <span
                 className="absolute bottom-1 right-1 rounded-full p-0.5 shadow"
-                style={{
-                  backgroundColor: forumMarkerColor,
-                  color: getReadableTextColor(forumMarkerColor ?? "#6b7280"),
-                }}
+                style={forumMarkerStyle}
                 title="Linked forum discussion"
               >
                 <MessageSquare className="h-3 w-3" />

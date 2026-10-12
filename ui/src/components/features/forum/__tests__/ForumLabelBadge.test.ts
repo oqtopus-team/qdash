@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { getReadableTextColor } from "../ForumLabelBadge";
+import type { ForumLabelDefinition } from "../categories";
+import { getForumMarkerStyle, getReadableTextColor } from "../ForumLabelBadge";
 
 describe("getReadableTextColor", () => {
   it("picks dark text for a light background", () => {
@@ -41,5 +42,44 @@ describe("getReadableTextColor", () => {
 
   it("trims surrounding whitespace before validating", () => {
     expect(getReadableTextColor(" #ffffff ")).toBe("#111827");
+  });
+});
+
+describe("getForumMarkerStyle", () => {
+  const labels: ForumLabelDefinition[] = [
+    {
+      id: "anomaly",
+      label: "Anomaly",
+      description: "Unexpected behavior",
+      color: "#f59e0b",
+      isSystem: true,
+    },
+  ];
+
+  it("returns undefined when no label key is linked", () => {
+    expect(getForumMarkerStyle(undefined, labels)).toBeUndefined();
+    expect(getForumMarkerStyle(null, labels)).toBeUndefined();
+    expect(getForumMarkerStyle("", labels)).toBeUndefined();
+  });
+
+  it("resolves the background color and a readable text color for a known label", () => {
+    expect(getForumMarkerStyle("anomaly", labels)).toEqual({
+      backgroundColor: "#f59e0b",
+      color: getReadableTextColor("#f59e0b"),
+    });
+  });
+
+  it("falls back to the neutral color for an unknown label key", () => {
+    expect(getForumMarkerStyle("deprecated", labels)).toEqual({
+      backgroundColor: "#6b7280",
+      color: getReadableTextColor("#6b7280"),
+    });
+  });
+
+  it("defaults to an empty label list when none is provided", () => {
+    expect(getForumMarkerStyle("deprecated")).toEqual({
+      backgroundColor: "#6b7280",
+      color: getReadableTextColor("#6b7280"),
+    });
   });
 });

@@ -163,7 +163,11 @@ export function ForumLabelPicker({
     <div className="flex min-w-0 flex-wrap items-center gap-2">
       <DropdownMenu
         onOpenChange={(open) => {
-          if (!open) setQuery("");
+          if (open) {
+            requestAnimationFrame(() => searchInputRef.current?.focus());
+          } else {
+            setQuery("");
+          }
         }}
       >
         <DropdownMenuTrigger asChild>

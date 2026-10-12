@@ -46,7 +46,7 @@ export interface ForumPostResponse {
   content_blocks?: ForumPostResponseContentBlocksItem[];
   /** Parent forum post ID */
   parent_id?: ForumPostResponseParentId;
-  /** Operator label for root threads */
+  /** Operator labels for root threads (up to 10) */
   labels?: string[];
   /** Assigned project member username */
   assignee_username?: ForumPostResponseAssigneeUsername;

@@ -5,8 +5,8 @@ import { useMemo, useState } from "react";
 import { MessageSquare, StickyNote } from "lucide-react";
 
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
-import { getForumLabel, type ForumLabelDefinition } from "../forum/categories";
-import { getReadableTextColor } from "../forum/ForumLabelBadge";
+import type { ForumLabelDefinition } from "../forum/categories";
+import { getForumMarkerStyle } from "../forum/ForumLabelBadge";
 import { getQubitGridPosition } from "@/lib/utils/grid-position";
 
 import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
@@ -251,9 +251,7 @@ export function DashboardCouplingGrid({
           const hasTargetNote = targetNotedTargets?.has(couplingId) ?? false;
           const forumLabel = forumLinkedTargets?.[couplingId];
           const hasForumDiscussion = !!forumLabel;
-          const forumMarkerColor = forumLabel
-            ? getForumLabel(forumLabel, forumLabels).color
-            : undefined;
+          const forumMarkerStyle = getForumMarkerStyle(forumLabel, forumLabels);
           const hasCrossMetricNote =
             !hasNote && !hasTargetNote && (crossMetricNotedTargets?.has(couplingId) ?? false);
           const Tag = onCouplingClick ? "button" : "div";
@@ -371,10 +369,7 @@ export function DashboardCouplingGrid({
                   className={`absolute rounded-full p-0.5 shadow ${
                     isSummaryPresentation ? "-bottom-2 -right-2" : "-bottom-1 -right-1"
                   }`}
-                  style={{
-                    backgroundColor: forumMarkerColor,
-                    color: getReadableTextColor(forumMarkerColor ?? "#6b7280"),
-                  }}
+                  style={forumMarkerStyle}
                   title="Linked forum discussion"
                 >
                   <MessageSquare className="h-2.5 w-2.5" />

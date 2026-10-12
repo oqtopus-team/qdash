@@ -21374,7 +21374,7 @@
             "type": "array",
             "maxItems": 10,
             "title": "Labels",
-            "description": "Operator label for root threads"
+            "description": "Operator labels for root threads (up to 10)"
           },
           "assignee_username": {
             "anyOf": [
@@ -21578,7 +21578,7 @@
             },
             "type": "array",
             "title": "Labels",
-            "description": "Operator label for root threads"
+            "description": "Operator labels for root threads (up to 10)"
           },
           "assignee_username": {
             "anyOf": [
@@ -21779,7 +21779,7 @@
               }
             ],
             "title": "Labels",
-            "description": "Updated operator label for root threads"
+            "description": "Updated operator labels for root threads (up to 10)"
           },
           "assignee_username": {
             "anyOf": [

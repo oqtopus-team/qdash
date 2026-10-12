@@ -1,6 +1,8 @@
 "use client";
 
-import type { ForumLabelDefinition } from "./categories";
+import type { CSSProperties } from "react";
+
+import { getForumLabel, NEUTRAL_FORUM_LABEL_COLOR, type ForumLabelDefinition } from "./categories";
 
 /** Picks readable black/white text for a given hex background color (YIQ heuristic). */
 export function getReadableTextColor(hex: string): string {
@@ -18,6 +20,16 @@ export function getReadableTextColor(hex: string): string {
   const b = Number.parseInt(expanded.slice(4, 6), 16);
   const yiq = (r * 299 + g * 587 + b * 114) / 1000;
   return yiq >= 128 ? "#111827" : "#ffffff";
+}
+
+/** Resolves the background/readable-text style for a forum discussion marker, or undefined when no label is linked. */
+export function getForumMarkerStyle(
+  labelKey: string | null | undefined,
+  labels: ForumLabelDefinition[] = [],
+): CSSProperties | undefined {
+  if (!labelKey) return undefined;
+  const color = getForumLabel(labelKey, labels).color ?? NEUTRAL_FORUM_LABEL_COLOR;
+  return { backgroundColor: color, color: getReadableTextColor(color) };
 }
 
 type ForumLabelBadgeProps = {

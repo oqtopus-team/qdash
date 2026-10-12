@@ -666,6 +666,13 @@ class ForumService:
         with contextlib.suppress(DuplicateKeyError):
             ForumLabelDocument(project_id=project_id, **spec).insert()
 
+    def _with_task_result_label(self, project_id: str, labels: list[str]) -> list[str]:
+        """Ensure the task-result label exists and append it to labels if absent."""
+        if TASK_RESULT_LABEL_KEY in labels:
+            return list(labels)
+        self._ensure_task_result_label(project_id)
+        return [*labels, TASK_RESULT_LABEL_KEY]
+
     def _normalize_forum_labels(self, project_id: str, labels: list[str] | None) -> list[str]:
         """Normalize user-provided labels and require each to exist for the project."""
         normalized = _dedupe_forum_label_keys(labels)
@@ -989,16 +996,14 @@ class ForumService:
         if root_doc is not None:
             post_labels = list(root_doc.labels)
             if has_task_result_link and TASK_RESULT_LABEL_KEY not in post_labels:
-                self._ensure_task_result_label(project_id)
-                root_doc.labels = [*root_doc.labels, TASK_RESULT_LABEL_KEY]
+                root_doc.labels = self._with_task_result_label(project_id, root_doc.labels)
                 root_doc.system_info.update_time()
                 root_doc.save()
                 post_labels = list(root_doc.labels)
         else:
             post_labels = self._normalize_forum_labels(project_id, labels)
             if has_task_result_link and TASK_RESULT_LABEL_KEY not in post_labels:
-                self._ensure_task_result_label(project_id)
-                post_labels.append(TASK_RESULT_LABEL_KEY)
+                post_labels = self._with_task_result_label(project_id, post_labels)
 
         doc = ForumPostDocument(
             project_id=project_id,
@@ -1307,8 +1312,7 @@ class ForumService:
                 ).run()
             )
             if root_target is not None and TASK_RESULT_LABEL_KEY not in root_target.labels:
-                self._ensure_task_result_label(project_id)
-                root_target.labels = [*root_target.labels, TASK_RESULT_LABEL_KEY]
+                root_target.labels = self._with_task_result_label(project_id, root_target.labels)
                 if root_target is not doc:
                     root_target.system_info.update_time()
                     root_target.save()
