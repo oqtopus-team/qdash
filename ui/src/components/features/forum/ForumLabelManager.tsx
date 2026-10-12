@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -18,7 +18,7 @@ import {
   NEUTRAL_FORUM_LABEL_COLOR,
   type ForumLabelDefinition,
 } from "./categories";
-import { ForumLabelBadge, getReadableTextColor } from "./ForumLabelBadge";
+import { ForumLabelBadge } from "./ForumLabelBadge";
 
 type ForumLabelColorInputProps = {
   value: string;
@@ -27,7 +27,7 @@ type ForumLabelColorInputProps = {
   className?: string;
 };
 
-/** Color picker whose whole field is filled with the selected color, with the hex value overlaid for contrast. */
+/** Color picker whose whole field is filled with the selected color. */
 function ForumLabelColorInput({
   value,
   onChange,
@@ -37,15 +37,9 @@ function ForumLabelColorInput({
   const sizeClass = size === "xs" ? "input-xs h-7" : "input-sm h-9";
   return (
     <label
-      className={`input input-bordered relative flex items-center justify-center overflow-hidden px-1 ${sizeClass} ${className}`}
+      className={`input input-bordered relative overflow-hidden ${sizeClass} ${className}`}
       style={{ backgroundColor: value }}
     >
-      <span
-        className="pointer-events-none select-none truncate font-mono text-xs"
-        style={{ color: getReadableTextColor(value) }}
-      >
-        {value}
-      </span>
       <input
         type="color"
         value={value}
@@ -191,7 +185,7 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
                         value={editColor}
                         onChange={setEditColor}
                         size="xs"
-                        className="w-24"
+                        className="w-12"
                       />
                       <input
                         className="input input-bordered input-xs min-w-0 flex-1"
@@ -220,12 +214,7 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
                   </div>
                 ) : (
                   <>
-                    <button
-                      type="button"
-                      className="min-w-0 flex-1 text-left"
-                      onClick={() => startEdit(item)}
-                      title="Edit label"
-                    >
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <ForumLabelBadge label={item} />
                         {item.isSystem && (
@@ -237,15 +226,26 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
                           {item.description}
                         </p>
                       )}
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-xs text-error"
-                      onClick={() => removeLabel(item)}
-                      disabled={item.isSystem || deleteMutation.isPending}
-                      title={item.isSystem ? "System labels cannot be deleted" : "Delete label"}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </div>
+                    <div className="flex shrink-0 items-center">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        onClick={() => startEdit(item)}
+                        title="Edit label"
+                        aria-label="Edit label"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-xs text-error"
+                        onClick={() => removeLabel(item)}
+                        disabled={item.isSystem || deleteMutation.isPending}
+                        title={item.isSystem ? "System labels cannot be deleted" : "Delete label"}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
