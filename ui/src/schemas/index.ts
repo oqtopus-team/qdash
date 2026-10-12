@@ -234,6 +234,7 @@ export * from './evaluationVerdictModelNote';
 export * from './evaluatorModel';
 export * from './evaluatorModelCommit';
 export * from './executeAgentActionRequest';
+export * from './executeAgentActionRequestSourceExecutionId';
 export * from './executeFlowRequest';
 export * from './executeFlowRequestParameters';
 export * from './executeFlowResponse';
