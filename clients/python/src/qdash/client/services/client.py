@@ -814,19 +814,22 @@ class QDashClient:
         session_id: str,
         action_id: str,
         *,
-        source_execution_id: str,
+        source_execution_id: str | None = None,
         update_params: bool = False,
         reconfigure: bool = False,
     ) -> AgentActionResponse:
-        """Dispatch one authorized agent action to the system workflow."""
+        """Dispatch one authorized agent action to the system workflow.
+
+        The task runs like a Task Workbench run, on the current calibration
+        state. ``source_execution_id`` only records what the action was decided from.
+        """
+        body: dict[str, Any] = {"update_params": update_params, "reconfigure": reconfigure}
+        if source_execution_id is not None:
+            body["source_execution_id"] = source_execution_id
         response = self._request(
             "POST",
             f"/agent-sessions/{session_id}/actions/{action_id}/execute",
-            json={
-                "source_execution_id": source_execution_id,
-                "update_params": update_params,
-                "reconfigure": reconfigure,
-            },
+            json=body,
         )
         return self._validate_model_payload(AgentActionResponse, response.data)
 

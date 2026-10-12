@@ -137,6 +137,28 @@ describe("QDashClient", () => {
     });
   });
 
+  it("sends an agent action's source execution only as provenance", async () => {
+    const bodies: unknown[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(await new Request(input, init).json());
+      return jsonResponse({ action_id: "action-1" });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    await client.executeAgentAction("session-1", "action-1");
+    await client.executeAgentAction("session-1", "action-1", { sourceExecutionId: "exec-1" });
+
+    expect(bodies[0]).toEqual({ update_params: false, reconfigure: false });
+    expect(bodies[1]).toEqual({
+      source_execution_id: "exec-1",
+      update_params: false,
+      reconfigure: false,
+    });
+  });
+
   it("downloads execution figures as binary files", async () => {
     let request: Request | undefined;
     const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
