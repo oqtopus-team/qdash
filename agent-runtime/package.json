@@ -17,7 +17,7 @@
     "yaml": "^2.8.0"
   },
   "devDependencies": {
-    "@oqtopus-team/pi-qdash": "0.1.10-beta.15",
+    "@oqtopus-team/pi-qdash": "0.1.11-beta.19",
     "@types/node": "^22.0.0",
     "typescript": "^5.8.0"
   },
