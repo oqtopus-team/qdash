@@ -28,6 +28,7 @@ import type {
   FileTreeNode,
   GetKnowledgeFileContent200,
   GetKnowledgeFileContentParams,
+  GetKnowledgeFileImageParams,
   GetKnowledgeGitStatus200,
   GitPullKnowledge200,
   GitPushKnowledge200,
@@ -311,6 +312,100 @@ export const useSaveKnowledgeFileContent = <TError = HTTPValidationError,
       return useMutation(getSaveKnowledgeFileContentMutationOptions(options), queryClient);
     }
     /**
+ * @summary Get an image from the knowledge directory
+ */
+export const getKnowledgeFileImage = (
+    params: GetKnowledgeFileImageParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<Blob>(
+      {url: `/knowledge/files/image`, method: 'GET',
+        params,
+        responseType: 'blob', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetKnowledgeFileImageQueryKey = (params?: GetKnowledgeFileImageParams,) => {
+    return [
+    `/knowledge/files/image`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetKnowledgeFileImageQueryOptions = <TData = Awaited<ReturnType<typeof getKnowledgeFileImage>>, TError = HTTPValidationError>(params: GetKnowledgeFileImageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getKnowledgeFileImage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetKnowledgeFileImageQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getKnowledgeFileImage>>> = ({ signal }) => getKnowledgeFileImage(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getKnowledgeFileImage>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetKnowledgeFileImageQueryResult = NonNullable<Awaited<ReturnType<typeof getKnowledgeFileImage>>>
+export type GetKnowledgeFileImageQueryError = HTTPValidationError
+
+
+export function useGetKnowledgeFileImage<TData = Awaited<ReturnType<typeof getKnowledgeFileImage>>, TError = HTTPValidationError>(
+ params: GetKnowledgeFileImageParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getKnowledgeFileImage>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getKnowledgeFileImage>>,
+          TError,
+          Awaited<ReturnType<typeof getKnowledgeFileImage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetKnowledgeFileImage<TData = Awaited<ReturnType<typeof getKnowledgeFileImage>>, TError = HTTPValidationError>(
+ params: GetKnowledgeFileImageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getKnowledgeFileImage>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getKnowledgeFileImage>>,
+          TError,
+          Awaited<ReturnType<typeof getKnowledgeFileImage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetKnowledgeFileImage<TData = Awaited<ReturnType<typeof getKnowledgeFileImage>>, TError = HTTPValidationError>(
+ params: GetKnowledgeFileImageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getKnowledgeFileImage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get an image from the knowledge directory
+ */
+
+export function useGetKnowledgeFileImage<TData = Awaited<ReturnType<typeof getKnowledgeFileImage>>, TError = HTTPValidationError>(
+ params: GetKnowledgeFileImageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getKnowledgeFileImage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetKnowledgeFileImageQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * @summary Validate file content (YAML/JSON)
  */
 export const validateKnowledgeFileContent = (

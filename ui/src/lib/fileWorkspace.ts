@@ -10,6 +10,7 @@ import type { AxiosResponse } from "axios";
 
 import {
   getFileContent,
+  getFileImage,
   getFileTree,
   getGitStatus,
   gitPullConfig,
@@ -18,6 +19,7 @@ import {
 } from "@/client/file/file";
 import {
   getKnowledgeFileContent,
+  getKnowledgeFileImage,
   getKnowledgeFileTree,
   getKnowledgeGitStatus,
   gitPullKnowledge,
@@ -78,6 +80,8 @@ export interface FileWorkspace {
   bulkDownload: boolean;
   getTree: () => Promise<FileTreeNode[]>;
   getContent: (path: string) => Promise<WorkspaceFileContent>;
+  /** A raster image in the workspace, for Markdown previews (the request carries the token). */
+  getImage: (path: string) => Promise<Blob>;
   saveContent: (path: string, content: string) => Promise<{ message: string; path: string }>;
   getGitStatus: () => Promise<GitWorkspaceStatus>;
   pull: () => Promise<GitPullResult>;
@@ -96,6 +100,7 @@ export const CONFIG_WORKSPACE: FileWorkspace = {
   getTree: () => getFileTree().then(data),
   getContent: (path) =>
     getFileContent({ path }).then((r) => r.data as unknown as WorkspaceFileContent),
+  getImage: (path) => getFileImage({ path }).then(data),
   saveContent: (path, content) =>
     saveFileContent({ path, content }).then((r) => r.data as { message: string; path: string }),
   getGitStatus: () => getGitStatus().then((r) => r.data as GitWorkspaceStatus),
@@ -113,6 +118,7 @@ export const KNOWLEDGE_WORKSPACE: FileWorkspace = {
   getTree: () => getKnowledgeFileTree().then(data),
   getContent: (path) =>
     getKnowledgeFileContent({ path }).then((r) => r.data as unknown as WorkspaceFileContent),
+  getImage: (path) => getKnowledgeFileImage({ path }).then(data),
   saveContent: (path, content) =>
     saveKnowledgeFileContent({ path, content }).then(
       (r) => r.data as { message: string; path: string },
@@ -136,4 +142,30 @@ export const workspaceQueryKeys = {
 /** The markdown file of one task's knowledge inside the knowledge repository. */
 export function knowledgeIndexPath(category: string, taskName: string): string {
   return `${category}/${taskName}/index.md`;
+}
+
+/**
+ * Workspace path of an image a Markdown file references, such as
+ * `./check_rabi_expected_1.png` next to `index.md`. Null for URLs, absolute
+ * paths, and paths that climb out of the workspace: those are left to the browser.
+ */
+export function resolveWorkspaceImagePath(markdownPath: string, src: string): string | null {
+  if (!src || /^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(src)) return null;
+  const parts = markdownPath.split("/").slice(0, -1);
+  let relative: string;
+  try {
+    relative = decodeURIComponent(src.split(/[?#]/)[0]);
+  } catch {
+    return null;
+  }
+  for (const segment of relative.split("/")) {
+    if (segment === "" || segment === ".") continue;
+    if (segment === "..") {
+      if (parts.length === 0) return null;
+      parts.pop();
+    } else {
+      parts.push(segment);
+    }
+  }
+  return parts.length > 0 ? parts.join("/") : null;
 }

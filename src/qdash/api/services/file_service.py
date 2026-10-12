@@ -13,7 +13,7 @@ import os
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import yaml
 from fastapi import BackgroundTasks, HTTPException
@@ -325,6 +325,40 @@ class FileService:
         except Exception as e:
             logger.error(f"Error reading file {file_path}: {e}")
             raise HTTPException(status_code=500, detail=f"Error reading file: {e!s}")
+
+    # Raster formats only: an SVG can carry script when opened directly.
+    IMAGE_MEDIA_TYPES: ClassVar[dict[str, str]] = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }
+    MAX_IMAGE_BYTES: ClassVar[int] = 10 * 1024 * 1024
+
+    def get_image(self, path: str) -> FileResponse:
+        """Return an image inside the workspace, as Markdown previews reference them.
+
+        Parameters
+        ----------
+        path : str
+            Relative path from the workspace base path.
+
+        Returns
+        -------
+        FileResponse
+            The image with its media type.
+
+        """
+        file_path = validate_relative_path(path, self._base_path)
+        media_type = self.IMAGE_MEDIA_TYPES.get(file_path.suffix.lower())
+        if media_type is None:
+            raise HTTPException(status_code=400, detail=f"Not an image: {path}")
+        if not file_path.is_file():
+            raise HTTPException(status_code=404, detail=f"File not found: {path}")
+        if file_path.stat().st_size > self.MAX_IMAGE_BYTES:
+            raise HTTPException(status_code=413, detail=f"Image is too large: {path}")
+        return FileResponse(file_path, media_type=media_type)
 
     def save_file_content(self, path: str, content: str) -> dict[str, str]:
         """Save file content.
