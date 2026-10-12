@@ -23,7 +23,11 @@ from git.exc import GitCommandError
 
 from qdash.api.lib.file_utils import validate_relative_path
 from qdash.api.schemas.file import FileTreeNode
-from qdash.common.config.path_resolver import resolve_config_base_path
+from qdash.common.config.path_resolver import (
+    PathOutsideCalibData,
+    resolve_config_base_path,
+    resolve_served_calib_data_path,
+)
 from qdash.common.utils.commit_message import format_machine_commit_message
 from qdash.common.utils.datetime import now_iso
 
@@ -148,12 +152,12 @@ class FileService:
             yield rel_path
 
     def download_file(self, path: str) -> FileResponse:
-        """Download a raw data file.
+        """Download a raw data file from the calibration data tree.
 
         Parameters
         ----------
         path : str
-            Absolute file path.
+            Absolute file path inside the calibration data tree.
 
         Returns
         -------
@@ -161,10 +165,14 @@ class FileService:
             The file as a downloadable response.
 
         """
-        if not Path(path).exists():
+        try:
+            resolved_path = resolve_served_calib_data_path(path)
+        except PathOutsideCalibData:
+            raise HTTPException(status_code=404, detail=f"File not found: {path}") from None
+        if not resolved_path.is_file():
             raise HTTPException(status_code=404, detail=f"File not found: {path}")
 
-        return FileResponse(path=path)
+        return FileResponse(path=resolved_path)
 
     def download_zip_file(self, path: str) -> FileResponse:
         """Download a file or directory as a ZIP archive.

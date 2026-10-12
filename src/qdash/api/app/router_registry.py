@@ -59,7 +59,7 @@ PUBLIC_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(admin.router, tags=("admin",), requires_auth=False),
     RouterRegistration(project.router, tags=("projects",), requires_auth=False),
     RouterRegistration(execution.router, tags=("execution",), requires_auth=False),
-    RouterRegistration(file.router, tags=("file",), requires_auth=False),
+    RouterRegistration(file.router, tags=("file",)),
     RouterRegistration(
         copilot.public_router,
         prefix="/copilot",
