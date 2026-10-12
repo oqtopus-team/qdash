@@ -6,7 +6,7 @@ import {
   CopilotChatSessionProvider,
   useCopilotChatSessionContext,
 } from "@/contexts/CopilotChatSessionContext";
-import type { AnalysisContext, CopilotBlocksResult } from "@/types/copilotChat";
+import type { TaskChatContext, CopilotBlocksResult } from "@/types/copilotChat";
 
 import { useCopilotChat } from "../useCopilotChat";
 
@@ -41,7 +41,7 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   <CopilotChatSessionProvider>{children}</CopilotChatSessionProvider>
 );
 
-const CONTEXT: AnalysisContext = {
+const CONTEXT: TaskChatContext = {
   taskName: "CheckT1",
   chipId: "64Q",
   qid: "0",
@@ -118,7 +118,11 @@ describe("useCopilotChat streaming", () => {
       if (url.endsWith("/copilot/chat/sessions/saved-session") && !init?.method) {
         return new Promise<Response>(() => {});
       }
-      return Response.json({ session_id: "saved-session", title: "Saved chat", messages: [] });
+      return Response.json({
+        session_id: "saved-session",
+        title: "Saved chat",
+        messages: [],
+      });
     });
     const result = await renderChat();
 
@@ -162,6 +166,10 @@ describe("useCopilotChat streaming", () => {
         tool: "qdash_get_timeseries",
         is_error: false,
         figures: ["exec/1/CheckT1_0.png"],
+        evaluation: {
+          prompt: "Reference for this experiment:\n## Experiment: CheckT1",
+          model: "vllm/ising",
+        },
       }),
     );
     stream.push(sse("delta", { text: "T1 is " }));
@@ -172,6 +180,10 @@ describe("useCopilotChat streaming", () => {
         kind: "tool",
         status: "done",
         figures: ["exec/1/CheckT1_0.png"],
+        evaluation: {
+          prompt: "Reference for this experiment:\n## Experiment: CheckT1",
+          model: "vllm/ising",
+        },
       });
       expect(steps[2]).toEqual({ kind: "text", text: "T1 is 45 us." });
     });
@@ -194,6 +206,10 @@ describe("useCopilotChat streaming", () => {
       id: "c1",
       args: { qid: "0" },
       figures: ["exec/1/CheckT1_0.png"],
+      evaluation: {
+        prompt: "Reference for this experiment:\n## Experiment: CheckT1",
+        model: "vllm/ising",
+      },
     });
     expect(streamRequest().url).toMatch(/\/copilot\/chat\/stream$/);
   });
@@ -227,7 +243,11 @@ describe("useCopilotChat streaming", () => {
 
     act(() => result.current.chat.send("Show T1 for Q00"));
     await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
-    stream.push(sse("result", { blocks: [{ type: "text", content: "Here", chart: null }] }));
+    stream.push(
+      sse("result", {
+        blocks: [{ type: "text", content: "Here", chart: null }],
+      }),
+    );
     stream.close();
     await waitFor(() => expect(result.current.chat.isStreaming).toBe(false));
     expect(result.current.chat.messages).toHaveLength(2);
@@ -304,7 +324,9 @@ describe("useCopilotChat streaming", () => {
       expect(
         fetchMock.mock.calls.some(([, init]) => {
           if (init?.method !== "PATCH") return false;
-          const body = JSON.parse(String(init.body)) as { messages?: { content: string }[] };
+          const body = JSON.parse(String(init.body)) as {
+            messages?: { content: string }[];
+          };
           return body.messages?.some((m) => m.content.includes('"feedback":"down"')) ?? false;
         }),
       ).toBe(true),
@@ -330,7 +352,7 @@ describe("useCopilotChat streaming", () => {
     expect(messages[messages.length - 1].content).toMatch(/^Error: .*closed before/);
   });
 
-  it("sends analysis chats through the analyze endpoint with their result", async () => {
+  it("sends a task chat through the chat endpoint naming its task result", async () => {
     const result = await renderChat();
 
     act(() => {
@@ -342,12 +364,9 @@ describe("useCopilotChat streaming", () => {
     await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
 
     const { url, body } = streamRequest();
-    expect(url).toMatch(/\/copilot\/analyze\/stream$/);
+    expect(url).toMatch(/\/copilot\/chat\/stream$/);
     expect(body).toMatchObject({
-      task_name: "CheckT1",
-      qid: "0",
-      execution_id: "exec-1",
-      task_id: "task-1",
+      task: { task_name: "CheckT1", qid: "0", execution_id: "exec-1", task_id: "task-1" },
       message: "Is this fit good?",
       session_id: result.current.chat.session?.id,
     });
@@ -379,7 +398,11 @@ describe("image turn replay", () => {
     const images = [{ data: "iVBORw0KGgo=", mimeType: "image/png" }];
     act(() => result.current.chat.send("Evaluate", images));
     await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
-    stream.push(sse("result", { blocks: [{ type: "text", content: "Here", chart: null }] }));
+    stream.push(
+      sse("result", {
+        blocks: [{ type: "text", content: "Here", chart: null }],
+      }),
+    );
     stream.close();
     await waitFor(() => expect(result.current.chat.isStreaming).toBe(false));
     stream = controllableStream();
@@ -398,7 +421,9 @@ describe("image turn replay", () => {
   it("blocks retry and edit when reloaded images cannot be recovered", async () => {
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url.endsWith("/copilot/chat/sessions") && !init?.method) {
-        return Response.json({ sessions: [{ session_id: "saved", title: "Plot", context: null }] });
+        return Response.json({
+          sessions: [{ session_id: "saved", title: "Plot", context: null }],
+        });
       }
       return Response.json({
         session_id: "saved",
@@ -434,7 +459,7 @@ describe("image turn replay", () => {
   });
 });
 
-it("keeps retry available for locally known analysis context figures", async () => {
+it("keeps retry available for locally known task chat figures", async () => {
   const result = await renderChat();
   act(() => result.current.store.createNewSession(CONTEXT));
   act(() => result.current.chat.send("Is this fit good?"));

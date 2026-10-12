@@ -1,7 +1,7 @@
-# Copilot and AI Reviews
+# Copilot
 
-QDash provides conversational analysis and bulk AI review tools that use project calibration
-context without replacing operator judgment.
+QDash provides conversational analysis tools that use project calibration context without
+replacing operator judgment.
 
 ## Choose a Tool
 
@@ -9,7 +9,6 @@ context without replacing operator judgment.
 | --- | --- |
 | AI Chat | Explore a question interactively with project-aware tools and cited QDash records. |
 | Analysis chat panel | Discuss the metric and filters already open on the Metrics page. |
-| AI Reviews | Analyze a selected set of displayed task results and compare target-level findings. |
 | Agent calibration | Run a separately authorized, bounded calibration campaign through the client. |
 
 Agent calibration performs hardware-affecting operations and is documented separately in
@@ -21,8 +20,26 @@ Open **AI Chat** for a project-wide conversation. Start a new session when the c
 or goal changes substantially. QDash stores sessions so you can return to prior analysis.
 
 The assistant can use the project tools exposed by QDash to inspect records such as chips,
-metrics, task results, issues, workflows, and provenance. Keep the active project and selected chip
+metrics, task results, forum threads, workflows, and provenance. Keep the active project and selected chip
 in mind when interpreting an answer. Open referenced records to confirm important conclusions.
+
+### Thinking and your own instructions
+
+The **Thinking** menu next to the model picker sets how much the model reasons before it answers:
+**Auto** (the model's configured default), **Off**, **Low**, **Medium**, or **High**. The choice
+applies from the next message and is remembered in your browser.
+
+**Settings → Copilot → Your instructions** holds instructions added to every chat you start, after
+QDash's own rules: language, tone, and formats such as "answer in Japanese, conclusion first" or
+"put numbers in a table with units". They are stored with your account, so they follow you across
+devices. They do not apply to AI evaluations or forum replies, which stay the same for everyone,
+and they cannot skip the approval of write operations. A **Your instructions** link in the chat
+composer shows when they are on.
+
+**What Copilot is told**, below the instructions, shows read-only what the application sends the
+chat model: QDash's system prompt, your instructions as they are appended to it, and the tools the
+chat offers. It is the running text, so it reflects the current skills, tools, and language
+settings; the application's part is edited in the deployment, not in Settings.
 
 ### Run a calibration pipeline from chat
 
@@ -40,19 +57,9 @@ every task result is judged by the same gates as a saved workflow. The execution
 
 ## Metrics Analysis
 
-The Metrics page includes a chat panel with the current analysis context. Use it when a question
-depends on the selected chip, metric, target direction, or time range. Changing those filters can
-change the records available to the analysis; state the intended comparison explicitly.
-
-## Request an AI Review
-
-From a chip task view, select the displayed qubit or coupling results and request an AI review.
-The request creates a review run containing one record per reviewed target. Open **AI Reviews** to
-filter runs by chip or task and inspect findings and referenced artifacts.
-
-Review only the results currently displayed and verify target direction and selection before
-submitting. A review run is a snapshot of that request; later calibration results do not rewrite
-its findings.
+The Metrics page includes a chat panel that opens with the selected task result as its context. Use it
+when a question depends on the selected chip, metric, target direction, or time range. Changing those
+filters can change the records available to the chat; state the intended comparison explicitly.
 
 ## Evaluate Findings
 
@@ -60,10 +67,10 @@ Treat AI output as supporting evidence. Before changing calibration state, exclu
 starting another hardware run:
 
 - open the underlying task result and artifacts;
-- compare the finding with task knowledge and known issue cases;
+- compare the finding with task knowledge;
 - confirm the project, chip, target, and time context;
 - use deterministic quality gates where the workflow provides them;
-- record the decision in a note, issue, or discussion when others need the context.
+- record the decision in a note or a forum thread when others need the context.
 
 Provider availability and model selection depend on the deployment configuration. Operators
 configure those providers in `.env`; missing provider credentials disable the corresponding AI

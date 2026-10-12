@@ -12,6 +12,7 @@ import { WRAP_UP_MESSAGE } from "./budget.ts";
 import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
 import { hasBearerToken, readJsonBody, RequestError } from "./http.ts";
 import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
+import { EvaluationError } from "./evaluate.ts";
 import {
   answerText,
   pendingApproval,
@@ -31,8 +32,6 @@ const CHAT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 0);
 // A quiet turn (a tool polling an execution) sends a ping this often so the
 // proxies between here and the browser do not take silence for a dead stream.
 const CHAT_PING_MS = Number(process.env.CHAT_PING_MS ?? 15_000);
-const REVIEW_CONCURRENCY = Number(process.env.REVIEW_CONCURRENCY ?? 2);
-const REVIEW_QUEUE_TIMEOUT_MS = Number(process.env.REVIEW_QUEUE_TIMEOUT_MS ?? 30_000);
 const MAX_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES ?? 20 * 1024 * 1024);
 const RUNTIME_TOKEN = process.env.AGENT_RUNTIME_TOKEN;
 
@@ -55,18 +54,30 @@ interface ChatBody {
   initial_images?: ImageBody[];
   /** The user's decision on a write call the previous turn asked approval for. */
   approval?: { id?: string; approve?: boolean };
-}
-
-interface ReviewBody {
-  prompt?: string;
-  images?: ImageBody[];
-  model?: { provider?: string; name?: string };
+  /** The user's own chat instructions, set in QDash's Settings. */
+  user_instructions?: string;
 }
 
 interface DeleteSessionBody {
   owner_id?: string;
   conversation_id?: string;
 }
+
+interface EvaluateBody {
+  task_id?: string;
+  question?: string;
+  max_figures?: number;
+  /** "direct" (default) runs the two tools; "planner" runs a planner turn that calls them. */
+  mode?: "direct" | "planner";
+  /** The planner in planner mode; in direct mode only pi-qcaleval's fallback model. */
+  model?: { provider?: string; name?: string };
+  thinking_level?: SessionRequest["thinkingLevel"];
+  /** Show the task's labeled example plots before the figure (in-context examples). */
+  with_examples?: boolean;
+}
+
+/** Planner-less evaluations in flight, for /health. */
+let evaluating = 0;
 
 /** Convert wire images into Pi image-content blocks. */
 function toImageContent(images: ImageBody[] | undefined) {
@@ -84,36 +95,6 @@ function toImageContent(images: ImageBody[] | undefined) {
  */
 const running = new Map<string, Conversation | null>();
 
-/** Bound local-model review concurrency across API and worker callers. */
-const reviewQueue: Array<() => void> = [];
-let reviewsInFlight = 0;
-
-/** Wait for a review slot, rejecting before the caller's HTTP timeout. */
-async function acquireReviewSlot(): Promise<() => void> {
-  if (reviewsInFlight >= REVIEW_CONCURRENCY) {
-    await new Promise<void>((resolve, reject) => {
-      const resume = (): void => {
-        clearTimeout(timeout);
-        resolve();
-      };
-      const timeout = setTimeout(() => {
-        const index = reviewQueue.indexOf(resume);
-        if (index >= 0) reviewQueue.splice(index, 1);
-        reject(new RequestError(503, "review queue is busy; retry later"));
-      }, REVIEW_QUEUE_TIMEOUT_MS);
-      reviewQueue.push(resume);
-    });
-  }
-  reviewsInFlight++;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    reviewsInFlight--;
-    reviewQueue.shift()?.();
-  };
-}
-
 const runtime = await SharedRuntime.create();
 console.log(`[agent-runtime] tools: ${runtime.listToolNames().join(", ")}`);
 
@@ -121,35 +102,6 @@ console.log(`[agent-runtime] tools: ${runtime.listToolNames().join(", ")}`);
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
-}
-
-/** Run one automatic review and return its structured verdict. */
-async function handleReview(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = await readJsonBody<ReviewBody>(req, MAX_BODY_BYTES);
-  if (typeof body.prompt !== "string" || !body.prompt) {
-    sendJson(res, 400, { error: "prompt is required" });
-    return;
-  }
-
-  const release = await acquireReviewSlot();
-  try {
-    const result = await runtime.runReview({
-      prompt: body.prompt,
-      provider: body.model?.provider,
-      modelName: body.model?.name,
-      images: toImageContent(body.images),
-    });
-    if (result.review) {
-      sendJson(res, 200, { review: result.review });
-    } else {
-      sendJson(res, 200, {
-        error: "submit_review was not called",
-        text: result.text,
-      });
-    }
-  } finally {
-    release();
-  }
 }
 
 /** Translate one committed durable event to the existing NDJSON bridge. */
@@ -198,6 +150,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
         modelName: body.model?.name,
         thinkingLevel: body.thinking_level,
         images: toImageContent(body.images),
+        ...(typeof body.user_instructions === "string" ? { userInstructions: body.user_instructions } : {}),
       },
       auth,
     );
@@ -349,13 +302,15 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     } finally {
       if (ping) clearInterval(ping);
       await events.stop();
-      if (connected && !res.writableEnded) res.end();
     }
   } finally {
     try {
       await opened.close();
     } finally {
       running.delete(runKey);
+      // End the stream only once the conversation is free, so a client that
+      // sends its next message as soon as the stream ends is not refused.
+      if (!res.writableEnded) res.end();
     }
   }
 }
@@ -380,6 +335,66 @@ async function handleAbortChat(req: IncomingMessage, res: ServerResponse): Promi
   }
   await conversation.abort(BACKGROUND_CONTEXT);
   sendJson(res, 200, { aborted: true });
+}
+
+/**
+ * Evaluate one task result's figure without a planner (see evaluate.ts).
+ *
+ * Synchronous: the response is the evaluation record, after the calibration
+ * VLM has answered. A caller that gives up closes the connection, which
+ * aborts the evaluation; concurrency is the caller's to limit.
+ */
+async function handleEvaluate(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody<EvaluateBody>(req, MAX_BODY_BYTES);
+  if (typeof body.task_id !== "string" || !body.task_id.trim()) {
+    sendJson(res, 400, { error: "task_id is required" });
+    return;
+  }
+  let auth;
+  try {
+    auth = requestQDashAuth(req.headers);
+  } catch {
+    sendJson(res, 401, { error: "QDash user authentication is required" });
+    return;
+  }
+  const controller = new AbortController();
+  res.on("close", () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  if (body.mode !== undefined && body.mode !== "direct" && body.mode !== "planner") {
+    sendJson(res, 400, { error: "mode must be direct or planner" });
+    return;
+  }
+  evaluating += 1;
+  try {
+    const request = {
+      taskId: body.task_id,
+      question: typeof body.question === "string" ? body.question : undefined,
+      maxFigures: body.max_figures,
+      withExamples: body.with_examples === true,
+      provider: body.model?.provider,
+      modelName: body.model?.name,
+      thinkingLevel: body.thinking_level,
+    };
+    const result =
+      body.mode === "planner"
+        ? await runtime.evaluateWithPlanner(request, auth, controller.signal)
+        : await runtime.evaluateTask(request, auth, controller.signal);
+    sendJson(res, 200, result);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      console.warn(`[agent-runtime] evaluation of ${body.task_id} abandoned by the caller`);
+      return;
+    }
+    if (error instanceof EvaluationError) {
+      console.warn(`[agent-runtime] evaluation of ${body.task_id} failed at ${error.stage}: ${error.message}`);
+      sendJson(res, error.status, { error: error.message, stage: error.stage });
+      return;
+    }
+    throw error;
+  } finally {
+    evaluating -= 1;
+  }
 }
 
 /** Remove durable state after the owning QDash session has been deleted. */
@@ -408,8 +423,16 @@ const server = createServer((req, res) => {
     sendJson(res, 200, {
       status: "ok",
       running: running.size,
-      reviews: reviewsInFlight,
+      evaluating,
     });
+    return;
+  }
+  if (req.method === "POST" && req.url === "/evaluate") {
+    if (!authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    handleEvaluate(req, res).catch((error: unknown) => handleRouteError(res, error, "evaluate"));
     return;
   }
   if (req.method === "POST" && req.url === "/chat") {
@@ -420,20 +443,30 @@ const server = createServer((req, res) => {
     handleChat(req, res).catch((error: unknown) => handleRouteError(res, error, "request"));
     return;
   }
+  if (req.method === "POST" && req.url === "/system-prompt") {
+    if (!authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    readJsonBody<{ user_instructions?: unknown }>(req, MAX_BODY_BYTES)
+      .then((body) =>
+        sendJson(
+          res,
+          200,
+          runtime.chatSystemPrompt(
+            typeof body.user_instructions === "string" ? body.user_instructions : undefined,
+          ),
+        ),
+      )
+      .catch((error: unknown) => handleRouteError(res, error, "system prompt"));
+    return;
+  }
   if (req.method === "POST" && req.url === "/chat/abort") {
     if (!authorized(req)) {
       sendJson(res, 401, { error: "unauthorized" });
       return;
     }
     handleAbortChat(req, res).catch((error: unknown) => handleRouteError(res, error, "abort"));
-    return;
-  }
-  if (req.method === "POST" && req.url === "/review") {
-    if (!authorized(req)) {
-      sendJson(res, 401, { error: "unauthorized" });
-      return;
-    }
-    handleReview(req, res).catch((error: unknown) => handleRouteError(res, error, "review"));
     return;
   }
   if (req.method === "DELETE" && req.url === "/session") {

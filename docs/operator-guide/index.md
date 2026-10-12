@@ -16,8 +16,8 @@ health, or understand how users interact with projects and workflows.
 - [Application Tour](../user-guide/application-tour.md): page map, roles, and permission-gated features.
 - [Running Calibrations](../user-guide/running-calibrations.md): workflows, quick runs, executions, and results.
 - [Calibration Data and Provenance](../user-guide/data-and-provenance.md): choose the right data view and trace parameter lineage.
-- [Reviewing and Sharing Results](../user-guide/reviewing-results.md): notes, issues, discussions, knowledge, and AI reviews.
-- [Copilot and AI Reviews](../user-guide/copilot.md): conversational analysis, review runs, and verification boundaries.
+- [Reviewing and Sharing Results](../user-guide/reviewing-results.md): notes, issues, discussions, and knowledge.
+- [Copilot](../user-guide/copilot.md): conversational analysis and verification boundaries.
 - [Authentication](../user-guide/authentication.md): users, admin role, password management.
 - [Projects and Sharing](../user-guide/projects-and-sharing.md): project membership and roles.
 - [Dashboard](../user-guide/dashboard.md): metrics, notes, and filtering.

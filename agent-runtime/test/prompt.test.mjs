@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildReviewSystemPrompt, buildSystemPrompt } from "../src/prompt.ts";
+import { buildSystemPrompt } from "../src/prompt.ts";
 
 test("Japanese language codes become an explicit user-facing instruction", () => {
   const prompt = buildSystemPrompt("ja", "en");
@@ -9,13 +9,8 @@ test("Japanese language codes become an explicit user-facing instruction", () =>
   assert.match(prompt, /entire reply.*Japanese \(日本語\)/);
 });
 
-test("review free-text fields use the configured natural language", () => {
-  assert.match(buildReviewSystemPrompt("ja"), /free-text field.*Japanese \(日本語\)/);
-});
-
 test("automatic language follows the latest user message", () => {
   assert.match(buildSystemPrompt("auto", "en"), /same language as the user's latest message/);
-  assert.match(buildReviewSystemPrompt("auto"), /language used by the review request/);
 });
 
 test("experimental write tools are approved by the user, not the model", () => {
@@ -49,4 +44,22 @@ test("local extension tools are introduced after the pi-qdash tool guide", () =>
   const prompt = buildSystemPrompt("auto", "en", false, [], "qdash guide", guide);
   assert.match(prompt, /Tool guide:\nqdash guide\n\nAdditional tools:\n- `qcal_evaluate`/);
   assert.doesNotMatch(buildSystemPrompt("auto", "en", false, [], "qdash guide"), /Additional tools/);
+});
+
+import { buildUserInstructionsSection, MAX_USER_INSTRUCTIONS_CHARS } from "../src/prompt.ts";
+
+test("user instructions become a section that cannot lift the approval rule", () => {
+  const section = buildUserInstructionsSection("  Answer in Japanese.  ");
+  assert.match(section, /Answer in Japanese\.$/);
+  assert.match(section, /write operations still need the user's approval/);
+  assert.equal(buildUserInstructionsSection("   "), undefined);
+  assert.equal(buildUserInstructionsSection(undefined), undefined);
+  const long = buildUserInstructionsSection("x".repeat(MAX_USER_INSTRUCTIONS_CHARS + 50));
+  assert.ok(long.endsWith("x".repeat(MAX_USER_INSTRUCTIONS_CHARS)));
+  assert.ok(!long.includes("x".repeat(MAX_USER_INSTRUCTIONS_CHARS + 1)));
+});
+
+test("a language in the user's preferences sets the reply language under auto", () => {
+  assert.match(buildSystemPrompt("auto", "en"), /in a message or in their preferences below/);
+  assert.match(buildUserInstructionsSection("Answer in Japanese."), /a language they name here is the reply language/);
 });

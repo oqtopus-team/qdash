@@ -82,7 +82,7 @@ class ConfigLoader:
         for filename in (
             "copilot/config.yaml",
             "copilot/chat.yaml",
-            "copilot/review.yaml",
+            "copilot/evaluation.yaml",
         ):
             config = _deep_merge(config, cls._load_config(filename))
         return config

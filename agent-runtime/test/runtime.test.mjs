@@ -43,3 +43,13 @@ test("failure to open a harness removes its temporary credentials", async (t) =>
   );
   await assert.rejects(readFile(configPath), { code: "ENOENT" });
 });
+
+import { chatSystemPromptOf } from "../src/runtime.ts";
+
+test("the system prompt shown in Settings is QDash's text plus the user's tagged section", () => {
+  const shown = chatSystemPromptOf("You are QDash Copilot.", ["run_python", "ask_user"], "  Use tables. ");
+  assert.equal(shown.system_prompt, "You are QDash Copilot.");
+  assert.match(shown.user_preferences, /^<user-preferences>\n[\s\S]*Use tables\.\n<\/user-preferences>$/);
+  assert.deepEqual(shown.tools, ["ask_user", "run_python"]);
+  assert.equal(chatSystemPromptOf("x", [], "   ").user_preferences, null);
+});

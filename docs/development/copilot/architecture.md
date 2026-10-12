@@ -4,10 +4,12 @@
 
 QDash Copilot is an AI-powered assistant that helps experimentalists interpret qubit calibration results. It provides two interaction modes:
 
-1. **Analysis Sidebar** -- Task-scoped analysis within the metrics modal, providing contextual interpretation of individual calibration results (e.g., CheckT1, CheckRabi).
+1. **Chat about a task result** (sidebar or floating window) -- Opened from a task result with that result's context and figures, for questions about one calibration result (e.g., CheckT1, CheckRabi).
 2. **Chat Page** -- A dedicated chat interface for chip-wide questions, cross-qubit comparisons, and exploratory data analysis.
 
-Both modes use the same underlying LLM agent with tool-calling capabilities, sandboxed Python execution, and SSE streaming for real-time progress feedback.
+Both are the same chat with the same planner; the first just opens with a task result as its context. The evaluation model's recorded judgements are a separate thing (see "Planner-less evaluation runs"). Forum AI replies are one planner turn each on the same runtime.
+
+Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a sandboxed Python tool served by the API, and SSE streaming for progress.
 
 ## Component Diagram
 
@@ -17,23 +19,23 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 
 | File | Responsibility |
 |------|---------------|
-| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/analyze`, `/analyze/stream`, `/chat/stream` endpoints; SSE event generation via `SSETaskBridge` |
-| `src/qdash/api/services/copilot_data_service.py` | Data loading service: `build_analysis_context()`, `build_images_sent_metadata()`, qubit/task/history queries, tool executor wiring |
-| `src/qdash/api/lib/copilot_agent.py` | LLM agent: system prompt construction, OpenAI Responses API calls, tool call loop, response parsing |
-| `src/qdash/copilot/` | Shared Copilot runtime used outside the API process, including workflow-side automatic review |
-| `src/qdash/workflow/engine/task/ai_review.py` | Asynchronous task-result review hook that writes AI review notes to task history |
-| `src/qdash/api/lib/copilot_sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
-| `src/qdash/api/lib/copilot_analysis.py` | Pydantic models: `TaskAnalysisContext`, `AnalysisResponse`, `AnalysisContextResult`; request schemas |
-| `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter, `SSETaskBridge` for queue-poll-heartbeat-drain pattern |
-| `src/qdash/api/lib/copilot_config.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `ScoringThreshold` models; YAML loading with local override |
+| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/chat/stream` (general and task chats), `/sandbox/python`, chat sessions |
+| `src/qdash/copilot/runtime.py` | Data loading: `build_task_context()`, `build_images_sent_metadata()`, qubit/task/history queries |
+| `src/qdash/api/services/pi_chat_service.py` | Runtime bridge: request payloads, the task chat's opening message and figures, NDJSON to SSE translation, `thread_reply` / `complete_once` for forum reply turns |
+| `src/qdash/copilot/` | Shared Copilot runtime used outside the API process |
+| `src/qdash/copilot/tooling/sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
+| `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`); request schemas |
+| `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter |
+| `src/qdash/copilot/config/settings.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `TaskChatConfig`; YAML loading with local override |
 | `src/qdash/datamodel/task_knowledge.py` | `TaskKnowledge` model with domain-specific knowledge per calibration task |
-| `config/copilot/config.yaml` | Shared enablement, language, and default model settings |
-| `config/copilot/chat.yaml` | General chat models, prompt, initial message, and suggestions |
-| `config/copilot/review.yaml` | Task result analysis models, scoring thresholds, and AI review prompts |
+| `config/copilot/config.yaml` | Enablement, languages, how a task chat opens |
+| `config/copilot/chat.yaml` | Planner models for every chat |
+| `config/copilot/evaluation.yaml` | Evaluation model (calibration VLM) |
+| `agent-runtime/src/evaluate.ts`                           | Planner-less evaluation of one task result: evidence tool, then `qcal_evaluate`, as one record                                     |
+| `src/qdash/api/services/evaluation_service.py`             | Bulk evaluation runs: selection per chip, background execution through the runtime, records and verdicts                          |
 | `ui/src/hooks/useCopilotChat.ts` | React hook for the chat page: session management, SSE consumption, localStorage persistence |
-| `ui/src/hooks/useAnalysisChat.ts` | React hook for the analysis sidebar: task-scoped SSE streaming, message management |
+| `ui/src/contexts/ChatDockContext.tsx` | Where the chat is shown outside the chat page: the docked sidebar (`ChatSidebar`) or the floating window, and opening a chat about a task result |
 | `ui/src/components/features/chat/CopilotChatPage.tsx` | Chat page UI: session list, message rendering, blocks/chart display |
-| `ui/src/components/features/metrics/AnalysisChatPanel.tsx` | Analysis sidebar UI within the metrics modal |
 
 ## Pi runtime authentication
 
@@ -41,70 +43,43 @@ The API forwards the authenticated user's access token and selected `X-Project-I
 
 Each open conversation gets its own tool registry and a private temporary pi-qdash profile. Read tools, approved writes, and the Python sandbox use that user's credentials. The runtime overrides connection arguments supplied by a model or an older stored tool call and never falls back to `QDASH_API_TOKEN` or an administrator login. QDash API endpoints enforce the user's permissions.
 
-The pinned pi-qdash version accepts a configuration file rather than an injected client. The runtime creates the profile in a private directory with a mode-0600 file and removes it when the conversation closes, including failures. Docker Compose mounts `/tmp` as tmpfs so these credentials do not enter the container's persistent filesystem. Deployments outside Compose should provide an equivalent memory-backed temporary directory. Automatic reviews use no QDash tools and need no user API token.
+The pinned pi-qdash version accepts a configuration file rather than an injected client. The runtime creates the profile in a private directory with a mode-0600 file and removes it when the conversation closes, including failures. Docker Compose mounts `/tmp` as tmpfs so these credentials do not enter the container's persistent filesystem. Deployments outside Compose should provide an equivalent memory-backed temporary directory.
 
 ## Configuration
 
 ### `config/copilot/`
 
+Three small files, each with an optional `*.local.yaml` overlay, deep-merged by `ConfigLoader`:
+
 ```yaml
 # config.yaml
 enabled: true
-copilot_backend: pi       # Also requires COMPOSE_PROFILES=agent-runtime for Docker Compose
-
-# Language settings
 thinking_language: en      # Internal reasoning language
 response_language: auto    # Follow the latest user message; use ja/en to pin it
-
-# Model settings
-model:
-  provider: openai         # openai | ollama
-  name: gpt-4.1
-  temperature: 0.7
-  max_output_tokens: 2048
-
-# chat.yaml
-chat_models:
-  - provider: ollama
-    name: gemma4:26b
-    base_url: env:OLLAMA_BASE_URL
-    api_key_env: OLLAMA_API_KEY
-system_prompt: |
-  You are QDash Copilot...
-
-# review.yaml
-# Metrics for chip health evaluation
-evaluation_metrics:
-  qubit: [qubit_frequency, anharmonicity, t1, t2_echo, ...]
-  coupling: [zx90_gate_fidelity, bell_state_fidelity]
-
-# Scoring thresholds per metric
-scoring:
-  t1:
-    good: 50
-    excellent: 100
-    bad: 20
-    unit: "μs"
-    higher_is_better: true
-  # ... (see config/copilot/review.yaml for full list)
-
-# Task analysis settings
-analysis:
-  enabled: true
+task_chat:                 # How a chat about a task result opens
   multimodal: true
   max_expected_images: 2
-  ai_review_max_expected_images: null
-  ai_review_max_output_tokens: null
-  ai_review_tasks: [CheckQubitSpectroscopy, CheckResonatorSpectroscopy]
-  ai_review_message: >-
-    Review this calibration result and attach a concise operational review note.
-  max_conversation_turns: 10
+
+# chat.yaml: the planner models every chat can use; the first is the default
+chat_models:
+  - provider: openai-compatible
+    name: qwen3.8-flash-next
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL
+    api_key_env: OPENAI_COMPATIBLE_API_KEY
+
+# evaluation.yaml: the model pi-qcaleval judges calibration plots with
+evaluation_models:
+  - provider: vllm
+    name: nvidia/Ising-Calibration-1.5-31B-NVFP4
+    base_url: env:VLLM_BASE_URL
+    api_key_env: VLLM_API_KEY
 ```
 
-Configuration is loaded via `ConfigLoader` by deep-merging `config.yaml`, `chat.yaml`, and
-`review.yaml`. YAML string values support shell-style environment variable references such
+YAML string values support shell-style environment variable references such
 as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be supplied
-through environment variables instead of committed template files.
+through environment variables instead of committed template files. The Pi runtime
+builds its `models.json` from `chat_models` and `evaluation_models` at startup.
 
 ### Environment Variables
 
@@ -169,27 +144,95 @@ Checkout tools receive the same extension context as pi-qdash tools, including
 `promptSnippet` and `promptGuidelines` are inlined into the system prompt under
 "Additional tools", since the pi-qdash tool guide does not know them. A checkout
 tool that declares an `images` parameter (for example `qcal_evaluate`) gets it
-filled by the runtime when the model omits it: the newest figure in the
-conversation, whether a user attachment or a figure a pi-qdash tool returned, is
-taken from the durable transcript, so the model never has to copy image bytes
-into a call.
+filled by the runtime: the newest figure in the conversation, whether a user
+attachment or a figure a pi-qdash tool returned, is taken from the durable
+transcript, so the model never has to copy image bytes into a call. Bytes the
+model copies anyway are replaced by that figure, since a retyped base64 string
+is usually corrupt; they are kept only when the conversation holds no figure.
+
+A checkout tool that declares `task_name` and `knowledge` parameters (again
+`qcal_evaluate`) gets `knowledge` filled the same way: when the model names the
+task and passes no reference of its own, the runtime fetches the task's review
+guide from the QDash API as the user (`GET /tasks/{task_name}/knowledge`,
+`review_prompt_text`, or the full `prompt_text` for a task without a review
+guide, cut at 6000 characters) and passes it. Every evaluation of a task is thus
+read against the same host-maintained reference, kept in the task knowledge
+repository, rather than against a summary the planner improvised. The exact
+text the evaluation model received is stored in the tool result's
+`details.prompt`.
 
 The runtime's `/chat` body carries two image lists: `initial_images` (the
-analysis sidebar's opening figures, attached only when the conversation is new)
+task chat's opening figures, attached only when the conversation is new)
 and `images` (attachments of the current turn, attached every time). Restart the
 runtime after editing the extension; the startup log lists the local paths and
 the tools they contributed. Anything placed under `agent-runtime/extensions/` on
 the host is trusted the same way, so keep that directory empty on production hosts.
 
+## Planner-less evaluation runs
+
+The chat is one entry point to the evaluation core; a bulk request from the
+chip page is another, and it does not need a planner. The runtime's
+`POST /evaluate` route (`agent-runtime/src/evaluate.ts`) runs, for one task
+result, exactly the two tools the planner would call: `qdash_build_qcal_evidence`
+(evidence text plus the task figure) and then `qcal_evaluate`, with the same
+auto-fill as in chat (figure bytes from the evidence, QDash's reference for
+the task name the evidence reports). It answers with a record of what the
+evaluation model saw and said: the evidence context, the figure hashes, the
+reference's size and hash, the exact prompt, the parsed diagnosis or the raw
+answer, the model, the duration, and the extension that judged (package name,
+version, and the checkout commit when a mounted checkout is in use). The route
+is synchronous and needs the same headers as `/chat`; concurrency is the
+caller's to limit.
+
+The route has two modes. `direct` (the default) runs the two tools as such.
+`planner` opens a throwaway conversation on the given chat model, tells it
+to summarise the result and judge its figure, and reads the record off the
+`qcal_evaluate` result it produced; the durable tool wrapper stamps every
+evaluation result with a `host` record (figure hashes, the reference's size
+and hash, the context, the call's duration), so a planner turn leaves the
+same record as a direct evaluation, plus the planner's answer and the tools
+it called. The two modes differ in what reaches the evaluation model (the
+planner writes its own context and may pass its own reference), which is
+exactly what the stored records make comparable.
+
+The API turns that into runs (`src/qdash/api/services/evaluation_service.py`,
+router `src/qdash/api/routers/evaluation.py`): `POST /evaluations/runs`
+selects the latest evaluable result of one task per qubit or coupling of a
+chip (or that of one day, or a given list of task results), stores one
+pending `evaluation` record per task result under an `evaluation_run` (with
+its `trigger`, `bulk` from the chip page or `single` for one task result, and
+its `mode`, `direct` or `planner` with the chat's planner model), and
+executes them in the background of the API worker as the requesting user, a
+few at a time (`EVALUATION_CONCURRENCY`, default 2). Entities without an
+evaluable result (no result, no figure, still running) are reported as
+skipped. `GET /evaluations/runs` and `GET /evaluations/runs/{run_id}` show
+progress and the records; `GET /evaluations?task_id=` lists every evaluation
+of one task result across runs; `PUT /evaluations/{id}/verdict` stores a
+person's agreement or disagreement, the ground truth for comparing runs.
+
+The chat is the third entry. When the planner calls `qcal_evaluate` during a
+chat, the durable tool wrapper's `host` record (which also names the task
+result the figures were fetched for) rides on the runtime's `tool_end` event,
+and the API files it as a run of one with `trigger: "chat"` and the planner's
+final answer; the trace shows "recorded as an evaluation" with a link. A
+judgement of a figure that no tool fetched (a user attachment) is not recorded.
+So every judgement the evaluation model makes, from the chip page, a single
+result or a chat, is on one ledger.
+
+A run is a snapshot: the same selection evaluated again after a change to
+the extension, the model, or the task's reference yields a second run with
+the same shape, so parse rate, success rate, agreement rate and duration
+can be compared run against run. A run interrupted by an API restart keeps
+its unfinished records as pending; request it again rather than resuming it.
+
 ## Two Modes
 
-### Analysis Sidebar
+### Chat about a task result
 
-Activated from the metrics modal when viewing a specific task result (e.g., CheckT1 for qubit Q03).
+Opened from a task result (metrics modal, task history, execution detail) with "Ask AI".
 
-- **Endpoint**: `POST /copilot/analyze/stream`
-- **Hook**: `useAnalysisChat`
-- **Context**: Full `TaskAnalysisContext` including task knowledge, qubit parameters, experiment results, historical data, neighbor qubit data, and coupling parameters
+- **Endpoint**: `POST /copilot/chat/stream` with `task: {task_name, chip_id, qid, execution_id, task_id}`
+- **Context**: Full `TaskContext` including task knowledge, qubit parameters, experiment results, historical data, neighbor qubit data, and coupling parameters, rendered into the opening message together with the result's figures
 - **Use case**: "Is this T1 result normal?", "Why does the fit R² look low?"
 
 ### Chat Page
@@ -201,45 +244,3 @@ A standalone page (`/copilot`) for general questions about the calibration syste
 - **Context**: Chip ID, optional qubit ID, scoring thresholds
 - **Use case**: "Compare T1 across all qubits", "Show me the frequency trend for Q16"
 - **Sessions**: Persisted to localStorage with multi-session support
-
-### Automatic AI Review
-
-Automatic AI review attaches an LLM-generated operational review note to selected terminal task results after they are persisted. It is designed for tasks where visual or contextual review is valuable, but sending every calibration result to an LLM would be too slow or expensive.
-
-For prompt and task-knowledge tuning, use the [AI review evaluation loop](./ai-review-evals.md) to capture a real task result once and replay it in either frozen-context or rebuilt-context mode.
-
-- **Entry point**: `enqueue_ai_review_note()` in `src/qdash/workflow/engine/task/ai_review.py`
-- **Trigger**: task-result history save paths in the workflow recorder and repository
-- **Configuration**: `analysis.ai_review_tasks` and `analysis.ai_review_message` in `config/copilot/review.yaml`
-- **Execution model**: asynchronous background thread pool, de-duplicated by `task_id`
-- **Model selection**: `analysis_model`, then the first `analysis_models` entry, then the general `model`
-- **AI review quality path**: automatic review inherits
-  `analysis.max_expected_images` and the selected model's `max_output_tokens`
-  by default. Set `analysis.ai_review_max_expected_images` or
-  `analysis.ai_review_max_output_tokens` only for an explicit low-latency mode.
-- **Storage**: task-result `user_note.content`, under a `## AI review` Markdown section
-- **UI**: task detail modals render the note as Markdown; chip page badges are shown only when the review decision requires review
-
-The hook is best effort. It must not block calibration progress and must not change the task outcome when the LLM request fails. Both successful and failed task results are eligible when the task name is listed in `ai_review_tasks`; running, pending, scheduled, and skipped results are ignored. Automatic review uses the current task result, current qubit parameters, task knowledge, figures, and reference images, but drops historical result runs from the prompt so the dashboard note is not framed as a past-history comparison.
-
-For `CheckResonatorSpectroscopy`, QDash records one AI review note per MUX group. The representative result is the qid where `int(qid) % 4 == 0`; copied sibling resonator results are skipped to avoid duplicate LLM calls and duplicate notes.
-
-For `CheckQubitSpectroscopy`, QDash applies a deterministic safety guard before
-calling the VLM: if no f01-like output parameter is present, the note is marked
-as `FAIL` / `NO_SIGNAL`. This avoids accepting an empty parameter update when a
-compact local model returns an overly optimistic free-form response.
-
-The expected review note begins with a compact review block:
-
-```markdown
-## AI review
-
-**AI review**
-- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
-- Accepted parameter(s): ...
-- Needs review: ...
-- Primary reason: ...
-- Recommended action: ...
-```
-
-The chip page badge logic intentionally does not mark every AI note. It marks only notes whose `Decision` is `REVIEW` or `FAIL`, or whose `Needs review` field is not `none`.

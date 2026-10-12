@@ -180,6 +180,21 @@ def test_capture_qubex_progress_patches_measurement_service() -> None:
     assert events[-1].description == "Sweeping parameters"
 
 
+def test_capture_qubex_progress_patches_filtered_ckp() -> None:
+    """Contrib experiments should forward their own tqdm loops as well."""
+    from qubex.contrib.experiment import ckp_characterization
+
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(events.append, task_name="CheckCKP"):
+        list(_service_tqdm(ckp_characterization)(range(2), file=StringIO()))
+
+    assert events[0].current == 0
+    assert events[-1].current == 2
+    assert events[-1].total == 2
+    assert {event.description for event in events} == {"Filtered CKP sweep"}
+    assert events[-1].has_multiple_phases is True
+
+
 def test_rabi_progress_labels_disabled_qubex_sweep() -> None:
     """Disabled internal bars should count and receive a task-specific label."""
     from qubex.experiment.services import measurement_service

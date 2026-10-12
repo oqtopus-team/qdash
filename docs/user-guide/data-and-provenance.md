@@ -21,7 +21,7 @@ an observation with another user.
 
 **Dashboard** presents all configured metrics with coverage, heatmaps, distributions, and scoped
 notes. **Metrics** focuses on a selected metric and provides qubit or coupling history, parameter
-details, notes, issues, report export, and data export where available.
+details, notes, forum threads, report export, and data export where available.
 
 For directional coupling data, verify the displayed direction before comparing values. For time
 ranges, distinguish the latest value from best or average aggregation.
@@ -29,8 +29,8 @@ ranges, distinguish the latest value from best or average aggregation.
 ## Chip and Task Artifacts
 
 **Chip** organizes calibration task results on the device topology. Select a task, then a qubit or
-coupling to open its details and history. Multi-select actions can request AI review or download
-figures for the displayed results.
+coupling to open its details and history. Multi-select actions can download figures for the
+displayed results.
 
 Task-result pages expose the stored parameters and artifacts for one measurement. Figure JSON and
 NetCDF raw data are downloadable when that task produced them.

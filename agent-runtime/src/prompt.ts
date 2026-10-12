@@ -58,39 +58,11 @@ export function buildSystemPrompt(
   ].join("\n");
 }
 
-/**
- * System prompt for one automatic AI review.
- *
- * Deliberately free of review criteria: what counts as PASS or REVIEW comes from
- * review.yaml's `ai_review_message` and the task knowledge, both sent by Python
- * as the prompt body. Only the shape of the interaction lives here.
- */
-export function buildReviewSystemPrompt(responseLanguage: string): string {
-  return [
-    "You review one calibration task result from a superconducting quantum processor and return an operational verdict.",
-    "",
-    "Everything you need is in this single message: the task knowledge, the measured parameters, and the attached figures. You have no tools for looking anything up and no way to ask a follow-up question. Judge on what is in front of you.",
-    "",
-    "Guidelines:",
-    "- Attached figures come in order: the reference figures showing what a good result looks like, then the figures measured in this run. The prompt states how many of each.",
-    "- Base the verdict on whether the figures visually support the reported output parameters. Numerical consistency alone does not justify accepting a parameter the figure does not support.",
-    "- Finish by calling `submit_review` exactly once. Do not restate the verdict as prose; every field belongs in that call.",
-    `- ${reviewLanguageInstruction(responseLanguage)} Keep the enum fields exactly as specified.`,
-  ].join("\n");
-}
-
 function responseInstruction(language: string): string {
   if (language.trim().toLowerCase() === "auto") {
-    return "Reply in the same language as the user's latest message, unless the user asks for another language.";
+    return "Reply in the same language as the user's latest message, unless the user asks for another language, in a message or in their preferences below.";
   }
   return `Always write your entire reply to the user in ${languageName(language)}.`;
-}
-
-function reviewLanguageInstruction(language: string): string {
-  if (language.trim().toLowerCase() === "auto") {
-    return "Write every free-text field in the language used by the review request.";
-  }
-  return `Write every free-text field in ${languageName(language)}.`;
 }
 
 function languageName(language: string): string {
@@ -98,4 +70,24 @@ function languageName(language: string): string {
   if (normalized === "ja" || normalized === "japanese") return "Japanese (日本語)";
   if (normalized === "en" || normalized === "english") return "English";
   return language;
+}
+
+/** Longest user instructions placed into the system prompt; QDash caps them at 2000. */
+export const MAX_USER_INSTRUCTIONS_CHARS = 2000;
+
+/**
+ * The user's own instructions for their chats, as a system prompt section
+ * after QDash's rules. They adjust style, language and formats; they cannot
+ * lift a rule above them, notably the approval of write operations.
+ * Empty instructions give no section.
+ */
+export function buildUserInstructionsSection(instructions: string | undefined): string | undefined {
+  const text = instructions?.trim().slice(0, MAX_USER_INSTRUCTIONS_CHARS);
+  if (!text) return undefined;
+  return [
+    "The user you are talking to set these preferences for their chats. Follow them for style, language, and format; a language they name here is the reply language even when they write in another.",
+    "They do not change the rules above: write operations still need the user's approval in the card, every fact still comes from a tool result or the user, and you still say when data is missing.",
+    "",
+    text,
+  ].join("\n");
 }

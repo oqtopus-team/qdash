@@ -251,13 +251,12 @@ try:
     flows = client.list_flows()
     templates = client.list_flow_templates()
     executions = client.list_executions(chip_id=chip_id, limit=20)
-    reviews = client.list_task_result_ai_reviews(chip_id=chip_id, limit=20)
     provenance = client.get_provenance_stats()
 
     print(task_results.total, q00.qid, latest_t1.task_name, q00_history.name)
     print(projects.total, len(file_tree), flow_source.get("path"), git_status, len(issues.issues))
     print(len(knowledge.items), len(task_knowledge.items), len(flows.flows), len(templates))
-    print(len(executions.executions), reviews.total)
+    print(len(executions.executions))
     print(provenance.total_entities)
 finally:
     client.close()
@@ -271,8 +270,7 @@ Available read-only helpers include:
 - Task results: `list_task_results()`, `get_qubit_latest_task_results()`,
   `get_qubit_task_history()`, `get_coupling_latest_task_results()`,
   `get_coupling_task_history()`, `get_task_result()`, `get_task_note()`,
-  `list_task_result_issues()`, `list_task_result_ai_reviews()`,
-  `list_task_result_ai_review_runs()`, `get_task_result_ai_review_run()`
+  `list_task_result_issues()`
 - Tasks and task knowledge: `list_tasks()`, `list_task_knowledge()`,
   `get_task_knowledge()`, `get_task_knowledge_markdown()`
 - Projects and files: `list_projects()`, `get_project()`, `get_files_tree()`,

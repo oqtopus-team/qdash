@@ -14,6 +14,12 @@ interface TaskFigureProps {
   qid: string;
   className?: string;
   hideExpandButton?: boolean;
+  /**
+   * Scale the figure down to fit its box (both width and height), centred.
+   * Without it the figure keeps its height and overflows sideways, which suits
+   * the horizontally scrolling strips most pages put figures in.
+   */
+  fit?: boolean;
 }
 
 function figureUrl(path: string): string {
@@ -26,12 +32,14 @@ function ExpandableImage({
   className,
   jsonFigurePath,
   hideExpandButton,
+  fit = false,
 }: {
   src: string;
   alt: string;
   className: string;
   jsonFigurePath?: string;
   hideExpandButton?: boolean;
+  fit?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -45,9 +53,20 @@ function ExpandableImage({
   }
 
   return (
-    <div className="relative group inline-flex h-full min-w-0 min-h-0 shrink-0">
+    <div
+      className={
+        fit
+          ? "relative group flex h-full w-full min-w-0 min-h-0 items-center justify-center"
+          : "relative group inline-flex h-full min-w-0 min-h-0 shrink-0"
+      }
+    >
       {/* eslint-disable-next-line @next/next/no-img-element -- dynamic API image with native sizing */}
-      <img src={src} alt={alt} className={className} onError={() => setHasError(true)} />
+      <img
+        src={src}
+        alt={alt}
+        className={fit ? `h-full w-full object-contain ${className}` : className}
+        onError={() => setHasError(true)}
+      />
       {!hideExpandButton && (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -85,6 +104,7 @@ export function TaskFigure({
   qid,
   className = "",
   hideExpandButton,
+  fit = false,
 }: TaskFigureProps) {
   // Use generated API client hook when taskId is provided
   const {
@@ -144,6 +164,7 @@ export function TaskFigure({
         className={className}
         jsonFigurePath={normalizedJsonPaths[0]}
         hideExpandButton={hideExpandButton}
+        fit={fit}
       />
     );
   }

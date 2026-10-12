@@ -24,11 +24,10 @@ import {
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
-import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
-import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
+import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
-import type { AnalysisContext } from "@/types/copilotChat";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
+import type { TaskChatContext } from "@/types/copilotChat";
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { DockedChatPanel } from "@/components/features/chat/DockedChatPanel";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
@@ -58,17 +57,17 @@ export function TaskHistoryModal({
     type: "success" | "error";
     text: string;
   } | null>(null);
-  const { focusAnalysisChat } = useAnalysisChatContext();
+  const { focusTaskChat } = useChatDock();
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   const handleAskAi = useCallback(
-    (ctx: AnalysisContext) => {
+    (ctx: TaskChatContext) => {
       // Resume or start the chat for this result. We deliberately do NOT open
       // the global sidebar — the chat is shown inline as a split view here.
-      focusAnalysisChat(ctx);
+      focusTaskChat(ctx);
       setIsChatOpen(true);
     },
-    [focusAnalysisChat],
+    [focusTaskChat],
   );
 
   // Reset chat pane when modal closes so re-opening starts clean.
@@ -204,7 +203,7 @@ export function TaskHistoryModal({
     : [];
   const rawDataPaths = selectedTask?.raw_data_path ?? [];
 
-  const analysisContext: AnalysisContext | null = useMemo(() => {
+  const chatContext: TaskChatContext | null = useMemo(() => {
     if (!selectedTask?.task_id) return null;
     return {
       taskName: selectedTask.name || taskName,
@@ -522,9 +521,9 @@ export function TaskHistoryModal({
               <GitBranch className="h-3 w-3" />
               View Provenance Lineage
             </Link>
-            {analysisContext && (
+            {chatContext && (
               <button
-                onClick={() => handleAskAi(analysisContext)}
+                onClick={() => handleAskAi(chatContext)}
                 className="btn btn-xs btn-primary gap-1"
               >
                 <Bot className="h-3 w-3" />
@@ -535,9 +534,6 @@ export function TaskHistoryModal({
         </div>
       )}
 
-      {selectedTask?.task_id && (
-        <TaskResultAiReviewNote taskId={selectedTask.task_id} hideWhenEmpty />
-      )}
       {selectedTask?.task_id && (
         <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} hideWhenEmpty />
       )}
@@ -588,8 +584,8 @@ export function TaskHistoryModal({
         </div>
       )}
 
-      {/* Issues */}
-      {selectedTask?.task_id && <TaskResultIssues taskId={selectedTask.task_id} />}
+      {/* Forum threads about this result */}
+      {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
     </div>
   );
 

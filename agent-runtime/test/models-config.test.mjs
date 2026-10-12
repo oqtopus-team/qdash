@@ -25,8 +25,8 @@ chat_models:
     temperature: 0.7
 `;
 
-const REVIEW_YAML = `
-analysis_models:
+const EVALUATION_YAML = `
+evaluation_models:
   - provider: ollama
     name: nvidia/Gemma-4-31B-IT-NVFP4
     api_style: completion
@@ -183,8 +183,8 @@ test("a base_url that already ends in /v1 is left alone", () => {
   assert.equal(providers.ollama.baseUrl, "http://ollama:11434/v1");
 });
 
-test("review models are merged into the same providers as chat models", () => {
-  const { providers } = buildModelsConfig(YAML, REVIEW_YAML, env);
+test("evaluation models are merged into the same providers as chat models", () => {
+  const { providers } = buildModelsConfig(YAML, EVALUATION_YAML, env);
   assert.deepEqual(
     providers.ollama.models.map((model) => model.id),
     ["gemma4:31b", "nvidia/Gemma-4-31B-IT-NVFP4"],
@@ -192,11 +192,11 @@ test("review models are merged into the same providers as chat models", () => {
 });
 
 test("keep_alive rides along in samplingParams so ollama keeps the VLM resident", () => {
-  const { providers } = buildModelsConfig(YAML, REVIEW_YAML, env);
-  const reviewModel = providers.ollama.models.find(
+  const { providers } = buildModelsConfig(YAML, EVALUATION_YAML, env);
+  const evaluationModel = providers.ollama.models.find(
     (model) => model.id === "nvidia/Gemma-4-31B-IT-NVFP4",
   );
-  assert.deepEqual(reviewModel.samplingParams, {
+  assert.deepEqual(evaluationModel.samplingParams, {
     temperature: 1,
     top_p: 0.95,
     top_k: 64,
@@ -206,15 +206,15 @@ test("keep_alive rides along in samplingParams so ollama keeps the VLM resident"
 
 test("locally hosted models are declared image-capable", () => {
   // Pi defaults an unstated `input` to text-only and then drops image content
-  // while building the request, so AI review would silently lose its figures.
-  const { providers } = buildModelsConfig(YAML, REVIEW_YAML, env);
+  // while building the request, so figure analysis would silently lose its figures.
+  const { providers } = buildModelsConfig(YAML, EVALUATION_YAML, env);
   for (const model of providers.ollama.models) {
     assert.deepEqual(model.input, ["text", "image"]);
   }
 });
 
 test("a model declared in both files keeps the chat definition", () => {
-  const { providers } = buildModelsConfig(YAML, REVIEW_YAML, env);
+  const { providers } = buildModelsConfig(YAML, EVALUATION_YAML, env);
   const shared = providers.ollama.models.find((model) => model.id === "gemma4:31b");
   assert.equal(shared.maxTokens, 4096);
   assert.deepEqual(providers.openai.modelOverrides["gpt-5.4"], {

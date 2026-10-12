@@ -3,11 +3,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { parse } from "yaml";
 
 /**
- * Build pi's models.json from QDash's chat.yaml and review.yaml.
+ * Build pi's models.json from QDash's chat.yaml and evaluation.yaml.
  *
  * Those two files are the single place model wiring is declared; this module is
- * the only translation into pi's schema. See adr/0004 of the chat session and
- * adr/0001 of 2026-09-28-ai-review-pi-agent.
+ * the only translation into pi's schema. chat.yaml's `chat_models` back the
+ * Copilot chat; evaluation.yaml's `evaluation_models` back the figure evaluation
+ * sidebar. See adr/0004 of the chat session.
  */
 
 /** QDash's chat config names providers the way LiteLLM does; pi uses its own ids. */
@@ -71,7 +72,7 @@ function readModels(yaml: string | undefined, key: string): ChatModel[] {
 }
 
 /**
- * Translate chat.yaml's `chat_models` and review.yaml's `analysis_models` into a
+ * Translate chat.yaml's `chat_models` and evaluation.yaml's `evaluation_models` into a
  * models.json object.
  *
  * Models with a `base_url` describe an endpoint pi has no catalog for
@@ -79,17 +80,17 @@ function readModels(yaml: string | undefined, key: string): ChatModel[] {
  * without one are served by pi's bundled catalog (openai, bedrock); only their
  * sampling parameters are layered on via `modelOverrides`.
  *
- * Chat and review routinely name the same provider and sometimes the same
+ * Chat and analysis routinely name the same provider and sometimes the same
  * model, so entries are merged rather than appended blindly.
  */
 export function buildModelsConfig(
   chatYaml: string,
-  reviewYaml: string | undefined,
+  evaluationYaml: string | undefined,
   env: NodeJS.ProcessEnv,
 ): ModelsConfig {
   const models = [
     ...readModels(chatYaml, "chat_models"),
-    ...readModels(reviewYaml, "analysis_models"),
+    ...readModels(evaluationYaml, "evaluation_models"),
   ];
   const providers: Record<string, ProviderEntry> = {};
 
@@ -154,8 +155,8 @@ export function buildModelsConfig(
       maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
       ...(reasoning ? { reasoning: true } : {}),
       // Pi treats an unstated `input` as text-only and then silently drops
-      // image content while building the request. AI review exists to read
-      // figures, so the verdict would come back as "no figures attached"
+      // image content while building the request. Figure analysis exists to
+      // read figures, so the answer would come back as "no figures attached"
       // without any error anywhere.
       input: ["text", "image"],
       ...(sampling ? { samplingParams: sampling } : {}),
@@ -171,12 +172,12 @@ export function buildModelsConfig(
 /** Generate models.json next to the agent dir and return its path. */
 export function writeModelsConfig(
   chatConfigPath: string,
-  reviewConfigPath: string,
+  evaluationConfigPath: string,
   outPath: string,
 ): string {
   const config = buildModelsConfig(
     readFileSync(chatConfigPath, "utf8"),
-    readFileIfPresent(reviewConfigPath),
+    readFileIfPresent(evaluationConfigPath),
     process.env,
   );
   writeFileSync(outPath, `${JSON.stringify(config, null, 2)}\n`);
@@ -217,7 +218,7 @@ function apiFromStyle(style: string | undefined): string {
  * Sampling parameters pi merges into the request body verbatim.
  *
  * `keep_alive` is not a sampling parameter, but ollama reads it from the same
- * body and it keeps the local VLM resident between reviews, so it rides along.
+ * body and it keeps the local VLM resident between analyses, so it rides along.
  */
 function samplingParams(model: ChatModel): Record<string, unknown> | undefined {
   const params = asRecord(model.sampling_params) ?? {};

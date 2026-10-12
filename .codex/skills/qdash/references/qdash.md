@@ -58,9 +58,6 @@ uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile 
 uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local flow-helper-files
 uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local flow-helper-file --filename common.py
 uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local executions --limit 20
-uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local ai-reviews --chip-id chip-001 --limit 20
-uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local ai-review-runs --chip-id chip-001 --limit 20
-uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local ai-review-run --review-run-id run-001
 uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local provenance-stats
 uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local provenance-history --parameter-name t1 --qid Q00 --limit 20
 uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local provenance-changes --within-hours 24 --parameter-name t1
@@ -90,7 +87,7 @@ Useful path groups from the OpenAPI spec:
 
 - `/chips`, `/chips/{chip_id}`, `/chips/{chip_id}/qubits`, `/chips/{chip_id}/couplings`
 - `/metrics/config`, `/metrics/chips/{chip_id}/metrics`, `/metrics/chips/{chip_id}/qubits/{qid}/history`
-- `/task-results`, `/tasks/{task_id}/result`, `/task-results/{task_id}/note`, `/task-results/{task_id}/issues`, `/task-results/timeseries`, `/task-results/qubits/latest`, `/task-results/couplings/latest`, `/task-results/ai-review`
+- `/task-results`, `/tasks/{task_id}/result`, `/task-results/{task_id}/note`, `/task-results/{task_id}/issues`, `/task-results/timeseries`, `/task-results/qubits/latest`, `/task-results/couplings/latest`
 - `/tasks`, `/task-knowledge`, `/tasks/{task_name}/knowledge`, `/tasks/{task_name}/knowledge/markdown`
 - `/projects`, `/provenance/*`, `/issues`, `/issue-knowledge`, `/forum/posts`
 - `/flows/*`, `/flows/templates`, `/flows/helpers`, `/executions/*`, `/files/*`, `/admin/*`

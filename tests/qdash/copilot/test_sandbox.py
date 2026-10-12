@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from tests._sandbox import requires_sandbox
 
-from qdash.copilot.agent_runtime.execution import execute_tool_executor, wrap_tool_executors
 from qdash.copilot.tooling import sandbox
 from qdash.copilot.tooling.sandbox import WORKER_SCRIPT, _worker_env, execute_python_analysis
 from qdash.copilot.tooling.sandbox_core import (
@@ -486,36 +485,6 @@ async def test_execute_python_analysis_kills_worker_on_cancellation() -> None:
 
     remaining = await _wait_until(lambda pids: not (pids & running))
     assert not (remaining & running)
-
-
-@pytest.mark.asyncio
-async def test_execute_tool_executor_awaits_awaitable_result() -> None:
-    async def async_executor(args: dict[str, Any]) -> dict[str, Any]:
-        return {"value": args["value"]}
-
-    result = await execute_tool_executor(async_executor, {"value": 42})
-
-    assert result == {"value": 42}
-
-
-@requires_sandbox
-@pytest.mark.asyncio
-async def test_wrap_tool_executors_collects_chart_from_async_python_executor() -> None:
-    wrapped, charts = wrap_tool_executors({}, {"values": [1, 2]})
-
-    result = await execute_tool_executor(
-        wrapped["execute_python_analysis"],
-        {
-            "code": (
-                "result = {'output': len(data['values']), "
-                "'chart': {'data': [{'y': data['values']}], 'layout': {}}}"
-            )
-        },
-    )
-
-    assert result["output"] == "2"
-    assert result["chart"] is None
-    assert charts == [{"data": [{"y": [1, 2]}], "layout": {}}]
 
 
 class _FakeProcess:

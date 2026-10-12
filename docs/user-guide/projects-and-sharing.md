@@ -6,7 +6,7 @@ results, discussions, and files.
 ## Active Project
 
 Use the project selector to switch between projects. The active project determines which chips,
-workflows, executions, task results, notes, issues, and files QDash displays or changes. Confirm
+workflows, executions, task results, notes, forum threads, and files QDash displays or changes. Confirm
 it before starting a calibration or editing shared state.
 
 Every new account receives a default project owned by that user. Users may also belong to other

@@ -1,15 +1,19 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { DefaultResourceLoader, ModelRuntime } from "@earendil-works/pi-coding-agent";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import {
+  DefaultResourceLoader,
+  ModelRuntime,
+  type ToolDefinition as CodingAgentTool,
+} from "@earendil-works/pi-coding-agent";
 import {
   AssistantEntry,
   createRegistry,
   defineExtension,
   Harness,
-  MemoryStorage,
   section,
   ToolResultEntry,
   UserEntry,
@@ -32,24 +36,40 @@ import { compactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { askUserTool } from "./ask-tool.ts";
-import { formatSettledDetail } from "./events.ts";
 import {
   buildLocalToolGuide,
   localToolNames,
   describeExtensionError,
+  extensionPackage,
+  isTrustedExtension,
+  withoutReplacedInstalls,
   discoverExtensionCheckouts,
   trustedCheckoutRoots,
 } from "./local-extensions.ts";
 import {
   buildQDashExtension,
+  runCodingAgentTool,
   type ApprovalRequest,
   type QDashWriteTools,
 } from "./durable-tools.ts";
+import {
+  EVALUATION_TOOL,
+  EVIDENCE_TOOL,
+  EvaluationError,
+  evaluateTask,
+  plannerInstruction,
+  plannerOutcome,
+  recordFromDetails,
+  type EvaluateRequest,
+  type EvaluateResult,
+  type ToolRun,
+} from "./evaluate.ts";
+import { formatSettledDetail } from "./events.ts";
+import { fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
 import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
-import { buildReviewSystemPrompt, buildSystemPrompt } from "./prompt.ts";
+import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
 import { buildPythonTool } from "./python-tool.ts";
 import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
-import { submitReviewTool } from "./review-tool.ts";
 import { extractToolGuide, TOOL_GUIDE_SKILL } from "./tool-guide.ts";
 
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
@@ -57,7 +77,8 @@ const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
 const STATE_DIR = process.env.AGENT_STATE_DIR ?? "/app/state";
 const COPILOT_CONFIG_PATH = process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
 const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
-const REVIEW_CONFIG_PATH = process.env.REVIEW_CONFIG_PATH ?? "/app/config/copilot/review.yaml";
+const EVALUATION_CONFIG_PATH =
+  process.env.EVALUATION_CONFIG_PATH ?? "/app/config/copilot/evaluation.yaml";
 // One model request; a whole turn is bounded by the server's own timers.
 const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 180_000);
 const EXPERIMENTAL_WRITE_TOOLS_ENABLED = ["1", "true", "yes", "on"].includes(
@@ -83,13 +104,36 @@ export interface SessionRequest {
   modelName?: string;
   thinkingLevel?: ThinkingLevel;
   images?: Array<{ type: "image"; data: string; mimeType: string }>;
+  /** The user's own chat instructions from QDash; a chat only, never an evaluation. */
+  userInstructions?: string;
 }
 
-export interface ReviewSessionRequest {
-  prompt: string;
-  provider?: string;
-  modelName?: string;
-  images?: Array<{ type: "image"; data: string; mimeType: string }>;
+/** Section key of the user's preferences in the system prompt. */
+const USER_PREFERENCES_SECTION = "user-preferences";
+
+/** What `chatSystemPrompt` returns. */
+export interface ChatSystemPrompt {
+  system_prompt: string;
+  /** The user's preferences section, or null when they set none. */
+  user_preferences: string | null;
+  /** Tools offered to the chat; their descriptions travel with the request, not in this text. */
+  tools: string[];
+}
+
+/** The system prompt a chat receives, with the user's preferences as the harness tags them. */
+export function chatSystemPromptOf(
+  systemPrompt: string,
+  toolNames: readonly string[],
+  userInstructions?: string,
+): ChatSystemPrompt {
+  const preferences = buildUserInstructionsSection(userInstructions);
+  return {
+    system_prompt: systemPrompt,
+    user_preferences: preferences
+      ? `<${USER_PREFERENCES_SECTION}>\n${preferences}\n</${USER_PREFERENCES_SECTION}>`
+      : null,
+    tools: [...toolNames].sort(),
+  };
 }
 
 export interface OpenDurableSession {
@@ -104,17 +148,35 @@ export function sessionStorageName(ownerId: string, sessionId: string): string {
   return `${createHash("sha256").update(ownerId).update("\0").update(sessionId).digest("hex")}.sqlite`;
 }
 
+/** An enabled extension tool and the file that defines it. */
+interface EnabledTool {
+  definition: CodingAgentTool;
+  path?: string;
+}
+
 /** Process-wide model, extension, and durable-harness configuration. */
 export class SharedRuntime {
   private constructor(
     private readonly modelRuntime: ModelRuntime,
-    private readonly buildChatRegistry: (connection: QDashConnection) => {
+    private readonly buildChatRegistry: (connection: QDashConnection, userInstructions?: string) => {
       registry: ReturnType<typeof createRegistry>;
       writeTools: QDashWriteTools;
     },
     private readonly toolNames: string[],
-    private readonly reviewRegistry: ReturnType<typeof createRegistry>,
+    /** The same tools the chat registry adapts, for running outside a conversation. */
+    private readonly enabledTools: ReadonlyMap<string, EnabledTool>,
+    /** QDash's system prompt for chats, as built at startup. */
+    private readonly systemPrompt: string,
   ) {}
+
+  /**
+   * The system prompt a chat of this user gets, as the model receives it:
+   * QDash's own section, then the user's preferences wrapped the way the
+   * harness wraps a tagged section. Read-only, for Settings.
+   */
+  chatSystemPrompt(userInstructions?: string): ChatSystemPrompt {
+    return chatSystemPromptOf(this.systemPrompt, this.toolNames, userInstructions);
+  }
 
   /** Load the Pi model catalog and adapt the installed pi-qdash extension once. */
   static async create(): Promise<SharedRuntime> {
@@ -130,15 +192,20 @@ export class SharedRuntime {
       additionalExtensionPaths: CHECKOUT_PATHS,
     });
     await loader.reload();
+    // pi reports one conflict per tool name, so a checkout that replaces an
+    // installed package yields the same replacement notice dozens of times.
+    const reported = new Set<string>();
     for (const { path, error } of loader.getExtensions().errors) {
       const report = describeExtensionError(path, error, CHECKOUT_PATHS);
+      if (reported.has(report.message)) continue;
+      reported.add(report.message);
       if (report.level === "error") console.error(report.message);
       else console.log(report.message);
     }
 
     const modelsPath = writeModelsConfig(
       CHAT_CONFIG_PATH,
-      REVIEW_CONFIG_PATH,
+      EVALUATION_CONFIG_PATH,
       join(AGENT_DIR, "models.json"),
     );
     const modelRuntime = await ModelRuntime.create({
@@ -158,7 +225,7 @@ export class SharedRuntime {
       `[agent-runtime] skills: ${skills.map((skill) => skill.name).join(", ") || "none"}`,
     );
 
-    const extensions = loader.getExtensions().extensions;
+    const extensions = withoutReplacedInstalls(loader.getExtensions().extensions, CHECKOUTS);
     // Local checkouts and trusted installed packages are trusted as a whole
     // (see buildQDashExtension); the experimental write opt-in still applies
     // to their tool names.
@@ -194,26 +261,21 @@ export class SharedRuntime {
       TRUSTED_EXTENSION_PACKAGES,
     );
 
+    // Built once: the same text every chat gets and Settings shows read-only.
+    const systemPrompt = buildSystemPrompt(
+      responseLanguage,
+      thinkingLanguage,
+      EXPERIMENTAL_WRITE_TOOLS_ENABLED,
+      skills,
+      toolGuide,
+      localToolGuide,
+    );
     const copilotExtension = defineExtension({
       name: "qdash-copilot",
-      sections: [
-        section(
-          "qdash-copilot",
-          () =>
-            buildSystemPrompt(
-              responseLanguage,
-              thinkingLanguage,
-              EXPERIMENTAL_WRITE_TOOLS_ENABLED,
-              skills,
-              toolGuide,
-              localToolGuide,
-            ),
-          { tag: false },
-        ),
-      ],
+      sections: [section("qdash-copilot", () => systemPrompt, { tag: false })],
       tools: [chartTool, askUserTool, ...(skills.length ? [buildSkillTool(skills)] : [])],
     });
-    const buildChatRegistry = (connection: QDashConnection) => {
+    const buildChatRegistry = (connection: QDashConnection, userInstructions?: string) => {
       const registry = createRegistry();
       const qdash = buildQDashExtension(
         extensions,
@@ -226,6 +288,17 @@ export class SharedRuntime {
       );
       registry.install(qdash.extension);
       registry.install(copilotExtension);
+      // After QDash's own rules, so they come first and the user's preferences
+      // read as adjustments to them.
+      const preferences = buildUserInstructionsSection(userInstructions);
+      if (preferences) {
+        registry.install(
+          defineExtension({
+            name: "qdash-user-preferences",
+            sections: [section(USER_PREFERENCES_SECTION, () => preferences)],
+          }),
+        );
+      }
       registry.install(
         defineExtension({
           name: "qdash-python",
@@ -241,27 +314,173 @@ export class SharedRuntime {
       "ask_user",
       ...(skills.length ? ["read_skill"] : []),
     ];
+    // Pinned definitions first so a trusted one replaces, as in buildQDashExtension.
+    const enabledTools = new Map<string, EnabledTool>();
+    const trusted = (extension: { path: string }) =>
+      isTrustedExtension(extension.path, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES);
+    for (const extension of [...extensions].sort((a, b) => Number(trusted(a)) - Number(trusted(b)))) {
+      for (const [name, registered] of extension.tools) {
+        if (allowed.has(name)) enabledTools.set(name, { definition: registered.definition, path: extension.path });
+      }
+    }
 
-    const reviewRegistry = createRegistry();
-    reviewRegistry.install(
-      defineExtension({
-        name: "qdash-review",
-        sections: [
-          section("qdash-review", () => buildReviewSystemPrompt(responseLanguage), {
-            tag: false,
-          }),
-        ],
-        tools: [submitReviewTool],
-      }),
+    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames, enabledTools, systemPrompt);
+  }
+
+  /** A configured model named by the request, or none when the request names none. */
+  private resolveModel(provider: string | undefined, modelName: string | undefined): Model<Api> | undefined {
+    if (!provider && !modelName) return undefined;
+    if (!provider || !modelName) {
+      throw new EvaluationError("request", "model needs both provider and name", 400);
+    }
+    const providerId = PROVIDER_ALIASES[provider] ?? provider;
+    const model = this.modelRuntime.getModel(providerId, modelName);
+    if (!model) {
+      throw new EvaluationError(
+        "request",
+        `unknown model ${providerId}/${modelName}: not declared in chat.yaml or evaluation.yaml`,
+        400,
+      );
+    }
+    return model;
+  }
+
+  /**
+   * Evaluate one task result's figure without a conversation: evidence from
+   * pi-qdash, judgement from pi-qcaleval, QDash's reference in between. The
+   * optional model only serves pi-qcaleval's fallback when no calibration VLM
+   * is configured.
+   */
+  async evaluateTask(
+    request: EvaluateRequest & { provider?: string; modelName?: string },
+    auth: QDashAuth,
+    signal?: AbortSignal,
+  ): Promise<EvaluateResult> {
+    const evidence = this.enabledTools.get(EVIDENCE_TOOL);
+    const evaluation = this.enabledTools.get(EVALUATION_TOOL);
+    if (!evidence || !evaluation) {
+      const missing = [!evidence && EVIDENCE_TOOL, !evaluation && EVALUATION_TOOL].filter(Boolean);
+      throw new EvaluationError("request", `evaluation tools not loaded: ${missing.join(", ")}`, 503);
+    }
+    const model = this.resolveModel(request.provider, request.modelName);
+    const connection = await createQDashConnection(auth);
+    try {
+      return await evaluateTask(request, {
+        runTool: async (name, args) => {
+          const tool = this.enabledTools.get(name);
+          if (!tool) throw new EvaluationError("request", `tool ${name} is not enabled`, 503);
+          return (await runCodingAgentTool(
+            tool.definition,
+            `evaluate:${randomUUID()}`,
+            args,
+            signal,
+            this.modelRuntime,
+            WORK_DIR,
+            connection,
+            model,
+          )) as ToolRun;
+        },
+        fetchKnowledge: (taskName) => fetchTaskKnowledge(connection, taskName, signal),
+        fetchExamples: (taskName) => fetchTaskExamples(connection, taskName, signal),
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
+      });
+    } finally {
+      await connection.close();
+    }
+  }
+
+  /**
+   * Evaluate one task result the way the chat does: a planner turn in a
+   * throwaway conversation, told to summarise the result and judge its figure.
+   * The record comes from the `qcal_evaluate` result the durable wrapper
+   * stamped (see evaluate.ts), so it has the same shape as a direct
+   * evaluation, plus what the planner did and answered. The conversation's
+   * state is removed afterwards.
+   */
+  async evaluateWithPlanner(
+    request: EvaluateRequest & {
+      provider?: string;
+      modelName?: string;
+      thinkingLevel?: ThinkingLevel;
+    },
+    auth: QDashAuth,
+    signal?: AbortSignal,
+  ): Promise<EvaluateResult> {
+    if (!request.provider || !request.modelName) {
+      throw new EvaluationError("request", "planner mode needs a model provider and name", 400);
+    }
+    this.resolveModel(request.provider, request.modelName);
+    const evaluation = this.enabledTools.get(EVALUATION_TOOL);
+    if (!evaluation) {
+      throw new EvaluationError("request", `evaluation tools not loaded: ${EVALUATION_TOOL}`, 503);
+    }
+    const ownerId = "evaluation";
+    const sessionId = `planner-${randomUUID()}`;
+    const started = Date.now();
+    const opened = await this.openSession(
+      {
+        ownerId,
+        sessionId,
+        message: "",
+        provider: request.provider,
+        modelName: request.modelName,
+        thinkingLevel: request.thinkingLevel,
+      },
+      auth,
     );
-    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames, reviewRegistry);
+    try {
+      const { conversation } = opened;
+      const onAbort = () => void conversation.abort(BACKGROUND_CONTEXT);
+      signal?.addEventListener("abort", onAbort, { once: true });
+      let settled;
+      try {
+        const submission = await conversation.submit(
+          {
+            type: "input",
+            content: plannerInstruction(request.taskId, request.question, request.withExamples),
+          },
+          BACKGROUND_CONTEXT,
+        );
+        settled = await submission.wait(BACKGROUND_CONTEXT);
+      } finally {
+        signal?.removeEventListener("abort", onAbort);
+      }
+      const view = await conversation.context(BACKGROUND_CONTEXT);
+      const outcome = plannerOutcome(view.entries);
+      const answer =
+        settled.status === "done" && settled.type === "input"
+          ? await answerText(conversation, settled.answer)
+          : "";
+      if (outcome.error) throw new EvaluationError("evaluation", outcome.error);
+      if (!outcome.details) {
+        const why =
+          settled.status === "done"
+            ? `the planner did not call ${EVALUATION_TOOL}${answer ? `: ${answer.slice(0, 300)}` : ""}`
+            : `planner turn ${settled.reason}${formatSettledDetail(settled.detail)}`;
+        throw new EvaluationError("evaluation", why);
+      }
+      const providerId = PROVIDER_ALIASES[request.provider] ?? request.provider;
+      return recordFromDetails(request.taskId, outcome.details, {
+        mode: "planner",
+        usage: outcome.usage,
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
+        planner: {
+          model: `${providerId}/${request.modelName}`,
+          answer,
+          tool_calls: outcome.toolCalls,
+          duration_ms: Date.now() - started,
+        },
+      });
+    } finally {
+      try {
+        await opened.close();
+      } finally {
+        this.deleteSessionState(ownerId, sessionId);
+      }
+    }
   }
 
   /** Resolve a configured QDash model without allowing an invisible fallback. */
-  private resolveModel(provider: string | undefined, modelName: string | undefined): ModelRef {
-    return this.resolveModelWithLimits(provider, modelName).ref;
-  }
-
   private resolveModelWithLimits(
     provider: string | undefined,
     modelName: string | undefined,
@@ -271,7 +490,7 @@ export class SharedRuntime {
     const model = this.modelRuntime.getModel(providerId, modelName);
     if (!model) {
       throw new Error(
-        `unknown model ${providerId}/${modelName}: not declared in chat.yaml or review.yaml`,
+        `unknown model ${providerId}/${modelName}: not declared in chat.yaml or evaluation.yaml`,
       );
     }
     return {
@@ -310,7 +529,7 @@ export class SharedRuntime {
       }
     };
     try {
-      const { registry, writeTools } = this.buildChatRegistry(connection);
+      const { registry, writeTools } = this.buildChatRegistry(connection, request.userInstructions);
       harness = await Harness.open(
         await openNodeSqliteStorage(path),
         {
@@ -338,50 +557,6 @@ export class SharedRuntime {
     } catch (error) {
       await close();
       throw error;
-    }
-  }
-
-  /** Run a stateless automatic review with durable task semantics in memory. */
-  async runReview(request: ReviewSessionRequest): Promise<{ review?: unknown; text: string }> {
-    const model = this.resolveModel(request.provider, request.modelName);
-    const harness = await Harness.open(
-      new MemoryStorage(),
-      { models: this.modelRuntime, registry: this.reviewRegistry },
-      BACKGROUND_CONTEXT,
-    );
-    try {
-      const conversation = await harness.root(BACKGROUND_CONTEXT, {
-        agent: { model, cwd: WORK_DIR },
-      });
-      const content = request.images?.length
-        ? [{ type: "text" as const, text: request.prompt }, ...request.images]
-        : request.prompt;
-      const submission = await conversation.submit({ type: "input", content }, BACKGROUND_CONTEXT);
-      const timeout = setTimeout(
-        () => void conversation.abort(BACKGROUND_CONTEXT),
-        Number(process.env.REVIEW_TIMEOUT_MS ?? 300_000),
-      );
-      const settled = await submission
-        .wait(BACKGROUND_CONTEXT)
-        .finally(() => clearTimeout(timeout));
-      if (settled.status !== "done" || settled.type !== "input") {
-        throw new Error(
-          `review was not answered: ${settled.reason}${formatSettledDetail(settled.detail)}`,
-        );
-      }
-
-      const view = await conversation.context(BACKGROUND_CONTEXT);
-      let review: unknown;
-      for (const entry of view.entries) {
-        if (!ToolResultEntry.is(entry)) continue;
-        const message = entry.model?.[0];
-        if (message?.role === "toolResult" && message.details) {
-          review = (message.details as { review?: unknown }).review ?? review;
-        }
-      }
-      return { review, text: await answerText(conversation, settled.answer) };
-    } finally {
-      await harness.close(BACKGROUND_CONTEXT);
     }
   }
 }

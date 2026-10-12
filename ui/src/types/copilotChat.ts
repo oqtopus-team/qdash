@@ -1,7 +1,7 @@
 /** Shared types for every Copilot chat surface (page, sidebar, floating window). */
 
-/** The calibration result a chat is about; its first turn goes to the analyze endpoint. */
-export interface AnalysisContext {
+/** The task result a chat is about; its first turn opens with the result's context and figures. */
+export interface TaskChatContext {
   taskName: string;
   chipId: string;
   qid: string;
@@ -65,6 +65,19 @@ export interface BlocksResult {
   };
 }
 
+/** What an evaluation tool sent its model, shown in the trace on request. */
+export interface ToolEvaluation {
+  /** The exact prompt: the host's reference, the planner's context, the question. */
+  prompt: string;
+  /** `provider/modelId` of the judging model. */
+  model?: string;
+  /** No calibration VLM was configured; the conversation's model judged instead. */
+  fallback?: boolean;
+  /** The run the evaluation was recorded under, when the figure belonged to a task result. */
+  runId?: string;
+  evaluationId?: string;
+}
+
 export type TraceStep =
   | { kind: "thinking"; text: string; startedAt: number; endedAt?: number }
   | {
@@ -78,6 +91,8 @@ export type TraceStep =
       endedAt?: number;
       /** QDash figure paths the tool fetched, shown inline in the chat. */
       figures?: string[];
+      /** What an evaluation tool sent its model (qcal_evaluate). */
+      evaluation?: ToolEvaluation;
     }
   | { kind: "text"; text: string };
 

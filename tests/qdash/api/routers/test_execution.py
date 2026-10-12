@@ -193,6 +193,13 @@ def test_get_execution_lock_status_includes_latest_execution(
     }
 
 
+@pytest.fixture
+def calib_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Serve ``tmp_path`` as the calibration data tree."""
+    monkeypatch.setenv("CALIB_DATA_PATH", str(tmp_path))
+    return tmp_path
+
+
 def test_get_figure_by_path_maps_container_calib_data_path(
     test_client: TestClient,
     tmp_path: Path,
@@ -216,8 +223,9 @@ def test_get_figure_by_path_maps_container_calib_data_path(
 
 def test_download_artifact_by_path(
     test_client: TestClient,
-    tmp_path: Path,
+    calib_data: Path,
 ) -> None:
+    tmp_path = calib_data
     artifact = tmp_path / "raw_data.nc"
     artifact.write_bytes(b"netcdf")
 
@@ -230,8 +238,9 @@ def test_download_artifact_by_path(
 
 def test_download_artifacts_as_archive(
     test_client: TestClient,
-    tmp_path: Path,
+    calib_data: Path,
 ) -> None:
+    tmp_path = calib_data
     figure_dir = tmp_path / "figures"
     raw_dir = tmp_path / "raw"
     figure_dir.mkdir()
@@ -257,8 +266,9 @@ def test_download_artifacts_as_archive(
 
 def test_preview_artifact_by_path_returns_complex_table(
     test_client: TestClient,
-    tmp_path: Path,
+    calib_data: Path,
 ) -> None:
+    tmp_path = calib_data
     artifact = tmp_path / "raw_data.nc"
     PreFitRawData(
         target="Q00",
@@ -287,14 +297,65 @@ def test_preview_artifact_by_path_returns_complex_table(
 
 def test_preview_artifact_by_path_rejects_non_netcdf(
     test_client: TestClient,
-    tmp_path: Path,
+    calib_data: Path,
 ) -> None:
+    tmp_path = calib_data
     artifact = tmp_path / "figure.json"
     artifact.write_text("{}")
 
     response = test_client.get("/executions/artifact/preview", params={"path": str(artifact)})
 
     assert response.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    ["/executions/figure", "/executions/artifact", "/executions/artifact/preview"],
+)
+@pytest.mark.parametrize("escape", ["absolute", "traversal", "symlink"])
+def test_calibration_file_endpoints_serve_nothing_outside_calib_data(
+    test_client: TestClient,
+    calib_data: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+    endpoint: str,
+    escape: str,
+) -> None:
+    """These endpoints take no token, so a path must not reach other server files."""
+    secret = tmp_path_factory.mktemp("outside") / "secret.nc"
+    secret.write_bytes(b"TOP-SECRET-CONTENT")
+    if escape == "absolute":
+        path = str(secret)
+    elif escape == "traversal":
+        path = f"{calib_data}/../{secret.parent.name}/secret.nc"
+        (calib_data.parent / secret.parent.name).mkdir(exist_ok=True)
+        (calib_data.parent / secret.parent.name / "secret.nc").write_bytes(b"TOP-SECRET-CONTENT")
+    else:
+        link = calib_data / "link.nc"
+        link.symlink_to(secret)
+        path = str(link)
+
+    response = test_client.get(endpoint, params={"path": path})
+
+    assert response.status_code == 404
+    assert b"TOP-SECRET-CONTENT" not in response.content
+
+
+def test_artifact_archive_refuses_a_path_outside_calib_data(
+    test_client: TestClient,
+    calib_data: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    inside = calib_data / "figure.json"
+    inside.write_text("{}")
+    secret = tmp_path_factory.mktemp("outside") / "secret.txt"
+    secret.write_text("secret")
+
+    response = test_client.get(
+        "/executions/artifacts/archive",
+        params=[("paths", str(inside)), ("paths", str(secret))],
+    )
+
+    assert response.status_code == 404
 
 
 class TestCancelExecution:

@@ -2,8 +2,6 @@ import {
   BarChart3,
   BookMarked,
   Bot,
-  Brain,
-  CircleDot,
   ClipboardCheck,
   ClipboardList,
   Code,
@@ -78,6 +76,12 @@ export function getNavigationSections({
           icon: ClipboardList,
           match: "prefix",
         },
+        {
+          href: "/evaluations",
+          label: "AI Evaluations",
+          icon: ClipboardCheck,
+          match: "prefix",
+        },
         { href: "/tasks", label: "Tasks", icon: ListTodo, visible: canEdit },
         { href: "/cryo", label: "Cryo", icon: Snowflake },
         { href: "/import", label: "Calibration DB", icon: Database },
@@ -92,7 +96,6 @@ export function getNavigationSections({
           icon: Inbox,
           badge: unreadNotifications,
         },
-        { href: "/issues", label: "Issues", icon: CircleDot, match: "prefix" },
         {
           href: "/forum",
           label: "Forum",
@@ -100,20 +103,8 @@ export function getNavigationSections({
           match: "prefix",
         },
         {
-          href: "/issue-knowledge",
+          href: "/knowledge",
           label: "Knowledge",
-          icon: Brain,
-          match: "prefix",
-        },
-        {
-          href: "/ai-reviews",
-          label: "AI Reviews",
-          icon: ClipboardCheck,
-          match: "prefix",
-        },
-        {
-          href: "/task-knowledge",
-          label: "Task Knowledge",
           icon: BookMarked,
           match: "prefix",
         },
@@ -123,8 +114,8 @@ export function getNavigationSections({
       label: "Manage",
       items: [
         {
-          href: "/files",
-          label: "Files",
+          href: "/config",
+          label: "Config",
           icon: Files,
           match: "prefix",
           visible: canEdit,

@@ -150,7 +150,10 @@ def _build_parser() -> argparse.ArgumentParser:
     step.add_argument("--session-id", required=True)
     step.add_argument("--task", required=True)
     step.add_argument("--qid", required=True)
-    step.add_argument("--source-execution-id", required=True)
+    step.add_argument(
+        "--source-execution-id",
+        help="Execution the step was decided from, recorded for provenance; the task runs on the current calibration state",
+    )
     step.add_argument("--candidate-parameter", required=True)
     step.add_argument(
         "--parameter-overrides",
@@ -190,7 +193,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     campaign.add_argument("--session-id", required=True)
     campaign.add_argument("--qid", required=True)
-    campaign.add_argument("--source-execution-id", required=True)
+    campaign.add_argument(
+        "--source-execution-id",
+        help="Execution the step was decided from, recorded for provenance; the task runs on the current calibration state",
+    )
     campaign.add_argument("--plan", required=True, type=_campaign_plan)
     campaign.add_argument("--max-pre-dispatch-retries", type=int, default=1)
     campaign.add_argument("--max-node-executions", type=int)

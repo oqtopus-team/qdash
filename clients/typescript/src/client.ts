@@ -485,15 +485,19 @@ export class QDashClient {
     });
   }
 
+  /**
+   * Dispatch one authorized agent action. The task runs like a Task Workbench run, on the
+   * current calibration state; `sourceExecutionId` only records what it was decided from.
+   */
   async executeAgentAction(
     sessionId: string,
     actionId: string,
-    options: { sourceExecutionId: string; updateParams?: boolean; reconfigure?: boolean },
+    options: { sourceExecutionId?: string; updateParams?: boolean; reconfigure?: boolean } = {},
   ): Promise<AgentActionResponse> {
     return this.post(
       `/agent-sessions/${pathPart(sessionId)}/actions/${pathPart(actionId)}/execute`,
       {
-        source_execution_id: options.sourceExecutionId,
+        ...(options.sourceExecutionId ? { source_execution_id: options.sourceExecutionId } : {}),
         update_params: options.updateParams ?? false,
         reconfigure: options.reconfigure ?? false,
       },

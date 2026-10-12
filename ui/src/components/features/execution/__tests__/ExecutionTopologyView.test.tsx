@@ -41,8 +41,8 @@ vi.mock("@/hooks/useTopologyConfig", () => ({
   }),
 }));
 
-vi.mock("@/contexts/AnalysisChatContext", () => ({
-  useAnalysisChatContext: () => ({
+vi.mock("@/contexts/ChatDockContext", () => ({
+  useChatDock: () => ({
     openMiniChat: vi.fn(),
   }),
 }));

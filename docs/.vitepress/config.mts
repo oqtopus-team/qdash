@@ -1,7 +1,6 @@
 import { defineConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
 import { full as emoji } from "markdown-it-emoji";
-import taskKnowledgeSidebar from "./task-knowledge-sidebar.json";
 
 // Convert emoji to Fluent Emoji (flat SVG)
 function emojiToCodePoints(emoji: string): string {
@@ -125,7 +124,7 @@ export default withMermaid(
               link: "/user-guide/reviewing-results",
             },
             {
-              text: "Copilot and AI Reviews",
+              text: "Copilot",
               link: "/user-guide/copilot",
             },
             {
@@ -207,19 +206,10 @@ export default withMermaid(
                 { text: "Agent Platform", link: "/development/agent-platform" },
                 { text: "Architecture", link: "/development/copilot/architecture" },
                 { text: "Knowledge Layout", link: "/development/copilot/knowledge-layout" },
-                { text: "AI Review Evals", link: "/development/copilot/ai-review-evals" },
                 { text: "Sandbox", link: "/development/copilot/sandbox" },
-                { text: "LLM Agent", link: "/development/copilot/agent" },
                 { text: "LLM Integration Patterns", link: "/development/copilot/llm-integration-patterns" },
                 { text: "SSE Streaming", link: "/development/copilot/streaming" },
                 { text: "Tool Result Compression", link: "/development/copilot/tool-result-compression" },
-              ],
-            },
-            {
-              text: "Issues",
-              collapsed: true,
-              items: [
-                { text: "Architecture", link: "/development/issues/architecture" },
               ],
             },
             { text: "Datetime Handling", link: "/development/datetime" },
@@ -245,12 +235,6 @@ export default withMermaid(
             },
             { text: "OpenAPI", link: "/reference/openapi" },
           ],
-        },
-        {
-          text: "Task Knowledge",
-          collapsed: false,
-          link: "/task-knowledge/",
-          items: taskKnowledgeSidebar,
         },
         {
           text: "Architecture Deep Dives",

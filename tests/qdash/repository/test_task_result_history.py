@@ -47,13 +47,9 @@ def test_task_result_document_preserves_quality_metrics() -> None:
     assert document.quality_metrics == {"r2": 0.95}
 
 
-@patch("qdash.workflow.engine.task.ai_review.enqueue_ai_review_note")
 @patch("qdash.repository.task_result_history.TaskResultHistoryDocument")
-def test_save_attaches_ai_review_after_upsert(
-    mock_document: MagicMock,
-    mock_ai_review: MagicMock,
-) -> None:
-    """Repository save triggers AI review after task result persistence."""
+def test_save_upserts_document(mock_document: MagicMock) -> None:
+    """Repository save persists the task result through the document upsert."""
     task = _sample_task()
     execution_model = _sample_execution_model()
 
@@ -63,7 +59,6 @@ def test_save_attaches_ai_review_after_upsert(
         task=task,
         execution_model=execution_model,
     )
-    mock_ai_review.assert_called_once_with(task, execution_model)
 
 
 def _insert_task_result_row(**overrides: Any) -> None:
@@ -138,22 +133,3 @@ def test_find_latest_by_chip_and_qids_coerces_null_upstream_id(init_db) -> None:
 
     assert len(results) == 1
     assert results[0].upstream_id == ""
-
-
-@patch("qdash.workflow.engine.task.ai_review.enqueue_ai_review_note")
-@patch("qdash.repository.task_result_history.TaskResultHistoryDocument")
-def test_save_continues_when_ai_review_fails(
-    mock_document: MagicMock,
-    mock_ai_review: MagicMock,
-) -> None:
-    """AI review failures do not fail task result persistence."""
-    task = _sample_task()
-    execution_model = _sample_execution_model()
-    mock_ai_review.side_effect = Exception("AI review error")
-
-    MongoTaskResultHistoryRepository().save(task, execution_model)
-
-    mock_document.upsert_document.assert_called_once_with(
-        task=task,
-        execution_model=execution_model,
-    )

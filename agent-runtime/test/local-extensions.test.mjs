@@ -6,6 +6,8 @@ import { test } from "node:test";
 
 import {
   buildLocalToolGuide,
+  extensionPackage,
+  gitHead,
   isInstalledPackage,
   isLocalExtension,
   isTrustedExtension,
@@ -13,6 +15,7 @@ import {
   describeExtensionError,
   discoverExtensionCheckouts,
   trustedCheckoutRoots,
+  withoutReplacedInstalls,
 } from "../src/local-extensions.ts";
 
 test("checkouts are the package directories with a pi manifest under the mount", () => {
@@ -174,4 +177,78 @@ test("an installed copy rejected in favour of a checkout is reported as a replac
     "error",
   );
   assert.equal(describeExtensionError(installed, "Extension path does not exist", checkouts).level, "error");
+});
+
+test("an installed copy is dropped when a checkout of the same package is present", () => {
+  const checkouts = [
+    { path: "/app/extensions/pi-qdash", name: "@oqtopus-team/pi-qdash" },
+    { path: "/app/extensions/unnamed", name: null },
+  ];
+  const checkout = { path: "/app/extensions/pi-qdash/extensions/qdash.ts" };
+  const installed = { path: "/app/.pi-agent/npm/node_modules/@oqtopus-team/pi-qdash/extensions/qdash.ts" };
+  const other = { path: "/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval/extensions/qcaleval.ts" };
+  // pi lists the checkout first and the rejected installed copy after it.
+  assert.deepEqual(withoutReplacedInstalls([checkout, installed, other], checkouts), [checkout, other]);
+  // Without a checkout of that package, the installed copy stays.
+  assert.deepEqual(withoutReplacedInstalls([installed, other], []), [installed, other]);
+});
+
+test("the package of an extension file is read from the nearest manifest, with a checkout's commit", () => {
+  const dir = mkdtempSync(join(tmpdir(), "qdash-extensions-"));
+  try {
+    const checkout = join(dir, "pi-qcaleval");
+    mkdirSync(join(checkout, "extensions"), { recursive: true });
+    writeFileSync(
+      join(checkout, "package.json"),
+      JSON.stringify({ name: "@orangekame3/pi-qcaleval", version: "0.0.1", pi: {} }),
+    );
+    mkdirSync(join(checkout, ".git", "refs", "heads"), { recursive: true });
+    writeFileSync(join(checkout, ".git", "HEAD"), "ref: refs/heads/main\n");
+    writeFileSync(join(checkout, ".git", "refs", "heads", "main"), "042e454323b2438f5120ba545378bb6d89eaf3ee\n");
+    const file = join(checkout, "extensions", "qcaleval.ts");
+    writeFileSync(file, "");
+
+    assert.deepEqual(extensionPackage(file, [checkout]), {
+      name: "@orangekame3/pi-qcaleval",
+      version: "0.0.1",
+      source: "checkout",
+      commit: "042e454323b2",
+    });
+
+    const installed = join(dir, "node_modules", "@orangekame3", "pi-qcaleval");
+    mkdirSync(join(installed, "extensions"), { recursive: true });
+    writeFileSync(
+      join(installed, "package.json"),
+      JSON.stringify({ name: "@orangekame3/pi-qcaleval", version: "0.0.2-beta.5", pi: {} }),
+    );
+    const installedFile = join(installed, "extensions", "qcaleval.ts");
+    writeFileSync(installedFile, "");
+    assert.deepEqual(extensionPackage(installedFile, [checkout]), {
+      name: "@orangekame3/pi-qcaleval",
+      version: "0.0.2-beta.5",
+      source: "package",
+    });
+
+    assert.equal(extensionPackage(join(dir, "stray.ts"), [checkout]), undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a packed ref and a detached HEAD are read as the checkout's commit", () => {
+  const dir = mkdtempSync(join(tmpdir(), "qdash-git-"));
+  try {
+    mkdirSync(join(dir, ".git"), { recursive: true });
+    writeFileSync(join(dir, ".git", "HEAD"), "ref: refs/heads/main\n");
+    writeFileSync(
+      join(dir, ".git", "packed-refs"),
+      "# pack-refs with: peeled fully-peeled sorted\n9a7faeb000000000000000000000000000000000 refs/heads/main\n",
+    );
+    assert.equal(gitHead(dir), "9a7faeb00000");
+    writeFileSync(join(dir, ".git", "HEAD"), "291bd8a0000000000000000000000000000000ab\n");
+    assert.equal(gitHead(dir), "291bd8a00000");
+    assert.equal(gitHead(join(dir, "nowhere")), undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

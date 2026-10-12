@@ -7,7 +7,7 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 
 from qdash.common.utils.datetime import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel
-from qdash.datamodel.note import AiReviewModel, NoteModel
+from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import (
     BaseTaskResultModel,
@@ -66,14 +66,6 @@ class TaskResultHistoryDocument(Document):
     user_note: NoteModel = Field(
         default_factory=NoteModel,
         description="Free-form user note attached to this task result (dashboard)",
-    )
-    ai_review_note: NoteModel = Field(
-        default_factory=NoteModel,
-        description="AI-generated review note attached to this task result",
-    )
-    ai_review: AiReviewModel = Field(
-        default_factory=AiReviewModel,
-        description="Persistent AI review request state for this task result",
     )
     figure_path: list[str] = Field(..., description="The path to the figure")
     json_figure_path: list[str] = Field([], description="The path to the JSON figure")
@@ -220,15 +212,6 @@ class TaskResultHistoryDocument(Document):
                 # Mongo partial filters don't allow $ne, so use $type to match
                 # docs whose user_note.updated_at is an actual date (i.e. set).
                 partialFilterExpression={"user_note.updated_at": {"$type": "date"}},
-            ),
-            IndexModel(
-                [
-                    ("project_id", ASCENDING),
-                    ("chip_id", ASCENDING),
-                    ("ai_review_note.updated_at", DESCENDING),
-                ],
-                name="project_chip_ai_review_note_idx",
-                partialFilterExpression={"ai_review_note.updated_at": {"$type": "date"}},
             ),
             # Cool-down filter: list task results that ran in a specific
             # cool-down. Sparse so empty (legacy) rows are not indexed.
