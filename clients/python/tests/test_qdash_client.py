@@ -1862,3 +1862,43 @@ def test_agent_polling_helpers_timeout() -> None:
             )
     finally:
         client.close()
+
+
+@pytest.mark.parametrize(("source", "expected"), [(None, None), ("exec-1", "exec-1")])
+def test_execute_agent_action_sends_the_source_execution_only_when_given(
+    source: str | None, expected: str | None
+) -> None:
+    """The source execution is provenance only; the task runs on current calibration state."""
+    sent: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "action_id": "action-1",
+                "session_id": "session-1",
+                "idempotency_key": "key",
+                "action_type": "run_task",
+                "task_name": "CheckRabi",
+                "qids": ["Q04"],
+                "parameter_overrides": {},
+                "diagnosis": "",
+                "decision": "authorized",
+                "reason": "allowed",
+                "execution_status": "queued",
+                "state_version_before": 0,
+                "state_version_after": 1,
+                "created_at": "2026-10-12T00:00:00Z",
+            },
+        )
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        client.execute_agent_action("session-1", "action-1", source_execution_id=source)
+    finally:
+        client.close()
+
+    assert sent[0].get("source_execution_id") == expected
+    assert ("source_execution_id" in sent[0]) is (source is not None)
+    assert sent[0]["update_params"] is False
