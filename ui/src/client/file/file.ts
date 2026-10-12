@@ -30,6 +30,7 @@ import type {
   FileTreeNode,
   GetFileContent200,
   GetFileContentParams,
+  GetFileImageParams,
   GetGitStatus200,
   GitPullConfig200,
   GitPushConfig200,
@@ -521,6 +522,100 @@ export const useSaveFileContent = <TError = HTTPValidationError,
       return useMutation(getSaveFileContentMutationOptions(options), queryClient);
     }
     /**
+ * @summary Get an image from the config directory
+ */
+export const getFileImage = (
+    params: GetFileImageParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<Blob>(
+      {url: `/config/files/image`, method: 'GET',
+        params,
+        responseType: 'blob', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetFileImageQueryKey = (params?: GetFileImageParams,) => {
+    return [
+    `/config/files/image`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetFileImageQueryOptions = <TData = Awaited<ReturnType<typeof getFileImage>>, TError = HTTPValidationError>(params: GetFileImageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileImage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFileImageQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFileImage>>> = ({ signal }) => getFileImage(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFileImage>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetFileImageQueryResult = NonNullable<Awaited<ReturnType<typeof getFileImage>>>
+export type GetFileImageQueryError = HTTPValidationError
+
+
+export function useGetFileImage<TData = Awaited<ReturnType<typeof getFileImage>>, TError = HTTPValidationError>(
+ params: GetFileImageParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileImage>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFileImage>>,
+          TError,
+          Awaited<ReturnType<typeof getFileImage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetFileImage<TData = Awaited<ReturnType<typeof getFileImage>>, TError = HTTPValidationError>(
+ params: GetFileImageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileImage>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFileImage>>,
+          TError,
+          Awaited<ReturnType<typeof getFileImage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetFileImage<TData = Awaited<ReturnType<typeof getFileImage>>, TError = HTTPValidationError>(
+ params: GetFileImageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileImage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get an image from the config directory
+ */
+
+export function useGetFileImage<TData = Awaited<ReturnType<typeof getFileImage>>, TError = HTTPValidationError>(
+ params: GetFileImageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileImage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetFileImageQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * @summary Validate file content (YAML/JSON)
  */
 export const validateFileContent = (

@@ -27,9 +27,13 @@ import { EditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { PierreFileTree } from "@/components/ui/PierreFileTree";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DropdownMenuItem } from "@/components/ui/DropdownMenu";
-import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { MarkdownContent, type MarkdownImageLoader } from "@/components/ui/MarkdownContent";
 import { useToast } from "@/components/ui/Toast";
-import { type FileWorkspace, workspaceQueryKeys } from "@/lib/fileWorkspace";
+import {
+  type FileWorkspace,
+  resolveWorkspaceImagePath,
+  workspaceQueryKeys,
+} from "@/lib/fileWorkspace";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 import { useConfigZipDownload } from "./FilesBulkDownloadButton";
@@ -117,6 +121,18 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
   const changedFiles = useMemo(() => changedPaths(git.status), [git.status]);
   const zip = useConfigZipDownload((message) => toast.error(message));
   const isMarkdown = !!selectedFile && /\.(md|markdown)$/i.test(selectedFile);
+  // Images next to the Markdown file load through the workspace with the token.
+  const imageLoader = useMemo<MarkdownImageLoader | undefined>(
+    () =>
+      selectedFile
+        ? {
+            cacheKey: workspace.key,
+            resolve: (src) => resolveWorkspaceImagePath(selectedFile, src),
+            load: workspace.getImage,
+          }
+        : undefined,
+    [selectedFile, workspace],
+  );
 
   const saveMutation = useMutation({
     mutationFn: ({ path, content }: { path: string; content: string }) =>
@@ -518,7 +534,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                       </div>
                     )}
                     <div className="min-w-0 flex-1 overflow-auto bg-base-100 px-6 py-4">
-                      <MarkdownContent content={fileContent} />
+                      <MarkdownContent content={fileContent} imageLoader={imageLoader} />
                     </div>
                   </div>
                 ) : (

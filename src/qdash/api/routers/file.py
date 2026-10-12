@@ -116,6 +116,19 @@ def _workspace_router(
     def get_file_content(path: str, service: FileService = service_dep) -> dict[str, Any]:
         return service.get_file_content(path)
 
+    @workspace.get(
+        f"{prefix}/image",
+        summary=f"Get an image from the {label} directory",
+        operation_id=f"get{operation_prefix}FileImage",
+        response_class=FileResponse,
+        responses={
+            200: {"content": {"image/*": {"schema": {"type": "string", "format": "binary"}}}}
+        },
+    )
+    def get_file_image(path: str, service: FileService = service_dep) -> FileResponse:
+        # Images referenced from Markdown, for the preview.
+        return service.get_image(path)
+
     @workspace.put(
         f"{prefix}/content",
         summary=f"Save {label} file content",
