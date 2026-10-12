@@ -302,13 +302,15 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     } finally {
       if (ping) clearInterval(ping);
       await events.stop();
-      if (connected && !res.writableEnded) res.end();
     }
   } finally {
     try {
       await opened.close();
     } finally {
       running.delete(runKey);
+      // End the stream only once the conversation is free, so a client that
+      // sends its next message as soon as the stream ends is not refused.
+      if (!res.writableEnded) res.end();
     }
   }
 }
