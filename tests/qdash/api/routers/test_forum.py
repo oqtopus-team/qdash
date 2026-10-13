@@ -393,6 +393,24 @@ def test_create_root_post_auto_labels_task_result_link(test_client, init_db):
     assert "task-result" in root.json()["labels"]
 
 
+def test_create_post_creates_missing_task_result_system_label(test_client, init_db):
+    """A project with labels but no task-result label gets the system label created on demand."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+    ForumLabelDocument(
+        project_id="test_project", key="review", name="Review", color="#3b82f6"
+    ).insert()
+
+    root = _create_post(test_client, headers, content="See /task-results/abc123")
+
+    assert root.status_code == 201, root.text
+    assert "task-result" in root.json()["labels"]
+    label = ForumLabelDocument.find_one({"project_id": "test_project", "key": "task-result"}).run()
+    assert label is not None
+    assert label.is_system is True
+
+
 def test_create_post_without_link_has_no_task_result_label(test_client, init_db):
     """Threads without a task-result link are not auto-labeled."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
