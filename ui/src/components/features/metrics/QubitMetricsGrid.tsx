@@ -85,6 +85,7 @@ interface GridCellProps {
   onClick: () => void;
 }
 
+/** Renders a single qubit cell with its QID label, metric value, and hover tooltip. */
 const GridCell = memo(function GridCell({
   qid,
   value,
@@ -121,7 +122,7 @@ const GridCell = memo(function GridCell({
       {/* QID Label */}
       {showLabels && (
         <div
-          className={`absolute top-0.5 left-0.5 backdrop-blur-sm px-0.5 py-px rounded font-bold shadow-sm leading-tight ${
+          className={`absolute top-0.5 left-0.5 px-0.5 py-px rounded font-bold shadow-sm leading-tight ${
             value !== null && value !== undefined
               ? "bg-black/30 text-white"
               : "bg-base-content/20 text-base-content"
