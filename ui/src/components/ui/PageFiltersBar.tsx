@@ -72,7 +72,7 @@ function FilterItem({ children, label, className = "" }: FilterItemProps) {
   return (
     <div className={`w-full sm:w-auto ${className}`}>
       {label && (
-        <label className="label py-1 sm:hidden">
+        <label className="label flex py-1 sm:hidden">
           <span className="label-text text-xs text-base-content/60">{label}</span>
         </label>
       )}
