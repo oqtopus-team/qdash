@@ -113,6 +113,9 @@ const EDITOR_OPTIONS = {
 
 type SidePanel = "explorer" | "properties";
 
+/**
+ * Flow editor page with code editor, metadata side panel, and properties modal.
+ */
 export function WorkflowEditorPageContent() {
   const router = useRouter();
   const params = useParams();
@@ -1071,6 +1074,7 @@ export function WorkflowEditorPageContent() {
                         placeholder="simple_flow"
                         className="input input-bordered input-sm"
                         value={flowFunctionName}
+                        autoComplete="off"
                         onChange={(e) => setFlowFunctionName(e.target.value)}
                       />
                     </label>
@@ -1085,6 +1089,7 @@ export function WorkflowEditorPageContent() {
                         placeholder="your_username"
                         className="input input-bordered input-sm"
                         value={username}
+                        autoComplete="off"
                         onChange={(e) => setUsername(e.target.value)}
                       />
                     </label>
@@ -1099,6 +1104,7 @@ export function WorkflowEditorPageContent() {
                         placeholder="64Qv3"
                         className="input input-bordered input-sm"
                         value={chipId}
+                        autoComplete="off"
                         onChange={(e) => setChipId(e.target.value)}
                       />
                     </label>
@@ -1113,6 +1119,7 @@ export function WorkflowEditorPageContent() {
                         placeholder="tag1, tag2, tag3"
                         className="input input-bordered input-sm"
                         value={tags}
+                        autoComplete="off"
                         onChange={(e) => setTags(e.target.value)}
                       />
                     </label>
@@ -1127,6 +1134,7 @@ export function WorkflowEditorPageContent() {
                         placeholder="150 * 1024"
                         className="input input-bordered input-sm"
                         value={defaultInterval}
+                        autoComplete="off"
                         onChange={(e) => setDefaultInterval(e.target.value)}
                       />
                     </label>
@@ -1608,6 +1616,7 @@ export function WorkflowEditorPageContent() {
                     placeholder="simple_flow"
                     className="input input-bordered input-sm"
                     value={flowFunctionName}
+                    autoComplete="off"
                     onChange={(e) => setFlowFunctionName(e.target.value)}
                   />
                   <label className="label">
@@ -1627,6 +1636,7 @@ export function WorkflowEditorPageContent() {
                     placeholder="your_username"
                     className="input input-bordered input-sm"
                     value={username}
+                    autoComplete="off"
                     onChange={(e) => setUsername(e.target.value)}
                   />
                 </div>
@@ -1641,6 +1651,7 @@ export function WorkflowEditorPageContent() {
                     placeholder="64Qv3"
                     className="input input-bordered input-sm"
                     value={chipId}
+                    autoComplete="off"
                     onChange={(e) => setChipId(e.target.value)}
                   />
                 </div>
@@ -1655,6 +1666,7 @@ export function WorkflowEditorPageContent() {
                     placeholder="tag1, tag2, tag3"
                     className="input input-bordered input-sm"
                     value={tags}
+                    autoComplete="off"
                     onChange={(e) => setTags(e.target.value)}
                   />
                   <label className="label">
@@ -1672,6 +1684,7 @@ export function WorkflowEditorPageContent() {
                     placeholder="150 * 1024"
                     className="input input-bordered input-sm"
                     value={defaultInterval}
+                    autoComplete="off"
                     onChange={(e) => setDefaultInterval(e.target.value)}
                   />
                   <label className="label">

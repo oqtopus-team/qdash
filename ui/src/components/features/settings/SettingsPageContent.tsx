@@ -103,6 +103,7 @@ function CopilotSettingsPanel() {
   );
 }
 
+/** Panel for editing the current user's profile (display name and avatar). */
 function ProfileSettingsPanel() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -158,6 +159,7 @@ function ProfileSettingsPanel() {
               <input
                 className="input input-bordered w-full"
                 value={displayName}
+                autoComplete="off"
                 onChange={(event) => setDisplayName(event.target.value)}
                 placeholder={user?.username ?? "Display name"}
                 maxLength={100}
@@ -221,6 +223,7 @@ function ProfileSettingsPanel() {
   );
 }
 
+/** Panel for managing a project's members, invites, and roles. */
 function ProjectMembersPanel() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -419,6 +422,7 @@ function ProjectMembersPanel() {
               <input
                 className="input input-bordered w-full"
                 value={inviteUsername}
+                autoComplete="off"
                 onChange={(event) => setInviteUsername(event.target.value)}
                 placeholder="Username"
               />

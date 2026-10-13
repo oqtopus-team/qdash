@@ -86,6 +86,7 @@ export function SearchInput({
         className="grow"
         placeholder={placeholder}
         value={value}
+        autoComplete="off"
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Escape" && !event.nativeEvent.isComposing && value) {

@@ -761,6 +761,7 @@ function ForumThreadPreviewSidebar({
   );
 }
 
+/** Forum page listing threads with filters and category management. */
 export function ForumPageContent() {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -1125,18 +1126,21 @@ export function ForumPageContent() {
               <input
                 className="input input-bordered input-sm"
                 value={categoryKey}
+                autoComplete="off"
                 onChange={(event) => setCategoryKey(event.target.value)}
                 placeholder="key"
               />
               <input
                 className="input input-bordered input-sm"
                 value={categoryName}
+                autoComplete="off"
                 onChange={(event) => setCategoryName(event.target.value)}
                 placeholder="Name"
               />
               <input
                 className="input input-bordered input-sm"
                 value={categoryDescription}
+                autoComplete="off"
                 onChange={(event) => setCategoryDescription(event.target.value)}
                 placeholder="Description"
               />

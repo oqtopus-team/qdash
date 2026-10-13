@@ -248,6 +248,7 @@ function CryoLoadingSkeleton() {
   );
 }
 
+/** Modal form for creating a new cryostat. */
 function NewCryostatModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const create = useCreateCryostat();
   const [cryoId, setCryoId] = useState("");
@@ -279,6 +280,7 @@ function NewCryostatModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <input
             className="input input-sm input-bordered w-full"
             value={cryoId}
+            autoComplete="off"
             onChange={(e) => setCryoId(e.target.value)}
             placeholder="K-101"
             autoFocus
@@ -288,6 +290,7 @@ function NewCryostatModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <input
             className="input input-sm input-bordered w-full"
             value={name}
+            autoComplete="off"
             onChange={(e) => setName(e.target.value)}
             placeholder="Triton XL #2"
           />
@@ -296,6 +299,7 @@ function NewCryostatModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <input
             className="input input-sm input-bordered w-full"
             value={manufacturer}
+            autoComplete="off"
             onChange={(e) => setManufacturer(e.target.value)}
             placeholder="Oxford Instruments"
           />
@@ -304,6 +308,7 @@ function NewCryostatModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <input
             className="input input-sm input-bordered w-full"
             value={model}
+            autoComplete="off"
             onChange={(e) => setModel(e.target.value)}
             placeholder="Triton 200"
           />
@@ -312,6 +317,7 @@ function NewCryostatModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <input
             className="input input-sm input-bordered w-full"
             value={location}
+            autoComplete="off"
             onChange={(e) => setLocation(e.target.value)}
             placeholder="Lab B-204"
           />
@@ -328,6 +334,7 @@ function NewCryostatModal({ onClose, onCreated }: { onClose: () => void; onCreat
   );
 }
 
+/** Modal form for creating a new cool-down for a cryostat. */
 function NewCooldownModal({
   cryoId,
   onClose,
@@ -359,6 +366,7 @@ function NewCooldownModal({
         <input
           className="input input-sm input-bordered w-full"
           value={cooldownId}
+          autoComplete="off"
           onChange={(e) => setCooldownId(e.target.value)}
           placeholder="2026-001"
           autoFocus

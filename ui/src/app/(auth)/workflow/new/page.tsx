@@ -25,6 +25,9 @@ type TemplateOption = {
   description?: string;
 };
 
+/**
+ * New flow creation page with a code editor and flow metadata form.
+ */
 export default function NewFlowPage() {
   const router = useRouter();
   const toast = useToast();
@@ -326,6 +329,7 @@ export default function NewFlowPage() {
                     placeholder="my_flow"
                     className="input input-bordered input-sm"
                     value={name}
+                    autoComplete="off"
                     onChange={(e) => setName(e.target.value)}
                   />
                   <label className="label">
@@ -357,6 +361,7 @@ export default function NewFlowPage() {
                     placeholder="simple_flow"
                     className="input input-bordered input-sm"
                     value={flowFunctionName}
+                    autoComplete="off"
                     onChange={(e) => setFlowFunctionName(e.target.value)}
                   />
                   <label className="label">
@@ -375,6 +380,7 @@ export default function NewFlowPage() {
                     placeholder="your_username"
                     className="input input-bordered input-sm"
                     value={username}
+                    autoComplete="off"
                     onChange={(e) => setUsername(e.target.value)}
                   />
                 </div>
@@ -388,6 +394,7 @@ export default function NewFlowPage() {
                     placeholder="64Qv3"
                     className="input input-bordered input-sm"
                     value={chipId}
+                    autoComplete="off"
                     onChange={(e) => setChipId(e.target.value)}
                   />
                 </div>
@@ -401,6 +408,7 @@ export default function NewFlowPage() {
                     placeholder="tag1, tag2, tag3"
                     className="input input-bordered input-sm"
                     value={tags}
+                    autoComplete="off"
                     onChange={(e) => setTags(e.target.value)}
                   />
                   <label className="label">
