@@ -212,6 +212,7 @@ export function ForumLabelPicker({
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={handleSearchKeyDown}
               placeholder="Filter labels"
+              aria-label="Filter labels"
               className="input input-bordered input-xs w-full"
             />
           </div>

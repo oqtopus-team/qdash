@@ -741,6 +741,13 @@ class ForumService:
             raise HTTPException(status_code=404, detail="Forum label not found")
 
         if name is not None:
+            normalized_name = name.strip().lower()
+            others = ForumLabelDocument.find({"project_id": project_id}).to_list()
+            if any(
+                other.key != key and other.name.strip().lower() == normalized_name
+                for other in others
+            ):
+                raise HTTPException(status_code=409, detail="Forum label already exists")
             doc.name = name
         if description is not None:
             doc.description = description

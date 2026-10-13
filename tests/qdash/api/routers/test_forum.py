@@ -1,6 +1,7 @@
 """Tests for forum router endpoints."""
 
 import re
+import secrets
 
 import pytest
 from pymongo.errors import DuplicateKeyError
@@ -237,6 +238,40 @@ def test_owner_can_create_update_and_delete_forum_label(test_client, init_db):
 
     listed = test_client.get("/forum/labels", headers=headers)
     assert "hardware" not in {item["key"] for item in listed.json()["labels"]}
+
+
+def test_update_forum_label_rejects_case_insensitive_duplicate_name(test_client, init_db):
+    """Renaming a label to another label's name, ignoring case, is rejected with 409."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+    test_client.get("/forum/labels", headers=headers)  # seed defaults
+
+    created = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Hardware", "color": "#111111"}
+    )
+    assert created.status_code == 201, created.text
+
+    response = test_client.patch("/forum/labels/hardware", headers=headers, json={"name": "REVIEW"})
+    assert response.status_code == 409
+
+
+def test_update_forum_label_allows_case_variant_of_own_name(test_client, init_db):
+    """Renaming a label to a different casing of its own name succeeds."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Hardware", "color": "#111111"}
+    )
+    assert created.status_code == 201, created.text
+
+    response = test_client.patch(
+        "/forum/labels/hardware", headers=headers, json={"name": "HARDWARE"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["name"] == "HARDWARE"
 
 
 def test_create_forum_label_with_japanese_only_name_gets_random_key(test_client, init_db):
@@ -1222,7 +1257,7 @@ def _create_custom_labels(test_client, headers, count):
 
 def test_make_label_key_random_exhaustion_raises(monkeypatch):
     """A non-ASCII name whose random keys always collide fails with a 500."""
-    monkeypatch.setattr(forum_service.secrets, "token_hex", lambda _n: "abcdef")
+    monkeypatch.setattr(secrets, "token_hex", lambda _n: "abcdef")
     with pytest.raises(HTTPException) as exc_info:
         forum_service.ForumService._make_label_key("日本語", {"label-abcdef"})
     assert exc_info.value.status_code == 500
