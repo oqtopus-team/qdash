@@ -1103,10 +1103,24 @@ class FlowDocument(Document):
 
 ### ForumLabelDocument
 
-Custom, project-scoped forum labels, similar to GitHub issue labels. Threads can carry any number
-of labels as long as each key exists as a `ForumLabelDocument` for the project. The `task-result`
-label is a system label (`is_system=True`) that QDash assigns automatically to a thread when a
-post links a calibration task result; operators can rename or recolor it but not delete it.
+Custom, project-scoped forum labels, similar to GitHub issue labels. Threads can carry up to 10
+labels (the system `task-result` label is not counted), and each key must exist as a
+`ForumLabelDocument` for the project. The `task-result` label is a system label
+(`is_system=True`) that QDash assigns automatically to a thread when a post links a calibration
+task result; operators can rename or recolor it but not delete it.
+
+The `task-result` label is sticky: it is added when a post links a task result and is not removed
+when the link is later edited away. Operators can remove it from a thread manually, but if the content still contains a task-result
+link, a later content edit adds it again.
+
+Legacy data: the default labels `review` and `anomaly` are seeded with the same keys the former
+fixed label system used. Older label values (`discussion`, `info`, `mtg`, `resolved`) were already
+collapsed to `review`/`anomaly`/status by the existing `migrate-forum-status` migration
+(`python -m qdash.dbmodel.migration migrate-forum-status`), so no new migration is needed.
+
+> **Warning:** `migrate-forum-status` is a one-time legacy migration. It collapses every label to
+> `review`/`anomaly` and keeps only one label per thread, so do not re-run it once custom labels are
+> in use.
 
 Collection: `forum_label`
 

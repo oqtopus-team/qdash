@@ -37,7 +37,11 @@ import {
   getForumCategory,
   toForumCategoryDefinition,
 } from "./categories";
-import { ForumLabelPicker, MAX_FORUM_POST_LABELS } from "./ForumLabelSelector";
+import {
+  ForumLabelPicker,
+  isForumLabelLimitReached,
+  MAX_FORUM_POST_LABELS,
+} from "./ForumLabelSelector";
 import type { ForumBlockSnapshotGetter, ForumMentionCandidate } from "./ForumBlockEditor";
 
 const ForumBlockEditor = dynamic(
@@ -73,6 +77,7 @@ export function parseLabels(values: string[]): string[] {
   return result;
 }
 
+/** Page for composing a new forum thread. */
 export function ForumNewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -169,7 +174,8 @@ export function ForumNewPage() {
   const toggleLabel = (label: string) => {
     setSelectedLabels((current) => {
       if (current.includes(label)) return current.filter((item) => item !== label);
-      if (current.length >= MAX_FORUM_POST_LABELS) return current;
+      const isSystem = labels.find((item) => item.id === label)?.isSystem;
+      if (!isSystem && isForumLabelLimitReached(current, labels)) return current;
       return [...current, label];
     });
   };

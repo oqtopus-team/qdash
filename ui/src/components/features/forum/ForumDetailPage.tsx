@@ -55,7 +55,7 @@ import {
   toForumCategoryDefinition,
 } from "./categories";
 import { ForumLabelBadge } from "./ForumLabelBadge";
-import { ForumLabelPicker, MAX_FORUM_POST_LABELS } from "./ForumLabelSelector";
+import { ForumLabelPicker, isForumLabelLimitReached } from "./ForumLabelSelector";
 import { type ForumBlockSnapshotGetter, type ForumMentionCandidate } from "./ForumBlockEditor";
 import { ForumPostContent } from "./ForumPostContent";
 import { ForumThreadDownloadButton } from "./ForumThreadDownloadButton";
@@ -265,6 +265,7 @@ function PostBody({
   );
 }
 
+/** Page showing a forum thread with its replies and metadata controls. */
 export function ForumDetailPage({ postId }: { postId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -594,7 +595,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     const currentLabels = post.labels ?? [];
     const nextLabels = currentLabels.includes(label)
       ? currentLabels.filter((item) => item !== label)
-      : currentLabels.length >= MAX_FORUM_POST_LABELS
+      : !labels.find((item) => item.id === label)?.isSystem &&
+          isForumLabelLimitReached(currentLabels, labels)
         ? currentLabels
         : [...currentLabels, label];
     updateRootMetadata({ labels: nextLabels });

@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 
 import { getForumLabelErrorMessage, type ForumLabelDefinition } from "../categories";
 import {
+  countLimitedForumLabels,
   filterForumLabels,
   getForumLabelEnterAction,
+  isForumLabelLimitReached,
+  MAX_FORUM_POST_LABELS,
   shouldShowCreateForumLabelOption,
 } from "../ForumLabelSelector";
 
@@ -82,6 +85,29 @@ describe("shouldShowCreateForumLabelOption", () => {
   });
 });
 
+describe("countLimitedForumLabels", () => {
+  it("excludes system labels from the count", () => {
+    expect(countLimitedForumLabels(["bug", "enhancement", "readout"], LABELS)).toBe(2);
+  });
+
+  it("counts unknown keys toward the limit", () => {
+    expect(countLimitedForumLabels(["bug", "unknown"], LABELS)).toBe(1);
+  });
+});
+
+describe("isForumLabelLimitReached", () => {
+  const custom = Array.from({ length: MAX_FORUM_POST_LABELS }, (_, i) => `custom-${i}`);
+
+  it("is reached when the non-system count hits the maximum", () => {
+    expect(isForumLabelLimitReached(custom, LABELS)).toBe(true);
+  });
+
+  it("is not reached when a system label brings the total over the maximum", () => {
+    expect(isForumLabelLimitReached([...custom.slice(1), "bug"], LABELS)).toBe(false);
+    expect(isForumLabelLimitReached([...custom.slice(1), "bug", "readout"], LABELS)).toBe(true);
+  });
+});
+
 describe("getForumLabelEnterAction", () => {
   it("toggles the first filtered label when there are matches and it is not disabled", () => {
     expect(getForumLabelEnterAction([LABELS[0], LABELS[1]], [], false, true)).toEqual({
@@ -98,7 +124,14 @@ describe("getForumLabelEnterAction", () => {
   });
 
   it("does nothing when the first filtered label is unselected and at the limit", () => {
-    expect(getForumLabelEnterAction([LABELS[0]], [], true, true)).toEqual({ type: "none" });
+    expect(getForumLabelEnterAction([LABELS[1]], [], true, true)).toEqual({ type: "none" });
+  });
+
+  it("toggles an unselected system label even at the limit", () => {
+    expect(getForumLabelEnterAction([LABELS[0]], [], true, true)).toEqual({
+      type: "toggle",
+      labelId: "bug",
+    });
   });
 
   it("creates a label when there are no filtered matches and the create option is visible", () => {

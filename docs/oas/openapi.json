@@ -21372,9 +21372,9 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 10,
+            "maxItems": 11,
             "title": "Labels",
-            "description": "Operator labels for root threads (up to 10)"
+            "description": "Operator labels for root threads (up to 10, not counting the system task-result label)"
           },
           "assignee_username": {
             "anyOf": [
@@ -21578,7 +21578,7 @@
             },
             "type": "array",
             "title": "Labels",
-            "description": "Operator labels for root threads (up to 10)"
+            "description": "Operator labels for root threads (up to 10, not counting the system task-result label)"
           },
           "assignee_username": {
             "anyOf": [
@@ -21772,14 +21772,14 @@
                   "type": "string"
                 },
                 "type": "array",
-                "maxItems": 10
+                "maxItems": 11
               },
               {
                 "type": "null"
               }
             ],
             "title": "Labels",
-            "description": "Updated operator labels for root threads (up to 10)"
+            "description": "Updated operator labels for root threads (up to 10, not counting the system task-result label)"
           },
           "assignee_username": {
             "anyOf": [

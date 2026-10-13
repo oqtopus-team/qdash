@@ -7,6 +7,6 @@
  */
 
 /**
- * Updated operator labels for root threads (up to 10)
+ * Updated operator labels for root threads (up to 10, not counting the system task-result label)
  */
 export type ForumPostUpdateLabels = string[] | null;

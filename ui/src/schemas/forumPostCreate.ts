@@ -40,8 +40,8 @@ export interface ForumPostCreate {
   /** Parent forum post ID for replies. None for root threads. */
   parent_id?: ForumPostCreateParentId;
   /**
-     * Operator labels for root threads (up to 10)
-     * @maxItems 10
+     * Operator labels for root threads (up to 10, not counting the system task-result label)
+     * @maxItems 11
      */
   labels?: string[];
   /** Assigned project member username */

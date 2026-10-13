@@ -17,6 +17,7 @@ from pymongo.errors import DuplicateKeyError
 from starlette.exceptions import HTTPException
 
 from qdash.api.schemas.forum import (
+    MAX_FORUM_POST_LABELS,
     ForumCategoryResponse,
     ForumLabelResponse,
     ForumPostResponse,
@@ -646,14 +647,8 @@ class ForumService:
             return
 
         for item in DEFAULT_FORUM_LABELS:
-            try:
-                if ForumLabelDocument.find_one(
-                    {"project_id": project_id, "key": item["key"]}
-                ).run():
-                    continue
+            with contextlib.suppress(DuplicateKeyError):
                 ForumLabelDocument(project_id=project_id, **item).insert()
-            except DuplicateKeyError:
-                continue
 
     @staticmethod
     def _ensure_task_result_label(project_id: str) -> None:
@@ -667,9 +662,8 @@ class ForumService:
             ForumLabelDocument(project_id=project_id, **spec).insert()
 
     def _with_task_result_label(self, project_id: str, labels: list[str]) -> list[str]:
-        """Ensure the task-result label exists and append it to labels if absent."""
-        if TASK_RESULT_LABEL_KEY in labels:
-            return list(labels)
+        """Ensure the project's labels exist and append the task-result label; callers must check it is absent."""
+        self._ensure_default_labels(project_id)
         self._ensure_task_result_label(project_id)
         return [*labels, TASK_RESULT_LABEL_KEY]
 
@@ -680,14 +674,15 @@ class ForumService:
             return []
 
         self._ensure_default_labels(project_id)
-        existing_keys = {
-            doc.key
-            for doc in ForumLabelDocument.find(
-                {"project_id": project_id, "key": {"$in": normalized}}
-            ).to_list()
-        }
+        docs = ForumLabelDocument.find(
+            {"project_id": project_id, "key": {"$in": normalized}}
+        ).to_list()
+        existing_keys = {doc.key for doc in docs}
         if any(value not in existing_keys for value in normalized):
             raise HTTPException(status_code=422, detail="Unknown forum label")
+        system_keys = {doc.key for doc in docs if doc.is_system}
+        if len([value for value in normalized if value not in system_keys]) > MAX_FORUM_POST_LABELS:
+            raise HTTPException(status_code=422, detail="Too many forum labels")
         return normalized
 
     def list_labels(self, *, project_id: str) -> ListForumLabelsResponse:

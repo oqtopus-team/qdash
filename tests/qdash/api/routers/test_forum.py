@@ -2,9 +2,14 @@
 
 import re
 
+import pytest
+from pymongo.errors import DuplicateKeyError
+from starlette.exceptions import HTTPException
+
 from qdash.api.services import forum_service
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.forum import ForumLabelDocument
 from qdash.dbmodel.notification import NotificationDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
@@ -1192,3 +1197,186 @@ def test_forum_thread_about_a_task_result(test_client, init_db):
     )
     assert explicit.status_code == 201, explicit.text
     assert (explicit.json()["chip_id"], explicit.json()["target_id"]) == ("chip-9", "0")
+
+
+def _setup_owner():
+    """Create the owner and project, returning the owner's headers."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    return _headers("owner_token")
+
+
+def _create_custom_labels(test_client, headers, count):
+    """Create ``count`` custom labels and return their keys."""
+    keys = []
+    for index in range(count):
+        response = test_client.post(
+            "/forum/labels",
+            headers=headers,
+            json={"name": f"custom{index}", "color": "#123456"},
+        )
+        assert response.status_code == 201, response.text
+        keys.append(response.json()["key"])
+    return keys
+
+
+def test_make_label_key_random_exhaustion_raises(monkeypatch):
+    """A non-ASCII name whose random keys always collide fails with a 500."""
+    monkeypatch.setattr(forum_service.secrets, "token_hex", lambda _n: "abcdef")
+    with pytest.raises(HTTPException) as exc_info:
+        forum_service.ForumService._make_label_key("日本語", {"label-abcdef"})
+    assert exc_info.value.status_code == 500
+
+
+def test_make_label_key_suffix_exhaustion_raises():
+    """A slug whose numeric suffixes are all taken fails with a 500."""
+    existing = {"dup", *(f"dup-{n}" for n in range(2, 1000))}
+    with pytest.raises(HTTPException) as exc_info:
+        forum_service.ForumService._make_label_key("dup", existing)
+    assert exc_info.value.status_code == 500
+
+
+def test_create_forum_label_insert_race_returns_conflict(test_client, init_db, monkeypatch):
+    """A duplicate-key error on insert is reported as a 409."""
+    headers = _setup_owner()
+    test_client.get("/forum/labels", headers=headers)
+
+    def _raise(*_args, **_kwargs):
+        """Simulate a concurrent insert of the same label."""
+        raise DuplicateKeyError("dup")
+
+    monkeypatch.setattr(ForumLabelDocument, "insert", _raise)
+    response = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Racy", "color": "#111111"}
+    )
+    assert response.status_code == 409
+
+
+def test_update_and_delete_unknown_forum_label_return_404(test_client, init_db):
+    """Updating or deleting a missing label returns 404."""
+    headers = _setup_owner()
+
+    patched = test_client.patch("/forum/labels/missing", headers=headers, json={"name": "X"})
+    assert patched.status_code == 404
+    deleted = test_client.delete("/forum/labels/missing", headers=headers)
+    assert deleted.status_code == 404
+
+
+def test_update_forum_label_description_round_trips(test_client, init_db):
+    """Label descriptions can be updated."""
+    headers = _setup_owner()
+
+    updated = test_client.patch(
+        "/forum/labels/review", headers=headers, json={"description": "Needs a look"}
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["description"] == "Needs a look"
+    listed = test_client.get("/forum/labels", headers=headers)
+    review = next(item for item in listed.json()["labels"] if item["key"] == "review")
+    assert review["description"] == "Needs a look"
+
+
+def test_update_reply_with_task_result_link_labels_root_thread(test_client, init_db):
+    """Editing a reply to add a task-result link labels the root thread."""
+    headers = _setup_owner()
+    root = _create_post(test_client, headers, content="Plain root")
+    root_id = root.json()["id"]
+    reply = _create_post(test_client, headers, title=None, content="Plain reply", parent_id=root_id)
+    assert reply.status_code == 201, reply.text
+
+    updated = test_client.patch(
+        f"/forum/posts/{reply.json()['id']}",
+        headers=headers,
+        json={"category": "qubit", "title": None, "content": "see /task-results/abc-1"},
+    )
+    assert updated.status_code == 200, updated.text
+
+    fetched_root = test_client.get(f"/forum/posts/{root_id}", headers=headers)
+    assert "task-result" in fetched_root.json()["labels"]
+
+
+def test_task_result_label_not_counted_toward_label_limit(test_client, init_db):
+    """Ten custom labels plus the auto task-result label are accepted and round-trip."""
+    headers = _setup_owner()
+    keys = _create_custom_labels(test_client, headers, 10)
+
+    root = _create_post(test_client, headers, content="See /task-results/abc-1", labels=keys)
+    assert root.status_code == 201, root.text
+    labels = root.json()["labels"]
+    assert len(labels) == 11
+    assert "task-result" in labels
+
+    updated = test_client.patch(
+        f"/forum/posts/{root.json()['id']}",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": root.json()["title"],
+            "content": "Edited",
+            "labels": labels,
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["labels"] == labels
+
+
+def test_too_many_non_system_labels_rejected(test_client, init_db):
+    """Eleven non-system labels exceed the limit; twelve keys fail schema validation."""
+    headers = _setup_owner()
+    keys = _create_custom_labels(test_client, headers, 12)
+
+    too_many = _create_post(test_client, headers, labels=keys[:11])
+    assert too_many.status_code == 422
+    assert too_many.json()["detail"] == "Too many forum labels"
+
+    too_many_keys = _create_post(test_client, headers, labels=keys)
+    assert too_many_keys.status_code == 422
+
+
+def test_task_result_label_is_sticky_when_link_removed(test_client, init_db):
+    """Removing the task-result link from a post keeps the label on the thread."""
+    headers = _setup_owner()
+    test_client.get("/forum/labels", headers=headers)
+    root = _create_post(test_client, headers, content="See /task-results/abc-1")
+    assert "task-result" in root.json()["labels"]
+
+    updated = test_client.patch(
+        f"/forum/posts/{root.json()['id']}",
+        headers=headers,
+        json={"category": "qubit", "title": root.json()["title"], "content": "Link removed"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert "task-result" in updated.json()["labels"]
+
+
+def test_first_task_result_post_still_seeds_default_labels(test_client, init_db):
+    """A task-result link as the first forum action in a project still seeds default labels."""
+    headers = _setup_owner()
+    root = _create_post(test_client, headers, content="See /task-results/abc-1")
+    assert root.status_code == 201, root.text
+
+    labels = test_client.get("/forum/labels", headers=headers).json()["labels"]
+    assert {"review", "anomaly", "task-result"} <= {item["key"] for item in labels}
+
+    labeled = _create_post(test_client, headers, labels=["review"])
+    assert labeled.status_code == 201, labeled.text
+
+
+def test_thread_with_default_labels_can_be_updated_unchanged(test_client, init_db):
+    """A thread carrying default labels accepts its own labels back in an update."""
+    headers = _setup_owner()
+    root = _create_post(test_client, headers, labels=["review", "anomaly"])
+    assert root.status_code == 201, root.text
+
+    updated = test_client.patch(
+        f"/forum/posts/{root.json()['id']}",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": root.json()["title"],
+            "content": root.json()["content"],
+            "labels": ["review", "anomaly"],
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["labels"] == ["review", "anomaly"]

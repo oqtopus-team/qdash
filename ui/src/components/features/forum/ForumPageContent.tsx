@@ -65,7 +65,7 @@ import {
 } from "./categories";
 import { ForumLabelBadge } from "./ForumLabelBadge";
 import { ForumLabelManager } from "./ForumLabelManager";
-import { ForumLabelPicker, MAX_FORUM_POST_LABELS } from "./ForumLabelSelector";
+import { ForumLabelPicker, isForumLabelLimitReached } from "./ForumLabelSelector";
 import { ForumPostContent } from "./ForumPostContent";
 
 const PAGE_SIZE = 30;
@@ -280,6 +280,7 @@ function ForumThreadCard({
   );
 }
 
+/** Sidebar previewing a selected forum thread with editable metadata. */
 function ForumThreadPreviewSidebar({
   postId,
   categories,
@@ -434,7 +435,8 @@ function ForumThreadPreviewSidebar({
     const currentLabels = post.labels ?? [];
     const nextLabels = currentLabels.includes(labelId)
       ? currentLabels.filter((item) => item !== labelId)
-      : currentLabels.length >= MAX_FORUM_POST_LABELS
+      : !labels.find((item) => item.id === labelId)?.isSystem &&
+          isForumLabelLimitReached(currentLabels, labels)
         ? currentLabels
         : [...currentLabels, labelId];
     updateMetadata({ labels: nextLabels });
