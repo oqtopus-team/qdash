@@ -22,26 +22,20 @@ src/app/
 │   ├── cryo/page.tsx           # /cryo
 │   ├── dashboard/page.tsx      # /dashboard
 │   ├── execution/page.tsx      # /execution
-│   ├── files/page.tsx          # /files
+│   ├── config/page.tsx         # /config (Qubex config editor)
 │   ├── forum/
 │   │   ├── page.tsx            # /forum
 │   │   └── [postId]/page.tsx   # /forum/:postId
 │   ├── import/page.tsx         # /import
 │   ├── home/page.tsx           # /home (default landing page)
 │   ├── inbox/page.tsx          # /inbox
-│   ├── issue-knowledge/
-│   │   ├── page.tsx            # /issue-knowledge
-│   │   └── [knowledgeId]/page.tsx # /issue-knowledge/:knowledgeId
-│   ├── issues/
-│   │   ├── page.tsx            # /issues
-│   │   └── [issueId]/
-│   │       └── page.tsx        # /issues/:issueId
 │   ├── metrics/page.tsx        # /metrics
 │   ├── provenance/page.tsx     # /provenance
 │   ├── settings/page.tsx       # /settings
-│   ├── task-knowledge/
-│   │   ├── page.tsx            # /task-knowledge
-│   │   └── [taskName]/page.tsx # /task-knowledge/:taskName
+│   ├── knowledge/
+│   │   ├── page.tsx            # /knowledge
+│   │   ├── files/page.tsx      # /knowledge/files (knowledge repo file editor)
+│   │   └── [taskName]/page.tsx # /knowledge/:taskName
 │   ├── task-results/
 │   │   ├── page.tsx            # /task-results
 │   │   └── [taskId]/page.tsx   # /task-results/:taskId
@@ -112,13 +106,11 @@ components/
 │   ├── cryo/               # Cryostat monitoring components
 │   ├── dashboard/          # Dashboard components
 │   ├── execution/          # Execution page components
-│   ├── files/              # File management components
+│   ├── files/              # Git workspace editor + toolbar (config and knowledge)
 │   ├── flow/               # Flow editor components
 │   ├── forum/              # Forum components
 │   ├── import/             # Data import components
 │   ├── inbox/              # Inbox components
-│   ├── issue-knowledge/    # Issue-derived knowledge components
-│   ├── issues/             # Issue tracking components
 │   ├── metrics/            # Metrics dashboard components
 │   ├── provenance/         # Data provenance components
 │   ├── qubit/              # Qubit detail components
@@ -129,7 +121,7 @@ components/
 │
 ├── layout/                 # Layout components
 │   ├── AppLayout.tsx       # Main app layout
-│   └── AnalysisSidebar.tsx # Analysis page sidebar
+│   └── ChatSidebar.tsx     # Docked chat sidebar (Ask AI)
 │
 └── selectors/              # Selection/input components
     ├── ChipSelector/       # Chip dropdown

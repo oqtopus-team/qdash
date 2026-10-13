@@ -50,8 +50,12 @@ def _task_info() -> TaskInfo:
 async def test_catalog_run_source_is_provenance_only(
     monkeypatch: pytest.MonkeyPatch, source_error: str | None
 ) -> None:
-    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
-    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: True)
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: True
+    )
     execute = AsyncMock()
     source = SimpleNamespace(
         username="bob" if source_error == "owner" else "alice",
@@ -96,8 +100,12 @@ async def test_catalog_run_source_is_provenance_only(
 async def test_quick_run_passes_readout_duration_to_task_and_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
-    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: True)
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: True
+    )
     execute = AsyncMock()
 
     await quick_run_task(
@@ -125,8 +133,12 @@ async def test_quick_run_passes_readout_duration_to_task_and_session(
 
 @pytest.mark.asyncio
 async def test_quick_run_task_rejects_disabled_task(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
-    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: False)
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: False
+    )
     flow_service = SimpleNamespace(execute_single_task_from_snapshot=AsyncMock())
 
     with pytest.raises(HTTPException, match="not enabled") as exc_info:
@@ -147,9 +159,13 @@ async def test_quick_run_task_rejects_disabled_task(monkeypatch: pytest.MonkeyPa
 async def test_quick_run_task_resolves_and_validates_default_backend(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("qdash.api.routers.task.get_default_backend", lambda: "fake")
-    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
-    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: True)
+    monkeypatch.setattr("qdash.api.services.catalog_task_run.get_default_backend", lambda: "fake")
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: True
+    )
     response = ExecuteFlowResponse(
         execution_id="flow-run-1",
         flow_run_id="flow-run-1",
@@ -240,8 +256,12 @@ async def test_quick_run_task_rejects_invalid_overrides(
     body: QuickRunTaskRequest,
     message: str,
 ) -> None:
-    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
-    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: True)
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: True
+    )
     flow_service = SimpleNamespace(execute_single_task_from_snapshot=AsyncMock())
 
     with pytest.raises(HTTPException, match=message) as exc_info:

@@ -2,11 +2,12 @@
  * Pure helpers that fold Copilot SSE events into a live transcript.
  */
 
-import type { ChatTrace, LiveTurn, TraceStep } from "@/types/copilotChat";
+import type { ChatTrace, LiveTurn, ToolEvaluation, TraceStep } from "@/types/copilotChat";
 
 // Bound what a single message adds to the stored session document.
 const MAX_PERSISTED_THINKING = 20_000;
 const MAX_PERSISTED_ARGS = 4_000;
+const MAX_PERSISTED_PROMPT = 12_000;
 
 function closeThinking(steps: TraceStep[], now: number): TraceStep[] {
   return steps.map((step) =>
@@ -59,9 +60,29 @@ export function startTool(
   ];
 }
 
+/** The evaluation summary of a tool_end payload, when it is well-formed. */
+function toolEvaluation(value: unknown): ToolEvaluation | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const { prompt, model, fallback, run_id, evaluation_id } = value as Record<string, unknown>;
+  if (typeof prompt !== "string" || !prompt) return undefined;
+  return {
+    prompt,
+    ...(typeof model === "string" && model ? { model } : {}),
+    ...(fallback === true ? { fallback: true } : {}),
+    ...(typeof run_id === "string" && run_id ? { runId: run_id } : {}),
+    ...(typeof evaluation_id === "string" && evaluation_id ? { evaluationId: evaluation_id } : {}),
+  };
+}
+
 export function endTool(
   steps: TraceStep[],
-  payload: { id?: string | null; tool: string; is_error?: boolean; figures?: unknown },
+  payload: {
+    id?: string | null;
+    tool: string;
+    is_error?: boolean;
+    figures?: unknown;
+    evaluation?: unknown;
+  },
 ): TraceStep[] {
   // Match by call id; fall back to the oldest running call of that tool.
   const idx =
@@ -75,12 +96,14 @@ export function endTool(
   const figures = Array.isArray(payload.figures)
     ? payload.figures.filter((p): p is string => typeof p === "string" && p.length > 0)
     : [];
+  const evaluation = toolEvaluation(payload.evaluation);
   const next = [...steps];
   next[idx] = {
     ...step,
     status: payload.is_error ? "error" : "done",
     endedAt: Date.now(),
     ...(figures.length ? { figures } : {}),
+    ...(evaluation ? { evaluation } : {}),
   };
   return next;
 }
@@ -120,7 +143,17 @@ export function toPersistedTrace(turn: LiveTurn, now: number): ChatTrace | undef
       thinkingBudget -= text.length;
       return { ...step, text };
     }
-    if (step.kind === "tool") return { ...step, args: truncateArgs(step.args) };
+    if (step.kind === "tool") {
+      const evaluation = step.evaluation && {
+        ...step.evaluation,
+        prompt: step.evaluation.prompt.slice(0, MAX_PERSISTED_PROMPT),
+      };
+      return {
+        ...step,
+        args: truncateArgs(step.args),
+        ...(evaluation ? { evaluation } : {}),
+      };
+    }
     return step;
   });
   return { steps, durationMs: now - turn.startedAt };

@@ -1,14 +1,9 @@
 # Copilot Shared Configuration
-# Common settings for QDash Copilot. Chat and review-specific settings live in
-# chat.yaml and review.yaml.
+#
+# The chat planner models live in chat.yaml, the calibration evaluation model
+# in evaluation.yaml. Each file may have a `*.local.yaml` overlay.
 
 enabled: true
-
-# Backend serving the chat page and the analysis sidebar.
-#   pi:      Pi Agent Runtime service (agent-runtime/)
-#   litellm: in-process agent (src/qdash/copilot/agent.py)
-# When using pi with Docker Compose, also set COMPOSE_PROFILES=agent-runtime in .env.
-copilot_backend: pi
 
 # Language configuration
 # thinking_language: Language for internal reasoning (en recommended for technical accuracy)
@@ -16,78 +11,9 @@ copilot_backend: pi
 thinking_language: en
 response_language: auto
 
-# Default model configuration.
-# Chat-specific selectable models live in chat.yaml.
-# Review/analysis-specific selectable models live in review.yaml.
-model:
-  # Vendor-neutral OpenAI Chat Completions endpoint. The deployment may be
-  # backed by vLLM or any other compatible server.
-  provider: openai-compatible
-  name: qwen3.8-flash-next
-  api_style: completion
-  base_url: env:OPENAI_COMPATIBLE_BASE_URL
-  api_key_env: OPENAI_COMPATIBLE_API_KEY
-  # Qwen3.8 Flash Next non-thinking defaults. Pi overrides these for the
-  # configured thinking level below.
-  temperature: 0.7
-  top_p: 0.80
-  top_k: 20
-  sampling_params:
-    min_p: 0.0
-    presence_penalty: 1.5
-    repetition_penalty: 1.0
-  sampling_params_by_thinking_level:
-    minimal:
-      temperature: 1.0
-      top_p: 0.95
-      top_k: 20
-      min_p: 0.0
-      presence_penalty: 0.0
-      repetition_penalty: 1.0
-      reasoning_effort: low
-    low:
-      temperature: 1.0
-      top_p: 0.95
-      top_k: 20
-      min_p: 0.0
-      presence_penalty: 0.0
-      repetition_penalty: 1.0
-      reasoning_effort: low
-    medium:
-      temperature: 1.0
-      top_p: 0.95
-      top_k: 20
-      min_p: 0.0
-      presence_penalty: 0.0
-      repetition_penalty: 1.0
-      reasoning_effort: medium
-    high:
-      temperature: 1.0
-      top_p: 0.95
-      top_k: 20
-      min_p: 0.0
-      presence_penalty: 0.0
-      repetition_penalty: 1.0
-      reasoning_effort: xhigh
-  reasoning_effort: high
-  # Maximum tokens for response
-  num_ctx: 65536
-  max_output_tokens: 8192
-
-  # provider: bedrock
-  # name: jp.anthropic.claude-sonnet-4-6
-  # api_style: responses
-  # temperature: 0.7
-  # max_output_tokens: 4096
-
-  # NVIDIA Ising-Calibration via vLLM (see chat.yaml / review.yaml).
-  # provider: vllm
-  # name: nvidia/Ising-Calibration-1.5-31B-NVFP4
-  # api_style: completion
-  # base_url: env:VLLM_BASE_URL
-  # api_key_env: VLLM_API_KEY
-  # num_ctx: 16384
-  # temperature: 0.2
-  # reasoning_effort: none
-  # disable_thinking_instruction: true
-  # max_output_tokens: 2048
+# How a chat about one task result opens.
+task_chat:
+  # Send the result's figures to the planner (needs an image-capable model).
+  multimodal: true
+  # Reference images from the task's knowledge cases to send along, at most.
+  max_expected_images: 2

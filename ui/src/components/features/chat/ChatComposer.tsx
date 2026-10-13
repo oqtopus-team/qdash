@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import React, {
   forwardRef,
   useCallback,
@@ -8,7 +10,17 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { ArrowUp, Check, ChevronDown, Cpu, Paperclip, Square, X } from "lucide-react";
+import {
+  ArrowUp,
+  Check,
+  ChevronDown,
+  Cpu,
+  Paperclip,
+  Square,
+  X,
+  Brain,
+  UserCog,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,9 +35,28 @@ import {
   pastedImageFiles,
   type StagedAttachment,
 } from "@/lib/chatAttachments";
+import {
+  THINKING_CHOICES,
+  type ChatThinkingChoice,
+  type ChatThinkingLevel,
+} from "@/lib/chatThinking";
 import type { ModelOption } from "@/lib/copilotModels";
 
 const MAX_HEIGHT_PX = 240;
+
+/** The thinking menu's button text: the choice, with what Auto resolves to. */
+export function thinkingLabel(
+  choice: ChatThinkingChoice,
+  modelDefault: ChatThinkingLevel | null,
+  compact = false,
+): string {
+  if (choice === "auto") {
+    if (compact) return modelDefault ? `Auto · ${modelDefault}` : "Auto";
+    return modelDefault ? `Thinking: Auto (${modelDefault})` : "Thinking: Auto";
+  }
+  const label = choice.charAt(0).toUpperCase() + choice.slice(1);
+  return compact ? label : `Thinking: ${label}`;
+}
 
 interface ChatComposerProps {
   value: string;
@@ -38,6 +69,13 @@ interface ChatComposerProps {
   modelOptions: ModelOption[];
   selectedModelKey: string;
   onModelChange: (key: string) => void;
+  /** How much the model thinks before answering; omitted on surfaces without the menu. */
+  thinkingChoice?: ChatThinkingChoice;
+  /** What "Auto" amounts to for the selected model. */
+  thinkingModelDefault?: ChatThinkingLevel | null;
+  onThinkingChange?: (choice: ChatThinkingChoice) => void;
+  /** The user's own instructions apply to this chat; shows a link to edit them. */
+  instructionsActive?: boolean;
   /** Figures staged for the next message; omit to hide attachments entirely. */
   attachments?: StagedAttachment[];
   isStaging?: boolean;
@@ -65,6 +103,10 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     modelOptions,
     selectedModelKey,
     onModelChange,
+    thinkingChoice,
+    thinkingModelDefault,
+    onThinkingChange,
+    instructionsActive = false,
     attachments,
     isStaging = false,
     attachmentNotice,
@@ -268,6 +310,60 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+        )}
+        {thinkingChoice && onThinkingChange && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={isStreaming || disabled}
+                className="btn btn-ghost btn-xs h-7 gap-1.5 rounded-lg font-normal text-base-content/60"
+                aria-label="Thinking level"
+                title="How much the model thinks before answering"
+              >
+                <Brain className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">
+                  {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null, compact)}
+                </span>
+                <ChevronDown className="w-3 h-3 shrink-0" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="top">
+              {THINKING_CHOICES.map((choice) => (
+                <DropdownMenuItem
+                  key={choice.value}
+                  onSelect={() => onThinkingChange(choice.value)}
+                >
+                  <span className="flex-1">
+                    <span className="block">
+                      {choice.value === "auto" && thinkingModelDefault
+                        ? `Auto (${thinkingModelDefault})`
+                        : choice.label}
+                    </span>
+                    <span className="block text-xs text-base-content/50">{choice.description}</span>
+                  </span>
+                  {choice.value === thinkingChoice && (
+                    <Check className="w-3.5 h-3.5 text-primary" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {instructionsActive && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href="/settings?tab=copilot"
+                className="btn btn-ghost btn-xs h-7 gap-1 rounded-lg font-normal text-base-content/60"
+                aria-label="Your instructions apply"
+              >
+                <UserCog className="w-3.5 h-3.5 shrink-0" />
+                {!compact && <span>Your instructions</span>}
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>Your instructions from Settings apply to this chat</TooltipContent>
+          </Tooltip>
         )}
         <div className="flex-1" />
         {isStreaming ? (

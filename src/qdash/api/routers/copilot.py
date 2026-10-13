@@ -1,15 +1,9 @@
-"""Copilot API router for AI assistant configuration and analysis.
-
-This router provides endpoints for copilot configuration
-and LLM-powered calibration result analysis.
-"""
+"""Copilot API router: configuration, chats (general and about a task result), sessions."""
 
 from __future__ import annotations
 
 import asyncio
-import base64
 import logging
-from functools import partial
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,11 +18,11 @@ if TYPE_CHECKING:
 from qdash.api.dependencies import (
     get_copilot_chat_session_service,
     get_copilot_runtime,
+    get_evaluation_service,
 )
-from qdash.api.lib.ai_labels import STATUS_LABELS, TOOL_LABELS
 from qdash.api.lib.auth import bearer_scheme, get_current_active_user
 from qdash.api.lib.project import get_project_id_from_header
-from qdash.api.lib.sse import SSETaskBridge, sse_event
+from qdash.api.lib.sse import sse_event
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.copilot_chat_session import (
     CopilotChatSessionResponse,
@@ -36,25 +30,28 @@ from qdash.api.schemas.copilot_chat_session import (
     ListCopilotChatSessionsResponse,
     UpdateCopilotChatSessionRequest,
 )
-from qdash.api.services import pi_analysis_service, pi_chat_service
+from qdash.api.schemas.copilot_preferences import (
+    CopilotPreferences,
+    CopilotPreferencesUpdate,
+    CopilotSystemPrompt,
+)
+from qdash.api.services import pi_chat_service
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
+from qdash.api.services.evaluation_service import EvaluationService
 from qdash.copilot.config import (
     CopilotConfig,
-    ModelConfig,
     load_copilot_config,
-    select_analysis_model,
+    select_chat_model,
 )
 from qdash.copilot.contracts import (
-    AnalysisResponse,
-    AnalyzeRequest,
     ChatRequest,
     ChatStopRequest,
     ChatStopResponse,
     SandboxPythonRequest,
+    TaskContextBundle,
 )
-from qdash.copilot.prompts.analysis import build_language_instruction
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
@@ -63,32 +60,11 @@ public_router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _config_with_request_model(config: CopilotConfig, request: AnalyzeRequest) -> CopilotConfig:
-    """Apply a per-request analysis model override when one is provided."""
-    if request.analysis_model_override is None:
-        return config
-    return config.model_copy(update={"analysis_model": request.analysis_model_override})
-
-
-def _resolve_chat_model(config: CopilotConfig, override: ModelConfig | None) -> ModelConfig | None:
-    """Pick the chat model to use for a request.
-
-    Priority: per-request override > first entry of `chat_models` > None (caller
-    uses ``config.model`` as-is).
-    """
-    if override is not None:
-        return override
-    if config.chat_models:
-        return config.chat_models[0]
-    return None
-
-
 def _config_with_chat_model(config: CopilotConfig, request: ChatRequest) -> CopilotConfig:
-    """Apply the resolved chat model to ``config.model`` for this request."""
-    resolved = _resolve_chat_model(config, request.chat_model_override)
-    if resolved is None:
-        return config
-    return config.model_copy(update={"model": resolved})
+    """Resolve the planner for a general chat into ``config.model``."""
+    return config.model_copy(
+        update={"model": select_chat_model(config, request.chat_model_override)}
+    )
 
 
 @router.get(
@@ -101,10 +77,8 @@ async def get_copilot_config() -> dict[str, Any]:
 
     Retrieves the Copilot configuration from YAML, including:
     - enabled: Whether Copilot is enabled
-    - evaluation_metrics: Which metrics to use for multi-metric evaluation
-    - scoring: Thresholds for good/excellent ratings per metric
-    - system_prompt: The AI assistant's system prompt
-    - initial_message: The initial greeting message
+    - chat_models: The planner models the UI offers
+    - evaluation_models: The calibration evaluation model
 
     Returns
     -------
@@ -118,223 +92,15 @@ async def get_copilot_config() -> dict[str, Any]:
 
 @public_router.get("/expected-image", include_in_schema=False)
 def get_expected_image(task_name: str, index: int) -> Response:
-    """Serve a reference/expected image from TaskKnowledge by index."""
+    """Serve a reference/expected figure of a task's knowledge by index."""
     knowledge = get_task_knowledge(task_name)
-    if not knowledge or not knowledge.images or index < 0 or index >= len(knowledge.images):
+    if not knowledge or index < 0 or index >= len(knowledge.figures):
         raise HTTPException(status_code=404, detail="Image not found")
-    img = knowledge.images[index]
-    if not img.base64_data:
-        raise HTTPException(status_code=404, detail="Image has no data")
-    return Response(content=base64.b64decode(img.base64_data), media_type="image/png")
-
-
-@router.post(
-    "/analyze",
-    response_model=AnalysisResponse,
-    summary="Analyze calibration result with AI",
-    operation_id="analyzeCopilot",
-)
-async def analyze_task_result(
-    request: AnalyzeRequest,
-    copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
-) -> dict[str, Any]:
-    """Analyze a calibration task result using LLM.
-
-    Constructs a rich context from task knowledge, qubit parameters,
-    and experimental data, then sends it to the configured LLM for analysis.
-
-    Parameters
-    ----------
-    request : AnalyzeRequest
-        The analysis request containing task info, IDs, and user message.
-
-    Returns
-    -------
-    AnalysisResponse
-        Structured analysis from the LLM.
-
-    """
-    config = load_copilot_config()
-    if not config.enabled:
-        raise HTTPException(status_code=503, detail="Copilot is not enabled")
-    analysis_config = _config_with_request_model(config, request)
-
-    # Build analysis context (resolves knowledge, qubit params, images, etc.)
-    ctx = copilot_runtime.build_analysis_context(
-        task_name=request.task_name,
-        chip_id=request.chip_id,
-        qid=request.qid,
-        task_id=request.task_id,
-        image_base64=request.image_base64,
-        config=analysis_config,
-    )
-
-    # Build tool executors for function calling
-    tool_executors = copilot_runtime.build_tool_executors()
-
-    # Run the analysis agent
-    try:
-        from qdash.copilot.agent import run_analysis
-
-        result = await run_analysis(
-            context=ctx.context,
-            user_message=request.message,
-            config=analysis_config,
-            image_base64=ctx.image_base64,
-            expected_images=ctx.expected_images,
-            experiment_images=ctx.experiment_images,
-            conversation_history=request.conversation_history,
-            tool_executors=tool_executors,
-        )
-        result["images_sent"] = CopilotRuntime.build_images_sent_metadata(
-            ctx.image_base64,
-            ctx.figure_paths,
-            ctx.expected_images,
-            request.task_name,
-            ctx.experiment_images,
-        )
-        return result
-    except ImportError:
-        raise HTTPException(
-            status_code=503,
-            detail="openai is not installed. Install with: pip install openai",
-        )
-    except Exception as e:
-        logger.exception("Analysis failed")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
-
-
-@router.post("/analyze/stream", include_in_schema=False)
-async def analyze_task_result_stream(
-    request: AnalyzeRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
-    project_id: Annotated[str | None, Depends(get_project_id_from_header)],
-) -> StreamingResponse:
-    """SSE streaming version of analyze_task_result.
-
-    Sends status events as each step progresses, then a final result or error event.
-    """
-
-    async def event_generator() -> AsyncGenerator[str, None]:
-        config = load_copilot_config()
-        if not config.enabled:
-            yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
-            return
-        analysis_config = _config_with_request_model(config, request)
-
-        # Build analysis context
-        yield sse_event(
-            "status",
-            {"step": "build_context", "message": "分析コンテキストを構築中..."},
-        )
-        await asyncio.sleep(0)
-        ctx = copilot_runtime.build_analysis_context(
-            task_name=request.task_name,
-            chip_id=request.chip_id,
-            qid=request.qid,
-            task_id=request.task_id,
-            image_base64=request.image_base64,
-            config=analysis_config,
-        )
-
-        # Emit image loading status
-        has_experiment = bool(ctx.image_base64)
-        num_expected = len(ctx.expected_images)
-        if has_experiment and num_expected > 0:
-            img_msg = f"実験結果画像と参照画像{num_expected}枚をAIに送信中..."
-        elif has_experiment:
-            img_msg = "実験結果画像をAIに送信中..."
-        elif num_expected > 0:
-            img_msg = f"参照画像{num_expected}枚をAIに送信中..."
-        else:
-            img_msg = None
-        if img_msg:
-            yield sse_event("status", {"step": "load_images", "message": img_msg})
-            await asyncio.sleep(0)
-
-        images_sent = CopilotRuntime.build_images_sent_metadata(
-            ctx.image_base64,
-            ctx.figure_paths,
-            ctx.expected_images,
-            request.task_name,
-            ctx.experiment_images,
-        )
-
-        # Run analysis with tool progress streaming
-        yield sse_event("status", {"step": "run_analysis", "message": "AIが分析中..."})
-
-        if config.copilot_backend == "pi":
-            # The Pi runtime owns the model selection, so the analysis model has
-            # to be resolved into `config.model` before the payload is built.
-            pi_config = analysis_config.model_copy(
-                update={"model": select_analysis_model(analysis_config)}
-            )
-            async for event in pi_analysis_service.stream(
-                request,
-                pi_config,
-                ctx,
-                username=current_user.username,
-                auth=pi_chat_service.QDashAuth(
-                    access_token=credentials.credentials,
-                    project_id=project_id or current_user.default_project_id,
-                ),
-                language_instruction=build_language_instruction(pi_config),
-                images_sent=images_sent,
-            ):
-                yield event
-            return
-
-        tool_executors = copilot_runtime.build_tool_executors()
-        bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
-
-        try:
-            from qdash.copilot.agent import run_analysis
-
-            coro = partial(
-                run_analysis,
-                context=ctx.context,
-                user_message=request.message,
-                config=analysis_config,
-                image_base64=ctx.image_base64,
-                expected_images=ctx.expected_images,
-                experiment_images=ctx.experiment_images,
-                conversation_history=request.conversation_history,
-                tool_executors=tool_executors,
-            )
-
-            result: dict[str, Any] = {}
-            async for event in bridge.drain(coro):
-                if isinstance(event, str):
-                    yield event
-                else:
-                    result = event
-        except ImportError:
-            yield sse_event(
-                "error",
-                {
-                    "step": "run_analysis",
-                    "detail": "openai is not installed. Install with: pip install openai",
-                },
-            )
-            return
-        except Exception as e:
-            logger.exception("Analysis failed")
-            yield sse_event("error", {"step": "run_analysis", "detail": f"Analysis failed: {e}"})
-            return
-
-        result["images_sent"] = images_sent
-
-        # Complete
-        yield sse_event("status", {"step": "complete", "message": "分析完了"})
-        yield sse_event("result", result)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    loaded = knowledge.load_figure(knowledge.figures[index].path)
+    if loaded is None:
+        raise HTTPException(status_code=404, detail="Image file not found")
+    data, mime = loaded
+    return Response(content=data, media_type=mime)
 
 
 @router.post("/sandbox/python", include_in_schema=False)
@@ -344,8 +110,8 @@ async def run_sandboxed_python(
 ) -> dict[str, Any]:
     """Run analysis code in the Copilot Python sandbox.
 
-    Exposes the same sandbox the LiteLLM agent uses as ``execute_python_analysis``
-    so the Pi Agent Runtime can offer Python without running code itself.
+    The restricted sandbox behind the chat's ``run_python`` tool, so the Pi Agent
+    Runtime can offer Python without running code itself.
     """
     from qdash.copilot.tooling import execute_python_analysis
 
@@ -360,14 +126,24 @@ async def chat_stop(
 ) -> ChatStopResponse:
     """Stop the turn running for a chat session.
 
-    Only the Pi backend runs turns that outlive the stream; for the other
-    backend closing the stream is the cancellation, so this reports False.
+    Closing the SSE stream alone does not cancel the runtime's turn, so the
+    chat's Stop button calls this explicitly.
     """
-    config = load_copilot_config()
-    if config.copilot_backend != "pi":
-        return ChatStopResponse(stopped=False)
     stopped = await pi_chat_service.abort_runtime_turn(current_user.username, request.session_id)
     return ChatStopResponse(stopped=stopped)
+
+
+def _figures_status(bundle: TaskContextBundle) -> str | None:
+    """Status line for the figures a task chat opens with."""
+    has_experiment = bool(bundle.image_base64)
+    num_expected = len(bundle.expected_images)
+    if has_experiment and num_expected > 0:
+        return f"実験結果画像と参照画像{num_expected}枚をAIに送信中..."
+    if has_experiment:
+        return "実験結果画像をAIに送信中..."
+    if num_expected > 0:
+        return f"参照画像{num_expected}枚をAIに送信中..."
+    return None
 
 
 @router.post("/chat/stream", include_in_schema=False)
@@ -377,10 +153,13 @@ async def chat_stream(
     copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     project_id: Annotated[str | None, Depends(get_project_id_from_header)],
+    evaluation_service: Annotated[EvaluationService, Depends(get_evaluation_service)],
 ) -> StreamingResponse:
-    """SSE streaming generic chat endpoint.
+    """SSE streaming chat endpoint.
 
-    Does not require task context. Optionally accepts chip_id/qid for scoped queries.
+    A chat is about one task result when ``task`` is set: its first turn then
+    opens with the result's context and figures. Otherwise it is a general
+    chat, optionally scoped by chip_id/qid.
     """
 
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -390,83 +169,61 @@ async def chat_stream(
             return
         chat_config = _config_with_chat_model(config, request)
 
-        if config.copilot_backend == "pi":
-            async for event in pi_chat_service.stream(
-                request,
-                chat_config,
-                username=current_user.username,
-                auth=pi_chat_service.QDashAuth(
-                    access_token=credentials.credentials,
-                    project_id=project_id or current_user.default_project_id,
-                ),
-            ):
-                yield event
-            return
-
-        # Load config and resolve default chip_id
-        yield sse_event("status", {"step": "load_config", "message": "設定を読み込み中..."})
-        await asyncio.sleep(0)
-
-        chip_id = request.chip_id
-        qid = request.qid
-
-        # Resolve default chip_id if not provided
-        if not chip_id:
-            chip_id = copilot_runtime.load_default_chip_id()
-
-        # Optionally load qubit params
-        qubit_params: dict[str, Any] = {}
-        if chip_id and qid:
+        task_bundle = None
+        images_sent: dict[str, Any] | None = None
+        if request.task is not None:
             yield sse_event(
                 "status",
-                {"step": "load_qubit_params", "message": "キュービットパラメータを取得中..."},
+                {"step": "build_context", "message": "タスク結果のコンテキストを構築中..."},
             )
             await asyncio.sleep(0)
-            qubit_params = copilot_runtime.load_qubit_params(chip_id, qid)
-
-        # Run chat with tool progress streaming
-        yield sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
-        tool_executors = copilot_runtime.build_tool_executors()
-        bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
-
-        try:
-            from qdash.copilot.agent import run_chat
-
-            coro = partial(
-                run_chat,
-                user_message=request.message,
-                config=chat_config,
-                chip_id=chip_id,
-                qid=qid,
-                qubit_params=qubit_params if qubit_params else None,
+            task_bundle = copilot_runtime.build_task_context(
+                task_name=request.task.task_name,
+                chip_id=request.task.chip_id,
+                qid=request.task.qid,
+                task_id=request.task.task_id,
                 image_base64=request.image_base64,
-                conversation_history=request.conversation_history,
-                tool_executors=tool_executors,
+                config=chat_config,
+            )
+            img_msg = _figures_status(task_bundle)
+            if img_msg:
+                yield sse_event("status", {"step": "load_images", "message": img_msg})
+                await asyncio.sleep(0)
+            images_sent = CopilotRuntime.build_images_sent_metadata(
+                task_bundle.image_base64,
+                task_bundle.figure_paths,
+                task_bundle.expected_images,
+                request.task.task_name,
+                task_bundle.experiment_images,
             )
 
-            result: dict[str, Any] = {}
-            async for event in bridge.drain(coro):
-                if isinstance(event, str):
-                    yield event
-                else:
-                    result = event
-        except ImportError:
-            yield sse_event(
-                "error",
-                {
-                    "step": "run_chat",
-                    "detail": "openai is not installed. Install with: pip install openai",
-                },
+        effective_project = project_id or current_user.default_project_id
+        # The planner's own qcal_evaluate calls are kept as evaluations
+        # (trigger "chat"), so every model judgement is on one ledger.
+        recorder = (
+            evaluation_service.chat_recorder(
+                project_id=effective_project,
+                username=current_user.username,
+                session_id=request.session_id,
+                planner_model=f"{chat_config.model.provider}/{chat_config.model.name}",
+                task_id=request.task.task_id if request.task else None,
             )
-            return
-        except Exception as e:
-            logger.exception("Chat failed")
-            yield sse_event("error", {"step": "run_chat", "detail": f"Chat failed: {e}"})
-            return
-
-        # Complete
-        yield sse_event("status", {"step": "complete", "message": "完了"})
-        yield sse_event("result", result)
+            if effective_project
+            else None
+        )
+        async for event in pi_chat_service.stream(
+            request,
+            chat_config,
+            username=current_user.username,
+            auth=pi_chat_service.QDashAuth(
+                access_token=credentials.credentials,
+                project_id=effective_project,
+            ),
+            task=task_bundle,
+            images_sent=images_sent,
+            recorder=recorder,
+        ):
+            yield event
 
     return StreamingResponse(
         event_generator(),
@@ -554,3 +311,59 @@ async def delete_copilot_chat_session(
     service.delete_session(username=current_user.username, session_id=session_id)
     await pi_chat_service.delete_runtime_session_state(current_user.username, session_id)
     return {"deleted": True}
+
+
+@router.get(
+    "/preferences",
+    response_model=CopilotPreferences,
+    summary="Get the current user's Copilot preferences",
+    operation_id="getCopilotPreferences",
+)
+def get_copilot_preferences(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> CopilotPreferences:
+    """The instructions this user added to their chats."""
+    from qdash.dbmodel.user import UserDocument
+
+    user = UserDocument.find_one({"username": current_user.username}).run()
+    return CopilotPreferences(instructions=(user.copilot_instructions or "") if user else "")
+
+
+@router.put(
+    "/preferences",
+    response_model=CopilotPreferences,
+    summary="Update the current user's Copilot preferences",
+    operation_id="updateCopilotPreferences",
+)
+def update_copilot_preferences(
+    body: CopilotPreferencesUpdate,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> CopilotPreferences:
+    """Replace this user's chat instructions; an empty text clears them."""
+    from qdash.dbmodel.user import UserDocument
+
+    user = UserDocument.find_one({"username": current_user.username}).run()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    text = body.instructions.strip()
+    user.copilot_instructions = text or None
+    user.save()
+    return CopilotPreferences(instructions=text)
+
+
+@router.get(
+    "/system-prompt",
+    response_model=CopilotSystemPrompt,
+    summary="Show what QDash tells the chat model",
+    operation_id="getCopilotSystemPrompt",
+)
+async def get_copilot_system_prompt(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> CopilotSystemPrompt:
+    """QDash's chat system prompt and this user's instructions as appended to it (read-only)."""
+    try:
+        result = await pi_chat_service.system_prompt(current_user.username)
+    except Exception as exc:
+        logger.warning("system prompt unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="The Copilot runtime is not reachable") from exc
+    return CopilotSystemPrompt(**result)

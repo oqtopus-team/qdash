@@ -123,6 +123,34 @@ def resolve_calib_data_path(path: str | Path) -> Path:
     return mapped if mapped.exists() else candidate
 
 
+class PathOutsideCalibData(ValueError):
+    """A client asked for a file outside the calibration data tree."""
+
+
+def calib_data_roots() -> tuple[Path, ...]:
+    """Directories whose files the API may serve back to clients."""
+    local_base = Path(os.getenv("CALIB_DATA_PATH", "calib_data")).expanduser()
+    return tuple(dict.fromkeys(root.resolve() for root in (CALIB_DATA_BASE, local_base)))
+
+
+def resolve_served_calib_data_path(path: str | Path) -> Path:
+    """Resolve a client-supplied calibration data path for reading.
+
+    Paths stored by the workflow are absolute, so endpoints take them from the
+    client. The resolved file (``..`` and symlinks followed) must stay inside the
+    calibration data tree; anything else is refused, so an endpoint cannot be
+    used to read arbitrary server files.
+
+    Raises:
+        PathOutsideCalibData: If the path leaves the calibration data tree.
+
+    """
+    resolved = resolve_calib_data_path(path).resolve()
+    if not any(resolved.is_relative_to(root) for root in calib_data_roots()):
+        raise PathOutsideCalibData(str(path))
+    return resolved
+
+
 def execution_calib_data_dir(username: str, execution_id: str) -> Path:
     """Resolve the calibration data directory for a specific execution.
 

@@ -49,7 +49,6 @@ ui/
 │   │   │   ├── files/          # File management
 │   │   │   ├── home/           # Home (default landing page)
 │   │   │   ├── inbox/          # Notification inbox
-│   │   │   ├── issues/         # Issue tracking
 │   │   │   ├── metrics/        # Metrics dashboard
 │   │   │   ├── provenance/     # Data provenance
 │   │   │   ├── settings/       # Settings page
@@ -71,7 +70,7 @@ ui/
 │   │   │   ├── files/          # Files page content
 │   │   │   ├── tasks/          # Tasks page content
 │   │   │   └── ...             # Other feature directories
-│   │   ├── layout/             # Layout components (AppLayout, AnalysisSidebar)
+│   │   ├── layout/             # Layout components (AppLayout, ChatSidebar)
 │   │   ├── selectors/          # Selection components (dropdowns, etc.)
 │   │   └── ui/                 # Generic UI components
 │   ├── contexts/               # ALL React Context/Provider files
@@ -80,7 +79,7 @@ ui/
 │   │   ├── AuthContext.tsx      # Authentication context
 │   │   ├── ProjectContext.tsx   # Project selection context
 │   │   ├── SidebarContext.tsx   # Sidebar state context
-│   │   └── AnalysisChatContext.tsx
+│   │   └── ChatDockContext.tsx  # Chat sidebar / floating window state
 │   ├── hooks/                  # Custom React hooks
 │   │   ├── __tests__/          # Hook unit tests
 │   │   ├── url-state/          # URL state hooks (split from useUrlState)

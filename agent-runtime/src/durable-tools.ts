@@ -24,17 +24,23 @@ import type { QDashConnection } from "./auth.ts";
 import {
   acceptsImages,
   hasImages,
-  latestImages,
+  latestFigures,
   requestedImageCount,
   withImages,
 } from "./figure-context.ts";
+import { hostRecord } from "./evaluate.ts";
 import {
   acceptsKnowledge,
+  fetchTaskExamples,
   fetchTaskKnowledge,
+  hasExamples,
   hasKnowledge,
   requestedTaskName,
+  wantsExamples,
+  withExamples,
   withKnowledge,
 } from "./knowledge-context.ts";
+import type { LabeledExample } from "./knowledge-context.ts";
 import { isTrustedExtension } from "./local-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 
@@ -103,7 +109,7 @@ function withoutRuntimeArguments(parameters: TSchema): TSchema {
 }
 
 /** Run a pi-coding-agent tool with the non-interactive context this runtime provides. */
-async function runCodingAgentTool(
+export async function runCodingAgentTool(
   tool: CodingAgentTool,
   callId: string,
   args: unknown,
@@ -193,28 +199,43 @@ export function adaptCodingAgentTool(
         };
       }
       let callArgs: unknown = args;
-      if (options.fillImages && !hasImages(args)) {
+      let figureTaskId: string | undefined;
+      if (options.fillImages) {
         // The model names the figure it wants evaluated by having fetched or
         // received it; the bytes are taken from the transcript, not its call.
+        // Bytes the model copied into the call itself are replaced too: a
+        // model retyping base64 drops or alters characters, and the provider
+        // then rejects the whole request.
         const page = await api.commit(
           (tx) => tx.scanEntries({ conversationId: api.conversationId }, FIGURE_SCAN_LIMIT),
           context,
         );
-        callArgs = withImages(
-          args as object,
-          latestImages(page.items, requestedImageCount(args)),
-        );
+        const found = latestFigures(page.items, requestedImageCount(args));
+        figureTaskId = found.taskId;
+        if (found.images.length || !hasImages(args)) {
+          callArgs = withImages(args as object, found.images);
+        }
       }
       const taskName = requestedTaskName(args);
+      let knowledge: string | undefined;
       if (options.fillKnowledge && taskName && !hasKnowledge(args)) {
         // The model names the task; the reference it is judged against comes
         // from QDash, as the user, so every evaluation reads the same guide.
-        const knowledge = await fetchTaskKnowledge(connection, taskName, context.abortSignal);
+        knowledge = await fetchTaskKnowledge(connection, taskName, context.abortSignal);
         if (knowledge) {
           console.log(`[agent-runtime] ${tool.name}: reference for ${taskName} (${knowledge.length} chars)`);
         }
         callArgs = withKnowledge(callArgs as object, knowledge);
       }
+      let examples: LabeledExample[] | undefined;
+      if (options.fillKnowledge && taskName && wantsExamples(args) && !hasExamples(args)) {
+        // The model only asks for examples; the figures and labels come from
+        // QDash's knowledge, never from the model's own call.
+        examples = await fetchTaskExamples(connection, taskName, context.abortSignal);
+        console.log(`[agent-runtime] ${tool.name}: ${examples.length} labeled example(s) for ${taskName}`);
+        callArgs = withExamples(callArgs as object, examples);
+      }
+      const started = Date.now();
       const result = await runCodingAgentTool(
         tool,
         api.callId,
@@ -225,9 +246,25 @@ export function adaptCodingAgentTool(
         connection,
         await conversationModel(api, context, modelRuntime),
       );
+      // An evaluation result records what the host put into the call (figure
+      // hashes, the reference, the context), so a planner turn leaves the
+      // same record as a direct evaluation (see evaluate.ts).
+      const details =
+        options.fillImages && result.details !== undefined && typeof result.details === "object"
+          ? {
+              ...(result.details as object),
+              host: hostRecord(
+                callArgs,
+                knowledge ?? ((callArgs as { knowledge?: unknown }).knowledge as string | undefined),
+                Date.now() - started,
+                figureTaskId,
+                examples,
+              ),
+            }
+          : result.details;
       return {
         content: result.content,
-        ...(result.details === undefined ? {} : { details: asJson(result.details) }),
+        ...(details === undefined ? {} : { details: asJson(details) }),
         ...(result.isError === undefined ? {} : { isError: result.isError }),
         ...(result.usage === undefined ? {} : { usage: result.usage }),
         ...(result.terminate ? { control: { terminate: true as const } } : {}),

@@ -45,3 +45,21 @@ test("local extension tools are introduced after the pi-qdash tool guide", () =>
   assert.match(prompt, /Tool guide:\nqdash guide\n\nAdditional tools:\n- `qcal_evaluate`/);
   assert.doesNotMatch(buildSystemPrompt("auto", "en", false, [], "qdash guide"), /Additional tools/);
 });
+
+import { buildUserInstructionsSection, MAX_USER_INSTRUCTIONS_CHARS } from "../src/prompt.ts";
+
+test("user instructions become a section that cannot lift the approval rule", () => {
+  const section = buildUserInstructionsSection("  Answer in Japanese.  ");
+  assert.match(section, /Answer in Japanese\.$/);
+  assert.match(section, /write operations still need the user's approval/);
+  assert.equal(buildUserInstructionsSection("   "), undefined);
+  assert.equal(buildUserInstructionsSection(undefined), undefined);
+  const long = buildUserInstructionsSection("x".repeat(MAX_USER_INSTRUCTIONS_CHARS + 50));
+  assert.ok(long.endsWith("x".repeat(MAX_USER_INSTRUCTIONS_CHARS)));
+  assert.ok(!long.includes("x".repeat(MAX_USER_INSTRUCTIONS_CHARS + 1)));
+});
+
+test("a language in the user's preferences sets the reply language under auto", () => {
+  assert.match(buildSystemPrompt("auto", "en"), /in a message or in their preferences below/);
+  assert.match(buildUserInstructionsSection("Answer in Japanese."), /a language they name here is the reply language/);
+});

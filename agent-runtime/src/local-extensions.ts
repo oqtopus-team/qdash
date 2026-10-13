@@ -10,7 +10,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 
 /** A local checkout found under the extensions mount. */
 export interface ExtensionCheckout {
@@ -116,6 +116,73 @@ export function withoutReplacedInstalls<T extends { path: string }>(
 ): T[] {
   const names = checkouts.flatMap((checkout) => (checkout.name ? [checkout.name] : []));
   return extensions.filter((extension) => !isInstalledPackage(extension.path, names));
+}
+
+/** The package an extension file belongs to, as recorded with an evaluation. */
+export interface ExtensionPackage {
+  name: string;
+  version: string;
+  /** Where the code came from: a mounted checkout or the image's pinned install. */
+  source: "checkout" | "package";
+  /** The checkout's HEAD commit, when it is a git checkout. */
+  commit?: string;
+}
+
+/**
+ * The nearest package manifest above an extension file. A checkout's
+ * manifest version may lag its code, so its git commit is recorded too.
+ */
+export function extensionPackage(
+  extensionPath: string,
+  checkoutRoots: readonly string[],
+): ExtensionPackage | undefined {
+  let dir = dirname(resolve(extensionPath));
+  for (;;) {
+    const manifest = join(dir, "package.json");
+    if (existsSync(manifest)) {
+      try {
+        const parsed = JSON.parse(readFileSync(manifest, "utf8")) as {
+          name?: unknown;
+          version?: unknown;
+        };
+        if (typeof parsed.name === "string") {
+          const source = isLocalExtension(extensionPath, checkoutRoots) ? "checkout" : "package";
+          const commit = source === "checkout" ? gitHead(dir) : undefined;
+          return {
+            name: parsed.name,
+            version: typeof parsed.version === "string" ? parsed.version : "unknown",
+            source,
+            ...(commit ? { commit } : {}),
+          };
+        }
+      } catch {
+        // Not a readable manifest; keep looking upwards.
+      }
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return undefined;
+    dir = parent;
+  }
+}
+
+/** The HEAD commit of a git checkout at `root`, read without running git. */
+export function gitHead(root: string): string | undefined {
+  const gitDir = join(root, ".git");
+  try {
+    const head = readFileSync(join(gitDir, "HEAD"), "utf8").trim();
+    const ref = /^ref: (.+)$/.exec(head)?.[1];
+    if (!ref) return /^[0-9a-f]{40}$/.test(head) ? head.slice(0, 12) : undefined;
+    const direct = join(gitDir, ref);
+    if (existsSync(direct)) return readFileSync(direct, "utf8").trim().slice(0, 12);
+    const packed = readFileSync(join(gitDir, "packed-refs"), "utf8");
+    for (const line of packed.split("\n")) {
+      const [sha, name] = line.trim().split(/\s+/);
+      if (name === ref && sha) return sha.slice(0, 12);
+    }
+  } catch {
+    // Not a git checkout, or an unreadable one.
+  }
+  return undefined;
 }
 
 /** Whether an extension is trusted as a whole: a local checkout or a listed package. */

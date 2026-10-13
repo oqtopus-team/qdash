@@ -1,5 +1,6 @@
 "use client";
 
+import type { GitStatusEntry } from "@pierre/trees";
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 
@@ -21,6 +22,8 @@ interface PierreFileTreeProps {
   nodes: PierreFileTreeNode[];
   onSelectFile: (path: string) => void;
   selectedPath?: string | null;
+  /** Git state per path; files and their folders are tinted and badged like an IDE. */
+  gitStatus?: readonly GitStatusEntry[];
 }
 
 function collectTreePaths(nodes: PierreFileTreeNode[]): {
@@ -46,7 +49,12 @@ function collectTreePaths(nodes: PierreFileTreeNode[]): {
   return { decorations, files, paths };
 }
 
-function PierreFileTreeInstance({ nodes, onSelectFile, selectedPath }: PierreFileTreeProps) {
+function PierreFileTreeInstance({
+  nodes,
+  onSelectFile,
+  selectedPath,
+  gitStatus,
+}: PierreFileTreeProps) {
   const { theme } = useTheme();
   const isDarkTheme = DARK_THEMES.includes(theme);
   const { decorations, files, paths } = useMemo(() => collectTreePaths(nodes), [nodes]);
@@ -57,6 +65,7 @@ function PierreFileTreeInstance({ nodes, onSelectFile, selectedPath }: PierreFil
 
   const { model } = useFileTree({
     flattenEmptyDirectories: true,
+    gitStatus,
     initialExpansion: 1,
     initialSelectedPaths: selectedPath ? [selectedPath] : [],
     onSelectionChange: (selectedPaths) => {
@@ -69,6 +78,10 @@ function PierreFileTreeInstance({ nodes, onSelectFile, selectedPath }: PierreFil
     renderRowDecoration: ({ item }) => decorationsRef.current.get(item.path) ?? null,
     search: true,
   });
+
+  useEffect(() => {
+    model.setGitStatus(gitStatus);
+  }, [model, gitStatus]);
 
   useEffect(() => {
     if (!selectedPath || model.getSelectedPaths().includes(selectedPath)) return;

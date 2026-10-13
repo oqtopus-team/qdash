@@ -40,10 +40,84 @@ export function withKnowledge<T extends object>(args: T, knowledge: string | und
   return { ...args, knowledge };
 }
 
+/** Whether a tool can take host-supplied labeled examples next to `task_name`. */
+export function acceptsExamples(parameters: TSchema): boolean {
+  const properties = (parameters as { properties?: Record<string, unknown> }).properties;
+  return properties !== undefined && "examples" in properties && "task_name" in properties;
+}
+
+/** Whether the model asked for the host's labeled examples (`use_examples: true`). */
+export function wantsExamples(args: unknown): boolean {
+  return (args as { use_examples?: unknown } | null)?.use_examples === true;
+}
+
+/** Whether the model passed examples of its own. */
+export function hasExamples(args: unknown): boolean {
+  const value = (args as { examples?: unknown } | null)?.examples;
+  return Array.isArray(value) && value.length > 0;
+}
+
+/** The model's arguments with the host's examples filled in. */
+export function withExamples<T extends object>(args: T, examples: LabeledExample[] | undefined): T {
+  if (examples === undefined || examples.length === 0) return args;
+  return { ...args, examples: examples.map(({ label, images }) => ({ label, images })) };
+}
+
+/** One expert-labeled example plot of a task, as pi-qcaleval takes it, with its identity for the record. */
+export interface LabeledExample {
+  id: string;
+  title: string;
+  outcome: string;
+  label: string;
+  images: Array<{ data: string; mimeType: string }>;
+  /** Each image's path in the knowledge repository, in the same order, for the record. */
+  paths: string[];
+}
+
 /** The slice of QDash's task knowledge response the reference is taken from. */
 export interface TaskKnowledgeLike {
   review_prompt_text?: string;
   prompt_text?: string;
+  examples?: Array<{
+    id?: string;
+    title?: string;
+    outcome?: string;
+    label?: string;
+    figures?: Array<{ base64_data?: string; mime_type?: string; path?: string }>;
+  }>;
+}
+
+/** Most labeled examples fetched for one evaluation; pi-qcaleval shows up to four. */
+export const MAX_EXAMPLES = 4;
+
+/**
+ * The labeled examples of a task from QDash's knowledge response: each one's
+ * figures with the diagnosis an expert validated. Examples without a figure
+ * or a label are left out; the order is the repository's.
+ */
+export function examplesOf(knowledge: TaskKnowledgeLike, max = MAX_EXAMPLES): LabeledExample[] {
+  const examples: LabeledExample[] = [];
+  for (const example of knowledge.examples ?? []) {
+    if (examples.length >= max) break;
+    const label = example.label?.trim();
+    const figures = (example.figures ?? []).filter(
+      (figure) => typeof figure.base64_data === "string" && figure.base64_data.length > 0,
+    );
+    const images = figures.map((figure) => ({
+      data: figure.base64_data as string,
+      mimeType: figure.mime_type || "image/png",
+    }));
+    if (!label || images.length === 0) continue;
+    examples.push({
+      id: example.id ?? "",
+      title: example.title ?? "",
+      outcome: example.outcome ?? "",
+      label,
+      images,
+      paths: figures.map((figure) => figure.path ?? ""),
+    });
+  }
+  return examples;
 }
 
 /**
@@ -70,6 +144,31 @@ export async function fetchTaskKnowledge(
   signal?: AbortSignal,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string | undefined> {
+  const knowledge = await fetchKnowledgeJson(connection, taskName, signal, fetchImpl);
+  return knowledge ? renderKnowledge(knowledge) : undefined;
+}
+
+/**
+ * The labeled examples QDash holds for a task, as the user. A task without
+ * examples, or an unreachable API, yields none: the evaluation then runs
+ * zero-shot, and the record shows no examples.
+ */
+export async function fetchTaskExamples(
+  connection: Pick<QDashConnection, "auth" | "baseUrl">,
+  taskName: string,
+  signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
+): Promise<LabeledExample[]> {
+  const knowledge = await fetchKnowledgeJson(connection, taskName, signal, fetchImpl);
+  return knowledge ? examplesOf(knowledge) : [];
+}
+
+async function fetchKnowledgeJson(
+  connection: Pick<QDashConnection, "auth" | "baseUrl">,
+  taskName: string,
+  signal: AbortSignal | undefined,
+  fetchImpl: typeof fetch,
+): Promise<TaskKnowledgeLike | undefined> {
   const url = `${connection.baseUrl}/tasks/${encodeURIComponent(taskName)}/knowledge`;
   const headers: Record<string, string> = {
     Authorization: `Bearer ${connection.auth.accessToken}`,
@@ -84,7 +183,7 @@ export async function fetchTaskKnowledge(
       }
       return undefined;
     }
-    return renderKnowledge((await response.json()) as TaskKnowledgeLike);
+    return (await response.json()) as TaskKnowledgeLike;
   } catch (error) {
     if (signal?.aborted) throw error;
     console.warn(

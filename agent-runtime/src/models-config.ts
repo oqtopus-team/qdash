@@ -3,11 +3,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { parse } from "yaml";
 
 /**
- * Build pi's models.json from QDash's chat.yaml and review.yaml.
+ * Build pi's models.json from QDash's chat.yaml and evaluation.yaml.
  *
  * Those two files are the single place model wiring is declared; this module is
  * the only translation into pi's schema. chat.yaml's `chat_models` back the
- * Copilot chat; review.yaml's `analysis_models` back the figure analysis
+ * Copilot chat; evaluation.yaml's `evaluation_models` back the figure evaluation
  * sidebar. See adr/0004 of the chat session.
  */
 
@@ -72,7 +72,7 @@ function readModels(yaml: string | undefined, key: string): ChatModel[] {
 }
 
 /**
- * Translate chat.yaml's `chat_models` and review.yaml's `analysis_models` into a
+ * Translate chat.yaml's `chat_models` and evaluation.yaml's `evaluation_models` into a
  * models.json object.
  *
  * Models with a `base_url` describe an endpoint pi has no catalog for
@@ -85,12 +85,12 @@ function readModels(yaml: string | undefined, key: string): ChatModel[] {
  */
 export function buildModelsConfig(
   chatYaml: string,
-  reviewYaml: string | undefined,
+  evaluationYaml: string | undefined,
   env: NodeJS.ProcessEnv,
 ): ModelsConfig {
   const models = [
     ...readModels(chatYaml, "chat_models"),
-    ...readModels(reviewYaml, "analysis_models"),
+    ...readModels(evaluationYaml, "evaluation_models"),
   ];
   const providers: Record<string, ProviderEntry> = {};
 
@@ -172,12 +172,12 @@ export function buildModelsConfig(
 /** Generate models.json next to the agent dir and return its path. */
 export function writeModelsConfig(
   chatConfigPath: string,
-  reviewConfigPath: string,
+  evaluationConfigPath: string,
   outPath: string,
 ): string {
   const config = buildModelsConfig(
     readFileSync(chatConfigPath, "utf8"),
-    readFileIfPresent(reviewConfigPath),
+    readFileIfPresent(evaluationConfigPath),
     process.env,
   );
   writeFileSync(outPath, `${JSON.stringify(config, null, 2)}\n`);

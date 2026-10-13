@@ -5,7 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { NoteModel } from './noteModel';
 import type { ReExecutionEntry } from './reExecutionEntry';
 import type { TaskResultResponseElapsedTime } from './taskResultResponseElapsedTime';
 import type { TaskResultResponseEndAt } from './taskResultResponseEndAt';
@@ -66,6 +65,4 @@ export interface TaskResultResponse {
   start_at?: TaskResultResponseStartAt;
   end_at?: TaskResultResponseEndAt;
   elapsed_time?: TaskResultResponseElapsedTime;
-  /** AI-generated review note for this task result */
-  ai_review_note?: NoteModel;
 }

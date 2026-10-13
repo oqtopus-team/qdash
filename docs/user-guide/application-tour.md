@@ -53,10 +53,8 @@ permission. See [Running Calibrations](./running-calibrations.md) for the end-to
 | Page | Purpose |
 | --- | --- |
 | **Inbox** | Review mentions, replies, and system notifications. |
-| **Issues** | Track and discuss a problem attached to a task result. |
 | **Forum** | Hold project-wide discussions that are not tied to one result. |
-| **Knowledge** | Reuse curated cases derived from resolved issues. |
-| **Task Knowledge** | Read task physics, expected results, failure patterns, and analysis guidance. |
+| **Knowledge** | Read and edit each task's background and expert-labeled example plots, grouped like the calibtasks packages; pull and open pull requests against the knowledge repository. |
 
 See [Reviewing and Sharing Results](./reviewing-results.md) for how these records relate.
 
@@ -64,7 +62,7 @@ See [Reviewing and Sharing Results](./reviewing-results.md) for how these record
 
 | Page | Purpose |
 | --- | --- |
-| **Files** | Edit project workflow and configuration files and use the Git integration. |
+| **Config** | Edit the Qubex configuration files, review all saved changes as diffs, and pull or open pull requests. |
 | **Settings** | Change appearance, account settings, active project, and project membership. |
 | **Admin** | Manage system users and administrative settings. |
 

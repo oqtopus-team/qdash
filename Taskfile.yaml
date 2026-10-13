@@ -64,11 +64,6 @@ tasks:
           --output {{.PY_SCHEMA_OUTPUT}}
       - uv run ruff format {{.PY_SCHEMA_OUTPUT}}
 
-  knowledge:
-    desc: Generate task knowledge JSON from markdown files
-    cmds:
-      - uv run scripts/generate_task_knowledge.py
-
   knowledge-pull:
     desc: Pull task-knowledge.json from the knowledge repository (KNOWLEDGE_REPO_URL)
     dotenv: [.env]

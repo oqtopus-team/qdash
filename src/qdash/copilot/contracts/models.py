@@ -17,21 +17,21 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class AnalysisContextResult:
-    """Result of building a full analysis context for a copilot analysis request."""
+class TaskContextBundle:
+    """Everything a chat about one task result opens with: context text and figures."""
 
-    context: TaskAnalysisContext
+    context: TaskContext
     image_base64: str | None
     expected_images: list[tuple[str, str]]
     experiment_images: list[tuple[str, str]] = field(default_factory=list)
     figure_paths: list[str] = field(default_factory=list)
 
 
-class TaskAnalysisContext(BaseModel):
-    """Full context for LLM-based task result analysis.
+class TaskContext(BaseModel):
+    """Full context of one task result for a chat about it.
 
-    Constructed by the analysis endpoint from DB data and TaskKnowledge,
-    then injected into the Pydantic AI agent as ``deps``.
+    Built from DB data and TaskKnowledge when a chat opens on a task result;
+    rendered into the opening message of the chat.
     """
 
     # Task knowledge (pre-rendered prompt)
@@ -76,63 +76,6 @@ class TaskAnalysisContext(BaseModel):
         default_factory=dict,
         description="Coupling parameters: {coupling_id: {param: value}}",
     )
-
-
-class AnalysisResponse(BaseModel):
-    """Structured analysis returned by the LLM."""
-
-    summary: str = Field(description="One-line result summary")
-    assessment: str = Field(description="Overall assessment: good / warning / bad")
-    explanation: str = Field(description="Detailed analysis and interpretation")
-    potential_issues: list[str] = Field(
-        default_factory=list,
-        description="Detected potential issues",
-    )
-    recommendations: list[str] = Field(
-        default_factory=list,
-        description="Recommended next actions",
-    )
-
-    @field_validator("potential_issues", "recommendations", mode="before")
-    @classmethod
-    def _coerce_list(cls, v: Any) -> Any:
-        if v is None or v == "":
-            return []
-        if isinstance(v, str):
-            return [v]
-        return v
-
-    @field_validator("assessment", mode="before")
-    @classmethod
-    def _coerce_assessment(cls, v: Any) -> Any:
-        if v is None:
-            return "warning"
-        return str(v).strip().lower()
-
-
-class ContentBlock(BaseModel):
-    """A single content block in a blocks response."""
-
-    type: str = Field(description="Block type: 'text' or 'chart'")
-    content: str | None = Field(default=None, description="Text content (for text blocks)")
-    chart: dict[str, Any] | None = Field(
-        default=None,
-        description="Plotly chart spec with 'data' and 'layout' keys (for chart blocks)",
-    )
-
-
-class BlocksAnalysisResponse(BaseModel):
-    """Extended analysis response with mixed text/chart content blocks."""
-
-    blocks: list[ContentBlock] = Field(description="Ordered list of content blocks")
-    assessment: str | None = Field(
-        default=None,
-        description="Overall assessment: good / warning / bad / null",
-    )
-
-
-# Backward-compatible alias used by API imports and older tests.
-BlocksResponse = BlocksAnalysisResponse
 
 
 class ApprovalDecision(BaseModel):
@@ -188,48 +131,6 @@ class ImageAttachmentsRequest(BaseModel):
         return images
 
 
-class AnalyzeRequest(ImageAttachmentsRequest):
-    """Request body for POST /copilot/analyze."""
-
-    task_name: str = Field(description="Task class name (e.g. CheckT1)")
-    chip_id: str
-    qid: str
-    execution_id: str
-    task_id: str
-    message: str = Field(description="User question / message")
-    session_id: str | None = Field(
-        default=None,
-        description=(
-            "Analysis session identifier. Required by the Pi backend, which "
-            "restores conversation state from the persisted session."
-        ),
-    )
-    request_id: str | None = Field(
-        default=None,
-        description="Idempotency key for recovering or retrying one Pi submission.",
-    )
-    image_base64: str | None = Field(
-        default=None,
-        description="Base64-encoded result figure (for multimodal analysis)",
-    )
-    conversation_history: list[dict[str, str]] = Field(
-        default_factory=list,
-        description="Previous conversation messages [{role, content}, ...]",
-    )
-    analysis_model_override: ModelConfig | None = Field(
-        default=None,
-        alias="model_override",
-        description=(
-            "Optional per-request model override for task result analysis. "
-            "When unset, the configured analysis_model/model selection is used."
-        ),
-    )
-    approval: ApprovalDecision | None = Field(
-        default=None,
-        description="Decision on the write operation the previous turn asked approval for.",
-    )
-
-
 class ChatStopRequest(BaseModel):
     """Request body for POST /copilot/chat/stop."""
 
@@ -242,10 +143,27 @@ class ChatStopResponse(BaseModel):
     stopped: bool
 
 
+class TaskChatTarget(BaseModel):
+    """The task result a chat is about; its first turn opens with the result's context."""
+
+    task_name: str = Field(description="Task class name (e.g. CheckT1)")
+    chip_id: str
+    qid: str
+    execution_id: str
+    task_id: str
+
+
 class ChatRequest(ImageAttachmentsRequest):
     """Request body for POST /copilot/chat/stream."""
 
     message: str = Field(description="User question / message")
+    task: TaskChatTarget | None = Field(
+        default=None,
+        description=(
+            "The task result this chat is about. When set, a new conversation opens "
+            "with the result's context and figures; later turns carry it for scoping."
+        ),
+    )
     session_id: str | None = Field(
         default=None,
         description=(
@@ -272,6 +190,13 @@ class ChatRequest(ImageAttachmentsRequest):
             "When unset, the configured chat_models[0]/model selection is used."
         ),
     )
+    thinking_level: Literal["off", "minimal", "low", "medium", "high"] | None = Field(
+        default=None,
+        description=(
+            "How much the planner thinks before answering, for this turn. "
+            "Unset keeps the chat model's configured reasoning_effort."
+        ),
+    )
     approval: ApprovalDecision | None = Field(
         default=None,
         description="Decision on the write operation the previous turn asked approval for.",
@@ -287,7 +212,6 @@ class SandboxPythonRequest(BaseModel):
 def _rebuild_models() -> None:
     from qdash.copilot.config import ModelConfig as _RuntimeModelConfig
 
-    AnalyzeRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
     ChatRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
 
 

@@ -3,7 +3,7 @@
 This module is launched as a standalone script (``python <path>/sandbox_worker.py``)
 rather than with ``python -m qdash.copilot.tooling.sandbox_worker``: importing it as
 part of the ``qdash`` package would execute ``qdash.copilot.__init__``, which pulls in
-litellm and costs ~2.3s of interpreter startup on every sandbox call. ``sandbox_core``
+heavy packages and costs seconds of interpreter startup on every sandbox call. ``sandbox_core``
 is therefore imported as a sibling module from this file's own directory.
 """
 

@@ -9,7 +9,6 @@ import type { Task } from "@/schemas";
 import { useGetTaskResult } from "@/client/task/task";
 import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureContent";
 import { TaskFigure } from "@/components/charts/TaskFigure";
-import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { CalibrationUpdateStatusBadge } from "@/components/features/metrics/ParametersTable";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
@@ -476,9 +475,6 @@ export function TaskDetailModal({
                 </div>
               )}
 
-              {noteTaskId && (
-                <TaskResultAiReviewNote note={fetchedTaskData?.ai_review_note} hideWhenEmpty />
-              )}
               {noteTaskId && <TaskResultMemo taskId={noteTaskId} chipId={chipId} hideWhenEmpty />}
 
               {/* Parameters Tables (detailed variant only) */}

@@ -19,6 +19,7 @@ import {
   UserRound,
   X,
   XCircle,
+  ClipboardList,
 } from "lucide-react";
 
 import { useListChips } from "@/client/chip/chip";
@@ -68,6 +69,13 @@ const PAGE_SIZE = 30;
 
 type CategoryFilter = "all" | NonNullable<ListForumPostsParams["category"]>;
 type StatusFilter = "open" | "investigating" | "identified" | "resolved" | "all";
+
+function taskStatusClass(status: string): string {
+  if (status === "completed" || status === "success") return "badge-success";
+  if (status === "failed") return "badge-error";
+  if (status === "running") return "badge-warning";
+  return "badge-ghost";
+}
 
 function parseForumPage(value: string | null): number {
   const page = Number.parseInt(value ?? "1", 10);
@@ -193,7 +201,7 @@ function ForumThreadCard({
                     {displayNumber}
                   </span>
                 )}
-                {post.title || "Untitled topic"}
+                {post.title || "Untitled thread"}
               </h2>
             </div>
 
@@ -245,6 +253,20 @@ function ForumThreadCard({
               <span className="inline-flex items-center gap-1">
                 <CalendarDays className="h-3.5 w-3.5" />
                 {post.cooldown_id}
+              </span>
+            )}
+            {post.task_result && (
+              <span
+                className="inline-flex min-w-0 items-center gap-1"
+                title={`Task result ${post.task_result.task_id}`}
+              >
+                <ClipboardList className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {post.task_result.task_name} · Q{post.task_result.qid}
+                </span>
+                <span className={`badge badge-xs ${taskStatusClass(post.task_result.status)}`}>
+                  {post.task_result.status}
+                </span>
               </span>
             )}
           </div>
@@ -484,7 +506,7 @@ function ForumThreadPreviewSidebar({
                       {formatForumPostNumber(post.number)}
                     </span>
                   )}
-                  {post.title || "Untitled topic"}
+                  {post.title || "Untitled thread"}
                 </h2>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
                   <span>Opened by {post.username}</span>

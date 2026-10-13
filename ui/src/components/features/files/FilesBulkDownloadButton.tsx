@@ -31,17 +31,12 @@ function getArchiveFilename(contentDisposition: unknown): string {
   return filenameMatch?.[1] ?? "config-files.zip";
 }
 
-/**
- * Button that downloads the entire config file tree as a single ZIP archive.
- */
-export function FilesBulkDownloadButton({
-  disabled = false,
-  onError,
-}: FilesBulkDownloadButtonProps) {
+/** Downloads the entire config file tree as a single ZIP archive. */
+export function useConfigZipDownload(onError: (message: string) => void) {
   const [isDownloading, setIsDownloading] = useState(false);
 
   /** Fetches the config tree as a ZIP blob and saves it via a temporary link. */
-  const handleDownload = async () => {
+  const download = async () => {
     if (isDownloading) return;
 
     setIsDownloading(true);
@@ -67,6 +62,18 @@ export function FilesBulkDownloadButton({
       setIsDownloading(false);
     }
   };
+
+  return { download, isDownloading };
+}
+
+/**
+ * Button that downloads the entire config file tree as a single ZIP archive.
+ */
+export function FilesBulkDownloadButton({
+  disabled = false,
+  onError,
+}: FilesBulkDownloadButtonProps) {
+  const { download: handleDownload, isDownloading } = useConfigZipDownload(onError);
 
   return (
     <button

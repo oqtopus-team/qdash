@@ -9,13 +9,17 @@ import {
   type CopilotChatSession,
 } from "@/contexts/CopilotChatSessionContext";
 import {
-  buildAnalysisModelOptions,
+  getStoredThinkingChoice,
+  levelOfEffort,
+  setStoredThinkingChoice,
+  thinkingLevelForRequest,
+  type ChatThinkingChoice,
+  type ChatThinkingLevel,
+} from "@/lib/chatThinking";
+import {
   buildChatModelOptions,
-  getStoredAnalysisModelKey,
   getStoredChatModelKey,
-  resolveAnalysisModelOption,
   resolveChatModelOption,
-  setStoredAnalysisModelKey,
   setStoredChatModelKey,
   type ModelOption,
 } from "@/lib/copilotModels";
@@ -29,38 +33,37 @@ export interface ChatModelSelection {
 }
 
 /**
- * Model menu for a chat. Analysis chats pick from `analysis_models`, general
- * chats from `chat_models`; each remembers its own choice.
+ * Model menu for a chat. Every chat, with or without a task result as its
+ * context, picks the planner from `chat_models`; the evaluation model is not a
+ * planner and is configured separately (evaluation.yaml).
  */
-function useChatModel(isAnalysis: boolean): ChatModelSelection {
+function useChatModel(): ChatModelSelection {
   const { data } = useGetCopilotConfig();
   const config = data?.data ?? null;
   const [chatKey, setChatKey] = useState(getStoredChatModelKey);
-  const [analysisKey, setAnalysisKey] = useState(getStoredAnalysisModelKey);
-
   const chatOptions = useMemo(() => buildChatModelOptions(config), [config]);
-  const analysisOptions = useMemo(() => buildAnalysisModelOptions(config), [config]);
+  const select = useCallback((key: string) => {
+    setChatKey(key);
+    setStoredChatModelKey(key);
+  }, []);
+  return { options: chatOptions, selected: resolveChatModelOption(chatOptions, chatKey), select };
+}
 
-  const select = useCallback(
-    (key: string) => {
-      if (isAnalysis) {
-        setAnalysisKey(key);
-        setStoredAnalysisModelKey(key);
-      } else {
-        setChatKey(key);
-        setStoredChatModelKey(key);
-      }
-    },
-    [isAnalysis],
-  );
+export interface ChatThinkingSelection {
+  choice: ChatThinkingChoice;
+  select: (choice: ChatThinkingChoice) => void;
+  /** What "auto" amounts to for the selected model, when its config says. */
+  modelDefault: ChatThinkingLevel | null;
+}
 
-  return isAnalysis
-    ? {
-        options: analysisOptions,
-        selected: resolveAnalysisModelOption(analysisOptions, analysisKey),
-        select,
-      }
-    : { options: chatOptions, selected: resolveChatModelOption(chatOptions, chatKey), select };
+/** Thinking menu for a chat; remembered across chats like the model. */
+function useChatThinking(model: ChatModelSelection): ChatThinkingSelection {
+  const [choice, setChoice] = useState<ChatThinkingChoice>(getStoredThinkingChoice);
+  const select = useCallback((next: ChatThinkingChoice) => {
+    setChoice(next);
+    setStoredThinkingChoice(next);
+  }, []);
+  return { choice, select, modelDefault: levelOfEffort(model.selected?.reasoningEffort) };
 }
 
 /** One chat (the active one by default) as seen by a chat surface. */
@@ -71,23 +74,35 @@ export function useCopilotChat(sessionId?: string | null) {
       ? ctx.activeSession
       : (ctx.sessions.find((s) => s.id === sessionId) ?? null);
   const run = session ? ctx.runs[session.id] : undefined;
-  const model = useChatModel(Boolean(session?.context));
+  const model = useChatModel();
   const modelOverride = model.selected?.model ?? null;
+  const thinking = useChatThinking(model);
+  const thinkingLevel = thinkingLevelForRequest(thinking.choice);
   const { sendMessage, stop: stopSession } = ctx;
   const id = session?.id;
   const messages = useMemo(() => session?.messages ?? [], [session?.messages]);
 
   const send = useCallback(
     (text: string, images?: ChatImageAttachment[]) =>
-      sendMessage(text, { sessionId: id, modelOverride, ...(images?.length ? { images } : {}) }),
-    [id, modelOverride, sendMessage],
+      sendMessage(text, {
+        sessionId: id,
+        modelOverride,
+        thinkingLevel,
+        ...(images?.length ? { images } : {}),
+      }),
+    [id, modelOverride, thinkingLevel, sendMessage],
   );
 
   /** Answer the approval card on the last answer; the label is what the thread shows. */
   const decide = useCallback(
     (approvalId: string, approve: boolean, label: string) =>
-      sendMessage(label, { sessionId: id, modelOverride, approval: { id: approvalId, approve } }),
-    [id, modelOverride, sendMessage],
+      sendMessage(label, {
+        sessionId: id,
+        modelOverride,
+        thinkingLevel,
+        approval: { id: approvalId, approve },
+      }),
+    [id, modelOverride, thinkingLevel, sendMessage],
   );
 
   const stop = useCallback(() => {
@@ -107,8 +122,9 @@ export function useCopilotChat(sessionId?: string | null) {
       sessionId: id,
       history: messages.slice(0, lastUser),
       modelOverride,
+      thinkingLevel,
     });
-  }, [id, messages, modelOverride, run, sendMessage]);
+  }, [id, messages, modelOverride, thinkingLevel, run, sendMessage]);
 
   /** Replace the user message at `index` and everything after it with a new turn. */
   const editMessage = useCallback(
@@ -122,10 +138,11 @@ export function useCopilotChat(sessionId?: string | null) {
         sessionId: id,
         history: messages.slice(0, index),
         modelOverride,
+        thinkingLevel,
         images,
       });
     },
-    [id, messages, modelOverride, run, sendMessage],
+    [id, messages, modelOverride, thinkingLevel, run, sendMessage],
   );
 
   /** Rate the assistant message at `index`; rating it the same way again clears it. */
@@ -146,6 +163,7 @@ export function useCopilotChat(sessionId?: string | null) {
     liveTurn: run?.turn ?? null,
     statusMessage: run?.statusMessage ?? null,
     model,
+    thinking,
     send,
     decide,
     stop,
