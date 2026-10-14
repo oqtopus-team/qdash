@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import { getForumLabelErrorMessage, type ForumLabelDefinition } from "../categories";
 import {
-  countLimitedForumLabels,
   filterForumLabels,
   getForumLabelEnterAction,
   isForumLabelLimitReached,
@@ -12,15 +11,14 @@ import {
 } from "../ForumLabelSelector";
 
 const LABELS: ForumLabelDefinition[] = [
-  { id: "bug", label: "Bug", description: "Something is broken", color: "#ef4444", isSystem: true },
+  { id: "bug", label: "Bug", description: "Something is broken", color: "#ef4444" },
   {
     id: "enhancement",
     label: "Enhancement",
     description: "New feature or request",
     color: "#22c55e",
-    isSystem: false,
   },
-  { id: "readout", label: "Readout", description: "", color: "#3b82f6", isSystem: false },
+  { id: "readout", label: "Readout", description: "", color: "#3b82f6" },
 ];
 
 describe("filterForumLabels", () => {
@@ -85,26 +83,15 @@ describe("shouldShowCreateForumLabelOption", () => {
   });
 });
 
-describe("countLimitedForumLabels", () => {
-  it("excludes system labels from the count", () => {
-    expect(countLimitedForumLabels(["bug", "enhancement", "readout"], LABELS)).toBe(2);
-  });
-
-  it("counts unknown keys toward the limit", () => {
-    expect(countLimitedForumLabels(["bug", "unknown"], LABELS)).toBe(1);
-  });
-});
-
 describe("isForumLabelLimitReached", () => {
   const custom = Array.from({ length: MAX_FORUM_POST_LABELS }, (_, i) => `custom-${i}`);
 
-  it("is reached when the non-system count hits the maximum", () => {
-    expect(isForumLabelLimitReached(custom, LABELS)).toBe(true);
+  it("is reached when the count hits the maximum", () => {
+    expect(isForumLabelLimitReached(custom)).toBe(true);
   });
 
-  it("is not reached when a system label brings the total over the maximum", () => {
-    expect(isForumLabelLimitReached([...custom.slice(1), "bug"], LABELS)).toBe(false);
-    expect(isForumLabelLimitReached([...custom.slice(1), "bug", "readout"], LABELS)).toBe(true);
+  it("is not reached below the maximum", () => {
+    expect(isForumLabelLimitReached(custom.slice(1))).toBe(false);
   });
 });
 
@@ -125,13 +112,6 @@ describe("getForumLabelEnterAction", () => {
 
   it("does nothing when the first filtered label is unselected and at the limit", () => {
     expect(getForumLabelEnterAction([LABELS[1]], [], true, true)).toEqual({ type: "none" });
-  });
-
-  it("toggles an unselected system label even at the limit", () => {
-    expect(getForumLabelEnterAction([LABELS[0]], [], true, true)).toEqual({
-      type: "toggle",
-      labelId: "bug",
-    });
   });
 
   it("creates a label when there are no filtered matches and the create option is visible", () => {

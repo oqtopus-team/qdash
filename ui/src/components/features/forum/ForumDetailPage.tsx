@@ -590,13 +590,13 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     invalidateThread();
   };
 
+  /** Toggles a label on the thread, respecting the per-thread label limit. */
   const togglePostLabel = (label: string) => {
     if (!post) return;
     const currentLabels = post.labels ?? [];
     const nextLabels = currentLabels.includes(label)
       ? currentLabels.filter((item) => item !== label)
-      : !labels.find((item) => item.id === label)?.isSystem &&
-          isForumLabelLimitReached(currentLabels, labels)
+      : isForumLabelLimitReached(currentLabels)
         ? currentLabels
         : [...currentLabels, label];
     updateRootMetadata({ labels: nextLabels });

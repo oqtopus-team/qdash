@@ -35,7 +35,7 @@ between MongoDB, active execution state, and Qubex parameter files.
 | `chip_note`           | ChipNoteDocument          | Dashboard chip notes scoped by cooldown/range          |
 | `target_note`         | TargetNoteDocument        | Dashboard pinned target summaries scoped by cooldown/range |
 | `note_event`          | NoteEventDocument         | Audit log for every note edit (write-through)   |
-| `forum_label`         | ForumLabelDocument        | Custom forum labels, auto-assigned on task-result links |
+| `forum_label`         | ForumLabelDocument        | Custom project-scoped forum labels |
 | `cryostat`            | CryostatDocument          | Cryostat (dilution refrigerator) entity         |
 | `cooldown`            | CooldownDocument          | One cool-down cycle of one cryostat             |
 | `evaluation_run`      | EvaluationRunDocument     | One bulk calibration evaluation request          |
@@ -1104,14 +1104,7 @@ class FlowDocument(Document):
 ### ForumLabelDocument
 
 Custom, project-scoped forum labels, similar to GitHub issue labels. Threads can carry up to 10
-labels (the system `task-result` label is not counted), and each key must exist as a
-`ForumLabelDocument` for the project. The `task-result` label is a system label
-(`is_system=True`) that QDash assigns automatically to a thread when a post links a calibration
-task result; operators can rename or recolor it but not delete it.
-
-The `task-result` label is sticky: it is added when a post links a task result and is not removed
-when the link is later edited away. Operators can remove it from a thread manually, but if the content still contains a task-result
-link, a later content edit adds it again.
+labels, and each key must exist as a `ForumLabelDocument` for the project.
 
 Legacy data: the default labels `review` and `anomaly` are seeded with the same keys the former
 fixed label system used. Older label values (`discussion`, `info`, `mtg`, `resolved`) were already
@@ -1127,12 +1120,11 @@ Collection: `forum_label`
 ```python
 class ForumLabelDocument(Document):
     project_id: str
-    key: str              # Stable label key, e.g. "review" or "task-result".
+    key: str              # Stable label key, e.g. "review".
                            # Server-generated from name; never set by the client.
     name: str              # Display name
     description: str = ""
     color: str             # Lowercase hex color, e.g. "#3b82f6"
-    is_system: bool = False  # System labels can be renamed/recolored but not deleted
     system_info: SystemInfoModel
 ```
 

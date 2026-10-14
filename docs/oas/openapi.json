@@ -21252,12 +21252,6 @@
             "type": "string",
             "title": "Color",
             "description": "Display hex color"
-          },
-          "is_system": {
-            "type": "boolean",
-            "title": "Is System",
-            "description": "Whether this label is managed by the system",
-            "default": false
           }
         },
         "type": "object",
@@ -21372,9 +21366,9 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 11,
+            "maxItems": 10,
             "title": "Labels",
-            "description": "Operator labels for root threads (up to 10, not counting the system task-result label)"
+            "description": "Operator labels for root threads (up to 10)"
           },
           "assignee_username": {
             "anyOf": [
@@ -21578,7 +21572,7 @@
             },
             "type": "array",
             "title": "Labels",
-            "description": "Operator labels for root threads (up to 10, not counting the system task-result label)"
+            "description": "Operator labels for root threads (up to 10)"
           },
           "assignee_username": {
             "anyOf": [
@@ -21772,14 +21766,14 @@
                   "type": "string"
                 },
                 "type": "array",
-                "maxItems": 11
+                "maxItems": 10
               },
               {
                 "type": "null"
               }
             ],
             "title": "Labels",
-            "description": "Updated operator labels for root threads (up to 10, not counting the system task-result label)"
+            "description": "Updated operator labels for root threads (up to 10)"
           },
           "assignee_username": {
             "anyOf": [

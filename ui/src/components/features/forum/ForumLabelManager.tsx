@@ -55,7 +55,7 @@ type ForumLabelManagerProps = {
   labels: ForumLabelDefinition[];
 };
 
-/** Owner-only CRUD panel for forum labels: create, edit, and delete (system labels are protected). */
+/** Owner-only CRUD panel for forum labels: create, edit, and delete. */
 export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
   const queryClient = useQueryClient();
   const [labelName, setLabelName] = useState("");
@@ -126,8 +126,8 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
     }
   };
 
+  /** Deletes a label and refreshes the label list. */
   const removeLabel = (label: ForumLabelDefinition) => {
-    if (label.isSystem) return;
     deleteMutation.mutate(
       { labelKey: label.id },
       {
@@ -144,9 +144,6 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
       <div className="card-body">
         <div className="flex items-center justify-between gap-3">
           <h2 className="card-title text-sm">Forum Labels</h2>
-          <span className="text-xs text-base-content/50">
-            System labels are managed automatically and cannot be deleted.
-          </span>
         </div>
         <div className="mb-4 grid gap-2 sm:grid-cols-[150px_1fr_96px_80px]">
           <input
@@ -217,9 +214,6 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <ForumLabelBadge label={item} />
-                        {item.isSystem && (
-                          <span className="badge badge-ghost badge-xs">system</span>
-                        )}
                       </div>
                       {item.description && (
                         <p className="mt-1 truncate text-xs text-base-content/50">
@@ -240,8 +234,8 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
                       <button
                         className="btn btn-ghost btn-xs text-error"
                         onClick={() => removeLabel(item)}
-                        disabled={item.isSystem || deleteMutation.isPending}
-                        title={item.isSystem ? "System labels cannot be deleted" : "Delete label"}
+                        disabled={deleteMutation.isPending}
+                        title="Delete label"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

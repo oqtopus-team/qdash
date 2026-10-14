@@ -33,19 +33,19 @@ export type ForumLabelDefinition = {
   label: string;
   description: string;
   color: string;
-  isSystem: boolean;
 };
 
+/** Maps an API label response to the UI label definition. */
 export function toForumLabelDefinition(label: ForumLabelResponse): ForumLabelDefinition {
   return {
     id: label.key,
     label: label.name,
     description: label.description ?? "",
     color: label.color,
-    isSystem: label.is_system ?? false,
   };
 }
 
+/** Returns the label definition for a key, falling back to a gray placeholder. */
 export function getForumLabel(
   key: string,
   labels: ForumLabelDefinition[] = [],
@@ -56,7 +56,6 @@ export function getForumLabel(
       label: key,
       description: "",
       color: NEUTRAL_FORUM_LABEL_COLOR,
-      isSystem: false,
     }
   );
 }

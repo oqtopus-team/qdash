@@ -52,7 +52,6 @@ describe("getForumMarkerStyle", () => {
       label: "Anomaly",
       description: "Unexpected behavior",
       color: "#f59e0b",
-      isSystem: true,
     },
   ];
 

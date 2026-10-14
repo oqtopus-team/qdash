@@ -32,7 +32,7 @@ export interface ForumPostUpdate {
   content: string;
   /** BlockNote document JSON. Source of truth for rich content; content is derived. */
   content_blocks?: ForumPostUpdateContentBlocksItem[];
-  /** Updated operator labels for root threads (up to 10, not counting the system task-result label) */
+  /** Updated operator labels for root threads (up to 10) */
   labels?: ForumPostUpdateLabels;
   /** Updated assigned project member username */
   assignee_username?: ForumPostUpdateAssigneeUsername;

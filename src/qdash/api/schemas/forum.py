@@ -14,7 +14,6 @@ FORUM_TARGET_TYPE_PATTERN = r"^(qubit|coupling)$"
 FORUM_THREAD_STATUS_PATTERN = r"^(open|investigating|identified|resolved)$"
 FORUM_LABEL_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
 MAX_FORUM_POST_LABELS = 10
-MAX_FORUM_POST_LABEL_KEYS = MAX_FORUM_POST_LABELS + 1
 ForumThreadStatus = Literal["open", "investigating", "identified", "resolved"]
 
 
@@ -115,9 +114,6 @@ class ForumLabelResponse(BaseModel):
     name: str = Field(..., description="Display name")
     description: str = Field(default="", description="Short label description")
     color: str = Field(..., description="Display hex color")
-    is_system: bool = Field(
-        default=False, description="Whether this label is managed by the system"
-    )
 
 
 class ListForumLabelsResponse(BaseModel):
@@ -151,8 +147,8 @@ class ForumPostCreate(BaseModel):
     )
     labels: list[str] = Field(
         default_factory=list,
-        max_length=MAX_FORUM_POST_LABEL_KEYS,
-        description=f"Operator labels for root threads (up to {MAX_FORUM_POST_LABELS}, not counting the system task-result label)",
+        max_length=MAX_FORUM_POST_LABELS,
+        description=f"Operator labels for root threads (up to {MAX_FORUM_POST_LABELS})",
     )
     assignee_username: str | None = Field(
         default=None, max_length=64, description="Assigned project member username"
@@ -195,8 +191,8 @@ class ForumPostUpdate(BaseModel):
     )
     labels: list[str] | None = Field(
         default=None,
-        max_length=MAX_FORUM_POST_LABEL_KEYS,
-        description=f"Updated operator labels for root threads (up to {MAX_FORUM_POST_LABELS}, not counting the system task-result label)",
+        max_length=MAX_FORUM_POST_LABELS,
+        description=f"Updated operator labels for root threads (up to {MAX_FORUM_POST_LABELS})",
     )
     assignee_username: str | None = Field(
         default=None, max_length=64, description="Updated assigned project member username"
@@ -260,7 +256,7 @@ class ForumPostResponse(BaseModel):
     parent_id: str | None = Field(default=None, description="Parent forum post ID")
     labels: list[str] = Field(
         default_factory=list,
-        description=f"Operator labels for root threads (up to {MAX_FORUM_POST_LABELS}, not counting the system task-result label)",
+        description=f"Operator labels for root threads (up to {MAX_FORUM_POST_LABELS})",
     )
     assignee_username: str | None = Field(
         default=None, description="Assigned project member username"

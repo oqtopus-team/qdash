@@ -16,7 +16,6 @@ describe("toForumLabelDefinition", () => {
       name: "Anomaly",
       description: "Unexpected behavior",
       color: "#f59e0b",
-      is_system: true,
     };
 
     expect(toForumLabelDefinition(response)).toEqual({
@@ -24,11 +23,10 @@ describe("toForumLabelDefinition", () => {
       label: "Anomaly",
       description: "Unexpected behavior",
       color: "#f59e0b",
-      isSystem: true,
     });
   });
 
-  it("defaults description to an empty string and isSystem to false when omitted", () => {
+  it("defaults description to an empty string when omitted", () => {
     const response: ForumLabelResponse = {
       key: "custom",
       name: "Custom",
@@ -40,7 +38,6 @@ describe("toForumLabelDefinition", () => {
       label: "Custom",
       description: "",
       color: "#2563eb",
-      isSystem: false,
     });
   });
 });
@@ -52,14 +49,12 @@ describe("getForumLabel", () => {
       label: "Anomaly",
       description: "Unexpected behavior",
       color: "#f59e0b",
-      isSystem: true,
     },
     {
       id: "review",
       label: "Review",
       description: "Needs review",
       color: "#2563eb",
-      isSystem: false,
     },
   ];
 
@@ -67,13 +62,12 @@ describe("getForumLabel", () => {
     expect(getForumLabel("anomaly", labels)).toEqual(labels[0]);
   });
 
-  it("falls back to a gray, non-system definition for an unknown key", () => {
+  it("falls back to a gray definition for an unknown key", () => {
     expect(getForumLabel("deprecated", labels)).toEqual({
       id: "deprecated",
       label: "deprecated",
       description: "",
       color: NEUTRAL_FORUM_LABEL_COLOR,
-      isSystem: false,
     });
   });
 
@@ -83,7 +77,6 @@ describe("getForumLabel", () => {
       label: "anomaly",
       description: "",
       color: "#6b7280",
-      isSystem: false,
     });
   });
 });

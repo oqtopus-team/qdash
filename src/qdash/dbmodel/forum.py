@@ -56,9 +56,6 @@ class ForumLabelDocument(Document):
     name: str = Field(..., description="Display name")
     description: str = Field(default="", description="Short label description")
     color: str = Field(..., description="Display color as a lowercase hex string")
-    is_system: bool = Field(
-        default=False, description="Whether this label is managed by the system"
-    )
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="System timestamps"
     )

@@ -18,6 +18,4 @@ export interface ForumLabelResponse {
   description?: string;
   /** Display hex color */
   color: string;
-  /** Whether this label is managed by the system */
-  is_system?: boolean;
 }

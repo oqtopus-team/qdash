@@ -171,11 +171,11 @@ export function ForumNewPage() {
   const createMutation = useCreateForumPost();
   const { labels } = useForumLabels();
 
+  /** Toggles a label in the new-thread selection, respecting the label limit. */
   const toggleLabel = (label: string) => {
     setSelectedLabels((current) => {
       if (current.includes(label)) return current.filter((item) => item !== label);
-      const isSystem = labels.find((item) => item.id === label)?.isSystem;
-      if (!isSystem && isForumLabelLimitReached(current, labels)) return current;
+      if (isForumLabelLimitReached(current)) return current;
       return [...current, label];
     });
   };

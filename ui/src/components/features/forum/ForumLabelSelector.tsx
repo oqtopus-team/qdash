@@ -67,20 +67,9 @@ export function shouldShowCreateForumLabelOption(
   );
 }
 
-/** Counts the selected label keys that count toward the per-post limit, excluding system labels. */
-export function countLimitedForumLabels(
-  selected: string[],
-  labels: ForumLabelDefinition[],
-): number {
-  return selected.filter((key) => !labels.find((item) => item.id === key)?.isSystem).length;
-}
-
-/** Whether the selection has reached the per-post label limit, ignoring system labels. */
-export function isForumLabelLimitReached(
-  selected: string[],
-  labels: ForumLabelDefinition[],
-): boolean {
-  return countLimitedForumLabels(selected, labels) >= MAX_FORUM_POST_LABELS;
+/** Whether the selection has reached the per-post label limit. */
+export function isForumLabelLimitReached(selected: string[]): boolean {
+  return selected.length >= MAX_FORUM_POST_LABELS;
 }
 
 /** Action pressing Enter in the label search input should take: toggle the first filtered label, create a new one, or nothing. */
@@ -99,9 +88,7 @@ export function getForumLabelEnterAction(
   const first = filteredLabels[0];
   if (first) {
     const isSelected = selectedLabels.includes(first.id);
-    return isSelected || !atLimit || first.isSystem
-      ? { type: "toggle", labelId: first.id }
-      : { type: "none" };
+    return isSelected || !atLimit ? { type: "toggle", labelId: first.id } : { type: "none" };
   }
   return showCreateOption ? { type: "create" } : { type: "none" };
 }
@@ -129,7 +116,7 @@ export function ForumLabelPicker({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const selectedDefinitions = selectedLabels.map((key) => getForumLabel(key, labels));
-  const atLimit = isForumLabelLimitReached(selectedLabels, labels);
+  const atLimit = isForumLabelLimitReached(selectedLabels);
   const trimmedQuery = query.trim();
   const filteredLabels = filterForumLabels(labels, query);
   const showCreateOption = isOwner && shouldShowCreateForumLabelOption(query, labels);
@@ -227,7 +214,7 @@ export function ForumLabelPicker({
                 <DropdownMenuCheckboxItem
                   key={item.id}
                   checked={selected}
-                  disabled={!selected && atLimit && !item.isSystem}
+                  disabled={!selected && atLimit}
                   onCheckedChange={() => onToggle(item.id)}
                   onSelect={(event) => event.preventDefault()}
                 >
