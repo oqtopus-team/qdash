@@ -12,6 +12,7 @@ import {
   useDeleteForumLabel,
   useUpdateForumLabel,
 } from "@/client/forum/forum";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 import {
   getForumLabelErrorMessage,
@@ -65,6 +66,7 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editColor, setEditColor] = useState(NEUTRAL_FORUM_LABEL_COLOR);
+  const [pendingDelete, setPendingDelete] = useState<ForumLabelDefinition | null>(null);
 
   const createMutation = useCreateForumLabel();
   const updateMutation = useUpdateForumLabel();
@@ -126,13 +128,17 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
     }
   };
 
-  /** Deletes a label and refreshes the label list. */
+  /** Deletes a label after confirmation and refreshes the label list. */
   const removeLabel = (label: ForumLabelDefinition) => {
     deleteMutation.mutate(
       { labelKey: label.id },
       {
-        onSuccess: () => invalidateLabels(),
+        onSuccess: () => {
+          setPendingDelete(null);
+          invalidateLabels();
+        },
         onError: (error) => {
+          setPendingDelete(null);
           toast.error(getForumLabelErrorMessage(error, "Failed to delete label"));
         },
       },
@@ -236,7 +242,7 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
                       </button>
                       <button
                         className="btn btn-ghost btn-xs text-error"
-                        onClick={() => removeLabel(item)}
+                        onClick={() => setPendingDelete(item)}
                         disabled={deleteMutation.isPending}
                         title="Delete label"
                       >
@@ -250,6 +256,23 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
           })}
         </div>
       </div>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete label?"
+        description={
+          <>
+            This will delete <strong>{pendingDelete?.label}</strong> and remove it from every
+            thread. This cannot be undone.
+          </>
+        }
+        confirmLabel="Delete"
+        destructive
+        pending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (pendingDelete) removeLabel(pendingDelete);
+        }}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      />
     </div>
   );
 }
