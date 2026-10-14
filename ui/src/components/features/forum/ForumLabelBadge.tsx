@@ -22,13 +22,16 @@ export function getReadableTextColor(hex: string): string {
   return yiq >= 128 ? "#111827" : "#ffffff";
 }
 
-/** Resolves the background/readable-text style for a forum discussion marker, or undefined when no label is linked. */
+/** Resolves the background/readable-text style for a forum discussion marker, or undefined when no post is linked (null renders a neutral marker). */
 export function getForumMarkerStyle(
   labelKey: string | null | undefined,
   labels: ForumLabelDefinition[] = [],
 ): CSSProperties | undefined {
-  if (!labelKey) return undefined;
-  const color = getForumLabel(labelKey, labels).color ?? NEUTRAL_FORUM_LABEL_COLOR;
+  if (labelKey === undefined || labelKey === "") return undefined;
+  const color =
+    labelKey === null
+      ? NEUTRAL_FORUM_LABEL_COLOR
+      : (getForumLabel(labelKey, labels).color ?? NEUTRAL_FORUM_LABEL_COLOR);
   return { backgroundColor: color, color: getReadableTextColor(color) };
 }
 

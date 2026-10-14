@@ -29,7 +29,7 @@ interface DashboardCouplingGridProps {
   notedTargets?: Set<string>;
   targetNotedTargets?: Set<string>;
   /** Linked forum discussion label keyed by coupling ID. */
-  forumLinkedTargets?: Record<string, string>;
+  forumLinkedTargets?: Record<string, string | null>;
   /** Forum label definitions used to resolve marker colors. */
   forumLabels?: ForumLabelDefinition[];
   /** Linked forum discussion details keyed by coupling ID. */
@@ -250,7 +250,7 @@ export function DashboardCouplingGrid({
           const hasNote = notedTargets?.has(couplingId) ?? false;
           const hasTargetNote = targetNotedTargets?.has(couplingId) ?? false;
           const forumLabel = forumLinkedTargets?.[couplingId];
-          const hasForumDiscussion = !!forumLabel;
+          const hasForumDiscussion = forumLabel !== undefined;
           const forumMarkerStyle = getForumMarkerStyle(forumLabel, forumLabels);
           const hasCrossMetricNote =
             !hasNote && !hasTargetNote && (crossMetricNotedTargets?.has(couplingId) ?? false);

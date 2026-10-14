@@ -57,8 +57,14 @@ describe("getForumMarkerStyle", () => {
 
   it("returns undefined when no label key is linked", () => {
     expect(getForumMarkerStyle(undefined, labels)).toBeUndefined();
-    expect(getForumMarkerStyle(null, labels)).toBeUndefined();
     expect(getForumMarkerStyle("", labels)).toBeUndefined();
+  });
+
+  it("returns a neutral marker style for a linked post without labels", () => {
+    expect(getForumMarkerStyle(null, labels)).toEqual({
+      backgroundColor: "#6b7280",
+      color: "#ffffff",
+    });
   });
 
   it("resolves the background color and a readable text color for a known label", () => {

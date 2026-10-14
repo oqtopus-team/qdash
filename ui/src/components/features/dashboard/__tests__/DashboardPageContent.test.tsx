@@ -253,11 +253,11 @@ vi.mock("@/components/features/dashboard/DashboardQubitGrid", () => ({
     forumLinkedQids,
     onQubitClick,
   }: {
-    forumLinkedQids?: Record<string, string>;
+    forumLinkedQids?: Record<string, string | null>;
     onQubitClick?: (qid: string) => void;
   }) => (
     <div>
-      <span data-testid="qubit-forum-label">{forumLinkedQids?.["0"] ?? "none"}</span>
+      <span data-testid="qubit-forum-label">{String(forumLinkedQids?.["0"])}</span>
       <button type="button" onClick={() => onQubitClick?.("0")}>
         Open qubit
       </button>
@@ -270,11 +270,11 @@ vi.mock("@/components/features/dashboard/DashboardCouplingGrid", () => ({
     forumLinkedTargets,
     onCouplingClick,
   }: {
-    forumLinkedTargets?: Record<string, string>;
+    forumLinkedTargets?: Record<string, string | null>;
     onCouplingClick?: (couplingId: string) => void;
   }) => (
     <div>
-      <span data-testid="coupling-forum-label">{forumLinkedTargets?.["0-1"] ?? "none"}</span>
+      <span data-testid="coupling-forum-label">{String(forumLinkedTargets?.["0-1"])}</span>
       <button type="button" onClick={() => onCouplingClick?.("0-1")}>
         Open coupling
       </button>
@@ -431,6 +431,37 @@ describe("DashboardPageContent", () => {
     );
     expect(screen.getAllByTestId("coupling-forum-label").map((item) => item.textContent)).toContain(
       "anomaly",
+    );
+  });
+
+  it("uses a later post's label when earlier posts for the target have none", () => {
+    mockForumPosts.mockReturnValue([
+      { id: "forum-0", target_type: "qubit", target_id: "0", labels: [] },
+      { id: "forum-1", target_type: "qubit", target_id: "0", labels: ["review"] },
+    ]);
+
+    render(<DashboardPageContent />);
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
+
+    expect(screen.getAllByTestId("qubit-forum-label").map((item) => item.textContent)).toContain(
+      "review",
+    );
+  });
+
+  it("keeps a label-less marker for targets whose posts have no labels", () => {
+    mockForumPosts.mockReturnValue([
+      { id: "forum-0", target_type: "qubit", target_id: "0", labels: [] },
+      { id: "forum-1", target_type: "coupling", target_id: "0-1" },
+    ]);
+
+    render(<DashboardPageContent />);
+    fireEvent.click(screen.getByRole("button", { name: /Target Summaries/ }));
+
+    expect(screen.getAllByTestId("qubit-forum-label").map((item) => item.textContent)).toContain(
+      "null",
+    );
+    expect(screen.getAllByTestId("coupling-forum-label").map((item) => item.textContent)).toContain(
+      "null",
     );
   });
 

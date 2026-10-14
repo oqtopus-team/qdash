@@ -29,7 +29,7 @@ interface DashboardQubitGridProps {
   /** Set of qubit IDs that have a target-level note. */
   targetNotedQids?: Set<string>;
   /** Linked forum discussion label keyed by qubit ID. */
-  forumLinkedQids?: Record<string, string>;
+  forumLinkedQids?: Record<string, string | null>;
   /** Forum label definitions used to resolve marker colors. */
   forumLabels?: ForumLabelDefinition[];
   /** Linked forum discussion details keyed by qubit ID. */
@@ -202,7 +202,7 @@ export function DashboardQubitGrid({
         const hasNote = notedQids?.has(qid) ?? false;
         const hasTargetNote = targetNotedQids?.has(qid) ?? false;
         const forumLabel = forumLinkedQids?.[qid];
-        const hasForumDiscussion = !!forumLabel;
+        const hasForumDiscussion = forumLabel !== undefined;
         const forumMarkerStyle = getForumMarkerStyle(forumLabel, forumLabels);
         const hasCrossMetricNote =
           !hasNote && !hasTargetNote && (crossMetricNotedQids?.has(qid) ?? false);

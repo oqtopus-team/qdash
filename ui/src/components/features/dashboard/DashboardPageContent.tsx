@@ -60,21 +60,17 @@ const SUMMARY_TOPOLOGY_HEADER_CLASS = "flex flex-wrap items-center justify-betwe
 const MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER =
   "<!-- qdash:migrated-metric-notes-to-latest-cooldown -->";
 
-/** Default label key still prioritized for the dashboard marker; falls back gracefully if renamed or removed. */
-const PRIORITY_FORUM_LABEL = "anomaly";
-const DEFAULT_FORUM_MARKER_LABEL = "review";
-
-function representativeForumLabel(labels: string[] | undefined): string {
-  const values = labels ?? [];
-  if (values.includes(PRIORITY_FORUM_LABEL)) return PRIORITY_FORUM_LABEL;
-  return values[0] ?? DEFAULT_FORUM_MARKER_LABEL;
+/** Picks the first label as the marker label, or null when the post has no labels. */
+function representativeForumLabel(labels: string[] | undefined): string | null {
+  return labels?.[0] ?? null;
 }
 
-function mergeForumMarkerLabel(current: string | undefined, labels: string[] | undefined): string {
-  const next = representativeForumLabel(labels);
-  return current === PRIORITY_FORUM_LABEL || next === PRIORITY_FORUM_LABEL
-    ? PRIORITY_FORUM_LABEL
-    : next;
+/** Merges marker labels for a target so the first label found wins and null means a label-less post. */
+function mergeForumMarkerLabel(
+  current: string | null | undefined,
+  labels: string[] | undefined,
+): string | null {
+  return current ?? representativeForumLabel(labels);
 }
 
 function coverageOf(
@@ -318,7 +314,7 @@ export function DashboardPageContent() {
   const { labels: forumLabels } = useForumLabels();
 
   const forumLinkedQids = useMemo(() => {
-    const targets: Record<string, string> = {};
+    const targets: Record<string, string | null> = {};
     (forumPostsResponse?.data.posts ?? []).forEach((post) => {
       if (post.target_type === "qubit" && post.target_id) {
         targets[post.target_id] = mergeForumMarkerLabel(targets[post.target_id], post.labels);
@@ -328,7 +324,7 @@ export function DashboardPageContent() {
   }, [forumPostsResponse?.data.posts]);
 
   const forumLinkedCouplings = useMemo(() => {
-    const targets: Record<string, string> = {};
+    const targets: Record<string, string | null> = {};
     (forumPostsResponse?.data.posts ?? []).forEach((post) => {
       if (post.target_type === "coupling" && post.target_id) {
         targets[post.target_id] = mergeForumMarkerLabel(targets[post.target_id], post.labels);
