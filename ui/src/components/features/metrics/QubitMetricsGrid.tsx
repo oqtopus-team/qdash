@@ -85,6 +85,7 @@ interface GridCellProps {
   onClick: () => void;
 }
 
+/** Renders a single qubit cell with its QID label, metric value, and hover tooltip. */
 const GridCell = memo(function GridCell({
   qid,
   value,
@@ -121,7 +122,7 @@ const GridCell = memo(function GridCell({
       {/* QID Label */}
       {showLabels && (
         <div
-          className={`absolute top-0.5 left-0.5 backdrop-blur-sm px-0.5 py-px rounded font-bold shadow-sm leading-tight ${
+          className={`absolute top-0.5 left-0.5 px-0.5 py-px rounded font-bold shadow-sm leading-tight ${
             value !== null && value !== undefined
               ? "bg-black/30 text-white"
               : "bg-base-content/20 text-base-content"
@@ -726,7 +727,7 @@ export function QubitMetricsGrid({
         className={`flex-1 relative flex justify-center ${
           viewMode === "pan-zoom"
             ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "bg-base-200/60 rounded-lg"
+            : "items-start bg-base-200/60 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
