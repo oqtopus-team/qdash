@@ -1108,10 +1108,11 @@ labels, and each key must exist as a `ForumLabelDocument` for the project.
 
 New projects start with no labels; owners create them as needed.
 
-Legacy data: for existing data, run `python -m qdash.dbmodel.migration migrate-forum-status` first,
-then run `python -m qdash.dbmodel.forum_label_db_migration --execute` manually (omit `--execute` for
-a dry-run). It registers every label key used by existing threads that has no definition yet, using
-the key as the name and a neutral gray color. Owners can rename or recolor these labels afterward.
+Legacy data: for existing data, run `python -m qdash.dbmodel.migration migrate-forum-status --execute`
+first, then run `python -m qdash.dbmodel.forum_label_db_migration --execute` manually. Both commands
+only dry-run unless `--execute` is given. The second one registers every label key used by existing
+threads that has no definition yet, using the key as the name and a neutral gray color. Owners can
+rename or recolor these labels afterward.
 
 > **Warning:** `migrate-forum-status` is a one-time legacy migration. It collapses every label to
 > `review`/`anomaly` and keeps only one label per thread, so do not re-run it once custom labels are
