@@ -2,9 +2,9 @@ from qdash.dbmodel.forum import ForumLabelDocument, ForumPostDocument
 from qdash.dbmodel.forum_label_db_migration import backfill_forum_labels
 
 
-def _post(project_id: str, labels: list[str]) -> ForumPostDocument:
+def _post(project_id: str, labels: list[str]) -> None:
     """Insert a root forum post with the given labels."""
-    return ForumPostDocument(
+    ForumPostDocument(
         project_id=project_id,
         category="qubit",
         username="owner",
