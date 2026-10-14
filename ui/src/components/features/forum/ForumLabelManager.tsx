@@ -168,6 +168,9 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
           </button>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {labels.length === 0 && (
+            <div className="px-2.5 py-2 text-xs text-base-content/45">No labels yet</div>
+          )}
           {labels.map((item) => {
             const isEditing = editingKey === item.id;
             return (
