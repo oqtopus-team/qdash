@@ -1106,10 +1106,12 @@ class FlowDocument(Document):
 Custom, project-scoped forum labels, similar to GitHub issue labels. Threads can carry up to 10
 labels, and each key must exist as a `ForumLabelDocument` for the project.
 
-Legacy data: the default labels `review` and `anomaly` are seeded with the same keys the former
-fixed label system used. Older label values (`discussion`, `info`, `mtg`, `resolved`) were already
-collapsed to `review`/`anomaly`/status by the existing `migrate-forum-status` migration
-(`python -m qdash.dbmodel.migration migrate-forum-status`), so no new migration is needed.
+New projects start with no labels; owners create them as needed.
+
+Legacy data: for existing data, run `python -m qdash.dbmodel.migration migrate-forum-status` first,
+then run `python -m qdash.dbmodel.forum_label_db_migration --execute` manually (omit `--execute` for
+a dry-run). It registers every label key used by existing threads that has no definition yet, using
+the key as the name and a neutral gray color. Owners can rename or recolor these labels afterward.
 
 > **Warning:** `migrate-forum-status` is a one-time legacy migration. It collapses every label to
 > `review`/`anomaly` and keeps only one label per thread, so do not re-run it once custom labels are

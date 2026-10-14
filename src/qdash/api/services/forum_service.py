@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import logging
 import re
 import secrets
@@ -87,21 +86,6 @@ DEFAULT_FORUM_CATEGORIES = [
         "color": "secondary",
         "icon": "message-square",
         "sort_order": 50,
-    },
-]
-
-DEFAULT_FORUM_LABELS: list[dict[str, str]] = [
-    {
-        "key": "review",
-        "name": "Review",
-        "description": "Needs review by operators",
-        "color": "#3b82f6",
-    },
-    {
-        "key": "anomaly",
-        "name": "Anomaly",
-        "description": "Unexpected behavior or degraded results",
-        "color": "#f59e0b",
     },
 ]
 
@@ -610,22 +594,12 @@ class ForumService:
                 return candidate
         raise HTTPException(status_code=500, detail="Failed to generate a unique label key")
 
-    def _ensure_default_labels(self, project_id: str) -> None:
-        """Create the default labels for a project when none exist."""
-        if ForumLabelDocument.find({"project_id": project_id}).count() > 0:
-            return
-
-        for item in DEFAULT_FORUM_LABELS:
-            with contextlib.suppress(DuplicateKeyError):
-                ForumLabelDocument(project_id=project_id, **item).insert()
-
     def _normalize_forum_labels(self, project_id: str, labels: list[str] | None) -> list[str]:
         """Normalize user-provided labels and require each to exist for the project."""
         normalized = _dedupe_forum_label_keys(labels)
         if not normalized:
             return []
 
-        self._ensure_default_labels(project_id)
         docs = ForumLabelDocument.find(
             {"project_id": project_id, "key": {"$in": normalized}}
         ).to_list()
@@ -636,7 +610,6 @@ class ForumService:
 
     def list_labels(self, *, project_id: str) -> ListForumLabelsResponse:
         """List forum labels for a project."""
-        self._ensure_default_labels(project_id)
         docs = (
             ForumLabelDocument.find({"project_id": project_id})
             .sort("system_info.created_at")
@@ -653,7 +626,6 @@ class ForumService:
         color: str,
     ) -> ForumLabelResponse:
         """Create a forum label; the key is always generated from the name, never from a client."""
-        self._ensure_default_labels(project_id)
         existing = ForumLabelDocument.find({"project_id": project_id}).to_list()
         normalized_name = name.strip().lower()
         if any(doc.name.strip().lower() == normalized_name for doc in existing):
@@ -684,7 +656,6 @@ class ForumService:
         color: str | None,
     ) -> ForumLabelResponse:
         """Update a forum label. The label key is immutable."""
-        self._ensure_default_labels(project_id)
         doc = ForumLabelDocument.find_one({"project_id": project_id, "key": key}).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum label not found")
@@ -708,7 +679,6 @@ class ForumService:
 
     def delete_label(self, *, project_id: str, key: str) -> SuccessResponse:
         """Delete a forum label and remove it from every thread that used it."""
-        self._ensure_default_labels(project_id)
         doc = ForumLabelDocument.find_one({"project_id": project_id, "key": key}).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum label not found")

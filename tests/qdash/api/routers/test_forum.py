@@ -132,6 +132,7 @@ def test_forum_thread_labels_round_trip_filter_and_update(test_client, init_db):
     _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_project()
     headers = _headers("owner_token")
+    _create_named_labels(test_client, headers, "Review", "Anomaly")
 
     root = _create_post(test_client, headers, labels=["review"])
 
@@ -184,8 +185,8 @@ def test_forum_thread_labels_round_trip_filter_and_update(test_client, init_db):
     assert rejected_status_label.status_code == 422
 
 
-def test_list_forum_labels_returns_defaults(test_client, init_db):
-    """Listing labels lazily seeds the default label set."""
+def test_list_forum_labels_is_empty_for_new_project(test_client, init_db):
+    """A new project starts with no labels."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_project()
     headers = _headers("owner_token")
@@ -193,10 +194,22 @@ def test_list_forum_labels_returns_defaults(test_client, init_db):
     response = test_client.get("/forum/labels", headers=headers)
 
     assert response.status_code == 200
-    labels = response.json()["labels"]
-    keys = {item["key"] for item in labels}
-    assert keys == {"review", "anomaly"}
-    assert all("is_system" not in item for item in labels)
+    assert response.json()["labels"] == []
+
+
+def test_deleting_all_forum_labels_leaves_list_empty(test_client, init_db):
+    """Deleting every label does not bring any label back."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+    keys = _create_named_labels(test_client, headers, "Review", "Anomaly")
+
+    for key in keys:
+        assert test_client.delete(f"/forum/labels/{key}", headers=headers).status_code == 200
+
+    response = test_client.get("/forum/labels", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["labels"] == []
 
 
 def test_owner_can_create_update_and_delete_forum_label(test_client, init_db):
@@ -244,7 +257,7 @@ def test_update_forum_label_rejects_case_insensitive_duplicate_name(test_client,
     _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_project()
     headers = _headers("owner_token")
-    test_client.get("/forum/labels", headers=headers)  # seed defaults
+    _create_named_labels(test_client, headers, "Review")
 
     created = test_client.post(
         "/forum/labels", headers=headers, json={"name": "Hardware", "color": "#111111"}
@@ -352,6 +365,7 @@ def test_delete_forum_label_removes_it_from_posts(test_client, init_db):
         "/forum/labels", headers=headers, json={"name": "Flaky", "color": "#654321"}
     )
     assert created.status_code == 201
+    _create_named_labels(test_client, headers, "Review")
 
     root = _create_post(test_client, headers, labels=["flaky", "review"])
     assert root.status_code == 201, root.text
@@ -737,6 +751,7 @@ def test_editor_can_update_forum_thread_metadata(test_client, init_db):
     _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_user("editor", "editor_token", ProjectRole.EDITOR)
     _create_project()
+    _create_named_labels(test_client, _headers("owner_token"), "Anomaly")
 
     root = _create_post(test_client, _headers("owner_token"))
     root_id = root.json()["id"]
@@ -1133,6 +1148,18 @@ def _setup_owner():
     return _headers("owner_token")
 
 
+def _create_named_labels(test_client, headers, *names):
+    """Create one label per name as the owner and return their keys."""
+    keys = []
+    for name in names:
+        response = test_client.post(
+            "/forum/labels", headers=headers, json={"name": name, "color": "#123456"}
+        )
+        assert response.status_code == 201, response.text
+        keys.append(response.json()["key"])
+    return keys
+
+
 def _create_custom_labels(test_client, headers, count):
     """Create ``count`` custom labels and return their keys."""
     keys = []
@@ -1166,7 +1193,6 @@ def test_make_label_key_suffix_exhaustion_raises():
 def test_create_forum_label_insert_race_returns_conflict(test_client, init_db, monkeypatch):
     """A duplicate-key error on insert is reported as a 409."""
     headers = _setup_owner()
-    test_client.get("/forum/labels", headers=headers)
 
     def _raise(*_args, **_kwargs):
         """Simulate a concurrent insert of the same label."""
@@ -1192,6 +1218,7 @@ def test_update_and_delete_unknown_forum_label_return_404(test_client, init_db):
 def test_update_forum_label_description_round_trips(test_client, init_db):
     """Label descriptions can be updated."""
     headers = _setup_owner()
+    _create_named_labels(test_client, headers, "Review")
 
     updated = test_client.patch(
         "/forum/labels/review", headers=headers, json={"description": "Needs a look"}
@@ -1216,9 +1243,10 @@ def test_too_many_labels_rejected(test_client, init_db):
     assert too_many.status_code == 422
 
 
-def test_thread_with_default_labels_can_be_updated_unchanged(test_client, init_db):
-    """A thread carrying default labels accepts its own labels back in an update."""
+def test_thread_with_labels_can_be_updated_unchanged(test_client, init_db):
+    """A thread carrying labels accepts its own labels back in an update."""
     headers = _setup_owner()
+    _create_named_labels(test_client, headers, "Review", "Anomaly")
     root = _create_post(test_client, headers, labels=["review", "anomaly"])
     assert root.status_code == 201, root.text
 
