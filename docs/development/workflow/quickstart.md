@@ -79,8 +79,9 @@ Run it immediately before `CheckEFChevron` in the same worker session:
 tasks = ["ConfigureEF", "CheckEFChevron"]
 ```
 
-The qubit must already have calibrated GE DRAG pi pulse parameters and readout
-parameters. `CheckEFChevron` verifies that GE and EF targets exist before
+The Qubex session must already have calibrated GE pulses (half-pi pulses are
+sufficient), and the qubit must have calibrated readout parameters.
+`CheckEFChevron` does not require DRAG pi task inputs and verifies that GE and EF targets exist before
 starting measurement. Configuration tasks delegate channel allocation to Qubex.
 
 `Configure` also accepts the `configuration_mode` run parameter: `ge-cr-cr`,

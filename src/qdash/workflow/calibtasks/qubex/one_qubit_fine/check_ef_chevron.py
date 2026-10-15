@@ -27,7 +27,7 @@ from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
 class CheckEFChevron(QubexTask):
-    """Measure f_ef and alpha = f_ef - f_ge using the calibrated GE DRAG pi pulse."""
+    """Measure f_ef and alpha = f_ef - f_ge using the Qubex session's GE pulses."""
 
     name: str = "CheckEFChevron"
     task_type: str = "qubit"
@@ -42,11 +42,6 @@ class CheckEFChevron(QubexTask):
         "ef_control_amplitude": InputParameterSpec.database_or_default(
             default=0.0625, unit="a.u.", description="EF drive pulse amplitude"
         ),
-        "drag_pi_amplitude": InputParameterSpec.required_database(unit="a.u."),
-        "drag_pi_duration": InputParameterSpec.required_database(
-            parameter_aliases=("drag_pi_length",), unit="ns"
-        ),
-        "drag_pi_beta": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(unit="a.u."),
         "readout_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("resonator_frequency",), unit="GHz"

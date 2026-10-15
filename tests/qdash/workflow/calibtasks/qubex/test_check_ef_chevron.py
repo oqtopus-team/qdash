@@ -23,9 +23,6 @@ def _task() -> CheckEFChevron:
     for name, value in {
         "qubit_frequency": 5.0,
         "control_frequency": 5.001,
-        "drag_pi_amplitude": 0.1,
-        "drag_pi_duration": 32.0,
-        "drag_pi_beta": -0.5,
         "readout_frequency": 6.1,
         "readout_amplitude": 0.031,
     }.items():
