@@ -39,10 +39,7 @@ export interface ForumPostCreate {
   content_blocks?: ForumPostCreateContentBlocksItem[];
   /** Parent forum post ID for replies. None for root threads. */
   parent_id?: ForumPostCreateParentId;
-  /**
-     * Operator labels for root threads (up to 10)
-     * @maxItems 10
-     */
+  /** Operator labels for root threads */
   labels?: string[];
   /** Assigned project member username */
   assignee_username?: ForumPostCreateAssigneeUsername;

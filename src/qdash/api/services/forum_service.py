@@ -337,8 +337,17 @@ class ForumService:
         reply_count: int = 0,
         task_result: ForumTaskResultSummary | None = None,
     ) -> ForumPostResponse:
-        """Convert a document to an API response."""
+        """Convert a document to an API response, omitting label keys that have no definition."""
         user = UserDocument.find_one({"user_id": doc.user_id}).run() if doc.user_id else None
+        labels = list(getattr(doc, "labels", []))
+        if labels:
+            defined = {
+                label.key
+                for label in ForumLabelDocument.find(
+                    {"project_id": doc.project_id, "key": {"$in": labels}}
+                ).to_list()
+            }
+            labels = [key for key in labels if key in defined]
         return ForumPostResponse(
             id=str(doc.id),
             project_id=doc.project_id,
@@ -351,7 +360,7 @@ class ForumService:
             content=doc.content,
             content_blocks=list(doc.content_blocks),
             parent_id=doc.parent_id,
-            labels=list(getattr(doc, "labels", [])),
+            labels=labels,
             assignee_username=getattr(doc, "assignee_username", None),
             chip_id=getattr(doc, "chip_id", None),
             target_type=getattr(doc, "target_type", None),

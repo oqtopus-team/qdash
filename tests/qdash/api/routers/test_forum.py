@@ -4,13 +4,14 @@ import re
 import secrets
 
 import pytest
+from bson import ObjectId
 from pymongo.errors import DuplicateKeyError
 from starlette.exceptions import HTTPException
 
 from qdash.api.services import forum_service
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.forum import ForumLabelDocument
+from qdash.dbmodel.forum import ForumLabelDocument, ForumPostDocument
 from qdash.dbmodel.notification import NotificationDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
@@ -1160,20 +1161,6 @@ def _create_named_labels(test_client, headers, *names):
     return keys
 
 
-def _create_custom_labels(test_client, headers, count):
-    """Create ``count`` custom labels and return their keys."""
-    keys = []
-    for index in range(count):
-        response = test_client.post(
-            "/forum/labels",
-            headers=headers,
-            json={"name": f"custom{index}", "color": "#123456"},
-        )
-        assert response.status_code == 201, response.text
-        keys.append(response.json()["key"])
-    return keys
-
-
 def test_make_label_key_random_exhaustion_raises(monkeypatch):
     """A non-ASCII name whose random keys always collide fails with a 500."""
     monkeypatch.setattr(secrets, "token_hex", lambda _n: "abcdef")
@@ -1230,17 +1217,32 @@ def test_update_forum_label_description_round_trips(test_client, init_db):
     assert review["description"] == "Needs a look"
 
 
-def test_too_many_labels_rejected(test_client, init_db):
-    """Ten labels are accepted; eleven exceed the limit and are rejected."""
+def test_undefined_stored_label_is_omitted_and_dropped_on_update(test_client, init_db):
+    """A stored label key without a definition is hidden and replaced on the next update."""
     headers = _setup_owner()
-    keys = _create_custom_labels(test_client, headers, 11)
+    root = _create_post(test_client, headers)
+    assert root.status_code == 201, root.text
+    root_id = root.json()["id"]
+    ForumPostDocument.find_one({"_id": ObjectId(root_id)}).update(
+        {"$set": {"labels": ["review"]}}
+    ).run()
 
-    accepted = _create_post(test_client, headers, labels=keys[:10])
-    assert accepted.status_code == 201, accepted.text
-    assert len(accepted.json()["labels"]) == 10
+    fetched = test_client.get(f"/forum/posts/{root_id}", headers=headers)
+    assert fetched.json()["labels"] == []
 
-    too_many = _create_post(test_client, headers, labels=keys)
-    assert too_many.status_code == 422
+    (key,) = _create_named_labels(test_client, headers, "Anomaly")
+    updated = test_client.patch(
+        f"/forum/posts/{root_id}",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": root.json()["title"],
+            "content": root.json()["content"],
+            "labels": [key],
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["labels"] == [key]
 
 
 def test_thread_with_labels_can_be_updated_unchanged(test_client, init_db):

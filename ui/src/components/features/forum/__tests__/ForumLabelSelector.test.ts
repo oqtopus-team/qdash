@@ -5,8 +5,6 @@ import { getForumLabelErrorMessage, type ForumLabelDefinition } from "../categor
 import {
   filterForumLabels,
   getForumLabelEnterAction,
-  isForumLabelLimitReached,
-  MAX_FORUM_POST_LABELS,
   shouldShowCreateForumLabelOption,
 } from "../ForumLabelSelector";
 
@@ -83,43 +81,20 @@ describe("shouldShowCreateForumLabelOption", () => {
   });
 });
 
-describe("isForumLabelLimitReached", () => {
-  const custom = Array.from({ length: MAX_FORUM_POST_LABELS }, (_, i) => `custom-${i}`);
-
-  it("is reached when the count hits the maximum", () => {
-    expect(isForumLabelLimitReached(custom)).toBe(true);
-  });
-
-  it("is not reached below the maximum", () => {
-    expect(isForumLabelLimitReached(custom.slice(1))).toBe(false);
-  });
-});
-
 describe("getForumLabelEnterAction", () => {
-  it("toggles the first filtered label when there are matches and it is not disabled", () => {
-    expect(getForumLabelEnterAction([LABELS[0], LABELS[1]], [], false, true)).toEqual({
+  it("toggles the first filtered label when there are matches", () => {
+    expect(getForumLabelEnterAction([LABELS[0], LABELS[1]], true)).toEqual({
       type: "toggle",
       labelId: "bug",
     });
-  });
-
-  it("toggles off the first filtered label even at the limit when it is already selected", () => {
-    expect(getForumLabelEnterAction([LABELS[0]], ["bug"], true, false)).toEqual({
-      type: "toggle",
-      labelId: "bug",
-    });
-  });
-
-  it("does nothing when the first filtered label is unselected and at the limit", () => {
-    expect(getForumLabelEnterAction([LABELS[1]], [], true, true)).toEqual({ type: "none" });
   });
 
   it("creates a label when there are no filtered matches and the create option is visible", () => {
-    expect(getForumLabelEnterAction([], [], false, true)).toEqual({ type: "create" });
+    expect(getForumLabelEnterAction([], true)).toEqual({ type: "create" });
   });
 
   it("does nothing when there are no filtered matches and the create option is hidden", () => {
-    expect(getForumLabelEnterAction([], [], false, false)).toEqual({ type: "none" });
+    expect(getForumLabelEnterAction([], false)).toEqual({ type: "none" });
   });
 });
 

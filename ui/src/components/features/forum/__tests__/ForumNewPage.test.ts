@@ -26,11 +26,4 @@ describe("parseLabels", () => {
   it("returns an empty array when given no values", () => {
     expect(parseLabels([])).toEqual([]);
   });
-
-  it("limits the result to MAX_FORUM_POST_LABELS", () => {
-    const values = Array.from({ length: 12 }, (_, index) => `label-${index}`);
-    const result = parseLabels(values);
-    expect(result).toHaveLength(10);
-    expect(result).toEqual(values.slice(0, 10));
-  });
 });

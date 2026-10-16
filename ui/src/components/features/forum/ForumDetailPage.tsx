@@ -55,7 +55,7 @@ import {
   toForumCategoryDefinition,
 } from "./categories";
 import { ForumLabelBadge } from "./ForumLabelBadge";
-import { ForumLabelPicker, isForumLabelLimitReached } from "./ForumLabelSelector";
+import { ForumLabelPicker } from "./ForumLabelSelector";
 import { type ForumBlockSnapshotGetter, type ForumMentionCandidate } from "./ForumBlockEditor";
 import { ForumPostContent } from "./ForumPostContent";
 import { ForumThreadDownloadButton } from "./ForumThreadDownloadButton";
@@ -590,15 +590,13 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     invalidateThread();
   };
 
-  /** Toggles a label on the thread, respecting the per-thread label limit. */
+  /** Toggles a label on the thread. */
   const togglePostLabel = (label: string) => {
     if (!post) return;
     const currentLabels = post.labels ?? [];
     const nextLabels = currentLabels.includes(label)
       ? currentLabels.filter((item) => item !== label)
-      : isForumLabelLimitReached(currentLabels)
-        ? currentLabels
-        : [...currentLabels, label];
+      : [...currentLabels, label];
     updateRootMetadata({ labels: nextLabels });
   };
 

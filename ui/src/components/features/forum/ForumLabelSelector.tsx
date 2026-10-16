@@ -30,8 +30,6 @@ import {
 } from "./categories";
 import { ForumLabelBadge } from "./ForumLabelBadge";
 
-export const MAX_FORUM_POST_LABELS = 10;
-
 type ForumLabelPickerProps = {
   labels: ForumLabelDefinition[];
   selectedLabels: string[];
@@ -67,29 +65,19 @@ export function shouldShowCreateForumLabelOption(
   );
 }
 
-/** Whether the selection has reached the per-post label limit. */
-export function isForumLabelLimitReached(selected: string[]): boolean {
-  return selected.length >= MAX_FORUM_POST_LABELS;
-}
-
 /** Action pressing Enter in the label search input should take: toggle the first filtered label, create a new one, or nothing. */
 export type ForumLabelEnterAction =
   | { type: "toggle"; labelId: string }
   | { type: "create" }
   | { type: "none" };
 
-/** Decides what pressing Enter in the label search input does, respecting the first filtered label's disabled state. */
+/** Decides what pressing Enter in the label search input does: toggle the first filtered label, else create or nothing. */
 export function getForumLabelEnterAction(
   filteredLabels: ForumLabelDefinition[],
-  selectedLabels: string[],
-  atLimit: boolean,
   showCreateOption: boolean,
 ): ForumLabelEnterAction {
   const first = filteredLabels[0];
-  if (first) {
-    const isSelected = selectedLabels.includes(first.id);
-    return isSelected || !atLimit ? { type: "toggle", labelId: first.id } : { type: "none" };
-  }
+  if (first) return { type: "toggle", labelId: first.id };
   return showCreateOption ? { type: "create" } : { type: "none" };
 }
 
@@ -116,7 +104,6 @@ export function ForumLabelPicker({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const selectedDefinitions = selectedLabels.map((key) => getForumLabel(key, labels));
-  const atLimit = isForumLabelLimitReached(selectedLabels);
   const trimmedQuery = query.trim();
   const filteredLabels = filterForumLabels(labels, query);
   const showCreateOption = isOwner && shouldShowCreateForumLabelOption(query, labels);
@@ -129,7 +116,7 @@ export function ForumLabelPicker({
       });
       queryClient.invalidateQueries({ queryKey: getListForumLabelsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
-      if (!atLimit) onToggle(response.data.key);
+      onToggle(response.data.key);
       setQuery("");
     } catch (error) {
       toast.error(getForumLabelErrorMessage(error, "Failed to create label"));
@@ -146,12 +133,7 @@ export function ForumLabelPicker({
     }
     if (event.key === "Enter") {
       event.stopPropagation();
-      const action = getForumLabelEnterAction(
-        filteredLabels,
-        selectedLabels,
-        atLimit,
-        showCreateOption,
-      );
+      const action = getForumLabelEnterAction(filteredLabels, showCreateOption);
       if (action.type === "toggle") {
         event.preventDefault();
         onToggle(action.labelId);
@@ -214,7 +196,6 @@ export function ForumLabelPicker({
                 <DropdownMenuCheckboxItem
                   key={item.id}
                   checked={selected}
-                  disabled={!selected && atLimit}
                   onCheckedChange={() => onToggle(item.id)}
                   onSelect={(event) => event.preventDefault()}
                 >

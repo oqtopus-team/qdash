@@ -37,11 +37,7 @@ import {
   getForumCategory,
   toForumCategoryDefinition,
 } from "./categories";
-import {
-  ForumLabelPicker,
-  isForumLabelLimitReached,
-  MAX_FORUM_POST_LABELS,
-} from "./ForumLabelSelector";
+import { ForumLabelPicker } from "./ForumLabelSelector";
 import type { ForumBlockSnapshotGetter, ForumMentionCandidate } from "./ForumBlockEditor";
 
 const ForumBlockEditor = dynamic(
@@ -62,6 +58,7 @@ function formatCooldownPeriod(
   return `${start} - ${end}`;
 }
 
+/** Splits comma-separated label params into a deduplicated list of trimmed keys. */
 export function parseLabels(values: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -71,7 +68,6 @@ export function parseLabels(values: string[]): string[] {
       if (!trimmed || seen.has(trimmed)) continue;
       seen.add(trimmed);
       result.push(trimmed);
-      if (result.length >= MAX_FORUM_POST_LABELS) return result;
     }
   }
   return result;
@@ -171,11 +167,10 @@ export function ForumNewPage() {
   const createMutation = useCreateForumPost();
   const { labels } = useForumLabels();
 
-  /** Toggles a label in the new-thread selection, respecting the label limit. */
+  /** Toggles a label in the new-thread selection. */
   const toggleLabel = (label: string) => {
     setSelectedLabels((current) => {
       if (current.includes(label)) return current.filter((item) => item !== label);
-      if (isForumLabelLimitReached(current)) return current;
       return [...current, label];
     });
   };

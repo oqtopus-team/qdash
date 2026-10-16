@@ -13,7 +13,6 @@ FORUM_CATEGORY_ICON_PATTERN = r"^[a-z0-9][a-z0-9-]{0,63}$"
 FORUM_TARGET_TYPE_PATTERN = r"^(qubit|coupling)$"
 FORUM_THREAD_STATUS_PATTERN = r"^(open|investigating|identified|resolved)$"
 FORUM_LABEL_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
-MAX_FORUM_POST_LABELS = 10
 ForumThreadStatus = Literal["open", "investigating", "identified", "resolved"]
 
 
@@ -147,8 +146,7 @@ class ForumPostCreate(BaseModel):
     )
     labels: list[str] = Field(
         default_factory=list,
-        max_length=MAX_FORUM_POST_LABELS,
-        description=f"Operator labels for root threads (up to {MAX_FORUM_POST_LABELS})",
+        description="Operator labels for root threads",
     )
     assignee_username: str | None = Field(
         default=None, max_length=64, description="Assigned project member username"
@@ -191,8 +189,7 @@ class ForumPostUpdate(BaseModel):
     )
     labels: list[str] | None = Field(
         default=None,
-        max_length=MAX_FORUM_POST_LABELS,
-        description=f"Updated operator labels for root threads (up to {MAX_FORUM_POST_LABELS})",
+        description="Updated operator labels for root threads",
     )
     assignee_username: str | None = Field(
         default=None, max_length=64, description="Updated assigned project member username"
@@ -256,7 +253,7 @@ class ForumPostResponse(BaseModel):
     parent_id: str | None = Field(default=None, description="Parent forum post ID")
     labels: list[str] = Field(
         default_factory=list,
-        description=f"Operator labels for root threads (up to {MAX_FORUM_POST_LABELS})",
+        description="Operator labels for root threads",
     )
     assignee_username: str | None = Field(
         default=None, description="Assigned project member username"
