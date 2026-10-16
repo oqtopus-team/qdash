@@ -2292,12 +2292,6 @@
             "unit": "ns",
             "user_override": "allowed"
           },
-          "qubit_frequency": {
-            "default_value": null,
-            "resolution": "database_required",
-            "unit": "GHz",
-            "user_override": "allowed"
-          },
           "readout_amplitude": {
             "default_value": null,
             "resolution": "database_required",

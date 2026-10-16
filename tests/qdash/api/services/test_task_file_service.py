@@ -163,7 +163,11 @@ def test_ef_chevron_is_enabled_with_calibration_and_sweep_metadata() -> None:
 
     assert task.enabled
     assert task.category == "One Qubit"
-    assert task.input_parameters["qubit_frequency"]["resolution"] == "database_required"
+    assert "qubit_frequency" not in task.input_parameters
+    assert task.input_parameters["control_frequency"]["resolution"] == "database_required"
+    assert task.input_parameters["control_frequency"]["fallback_parameter_names"] == [
+        "qubit_frequency"
+    ]
     assert not any(name.startswith("drag_pi_") for name in task.input_parameters)
     assert task.input_parameters["hpi_amplitude"]["resolution"] == "database_required"
     assert task.input_parameters["hpi_duration"]["resolution"] == "database_required"

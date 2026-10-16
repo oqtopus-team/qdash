@@ -21,7 +21,6 @@ from qdash.workflow.engine.task.backend_saver import BackendSaver
 def _task() -> CheckEFChevron:
     task = CheckEFChevron()
     for name, value in {
-        "qubit_frequency": 5.0,
         "control_frequency": 5.001,
         "hpi_amplitude": 0.1,
         "hpi_duration": 32.0,
@@ -76,7 +75,7 @@ def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monk
         result = task.run(cast("Any", object()), "0")
     kwargs = estimate.call_args.kwargs
     assert kwargs["targets"] == ["Q00"]
-    assert kwargs["frequencies"] == {"Q00": 4.7}
+    assert kwargs["frequencies"]["Q00"] == pytest.approx(4.701)
     assert kwargs["amplitudes"] == {"Q00": 0.0625}
     np.testing.assert_allclose(kwargs["final_detuning_range"], np.linspace(-0.05, 0.05, 41))
     assert list(kwargs["final_time_range"]) == list(range(0, 257, 8))
@@ -117,7 +116,7 @@ def test_postprocess_uses_final_frequency_and_prioritizes_final_chevron_figure()
     result = _task().postprocess(_backend(), "exec-1", _result(figures=figures), "0")
     assert result.validation_error is None
     assert result.output_parameters["ef_frequency"].value == 4.72
-    assert result.output_parameters["anharmonicity"].value == pytest.approx(-0.28)
+    assert result.output_parameters["anharmonicity"].value == pytest.approx(-0.281)
     assert all(
         p.unit == "GHz" and p.execution_id == "exec-1" for p in result.output_parameters.values()
     )
@@ -146,7 +145,7 @@ def test_registered_task_saves_both_qubit_metrics() -> None:
     task = generate_task_instances(["CheckEFChevron"], {"CheckEFChevron": {}}, "qubex")[
         "CheckEFChevron"
     ]
-    task.input_parameters["qubit_frequency"] = InputParameterModel(value=5.0)
+    task.input_parameters["control_frequency"] = InputParameterModel(value=5.001)
     output = task.postprocess(_backend(), "exec-1", _result(), "0").output_parameters
     state_manager = MagicMock()
     state_manager.get_task.return_value = SimpleNamespace(output_parameters=output)
@@ -160,7 +159,7 @@ def test_registered_task_saves_both_qubit_metrics() -> None:
     saved = repository.return_value.update_calib_data.call_args.kwargs
     assert saved["qid"] == "0" and saved["project_id"] == "proj-1"
     assert saved["output_parameters"]["ef_frequency"].value == 4.72
-    assert saved["output_parameters"]["anharmonicity"].value == pytest.approx(-0.28)
+    assert saved["output_parameters"]["anharmonicity"].value == pytest.approx(-0.281)
     metrics = load_metrics_config().qubit_metrics
     assert metrics["ef_frequency"].unit == "GHz" and metrics["ef_frequency"].scale == 1
     assert metrics["anharmonicity"].unit == "MHz" and metrics["anharmonicity"].scale == 1000
