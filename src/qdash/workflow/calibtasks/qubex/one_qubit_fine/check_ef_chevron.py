@@ -36,6 +36,8 @@ class CheckEFChevron(QubexTask):
             fallback_parameter_names=("qubit_frequency",), unit="GHz"
         ),
         "qubit_frequency": InputParameterSpec.required_database(unit="GHz"),
+        "hpi_amplitude": InputParameterSpec.required_database(unit="a.u."),
+        "hpi_duration": InputParameterSpec.required_database(unit="ns"),
         "anharmonicity": InputParameterSpec.database_or_default(
             default=-0.3, unit="GHz", description="Initial EF frequency offset from f_ge"
         ),

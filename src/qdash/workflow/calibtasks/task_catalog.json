@@ -2280,6 +2280,18 @@
             "unit": "a.u.",
             "user_override": "allowed"
           },
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_duration": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
           "qubit_frequency": {
             "default_value": null,
             "resolution": "database_required",
