@@ -35,7 +35,7 @@ def _backend() -> Any:
     return SimpleNamespace(
         get_instance=lambda: SimpleNamespace(
             get_qubit_label=lambda qid: f"Q{qid:02d}",
-            ctx=SimpleNamespace(resolve_ef_label=lambda label: f"{label}_ef"),
+            ctx=SimpleNamespace(resolve_ef_label=lambda label: f"{label}-ef"),
         )
     )
 
@@ -44,9 +44,9 @@ def _result(frequency=4.72, ratio=8.5, figures=None) -> RunResult:
     return RunResult(
         raw_result=SimpleNamespace(
             data={
-                "search_results": {"Q00_ef": {"omega_q": 4.7}},
-                "resonant_frequencies": {"Q00_ef": frequency},
-                "peak_background_rms_ratios": {"Q00_ef": ratio},
+                "search_results": {"Q00-ef": {"omega_q": 4.7}},
+                "resonant_frequencies": {"Q00-ef": frequency},
+                "peak_background_rms_ratios": {"Q00-ef": ratio},
             },
             figures=figures or {},
         )
@@ -58,9 +58,9 @@ def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monk
     exp = MagicMock()
     exp.get_qubit_label.return_value = "Q00"
     exp.ctx.resolve_ge_label.return_value = "Q00_ge"
-    exp.ctx.resolve_ef_label.return_value = "Q00_ef"
+    exp.ctx.resolve_ef_label.return_value = "Q00-ef"
     # Validation must not access backend-specific channel attributes.
-    exp.targets = {"Q00_ge": object(), "Q00_ef": object()}
+    exp.targets = {"Q00_ge": object(), "Q00-ef": object()}
     exp.ctx.resolve_read_label.return_value = "Q00_read"
     exp.modified_frequencies.return_value = nullcontext()
     monkeypatch.setattr(task, "get_experiment", lambda backend: exp)
@@ -91,7 +91,7 @@ def test_run_rejects_missing_ef_target_before_measurement() -> None:
     exp = MagicMock()
     exp.get_qubit_label.return_value = "Q00"
     exp.ctx.resolve_ge_label.return_value = "Q00_ge"
-    exp.ctx.resolve_ef_label.return_value = "Q00_ef"
+    exp.ctx.resolve_ef_label.return_value = "Q00-ef"
     exp.targets = {"Q00_ge": SimpleNamespace(channel=SimpleNamespace(id="ctrl:0"))}
     backend = SimpleNamespace(get_instance=lambda: exp)
     with (
@@ -108,10 +108,10 @@ def test_run_rejects_missing_ef_target_before_measurement() -> None:
 
 def test_postprocess_uses_final_frequency_and_prioritizes_final_chevron_figure() -> None:
     figures = {
-        "Q00_ef_search_measurement": go.Figure(),
-        "Q00_ef_search_transform": go.Figure(),
-        "Q00_ef_measurement": go.Figure(),
-        "Q00_ef_transform": go.Figure(),
+        "Q00-ef_search_measurement": go.Figure(),
+        "Q00-ef_search_transform": go.Figure(),
+        "Q00-ef_measurement": go.Figure(),
+        "Q00-ef_transform": go.Figure(),
     }
     result = _task().postprocess(_backend(), "exec-1", _result(figures=figures), "0")
     assert result.validation_error is None
@@ -121,10 +121,10 @@ def test_postprocess_uses_final_frequency_and_prioritizes_final_chevron_figure()
         p.unit == "GHz" and p.execution_id == "exec-1" for p in result.output_parameters.values()
     )
     expected_keys = [
-        "Q00_ef_measurement",
-        "Q00_ef_transform",
-        "Q00_ef_search_measurement",
-        "Q00_ef_search_transform",
+        "Q00-ef_measurement",
+        "Q00-ef_transform",
+        "Q00-ef_search_measurement",
+        "Q00-ef_search_transform",
     ]
     assert len(result.figures) == len(expected_keys)
     assert all(

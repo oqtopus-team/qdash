@@ -2358,6 +2358,187 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CheckEFRabi",
+        "description": "Measure the EF Rabi oscillation using the Qubex session's GE pulses.",
+        "file_path": "one_qubit_fine/check_ef_rabi.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "parameter_name": "control_amplitude",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "ef_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_duration": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "maximum_rabi_frequency": {
+            "default_value": null,
+            "parameter_name": "maximum_rabi_frequency",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "MHz/a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_amplitude": {
+            "default_value": null,
+            "parameter_name": "rabi_amplitude",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_angle": {
+            "default_value": null,
+            "parameter_name": "rabi_angle",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "rad",
+            "user_override": "allowed"
+          },
+          "rabi_distance": {
+            "default_value": null,
+            "parameter_name": "rabi_distance",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_noise": {
+            "default_value": null,
+            "parameter_name": "rabi_noise",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_offset": {
+            "default_value": null,
+            "parameter_name": "rabi_offset",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_phase",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_r2": {
+            "default_value": null,
+            "parameter_name": "rabi_r2",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "",
+            "user_override": "allowed"
+          },
+          "rabi_reference_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_reference_phase",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckEFRabi",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Shots per EF Rabi point",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "EF Rabi drive-time sweep",
+            "unit": "ns",
+            "value": [
+              0,
+              401,
+              8
+            ],
+            "value_type": "range"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckHPIPulse",
         "description": "Task to check the HPI pulse.",
         "file_path": "one_qubit_coarse/check_hpi_pulse.py",
@@ -5021,6 +5202,314 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CreateEFHPIPulse",
+        "description": "Calibrate and store a flat-top EF half-pi pulse.",
+        "file_path": "one_qubit_fine/create_ef_hpi_pulse.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "ef_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "ef_rabi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_rabi_angle": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "rad",
+            "user_override": "allowed"
+          },
+          "ef_rabi_distance": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_rabi_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "MHz",
+            "user_override": "allowed"
+          },
+          "ef_rabi_noise": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_rabi_offset": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_rabi_phase": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_rabi_r2": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "user_override": "allowed"
+          },
+          "ef_rabi_reference_phase": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_duration": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CreateEFHPIPulse",
+        "run_parameters": {
+          "ef_hpi_duration": {
+            "description": "EF half-pi pulse duration",
+            "unit": "ns",
+            "value": 32,
+            "value_type": "float"
+          },
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Shots per EF half-pi calibration point",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CreateEFPIPulse",
+        "description": "Calibrate and store a flat-top EF pi pulse.",
+        "file_path": "one_qubit_fine/create_ef_pi_pulse.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "ef_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "ef_rabi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_rabi_angle": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "rad",
+            "user_override": "allowed"
+          },
+          "ef_rabi_distance": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_rabi_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "MHz",
+            "user_override": "allowed"
+          },
+          "ef_rabi_noise": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_rabi_offset": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_rabi_phase": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_rabi_r2": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "user_override": "allowed"
+          },
+          "ef_rabi_reference_phase": {
+            "default_value": null,
+            "resolution": "database_required",
+            "ui_group": "EF Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_duration": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CreateEFPIPulse",
+        "run_parameters": {
+          "ef_pi_duration": {
+            "description": "EF pi pulse duration",
+            "unit": "ns",
+            "value": 32,
+            "value_type": "float"
+          },
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Shots per EF pi calibration point",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CreateHPIPulse",
         "description": "Task to create the HPI pulse.",
         "file_path": "one_qubit_coarse/create_hpi_pulse.py",
@@ -5763,6 +6252,89 @@
         "name": "DumpBox",
         "run_parameters": {},
         "task_type": "global"
+      },
+      {
+        "class_name": "EFReadoutClassification",
+        "description": "Build a three-state classifier for the ground, excited, and second-excited states.",
+        "file_path": "measurement/ef_readout_classification.py",
+        "input_parameters": {
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "ef_frequency": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "ef_hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_hpi_duration": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_duration": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "EFReadoutClassification",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Shots per prepared state",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
       },
       {
         "class_name": "LinkUp",

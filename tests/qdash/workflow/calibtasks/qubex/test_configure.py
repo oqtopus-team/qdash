@@ -17,7 +17,7 @@ class ConfigurationExperiment:
         self.ctx = SimpleNamespace(
             _configuration_mode="ge-cr-cr",
             resolve_ge_label=lambda label: f"{label}_ge",
-            resolve_ef_label=lambda label: f"{label}_ef",
+            resolve_ef_label=lambda label: f"{label}-ef",
         )
         self.chip_id = "chip"
         self.config_path = "/config"
@@ -40,9 +40,9 @@ class ConfigurationExperiment:
         return str(self.ctx._configuration_mode)
 
     def _load(self, **kwargs: Any) -> None:
-        self.targets.pop("Q00_ef", None)
+        self.targets.pop("Q00-ef", None)
         if self.ef_available and kwargs["configuration_mode"] in ("ge-ef-cr", "ge-ef-fh"):
-            self.targets["Q00_ef"] = SimpleNamespace(channel=SimpleNamespace(id="ctrl:1"))
+            self.targets["Q00-ef"] = SimpleNamespace(channel=SimpleNamespace(id="ctrl:1"))
 
     def get_qubit_label(self, qid: int) -> str:
         return f"Q{qid:02d}"
@@ -102,7 +102,7 @@ def test_configure_can_explicitly_restore_cr_mode() -> None:
 
     assert exp.configuration_mode == "ge-cr-cr"
     assert backend.config == {}
-    assert "Q00_ef" not in exp.targets
+    assert "Q00-ef" not in exp.targets
 
 
 @pytest.mark.parametrize("old_snapshot", [False, True])
