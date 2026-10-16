@@ -131,9 +131,9 @@ class CheckEFChevron(QubexTask):
         readout_amp_param = self.input_parameters["readout_amplitude"]
         if readout_amp_param is not None:
             exp.params.readout_amplitude[label] = readout_amp_param.value
-        ef_frequency = self._get_calibration_value("control_frequency") + self._get_calibration_value(
-            "anharmonicity"
-        )
+        ef_frequency = self._get_calibration_value(
+            "control_frequency"
+        ) + self._get_calibration_value("anharmonicity")
         with exp.modified_frequencies(
             {
                 exp.ctx.resolve_ge_label(label): self._get_calibration_value("control_frequency"),
