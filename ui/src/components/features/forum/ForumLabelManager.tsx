@@ -7,7 +7,6 @@ import { toast } from "sonner";
 
 import {
   getListForumLabelsQueryKey,
-  getListForumPostsQueryKey,
   useCreateForumLabel,
   useDeleteForumLabel,
   useUpdateForumLabel,
@@ -72,9 +71,13 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
   const updateMutation = useUpdateForumLabel();
   const deleteMutation = useDeleteForumLabel();
 
+  /** Refresh label definitions and every cached forum post query (list, detail, replies). */
   const invalidateLabels = () => {
     queryClient.invalidateQueries({ queryKey: getListForumLabelsQueryKey() });
-    queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/forum/posts"),
+    });
   };
 
   const submitLabel = async () => {
