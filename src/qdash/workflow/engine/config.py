@@ -26,6 +26,7 @@ class CalibConfig:
         project_id: Project ID for multi-tenancy
         enable_github_pull: Whether to pull config from GitHub
         enable_provenance_tracking: Whether to track data provenance for lineage
+        connect_backend: Whether to connect hardware during session initialization
         task_run_parameters: Explicit run parameters keyed by task name
     """
 
@@ -42,6 +43,7 @@ class CalibConfig:
     enable_github_pull: bool = True
     enable_provenance_tracking: bool = True
     skip_execution: bool = False  # Isolated worker borrowing its step's Execution
+    connect_backend: bool = True  # Parent may delegate all hardware work to isolated workers
     force_update_params: bool = False  # Force backend params update regardless of R² validation
     persist_output_parameters: bool = True  # Write task outputs to calibration/backend stores
     configuration_mode: str | None = field(

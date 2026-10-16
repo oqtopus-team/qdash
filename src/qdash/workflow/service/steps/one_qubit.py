@@ -122,6 +122,11 @@ class CustomOneQubit(CalibrationStep):
     def provides(self) -> set[str]:
         return {self.step_name, "candidate_qids"}
 
+    @property
+    def connect_parent_backend(self) -> bool:
+        """Synchronized qubit tasks connect in isolated workers."""
+        return self.mode != "synchronized"
+
     def execute(
         self,
         service: CalibService,
@@ -227,8 +232,8 @@ class CustomOneQubit(CalibrationStep):
 class OneQubitCheck(CalibrationStep):
     """Basic 1-qubit characterization step.
 
-    Executes CHECK_1Q_TASKS including Rabi/half-pi pulse checks,
-    and T1/T2/Ramsey characterization.
+    Executes CHECK_1Q_TASKS by default: Rabi, then the HPI and PI pulse
+    calibrations.
 
     Provides: one_qubit_check
     """

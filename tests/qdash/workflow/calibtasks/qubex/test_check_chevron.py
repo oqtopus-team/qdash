@@ -45,7 +45,7 @@ class _DummyExperiment:
 
 def _configured_task() -> CheckChevron:
     task = CheckChevron()
-    task.input_parameters["qubit_frequency"] = InputParameterModel(value=4.25, unit="GHz")
+    task.input_parameters["control_frequency"] = InputParameterModel(value=4.25, unit="GHz")
     task.input_parameters["readout_frequency"] = InputParameterModel(value=6.1, unit="GHz")
     task.input_parameters["readout_amplitude"] = InputParameterModel(value=0.031, unit="a.u.")
     task.input_parameters["control_amplitude"] = InputParameterModel(value=0.07, unit="a.u.")
@@ -98,12 +98,12 @@ def test_check_chevron_postprocess_extracts_frequency_and_figures(monkeypatch) -
     assert result.validation_error is None
 
 
-def test_check_chevron_requires_calibrated_qubit_frequency(monkeypatch) -> None:
+def test_check_chevron_requires_calibrated_control_frequency(monkeypatch) -> None:
     task = _configured_task()
-    task.input_parameters["qubit_frequency"] = InputParameterModel(value=None)
+    task.input_parameters["control_frequency"] = InputParameterModel(value=None)
     monkeypatch.setattr(task, "get_experiment", lambda _backend: _DummyExperiment())
 
-    with pytest.raises(ValueError, match="qubit_frequency input parameter is required"):
+    with pytest.raises(ValueError, match="control_frequency input parameter is required"):
         task.run(backend=cast("QubexBackend", object()), qid="0")
 
 

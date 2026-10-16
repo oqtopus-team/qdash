@@ -53,13 +53,28 @@ LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose -f compose.devcontainer.yam
 ```
 
 The container mounts `/var/run/docker.sock` so devcontainer users can run the local Docker
-Compose tasks from inside the workspace. In the default VS Code session, tools under
+Compose tasks from inside the workspace. The Docker daemon resolves bind mounts on the host,
+so on start the container links the checkout's host path (`QDASH_HOST_WORKSPACE`, set by VS
+Code from `${localWorkspaceFolder}` or by `compose.devcontainer.yaml` from `$PWD`) to
+`/workspace/qdash`; run `docker compose` from that host path inside the container, never from
+`/workspace/qdash` directly. In the default VS Code session, tools under
 `/home/vscode/.local` and agent configuration under `/home/vscode/.claude` and
 `/home/vscode/.codex` are persisted in Docker volumes, so they survive container rebuilds.
 Codex itself is installed under `/opt/codex`, which remains writable by the `vscode` user for
 CLI updates without being hidden by the persisted `.local` volume. Host-side deployment commands
 keep their Python environment and updater runtime state outside the checkout, so they do not reuse
 root-owned DevContainer artifacts.
+
+Use the same `task` commands from the host or DevContainer. Both sessions edit the same source
+checkout and use the same Docker daemon. Run development commands as the `vscode` user in the
+DevContainer; reserve root for container setup.
+
+The DevContainer keeps its Python `.venv` in a Docker volume mounted at the usual workspace path.
+The host retains its own `.venv`, so running `uv sync` or `uv run` in one environment does not
+replace packages used by the other. Ruff, mypy, pytest, and coverage caches are also kept inside
+the container. `ui/node_modules` and `ui/.next` also use DevContainer volumes, so its Next.js
+output does not replace host output. Recreate the DevContainer after changing these mounts; its
+first `uv sync` installs dependencies into the new volume.
 
 Then attach to the container using VS Code's DevContainer extension or:
 

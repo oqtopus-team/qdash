@@ -1,0 +1,4 @@
+# Keep `bun test` out of extensions/, where local pi extension checkouts bring
+# their own test setup (see compose.extensions.yaml).
+[test]
+root = "test"

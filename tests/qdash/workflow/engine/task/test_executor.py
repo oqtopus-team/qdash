@@ -883,6 +883,60 @@ class TestSnapshotOverrides:
         assert set(canonical_task.input_parameters) == {"control_drag_pi_duration"}
         assert canonical_task.input_parameters["control_drag_pi_duration"].value == 48
 
+    def test_apply_snapshot_overrides_normalizes_frequency_fallback_name(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        class FrequencyTask(MockTask):
+            input_spec = {
+                "control_frequency": InputParameterSpec.required_database(
+                    fallback_parameter_names=("qubit_frequency",),
+                )
+            }
+
+        mock_snapshot_loader.has_snapshot_source = True
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {"qubit_frequency": {"value": 5.2, "unit": "GHz"}},
+            {},
+        )
+
+        task = FrequencyTask()
+        executor_with_snapshot._apply_snapshot_overrides(task, "Task", "qubit", "0")
+
+        assert set(task.input_parameters) == {"control_frequency"}
+        assert task.input_parameters["control_frequency"].value == 5.2
+        assert task.input_parameters["control_frequency"].parameter_name == "qubit_frequency"
+
+    def test_apply_snapshot_overrides_preserves_declared_fallback_input(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        class FrequencyTask(MockTask):
+            input_spec = {
+                "control_frequency": InputParameterSpec.required_database(
+                    fallback_parameter_names=("qubit_frequency",),
+                ),
+                "qubit_frequency": InputParameterSpec.required_database(),
+            }
+
+        mock_snapshot_loader.has_snapshot_source = True
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {
+                "control_frequency": {"value": 5.1, "unit": "GHz"},
+                "qubit_frequency": {"value": 5.2, "unit": "GHz"},
+            },
+            {},
+        )
+
+        task = FrequencyTask()
+        executor_with_snapshot._apply_snapshot_overrides(task, "Task", "qubit", "0")
+
+        assert set(task.input_parameters) == {"control_frequency", "qubit_frequency"}
+        assert task.input_parameters["control_frequency"].value == 5.1
+        assert task.input_parameters["qubit_frequency"].value == 5.2
+
     def test_incompatible_snapshot_prompts_fresh_calibration(
         self,
         executor_with_snapshot: TaskExecutor,

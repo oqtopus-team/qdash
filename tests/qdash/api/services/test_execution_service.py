@@ -599,3 +599,111 @@ def test_get_lock_status_does_not_query_prefect_once_the_flow_has_started(
 
     assert calls == []
     assert result.lock is True
+
+
+# ---------------------------------------------------------------------------
+# Pipeline runs: one execution per calibration step, one flow run
+# ---------------------------------------------------------------------------
+
+PIPELINE_PLAN: dict[str, Any] = {
+    "name": "coarse-then-coherence",
+    "steps": [
+        {"index": 1, "name": "one_qubit_check", "type": "OneQubitCheck", "kind": "calibration"},
+        {"index": 2, "name": "filter_by_status", "type": "FilterByStatus", "kind": "transform"},
+        {"index": 3, "name": "coherence", "type": "CustomOneQubit", "kind": "calibration"},
+    ],
+}
+
+
+def _pipeline_note(flow_run_id: str, step_index: int) -> dict[str, Any]:
+    return {
+        "flow_run_id": flow_run_id,
+        "pipeline": PIPELINE_PLAN,
+        "step_index": step_index,
+        "step_name": PIPELINE_PLAN["steps"][step_index - 1]["name"],
+    }
+
+
+def _stub_prefect_running(monkeypatch: Any, flow_run_id: str) -> None:
+    client = _FakeSyncClient([_make_run(flow_run_id, "RUNNING")])
+    monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, []))
+
+
+def test_get_execution_follows_a_pipeline_across_its_steps(monkeypatch: Any, init_db: Any) -> None:
+    """Step 1 done, step 3 running: the pipeline is running and lists every step."""
+    flow_run_id = str(uuid4())
+    _stub_prefect_running(monkeypatch, flow_run_id)
+    _make_execution(execution_id="exec-1", status="completed", note=_pipeline_note(flow_run_id, 1))
+    _make_execution(execution_id="exec-2", status="running", note=_pipeline_note(flow_run_id, 3))
+    done = _make_task(task_id="t1", execution_id="exec-1", status="completed")
+    done.figure_path = ["exec-1/CheckRabi_0.png"]
+    done.save()
+    _make_task(task_id="t2", execution_id="exec-1", status="failed")
+    _make_task(task_id="t3", execution_id="exec-2", status="running")
+
+    detail = _make_service().get_execution(project_id=PROJECT_ID, execution_id="exec-1")
+
+    assert detail is not None and detail.pipeline is not None
+    pipeline = detail.pipeline
+    assert pipeline.name == "coarse-then-coherence"
+    assert pipeline.root_execution_id == "exec-1"
+    assert pipeline.status == "running"
+    assert [s.status for s in pipeline.steps] == ["completed", "skipped", "running"]
+    first = pipeline.steps[0]
+    assert (first.execution_id, first.task_total, first.task_finished, first.task_failed) == (
+        "exec-1",
+        2,
+        2,
+        1,
+    )
+    assert first.figure_paths == ["exec-1/CheckRabi_0.png"]
+    assert pipeline.steps[2].execution_id == "exec-2"
+
+    # The same view from the later step's execution.
+    from_step = _make_service().get_execution(project_id=PROJECT_ID, execution_id="exec-2")
+    assert from_step is not None and from_step.pipeline is not None
+    assert from_step.pipeline.root_execution_id == "exec-1"
+
+
+def test_pipeline_between_steps_is_running_while_the_run_holds_the_lock(
+    monkeypatch: Any, init_db: Any
+) -> None:
+    """Step 1 finished, step 3 not started: running if the lock is held by the run."""
+    flow_run_id = str(uuid4())
+    _stub_prefect_running(monkeypatch, flow_run_id)
+    _make_execution(execution_id="exec-1", status="completed", note=_pipeline_note(flow_run_id, 1))
+    service = _make_service()
+
+    service._lock_repo.lock(project_id=PROJECT_ID, execution_id="exec-1")
+    detail = service.get_execution(project_id=PROJECT_ID, execution_id="exec-1")
+    assert detail is not None and detail.pipeline is not None
+    assert detail.pipeline.status == "running"
+    assert [s.status for s in detail.pipeline.steps] == ["completed", "skipped", "pending"]
+
+    # Lock gone with steps still pending: the run died.
+    service._lock_repo.unlock(project_id=PROJECT_ID, execution_id="exec-1")
+    detail = service.get_execution(project_id=PROJECT_ID, execution_id="exec-1")
+    assert detail is not None and detail.pipeline is not None
+    assert detail.pipeline.status == "failed"
+
+
+def test_pipeline_outcome_is_the_last_step_outcome(monkeypatch: Any, init_db: Any) -> None:
+    flow_run_id = str(uuid4())
+    _stub_prefect_running(monkeypatch, flow_run_id)
+    _make_execution(execution_id="exec-1", status="completed", note=_pipeline_note(flow_run_id, 1))
+    _make_execution(execution_id="exec-2", status="completed", note=_pipeline_note(flow_run_id, 3))
+    detail = _make_service().get_execution(project_id=PROJECT_ID, execution_id="exec-2")
+    assert detail is not None and detail.pipeline is not None
+    assert detail.pipeline.status == "completed"
+
+    _make_execution(execution_id="exec-9", status="failed", note=_pipeline_note(str(uuid4()), 1))
+    failed = _make_service().get_execution(project_id=PROJECT_ID, execution_id="exec-9")
+    assert failed is not None and failed.pipeline is not None
+    assert failed.pipeline.status == "failed"
+
+
+def test_plain_executions_have_no_pipeline(init_db: Any) -> None:
+    _make_execution(execution_id="exec-1", status="completed", note={"flow_run_id": str(uuid4())})
+    detail = _make_service().get_execution(project_id=PROJECT_ID, execution_id="exec-1")
+    assert detail is not None
+    assert detail.pipeline is None

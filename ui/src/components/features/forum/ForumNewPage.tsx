@@ -2,9 +2,18 @@
 
 import { useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, Crosshair, Send, Tag, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  ClipboardList,
+  Crosshair,
+  Send,
+  Tag,
+  UserRound,
+} from "lucide-react";
 
 import { useListChips } from "@/client/chip/chip";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
@@ -82,6 +91,8 @@ export function ForumNewPage() {
   );
   const [targetDraftId, setTargetDraftId] = useState(searchParams.get("target_id") ?? "");
   const [cooldownDraftId, setCooldownDraftId] = useState(searchParams.get("cooldown_id") ?? "");
+  // The task result this thread is about, when opened from a result page.
+  const linkedTaskId = searchParams.get("task_id")?.trim() || null;
   const [assigneeUsername, setAssigneeUsername] = useState("");
 
   const { data: categoriesResponse } = useListForumCategories(undefined, {
@@ -180,6 +191,7 @@ export function ForumNewPage() {
         target_type: hasTarget ? targetDraftType : null,
         target_id: hasTarget ? targetId : null,
         cooldown_id: cooldownDraftId || null,
+        task_id: linkedTaskId,
       },
     });
     queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
@@ -217,6 +229,16 @@ export function ForumNewPage() {
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
             <span>Opened by {user?.username ?? "you"}</span>
             <span>New forum thread</span>
+            {linkedTaskId && (
+              <Link
+                href={`/task-results/${encodeURIComponent(linkedTaskId)}`}
+                className="badge badge-outline gap-1"
+                title={linkedTaskId}
+              >
+                <ClipboardList className="h-3 w-3" />
+                about task result {linkedTaskId.slice(0, 8)}
+              </Link>
+            )}
           </div>
         </div>
       </div>

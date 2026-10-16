@@ -196,6 +196,63 @@ class TestLoadParametersFromDbQubitTask:
 
         assert canonical_task.input_parameters["pi_duration"].value == 48
 
+    def test_input_parameter_fallback_uses_measurement_when_operational_value_is_missing(
+        self,
+    ) -> None:
+        class FrequencyInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "control_frequency": InputParameterSpec.required_database(
+                    fallback_parameter_names=("qubit_frequency",),
+                )
+            }
+
+        fallback_task = FrequencyInputTask()
+        fallback_task._populate_parameters(
+            {"": [{"qubit_frequency": {"value": 5.2, "unit": "GHz"}}]}
+        )
+
+        fallback_parameter = fallback_task.input_parameters["control_frequency"]
+        assert fallback_parameter.value == 5.2
+        assert fallback_parameter.parameter_name == "qubit_frequency"
+
+        canonical_task = FrequencyInputTask()
+        canonical_task._populate_parameters(
+            {
+                "": [
+                    {
+                        "control_frequency": {"value": 5.1, "unit": "GHz"},
+                        "qubit_frequency": {"value": 5.2, "unit": "GHz"},
+                    }
+                ]
+            }
+        )
+
+        canonical_parameter = canonical_task.input_parameters["control_frequency"]
+        assert canonical_parameter.value == 5.1
+        assert canonical_parameter.parameter_name == "control_frequency"
+
+    def test_input_parameter_prefers_operational_value_across_sources(self) -> None:
+        class FrequencyInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "control_frequency": InputParameterSpec.required_database(
+                    fallback_parameter_names=("qubit_frequency",),
+                )
+            }
+
+        task = FrequencyInputTask()
+        task._populate_parameters(
+            {
+                "": [
+                    {"qubit_frequency": {"value": 5.2, "unit": "GHz"}},
+                    {"control_frequency": {"value": 5.1, "unit": "GHz"}},
+                ]
+            }
+        )
+
+        parameter = task.input_parameters["control_frequency"]
+        assert parameter.value == 5.1
+        assert parameter.parameter_name == "control_frequency"
+
     def test_qubit_task_falls_back_to_dict_key_when_no_parameter_name(self):
         """When parameter_name is empty, dict key is used as lookup."""
         task = ConcreteQubexTask()

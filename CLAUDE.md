@@ -59,6 +59,7 @@ For detailed setup instructions, see [docs/development/setup.md](docs/developmen
 | Database Structure | [docs/reference/database-structure.md](docs/reference/database-structure.md) |
 | Database Indexes   | [docs/reference/database-indexes.md](docs/reference/database-indexes.md)     |
 | Notes Architecture | [docs/architecture/notes.md](docs/architecture/notes.md)                     |
+| Copilot Knowledge  | [docs/development/copilot/knowledge-layout.md](docs/development/copilot/knowledge-layout.md) |
 | Dashboard Guide    | [docs/user-guide/dashboard.md](docs/user-guide/dashboard.md)                 |
 | Cryo Guide         | [docs/user-guide/cryo.md](docs/user-guide/cryo.md)                           |
 | Docs Guidelines    | [docs/development/docs-guidelines.md](docs/development/docs-guidelines.md)   |

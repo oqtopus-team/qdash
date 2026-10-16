@@ -5,31 +5,33 @@ Defines the structured context sent to the LLM and the expected response format.
 
 from __future__ import annotations
 
+import base64
+import binascii
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 if TYPE_CHECKING:
     from qdash.copilot.config import ModelConfig
 
 
 @dataclass
-class AnalysisContextResult:
-    """Result of building a full analysis context for a copilot analysis request."""
+class TaskContextBundle:
+    """Everything a chat about one task result opens with: context text and figures."""
 
-    context: TaskAnalysisContext
+    context: TaskContext
     image_base64: str | None
     expected_images: list[tuple[str, str]]
     experiment_images: list[tuple[str, str]] = field(default_factory=list)
     figure_paths: list[str] = field(default_factory=list)
 
 
-class TaskAnalysisContext(BaseModel):
-    """Full context for LLM-based task result analysis.
+class TaskContext(BaseModel):
+    """Full context of one task result for a chat about it.
 
-    Constructed by the analysis endpoint from DB data and TaskKnowledge,
-    then injected into the Pydantic AI agent as ``deps``.
+    Built from DB data and TaskKnowledge when a chat opens on a task result;
+    rendered into the opening message of the chat.
     """
 
     # Task knowledge (pre-rendered prompt)
@@ -76,94 +78,103 @@ class TaskAnalysisContext(BaseModel):
     )
 
 
-class AnalysisResponse(BaseModel):
-    """Structured analysis returned by the LLM."""
+class ApprovalDecision(BaseModel):
+    """The user's decision on a write operation the assistant asked approval for."""
 
-    summary: str = Field(description="One-line result summary")
-    assessment: str = Field(description="Overall assessment: good / warning / bad")
-    explanation: str = Field(description="Detailed analysis and interpretation")
-    potential_issues: list[str] = Field(
+    id: str = Field(description="Tool call id from the approval card")
+    approve: bool
+
+
+class ChatImageAttachment(BaseModel):
+    """One figure the user attached to a chat message."""
+
+    data: str = Field(
+        description="Base64 image bytes without a data: prefix",
+        min_length=1,
+        # 6 MB of base64: the UI downscales to 1600 px, so real plots are far smaller.
+        max_length=6 * 1024 * 1024,
+    )
+    mime_type: Literal["image/png", "image/jpeg"] = Field(alias="mimeType")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="after")
+    def validate_image_data(self) -> ChatImageAttachment:
+        """Reject invalid base64 and bytes that do not match the declared image format."""
+        try:
+            decoded = base64.b64decode(self.data, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError("Image data must be valid base64") from exc
+        signature = b"\x89PNG\r\n\x1a\n" if self.mime_type == "image/png" else b"\xff\xd8\xff"
+        if not decoded.startswith(signature):
+            raise ValueError("Image bytes do not match the declared PNG or JPEG format")
+        return self
+
+
+class ImageAttachmentsRequest(BaseModel):
+    """Shared attachment validation for chat and analysis turns."""
+
+    images: list[ChatImageAttachment] = Field(
         default_factory=list,
-        description="Detected potential issues",
-    )
-    recommendations: list[str] = Field(
-        default_factory=list,
-        description="Recommended next actions",
+        max_length=4,
+        description="Figures attached to this turn (at most 12 MiB of base64 in total).",
     )
 
-    @field_validator("potential_issues", "recommendations", mode="before")
+    @field_validator("images")
     @classmethod
-    def _coerce_list(cls, v: Any) -> Any:
-        if v is None or v == "":
-            return []
-        if isinstance(v, str):
-            return [v]
-        return v
-
-    @field_validator("assessment", mode="before")
-    @classmethod
-    def _coerce_assessment(cls, v: Any) -> Any:
-        if v is None:
-            return "warning"
-        return str(v).strip().lower()
+    def validate_total_image_size(
+        cls, images: list[ChatImageAttachment]
+    ) -> list[ChatImageAttachment]:
+        """Leave room for context below the runtime's default 20 MiB body limit."""
+        if sum(len(image.data) for image in images) > 12 * 1024 * 1024:
+            raise ValueError("Attached images exceed 12 MiB in total; use fewer or smaller images")
+        return images
 
 
-class ContentBlock(BaseModel):
-    """A single content block in a blocks response."""
+class ChatStopRequest(BaseModel):
+    """Request body for POST /copilot/chat/stop."""
 
-    type: str = Field(description="Block type: 'text' or 'chart'")
-    content: str | None = Field(default=None, description="Text content (for text blocks)")
-    chart: dict[str, Any] | None = Field(
-        default=None,
-        description="Plotly chart spec with 'data' and 'layout' keys (for chart blocks)",
-    )
+    session_id: str = Field(description="Chat session whose running turn should stop")
 
 
-class BlocksAnalysisResponse(BaseModel):
-    """Extended analysis response with mixed text/chart content blocks."""
+class ChatStopResponse(BaseModel):
+    """Whether a running turn was stopped."""
 
-    blocks: list[ContentBlock] = Field(description="Ordered list of content blocks")
-    assessment: str | None = Field(
-        default=None,
-        description="Overall assessment: good / warning / bad / null",
-    )
+    stopped: bool
 
 
-# Backward-compatible alias used by API imports and older tests.
-BlocksResponse = BlocksAnalysisResponse
-
-
-class AnalyzeRequest(BaseModel):
-    """Request body for POST /copilot/analyze."""
+class TaskChatTarget(BaseModel):
+    """The task result a chat is about; its first turn opens with the result's context."""
 
     task_name: str = Field(description="Task class name (e.g. CheckT1)")
     chip_id: str
     qid: str
     execution_id: str
     task_id: str
-    message: str = Field(description="User question / message")
-    image_base64: str | None = Field(
-        default=None,
-        description="Base64-encoded result figure (for multimodal analysis)",
-    )
-    conversation_history: list[dict[str, str]] = Field(
-        default_factory=list,
-        description="Previous conversation messages [{role, content}, ...]",
-    )
-    analysis_model_override: ModelConfig | None = Field(
-        default=None,
-        alias="model_override",
-        description=(
-            "Optional per-request model override for task result analysis. "
-            "When unset, the configured analysis_model/model selection is used."
-        ),
-    )
 
 
-class ChatRequest(BaseModel):
+class ChatRequest(ImageAttachmentsRequest):
     """Request body for POST /copilot/chat/stream."""
 
     message: str = Field(description="User question / message")
+    task: TaskChatTarget | None = Field(
+        default=None,
+        description=(
+            "The task result this chat is about. When set, a new conversation opens "
+            "with the result's context and figures; later turns carry it for scoping."
+        ),
+    )
+    session_id: str | None = Field(
+        default=None,
+        description=(
+            "Chat session identifier. Required by the Pi chat backend, which "
+            "restores conversation state from the persisted session."
+        ),
+    )
+    request_id: str | None = Field(
+        default=None,
+        description="Idempotency key for recovering or retrying one Pi submission.",
+    )
     chip_id: str | None = None
     qid: str | None = None
     conversation_history: list[dict[str, str]] = Field(
@@ -179,12 +190,28 @@ class ChatRequest(BaseModel):
             "When unset, the configured chat_models[0]/model selection is used."
         ),
     )
+    thinking_level: Literal["off", "minimal", "low", "medium", "high"] | None = Field(
+        default=None,
+        description=(
+            "How much the planner thinks before answering, for this turn. "
+            "Unset keeps the chat model's configured reasoning_effort."
+        ),
+    )
+    approval: ApprovalDecision | None = Field(
+        default=None,
+        description="Decision on the write operation the previous turn asked approval for.",
+    )
+
+
+class SandboxPythonRequest(BaseModel):
+    """Request body for POST /copilot/sandbox/python."""
+
+    code: str = Field(description="Python source to run in the sandbox")
 
 
 def _rebuild_models() -> None:
     from qdash.copilot.config import ModelConfig as _RuntimeModelConfig
 
-    AnalyzeRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
     ChatRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
 
 

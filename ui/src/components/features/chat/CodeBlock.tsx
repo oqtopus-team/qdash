@@ -1,201 +1,73 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Copy, Check } from "lucide-react";
+import hljs from "highlight.js/lib/core";
+import bash from "highlight.js/lib/languages/bash";
+import javascript from "highlight.js/lib/languages/javascript";
+import json from "highlight.js/lib/languages/json";
+import python from "highlight.js/lib/languages/python";
+import sql from "highlight.js/lib/languages/sql";
+import typescript from "highlight.js/lib/languages/typescript";
+import yaml from "highlight.js/lib/languages/yaml";
+
+hljs.registerLanguage("bash", bash);
+hljs.registerLanguage("javascript", javascript);
+hljs.registerLanguage("json", json);
+hljs.registerLanguage("python", python);
+hljs.registerLanguage("sql", sql);
+hljs.registerLanguage("typescript", typescript);
+hljs.registerLanguage("yaml", yaml);
+hljs.registerAliases(["py"], { languageName: "python" });
+hljs.registerAliases(["sh", "shell", "zsh", "console"], { languageName: "bash" });
+hljs.registerAliases(["js", "jsx"], { languageName: "javascript" });
+hljs.registerAliases(["ts", "tsx"], { languageName: "typescript" });
+hljs.registerAliases(["yml"], { languageName: "yaml" });
 
 interface CodeBlockProps {
   language?: string;
   children: string;
 }
 
-// Minimal keyword-based syntax highlighting using CSS variables
-const PYTHON_KEYWORDS = new Set([
-  "import",
-  "from",
-  "as",
-  "def",
-  "class",
-  "return",
-  "if",
-  "elif",
-  "else",
-  "for",
-  "while",
-  "in",
-  "not",
-  "and",
-  "or",
-  "is",
-  "with",
-  "try",
-  "except",
-  "finally",
-  "raise",
-  "pass",
-  "break",
-  "continue",
-  "yield",
-  "lambda",
-  "True",
-  "False",
-  "None",
-  "print",
-  "len",
-  "range",
-  "type",
-  "isinstance",
-]);
-
-const PYTHON_BUILTINS = new Set([
-  "dict",
-  "list",
-  "set",
-  "tuple",
-  "int",
-  "float",
-  "str",
-  "bool",
-  "sorted",
-  "enumerate",
-  "zip",
-  "map",
-  "filter",
-  "sum",
-  "min",
-  "max",
-  "abs",
-  "round",
-]);
-
-function highlightPython(code: string): React.ReactNode[] {
-  const lines = code.split("\n");
-  return lines.map((line, lineIdx) => {
-    const tokens: React.ReactNode[] = [];
-    // Simple tokenizer: comments, strings, numbers, keywords
-    let i = 0;
-    while (i < line.length) {
-      // Comment
-      if (line[i] === "#") {
-        tokens.push(
-          <span key={`${lineIdx}-${i}`} className="text-base-content/40 italic">
-            {line.slice(i)}
-          </span>,
-        );
-        i = line.length;
-        continue;
-      }
-      // String (single or double quotes)
-      if (line[i] === '"' || line[i] === "'") {
-        const quote = line[i];
-        let j = i + 1;
-        while (j < line.length && line[j] !== quote) {
-          if (line[j] === "\\") j++; // skip escaped char
-          j++;
-        }
-        j = Math.min(j + 1, line.length);
-        tokens.push(
-          <span key={`${lineIdx}-${i}`} className="text-success">
-            {line.slice(i, j)}
-          </span>,
-        );
-        i = j;
-        continue;
-      }
-      // f-string prefix
-      if (
-        (line[i] === "f" || line[i] === "r" || line[i] === "b") &&
-        i + 1 < line.length &&
-        (line[i + 1] === '"' || line[i + 1] === "'")
-      ) {
-        const quote = line[i + 1];
-        let j = i + 2;
-        while (j < line.length && line[j] !== quote) {
-          if (line[j] === "\\") j++;
-          j++;
-        }
-        j = Math.min(j + 1, line.length);
-        tokens.push(
-          <span key={`${lineIdx}-${i}`} className="text-success">
-            {line.slice(i, j)}
-          </span>,
-        );
-        i = j;
-        continue;
-      }
-      // Number
-      if (/\d/.test(line[i]) && (i === 0 || /[\s(=,[\-+*/%<>]/.test(line[i - 1]))) {
-        let j = i;
-        while (j < line.length && /[\d._eE+-]/.test(line[j])) j++;
-        tokens.push(
-          <span key={`${lineIdx}-${i}`} className="text-info">
-            {line.slice(i, j)}
-          </span>,
-        );
-        i = j;
-        continue;
-      }
-      // Word (keyword/builtin/identifier)
-      if (/[a-zA-Z_]/.test(line[i])) {
-        let j = i;
-        while (j < line.length && /[a-zA-Z0-9_]/.test(line[j])) j++;
-        const word = line.slice(i, j);
-        if (PYTHON_KEYWORDS.has(word)) {
-          tokens.push(
-            <span key={`${lineIdx}-${i}`} className="text-primary font-semibold">
-              {word}
-            </span>,
-          );
-        } else if (PYTHON_BUILTINS.has(word)) {
-          tokens.push(
-            <span key={`${lineIdx}-${i}`} className="text-secondary">
-              {word}
-            </span>,
-          );
-        } else {
-          tokens.push(<span key={`${lineIdx}-${i}`}>{word}</span>);
-        }
-        i = j;
-        continue;
-      }
-      // Operators and punctuation
-      tokens.push(<span key={`${lineIdx}-${i}`}>{line[i]}</span>);
-      i++;
-    }
-    return (
-      <React.Fragment key={lineIdx}>
-        {tokens}
-        {lineIdx < lines.length - 1 ? "\n" : null}
-      </React.Fragment>
-    );
-  });
+/** Highlighted HTML for a known language, or null to render the code as plain text. */
+function highlight(code: string, language?: string): string | null {
+  if (!language || !hljs.getLanguage(language)) return null;
+  try {
+    return hljs.highlight(code, { language, ignoreIllegals: true }).value;
+  } catch {
+    return null;
+  }
 }
 
 export function CodeBlock({ language, children }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(children).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(children).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      () => {
+        // Clipboard can be unavailable on insecure origins; keep the button idle.
+      },
+    );
   }, [children]);
 
-  const isPython = language === "python" || language === "py";
+  const html = useMemo(() => highlight(children, language), [children, language]);
 
   return (
-    <div className="relative group my-3 rounded-xl overflow-hidden border border-base-300/70 bg-base-200/80">
+    <div className="relative group my-3 rounded-xl overflow-hidden border border-base-300/70 bg-base-200/80 not-prose">
       {/* Header bar */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-base-300/30 text-xs border-b border-base-300/50">
-        <span className="font-mono text-base-content/40 text-[11px] uppercase tracking-wider">
+        <span className="font-mono text-base-content/50 text-[11px] lowercase tracking-wide">
           {language || "code"}
         </span>
         <button
           type="button"
           onClick={handleCopy}
-          className={`btn btn-ghost btn-xs gap-1 transition-all ${
-            copied
-              ? "opacity-100 text-success"
-              : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-base-content/50"
+          className={`btn btn-ghost btn-xs gap-1 transition-colors ${
+            copied ? "text-success" : "text-base-content/50 hover:text-base-content"
           }`}
           aria-label={copied ? "Code copied" : "Copy code"}
         >
@@ -213,8 +85,13 @@ export function CodeBlock({ language, children }: CodeBlockProps) {
         </button>
       </div>
       {/* Code content */}
-      <pre className="overflow-x-auto px-4 py-3 text-xs leading-relaxed">
-        <code>{isPython ? highlightPython(children) : children}</code>
+      <pre className="overflow-x-auto px-4 py-3 text-xs leading-relaxed font-mono">
+        {html !== null ? (
+          // hljs escapes the source, so its output is safe to inject.
+          <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
+        ) : (
+          <code>{children}</code>
+        )}
       </pre>
     </div>
   );

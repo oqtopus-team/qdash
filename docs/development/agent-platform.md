@@ -4,7 +4,7 @@ QDash provides the execution and safety boundary for local AI agents that operat
 
 ## Responsibility boundary
 
-The local agent owns model selection, private knowledge, diagnosis, and the next-action proposal. QDash owns authentication, project scope, hardware execution, scheduling, deterministic validation, parameter persistence, provenance, and audit records. Installable agent instructions are versioned in [oqtopus-team/skills](https://github.com/oqtopus-team/skills); QDash stores their name, version, and hash in each session rather than treating its repository-local development helper as the distribution source.
+The local agent owns model selection, private knowledge, diagnosis, and the next-action proposal. QDash owns authentication, project scope, hardware execution, scheduling, deterministic validation, parameter persistence, provenance, and audit records. Installable agent instructions are versioned as skills in [pi-qdash](https://github.com/oqtopus-team/pi-qdash), next to the tools they name (see [Copilot Knowledge Layout](./copilot/knowledge-layout.md)); QDash stores their name, version, and hash in each session rather than treating its repository-local development helper as the distribution source.
 
 An agent must create a bounded session before proposing an action. A session fixes the chip, targets, allowed tasks, parameter bounds, action budget, expiration, Skill identity, and model identity. QDash rejects actions outside that grant, actions based on a stale session state version, and duplicate requests with conflicting idempotency keys. The action budget counts proposed agent actions; committing an accepted candidate advances the state version but does not consume another action.
 

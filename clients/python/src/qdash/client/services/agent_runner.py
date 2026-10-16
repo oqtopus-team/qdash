@@ -53,7 +53,7 @@ class AgentPlannerObservation:
 
     session_id: str
     qid: str
-    source_execution_id: str
+    source_execution_id: str | None
     last_node_id: str
     last_outcome: AgentStepOutcome
     node_path: tuple[str, ...]
@@ -121,7 +121,7 @@ class AgentCampaignOutcome:
     reason: str
     session_id: str
     qid: str
-    source_execution_id: str
+    source_execution_id: str | None
     completed_nodes: int
     attempts: int
     outcomes: tuple[AgentStepOutcome, ...]
@@ -186,7 +186,7 @@ class AgentCalibrationRunner:
         session_id: str,
         task_name: str,
         qid: str,
-        source_execution_id: str,
+        source_execution_id: str | None = None,
         candidate_parameter: str,
         parameter_overrides: dict[str, float] | None = None,
         diagnosis: str = "",
@@ -599,7 +599,7 @@ class AgentCampaignRunner:
         *,
         session_id: str,
         qid: str,
-        source_execution_id: str,
+        source_execution_id: str | None = None,
         nodes: list[AgentCampaignNode],
         max_pre_dispatch_retries: int = 1,
         max_node_executions: int | None = None,

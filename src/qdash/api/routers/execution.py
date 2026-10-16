@@ -36,11 +36,30 @@ from qdash.api.schemas.execution import (
 from qdash.api.services.artifact_preview_service import preview_netcdf
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.flow_service import FlowService
-from qdash.common.config.path_resolver import resolve_calib_data_path
+from qdash.common.config.path_resolver import (
+    PathOutsideCalibData,
+    resolve_served_calib_data_path,
+)
 
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+
+def _served_file(path: str) -> Path:
+    """Resolve a requested calibration data file, or 404.
+
+    These endpoints are reachable without a token (``<img>`` and download links
+    cannot send one), so a path outside the calibration data tree is reported
+    exactly like a missing file.
+    """
+    try:
+        resolved_path = resolve_served_calib_data_path(path)
+    except PathOutsideCalibData:
+        raise HTTPException(status_code=404, detail=f"File not found: {path}") from None
+    if not resolved_path.is_file():
+        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    return resolved_path
 
 
 @router.get(
@@ -72,12 +91,7 @@ def get_figure_by_path(path: str) -> FileResponse:
         404 if the file does not exist at the specified path
 
     """
-    resolved_path = resolve_calib_data_path(path)
-    if not resolved_path.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"File not found: {path}",
-        )
+    resolved_path = _served_file(path)
     # FileResponse sets Content-Length, avoiding chunked encoding
     return FileResponse(resolved_path, media_type="image/png")
 
@@ -91,9 +105,7 @@ def get_figure_by_path(path: str) -> FileResponse:
 )
 def download_artifact_by_path(path: str) -> FileResponse:
     """Download a calibration artifact such as figure JSON or raw NetCDF data."""
-    resolved_path = resolve_calib_data_path(path)
-    if not resolved_path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    resolved_path = _served_file(path)
     return FileResponse(resolved_path, filename=resolved_path.name)
 
 
@@ -124,10 +136,7 @@ def download_artifacts_as_archive(
     """Download multiple figure JSON and raw NetCDF artifacts as one ZIP file."""
     resolved_paths: list[Path] = []
     for path in paths:
-        resolved_path = resolve_calib_data_path(path)
-        if not resolved_path.exists():
-            raise HTTPException(status_code=404, detail=f"File not found: {path}")
-        resolved_paths.append(resolved_path)
+        resolved_paths.append(_served_file(path))
 
     with NamedTemporaryFile(delete=False, suffix=".zip") as temporary_file:
         archive_path = Path(temporary_file.name)
@@ -161,9 +170,7 @@ def download_artifacts_as_archive(
 )
 def preview_artifact_by_path(path: str) -> ArtifactPreviewResponse:
     """Return a size-limited table preview of a NetCDF calibration artifact."""
-    resolved_path = resolve_calib_data_path(path)
-    if not resolved_path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    resolved_path = _served_file(path)
     if resolved_path.suffix.lower() != ".nc":
         raise HTTPException(status_code=400, detail="Only NetCDF (.nc) artifacts can be previewed")
     try:

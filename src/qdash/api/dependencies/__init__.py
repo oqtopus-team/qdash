@@ -7,6 +7,7 @@ repositories and services into route handlers.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
     from qdash.api.services.flow_schedule_service import FlowScheduleService
     from qdash.api.services.flow_service import FlowService
 
@@ -27,11 +28,10 @@ from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEvent
 from qdash.api.services.copilot_chat_session_service import CopilotChatSessionService
 from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.device_topology_service import DeviceTopologyService
+from qdash.api.services.evaluation_service import EvaluationService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
 from qdash.api.services.forum_service import ForumService
-from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
-from qdash.api.services.issue_service import IssueService
 from qdash.api.services.manual_update_service import ManualUpdateService
 from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.note_service import NoteService
@@ -255,6 +255,19 @@ def get_task_result_service() -> TaskResultService:
 
 
 @cached_dependency_provider
+def get_evaluation_service() -> EvaluationService:
+    """Get the calibration evaluation service instance.
+
+    Cached so background runs stay referenced by one service for the
+    lifetime of the worker.
+    """
+    return EvaluationService(
+        chip_repository=get_chip_repository(),
+        task_result_repository=get_task_result_repository(),
+    )
+
+
+@cached_dependency_provider
 def get_tag_repository() -> MongoTagRepository:
     """Get the tag repository instance."""
     return MongoTagRepository()
@@ -336,12 +349,6 @@ def get_provenance_service() -> ProvenanceService:
 
 
 @cached_dependency_provider
-def get_issue_service() -> IssueService:
-    """Get the issue service instance."""
-    return IssueService(notification_service=get_notification_service())
-
-
-@cached_dependency_provider
 def get_forum_service() -> ForumService:
     """Get the forum service instance."""
     return ForumService(
@@ -354,12 +361,6 @@ def get_forum_service() -> ForumService:
 def get_slack_notification_service() -> SlackNotificationService:
     """Get the Slack notification service instance."""
     return SlackNotificationService()
-
-
-@cached_dependency_provider
-def get_issue_knowledge_service() -> IssueKnowledgeService:
-    """Get the issue knowledge service instance."""
-    return IssueKnowledgeService()
 
 
 @cached_dependency_provider
@@ -504,6 +505,31 @@ def get_file_service() -> FileService:
 
 
 @cached_dependency_provider
+def get_knowledge_file_service() -> FileService:
+    """The task knowledge repository as an editable git workspace.
+
+    A save regenerates ``task-knowledge.json`` with the repository's own
+    generator so the edit reaches the copilot and evaluations at once; the
+    generated file is left out of pushes because the repository's CI rebuilds it.
+    """
+    from qdash.common.config.loader import ConfigLoader
+    from qdash.datamodel.task_knowledge import regenerate_task_knowledge_json
+
+    repo_dir = (ConfigLoader.get_config_dir() / "task-knowledge").resolve()
+
+    def after_save() -> None:
+        regenerate_task_knowledge_json(repo_dir)
+
+    return FileService(
+        repo_dir,
+        label="knowledge",
+        repo_url_env="KNOWLEDGE_REPO_URL",
+        after_save=after_save,
+        push_exclude=("task-knowledge.json",),
+    )
+
+
+@cached_dependency_provider
 def get_reanalysis_service() -> ReanalysisService:
     """Get the spectroscopy-reanalysis service instance."""
     return ReanalysisService()
@@ -513,6 +539,16 @@ def get_reanalysis_service() -> ReanalysisService:
 def get_flow_repository() -> MongoFlowRepository:
     """Get the flow repository instance."""
     return MongoFlowRepository()
+
+
+@cached_dependency_provider
+def get_calibration_pipeline_service() -> "CalibrationPipelineService":
+    """Get the calibration pipeline service instance."""
+    from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
+
+    return CalibrationPipelineService(
+        task_definition_repository=get_task_definition_repository(),
+    )
 
 
 @cached_dependency_provider

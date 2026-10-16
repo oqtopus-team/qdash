@@ -40,7 +40,6 @@ uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile 
 uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local flows
 uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local flow-templates
 uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local files-tree
-uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local ai-reviews --limit 20
 uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local provenance-stats
 uv run --with qdash-client python skills/qdash/scripts/qdash_query.py --profile local timeseries --parameter t1 --start-at 2026-06-01T00:00:00Z --end-at 2026-06-08T00:00:00Z
 ```
@@ -57,7 +56,7 @@ uv run --with httpx --with pydantic python skills/qdash/scripts/qdash_query.py -
 
 1. Use `config-path` first when the user mentions a local profile. Report only the path, available profile names, and whether the file exists.
 2. Prefer `uv run --with qdash-client python skills/qdash/scripts/qdash_query.py ...` for supported read-only operations because it handles profile loading, auth headers, project headers, model serialization, and error formatting through the official client.
-3. Use named read-only commands first: `chips`, `default-chip`, `metrics-config`, `chip-metrics`, `chip-qubits`, `chip-qubit`, `chip-couplings`, `chip-coupling`, `timeseries`, `task-results`, `task-result`, `task-note`, `task-result-issues`, `task-knowledge`, `task-knowledge-markdown`, `qubit-latest`, `qubit-history`, `coupling-latest`, `coupling-history`, `projects`, `project`, `files-tree`, `file-content`, `git-status`, `issues`, `issue-knowledge`, `flows`, `flow`, `flow-templates`, `flow-template`, `flow-helper-files`, `flow-helper-file`, `executions`, `ai-reviews`, `ai-review-runs`, `ai-review-run`, and `provenance-*`.
+3. Use named read-only commands first: `chips`, `default-chip`, `metrics-config`, `chip-metrics`, `chip-qubits`, `chip-qubit`, `chip-couplings`, `chip-coupling`, `timeseries`, `task-results`, `task-result`, `task-note`, `task-result-issues`, `task-knowledge`, `task-knowledge-markdown`, `qubit-latest`, `qubit-history`, `coupling-latest`, `coupling-history`, `projects`, `project`, `files-tree`, `file-content`, `git-status`, `issues`, `issue-knowledge`, `flows`, `flow`, `flow-templates`, `flow-template`, `flow-helper-files`, `flow-helper-file`, `executions`, and `provenance-*`.
 4. Use `raw-get` for read-only endpoints not covered by first-class commands. It still goes through `qdash-client`; do not use `curl` as the normal path.
 5. Use a local checkout fallback only for qdash-client development or unreleased API/client changes.
 6. Before creating, updating, deleting, excluding, re-executing, pushing files, pulling files, or triggering flows, state the exact endpoint/action and wait for user confirmation.

@@ -85,11 +85,10 @@ class _QubexParamsUpdater(YamlParamsUpdater):
             if path.exists():
                 return path
 
-        # Only call get_session() if already connected (avoid reconnection with empty qids)
+        # Only request the session if already connected (avoid reconnecting with empty qids).
         session_obj = None
         try:
-            # Check if backend is already initialized (QubexBackend has _exp attribute)
-            if hasattr(self._backend, "_exp") and self._backend._exp is not None:
+            if self._backend.is_connected:
                 session_obj = self._backend.get_instance()
         except Exception:
             session_obj = None
@@ -134,6 +133,11 @@ class _QubexParamsUpdater(YamlParamsUpdater):
                     qid,
                     exc_info=True,
                 )
+
+        # A pipeline owner can prepare calibration files without connecting
+        # hardware. Do not reconnect it as a label lookup fallback.
+        if not self._backend.is_connected:
+            return None
 
         try:
             experiment = self._backend.get_instance()

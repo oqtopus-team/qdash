@@ -169,56 +169,6 @@ class NotificationService:
             return None
         return doc
 
-    def notify_issue_event(
-        self,
-        *,
-        project_id: str,
-        issue_id: str,
-        root_issue_id: str,
-        task_id: str,
-        actor_username: str,
-        content: str,
-        title: str | None,
-        parent_author: str | None = None,
-    ) -> None:
-        """Create mention and reply notifications for an issue or reply."""
-        target_url = f"/issues/{root_issue_id}"
-        issue_title = title or f"Issue on {task_id}"
-        mentioned = self._mentioned_project_recipients(project_id, content, actor_username)
-
-        for recipient in mentioned:
-            self.create_notification(
-                project_id=project_id,
-                recipient_username=recipient.username,
-                actor_username=actor_username,
-                kind="mention",
-                source_type="issue",
-                source_id=issue_id,
-                target_url=target_url,
-                title=f"{actor_username} mentioned you in {issue_title}",
-                excerpt=content,
-                dedupe_key=f"mention:issue:{issue_id}:{recipient.user_id or recipient.username}",
-            )
-
-        mentioned_usernames = {recipient.username for recipient in mentioned}
-        if (
-            parent_author
-            and parent_author != actor_username
-            and parent_author not in mentioned_usernames
-        ):
-            self.create_notification(
-                project_id=project_id,
-                recipient_username=parent_author,
-                actor_username=actor_username,
-                kind="issue_reply",
-                source_type="issue",
-                source_id=issue_id,
-                target_url=target_url,
-                title=f"{actor_username} replied to {issue_title}",
-                excerpt=content,
-                dedupe_key=f"issue_reply:{issue_id}:{parent_author}",
-            )
-
     def notify_note_mentions(
         self,
         *,

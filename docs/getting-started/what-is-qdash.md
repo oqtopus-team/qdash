@@ -37,8 +37,8 @@ QDash has three main application components:
   time-series data, and parameter provenance.
 - **Project collaboration**: Share calibration state and files through explicit project roles,
   notes, issues, forum discussions, notifications, and knowledge cases.
-- **Assisted analysis**: Use project-aware chat and AI review runs as supporting evidence during
-  result analysis.
+- **Assisted analysis**: Use project-aware chat and the analysis sidebar as supporting evidence
+  during result analysis.
 - **Client access**: Integrate through the REST API or the generated Python and TypeScript clients.
 
 ## Demo

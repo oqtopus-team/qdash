@@ -9,7 +9,61 @@ from qdash.api.schemas.calibration import (
     SeedImportRequest,
     SeedImportSource,
 )
-from qdash.api.services.seed_import_service import SeedImportService
+from qdash.api.services.seed_import_service import (
+    SeedImportService,
+    _load_importable_parameter_names,
+)
+
+
+class TestSeedImportServiceConfiguration:
+    """Tests for the configured seed-import file allowlist."""
+
+    def test_default_config_only_allows_operational_parameters(self):
+        """Measured frequencies are not writable through seed import."""
+        assert _load_importable_parameter_names() == {
+            "control_amplitude",
+            "control_frequency",
+            "readout_amplitude",
+            "readout_frequency",
+        }
+
+    def test_load_importable_parameter_names_converts_yaml_files(self):
+        """Configured YAML file names are exposed as parameter names."""
+        with patch(
+            "qdash.api.services.seed_import_service.ConfigLoader.load_workflow",
+            return_value={
+                "seed_import": {
+                    "params_file_names": ["qubit_frequency.yaml", "readout_amplitude.yaml"]
+                }
+            },
+        ):
+            assert _load_importable_parameter_names() == {
+                "qubit_frequency",
+                "readout_amplitude",
+            }
+
+    def test_load_importable_parameter_names_allows_omitted_setting(self):
+        """An omitted allowlist preserves historical unrestricted behavior."""
+        with patch(
+            "qdash.api.services.seed_import_service.ConfigLoader.load_workflow",
+            return_value={},
+        ):
+            assert _load_importable_parameter_names() is None
+
+    @pytest.mark.parametrize(
+        "value",
+        ["qubit_frequency.yaml", ["../qubit_frequency.yaml"], ["qubit_frequency.yml"]],
+    )
+    def test_load_importable_parameter_names_rejects_invalid_config(self, value):
+        """Malformed allowlists fail during service construction."""
+        with (
+            patch(
+                "qdash.api.services.seed_import_service.ConfigLoader.load_workflow",
+                return_value={"seed_import": {"params_file_names": value}},
+            ),
+            pytest.raises(ValueError, match=r"workflow\.seed_import\.params_file_names"),
+        ):
+            _load_importable_parameter_names()
 
 
 class TestSeedImportServicePathValidation:
@@ -179,13 +233,26 @@ class TestSeedImportServiceImportFromManual:
         with pytest.raises(ValueError, match="manual_data is required"):
             service._import_from_manual(request, "project-001", "user001")
 
+    def test_import_from_manual_rejects_parameter_outside_allowlist(self, service, mock_deps):
+        """Manual requests cannot bypass the configured file allowlist."""
+        request = SeedImportRequest(
+            chip_id="chip001",
+            source=SeedImportSource.MANUAL,
+            manual_data={"qubit_frequency": {"Q0": 5.0}},
+        )
+
+        with pytest.raises(ValueError, match=r"not allowed.*qubit_frequency"):
+            service._import_from_manual(request, "project-001", "user001")
+
+        mock_deps["activity"].return_value.create_activity.assert_not_called()
+
     def test_import_from_manual_skips_null_values(self, service, mock_deps):
         """Test _import_from_manual skips null values."""
         request = SeedImportRequest(
             chip_id="chip001",
             source=SeedImportSource.MANUAL,
             manual_data={
-                "qubit_frequency": {
+                "control_frequency": {
                     "Q0": 5.0,
                     "Q1": None,  # Should be skipped
                 }
@@ -203,7 +270,7 @@ class TestSeedImportServiceImportFromManual:
             chip_id="chip001",
             source=SeedImportSource.MANUAL,
             manual_data={
-                "qubit_frequency": {
+                "control_frequency": {
                     "Q0": {"value": 5.0, "unit": "GHz"},
                 }
             },
@@ -221,7 +288,7 @@ class TestSeedImportServiceImportFromManual:
             chip_id="chip001",
             source=SeedImportSource.MANUAL,
             manual_data={
-                "qubit_frequency": {
+                "control_frequency": {
                     "Q0": 5.0,
                     "Q1": 5.1,
                     "Q2": 5.2,
@@ -244,7 +311,7 @@ class TestSeedImportServiceImportFromManual:
             chip_id="chip001",
             source=SeedImportSource.MANUAL,
             manual_data={
-                "zx90_gate_fidelity": {
+                "control_amplitude": {
                     "Q0": 97.0,
                     "Q0-Q1": 96.5,
                     "Q1-Q2": 95.0,
@@ -307,7 +374,43 @@ class TestSeedImportServiceImportFromQubex:
         request = SeedImportRequest(
             chip_id="chip001",
             source=SeedImportSource.QUBEX_PARAMS,
-            parameters=["qubit_frequency"],  # This file doesn't exist
+            parameters=["control_frequency"],  # This file doesn't exist
+        )
+
+        result = service._import_from_qubex(request, "project-001", "user001")
+
+        assert result.imported_count == 0
+        assert result.skipped_count == 1
+
+    def test_import_from_qubex_rejects_parameter_outside_allowlist(
+        self, service, mock_deps, tmp_path
+    ):
+        """Qubex-file requests cannot import a file outside the allowlist."""
+        service._config_base = str(tmp_path)
+        request = SeedImportRequest(
+            chip_id="chip001",
+            source=SeedImportSource.QUBEX_PARAMS,
+            parameters=["resonator_frequency"],
+        )
+
+        with pytest.raises(ValueError, match=r"not allowed.*resonator_frequency"):
+            service._import_from_qubex(request, "project-001", "user001")
+
+        mock_deps["activity"].return_value.create_activity.assert_not_called()
+
+    @pytest.mark.parametrize("parameters", [None, []])
+    def test_import_from_qubex_filters_defaults_by_allowlist(
+        self, service, mock_deps, tmp_path, parameters
+    ):
+        """Omitted parameters import only defaults permitted by the allowlist."""
+        service._config_base = str(tmp_path)
+        service._importable_parameters = {"control_frequency"}
+        params_dir = tmp_path / "chip001" / "params"
+        params_dir.mkdir(parents=True)
+        request = SeedImportRequest(
+            chip_id="chip001",
+            source=SeedImportSource.QUBEX_PARAMS,
+            parameters=parameters,
         )
 
         result = service._import_from_qubex(request, "project-001", "user001")
@@ -329,12 +432,12 @@ data:
   Q0: 5.0
   Q1: 5.1
 """
-        (params_dir / "qubit_frequency.yaml").write_text(yaml_content)
+        (params_dir / "control_frequency.yaml").write_text(yaml_content)
 
         request = SeedImportRequest(
             chip_id="chip001",
             source=SeedImportSource.QUBEX_PARAMS,
-            parameters=["qubit_frequency"],
+            parameters=["control_frequency"],
         )
 
         result = service._import_from_qubex(request, "project-001", "user001")
@@ -357,12 +460,12 @@ data:
   Q1-Q2: 95.0
   Q2: 98.0
 """
-        (params_dir / "zx90_gate_fidelity.yaml").write_text(yaml_content)
+        (params_dir / "control_amplitude.yaml").write_text(yaml_content)
 
         request = SeedImportRequest(
             chip_id="chip001",
             source=SeedImportSource.QUBEX_PARAMS,
-            parameters=["zx90_gate_fidelity"],
+            parameters=["control_amplitude"],
         )
 
         result = service._import_from_qubex(request, "project-001", "user001")
@@ -386,18 +489,52 @@ data:
   Q0: 5.0
   Q1: null
 """
-        (params_dir / "qubit_frequency.yaml").write_text(yaml_content)
+        (params_dir / "control_frequency.yaml").write_text(yaml_content)
 
         request = SeedImportRequest(
             chip_id="chip001",
             source=SeedImportSource.QUBEX_PARAMS,
-            parameters=["qubit_frequency"],
+            parameters=["control_frequency"],
         )
 
         result = service._import_from_qubex(request, "project-001", "user001")
 
         assert result.imported_count == 1
         assert result.skipped_count == 1
+
+
+class TestSeedImportServiceAvailableParameters:
+    """Tests for filtering available files through the allowlist."""
+
+    def test_get_available_parameters_only_returns_allowed_files(self, tmp_path):
+        """Disallowed YAML files are hidden from comparison and import UI data."""
+        service = SeedImportService.__new__(SeedImportService)
+        service._config_base = tmp_path
+        service._importable_parameters = {"qubit_frequency", "readout_amplitude"}
+        params_dir = tmp_path / "chip001" / "params"
+        params_dir.mkdir(parents=True)
+        for file_name in (
+            "qubit_frequency.yaml",
+            "readout_amplitude.yaml",
+            "t1.yaml",
+            "params.yaml",
+        ):
+            (params_dir / file_name).touch()
+
+        result = service.get_available_parameters("chip001")
+
+        assert set(result) == {"qubit_frequency", "readout_amplitude"}
+
+    def test_get_available_parameters_empty_allowlist_returns_no_files(self, tmp_path):
+        """An explicitly empty allowlist disables file imports."""
+        service = SeedImportService.__new__(SeedImportService)
+        service._config_base = tmp_path
+        service._importable_parameters = set()
+        params_dir = tmp_path / "chip001" / "params"
+        params_dir.mkdir(parents=True)
+        (params_dir / "qubit_frequency.yaml").touch()
+
+        assert service.get_available_parameters("chip001") == []
 
 
 class TestSeedImportServiceLoadParamYaml:

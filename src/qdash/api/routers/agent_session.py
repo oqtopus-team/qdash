@@ -6,7 +6,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from qdash.api.dependencies import get_agent_session_service, get_flow_service
+from qdash.api.dependencies import (
+    get_agent_session_service,
+    get_flow_service,
+    get_task_file_service,
+)
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
@@ -30,6 +34,7 @@ from qdash.api.schemas.agent_session import (
 )
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.flow_service import FlowService
+from qdash.api.services.task_file_service import TaskFileService
 
 router = APIRouter(prefix="/agent-sessions")
 
@@ -290,6 +295,7 @@ async def execute_agent_action(
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
+    task_file_service: Annotated[TaskFileService, Depends(get_task_file_service)],
 ) -> AgentActionResponse:
     """Dispatch one authorized run-task action to the system workflow."""
     return await service.execute_action(
@@ -298,4 +304,5 @@ async def execute_agent_action(
         action_id=action_id,
         body=body,
         flow_service=flow_service,
+        task_file_service=task_file_service,
     )

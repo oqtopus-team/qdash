@@ -3,30 +3,22 @@
 import { useState, useCallback } from "react";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 
-type ImageUploadTarget = "issues" | "forum";
+const UPLOAD_PATH = "/forum/upload-image";
 
-const UPLOAD_PATHS: Record<ImageUploadTarget, string> = {
-  issues: "/issues/upload-image",
-  forum: "/forum/upload-image",
-};
-
-export function useImageUpload(target: ImageUploadTarget = "issues") {
+export function useImageUpload(_target: "forum" = "forum") {
   const [isUploading, setIsUploading] = useState(false);
 
-  const uploadImage = useCallback(
-    async (file: File): Promise<string> => {
-      setIsUploading(true);
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        const response = await AXIOS_INSTANCE.post<{ url: string }>(UPLOAD_PATHS[target], formData);
-        return response.data.url;
-      } finally {
-        setIsUploading(false);
-      }
-    },
-    [target],
-  );
+  const uploadImage = useCallback(async (file: File): Promise<string> => {
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await AXIOS_INSTANCE.post<{ url: string }>(UPLOAD_PATH, formData);
+      return response.data.url;
+    } finally {
+      setIsUploading(false);
+    }
+  }, []);
 
   return { uploadImage, isUploading };
 }

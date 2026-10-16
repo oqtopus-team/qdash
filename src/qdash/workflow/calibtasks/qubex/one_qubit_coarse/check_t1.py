@@ -31,11 +31,15 @@ class CheckT1(QubexTask):
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam normalizes measured IQ values; its readout duration is validated.
         **required_rabi_normalization_inputs(),
-        "qubit_frequency": InputParameterSpec.required_database(),
+        "control_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("qubit_frequency",)
+        ),
         "hpi_amplitude": InputParameterSpec.required_database(),
         "hpi_duration": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
-        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),

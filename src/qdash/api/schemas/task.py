@@ -6,7 +6,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
-from qdash.datamodel.note import NoteModel
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 
 
@@ -53,95 +52,45 @@ class QuickRunTaskRequest(BaseModel):
     update_params: bool = False
 
 
-class FailureModeResponse(BaseModel):
-    """Response model for a structured failure mode."""
+class KnowledgeFigureResponse(BaseModel):
+    """A figure of the knowledge, inlined so the UI can show it without another request."""
 
-    severity: str
-    description: str
-    cause: str = ""
-    visual: str = ""
-    next_action: str = ""
-
-
-class OutputParameterInfoResponse(BaseModel):
-    """Response model for output parameter description."""
-
-    name: str
-    description: str
-
-
-class ExpectedResultResponse(BaseModel):
-    """Response model for expected result description."""
-
-    description: str
-    result_type: str = ""
-    x_axis: str = ""
-    y_axis: str = ""
-    z_axis: str = ""
-    fit_model: str = ""
-    typical_range: str = ""
-    good_visual: str = ""
-
-
-class KnowledgeImageResponse(BaseModel):
-    """Response model for a task knowledge image reference."""
-
-    alt_text: str
-    relative_path: str
-    section: str
+    alt: str = ""
+    path: str
     base64_data: str = ""
+    mime_type: str = ""
 
 
-class KnowledgeCaseResponse(BaseModel):
-    """Response model for a knowledge case (postmortem)."""
+class KnowledgeExampleResponse(BaseModel):
+    """An expert-labeled example plot of the task."""
 
+    id: str
     title: str
     date: str = ""
-    severity: str = "warning"
-    chip_id: str = ""
+    chip: str = ""
     qid: str = ""
-    status: str = "resolved"
-    human_label: str = ""
-    failure_mode_labels: list[str] = []
-    case_type: list[str] = []
-    model_error_type: str = ""
-    resolution_label: str = ""
-    symptom: str = ""
-    model_prediction: str = ""
-    human_review_decision: str = ""
-    root_cause: str = ""
-    resolution: str = ""
-    boundary_criteria: str = ""
-    lesson_learned: list[str] = []
-    applicability: str = ""
-    counterexample: str = ""
-    prompt_guidance: str = ""
-    images: list[KnowledgeImageResponse] = []
-    model_config = ConfigDict(protected_namespaces=())
+    outcome: str
+    fit_quality: str = ""
+    verdict: str = ""
+    source: str = ""
+    figures: list[KnowledgeFigureResponse] = []
+    diagnosis: str = ""
+    label: str = Field(
+        default="", description="The demonstration label: outcome, fit quality, verdict, diagnosis"
+    )
 
 
 class TaskKnowledgeResponse(BaseModel):
-    """Response model for task knowledge (LLM-oriented domain knowledge)."""
+    """Task knowledge: the background, its figures, labeled examples, and the rendered prompt."""
 
     name: str
-    category: str = ""
-    summary: str
-    what_it_measures: str
-    physical_principle: str
-    expected_result: ExpectedResultResponse
-    evaluation_criteria: str
-    check_questions: list[str] = []
-    failure_modes: list[FailureModeResponse]
-    tips: list[str]
-    output_parameters_info: list[OutputParameterInfoResponse] = []
-    analysis_guide: list[str] = []
-    prerequisites: list[str] = []
-    images: list[KnowledgeImageResponse] = []
-    review_markdown: str = ""
-    review_images: list[KnowledgeImageResponse] = []
-    cases: list[KnowledgeCaseResponse] = []
-    prompt_text: str
-    review_prompt_text: str = ""
+    category: str = Field(default="", description="calibtasks package, e.g. one_qubit_coarse")
+    background: str = ""
+    figures: list[KnowledgeFigureResponse] = []
+    examples: list[KnowledgeExampleResponse] = []
+    prompt_text: str = Field(
+        description="The background as Markdown, headed by the experiment name"
+    )
 
 
 class TaskKnowledgeSummaryResponse(BaseModel):
@@ -150,11 +99,8 @@ class TaskKnowledgeSummaryResponse(BaseModel):
     name: str
     category: str = ""
     summary: str
-    failure_mode_count: int = 0
-    case_count: int = 0
-    image_count: int = 0
-    has_analysis_guide: bool = False
-    has_review_guide: bool = False
+    example_count: int = 0
+    figure_count: int = 0
 
 
 class ListTaskKnowledgeResponse(BaseModel):
@@ -224,10 +170,6 @@ class TaskResultResponse(BaseModel):
     start_at: datetime | None = None
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None
-    ai_review_note: NoteModel = Field(
-        default_factory=NoteModel,
-        description="AI-generated review note for this task result",
-    )
 
     model_config = ConfigDict(from_attributes=True)
 

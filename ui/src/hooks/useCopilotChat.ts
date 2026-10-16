@@ -1,203 +1,193 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { recoverMessageImages } from "@/lib/chatAttachments";
+import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import type { AnswerFeedback, ChatImageAttachment, ChatMessage } from "@/types/copilotChat";
 import {
   useCopilotChatSessionContext,
   type CopilotChatSession,
 } from "@/contexts/CopilotChatSessionContext";
-import type { ChatMessage } from "@/hooks/useAnalysisChat";
-import type { ModelOverride } from "@/lib/copilotModels";
-import { buildHeaders, consumeSSEEvents } from "@/lib/sse-utils";
+import {
+  getStoredThinkingChoice,
+  levelOfEffort,
+  setStoredThinkingChoice,
+  thinkingLevelForRequest,
+  type ChatThinkingChoice,
+  type ChatThinkingLevel,
+} from "@/lib/chatThinking";
+import {
+  buildChatModelOptions,
+  getStoredChatModelKey,
+  resolveChatModelOption,
+  setStoredChatModelKey,
+  type ModelOption,
+} from "@/lib/copilotModels";
 
-// Re-export for backward compat
-export type CopilotMessage = ChatMessage;
 export type CopilotSession = CopilotChatSession;
 
-interface UseCopilotChatOptions {
-  modelOverride?: ModelOverride | null;
+export interface ChatModelSelection {
+  options: ModelOption[];
+  selected: ModelOption;
+  select: (key: string) => void;
 }
 
-export function useCopilotChat(options?: UseCopilotChatOptions) {
-  const modelOverride = options?.modelOverride ?? null;
-  const {
-    sessions,
-    activeSessionId,
-    activeSession,
-    switchSession,
-    createNewSession,
-    deleteSession,
-    clearActiveSession: ctxClearActiveSession,
-    updateSessionMessages,
-    autoTitleSession,
-  } = useCopilotChatSessionContext();
+/**
+ * Model menu for a chat. Every chat, with or without a task result as its
+ * context, picks the planner from `chat_models`; the evaluation model is not a
+ * planner and is configured separately (evaluation.yaml).
+ */
+function useChatModel(): ChatModelSelection {
+  const { data } = useGetCopilotConfig();
+  const config = data?.data ?? null;
+  const [chatKey, setChatKey] = useState(getStoredChatModelKey);
+  const chatOptions = useMemo(() => buildChatModelOptions(config), [config]);
+  const select = useCallback((key: string) => {
+    setChatKey(key);
+    setStoredChatModelKey(key);
+  }, []);
+  return { options: chatOptions, selected: resolveChatModelOption(chatOptions, chatKey), select };
+}
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [completedTools, setCompletedTools] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+export interface ChatThinkingSelection {
+  choice: ChatThinkingChoice;
+  select: (choice: ChatThinkingChoice) => void;
+  /** What "auto" amounts to for the selected model, when its config says. */
+  modelDefault: ChatThinkingLevel | null;
+}
 
-  const createSession = useCallback((): string => {
-    const id = createNewSession(null);
-    setError(null);
-    return id;
-  }, [createNewSession]);
+/** Thinking menu for a chat; remembered across chats like the model. */
+function useChatThinking(model: ChatModelSelection): ChatThinkingSelection {
+  const [choice, setChoice] = useState<ChatThinkingChoice>(getStoredThinkingChoice);
+  const select = useCallback((next: ChatThinkingChoice) => {
+    setChoice(next);
+    setStoredThinkingChoice(next);
+  }, []);
+  return { choice, select, modelDefault: levelOfEffort(model.selected?.reasoningEffort) };
+}
 
-  const handleSwitchSession = useCallback(
-    (id: string) => {
-      switchSession(id);
-      setError(null);
-      setStatusMessage(null);
-    },
-    [switchSession],
+/** One chat (the active one by default) as seen by a chat surface. */
+export function useCopilotChat(sessionId?: string | null) {
+  const ctx = useCopilotChatSessionContext();
+  const session =
+    sessionId === undefined
+      ? ctx.activeSession
+      : (ctx.sessions.find((s) => s.id === sessionId) ?? null);
+  const run = session ? ctx.runs[session.id] : undefined;
+  const model = useChatModel();
+  const modelOverride = model.selected?.model ?? null;
+  const thinking = useChatThinking(model);
+  const thinkingLevel = thinkingLevelForRequest(thinking.choice);
+  const { sendMessage, stop: stopSession } = ctx;
+  const id = session?.id;
+  const messages = useMemo(() => session?.messages ?? [], [session?.messages]);
+
+  const send = useCallback(
+    (text: string, images?: ChatImageAttachment[]) =>
+      sendMessage(text, {
+        sessionId: id,
+        modelOverride,
+        thinkingLevel,
+        ...(images?.length ? { images } : {}),
+      }),
+    [id, modelOverride, thinkingLevel, sendMessage],
   );
 
-  const handleDeleteSession = useCallback(
-    (id: string) => {
-      deleteSession(id);
-    },
-    [deleteSession],
+  /** Answer the approval card on the last answer; the label is what the thread shows. */
+  const decide = useCallback(
+    (approvalId: string, approve: boolean, label: string) =>
+      sendMessage(label, {
+        sessionId: id,
+        modelOverride,
+        thinkingLevel,
+        approval: { id: approvalId, approve },
+      }),
+    [id, modelOverride, thinkingLevel, sendMessage],
   );
 
-  const sendMessage = useCallback(
-    async (userMessage: string) => {
-      let sessionId = activeSessionId;
+  const stop = useCallback(() => {
+    if (id) stopSession(id);
+  }, [id, stopSession]);
 
-      // Auto-create session if none active
-      if (!sessionId) {
-        sessionId = createNewSession(null);
-      }
-
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      setError(null);
-      setStatusMessage("応答を準備中...");
-      setCompletedTools([]);
-      setIsLoading(true);
-
-      const userMsg: CopilotMessage = { role: "user", content: userMessage };
-
-      // Get current messages before adding the user message
-      const currentMessages = activeSession?.messages ?? [];
-
-      // Add user message and auto-title
-      updateSessionMessages(sessionId, [...currentMessages, userMsg]);
-      autoTitleSession(sessionId, userMessage);
-
-      try {
-        const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
-        const response = await fetch(`${baseURL}/copilot/chat/stream`, {
-          method: "POST",
-          headers: buildHeaders(),
-          body: JSON.stringify({
-            message: userMessage,
-            conversation_history: currentMessages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-            model_override: modelOverride,
-          }),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error("No response body");
-        }
-
-        const decoder = new TextDecoder();
-        let buffer = "";
-        // Track messages locally to avoid stale closure issues during streaming
-        let messagesSnapshot = [...currentMessages, userMsg];
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const { events, remainder } = consumeSSEEvents(buffer);
-          buffer = remainder;
-
-          for (const evt of events) {
-            if (evt.event === "status") {
-              const payload = JSON.parse(evt.data);
-              setStatusMessage(payload.message);
-              if (payload.completed_tools && Array.isArray(payload.completed_tools)) {
-                setCompletedTools(payload.completed_tools);
-              }
-            } else if (evt.event === "result") {
-              const result = JSON.parse(evt.data);
-              const assistantContent =
-                result.blocks && Array.isArray(result.blocks)
-                  ? JSON.stringify(result)
-                  : result.explanation || JSON.stringify(result);
-
-              const assistantMsg: CopilotMessage = {
-                role: "assistant",
-                content: assistantContent,
-              };
-              messagesSnapshot = [...messagesSnapshot, assistantMsg];
-              updateSessionMessages(sessionId!, messagesSnapshot);
-            } else if (evt.event === "error") {
-              const payload = JSON.parse(evt.data);
-              throw new Error(payload.detail);
-            }
-          }
-        }
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") {
-          return;
-        }
-        const errorMsg = err instanceof Error ? err.message : "Request failed";
-        setError(errorMsg);
-        const errorAssistant: CopilotMessage = {
-          role: "assistant",
-          content: `Error: ${errorMsg}`,
-        };
-        // Re-read messages from context to get latest state
-        updateSessionMessages(sessionId!, [...currentMessages, userMsg, errorAssistant]);
-      } finally {
-        setIsLoading(false);
-        setStatusMessage(null);
-        setCompletedTools([]);
-        abortRef.current = null;
-      }
-    },
-    [
-      activeSessionId,
-      activeSession,
-      createNewSession,
-      updateSessionMessages,
-      autoTitleSession,
+  /** Re-send the last user message, replacing the failed or stopped answer. */
+  const retryLast = useCallback(() => {
+    if (!id || run) return;
+    let lastUser = messages.length - 1;
+    while (lastUser >= 0 && messages[lastUser].role !== "user") lastUser--;
+    if (lastUser < 0) return;
+    const images = recoverMessageImages(messages[lastUser]);
+    if (images === null) return;
+    sendMessage(messages[lastUser].content, {
+      images,
+      sessionId: id,
+      history: messages.slice(0, lastUser),
       modelOverride,
-    ],
+      thinkingLevel,
+    });
+  }, [id, messages, modelOverride, thinkingLevel, run, sendMessage]);
+
+  /** Replace the user message at `index` and everything after it with a new turn. */
+  const editMessage = useCallback(
+    (index: number, text: string) => {
+      const trimmed = text.trim();
+      if (!id || run || !trimmed) return;
+      if (messages[index]?.role !== "user") return;
+      const images = recoverMessageImages(messages[index]);
+      if (images === null) return;
+      sendMessage(trimmed, {
+        sessionId: id,
+        history: messages.slice(0, index),
+        modelOverride,
+        thinkingLevel,
+        images,
+      });
+    },
+    [id, messages, modelOverride, thinkingLevel, run, sendMessage],
   );
 
-  const clearActiveSession = useCallback(() => {
-    abortRef.current?.abort();
-    ctxClearActiveSession();
-    setError(null);
-    setStatusMessage(null);
-  }, [ctxClearActiveSession]);
+  /** Rate the assistant message at `index`; rating it the same way again clears it. */
+  const rateAnswer = useCallback(
+    (index: number, feedback: AnswerFeedback) => {
+      if (!id) return;
+      const current = answerFeedback(messages[index]);
+      ctx.setMessageFeedback(id, index, current === feedback ? null : feedback);
+    },
+    [ctx, id, messages],
+  );
 
   return {
-    sessions,
-    activeSession,
-    activeSessionId,
-    isLoading,
-    statusMessage,
-    completedTools,
-    error,
-    createSession,
-    switchSession: handleSwitchSession,
-    deleteSession: handleDeleteSession,
-    sendMessage,
-    clearActiveSession,
+    session,
+    messages,
+    isLoadingMessages: session !== null && !session.messagesLoaded,
+    isStreaming: Boolean(run),
+    liveTurn: run?.turn ?? null,
+    statusMessage: run?.statusMessage ?? null,
+    model,
+    thinking,
+    send,
+    decide,
+    stop,
+    retryLast,
+    canRetryLast:
+      !run &&
+      messages
+        .filter((m) => m.role === "user")
+        .slice(-1)
+        .some((m) => recoverMessageImages(m) !== null),
+    canEditMessage: (index: number) =>
+      !run && messages[index]?.role === "user" && recoverMessageImages(messages[index]) !== null,
+    editMessage,
+    rateAnswer,
   };
+}
+
+/** The stored rating of an assistant message, if any. */
+export function answerFeedback(message: ChatMessage | undefined): AnswerFeedback | null {
+  if (!message || message.role !== "assistant" || !message.content.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(message.content) as { feedback?: unknown };
+    return parsed.feedback === "up" || parsed.feedback === "down" ? parsed.feedback : null;
+  } catch {
+    return null;
+  }
 }

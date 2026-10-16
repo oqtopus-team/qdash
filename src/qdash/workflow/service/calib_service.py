@@ -610,6 +610,8 @@ class CalibService:
         qids: list[str],
         tags: list[str] | None = None,
         note: dict[str, Any] | None = None,
+        *,
+        connect_backend: bool = True,
     ) -> None:
         """Initialize session with given qids (internal method).
 
@@ -617,6 +619,7 @@ class CalibService:
             qids: List of qubit IDs to calibrate
             tags: List of tags for categorization
             note: Additional notes to store with execution
+            connect_backend: Whether the session itself executes hardware tasks
 
         """
         if self._initialized:
@@ -695,6 +698,7 @@ class CalibService:
                 project_id=self.project_id,
                 enable_github_pull=self._enable_github_pull,
                 skip_execution=self.skip_execution,
+                connect_backend=connect_backend,
                 default_run_parameters=self.default_run_parameters,
                 task_run_parameters=self.task_run_parameters,
                 force_update_params=self._force_update_params,
@@ -773,6 +777,16 @@ class CalibService:
             return None
         # Access private attribute to avoid RuntimeError from property
         return self._orchestrator._backend
+
+    def _disconnect_backend(self) -> None:
+        """Release this session's backend without changing Execution ownership."""
+        backend = self.backend
+        if backend is None:
+            return
+        try:
+            backend.disconnect()
+        except Exception:
+            logger.exception("Failed to disconnect backend for execution %s", self.execution_id)
 
     def execute_task(
         self,
@@ -1240,7 +1254,10 @@ class CalibService:
             push_results = self._push_to_github_if_configured(logger, push_to_github)
 
         finally:
-            self._release_lock_if_acquired()
+            try:
+                self._disconnect_backend()
+            finally:
+                self._release_lock_if_acquired()
 
         return push_results
 
@@ -1372,8 +1389,11 @@ class CalibService:
             if self.execution_service:
                 self.execution_service = self.execution_service.reload().fail(error_message)
         finally:
-            self._release_lock_if_acquired()
-            self._initialized = False
+            try:
+                self._disconnect_backend()
+            finally:
+                self._release_lock_if_acquired()
+                self._initialized = False
 
     def cancel_calibration(self) -> None:
         """Mark the calibration as cancelled and cleanup.
@@ -1394,8 +1414,11 @@ class CalibService:
             if self.execution_service:
                 self.execution_service = self.execution_service.reload().cancel()
         finally:
-            self._release_lock_if_acquired()
-            self._initialized = False
+            try:
+                self._disconnect_backend()
+            finally:
+                self._release_lock_if_acquired()
+                self._initialized = False
 
     def abandon_calibration(self) -> None:
         """Release resources without recording a terminal status.
@@ -1405,8 +1428,11 @@ class CalibService:
         so the execution is left open for ``on_flow_cancellation`` /
         ``on_flow_crashed``, or the API reconciliation, to close.
         """
-        self._release_lock_if_acquired()
-        self._initialized = False
+        try:
+            self._disconnect_backend()
+        finally:
+            self._release_lock_if_acquired()
+            self._initialized = False
 
     # =========================================================================
     # High-level API Methods
@@ -1522,7 +1548,12 @@ class CalibService:
                         was_skipped = self.skip_execution
                         self.skip_execution = False
                         if not self._initialized:
-                            self._initialize(ctx.candidate_qids, self.tags, self.note)
+                            self._initialize(
+                                ctx.candidate_qids,
+                                self.tags,
+                                self.note,
+                                connect_backend=step.connect_parent_backend,
+                            )
                         elif was_skipped and self.execution_service is not None:
                             assert self._orchestrator is not None
                             self._orchestrator.config.skip_execution = False

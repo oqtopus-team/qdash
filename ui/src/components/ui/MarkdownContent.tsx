@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef, useId } from "react";
+import React, { useEffect, useMemo, useRef, useId } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { ImageIcon, BarChart3, Code2 } from "lucide-react";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
@@ -125,6 +126,21 @@ function PreviewBadge({
   );
 }
 
+function MarkdownImage({ src, alt, ...props }: React.ComponentPropsWithoutRef<"img">) {
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- markdown can include arbitrary remote/data URLs */}
+      <img
+        src={src}
+        alt={alt ?? ""}
+        className="max-w-full h-auto rounded border border-base-300 my-2"
+        loading="lazy"
+        {...props}
+      />
+    </>
+  );
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const previewComponents: Record<string, React.ComponentType<any>> = {
   img() {
@@ -203,20 +219,7 @@ const markdownComponents: Record<string, React.ComponentType<any>> = {
       </code>
     );
   },
-  img({ src, alt, ...props }: React.ComponentPropsWithoutRef<"img">) {
-    return (
-      <>
-        {/* eslint-disable-next-line @next/next/no-img-element -- markdown can include arbitrary remote/data URLs */}
-        <img
-          src={src}
-          alt={alt ?? ""}
-          className="max-w-full h-auto rounded border border-base-300 my-2"
-          loading="lazy"
-          {...props}
-        />
-      </>
-    );
-  },
+  img: MarkdownImage,
   // Intercept paragraph nodes to highlight @mentions in text
   p({ children, ...props }: React.ComponentPropsWithoutRef<"p">) {
     return (
@@ -270,13 +273,69 @@ function urlTransform(url: string): string {
   return "";
 }
 
+/**
+ * Loads images the browser cannot fetch from their `src`: paths relative to a
+ * file in a workspace, served behind authentication.
+ */
+export interface MarkdownImageLoader {
+  /** Separates the cached images of different sources, e.g. workspaces. */
+  cacheKey: string;
+  /** The path to load for `src`, or null to leave `src` to the browser. */
+  resolve: (src: string) => string | null;
+  load: (path: string) => Promise<Blob>;
+}
+
+function LoadedImage({
+  loader,
+  path,
+  alt,
+  ...props
+}: React.ComponentPropsWithoutRef<"img"> & { loader: MarkdownImageLoader; path: string }) {
+  const { data, isError } = useQuery({
+    queryKey: ["markdown-image", loader.cacheKey, path],
+    queryFn: () => loader.load(path),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const url = useMemo(() => (data ? URL.createObjectURL(data) : null), [data]);
+  useEffect(() => () => (url ? URL.revokeObjectURL(url) : undefined), [url]);
+
+  if (isError) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded bg-base-200 px-1.5 py-0.5 text-xs text-base-content/60">
+        <ImageIcon className="h-3 w-3" />
+        {alt || path} (not found)
+      </span>
+    );
+  }
+  if (!url) {
+    return (
+      <span className="loading loading-spinner loading-sm my-2 block" aria-label={alt || path} />
+    );
+  }
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- blob URL of an authenticated workspace image */}
+      <img
+        src={url}
+        alt={alt ?? ""}
+        className="max-w-full h-auto rounded border border-base-300 my-2"
+        {...props}
+      />
+    </>
+  );
+}
+
 export function MarkdownContent({
   content,
   className,
   preview = false,
+  imageLoader,
 }: {
   content: string;
   className?: string;
+  /** Loads relative images, e.g. those next to a Markdown file in a workspace. */
+  imageLoader?: MarkdownImageLoader;
   /**
    * Compact preview mode for list views: replaces block-level attachments
    * (images, code blocks, charts, diagrams) with small inline badges so the
@@ -284,6 +343,19 @@ export function MarkdownContent({
    */
   preview?: boolean;
 }) {
+  const components = useMemo(() => {
+    if (preview) return previewComponents;
+    if (!imageLoader) return markdownComponents;
+    return {
+      ...markdownComponents,
+      img({ src, alt, ...props }: React.ComponentPropsWithoutRef<"img">) {
+        const path = typeof src === "string" ? imageLoader.resolve(src) : null;
+        if (path == null) return <MarkdownImage src={src} alt={alt} {...props} />;
+        return <LoadedImage loader={imageLoader} path={path} alt={alt} {...props} />;
+      },
+    };
+  }, [preview, imageLoader]);
+
   return (
     <div
       className={`prose prose-sm max-w-none ${
@@ -295,7 +367,7 @@ export function MarkdownContent({
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         urlTransform={urlTransform}
-        components={preview ? previewComponents : markdownComponents}
+        components={components}
       >
         {content}
       </ReactMarkdown>

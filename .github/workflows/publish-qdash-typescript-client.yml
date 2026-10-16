@@ -1,5 +1,10 @@
 name: Publish @oqtopus-team/qdash-client
 
+# Pull requests build and check the package. Pushes to develop publish a
+# prerelease under the `beta` dist-tag (next patch version + `-beta.<run>`), so
+# downstream packages such as pi-qdash can build against unreleased endpoints
+# with `npm install @oqtopus-team/qdash-client@beta`. Release tags publish
+# `latest`.
 on:
   pull_request:
     branches: [develop]
@@ -9,6 +14,11 @@ on:
       - "Taskfile.yaml"
       - ".github/workflows/publish-qdash-typescript-client.yml"
   push:
+    branches: [develop]
+    paths:
+      - "clients/typescript/**"
+      - "docs/oas/openapi.json"
+      - ".github/workflows/publish-qdash-typescript-client.yml"
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
@@ -23,6 +33,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          # Tags are needed to derive the beta version from the latest release.
+          fetch-depth: 0
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -48,6 +61,21 @@ jobs:
         working-directory: clients/typescript
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
 
+      - name: Set beta version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        working-directory: clients/typescript
+        run: |
+          # Next patch after the highest release tag, as a prerelease of it:
+          # v1.9.20 -> 1.9.21-beta.<run number>. Sorts before the eventual 1.9.21.
+          # Release tags are cut from main, so they are not ancestors of develop
+          # and `git describe` would pick a stale one; take the highest by version.
+          latest="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -1)"
+          latest="${latest:-v0.0.0}"
+          IFS=. read -r major minor patch <<< "${latest#v}"
+          version="${major}.${minor}.$((patch + 1))-beta.${GITHUB_RUN_NUMBER}"
+          echo "Beta version: ${version} (latest release ${latest})"
+          npm version "${version}" --no-git-tag-version
+
       - name: Build package
         working-directory: clients/typescript
         run: |
@@ -65,7 +93,9 @@ jobs:
     name: Publish to npm
     runs-on: ubuntu-latest
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop')
     permissions:
       contents: read
       id-token: write
@@ -86,7 +116,12 @@ jobs:
           path: dist
 
       - name: Publish package
-        run: npm publish ./dist/oqtopus-team-qdash-client-*.tgz --access public --provenance
+        # Release tags go to `latest`; develop builds go to `beta` so they never
+        # become the default install.
+        run: |
+          tag=latest
+          if [ "${GITHUB_REF}" = "refs/heads/develop" ]; then tag=beta; fi
+          npm publish ./dist/oqtopus-team-qdash-client-*.tgz --access public --provenance --tag "${tag}"
         env:
           # Used only to bootstrap the package before npm Trusted Publishing can be configured.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -122,7 +122,7 @@ export function NotificationsPageContent() {
         ) : notifications.length === 0 ? (
           <EmptyState
             title="Inbox is empty"
-            description="Mentions in issues and notes, replies, and system messages will appear here."
+            description="Mentions in forum threads and notes, replies, and system messages will appear here."
             emoji="empty"
             size="md"
           />

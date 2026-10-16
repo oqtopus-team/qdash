@@ -234,6 +234,21 @@ data:
         assert updated_files == {"control_amplitude.yaml"}
         assert "Q047: 0.25" in (params_dir / "control_amplitude.yaml").read_text()
 
+    def test_unconnected_backend_does_not_connect_for_label_fallback(self):
+        """A parent session that delegates hardware must stay disconnected on lookup failure."""
+        backend = MagicMock()
+        backend.is_connected = False
+        backend.config = {"project_id": "project-1", "chip_id": "chip-1"}
+        updater = _QubexParamsUpdater(backend, chip_id="chip-1")
+
+        with patch(
+            "qdash.common.domain.qubit.qid_to_label_from_chip",
+            side_effect=LookupError("chip metadata unavailable"),
+        ):
+            assert updater._resolve_qubit_label("0") is None
+
+        backend.get_instance.assert_not_called()
+
     def test_verify_reads_back_all_mapped_yaml_values(self, tmp_path):
         """Verification covers primary and mirrored YAML mappings without connecting."""
         params_dir = tmp_path / "params"
@@ -301,7 +316,7 @@ data:
                 },
             )
 
-        assert updated_files == {"control_frequency.yaml", "t1.yaml"}
+        assert updated_files == {"t1.yaml"}
 
     def test_resolve_param_yaml_file_names_includes_mapped_and_extra_files(self):
         """Push candidates should be resolved even before checking file diffs."""

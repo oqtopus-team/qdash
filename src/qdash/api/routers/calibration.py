@@ -142,11 +142,14 @@ def import_seed_parameters(
         f"Seed import: project={ctx.project_id}, user={ctx.user.username}, "
         f"chip={request.chip_id}, source={request.source}"
     )
-    return service.import_seeds(
-        request=request,
-        project_id=ctx.project_id,
-        username=ctx.user.username,
-    )
+    try:
+        return service.import_seeds(
+            request=request,
+            project_id=ctx.project_id,
+            username=ctx.user.username,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get(

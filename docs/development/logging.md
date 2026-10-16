@@ -61,8 +61,8 @@ The `RequestIdMiddleware` assigns a unique ID to every incoming HTTP request:
 This allows you to correlate all log entries produced during a single request:
 
 ```bash
-# Filter logs for a specific request
-jq 'select(.request_id == "a1b2c3d4")' logs/api/api.log
+# Filter Docker console logs for a specific request
+docker compose logs --no-log-prefix api | jq 'select(.request_id == "a1b2c3d4")'
 ```
 
 ## Adding Logging to New Modules
@@ -84,23 +84,24 @@ The `request_id` field is injected automatically by the logging filter. You do n
 
 ## Log File Access
 
-In Docker, the API container writes logs to `/app/logs/api.log`, which is mounted to the host:
+In Docker, the API container writes logs to `/app/logs/api.log` in a named volume:
 
 ```yaml
 # compose.yaml
 volumes:
-  - ./logs/api:/app/logs
+  - api-logs:/app/logs
 ```
 
 | Setting | Value |
 |---------|-------|
-| Host path | `./logs/api/api.log` |
+| Docker volume | `api-logs` |
 | Container path | `/app/logs/api.log` |
 | Max file size | 10 MB |
 | Backup count | 5 |
 | Rotation | `RotatingFileHandler` (automatic) |
 
 When the log file reaches 10 MB, it is rotated to `api.log.1`, `api.log.2`, etc., keeping up to 5 backups.
+Host-side API runs write to `${XDG_STATE_HOME:-$HOME/.local/state}/qdash/logs/api.log`.
 
 ## Filtering & Querying
 
@@ -108,20 +109,20 @@ Since logs are JSON, you can use `jq` to filter and query them:
 
 ```bash
 # All errors
-jq 'select(.level == "ERROR")' logs/api/api.log
+docker compose logs --no-log-prefix api | jq 'select(.level == "ERROR")'
 
 # Logs from a specific module
-jq 'select(.name == "qdash.api.routers.chip")' logs/api/api.log
+docker compose logs --no-log-prefix api | jq 'select(.name == "qdash.api.routers.chip")'
 
 # Logs for a specific request ID
-jq 'select(.request_id == "a1b2c3d4")' logs/api/api.log
+docker compose logs --no-log-prefix api | jq 'select(.request_id == "a1b2c3d4")'
 
 # Errors in the last hour (requires GNU date)
-jq --arg since "$(date -d '1 hour ago' '+%Y-%m-%d %H:%M')" \
-  'select(.level == "ERROR" and .timestamp >= $since)' logs/api/api.log
+docker compose logs --no-log-prefix api | jq --arg since "$(date -d '1 hour ago' '+%Y-%m-%d %H:%M')" \
+  'select(.level == "ERROR" and .timestamp >= $since)'
 
 # Count log entries by level
-jq -s 'group_by(.level) | map({level: .[0].level, count: length})' logs/api/api.log
+docker compose logs --no-log-prefix api | jq -s 'group_by(.level) | map({level: .[0].level, count: length})'
 ```
 
 For live log streaming:
@@ -130,8 +131,8 @@ For live log streaming:
 # Stream console logs via docker compose
 docker compose logs -f api
 
-# Stream and filter the log file
-tail -f logs/api/api.log | jq 'select(.level == "ERROR")'
+# Stream and filter the host-side log file
+tail -f "${XDG_STATE_HOME:-$HOME/.local/state}/qdash/logs/api.log" | jq 'select(.level == "ERROR")'
 ```
 
 ## Implementation Files

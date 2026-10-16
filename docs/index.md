@@ -31,7 +31,7 @@ features:
     details: Compare chip metrics, task results, raw artifacts, parameter history, and provenance.
     link: /user-guide/data-and-provenance
   - title: Collaborate on Results
-    details: Connect notes, issues, forum discussions, knowledge cases, notifications, and AI reviews.
+    details: Connect notes, issues, forum discussions, knowledge cases, and notifications.
     link: /user-guide/reviewing-results
   - title: Share by Project
     details: Keep workflows, calibration data, files, and membership within an explicit project boundary.

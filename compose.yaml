@@ -119,7 +119,7 @@ services:
       - ./src/qdash/repository:/app/qdash/repository
       - ./src/qdash/config.py:/app/qdash/config.py
       - ./config:/app/config
-      - ./logs/deployment:/app/logs
+      - deployment-logs:/app/logs
     working_dir: /app/qdash/workflow
     command: uvicorn deployment_service:app --host 0.0.0.0 --port 8001 --reload
     ports:
@@ -156,7 +156,7 @@ services:
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - ./config:/app/config # QDash app/domain/copilot config files
-      - ./logs/worker:/app/logs
+      - worker-logs:/app/logs
     working_dir: /app/qdash/workflow
     command: python start_worker.py
     environment:
@@ -193,7 +193,7 @@ services:
       - ./config:/app/config # QDash app/domain/copilot config files
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
-      - ./logs/api:/app/logs
+      - api-logs:/app/logs
       - ${QDASH_UPDATER_RUNTIME_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/qdash/updater}:/run/qdash-updater
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
@@ -218,6 +218,60 @@ services:
       - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
       - UPDATER_SOCKET=/run/qdash-updater/updater.sock
+      - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
+      - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
+    networks:
+      - custom_net
+  agent-runtime:
+    # Pi Agent Runtime backing the Copilot chat page and figure analysis when
+    # config/copilot/config.yaml sets copilot_backend: pi. Enable this opt-in
+    # service with COMPOSE_PROFILES=agent-runtime.
+    profiles:
+      - agent-runtime
+    build:
+      context: .
+      dockerfile: ./agent-runtime/Dockerfile
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./agent-runtime/src:/app/src
+      - ./config:/app/config # Read for copilot language and model settings only
+      # Local pi extension checkouts for development (gitignored, empty in
+      # production); the runtime trusts whatever package directories it finds.
+      - ./agent-runtime/extensions:/app/extensions:ro
+      - agent-runtime-state:/app/state
+    # Per-turn pi-qdash credential profiles are transient, including on crashes.
+    tmpfs:
+      - /tmp
+    environment:
+      - PORT=${AGENT_RUNTIME_PORT:-8002}
+      - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
+      - AGENT_RUNTIME_ENABLE_WRITE_TOOLS=${AGENT_RUNTIME_ENABLE_WRITE_TOOLS:-false}
+      - PI_CODING_AGENT_DIR=/app/.pi-agent
+      - AGENT_STATE_DIR=/app/state
+      # A turn runs until it answers or the user stops it; calibrations a tool
+      # waits on take as long as they take. Set these (ms) to steer the model to
+      # answer after a while, or to abort a turn outright. 0 disables.
+      - CHAT_WRAP_UP_MS=${AGENT_RUNTIME_WRAP_UP_MS:-0}
+      - CHAT_TIMEOUT_MS=${AGENT_RUNTIME_TIMEOUT_MS:-0}
+      - CHAT_PING_MS=${AGENT_RUNTIME_PING_MS:-15000}
+      - MODEL_STREAM_TIMEOUT_MS=${AGENT_RUNTIME_MODEL_STREAM_TIMEOUT_MS:-180000}
+      # The API forwards the logged-in user's token and project on each turn.
+      # No shared API token or administrator login is used by the runtime.
+      - QDASH_BASE_URL=http://api:${API_PORT:-5715}
+      # Links in Copilot answers point here. QDASH_BASE_URL is an internal
+      # hostname, so the browser-facing UI address comes from CLIENT_URL.
+      - QDASH_WEB_URL=${CLIENT_URL:-http://localhost:${UI_PORT:-5714}}
+      # Pi hides models whose provider has no credential, even when the server
+      # ignores it. Keep a placeholder for keyless local endpoints.
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-ollama}
+      - VLLM_API_KEY=${VLLM_API_KEY:-vllm}
+      # Bun's fetch reads HTTP(S)_PROXY on its own. NO_PROXY comes from .env via
+      # env_file; redeclaring it here would let an ambient shell value win.
+    depends_on:
+      api:
+        condition: service_started
     networks:
       - custom_net
   ui:
@@ -258,3 +312,8 @@ services:
 networks:
   custom_net:
     external: false
+volumes:
+  deployment-logs:
+  worker-logs:
+  api-logs:
+  agent-runtime-state:

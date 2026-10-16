@@ -156,6 +156,56 @@ def test_list_task_info_uses_configured_category_and_task_order() -> None:
     ]
 
 
+def test_ef_chevron_is_enabled_with_calibration_and_sweep_metadata() -> None:
+    clear_backend_config_cache()
+    tasks = TaskFileService().list_task_info("qubex", enabled_only=True).tasks
+    task = next(task for task in tasks if task.name == "CheckEFChevron")
+
+    assert task.enabled
+    assert task.category == "One Qubit"
+    assert "qubit_frequency" not in task.input_parameters
+    assert task.input_parameters["control_frequency"]["resolution"] == "database_required"
+    assert task.input_parameters["control_frequency"]["fallback_parameter_names"] == [
+        "qubit_frequency"
+    ]
+    assert not any(name.startswith("drag_pi_") for name in task.input_parameters)
+    assert task.input_parameters["hpi_amplitude"]["resolution"] == "database_required"
+    assert task.input_parameters["hpi_duration"]["resolution"] == "database_required"
+    assert task.input_parameters["anharmonicity"]["default_value"] == -0.3
+    assert task.input_parameters["ef_control_amplitude"]["default_value"] == 0.0625
+    assert task.run_parameters["detuning_range"]["value"] == [-0.05, 0.05, 41]
+    assert task.run_parameters["shots"]["value"] == 256
+
+
+def test_ef_configure_is_enabled_with_mode_metadata() -> None:
+    clear_backend_config_cache()
+    tasks = TaskFileService().list_task_info("qubex", enabled_only=True).tasks
+    task = next(task for task in tasks if task.name == "ConfigureEF")
+
+    assert task.enabled
+    assert task.category == "Other"
+    assert task.task_type == "qubit"
+    assert task.run_parameters["configuration_mode"]["value"] == "ge-ef-cr"
+    configure = next(task for task in tasks if task.name == "Configure")
+    assert configure.run_parameters["configuration_mode"]["value"] == "ge-cr-cr"
+
+
+def test_jazz_task_is_enabled_in_two_qubit_group() -> None:
+    from qdash.common.config.backend import is_task_available
+
+    clear_backend_config_cache()
+    task = next(
+        task
+        for task in TaskFileService().list_task_info("qubex", enabled_only=True).tasks
+        if task.name == "CheckJAZZ"
+    )
+
+    assert task.enabled
+    assert task.category == "Two Qubit"
+    assert task.task_type == "coupling"
+    assert is_task_available("CheckJAZZ", "qubex")
+
+
 def test_list_task_info_extracts_input_parameter_metadata() -> None:
     clear_backend_config_cache()
     service = TaskFileService()
@@ -176,7 +226,7 @@ def test_coarse_readout_task_is_enabled_with_resolvable_input_metadata() -> None
 
     assert task.enabled
     assert set(task.input_parameters) == {
-        "qubit_frequency",
+        "control_frequency",
         "control_amplitude",
         "readout_frequency",
         "readout_amplitude",
@@ -258,7 +308,7 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
     task = next(t for t in tasks if t.name == "CheckT2EchoAverage")
 
     assert set(task.input_parameters) == {
-        "qubit_frequency",
+        "control_frequency",
         "hpi_amplitude",
         "hpi_duration",
         "pi_amplitude",
@@ -266,11 +316,15 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
         "readout_amplitude",
         "readout_frequency",
     } | set(RABI_NORMALIZATION_INPUT_UNITS)
-    assert task.input_parameters["qubit_frequency"] == {
+    assert task.input_parameters["control_frequency"] == {
         "resolution": "database_required",
         "user_override": "allowed",
         "default_value": None,
+        "fallback_parameter_names": ["qubit_frequency"],
     }
+    assert task.input_parameters["readout_frequency"]["fallback_parameter_names"] == [
+        "resonator_frequency"
+    ]
     assert task.input_parameters["pi_duration"]["parameter_aliases"] == ["pi_length"]
     assert task.run_parameters["readout_duration"]["unit"] == "ns"
     assert task.run_parameters["readout_duration"]["value"] == 1024
@@ -368,7 +422,7 @@ def test_extract_parameter_metadata_expands_rabi_normalization_inputs() -> None:
         "default_value": None,
         "parameter_name": "rabi_angle",
         "qid_role": "control",
-        "unit": "degree",
+        "unit": "rad",
         "ui_group": "Rabi normalization",
         "ui_group_collapsed": True,
     }

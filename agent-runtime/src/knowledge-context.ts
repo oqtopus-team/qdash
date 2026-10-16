@@ -1,0 +1,194 @@
+/**
+ * Host-supplied task knowledge for evaluation tools.
+ *
+ * `qcal_evaluate` declares a `knowledge` parameter next to `task_name`. The
+ * model only has to name the task; the runtime fetches QDash's review guide for
+ * it (expected result, review questions, failure patterns, the task's review
+ * notes) and passes that text, so the evaluation model reads the plot against
+ * the same reference every time instead of against a summary the planner
+ * improvised. The planner may still fill `knowledge` itself, which wins.
+ */
+
+import type { TSchema } from "typebox";
+
+import type { QDashConnection } from "./auth.ts";
+
+/** Longest reference passed; the review guide of the largest task is ~7k chars. */
+export const MAX_KNOWLEDGE_CHARS = 6000;
+
+/** Whether a tool declares both `task_name` and a host-fillable `knowledge`. */
+export function acceptsKnowledge(parameters: TSchema): boolean {
+  const properties = (parameters as { properties?: Record<string, unknown> }).properties;
+  return properties !== undefined && "knowledge" in properties && "task_name" in properties;
+}
+
+/** The task the model named, when it did. */
+export function requestedTaskName(args: unknown): string | undefined {
+  const value = (args as { task_name?: unknown } | null)?.task_name;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+/** Whether the model passed reference text of its own. */
+export function hasKnowledge(args: unknown): boolean {
+  const value = (args as { knowledge?: unknown } | null)?.knowledge;
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+/** The model's arguments with the host's reference filled in. */
+export function withKnowledge<T extends object>(args: T, knowledge: string | undefined): T {
+  if (knowledge === undefined) return args;
+  return { ...args, knowledge };
+}
+
+/** Whether a tool can take host-supplied labeled examples next to `task_name`. */
+export function acceptsExamples(parameters: TSchema): boolean {
+  const properties = (parameters as { properties?: Record<string, unknown> }).properties;
+  return properties !== undefined && "examples" in properties && "task_name" in properties;
+}
+
+/** Whether the model asked for the host's labeled examples (`use_examples: true`). */
+export function wantsExamples(args: unknown): boolean {
+  return (args as { use_examples?: unknown } | null)?.use_examples === true;
+}
+
+/** Whether the model passed examples of its own. */
+export function hasExamples(args: unknown): boolean {
+  const value = (args as { examples?: unknown } | null)?.examples;
+  return Array.isArray(value) && value.length > 0;
+}
+
+/** The model's arguments with the host's examples filled in. */
+export function withExamples<T extends object>(args: T, examples: LabeledExample[] | undefined): T {
+  if (examples === undefined || examples.length === 0) return args;
+  return { ...args, examples: examples.map(({ label, images }) => ({ label, images })) };
+}
+
+/** One expert-labeled example plot of a task, as pi-qcaleval takes it, with its identity for the record. */
+export interface LabeledExample {
+  id: string;
+  title: string;
+  outcome: string;
+  label: string;
+  images: Array<{ data: string; mimeType: string }>;
+  /** Each image's path in the knowledge repository, in the same order, for the record. */
+  paths: string[];
+}
+
+/** The slice of QDash's task knowledge response the reference is taken from. */
+export interface TaskKnowledgeLike {
+  review_prompt_text?: string;
+  prompt_text?: string;
+  examples?: Array<{
+    id?: string;
+    title?: string;
+    outcome?: string;
+    label?: string;
+    figures?: Array<{ base64_data?: string; mime_type?: string; path?: string }>;
+  }>;
+}
+
+/** Most labeled examples fetched for one evaluation; pi-qcaleval shows up to four. */
+export const MAX_EXAMPLES = 4;
+
+/**
+ * The labeled examples of a task from QDash's knowledge response: each one's
+ * figures with the diagnosis an expert validated. Examples without a figure
+ * or a label are left out; the order is the repository's.
+ */
+export function examplesOf(knowledge: TaskKnowledgeLike, max = MAX_EXAMPLES): LabeledExample[] {
+  const examples: LabeledExample[] = [];
+  for (const example of knowledge.examples ?? []) {
+    if (examples.length >= max) break;
+    const label = example.label?.trim();
+    const figures = (example.figures ?? []).filter(
+      (figure) => typeof figure.base64_data === "string" && figure.base64_data.length > 0,
+    );
+    const images = figures.map((figure) => ({
+      data: figure.base64_data as string,
+      mimeType: figure.mime_type || "image/png",
+    }));
+    if (!label || images.length === 0) continue;
+    examples.push({
+      id: example.id ?? "",
+      title: example.title ?? "",
+      outcome: example.outcome ?? "",
+      label,
+      images,
+      paths: figures.map((figure) => figure.path ?? ""),
+    });
+  }
+  return examples;
+}
+
+/**
+ * The reference text for one task: QDash's review guide, which the retired
+ * automatic review read, or the full knowledge prompt when the task has no
+ * review guide. Cut to `MAX_KNOWLEDGE_CHARS` at a line break.
+ */
+export function renderKnowledge(knowledge: TaskKnowledgeLike, limit = MAX_KNOWLEDGE_CHARS): string | undefined {
+  const text = (knowledge.review_prompt_text?.trim() || knowledge.prompt_text?.trim()) ?? "";
+  if (!text) return undefined;
+  if (text.length <= limit) return text;
+  const cut = text.lastIndexOf("\n", limit);
+  return `${text.slice(0, cut > limit / 2 ? cut : limit).trimEnd()}\n[reference truncated]`;
+}
+
+/**
+ * Fetch QDash's knowledge for a task as the user who submitted the turn.
+ * A task without knowledge, or an unreachable API, yields nothing: the
+ * evaluation then runs on the planner's context alone, as before.
+ */
+export async function fetchTaskKnowledge(
+  connection: Pick<QDashConnection, "auth" | "baseUrl">,
+  taskName: string,
+  signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | undefined> {
+  const knowledge = await fetchKnowledgeJson(connection, taskName, signal, fetchImpl);
+  return knowledge ? renderKnowledge(knowledge) : undefined;
+}
+
+/**
+ * The labeled examples QDash holds for a task, as the user. A task without
+ * examples, or an unreachable API, yields none: the evaluation then runs
+ * zero-shot, and the record shows no examples.
+ */
+export async function fetchTaskExamples(
+  connection: Pick<QDashConnection, "auth" | "baseUrl">,
+  taskName: string,
+  signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
+): Promise<LabeledExample[]> {
+  const knowledge = await fetchKnowledgeJson(connection, taskName, signal, fetchImpl);
+  return knowledge ? examplesOf(knowledge) : [];
+}
+
+async function fetchKnowledgeJson(
+  connection: Pick<QDashConnection, "auth" | "baseUrl">,
+  taskName: string,
+  signal: AbortSignal | undefined,
+  fetchImpl: typeof fetch,
+): Promise<TaskKnowledgeLike | undefined> {
+  const url = `${connection.baseUrl}/tasks/${encodeURIComponent(taskName)}/knowledge`;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${connection.auth.accessToken}`,
+    Accept: "application/json",
+  };
+  if (connection.auth.projectId) headers["X-Project-Id"] = connection.auth.projectId;
+  try {
+    const response = await fetchImpl(url, { headers, signal });
+    if (!response.ok) {
+      if (response.status !== 404) {
+        console.warn(`[agent-runtime] task knowledge for ${taskName}: HTTP ${response.status}`);
+      }
+      return undefined;
+    }
+    return (await response.json()) as TaskKnowledgeLike;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    console.warn(
+      `[agent-runtime] task knowledge for ${taskName}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return undefined;
+  }
+}

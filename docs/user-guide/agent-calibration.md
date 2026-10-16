@@ -59,7 +59,7 @@ qdash-agent --profile local run-step \
   --apply-backend
 ~~~
 
-The result includes a Prefect `operation_id` and, after QDash creates its execution record, a separate QDash `execution_id`; the runner resolves and polls both. In QDash, the execution is named `agent:<task>` and tagged `agent-session:<session_id>` so it can be distinguished from a manual `re-execute:<task>` run. Task measurement always uses `update_params=false`. QDash derives the candidate from the authoritative task result and currently normalizes R² as `r2`; a missing required metric rejects the candidate. `--commit` writes only the accepted value to QDash state. `--apply-backend` then instructs a worker to re-read that committed snapshot, pull the latest config, atomically update mapped Qubex YAML files, read them back, and push only the target files. The response records the base and resulting Git versions.
+The result includes a Prefect `operation_id` and, after QDash creates its execution record, a separate QDash `execution_id`; the runner resolves and polls both. The task runs the way the Task Workbench runs it: inputs come from the current calibration state, and the Qubex session opens with the task's own `readout_duration`. `--source-execution-id` records the execution the step was decided from; the run does not restore its snapshot. In QDash, the execution is named `agent:<task>` and tagged `agent-session:<session_id>` so it can be distinguished from a Task Workbench `quick-run:<task>` or a manual `re-execute:<task>` run. Task measurement always uses `update_params=false`. QDash derives the candidate from the authoritative task result and currently normalizes R² as `r2`; a missing required metric rejects the candidate. `--commit` writes only the accepted value to QDash state. `--apply-backend` then instructs a worker to re-read that committed snapshot, pull the latest config, atomically update mapped Qubex YAML files, read them back, and push only the target files. The response records the base and resulting Git versions.
 
 Use `--github-push` when changed backend files must also be versioned in GitHub.
 
@@ -93,9 +93,9 @@ qdash-agent --profile local run-campaign \
   ]'
 ~~~
 
-The campaign keeps the approved source execution fixed so every node retains its complete task
-snapshot. After a node passes, its authoritative candidate is carried into later nodes as an input
-parameter override. An explicit `parameter_overrides` value on a later node takes precedence over a
+Every node reads the current calibration state, so a value committed by an earlier node is the
+input of the later ones. After a node passes, its authoritative candidate is also carried into later
+nodes as an input parameter override, so a node sees it even when it was not committed. An explicit `parameter_overrides` value on a later node takes precedence over a
 carried value. Every override is checked against the immutable session bounds before dispatch.
 
 Nodes may define `id`, `on_pass`, and `on_rollback` to form a bounded decision graph. An omitted

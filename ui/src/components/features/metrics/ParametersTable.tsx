@@ -26,8 +26,30 @@ interface ParametersTableProps {
 
 type DatabaseUpdateStatus = "updated" | "not-updated" | "partial" | "unknown";
 
+interface DatabaseUpdate {
+  parameter_name: string;
+  previous_value?: unknown;
+  updated_value?: unknown;
+  updated: boolean;
+}
+
+function getDatabaseUpdates(value: unknown): DatabaseUpdate[] {
+  if (typeof value !== "object" || value === null || !("database_updates" in value)) return [];
+  const updates = (value as Record<string, unknown>).database_updates;
+  if (!Array.isArray(updates)) return [];
+  return updates.filter(
+    (update): update is DatabaseUpdate =>
+      typeof update === "object" &&
+      update !== null &&
+      typeof (update as Record<string, unknown>).parameter_name === "string" &&
+      typeof (update as Record<string, unknown>).updated === "boolean",
+  );
+}
+
 function getDatabaseUpdateStatus(parameters: Record<string, unknown>): DatabaseUpdateStatus {
   const flags = Object.values(parameters).flatMap((value) => {
+    const updates = getDatabaseUpdates(value);
+    if (updates.length > 0) return updates.map((update) => update.updated);
     if (typeof value !== "object" || value === null || !("database_updated" in value)) return [];
     const flag = (value as Record<string, unknown>).database_updated;
     return typeof flag === "boolean" ? [flag] : [];
@@ -37,6 +59,12 @@ function getDatabaseUpdateStatus(parameters: Record<string, unknown>): DatabaseU
   if (flags.every(Boolean)) return "updated";
   if (flags.every((flag) => !flag)) return "not-updated";
   return "partial";
+}
+
+function getDatabaseUpdatesLabel(updates: DatabaseUpdate[]): string {
+  if (updates.every((update) => update.updated)) return "Applied to calibration database";
+  if (updates.every((update) => !update.updated)) return "Not applied to calibration database";
+  return "Calibration database updates";
 }
 
 export function CalibrationUpdateStatusBadge({
@@ -178,6 +206,7 @@ export function ParametersTable({
             typeof val === "object" && val !== null && "value" in val
               ? (val as Record<string, unknown>)
               : { value: val };
+          const databaseUpdates = getDatabaseUpdates(paramValue);
           const override = overrides?.[key];
           return (
             <tr key={key}>
@@ -194,6 +223,26 @@ export function ParametersTable({
                   >
                     edited
                   </span>
+                )}
+                {databaseUpdates.length > 0 && (
+                  <div
+                    className="mt-2 flex flex-wrap items-center gap-1.5"
+                    aria-label={`Database destinations for ${key}`}
+                  >
+                    <span className="text-xs font-normal text-base-content/60">
+                      {getDatabaseUpdatesLabel(databaseUpdates)}:
+                    </span>
+                    {databaseUpdates.map((update) => (
+                      <span
+                        key={`${key}:${update.parameter_name}`}
+                        className={`badge badge-xs font-mono ${
+                          update.updated ? "badge-success badge-soft" : "badge-ghost"
+                        }`}
+                      >
+                        {update.parameter_name}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </td>
               {showsDatabaseComparison && (

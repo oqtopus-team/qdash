@@ -41,7 +41,9 @@ class CheckQubitSpectroscopy(QubexTask):
     name: str = "CheckQubitSpectroscopy"
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
-        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
         "readout_amplitude": InputParameterSpec.required_database(),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
@@ -98,6 +100,10 @@ class CheckQubitSpectroscopy(QubexTask):
                 "qubit_frequency (those come from a Rabi-detuning fit such as "
                 "CheckAdaptiveChevron); this is intended as a seed for downstream "
                 "frequency-refinement tasks."
+            ),
+            publish_targets=(
+                "coarse_qubit_frequency",
+                "control_frequency",
             ),
         ),
         "anharmonicity": OutputParameterSpec(

@@ -18,6 +18,12 @@ else:
     QubexBackend = Any
 
 
+def test_adaptive_chevron_uses_operational_frequency_with_legacy_fallback() -> None:
+    frequency_spec = CheckAdaptiveChevron.input_spec["control_frequency"]
+
+    assert frequency_spec.fallback_parameter_names == ("coarse_qubit_frequency",)
+
+
 def test_chevron_control_amplitude_requires_database_value() -> None:
     spec = CheckAdaptiveChevron.input_spec["coarse_control_amplitude"]
 
@@ -58,7 +64,7 @@ class _DummyExperiment:
 
 def test_check_chevron_run_uses_adaptive_helper(monkeypatch) -> None:
     task = CheckAdaptiveChevron()
-    task.input_parameters["coarse_qubit_frequency"] = ParameterModel(value=4.25, unit="GHz")
+    task.input_parameters["control_frequency"] = ParameterModel(value=4.25, unit="GHz")
     task.input_parameters["readout_frequency"] = ParameterModel(value=6.1, unit="GHz")
     task.input_parameters["readout_amplitude"] = ParameterModel(value=0.031, unit="a.u.")
     task.input_parameters["coarse_control_amplitude"] = ParameterModel(value=0.07, unit="a.u.")
@@ -307,7 +313,7 @@ def test_check_chevron_postprocess_rejects_invalid_target_control_amplitude(
 
 def test_check_chevron_run_requires_db_readout_amplitude(monkeypatch) -> None:
     task = CheckAdaptiveChevron()
-    task.input_parameters["coarse_qubit_frequency"] = ParameterModel(value=4.25, unit="GHz")
+    task.input_parameters["control_frequency"] = ParameterModel(value=4.25, unit="GHz")
     task.input_parameters["readout_frequency"] = ParameterModel(value=6.1, unit="GHz")
     task.input_parameters["readout_amplitude"] = ParameterModel(value=None)
 

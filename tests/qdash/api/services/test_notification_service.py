@@ -42,28 +42,6 @@ def test_project_mention_is_reserved_for_username_extraction() -> None:
     assert service.has_project_mention("Please check @Project") is True
 
 
-def test_project_mention_notifies_active_project_members(init_db) -> None:
-    service = NotificationService()
-    _create_user("actor")
-    active = _create_user("active")
-    _create_user("pending", status="pending")
-    _create_user("disabled", disabled=True)
-
-    service.notify_issue_event(
-        project_id="test_project",
-        issue_id="issue_1",
-        root_issue_id="root_1",
-        task_id="task_1",
-        actor_username="actor",
-        content="@project please review",
-        title="Calibration issue",
-    )
-
-    notifications = NotificationDocument.find({}).to_list()
-    assert [notification.recipient_username for notification in notifications] == [active.username]
-    assert notifications[0].kind == "mention"
-
-
 def test_project_and_direct_mentions_are_deduplicated(init_db) -> None:
     service = NotificationService()
     _create_user("actor")

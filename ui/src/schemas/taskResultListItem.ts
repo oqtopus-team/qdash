@@ -29,5 +29,4 @@ export interface TaskResultListItem {
   start_at?: TaskResultListItemStartAt;
   end_at?: TaskResultListItemEndAt;
   elapsed_time?: TaskResultListItemElapsedTime;
-  ai_review_status?: string;
 }

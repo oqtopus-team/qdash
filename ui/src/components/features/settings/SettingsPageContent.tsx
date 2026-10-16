@@ -21,17 +21,21 @@ import {
   useUpdateProjectMember,
 } from "@/client/projects/projects";
 import {
-  buildAnalysisModelOptions,
-  getStoredAnalysisModelKey,
-  resolveAnalysisModelOption,
-  setStoredAnalysisModelKey,
+  buildChatModelOptions,
+  getStoredChatModelKey,
+  resolveChatModelOption,
+  setStoredChatModelKey,
 } from "@/lib/copilotModels";
 import type { MemberResponse, ProjectRole } from "@/schemas";
 import { getGetCurrentUserQueryKey, useUpdateCurrentUserProfile } from "@/client/auth/auth";
 import { AVATAR_PRESETS, UserAvatar } from "@/components/ui/UserAvatar";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
-type Tab = "appearance" | "project" | "copilot" | "account" | "api";
+import { CopilotInstructionsSettings } from "./CopilotInstructionsSettings";
+import { CopilotSystemPromptView } from "./CopilotSystemPromptView";
+
+const TABS = ["appearance", "project", "copilot", "account", "api"] as const;
+type Tab = (typeof TABS)[number];
 
 const editableProjectRoles: ProjectRole[] = ["viewer", "editor"];
 
@@ -42,17 +46,17 @@ function roleBadgeClass(role: ProjectRole) {
 }
 
 function CopilotSettingsPanel() {
-  const [selectedModelKey, setSelectedModelKey] = useState(getStoredAnalysisModelKey);
+  const [selectedModelKey, setSelectedModelKey] = useState(getStoredChatModelKey);
   const { data: copilotConfigResponse, isLoading } = useGetCopilotConfig();
   const modelOptions = useMemo(
-    () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
+    () => buildChatModelOptions(copilotConfigResponse?.data ?? null),
     [copilotConfigResponse?.data],
   );
-  const selectedModel = resolveAnalysisModelOption(modelOptions, selectedModelKey);
+  const selectedModel = resolveChatModelOption(modelOptions, selectedModelKey);
 
   const handleModelChange = (key: string) => {
     setSelectedModelKey(key);
-    setStoredAnalysisModelKey(key);
+    setStoredChatModelKey(key);
   };
 
   return (
@@ -61,7 +65,7 @@ function CopilotSettingsPanel() {
         <h2 className="card-title text-xl mb-4">Copilot Settings</h2>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
-            <label className="text-sm font-medium">Default analysis model</label>
+            <label className="text-sm font-medium">Default chat model</label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <select
                 className="select select-bordered w-full sm:max-w-md"
@@ -97,6 +101,12 @@ function CopilotSettingsPanel() {
                 : selectedModel.label}
             </div>
           </div>
+
+          <div className="divider my-0" />
+
+          <CopilotInstructionsSettings />
+
+          <CopilotSystemPromptView />
         </div>
       </div>
     </div>
@@ -546,6 +556,14 @@ function ProjectMembersPanel() {
 export function SettingsPageContent() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("appearance");
+
+  // `?tab=copilot` opens a tab directly (the chat links to its instructions).
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested && (TABS as readonly string[]).includes(requested)) {
+      setActiveTab(requested as Tab);
+    }
+  }, []);
 
   useEffect(() => {
     if (user?.must_change_password) {

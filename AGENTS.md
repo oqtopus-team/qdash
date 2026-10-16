@@ -64,6 +64,7 @@ Run commands from the repository root unless a directory is specified.
 - Workflow tests: `task test-workflow`
 - UI tests: `task test-ui`
 - TypeScript client checks: `task test-client-ts`
+- Agent runtime tests and typecheck: `task ci-agent-runtime`
 - Python CI checks: `task ci`
 - Full local checks including UI: `task check-all`
 - Python lint/format with fixes: `task lint-python`

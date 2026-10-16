@@ -54,6 +54,8 @@ def test_backend_initialization_failure_is_persisted(monkeypatch, skip_execution
 
     assert caught.value is error
     assert not orchestrator.is_initialized
+    if failure_stage == "connect":
+        backend.disconnect.assert_called_once_with()
     saved = repo.find_by_id(config.execution_id)
     assert saved is not None
     if skip_execution:
@@ -67,3 +69,45 @@ def test_backend_initialization_failure_is_persisted(monkeypatch, skip_execution
         # A later cleanup without a reason must retain the diagnostic.
         service.reload().fail()
         assert service.reload().message == saved.message
+
+
+def test_delegating_session_keeps_execution_without_connecting_backend(monkeypatch):
+    """A pipeline owner can keep its Execution while workers own hardware connections."""
+    config = CalibConfig(
+        username="alice",
+        chip_id="chip-1",
+        qids=["0", "1"],
+        execution_id="exec-1",
+        project_id="project-1",
+        enable_github_pull=False,
+        connect_backend=False,
+    )
+    repo = InMemoryExecutionRepository()
+    service = ExecutionService.create(
+        username=config.username,
+        chip_id=config.chip_id,
+        execution_id=config.execution_id,
+        calib_data_path=config.calib_data_path,
+        project_id=config.project_id,
+        repository=repo,
+    )
+    orchestrator = CalibOrchestrator(config)
+    monkeypatch.setattr(orchestrator, "_create_directories", MagicMock())
+    monkeypatch.setattr(orchestrator, "_create_history_recorder", lambda: None)
+    monkeypatch.setattr("qdash.workflow.engine.orchestrator.get_run_logger", MagicMock())
+    monkeypatch.setattr("qdash.workflow.engine.orchestrator.TaskContext", MagicMock())
+    monkeypatch.setattr(ExecutionService, "create", lambda **kwargs: service)
+    backend = MagicMock()
+    backend.name = "qubex"
+    backend_factory = MagicMock(return_value=backend)
+    monkeypatch.setattr("qdash.workflow.engine.orchestrator.create_backend", backend_factory)
+
+    orchestrator.initialize()
+
+    backend_factory.assert_called_once()
+    backend.save_note.assert_called_once()
+    backend.connect.assert_not_called()
+    assert orchestrator.backend is backend
+    execution = repo.find_by_id(config.execution_id)
+    assert execution is not None
+    assert execution.status == ExecutionStatusModel.RUNNING

@@ -10,6 +10,12 @@ Install the package from npm. Node.js 20 or later is required.
 npm install @oqtopus-team/qdash-client
 ```
 
+Every push to `develop` that touches the client or the OpenAPI spec also publishes a prerelease under the `beta` dist-tag, versioned as the next patch release with a `-beta.<build>` suffix (for example `1.9.10-beta.412`). Use it to build against endpoints that are merged but not yet released, and switch back to `latest` once the release is tagged.
+
+```bash
+npm install @oqtopus-team/qdash-client@beta
+```
+
 ## Configuration
 
 The TypeScript and Python clients use the same `QDASH_*` environment variables and named profiles. This allows an extension to reuse an existing `$XDG_CONFIG_HOME/qdash/config.ini` or `~/.config/qdash/config.ini` file.
