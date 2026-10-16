@@ -47,6 +47,10 @@ backends:
         - CreateDRAGPIPulse
         - CheckDRAGPIPulse
         - CheckEFChevron
+        - CheckEFRabi
+        - CreateEFHPIPulse
+        - CreateEFPIPulse
+        - EFReadoutClassification
         - ReadoutClassification
         - RandomizedBenchmarking
         - X90InterleavedRandomizedBenchmarking
