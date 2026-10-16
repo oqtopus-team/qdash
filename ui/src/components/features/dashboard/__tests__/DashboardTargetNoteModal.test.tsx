@@ -20,7 +20,12 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+vi.mock("@/contexts/ProjectContext", () => ({
+  useProject: () => ({ projectId: "project-1" }),
+}));
+
 vi.mock("@/client/forum/forum", () => ({
+  getListForumLabelsQueryKey: () => ["/forum/labels"],
   useListForumPosts: () => ({
     data: { data: { posts: [] } },
   }),

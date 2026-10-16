@@ -45,6 +45,7 @@ vi.mock("@/client/cooldown/cooldown", () => ({
 }));
 
 vi.mock("@/client/forum/forum", () => ({
+  getListForumLabelsQueryKey: () => ["/forum/labels"],
   useListForumPosts: (params: unknown, options: unknown) => {
     mockListForumPosts(params, options);
     return {
