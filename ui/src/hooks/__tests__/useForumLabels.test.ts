@@ -12,7 +12,9 @@ vi.mock("@/client/forum/forum", () => ({
   useListForumLabels: mocks.useListForumLabels,
   getListForumLabelsQueryKey: () => ["/forum/labels"],
 }));
-vi.mock("@/contexts/ProjectContext", () => ({ useProject: () => ({ projectId: mocks.projectId }) }));
+vi.mock("@/contexts/ProjectContext", () => ({
+  useProject: () => ({ projectId: mocks.projectId }),
+}));
 
 beforeEach(() => {
   mocks.projectId = "project-1";
