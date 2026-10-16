@@ -1245,6 +1245,24 @@ def test_undefined_stored_label_is_omitted_and_dropped_on_update(test_client, in
     assert updated.json()["labels"] == [key]
 
 
+def test_list_posts_and_replies_omit_undefined_stored_labels(test_client, init_db):
+    """Listing posts and replies keeps defined label keys and omits undefined ones."""
+    headers = _setup_owner()
+    (key,) = _create_named_labels(test_client, headers, "Anomaly")
+    root = _create_post(test_client, headers)
+    root_id = root.json()["id"]
+    reply = _create_post(test_client, headers, title=None, content="Reply", parent_id=root_id)
+    for post_id in (root_id, reply.json()["id"]):
+        ForumPostDocument.find_one({"_id": ObjectId(post_id)}).update(
+            {"$set": {"labels": ["review", key]}}
+        ).run()
+
+    posts = test_client.get("/forum/posts", headers=headers)
+    assert [post["labels"] for post in posts.json()["posts"]] == [[key]]
+    replies = test_client.get(f"/forum/posts/{root_id}/replies", headers=headers)
+    assert [post["labels"] for post in replies.json()] == [[key]]
+
+
 def test_thread_with_labels_can_be_updated_unchanged(test_client, init_db):
     """A thread carrying labels accepts its own labels back in an update."""
     headers = _setup_owner()

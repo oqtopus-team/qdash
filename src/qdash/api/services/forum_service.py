@@ -332,21 +332,34 @@ class ForumService:
         }
 
     @staticmethod
+    def _defined_label_keys(project_id: str, docs: list[ForumPostDocument]) -> set[str]:
+        """Return the stored label keys across docs that have a definition in the project."""
+        keys = {key for doc in docs for key in getattr(doc, "labels", [])}
+        if not keys:
+            return set()
+        return {
+            label.key
+            for label in ForumLabelDocument.find(
+                {"project_id": project_id, "key": {"$in": list(keys)}}
+            ).to_list()
+        }
+
+    @staticmethod
     def _to_response(
         doc: ForumPostDocument,
         reply_count: int = 0,
         task_result: ForumTaskResultSummary | None = None,
+        defined_label_keys: set[str] | None = None,
     ) -> ForumPostResponse:
         """Convert a document to an API response, omitting label keys that have no definition."""
         user = UserDocument.find_one({"user_id": doc.user_id}).run() if doc.user_id else None
         labels = list(getattr(doc, "labels", []))
         if labels:
-            defined = {
-                label.key
-                for label in ForumLabelDocument.find(
-                    {"project_id": doc.project_id, "key": {"$in": labels}}
-                ).to_list()
-            }
+            defined = (
+                defined_label_keys
+                if defined_label_keys is not None
+                else ForumService._defined_label_keys(doc.project_id, [doc])
+            )
             labels = [key for key in labels if key in defined]
         return ForumPostResponse(
             id=str(doc.id),
@@ -792,12 +805,14 @@ class ForumService:
             for item in results:
                 reply_counts[item["_id"]] = item["count"]
 
+        defined_label_keys = self._defined_label_keys(project_id, docs)
         return ListForumPostsResponse(
             posts=[
                 self._to_response(
                     doc,
                     reply_count=reply_counts.get(str(doc.id), 0),
                     task_result=summaries.get(getattr(doc, "task_id", None) or ""),
+                    defined_label_keys=defined_label_keys,
                 )
                 for doc in docs
             ],
@@ -849,7 +864,8 @@ class ForumService:
             .limit(limit)
             .to_list()
         )
-        return [self._to_response(doc) for doc in docs]
+        defined_label_keys = self._defined_label_keys(project_id, docs)
+        return [self._to_response(doc, defined_label_keys=defined_label_keys) for doc in docs]
 
     def create_post(
         self,
