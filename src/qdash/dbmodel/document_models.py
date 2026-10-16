@@ -23,7 +23,12 @@ from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.flow import FlowDocument
-from qdash.dbmodel.forum import ForumCategoryDocument, ForumCounterDocument, ForumPostDocument
+from qdash.dbmodel.forum import (
+    ForumCategoryDocument,
+    ForumCounterDocument,
+    ForumLabelDocument,
+    ForumPostDocument,
+)
 from qdash.dbmodel.metric_note import MetricNoteDocument
 from qdash.dbmodel.note_event import NoteEventDocument
 from qdash.dbmodel.notification import NotificationDocument
@@ -74,6 +79,7 @@ def document_models() -> list[Any]:
         ForumCategoryDocument,
         ForumPostDocument,
         ForumCounterDocument,
+        ForumLabelDocument,
         MetricNoteDocument,
         TargetNoteDocument,
         EvaluationRunDocument,

@@ -40,6 +40,7 @@ import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useForumAiReply } from "@/hooks/useForumAiReply";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { formatDateTimeCompact, formatRelativeTime } from "@/lib/utils/datetime";
 import type { ForumPostResponse } from "@/schemas";
@@ -53,6 +54,7 @@ import {
   isForumTerminalStatus,
   toForumCategoryDefinition,
 } from "./categories";
+import { ForumLabelBadge } from "./ForumLabelBadge";
 import { ForumLabelPicker } from "./ForumLabelSelector";
 import { type ForumBlockSnapshotGetter, type ForumMentionCandidate } from "./ForumBlockEditor";
 import { ForumPostContent } from "./ForumPostContent";
@@ -263,6 +265,7 @@ function PostBody({
   );
 }
 
+/** Page showing a forum thread with its replies and metadata controls. */
 export function ForumDetailPage({ postId }: { postId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -390,6 +393,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const createMutation = useCreateForumPost();
   const updateMutation = useUpdateForumPost();
   const deleteMutation = useDeleteForumPost();
+  const { labels } = useForumLabels();
   const {
     isGenerating,
     statusMessage: aiStatus,
@@ -586,10 +590,13 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     invalidateThread();
   };
 
+  /** Toggles a label on the thread. */
   const togglePostLabel = (label: string) => {
     if (!post) return;
     const currentLabels = post.labels ?? [];
-    const nextLabels = currentLabels.includes(label) ? [] : [label];
+    const nextLabels = currentLabels.includes(label)
+      ? currentLabels.filter((item) => item !== label)
+      : [...currentLabels, label];
     updateRootMetadata({ labels: nextLabels });
   };
 
@@ -1133,6 +1140,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             </div>
             {canManageMetadata ? (
               <ForumLabelPicker
+                labels={labels}
                 selectedLabels={post.labels ?? []}
                 onToggle={togglePostLabel}
                 disabled={updateMutation.isPending}
@@ -1140,14 +1148,9 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {(post.labels ?? []).length > 0 ? (
-                  (post.labels ?? []).map((label) => {
-                    const labelDef = getForumLabel(label);
-                    return (
-                      <span key={label} className={`badge badge-sm ${labelDef.badgeClass}`}>
-                        {labelDef.label}
-                      </span>
-                    );
-                  })
+                  (post.labels ?? []).map((label) => (
+                    <ForumLabelBadge key={label} label={getForumLabel(label, labels)} />
+                  ))
                 ) : (
                   <span className="text-xs text-base-content/45">No labels</span>
                 )}

@@ -35,6 +35,7 @@ between MongoDB, active execution state, and Qubex parameter files.
 | `chip_note`           | ChipNoteDocument          | Dashboard chip notes scoped by cooldown/range          |
 | `target_note`         | TargetNoteDocument        | Dashboard pinned target summaries scoped by cooldown/range |
 | `note_event`          | NoteEventDocument         | Audit log for every note edit (write-through)   |
+| `forum_label`         | ForumLabelDocument        | Custom project-scoped forum labels |
 | `cryostat`            | CryostatDocument          | Cryostat (dilution refrigerator) entity         |
 | `cooldown`            | CooldownDocument          | One cool-down cycle of one cryostat             |
 | `evaluation_run`      | EvaluationRunDocument     | One bulk calibration evaluation request          |
@@ -1098,6 +1099,31 @@ class FlowDocument(Document):
     created_at: datetime
     updated_at: datetime
     tags: list[str] = []
+```
+
+### ForumLabelDocument
+
+Custom, project-scoped forum labels, similar to GitHub issue labels. Each label key set by a
+client must exist as a `ForumLabelDocument` for the project. Label keys stored on threads without a
+definition are omitted from API responses and dropped the next time the thread's labels are updated.
+
+New projects start with no labels; owners create them as needed.
+
+> **Warning:** `migrate-forum-status` is a one-time legacy migration. It collapses every label to
+> `review`/`anomaly` and keeps only one label per thread, so do not re-run it once custom labels are
+> in use.
+
+Collection: `forum_label`
+
+```python
+class ForumLabelDocument(Document):
+    project_id: str
+    key: str              # Stable label key, e.g. "review".
+                           # Server-generated from name; never set by the client.
+    name: str              # Display name
+    description: str = ""
+    color: str             # Lowercase hex color, e.g. "#3b82f6"
+    system_info: SystemInfoModel
 ```
 
 ### SlackForumThreadDocument
