@@ -27,7 +27,7 @@ from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
 class CheckEFChevron(QubexTask):
-    """Measure f_ef and alpha = f_ef - f_ge using the calibrated GE DRAG pi pulse."""
+    """Measure f_ef and alpha = f_ef - f_ge using the Qubex session's GE pulses."""
 
     name: str = "CheckEFChevron"
     task_type: str = "qubit"
@@ -35,18 +35,14 @@ class CheckEFChevron(QubexTask):
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("qubit_frequency",), unit="GHz"
         ),
-        "qubit_frequency": InputParameterSpec.required_database(unit="GHz"),
+        "hpi_amplitude": InputParameterSpec.required_database(unit="a.u."),
+        "hpi_duration": InputParameterSpec.required_database(unit="ns"),
         "anharmonicity": InputParameterSpec.database_or_default(
             default=-0.3, unit="GHz", description="Initial EF frequency offset from f_ge"
         ),
         "ef_control_amplitude": InputParameterSpec.database_or_default(
             default=0.0625, unit="a.u.", description="EF drive pulse amplitude"
         ),
-        "drag_pi_amplitude": InputParameterSpec.required_database(unit="a.u."),
-        "drag_pi_duration": InputParameterSpec.required_database(
-            parameter_aliases=("drag_pi_length",), unit="ns"
-        ),
-        "drag_pi_beta": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(unit="a.u."),
         "readout_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("resonator_frequency",), unit="GHz"
@@ -90,7 +86,7 @@ class CheckEFChevron(QubexTask):
             unit="GHz", description="Measured e-to-f transition frequency"
         ),
         "anharmonicity": OutputParameterSpec(
-            unit="GHz", description="Anharmonicity alpha = ef_frequency - qubit_frequency"
+            unit="GHz", description="Anharmonicity alpha = ef_frequency - control_frequency"
         ),
     }
 
@@ -101,7 +97,7 @@ class CheckEFChevron(QubexTask):
         label = exp.ctx.resolve_ef_label(self.get_qubit_label(backend, qid))
         result = run_result.raw_result
         frequency = result.data["resonant_frequencies"].get(label)
-        ge_frequency = self._get_calibration_value("qubit_frequency")
+        ge_frequency = self._get_calibration_value("control_frequency")
         anharmonicity = None if frequency is None else frequency - ge_frequency
         threshold = self.run_parameters["minimum_peak_background_rms_ratio"].get_value()
         threshold_error = finite_value_error(
@@ -135,9 +131,9 @@ class CheckEFChevron(QubexTask):
         readout_amp_param = self.input_parameters["readout_amplitude"]
         if readout_amp_param is not None:
             exp.params.readout_amplitude[label] = readout_amp_param.value
-        ef_frequency = self._get_calibration_value("qubit_frequency") + self._get_calibration_value(
-            "anharmonicity"
-        )
+        ef_frequency = self._get_calibration_value(
+            "control_frequency"
+        ) + self._get_calibration_value("anharmonicity")
         with exp.modified_frequencies(
             {
                 exp.ctx.resolve_ge_label(label): self._get_calibration_value("control_frequency"),
