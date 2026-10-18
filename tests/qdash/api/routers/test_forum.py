@@ -287,6 +287,27 @@ def test_update_forum_label_allows_case_variant_of_own_name(test_client, init_db
     assert response.json()["name"] == "HARDWARE"
 
 
+def test_forum_label_rejects_whitespace_only_name(test_client, init_db):
+    """Whitespace-only label names are rejected on create and update."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    blank = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "   ", "color": "#111111"}
+    )
+    assert blank.status_code == 422
+
+    created = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "  Hardware  ", "color": "#111111"}
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["name"] == "Hardware"
+
+    renamed = test_client.patch("/forum/labels/hardware", headers=headers, json={"name": "   "})
+    assert renamed.status_code == 422
+
+
 def test_create_forum_label_with_japanese_only_name_gets_random_key(test_client, init_db):
     """A name with no usable ASCII characters falls back to a random ``label-`` key."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)

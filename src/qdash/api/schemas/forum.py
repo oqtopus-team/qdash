@@ -1,9 +1,9 @@
 """Schema definitions for forum discussions."""
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 FORUM_CATEGORY_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,63}$"
 FORUM_CATEGORY_COLOR_PATTERN = (
@@ -14,6 +14,9 @@ FORUM_TARGET_TYPE_PATTERN = r"^(qubit|coupling)$"
 FORUM_THREAD_STATUS_PATTERN = r"^(open|investigating|identified|resolved)$"
 FORUM_LABEL_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
 ForumThreadStatus = Literal["open", "investigating", "identified", "resolved"]
+ForumLabelName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)
+]
 
 
 class ForumImageUploadResponse(BaseModel):
@@ -91,7 +94,7 @@ class ListForumCategoriesResponse(BaseModel):
 class ForumLabelCreate(BaseModel):
     """Request schema for creating a forum label."""
 
-    name: str = Field(..., min_length=1, max_length=80, description="Display name")
+    name: ForumLabelName = Field(..., description="Display name")
     description: str = Field(default="", max_length=200, description="Short description")
     color: str = Field(..., pattern=FORUM_LABEL_COLOR_PATTERN, description="Display hex color")
 
@@ -99,7 +102,7 @@ class ForumLabelCreate(BaseModel):
 class ForumLabelUpdate(BaseModel):
     """Request schema for updating a forum label."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=80, description="Display name")
+    name: ForumLabelName | None = Field(default=None, description="Display name")
     description: str | None = Field(default=None, max_length=200, description="Short description")
     color: str | None = Field(
         default=None, pattern=FORUM_LABEL_COLOR_PATTERN, description="Display hex color"
