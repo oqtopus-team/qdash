@@ -1,11 +1,15 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 import type { SystemRole, UserListItem } from "@/schemas";
 
 import { useResetPassword } from "@/client/auth/auth";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 type EditUserModalProps = {
   user: UserListItem;
@@ -15,10 +19,21 @@ type EditUserModalProps = {
     organization?: string;
     disabled?: boolean;
     system_role?: SystemRole;
-  }) => void;
+  }) => Promise<void>;
   isLoading: boolean;
 };
 
+/** Zod schema for the edit user form. */
+const editUserSchema = z.object({
+  organization: z.string().trim(),
+  disabled: z.boolean(),
+  systemRole: z.enum(["user", "admin"], { error: "Select a system role" }),
+});
+
+type EditUserFormInput = z.input<typeof editUserSchema>;
+type EditUserFormData = z.output<typeof editUserSchema>;
+
+/** Modal for editing a user's organization, disabled state, system role, and password. */
 export function EditUserModal({
   user,
   currentUsername,
@@ -26,27 +41,47 @@ export function EditUserModal({
   onSave,
   isLoading,
 }: EditUserModalProps) {
-  const [organization, setOrganization] = useState(user.organization ?? "");
-  const [disabled, setDisabled] = useState(user.disabled ?? false);
-  const [systemRole, setSystemRole] = useState<SystemRole>(user.system_role ?? "user");
   const isSelf = user.username === currentUsername;
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<EditUserFormInput, unknown, EditUserFormData>({
+    resolver: zodResolver(editUserSchema),
+    defaultValues: {
+      organization: user.organization ?? "",
+      disabled: user.disabled ?? false,
+      systemRole: user.system_role ?? "user",
+    },
+  });
+  const disabled = watch("disabled");
 
   const resetPasswordMutation = useResetPassword();
-  const isPending = isLoading || resetPasswordMutation.isPending;
+  const isPending = isLoading || isSubmitting || resetPasswordMutation.isPending;
 
-  const handleSave = () => {
-    onSave({
-      organization: organization.trim(),
-      disabled,
-      system_role: systemRole,
-    });
+  /** Submits the validated form values and surfaces a save failure as a server error. */
+  const handleSave = async (data: EditUserFormData) => {
+    setServerError(null);
+    try {
+      await onSave({
+        organization: data.organization,
+        disabled: data.disabled,
+        system_role: data.systemRole,
+      });
+    } catch (err) {
+      setServerError(getApiErrorMessage(err, "Failed to update user"));
+    }
   };
 
+  /** Generates a temporary password for the user. */
   const handleResetPassword = async () => {
     setPasswordError(null);
     setPasswordSuccess(false);
@@ -57,11 +92,12 @@ export function EditUserModal({
       });
       setTemporaryPassword(response.data.initial_password);
       setPasswordSuccess(true);
-    } catch {
-      setPasswordError("Failed to reset password");
+    } catch (err) {
+      setPasswordError(getApiErrorMessage(err, "Failed to reset password"));
     }
   };
 
+  /** Copies the temporary password to the clipboard. */
   const handleCopyPassword = async () => {
     if (!temporaryPassword) return;
     await navigator.clipboard.writeText(temporaryPassword);
@@ -74,27 +110,37 @@ export function EditUserModal({
       <DialogContent className="max-w-2xl">
         <DialogTitle className="mb-4">Edit User: {user.username}</DialogTitle>
 
-        <div className="space-y-4">
+        <form className="space-y-4" onSubmit={handleSubmit(handleSave)} noValidate>
           <div className="form-control">
-            <label className="label">
+            <label className="label" htmlFor="edit-user-organization">
               <span className="label-text font-medium">Organization</span>
             </label>
             <input
+              id="edit-user-organization"
               type="text"
-              className="input input-bordered w-full"
-              value={organization}
-              onChange={(event) => setOrganization(event.target.value)}
+              className={`input input-bordered w-full ${errors.organization ? "input-error" : ""}`}
               placeholder="Enter organization or affiliation"
+              aria-invalid={Boolean(errors.organization)}
+              aria-describedby={errors.organization ? "edit-user-organization-error" : undefined}
+              {...register("organization")}
             />
+            {errors.organization && (
+              <p id="edit-user-organization-error" className="mt-1 text-sm text-error">
+                {errors.organization.message}
+              </p>
+            )}
           </div>
 
           <div className="form-control">
-            <label className="label cursor-pointer justify-start gap-4">
+            <label
+              className="label cursor-pointer justify-start gap-4"
+              htmlFor="edit-user-disabled"
+            >
               <input
+                id="edit-user-disabled"
                 type="checkbox"
                 className="toggle toggle-error"
-                checked={disabled}
-                onChange={(event) => setDisabled(event.target.checked)}
+                {...register("disabled")}
               />
               <span className="label-text">
                 Account Disabled
@@ -104,20 +150,31 @@ export function EditUserModal({
           </div>
 
           <div className="form-control flex flex-col gap-1">
-            <label className="label">
+            <label className="label" htmlFor="edit-user-system-role">
               <span className="label-text font-medium">System Role</span>
             </label>
             <select
-              className="select select-bordered"
-              value={systemRole}
-              onChange={(event) => setSystemRole(event.target.value as SystemRole)}
+              id="edit-user-system-role"
+              className={`select select-bordered ${errors.systemRole ? "select-error" : ""}`}
               disabled={isSelf}
+              aria-invalid={Boolean(errors.systemRole)}
+              aria-describedby={
+                errors.systemRole
+                  ? "edit-user-system-role-hint edit-user-system-role-error"
+                  : "edit-user-system-role-hint"
+              }
+              {...register("systemRole")}
             >
               <option value="user">User</option>
               <option value="admin">Admin</option>
             </select>
+            {errors.systemRole && (
+              <p id="edit-user-system-role-error" className="mt-1 text-sm text-error">
+                {errors.systemRole.message}
+              </p>
+            )}
             <label className="label">
-              <span className="label-text-alt text-base-content/60">
+              <span id="edit-user-system-role-hint" className="label-text-alt text-base-content/60">
                 {isSelf
                   ? "You cannot change your own system role"
                   : "Admin users can manage all users and system settings"}
@@ -129,6 +186,7 @@ export function EditUserModal({
 
           {!showPasswordReset ? (
             <button
+              type="button"
               className="btn btn-outline btn-warning btn-sm"
               onClick={() => setShowPasswordReset(true)}
             >
@@ -153,7 +211,7 @@ export function EditUserModal({
               <h4 className="text-sm font-medium">Generate Temporary Password</h4>
 
               {passwordError && (
-                <div className="alert alert-error py-2">
+                <div className="alert alert-error py-2" role="alert">
                   <span className="text-sm">{passwordError}</span>
                 </div>
               )}
@@ -198,6 +256,7 @@ export function EditUserModal({
 
               <div className="flex gap-2">
                 <button
+                  type="button"
                   className="btn btn-warning btn-sm"
                   onClick={handleResetPassword}
                   disabled={resetPasswordMutation.isPending || passwordSuccess}
@@ -209,6 +268,7 @@ export function EditUserModal({
                   )}
                 </button>
                 <button
+                  type="button"
                   className="btn btn-ghost btn-sm"
                   onClick={() => {
                     setShowPasswordReset(false);
@@ -224,21 +284,22 @@ export function EditUserModal({
               </div>
             </div>
           )}
-        </div>
 
-        <div className="modal-action">
-          <button type="button" className="btn" onClick={onClose} disabled={isPending}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={handleSave}
-            disabled={isPending}
-          >
-            {isLoading ? <span className="loading loading-spinner loading-sm" /> : "Save Changes"}
-          </button>
-        </div>
+          {serverError && (
+            <div className="alert alert-error py-2" role="alert">
+              <span className="text-sm">{serverError}</span>
+            </div>
+          )}
+
+          <div className="modal-action">
+            <button type="button" className="btn" onClick={onClose} disabled={isPending}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={isPending}>
+              {isLoading ? <span className="loading loading-spinner loading-sm" /> : "Save Changes"}
+            </button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
