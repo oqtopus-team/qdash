@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
-import type { SystemRole, UserListItem } from "@/schemas";
+import { SystemRole, type UserListItem } from "@/schemas";
 
 import { useResetPassword } from "@/client/auth/auth";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
@@ -27,7 +27,7 @@ type EditUserModalProps = {
 const editUserSchema = z.object({
   organization: z.string().trim(),
   disabled: z.boolean(),
-  systemRole: z.enum(["user", "admin"], { error: "Select a system role" }),
+  systemRole: z.enum(SystemRole, { error: "Select a system role" }),
 });
 
 type EditUserFormInput = z.input<typeof editUserSchema>;
