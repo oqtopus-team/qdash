@@ -65,7 +65,7 @@ ago* indicator at the top-right of the section shows the autosave status.
   resize. Right-click a cell for the cell menu.
 - **Images**: paste a screenshot with <kbd>⌘/Ctrl+V</kbd>, drag a file in, or
   insert via the slash menu. Images are embedded inline as base64; max 5 MB
-  per image to keep cool-down documents within Mongo's 16 MiB limit.
+  per image, so a cool-down's record stays within its 16 MiB limit.
 - Drag the <kbd>⠿</kbd> handle in the left margin to reorder blocks.
 - Existing Markdown notes are imported automatically the first time the
   section is opened.
