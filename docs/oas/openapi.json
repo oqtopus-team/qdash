@@ -29998,7 +29998,17 @@
       "HTTPBearer": {
         "type": "http",
         "scheme": "bearer"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Bearer token authentication. Use the access_token from login response."
       }
     }
-  }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
 }
