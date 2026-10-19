@@ -8916,7 +8916,7 @@
           "forum"
         ],
         "summary": "Create a forum label",
-        "description": "Create a forum label. Only project owners can manage labels; the key is server-generated.",
+        "description": "Create a forum label. Only project owners and editors can manage labels; the key is server-generated.",
         "operationId": "createForumLabel",
         "security": [
           {
@@ -8981,7 +8981,7 @@
           "forum"
         ],
         "summary": "Update a forum label",
-        "description": "Update a forum label. Only project owners can manage labels.",
+        "description": "Update a forum label. Only project owners and editors can manage labels.",
         "operationId": "updateForumLabel",
         "security": [
           {
@@ -9053,7 +9053,7 @@
           "forum"
         ],
         "summary": "Delete a forum label",
-        "description": "Delete a forum label. Only project owners can manage labels.",
+        "description": "Delete a forum label. Only project owners and editors can manage labels.",
         "operationId": "deleteForumLabel",
         "security": [
           {

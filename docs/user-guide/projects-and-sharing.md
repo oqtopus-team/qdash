@@ -17,7 +17,7 @@ projects and switch between them without copying data.
 | Role | Access |
 | --- | --- |
 | Viewer | Inspect project data and download available results. |
-| Editor | Viewer access plus operational changes such as running workflows and editing calibration data. |
+| Editor | Viewer access plus operational changes such as running workflows, editing calibration data, and managing forum labels. |
 | Owner | Editor access plus project settings, membership, categories, ownership transfer, and deletion. |
 
 Each project has one owner. Transfer ownership before the current owner leaves the project.

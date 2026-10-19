@@ -450,7 +450,7 @@ export function useListForumLabels<TData = Awaited<ReturnType<typeof listForumLa
 
 
 /**
- * Create a forum label. Only project owners can manage labels; the key is server-generated.
+ * Create a forum label. Only project owners and editors can manage labels; the key is server-generated.
  * @summary Create a forum label
  */
 export const createForumLabel = (
@@ -515,7 +515,7 @@ export const useCreateForumLabel = <TError = HTTPValidationError,
       return useMutation(getCreateForumLabelMutationOptions(options), queryClient);
     }
     /**
- * Update a forum label. Only project owners can manage labels.
+ * Update a forum label. Only project owners and editors can manage labels.
  * @summary Update a forum label
  */
 export const updateForumLabel = (
@@ -581,7 +581,7 @@ export const useUpdateForumLabel = <TError = HTTPValidationError,
       return useMutation(getUpdateForumLabelMutationOptions(options), queryClient);
     }
     /**
- * Delete a forum label. Only project owners can manage labels.
+ * Delete a forum label. Only project owners and editors can manage labels.
  * @summary Delete a forum label
  */
 export const deleteForumLabel = (

@@ -794,6 +794,7 @@ function ForumThreadPreviewSidebar({
   );
 }
 
+/** Forum page listing threads with filters, category and label management, and thread creation. */
 export function ForumPageContent() {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -1031,7 +1032,7 @@ export function ForumPageContent() {
                 Categories
               </button>
             )}
-            {isOwner && (
+            {canEdit && (
               <button
                 className="btn btn-ghost btn-sm gap-2"
                 onClick={() => setShowLabelManager((open) => !open)}
@@ -1277,7 +1278,7 @@ export function ForumPageContent() {
         </div>
       )}
 
-      {showLabelManager && isOwner && <ForumLabelManager labels={labels} />}
+      {showLabelManager && canEdit && <ForumLabelManager labels={labels} />}
 
       {!isLoading && !isError && posts.length > 0 && (
         <div className="mb-3 flex items-center justify-between gap-3 text-xs text-base-content/60">

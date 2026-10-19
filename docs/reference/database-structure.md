@@ -1107,7 +1107,7 @@ Custom, project-scoped forum labels, similar to GitHub issue labels. Each label 
 client must exist as a `ForumLabelDocument` for the project. Label keys stored on threads without a
 definition are omitted from API responses and dropped the next time the thread's labels are updated.
 
-New projects start with no labels; owners create them as needed.
+New projects start with no labels; owners and editors create them as needed.
 
 > **Warning:** `migrate-forum-status` is a one-time legacy migration. It collapses every label to
 > `review`/`anomaly` and keeps only one label per thread, so do not re-run it once custom labels are

@@ -3140,7 +3140,7 @@ const listForumLabels = (
     }
 
 /**
- * Create a forum label. Only project owners can manage labels; the key is server-generated.
+ * Create a forum label. Only project owners and editors can manage labels; the key is server-generated.
  * @summary Create a forum label
  */
 const createForumLabel = (
@@ -3155,7 +3155,7 @@ const createForumLabel = (
     }
 
 /**
- * Update a forum label. Only project owners can manage labels.
+ * Update a forum label. Only project owners and editors can manage labels.
  * @summary Update a forum label
  */
 const updateForumLabel = (
@@ -3171,7 +3171,7 @@ const updateForumLabel = (
     }
 
 /**
- * Delete a forum label. Only project owners can manage labels.
+ * Delete a forum label. Only project owners and editors can manage labels.
  * @summary Delete a forum label
  */
 const deleteForumLabel = (
