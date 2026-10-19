@@ -104,6 +104,10 @@ export default withMermaid(
               link: "/user-guide/projects-and-sharing",
             },
             {
+              text: "Roles and Permissions",
+              link: "/user-guide/permissions",
+            },
+            {
               text: "Dashboard",
               link: "/user-guide/dashboard",
             },

@@ -20,5 +20,6 @@ health, or understand how users interact with projects and workflows.
 - [Copilot](../user-guide/copilot.md): conversational analysis and verification boundaries.
 - [Authentication](../user-guide/authentication.md): users, admin role, password management.
 - [Projects and Sharing](../user-guide/projects-and-sharing.md): project membership and roles.
+- [Roles and Permissions](../user-guide/permissions.md): system and project capability tables.
 - [Dashboard](../user-guide/dashboard.md): metrics, notes, and filtering.
 - [Cryostats and Cool-downs](../user-guide/cryo.md): cryostat/cool-down data management.
