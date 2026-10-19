@@ -18,7 +18,7 @@ interface RunPickerProps {
 }
 
 /** One line per run: when, how, and what it reports. */
-export function runOptionLabel(run: EvaluationRunSummary): string {
+function runOptionLabel(run: EvaluationRunSummary): string {
   const parts = [
     formatDateTime(run.requested_at),
     triggerLabel(run.trigger),
