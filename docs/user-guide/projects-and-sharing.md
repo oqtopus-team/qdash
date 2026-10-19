@@ -18,9 +18,9 @@ projects and switch between them without copying data.
 | --- | --- |
 | Viewer | Inspect project data and download available results. |
 | Editor | Viewer access plus operational changes such as running workflows and editing calibration data. |
-| Owner | Editor access plus project settings, membership, categories, ownership transfer, and deletion. |
+| Owner | Editor access plus project settings, membership, forum categories and labels, and deletion. |
 
-Each project has one owner. Transfer ownership before the current owner leaves the project.
+Each project has one owner. Ask a system Admin to transfer ownership before the current owner leaves the project.
 
 ## Create and Configure Projects
 
@@ -29,8 +29,7 @@ a name that identifies the experiment, device, or team; add a description when t
 not obvious.
 
 Project owners manage an existing project from **Settings**. They can update its name and
-description, invite existing QDash users, change member roles, remove members, and transfer
-ownership. Assign viewer access for inspection and editor access only when the member needs to
+description, invite existing QDash users, change member roles, and remove members. Assign viewer access for inspection and editor access only when the member needs to
 change shared operational state.
 
 Deleting a project removes its project-scoped records and is not reversible through the UI.
