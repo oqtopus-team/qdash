@@ -158,7 +158,8 @@ def test_registered_task_saves_both_qubit_metrics() -> None:
         saver.save(task, cast("Any", execution), "0", backend, success=True)
     saved = repository.return_value.update_calib_data.call_args.kwargs
     assert saved["qid"] == "0" and saved["project_id"] == "proj-1"
-    assert saved["output_parameters"]["ef_frequency"].value == 4.72
+    assert saved["output_parameters"]["ef_frequency"]["value"] == 4.72
+    assert saved["output_parameters"]["control_frequency_ef"]["value"] == 4.72
     assert saved["output_parameters"]["anharmonicity"].value == pytest.approx(-0.281)
     metrics = load_metrics_config().qubit_metrics
     assert metrics["ef_frequency"].unit == "GHz" and metrics["ef_frequency"].scale == 1
