@@ -28,6 +28,7 @@ import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useForumAiReply } from "@/hooks/useForumAiReply";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { formatDateTimeCompact } from "@/lib/utils/datetime";
 
@@ -57,14 +58,22 @@ function formatCooldownPeriod(
   return `${start} - ${end}`;
 }
 
-function parseLabels(value: string | null): string[] {
-  return (value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 1);
+/** Splits comma-separated label params into a deduplicated list of trimmed keys. */
+export function parseLabels(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of values) {
+    for (const item of raw.split(",")) {
+      const trimmed = item.trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      result.push(trimmed);
+    }
+  }
+  return result;
 }
 
+/** Page for composing a new forum thread. */
 export function ForumNewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -83,7 +92,7 @@ export function ForumNewPage() {
   const [content, setContent] = useState(searchParams.get("content") ?? "");
   const [contentBlocks, setContentBlocks] = useState<Record<string, unknown>[]>([]);
   const [selectedLabels, setSelectedLabels] = useState<string[]>(() =>
-    parseLabels(searchParams.get("labels")),
+    parseLabels(searchParams.getAll("labels")),
   );
   const [targetDraftChipId, setTargetDraftChipId] = useState(searchParams.get("chip_id") ?? "");
   const [targetDraftType, setTargetDraftType] = useState<"qubit" | "coupling">(
@@ -156,9 +165,14 @@ export function ForumNewPage() {
   );
 
   const createMutation = useCreateForumPost();
+  const { labels } = useForumLabels();
 
+  /** Toggles a label in the new-thread selection. */
   const toggleLabel = (label: string) => {
-    setSelectedLabels((current) => (current.includes(label) ? [] : [label]));
+    setSelectedLabels((current) => {
+      if (current.includes(label)) return current.filter((item) => item !== label);
+      return [...current, label];
+    });
   };
 
   const clearTargetMetadata = () => {
@@ -408,7 +422,11 @@ export function ForumNewPage() {
               <Tag className="h-3.5 w-3.5" />
               Labels
             </div>
-            <ForumLabelPicker selectedLabels={selectedLabels} onToggle={toggleLabel} />
+            <ForumLabelPicker
+              labels={labels}
+              selectedLabels={selectedLabels}
+              onToggle={toggleLabel}
+            />
           </section>
 
           <section className="space-y-2">

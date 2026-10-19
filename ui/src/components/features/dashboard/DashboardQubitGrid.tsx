@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import { MessageSquare, StickyNote } from "lucide-react";
 
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
-import { forumMarkerClass } from "../forum/categories";
+import type { ForumLabelDefinition } from "../forum/categories";
+import { getForumMarkerStyle } from "../forum/ForumLabelBadge";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 
 import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
@@ -28,7 +29,9 @@ interface DashboardQubitGridProps {
   /** Set of qubit IDs that have a target-level note. */
   targetNotedQids?: Set<string>;
   /** Linked forum discussion label keyed by qubit ID. */
-  forumLinkedQids?: Record<string, string>;
+  forumLinkedQids?: Record<string, string | null>;
+  /** Forum label definitions used to resolve marker colors. */
+  forumLabels?: ForumLabelDefinition[];
   /** Linked forum discussion details keyed by qubit ID. */
   forumLinksByTarget?: Record<string, ForumLinkEntry[]>;
   /**
@@ -90,6 +93,7 @@ export function DashboardQubitGrid({
   notedQids,
   targetNotedQids,
   forumLinkedQids,
+  forumLabels,
   forumLinksByTarget,
   crossMetricNotedQids,
   notesByTarget,
@@ -198,7 +202,8 @@ export function DashboardQubitGrid({
         const hasNote = notedQids?.has(qid) ?? false;
         const hasTargetNote = targetNotedQids?.has(qid) ?? false;
         const forumLabel = forumLinkedQids?.[qid];
-        const hasForumDiscussion = !!forumLabel;
+        const hasForumDiscussion = forumLabel !== undefined;
+        const forumMarkerStyle = getForumMarkerStyle(forumLabel, forumLabels);
         const hasCrossMetricNote =
           !hasNote && !hasTargetNote && (crossMetricNotedQids?.has(qid) ?? false);
         const handleClick = () => onQubitClick?.(qid);
@@ -271,7 +276,8 @@ export function DashboardQubitGrid({
             )}
             {hasForumDiscussion && (
               <span
-                className={`absolute bottom-1 right-1 rounded-full p-0.5 shadow ${forumMarkerClass(forumLabel)}`}
+                className="absolute bottom-1 right-1 rounded-full p-0.5 shadow"
+                style={forumMarkerStyle}
                 title="Linked forum discussion"
               >
                 <MessageSquare className="h-3 w-3" />

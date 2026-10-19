@@ -1,8 +1,17 @@
 """Tests for forum router endpoints."""
 
+import re
+import secrets
+
+import pytest
+from bson import ObjectId
+from pymongo.errors import DuplicateKeyError
+from starlette.exceptions import HTTPException
+
 from qdash.api.services import forum_service
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.forum import ForumLabelDocument, ForumPostDocument
 from qdash.dbmodel.notification import NotificationDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
@@ -124,6 +133,7 @@ def test_forum_thread_labels_round_trip_filter_and_update(test_client, init_db):
     _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_project()
     headers = _headers("owner_token")
+    _create_named_labels(test_client, headers, "Review", "Anomaly")
 
     root = _create_post(test_client, headers, labels=["review"])
 
@@ -140,7 +150,11 @@ def test_forum_thread_labels_round_trip_filter_and_update(test_client, init_db):
     assert hidden.status_code == 200
     assert hidden.json()["total"] == 0
 
-    rejected = _create_post(test_client, headers, title="multi label", labels=["review", "anomaly"])
+    multi = _create_post(test_client, headers, title="multi label", labels=["review", "anomaly"])
+    assert multi.status_code == 201, multi.text
+    assert multi.json()["labels"] == ["review", "anomaly"]
+
+    rejected = _create_post(test_client, headers, title="unknown label", labels=["not-a-label"])
     assert rejected.status_code == 422
 
     updated = test_client.patch(
@@ -170,6 +184,220 @@ def test_forum_thread_labels_round_trip_filter_and_update(test_client, init_db):
         },
     )
     assert rejected_status_label.status_code == 422
+
+
+def test_list_forum_labels_is_empty_for_new_project(test_client, init_db):
+    """A new project starts with no labels."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    response = test_client.get("/forum/labels", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["labels"] == []
+
+
+def test_deleting_all_forum_labels_leaves_list_empty(test_client, init_db):
+    """Deleting every label does not bring any label back."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+    keys = _create_named_labels(test_client, headers, "Review", "Anomaly")
+
+    for key in keys:
+        assert test_client.delete(f"/forum/labels/{key}", headers=headers).status_code == 200
+
+    response = test_client.get("/forum/labels", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["labels"] == []
+
+
+def test_owner_can_create_update_and_delete_forum_label(test_client, init_db):
+    """Project owners can manage custom forum labels."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = test_client.post(
+        "/forum/labels",
+        headers=headers,
+        json={"name": "Hardware", "color": "#ABCDEF"},
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["key"] == "hardware"
+    assert body["color"] == "#abcdef"
+    assert "is_system" not in body
+
+    duplicate = test_client.post(
+        "/forum/labels",
+        headers=headers,
+        json={"name": "hardware", "color": "#111111"},
+    )
+    assert duplicate.status_code == 409
+
+    updated = test_client.patch(
+        "/forum/labels/hardware",
+        headers=headers,
+        json={"name": "Hardware Issue", "color": "#222222"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["name"] == "Hardware Issue"
+    assert updated.json()["color"] == "#222222"
+
+    deleted = test_client.delete("/forum/labels/hardware", headers=headers)
+    assert deleted.status_code == 200
+
+    listed = test_client.get("/forum/labels", headers=headers)
+    assert "hardware" not in {item["key"] for item in listed.json()["labels"]}
+
+
+def test_update_forum_label_rejects_case_insensitive_duplicate_name(test_client, init_db):
+    """Renaming a label to another label's name, ignoring case, is rejected with 409."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+    _create_named_labels(test_client, headers, "Review")
+
+    created = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Hardware", "color": "#111111"}
+    )
+    assert created.status_code == 201, created.text
+
+    response = test_client.patch("/forum/labels/hardware", headers=headers, json={"name": "REVIEW"})
+    assert response.status_code == 409
+
+
+def test_update_forum_label_allows_case_variant_of_own_name(test_client, init_db):
+    """Renaming a label to a different casing of its own name succeeds."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Hardware", "color": "#111111"}
+    )
+    assert created.status_code == 201, created.text
+
+    response = test_client.patch(
+        "/forum/labels/hardware", headers=headers, json={"name": "HARDWARE"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["name"] == "HARDWARE"
+
+
+def test_forum_label_rejects_whitespace_only_name(test_client, init_db):
+    """Whitespace-only label names are rejected on create and update."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    blank = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "   ", "color": "#111111"}
+    )
+    assert blank.status_code == 422
+
+    created = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "  Hardware  ", "color": "#111111"}
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["name"] == "Hardware"
+
+    renamed = test_client.patch("/forum/labels/hardware", headers=headers, json={"name": "   "})
+    assert renamed.status_code == 422
+
+
+def test_create_forum_label_with_japanese_only_name_gets_random_key(test_client, init_db):
+    """A name with no usable ASCII characters falls back to a random ``label-`` key."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = test_client.post(
+        "/forum/labels",
+        headers=headers,
+        json={"name": "異常", "color": "#123456"},
+    )
+
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["name"] == "異常"
+    assert re.fullmatch(r"label-[a-z0-9]{6}", body["key"])
+
+
+def test_create_forum_label_ignores_client_supplied_key(test_client, init_db):
+    """A ``key`` sent in the request body is ignored; it is always derived from the name."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = test_client.post(
+        "/forum/labels",
+        headers=headers,
+        json={"key": "totally-custom", "name": "Firmware", "color": "#123456"},
+    )
+
+    assert created.status_code == 201, created.text
+    assert created.json()["key"] == "firmware"
+
+
+def test_create_forum_label_slug_collision_gets_numeric_suffix(test_client, init_db):
+    """A name whose slug collides with an existing label's key gets a ``-2`` suffix."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    first = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Bug?", "color": "#111111"}
+    )
+    assert first.status_code == 201, first.text
+    assert first.json()["key"] == "bug"
+
+    second = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Bug!", "color": "#222222"}
+    )
+    assert second.status_code == 201, second.text
+    assert second.json()["key"] == "bug-2"
+
+
+def test_editor_and_viewer_cannot_create_forum_label(test_client, init_db):
+    """Only project owners can manage forum labels."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_user("editor", "editor_token", ProjectRole.EDITOR)
+    _create_user("viewer", "viewer_token", ProjectRole.VIEWER)
+    _create_project()
+
+    for token in ("editor_token", "viewer_token"):
+        response = test_client.post(
+            "/forum/labels",
+            headers=_headers(token),
+            json={"name": "Hardware", "color": "#123456"},
+        )
+        assert response.status_code == 403
+
+
+def test_delete_forum_label_removes_it_from_posts(test_client, init_db):
+    """Deleting a label pulls it from every thread that used it."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    headers = _headers("owner_token")
+
+    created = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Flaky", "color": "#654321"}
+    )
+    assert created.status_code == 201
+    _create_named_labels(test_client, headers, "Review")
+
+    root = _create_post(test_client, headers, labels=["flaky", "review"])
+    assert root.status_code == 201, root.text
+    root_id = root.json()["id"]
+
+    deleted = test_client.delete("/forum/labels/flaky", headers=headers)
+    assert deleted.status_code == 200
+
+    fetched = test_client.get(f"/forum/posts/{root_id}", headers=headers)
+    assert fetched.json()["labels"] == ["review"]
 
 
 def test_forum_thread_assignee_round_trip_update_and_reply_inherit(test_client, init_db):
@@ -545,6 +773,7 @@ def test_editor_can_update_forum_thread_metadata(test_client, init_db):
     _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_user("editor", "editor_token", ProjectRole.EDITOR)
     _create_project()
+    _create_named_labels(test_client, _headers("owner_token"), "Anomaly")
 
     root = _create_post(test_client, _headers("owner_token"))
     root_id = root.json()["id"]
@@ -932,3 +1161,145 @@ def test_forum_thread_about_a_task_result(test_client, init_db):
     )
     assert explicit.status_code == 201, explicit.text
     assert (explicit.json()["chip_id"], explicit.json()["target_id"]) == ("chip-9", "0")
+
+
+def _setup_owner():
+    """Create the owner and project, returning the owner's headers."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+    return _headers("owner_token")
+
+
+def _create_named_labels(test_client, headers, *names):
+    """Create one label per name as the owner and return their keys."""
+    keys = []
+    for name in names:
+        response = test_client.post(
+            "/forum/labels", headers=headers, json={"name": name, "color": "#123456"}
+        )
+        assert response.status_code == 201, response.text
+        keys.append(response.json()["key"])
+    return keys
+
+
+def test_make_label_key_random_exhaustion_raises(monkeypatch):
+    """A non-ASCII name whose random keys always collide fails with a 500."""
+    monkeypatch.setattr(secrets, "token_hex", lambda _n: "abcdef")
+    with pytest.raises(HTTPException) as exc_info:
+        forum_service.ForumService._make_label_key("日本語", {"label-abcdef"})
+    assert exc_info.value.status_code == 500
+
+
+def test_make_label_key_suffix_exhaustion_raises():
+    """A slug whose numeric suffixes are all taken fails with a 500."""
+    existing = {"dup", *(f"dup-{n}" for n in range(2, 1000))}
+    with pytest.raises(HTTPException) as exc_info:
+        forum_service.ForumService._make_label_key("dup", existing)
+    assert exc_info.value.status_code == 500
+
+
+def test_create_forum_label_insert_race_returns_conflict(test_client, init_db, monkeypatch):
+    """A duplicate-key error on insert is reported as a 409."""
+    headers = _setup_owner()
+
+    def _raise(*_args, **_kwargs):
+        """Simulate a concurrent insert of the same label."""
+        raise DuplicateKeyError("dup")
+
+    monkeypatch.setattr(ForumLabelDocument, "insert", _raise)
+    response = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Racy", "color": "#111111"}
+    )
+    assert response.status_code == 409
+
+
+def test_update_and_delete_unknown_forum_label_return_404(test_client, init_db):
+    """Updating or deleting a missing label returns 404."""
+    headers = _setup_owner()
+
+    patched = test_client.patch("/forum/labels/missing", headers=headers, json={"name": "X"})
+    assert patched.status_code == 404
+    deleted = test_client.delete("/forum/labels/missing", headers=headers)
+    assert deleted.status_code == 404
+
+
+def test_update_forum_label_description_round_trips(test_client, init_db):
+    """Label descriptions can be updated."""
+    headers = _setup_owner()
+    _create_named_labels(test_client, headers, "Review")
+
+    updated = test_client.patch(
+        "/forum/labels/review", headers=headers, json={"description": "Needs a look"}
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["description"] == "Needs a look"
+    listed = test_client.get("/forum/labels", headers=headers)
+    review = next(item for item in listed.json()["labels"] if item["key"] == "review")
+    assert review["description"] == "Needs a look"
+
+
+def test_undefined_stored_label_is_omitted_and_dropped_on_update(test_client, init_db):
+    """A stored label key without a definition is hidden and replaced on the next update."""
+    headers = _setup_owner()
+    root = _create_post(test_client, headers)
+    assert root.status_code == 201, root.text
+    root_id = root.json()["id"]
+    ForumPostDocument.find_one({"_id": ObjectId(root_id)}).update(
+        {"$set": {"labels": ["review"]}}
+    ).run()
+
+    fetched = test_client.get(f"/forum/posts/{root_id}", headers=headers)
+    assert fetched.json()["labels"] == []
+
+    (key,) = _create_named_labels(test_client, headers, "Anomaly")
+    updated = test_client.patch(
+        f"/forum/posts/{root_id}",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": root.json()["title"],
+            "content": root.json()["content"],
+            "labels": [key],
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["labels"] == [key]
+
+
+def test_list_posts_and_replies_omit_undefined_stored_labels(test_client, init_db):
+    """Listing posts and replies keeps defined label keys and omits undefined ones."""
+    headers = _setup_owner()
+    (key,) = _create_named_labels(test_client, headers, "Anomaly")
+    root = _create_post(test_client, headers)
+    root_id = root.json()["id"]
+    reply = _create_post(test_client, headers, title=None, content="Reply", parent_id=root_id)
+    for post_id in (root_id, reply.json()["id"]):
+        ForumPostDocument.find_one({"_id": ObjectId(post_id)}).update(
+            {"$set": {"labels": ["review", key]}}
+        ).run()
+
+    posts = test_client.get("/forum/posts", headers=headers)
+    assert [post["labels"] for post in posts.json()["posts"]] == [[key]]
+    replies = test_client.get(f"/forum/posts/{root_id}/replies", headers=headers)
+    assert [post["labels"] for post in replies.json()] == [[key]]
+
+
+def test_thread_with_labels_can_be_updated_unchanged(test_client, init_db):
+    """A thread carrying labels accepts its own labels back in an update."""
+    headers = _setup_owner()
+    _create_named_labels(test_client, headers, "Review", "Anomaly")
+    root = _create_post(test_client, headers, labels=["review", "anomaly"])
+    assert root.status_code == 201, root.text
+
+    updated = test_client.patch(
+        f"/forum/posts/{root.json()['id']}",
+        headers=headers,
+        json={
+            "category": "qubit",
+            "title": root.json()["title"],
+            "content": root.json()["content"],
+            "labels": ["review", "anomaly"],
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["labels"] == ["review", "anomaly"]
