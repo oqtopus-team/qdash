@@ -9,7 +9,7 @@ title = "QDash Betterleaks Configuration"
 # Path-level exemptions (was: Gitleaks `[[allowlists]] paths`).
 # `prefilter` runs *before* any regex and only sees file/commit metadata, so it
 # skips whole files cheaply. These are all generation-owned or fixed-sample
-# files; see docs/development/credential-scan.md for why each is safe.
+# files; see docs/developer-guide/conventions/credential-scan.md for why each is safe.
 # ---------------------------------------------------------------------------
 prefilter = '''
 matchesAny(attributes[?"path"].orValue(""), [

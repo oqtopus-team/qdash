@@ -17,22 +17,23 @@ QDash is a web platform for managing and monitoring qubit calibration workflows.
 - Workflow engine: `src/qdash/workflow/` uses Prefect 3 and qubex.
 - Shared data/model code lives under `src/qdash/common`, `src/qdash/datamodel`, `src/qdash/dbmodel`, and repository/service modules.
 
-Read `docs/getting-started/architecture.md` and the more specific docs under `docs/development/` before making broad changes.
+Read `docs/developer-guide/architecture.md` and the more specific docs under `docs/developer-guide/` before making broad changes.
 
 ## High-Value References
 
-- Setup: `docs/development/setup.md`
-- Development flow and commits: `docs/development/development-flow.md`
-- API design: `docs/development/api/design.md`
-- API testing: `docs/development/api/testing.md`
-- UI guidelines: `docs/development/ui/guidelines.md`
-- UI architecture: `docs/development/ui/architecture.md`
-- UI testing: `docs/development/ui/testing.md`
-- UI design policy: `docs/development/ui/design-policy.md`
-- Workflow quickstart: `docs/development/workflow/quickstart.md`
-- Workflow architecture: `docs/development/workflow/engine-architecture.md`
-- Workflow testing: `docs/development/workflow/testing.md`
-- Documentation guidelines: `docs/development/docs-guidelines.md`
+- Setup: `docs/developer-guide/setup.md`
+- Development flow and commits: `docs/developer-guide/development-flow.md`
+- API design: `docs/developer-guide/api/design.md`
+- API testing: `docs/developer-guide/api/testing.md`
+- API endpoint testing: `docs/developer-guide/api/testing-endpoints.md`
+- UI guidelines: `docs/developer-guide/ui/guidelines.md`
+- UI architecture: `docs/developer-guide/ui/architecture.md`
+- UI testing: `docs/developer-guide/ui/testing.md`
+- UI design policy: `docs/developer-guide/ui/design-policy.md`
+- Workflow quickstart: `docs/developer-guide/workflow/quickstart.md`
+- Workflow architecture: `docs/developer-guide/workflow/engine-architecture.md`
+- Workflow testing: `docs/developer-guide/workflow/testing.md`
+- Documentation guidelines: `docs/developer-guide/docs-guidelines.md`
 - Database structure: `docs/reference/database-structure.md`
 - Database indexes: `docs/reference/database-indexes.md`
 
@@ -95,11 +96,11 @@ Prefer focused tests for narrow changes, then broader checks when touching share
 - Do not treat Radix as a wholesale DaisyUI replacement. Prefer DaisyUI for buttons, cards, inputs, badges, tables, and semantic colors; add a headless primitive only when the interaction behavior requires it.
 - Use TanStack Query for server state and `nuqs` for URL query state when matching existing patterns.
 - Use Lucide React icons where an icon is appropriate.
-- Follow `docs/development/ui/guidelines.md` and `docs/development/ui/design-policy.md` for implementation and visual design details.
+- Follow `docs/developer-guide/ui/guidelines.md` and `docs/developer-guide/ui/design-policy.md` for implementation and visual design details.
 
 ## Documentation Conventions
 
-- Follow `docs/development/docs-guidelines.md`.
+- Follow `docs/developer-guide/docs-guidelines.md`.
 - Start docs with a direct context sentence.
 - Do not add manual tables of contents, summary sections, empty checklists, future-enhancement sections, or emoji.
 - Link relevant docs inline instead of adding broad related-document lists.

@@ -99,7 +99,7 @@ When **Save calibrated outputs to DB** is off, calculated outputs remain visible
 When it is on, successful output parameters update the calibration database and are synchronized to the backend where supported. Validation failures do not normally update backend parameters. A force-update option used by some re-execution paths can allow backend updates after failed validation and should be used deliberately.
 
 A frequency result can update both a measured device parameter and its operational drive setting.
-The [task frequency matrix](../development/workflow/frequency-parameter-policy.md#task-frequency-matrix)
+The [task frequency matrix](../developer-guide/workflow/frequency-parameter-policy.md#task-frequency-matrix)
 lists the input precedence and database destinations for each frequency calibration task.
 
 ## Target selection

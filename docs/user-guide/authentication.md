@@ -39,7 +39,7 @@ reset.
 
 ## API Authentication
 
-Automation should use a saved [QDash Client](./qdash-client.md) profile or its documented
+Automation should use a saved [QDash Client](../reference/clients/python.md) profile or its documented
 `QDASH_*` environment variables. The client handles authentication and project headers without
 placing tokens directly in shell history.
 
