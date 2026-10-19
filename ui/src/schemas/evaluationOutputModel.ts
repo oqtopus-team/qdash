@@ -5,9 +5,13 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { EvaluationCallModel } from './evaluationCallModel';
+import type { EvaluationOutputModelAttempts } from './evaluationOutputModelAttempts';
 import type { EvaluationOutputModelDiagnosis } from './evaluationOutputModelDiagnosis';
 import type { EvaluationOutputModelModel } from './evaluationOutputModelModel';
 import type { EvaluationOutputModelRaw } from './evaluationOutputModelRaw';
+import type { EvaluationOutputModelStopReason } from './evaluationOutputModelStopReason';
+import type { EvaluationOutputModelStructured } from './evaluationOutputModelStructured';
 import type { EvaluationOutputModelUsage } from './evaluationOutputModelUsage';
 
 /**
@@ -20,11 +24,23 @@ export interface EvaluationOutputModel {
   fallback?: boolean;
   /** The parsed JSON diagnosis, when the answer was JSON */
   diagnosis?: EvaluationOutputModelDiagnosis;
-  /** The answer text when it was not JSON */
+  /** The answer text when it was not JSON, or not all of the diagnosis */
   raw?: EvaluationOutputModelRaw;
   /** Whether the answer parsed as the JSON object */
   parsed?: boolean;
-  /** Wall time of the model call */
+  /** Whether the diagnosis carries all six keys (derived) */
+  complete?: boolean;
+  /** Diagnosis keys the parsed answer lacks (derived) */
+  missing_keys?: string[];
+  /** Model calls made for the answer: 1, or 2 after an incomplete one */
+  attempts?: EvaluationOutputModelAttempts;
+  /** Whether decoding was constrained to the diagnosis schema */
+  structured?: EvaluationOutputModelStructured;
+  /** Why the model stopped, as pi reports it */
+  stop_reason?: EvaluationOutputModelStopReason;
+  /** Every model call made for the answer, in order, when the evaluator reports them */
+  calls?: EvaluationCallModel[];
+  /** Wall time of the evaluation call, every model call included */
   duration_ms?: number;
   /** Token usage, as pi reports it */
   usage?: EvaluationOutputModelUsage;

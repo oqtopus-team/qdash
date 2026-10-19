@@ -7,15 +7,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 
-import {
-  ArrowRightLeft,
-  ChevronRight,
-  GitBranch,
-  History,
-  ListTodo,
-  FileText,
-  Bot,
-} from "lucide-react";
+import { ArrowRightLeft, ChevronRight, GitBranch, History, ListTodo, FileText } from "lucide-react";
 
 import { useGetCouplingMetricHistory } from "@/client/metrics/metrics";
 import { useGetExecution } from "@/client/execution/execution";
@@ -30,6 +22,8 @@ import { useUpdateCalibrationParameters } from "@/client/calibration/calibration
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
+import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
 import type { TaskChatContext } from "@/types/copilotChat";
@@ -58,6 +52,7 @@ function formatMetricValue(value: number | null, unit: string, precision: number
   return displayValue.toFixed(precision);
 }
 
+/** History of a coupling metric, with the selected execution's task details. */
 export function CouplingMetricHistoryModal({
   chipId,
   couplingId,
@@ -599,13 +594,15 @@ export function CouplingMetricHistoryModal({
               View Provenance Lineage
             </Link>
             {chatContext && (
-              <button
-                onClick={() => openMiniChat(chatContext)}
-                className="btn btn-xs btn-primary gap-1"
-              >
-                <Bot className="h-3 w-3" />
-                Ask AI
-              </button>
+              <AskAiButton
+                taskId={chatContext.taskId}
+                chipId={chatContext.chipId}
+                taskName={chatContext.taskName}
+                qid={chatContext.qid}
+                chatContext={chatContext}
+                onChat={() => openMiniChat(chatContext)}
+                size="xs"
+              />
             )}
             {selectedHistoryItem?.task_id && (
               <TaskResultExcludeButton
@@ -667,6 +664,17 @@ export function CouplingMetricHistoryModal({
       )}
 
       {/* Forum threads about this result */}
+      {/* AI evaluations of this result, requested the same way as from the chip page */}
+      {selectedTask?.task_id && (
+        <TaskResultEvaluations
+          taskId={selectedTask.task_id}
+          chipId={chipId}
+          taskName={selectedTask.name || undefined}
+          qid={activeCouplingId}
+          onChat={chatContext ? () => openMiniChat(chatContext) : undefined}
+        />
+      )}
+
       {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
     </div>
   );

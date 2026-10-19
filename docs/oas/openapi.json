@@ -19333,6 +19333,53 @@
         "title": "EvaluateCandidateGateRequest",
         "description": "Evaluate one numeric candidate against session-owned parameter bounds."
       },
+      "EvaluationCallModel": {
+        "properties": {
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms",
+            "description": "Wall time of the call"
+          },
+          "stop_reason": {
+            "type": "string",
+            "title": "Stop Reason",
+            "description": "Why the model stopped, as pi reports it"
+          },
+          "structured": {
+            "type": "boolean",
+            "title": "Structured",
+            "description": "Whether the call was constrained to the diagnosis schema",
+            "default": false
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens",
+            "description": "Output tokens of the call"
+          },
+          "missing_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Keys",
+            "description": "Diagnosis keys the call's answer lacked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "duration_ms",
+          "stop_reason"
+        ],
+        "title": "EvaluationCallModel",
+        "description": "One model call made for an answer: how long it took and how it ended."
+      },
       "EvaluationExampleModel": {
         "properties": {
           "id": {
@@ -19692,7 +19739,7 @@
               }
             ],
             "title": "Raw",
-            "description": "The answer text when it was not JSON"
+            "description": "The answer text when it was not JSON, or not all of the diagnosis"
           },
           "parsed": {
             "type": "boolean",
@@ -19700,10 +19747,68 @@
             "description": "Whether the answer parsed as the JSON object",
             "default": false
           },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete",
+            "description": "Whether the diagnosis carries all six keys (derived)",
+            "default": false
+          },
+          "missing_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Keys",
+            "description": "Diagnosis keys the parsed answer lacks (derived)"
+          },
+          "attempts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempts",
+            "description": "Model calls made for the answer: 1, or 2 after an incomplete one"
+          },
+          "structured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured",
+            "description": "Whether decoding was constrained to the diagnosis schema"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason",
+            "description": "Why the model stopped, as pi reports it"
+          },
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationCallModel"
+            },
+            "type": "array",
+            "title": "Calls",
+            "description": "Every model call made for the answer, in order, when the evaluator reports them"
+          },
           "duration_ms": {
             "type": "integer",
             "title": "Duration Ms",
-            "description": "Wall time of the model call",
+            "description": "Wall time of the evaluation call, every model call included",
             "default": 0
           },
           "usage": {
@@ -19904,6 +20009,28 @@
             "title": "Parsed Count",
             "description": "Completed evaluations whose answer was JSON"
           },
+          "complete_count": {
+            "type": "integer",
+            "title": "Complete Count",
+            "description": "Completed evaluations whose diagnosis carries all six keys"
+          },
+          "elapsed_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Ms",
+            "description": "Wall time from the request to the run's completion"
+          },
+          "duration_ms_total": {
+            "type": "integer",
+            "title": "Duration Ms Total",
+            "description": "Wall time of the completed evaluations' model calls, added up"
+          },
           "success_count": {
             "type": "integer",
             "title": "Success Count",
@@ -19957,6 +20084,8 @@
           "failed_count",
           "pending_count",
           "parsed_count",
+          "complete_count",
+          "duration_ms_total",
           "success_count",
           "agree_count",
           "disagree_count"

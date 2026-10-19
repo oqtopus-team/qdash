@@ -16,6 +16,14 @@ vi.mock("nuqs", () => ({
   useQueryState: (key: "a" | "b") => [query[key], setQuery],
 }));
 
+vi.mock("@/components/ui/PierreDiffViewer", () => ({
+  PierreDiffViewer: ({ oldContent, newContent }: { oldContent: string; newContent: string }) => (
+    <div data-testid="prompt-diff-viewer">
+      {oldContent} → {newContent}
+    </div>
+  ),
+}));
+
 vi.mock("@/components/charts/TaskFigure", () => ({
   TaskFigure: ({ path }: { path: string }) => <div data-testid="figure">{path}</div>,
 }));
@@ -33,6 +41,7 @@ vi.mock("@/client/evaluation/evaluation", () => ({
   getListEvaluationsQueryKey: (params: unknown) => ["/evaluations", params],
 }));
 
+/** Builds a run summary for the compare page. */
 function summary(
   runId: string,
   override: Partial<EvaluationRunSummary> = {},
@@ -53,6 +62,8 @@ function summary(
     failed_count: 0,
     pending_count: 0,
     parsed_count: 2,
+    complete_count: 2,
+    duration_ms_total: 60_000,
     success_count: 2,
     agree_count: 0,
     disagree_count: 0,
@@ -62,6 +73,7 @@ function summary(
   };
 }
 
+/** Builds an evaluation item of a run. */
 function item(runId: string, qid: string, diagnosis: Record<string, unknown>): EvaluationItem {
   return {
     evaluation_id: `ev_${runId}_${qid}`,
@@ -75,11 +87,19 @@ function item(runId: string, qid: string, diagnosis: Record<string, unknown>): E
     status: "completed",
     requested_at: "2026-10-11T07:00:00Z",
     completed_at: "2026-10-11T07:00:30Z",
-    input: { context: "Task: CheckT1", prompt: "Reference ...", figures: [] },
+    input: {
+      context: "Task: CheckT1",
+      prompt: `Reference for ${runId}\nTask: CheckT1 ${qid}`,
+      system_prompt: "SYSTEM",
+      knowledge_chars: runId === "evr_a" ? 1534 : 1600,
+      knowledge_sha256: runId === "evr_a" ? "aaaa1111bbbb" : "cccc2222dddd",
+      figures: [],
+    },
     output: { model: "vllm/ising", fallback: false, diagnosis, parsed: true, duration_ms: 30_000 },
   };
 }
 
+/** Renders the compare page. */
 function renderPage() {
   const client = new QueryClient();
   return render(
@@ -118,10 +138,16 @@ describe("EvaluationComparePageContent", () => {
 
     expect(screen.getByText("Compare runs · CheckT1 · 64Qv1")).toBeTruthy();
     const examples = screen.getByTestId("setting-examples");
-    expect(within(examples).getByText("off")).toBeTruthy();
-    expect(within(examples).getByText("shown")).toBeTruthy();
+    expect(within(examples).getByText("Zero-shot")).toBeTruthy();
+    expect(within(examples).getByText("In-context")).toBeTruthy();
     expect(examples.className).toContain("bg-warning");
     expect(screen.getByTestId("setting-chip").className).not.toContain("bg-warning");
+    // The reference each run's records carry is a setting too; here it was edited in between.
+    const reference = screen.getByTestId("setting-reference");
+    expect(within(reference).getByText("1534 chars · aaaa1111")).toBeTruthy();
+    expect(within(reference).getByText("1600 chars · cccc2222")).toBeTruthy();
+    expect(reference.className).toContain("bg-warning");
+    expect(screen.getByTestId("setting-system_prompt").className).not.toContain("bg-warning");
 
     const table = screen.getByTestId("compare-table");
     expect(within(table).getByText("same")).toBeTruthy();
@@ -137,6 +163,16 @@ describe("EvaluationComparePageContent", () => {
     fireEvent.click(screen.getByTestId("compare-row-Q2"));
     expect(screen.getAllByTestId("evaluation-verdict")).toHaveLength(2);
     expect(screen.getAllByTestId("figure")).toHaveLength(1);
+
+    // The two prompts open as a diff, A against B.
+    const diff = screen.getByTestId("prompt-diff");
+    expect(within(diff).getByText("differs")).toBeTruthy();
+    expect(screen.queryByTestId("prompt-diff-viewer")).toBeNull();
+    (diff as HTMLDetailsElement).open = true;
+    fireEvent(diff, new Event("toggle"));
+    expect(screen.getByTestId("prompt-diff-viewer").textContent).toContain(
+      "Reference for evr_a\nTask: CheckT1 Q2 → Reference for evr_b\nTask: CheckT1 Q2",
+    );
   });
 
   it("asks for the other run when only one is in the URL", () => {

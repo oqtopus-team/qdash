@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Bot, ChevronRight, FileText, GitBranch, History, ListTodo } from "lucide-react";
+import { ChevronRight, FileText, GitBranch, History, ListTodo } from "lucide-react";
 
 import type { Task } from "@/schemas";
 
@@ -13,6 +13,8 @@ import {
   type ExecutionHistoryMobileTab,
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
+import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -54,6 +56,7 @@ function buildProvenanceUrl(parameterName: string, qidValue: string) {
   return `/provenance?tab=lineage&parameter=${parameter}&qid=${encodedQid}`;
 }
 
+/** Details of one execution's tasks for a qubit or coupling. */
 export function ExecutionTaskDetailModal({
   isOpen,
   chipId,
@@ -311,13 +314,15 @@ export function ExecutionTaskDetailModal({
               View Provenance Lineage
             </Link>
             {chatContext && (
-              <button
-                onClick={() => openMiniChat(chatContext)}
-                className="btn btn-xs btn-primary gap-1"
-              >
-                <Bot className="h-3 w-3" />
-                Ask AI
-              </button>
+              <AskAiButton
+                taskId={chatContext.taskId}
+                chipId={chatContext.chipId}
+                taskName={chatContext.taskName}
+                qid={chatContext.qid}
+                chatContext={chatContext}
+                onChat={() => openMiniChat(chatContext)}
+                size="xs"
+              />
             )}
           </div>
         </div>
@@ -350,6 +355,17 @@ export function ExecutionTaskDetailModal({
             />
           )}
         </div>
+      )}
+
+      {/* AI evaluations of this result, requested the same way as from the chip page */}
+      {selectedTask?.task_id && (
+        <TaskResultEvaluations
+          taskId={selectedTask.task_id}
+          chipId={chipId}
+          taskName={selectedTask.name || undefined}
+          qid={qid}
+          onChat={chatContext ? () => openMiniChat(chatContext) : undefined}
+        />
       )}
 
       {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}

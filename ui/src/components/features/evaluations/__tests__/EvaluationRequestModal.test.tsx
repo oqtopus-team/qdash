@@ -85,7 +85,13 @@ describe("EvaluationRequestModal", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(screen.getByLabelText(/Planner/));
+    fireEvent.click(screen.getByLabelText(/Via Copilot/));
+    fireEvent.click(screen.getByLabelText(/In-context/));
+    expect(screen.getByTestId("request-summary").textContent).toContain("Via Copilot · In-context");
+    fireEvent.click(screen.getByLabelText(/Zero-shot/));
+    expect(screen.getByTestId("request-summary").textContent).toContain(
+      "all qubits on 64Qv3 with Via Copilot · Zero-shot",
+    );
     fireEvent.change(screen.getByPlaceholderText(/Is the decay fit trustworthy/), {
       target: { value: "Is the fit trustworthy?" },
     });
@@ -103,12 +109,58 @@ describe("EvaluationRequestModal", () => {
       },
     });
     expect(toast.success).toHaveBeenCalledWith(
-      "Evaluation started: 2 task results queued",
+      "Evaluation started (Via Copilot · Zero-shot): 2 task results queued",
       expect.objectContaining({ description: "1 skipped (no evaluable result)" }),
     );
     const options = toast.success.mock.calls[0][1] as { action: { onClick: () => void } };
     options.action.onClick();
     expect(push).toHaveBeenCalledWith("/evaluations/evr_9");
+  });
+
+  it("offers the chat as a third way to ask only when the surface can open one", () => {
+    const { unmount } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <EvaluationRequestModal
+          isOpen
+          onClose={vi.fn()}
+          scope={scope}
+          scopeLabel="all qubits on 64Qv3"
+        />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText("Request AI evaluation")).toBeTruthy();
+    expect(screen.getByText("Who prepares the prompt")).toBeTruthy();
+    expect(screen.queryByText("What to do")).toBeNull();
+    expect(screen.queryByLabelText(/Chat with Copilot/)).toBeNull();
+    unmount();
+
+    const onChat = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <EvaluationRequestModal
+          isOpen
+          onClose={onClose}
+          scope={{ ...scope, trigger: "single", taskIds: ["t1"] }}
+          scopeLabel="CheckRabi · Q05"
+          onChat={onChat}
+        />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText("What to do")).toBeTruthy();
+    expect(screen.getByText("Who prepares the prompt")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText(/Chat with Copilot/));
+    expect(screen.queryByText("Who prepares the prompt")).toBeNull();
+    expect(screen.getByTestId("request-summary").textContent).toContain(
+      "Will open a chat about CheckRabi · Q05",
+    );
+    // Evaluation-only settings step aside; the question is typed in the chat.
+    expect(screen.queryByLabelText(/In-context/)).toBeNull();
+    expect(screen.queryByPlaceholderText(/Is the decay fit trustworthy/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Open chat/ }));
+    expect(onChat).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+    expect(mutateAsync).not.toHaveBeenCalled();
   });
 
   it("reports the API's reason when nothing could be queued", async () => {

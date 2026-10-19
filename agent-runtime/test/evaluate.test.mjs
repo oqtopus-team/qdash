@@ -337,3 +337,45 @@ test("the planner outcome is the last qcal_evaluate result and the tools called"
 
   assert.deepEqual(plannerOutcome([]), { details: undefined, usage: undefined, error: undefined, toolCalls: [] });
 });
+
+test("an incomplete answer keeps its text, the keys it lacks, and how it was asked", () => {
+  const details = {
+    model: { provider: "vllm", modelId: "nvidia/Ising-Calibration" },
+    diagnosis: { technical_description: "only" },
+    raw: '{"technical_description": "only"}',
+    missing_keys: ["experimental_conclusion", "experimental_significance", "fit_quality", "parameter_extraction", "success"],
+    attempts: 2,
+    structured: true,
+    stop_reason: "stop",
+    calls: [
+      { duration_ms: 195000, stop_reason: "length", structured: true, output_tokens: 2000, missing_keys: ["success"] },
+      { duration_ms: 30000, stop_reason: "stop", structured: true, output_tokens: 300, missing_keys: [] },
+      { bogus: true },
+    ],
+    prompt: "p",
+  };
+  const record = recordFromDetails("task-1", details, { mode: "direct", text: "ignored" });
+  assert.equal(record.evaluation.calls.length, 2);
+  assert.deepEqual(record.evaluation.calls[0], {
+    duration_ms: 195000,
+    stop_reason: "length",
+    structured: true,
+    output_tokens: 2000,
+    missing_keys: ["success"],
+  });
+  assert.deepEqual(record.evaluation.diagnosis, { technical_description: "only" });
+  assert.equal(record.evaluation.raw, '{"technical_description": "only"}');
+  assert.equal(record.evaluation.missing_keys.length, 5);
+  assert.equal(record.evaluation.attempts, 2);
+  assert.equal(record.evaluation.structured, true);
+  assert.equal(record.evaluation.stop_reason, "stop");
+
+  // An older evaluator reports none of this; a complete answer has no text to keep.
+  const old = recordFromDetails("task-1", { diagnosis: { fit_quality: "good", success: true } }, { mode: "direct", text: "{}" });
+  assert.equal(old.evaluation.raw, null);
+  assert.deepEqual(old.evaluation.missing_keys, []);
+  assert.equal(old.evaluation.attempts, null);
+  assert.equal(old.evaluation.structured, null);
+  assert.equal(old.evaluation.stop_reason, null);
+  assert.deepEqual(old.evaluation.calls, []);
+});

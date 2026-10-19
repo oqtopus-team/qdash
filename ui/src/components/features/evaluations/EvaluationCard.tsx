@@ -27,6 +27,8 @@ import type { EvaluationItem } from "@/schemas";
 
 import {
   DIAGNOSIS_SECTIONS,
+  answerShortfall,
+  callLabel,
   diagnosisOf,
   diagnosisSuccess,
   diagnosisText,
@@ -35,6 +37,7 @@ import {
   fitQualityBadgeClass,
   formatDuration,
 } from "./evaluationDisplay";
+import { promptSummary } from "./evaluationPrompt";
 
 interface EvaluationCardProps {
   item: EvaluationItem;
@@ -147,6 +150,7 @@ function Verdict({ item }: { item: EvaluationItem }) {
   );
 }
 
+/** One evaluation record: its verdict, diagnosis, figure and prompt. */
 export function EvaluationCard({
   item,
   showFigure = true,
@@ -162,6 +166,8 @@ export function EvaluationCard({
   const jsonFigurePath = item.json_figure_path?.[0];
   const evaluator = evaluatorLabel(item.evaluator);
   const duration = formatDuration(output?.duration_ms);
+  const shortfall = answerShortfall(output);
+  const calls = output?.calls ?? [];
   // The full input loads its figures, so only once someone opens it.
   const [showInput, setShowInput] = useState(false);
 
@@ -202,13 +208,15 @@ export function EvaluationCard({
                 {success ? "success" : "not successful"}
               </span>
             )}
-            {output && !output.parsed && (
-              <span className="badge badge-sm badge-outline">prose</span>
+            {shortfall && (
+              <span className="badge badge-sm badge-outline badge-warning" title={shortfall.title}>
+                {shortfall.label}
+              </span>
             )}
             {output?.fallback && (
               <span className="badge badge-sm badge-warning badge-outline">fallback model</span>
             )}
-            {item.planner && <span className="badge badge-sm badge-outline">planner</span>}
+            {item.planner && <span className="badge badge-sm badge-outline">via Copilot</span>}
             <span className="ml-auto flex items-center gap-1">
               {showRunLink && (
                 <Link href={`/evaluations/${item.run_id}`} className="btn btn-ghost btn-xs gap-1">
@@ -225,6 +233,24 @@ export function EvaluationCard({
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-base-content/60">
             {output?.model && <span className="font-mono">{output.model}</span>}
             {duration && <span>{duration}</span>}
+            {calls.length > 1 ? (
+              <span title="Each model call: how long it took (why it stopped)">
+                {calls.length} calls: {calls.map(callLabel).join(" + ")}
+              </span>
+            ) : (
+              output?.attempts !== undefined &&
+              output.attempts !== null &&
+              output.attempts > 1 && (
+                <span title="The first answer was incomplete, so the model was asked once more">
+                  {output.attempts} attempts
+                </span>
+              )
+            )}
+            {output?.structured === false && (
+              <span title="The server did not constrain decoding to the diagnosis schema">
+                free-form decoding
+              </span>
+            )}
             {evaluator && <span className="font-mono">{evaluator}</span>}
             {item.completed_at && <span>{formatDateTime(item.completed_at)}</span>}
             {input && (
@@ -263,9 +289,11 @@ export function EvaluationCard({
             </div>
           )}
 
-          {item.status === "completed" && !diagnosis && output?.raw && (
+          {item.status === "completed" && output?.raw && (!diagnosis || !output.complete) && (
             <div>
-              <div className="text-xs uppercase text-base-content/50">Answer (not JSON)</div>
+              <div className="text-xs uppercase text-base-content/50">
+                {diagnosis ? "Answer as returned" : "Answer (not JSON)"}
+              </div>
               <p className="mt-1 whitespace-pre-wrap text-sm text-base-content/80">{output.raw}</p>
             </div>
           )}
@@ -276,13 +304,10 @@ export function EvaluationCard({
               onToggle={(event) => setShowInput((event.target as HTMLDetailsElement).open)}
             >
               <summary className="cursor-pointer font-medium text-primary">
-                What the model saw
-                {(input.examples?.length ?? 0) > 0 && (
-                  <span className="ml-2 text-xs font-normal text-base-content/60">
-                    with {input.examples?.length} labeled example
-                    {input.examples?.length === 1 ? "" : "s"}
-                  </span>
-                )}
+                Prompt sent to the model
+                <span className="ml-2 text-xs font-normal text-base-content/60">
+                  {promptSummary(input)}
+                </span>
               </summary>
               {showInput && (
                 <ModelInputView
@@ -297,7 +322,7 @@ export function EvaluationCard({
           {item.planner && (
             <details className="text-sm">
               <summary className="cursor-pointer font-medium text-primary">
-                What the planner did
+                What Copilot did
               </summary>
               <div className="mt-2 space-y-2 rounded-lg border border-base-300 bg-base-200/40 p-3">
                 <div className="flex flex-wrap gap-1 text-xs">

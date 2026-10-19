@@ -11,7 +11,7 @@ compared.
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 EvaluationStatus = Literal["pending", "running", "completed", "failed"]
 EvaluationRunStatus = Literal["running", "completed"]
@@ -20,6 +20,16 @@ EvaluationRunStatus = Literal["running", "completed"]
 EvaluationTrigger = Literal["bulk", "single", "chat"]
 # How the evaluation was reached: the two tools run directly, or a planner turn that calls them.
 EvaluationMode = Literal["direct", "planner"]
+# The keys of a diagnosis, as pi-qcaleval asks the evaluation model for them.
+# An answer is complete when it carries all six.
+DIAGNOSIS_KEYS: tuple[str, ...] = (
+    "technical_description",
+    "experimental_conclusion",
+    "experimental_significance",
+    "fit_quality",
+    "parameter_extraction",
+    "success",
+)
 
 
 class EvaluationFigureModel(BaseModel):
@@ -67,6 +77,20 @@ class EvaluationInputModel(BaseModel):
     )
 
 
+class EvaluationCallModel(BaseModel):
+    """One model call made for an answer: how long it took and how it ended."""
+
+    duration_ms: int = Field(..., description="Wall time of the call")
+    stop_reason: str = Field(..., description="Why the model stopped, as pi reports it")
+    structured: bool = Field(
+        default=False, description="Whether the call was constrained to the diagnosis schema"
+    )
+    output_tokens: int | None = Field(default=None, description="Output tokens of the call")
+    missing_keys: list[str] = Field(
+        default_factory=list, description="Diagnosis keys the call's answer lacked"
+    )
+
+
 class EvaluationOutputModel(BaseModel):
     """What the evaluation model answered."""
 
@@ -78,10 +102,45 @@ class EvaluationOutputModel(BaseModel):
     diagnosis: dict[str, Any] | None = Field(
         default=None, description="The parsed JSON diagnosis, when the answer was JSON"
     )
-    raw: str | None = Field(default=None, description="The answer text when it was not JSON")
+    raw: str | None = Field(
+        default=None,
+        description="The answer text when it was not JSON, or not all of the diagnosis",
+    )
     parsed: bool = Field(default=False, description="Whether the answer parsed as the JSON object")
-    duration_ms: int = Field(default=0, description="Wall time of the model call")
+    complete: bool = Field(
+        default=False, description="Whether the diagnosis carries all six keys (derived)"
+    )
+    missing_keys: list[str] = Field(
+        default_factory=list, description="Diagnosis keys the parsed answer lacks (derived)"
+    )
+    attempts: int | None = Field(
+        default=None, description="Model calls made for the answer: 1, or 2 after an incomplete one"
+    )
+    structured: bool | None = Field(
+        default=None, description="Whether decoding was constrained to the diagnosis schema"
+    )
+    stop_reason: str | None = Field(
+        default=None, description="Why the model stopped, as pi reports it"
+    )
+    calls: list[EvaluationCallModel] = Field(
+        default_factory=list,
+        description="Every model call made for the answer, in order, when the evaluator reports them",
+    )
+    duration_ms: int = Field(
+        default=0, description="Wall time of the evaluation call, every model call included"
+    )
     usage: dict[str, Any] | None = Field(default=None, description="Token usage, as pi reports it")
+
+    @model_validator(mode="after")
+    def _derive_completeness(self) -> "EvaluationOutputModel":
+        # Derived from the diagnosis on every load, so records stored before
+        # these fields existed carry them too.
+        if isinstance(self.diagnosis, dict):
+            self.missing_keys = [key for key in DIAGNOSIS_KEYS if key not in self.diagnosis]
+        else:
+            self.missing_keys = []
+        self.complete = isinstance(self.diagnosis, dict) and not self.missing_keys
+        return self
 
 
 class EvaluatorModel(BaseModel):

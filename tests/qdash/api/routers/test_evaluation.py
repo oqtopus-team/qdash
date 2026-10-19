@@ -28,6 +28,15 @@ from qdash.repository.task_result_history import MongoTaskResultHistoryRepositor
 HEADERS = {"Authorization": "Bearer eval_token", "X-Project-Id": "eval_project"}
 AUTH = QDashAuth(access_token="eval_token", project_id="eval_project")
 
+DIAGNOSIS: dict[str, Any] = {
+    "technical_description": "A damped cosine.",
+    "experimental_conclusion": "Rabi frequency 12.5 MHz.",
+    "experimental_significance": "The drive amplitude is right.",
+    "fit_quality": "good",
+    "parameter_extraction": {"rabi_frequency": 12.5},
+    "success": True,
+}
+
 RECORD: dict[str, Any] = {
     "task_id": "task-q0-new",
     "task_name": "CheckRabi",
@@ -55,8 +64,20 @@ RECORD: dict[str, Any] = {
         "fallback": False,
         "prompt": "Reference for this experiment ...\nExperiment context:\nTask: CheckRabi",
         "system_prompt": "You evaluate superconducting qubit calibration experiment plots.",
-        "diagnosis": {"fit_quality": "good", "success": True},
+        "diagnosis": DIAGNOSIS,
         "raw": None,
+        "attempts": 1,
+        "structured": True,
+        "stop_reason": "stop",
+        "calls": [
+            {
+                "duration_ms": 30500,
+                "stop_reason": "stop",
+                "structured": True,
+                "output_tokens": 337,
+                "missing_keys": [],
+            }
+        ],
         "duration_ms": 31000,
         "usage": {"input": 1145, "output": 337},
     },
@@ -227,7 +248,7 @@ def test_execution_records_what_the_model_saw_and_answered(test_client, service)
     assert run["status"] == "completed"
     assert run["completed_at"] is not None
     assert (run["completed_count"], run["failed_count"], run["pending_count"]) == (1, 1, 0)
-    assert (run["parsed_count"], run["success_count"]) == (1, 1)
+    assert (run["parsed_count"], run["complete_count"], run["success_count"]) == (1, 1, 1)
     assert run["model"] == "vllm/nvidia/Ising-Calibration"
     assert run["evaluator"]["commit"] == "042e454323b2"
 
@@ -244,8 +265,24 @@ def test_execution_records_what_the_model_saw_and_answered(test_client, service)
     example = good["input"]["examples"][0]
     assert (example["id"], example["outcome"]) == ("short-t1", "suboptimal")
     assert example["figures"][0]["path"] == "examples/figures/t1.png"
-    assert good["output"]["diagnosis"] == {"fit_quality": "good", "success": True}
+    assert good["output"]["diagnosis"] == DIAGNOSIS
     assert good["output"]["parsed"] is True
+    assert good["output"]["complete"] is True
+    assert good["output"]["missing_keys"] == []
+    assert (good["output"]["attempts"], good["output"]["structured"]) == (1, True)
+    assert good["output"]["stop_reason"] == "stop"
+    assert good["output"]["calls"] == [
+        {
+            "duration_ms": 30500,
+            "stop_reason": "stop",
+            "structured": True,
+            "output_tokens": 337,
+            "missing_keys": [],
+        }
+    ]
+    # The run's timing: its own wall time, and the completed evaluations' model time added up.
+    assert run["elapsed_ms"] >= 0
+    assert run["duration_ms_total"] == 31000
     assert good["output"]["duration_ms"] == 31000
     assert good["evaluator"]["source"] == "checkout"
 
@@ -283,10 +320,70 @@ def test_a_prose_answer_is_kept_raw_and_counted_as_unparsed(test_client, service
 
     detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
     assert (detail["run"]["completed_count"], detail["run"]["parsed_count"]) == (1, 0)
+    assert detail["run"]["complete_count"] == 0
     output = detail["evaluations"][0]["output"]
     assert output["parsed"] is False
+    assert output["complete"] is False
+    assert output["missing_keys"] == []
     assert output["diagnosis"] is None
     assert output["raw"] == "The oscillation decays as expected."
+
+
+def test_a_partial_json_answer_is_parsed_but_counted_as_incomplete(test_client, service):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    text = '{"technical_description": "A damped cosine."}'
+    partial = {
+        **RECORD,
+        "evaluation": {
+            **RECORD["evaluation"],
+            "diagnosis": {"technical_description": "A damped cosine."},
+            "raw": text,
+            "missing_keys": [key for key in DIAGNOSIS if key != "technical_description"],
+            "attempts": 2,
+            "structured": False,
+            "calls": [
+                {"duration_ms": 195000, "stop_reason": "length", "structured": True},
+                {
+                    "duration_ms": 30000,
+                    "stop_reason": "stop",
+                    "structured": False,
+                    "missing_keys": ["success"],
+                },
+                {"bogus": True},
+            ],
+        },
+    }
+
+    async def evaluate(task_id: str, **_: Any):
+        return partial
+
+    service._evaluate = evaluate
+    run_id = test_client.post(
+        "/evaluations/runs", headers=HEADERS, json={"chip_id": "chip-1", "task": "CheckRabi"}
+    ).json()["run"]["run_id"]
+
+    asyncio.run(service.execute_run(run_id, AUTH))
+
+    detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
+    run = detail["run"]
+    assert (run["parsed_count"], run["complete_count"], run["success_count"]) == (1, 0, 0)
+    output = detail["evaluations"][0]["output"]
+    assert output["parsed"] is True
+    assert output["complete"] is False
+    assert output["missing_keys"] == [
+        "experimental_conclusion",
+        "experimental_significance",
+        "fit_quality",
+        "parameter_extraction",
+        "success",
+    ]
+    assert output["raw"] == text
+    assert (output["attempts"], output["structured"]) == (2, False)
+    assert [(call["duration_ms"], call["stop_reason"]) for call in output["calls"]] == [
+        (195000, "length"),
+        (30000, "stop"),
+    ]
+    assert output["calls"][1]["missing_keys"] == ["success"]
 
 
 def test_verdicts_are_recorded_counted_and_cleared(test_client, service):
@@ -472,7 +569,7 @@ def test_chat_evaluations_are_filed_as_runs_of_one(test_client, service):
     assert item["qid"] == "0"
     assert item["status"] == "completed"
     assert item["input"]["prompt"].startswith("Reference for this experiment")
-    assert item["output"]["diagnosis"] == {"fit_quality": "good", "success": True}
+    assert item["output"]["diagnosis"] == DIAGNOSIS
     assert item["planner"]["answer"] == "fit_quality good; I agree."
     assert item["figure_path"] == ["/figures/x.png"]
 

@@ -11,6 +11,7 @@ import {
   summarizeRows,
 } from "../evaluationCompare";
 
+/** Builds an evaluation item with an optional diagnosis. */
 function item(
   qid: string,
   diagnosis: Record<string, unknown> | null,
@@ -50,6 +51,9 @@ const run: EvaluationRunSummary = {
   failed_count: 0,
   pending_count: 0,
   parsed_count: 2,
+  complete_count: 2,
+  elapsed_ms: 90_000,
+  duration_ms_total: 60_000,
   success_count: 1,
   agree_count: 0,
   disagree_count: 0,
@@ -71,6 +75,9 @@ describe("evaluationCompare", () => {
     expect(rowOutcome(good, item("Q1", { fit_quality: "poor", success: true }))).toBe("differs");
     expect(rowOutcome(good, item("Q1", { fit_quality: "good", success: false }))).toBe("differs");
     expect(rowOutcome(good, item("Q1", null))).toBe("incomplete");
+    // A diagnosis without a verdict, or with a fit quality on one side only, is not compared.
+    expect(rowOutcome(good, item("Q1", { technical_description: "only" }))).toBe("incomplete");
+    expect(rowOutcome(good, item("Q1", { success: true }))).toBe("incomplete");
     expect(rowOutcome(good, item("Q1", { success: true }, { status: "failed" }))).toBe(
       "incomplete",
     );
@@ -102,17 +109,22 @@ describe("evaluationCompare", () => {
   });
 
   it("flags the run settings that differ", () => {
-    const settings = runSettings(run, {
-      ...run,
-      run_id: "evr_b",
-      with_examples: true,
-      mode: "planner",
-      planner_model: "openai-compatible/qwen3.8-flash-next",
-    });
+    const settings = runSettings(
+      { run },
+      {
+        run: {
+          ...run,
+          run_id: "evr_b",
+          with_examples: true,
+          mode: "planner",
+          planner_model: "openai-compatible/qwen3.8-flash-next",
+        },
+      },
+    );
     const byKey = Object.fromEntries(settings.map((setting) => [setting.key, setting]));
     expect(byKey.chip).toMatchObject({ a: "64Qv1", b: "64Qv1", differs: false });
-    expect(byKey.examples).toMatchObject({ a: "off", b: "shown", differs: true });
-    expect(byKey.mode).toMatchObject({ a: "Direct", b: "Planner", differs: true });
+    expect(byKey.examples).toMatchObject({ a: "Zero-shot", b: "In-context", differs: true });
+    expect(byKey.mode).toMatchObject({ a: "Fixed prompt", b: "Via Copilot", differs: true });
     expect(byKey.planner).toMatchObject({
       a: "-",
       b: "openai-compatible/qwen3.8-flash-next",
@@ -123,6 +135,39 @@ describe("evaluationCompare", () => {
       differs: false,
     });
     expect(byKey.date).toMatchObject({ a: "latest", b: "latest" });
+    // Timing rows: end to end, and the mean per completed evaluation.
+    expect(byKey.elapsed).toMatchObject({ a: "1.5 min", b: "1.5 min", differs: false });
+    expect(byKey.duration).toMatchObject({ a: "30.0 s", b: "30.0 s", differs: false });
+    // Without evaluations the prompt rows have nothing to say.
+    expect(byKey.reference).toMatchObject({ a: "-", b: "-", differs: false });
+    expect(byKey.system_prompt).toMatchObject({ a: "-", b: "-", differs: false });
+  });
+
+  it("flags different prompts and references even when their labels match", () => {
+    const withInput = (system_prompt: string, knowledge_sha256: string) => [
+      item("Q1", null, {
+        input: {
+          context: "c",
+          figures: [],
+          system_prompt,
+          knowledge_chars: 10,
+          knowledge_sha256,
+        },
+      }),
+    ];
+    const settings = runSettings(
+      { run, evaluations: withInput("aa", "aaaaaaaa11") },
+      { run, evaluations: withInput("bb", "bbbbbbbb22") },
+    );
+    const byKey = Object.fromEntries(settings.map((setting) => [setting.key, setting]));
+    expect(byKey.system_prompt).toMatchObject({ a: "2 chars", b: "2 chars", differs: true });
+    expect(byKey.reference.differs).toBe(true);
+    const same = runSettings(
+      { run, evaluations: withInput("aa", "aaaaaaaa11") },
+      { run, evaluations: withInput("aa", "aaaaaaaa11") },
+    );
+    expect(same.find((setting) => setting.key === "system_prompt")?.differs).toBe(false);
+    expect(same.find((setting) => setting.key === "reference")?.differs).toBe(false);
   });
 
   it("builds the compare page link", () => {

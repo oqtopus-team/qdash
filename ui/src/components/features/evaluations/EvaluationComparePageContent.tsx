@@ -19,6 +19,7 @@ import { useGetEvaluationRun } from "@/client/evaluation/evaluation";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
+import { PierreDiffViewer } from "@/components/ui/PierreDiffViewer";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { EvaluationItem, EvaluationRunSummary } from "@/schemas";
 
@@ -26,6 +27,7 @@ import { EvaluationCard } from "./EvaluationCard";
 import {
   type CompareRow,
   type RowOutcome,
+  type RunSide,
   joinEvaluations,
   runSettings,
   summarizeRows,
@@ -37,6 +39,7 @@ import {
   fitQuality,
   fitQualityBadgeClass,
   runIsActive,
+  runTimingLabel,
 } from "./evaluationDisplay";
 import { RunPicker } from "./RunPicker";
 
@@ -64,6 +67,7 @@ function Stat({ label, value, hint }: { label: string; value: string | number; h
   );
 }
 
+/** Headline of one run in the compare page. */
 function RunHeadline({ side, run }: { side: Side; run: EvaluationRunSummary }) {
   const agreement = agreementRate(run);
   return (
@@ -85,13 +89,14 @@ function RunHeadline({ side, run }: { side: Side; run: EvaluationRunSummary }) {
           {run.completed_count}/{run.total} done
         </span>
         {run.failed_count > 0 && <span className="text-error">{run.failed_count} failed</span>}
+        {runTimingLabel(run) && <span>{runTimingLabel(run)}</span>}
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
         <span className="badge badge-success badge-sm gap-1" title="Diagnoses reporting success">
           <strong>{run.success_count}</strong> success
         </span>
-        <span className="badge badge-ghost badge-sm gap-1" title="Answers parsed as JSON">
-          <strong>{run.parsed_count}</strong> parsed
+        <span className="badge badge-ghost badge-sm gap-1" title="Diagnoses with all six keys">
+          <strong>{run.complete_count}</strong> complete
         </span>
         <span className="badge badge-outline badge-sm gap-1" title="People agreeing with the model">
           {agreement === null
@@ -103,7 +108,8 @@ function RunHeadline({ side, run }: { side: Side; run: EvaluationRunSummary }) {
   );
 }
 
-function SettingsTable({ a, b }: { a: EvaluationRunSummary; b: EvaluationRunSummary }) {
+/** Side-by-side table of the recorded settings of two evaluation runs. */
+function SettingsTable({ a, b }: { a: RunSide; b: RunSide }) {
   const settings = runSettings(a, b);
   const differing = settings.filter((setting) => setting.differs).length;
   return (
@@ -176,7 +182,9 @@ function JudgementCells({ item }: { item: EvaluationItem | null }) {
         {fit ? (
           <span className={`badge badge-sm ${fitQualityBadgeClass(fit)}`}>{fit}</span>
         ) : (
-          <span className="badge badge-sm badge-outline">{diagnosis ? "-" : "prose"}</span>
+          <span className="badge badge-sm badge-outline">
+            {diagnosis ? (item.output?.complete === false ? "incomplete" : "-") : "prose"}
+          </span>
         )}
       </td>
       <td>
@@ -201,13 +209,74 @@ function OutcomeBadge({ outcome }: { outcome: RowOutcome }) {
   return <span className="text-xs text-base-content/40">n/a</span>;
 }
 
+/**
+ * The two prompts of one entity as a diff, A as the old side and B as the new,
+ * so what changed between the runs (an edited reference, examples, a question,
+ * what Copilot wrote as context) stands out. The diff is built only when opened.
+ */
+function PromptDiff({ row }: { row: CompareRow }) {
+  const [open, setOpen] = useState(false);
+  const promptA = row.a?.input?.prompt ?? null;
+  const promptB = row.b?.input?.prompt ?? null;
+  if (promptA === null || promptB === null) return null;
+  const systemA = row.a?.input?.system_prompt ?? "";
+  const systemB = row.b?.input?.system_prompt ?? "";
+  const same = promptA === promptB && systemA === systemB;
+  return (
+    <details
+      className="text-sm"
+      onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
+      data-testid="prompt-diff"
+    >
+      <summary className="cursor-pointer font-medium text-primary">
+        Prompt A vs B
+        <span className="ml-2 text-xs font-normal text-base-content/60">
+          {same ? "identical" : "differs"}
+        </span>
+      </summary>
+      {open && (
+        <div className="mt-2 space-y-3">
+          {systemA !== systemB && (
+            <div>
+              <div className="mb-1 text-xs uppercase text-base-content/50">System prompt</div>
+              <PierreDiffViewer
+                filename="system-prompt.txt"
+                oldContent={systemA}
+                newContent={systemB}
+                layout="split"
+              />
+            </div>
+          )}
+          <div>
+            <div className="mb-1 text-xs uppercase text-base-content/50">User turn</div>
+            {same ? (
+              <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded bg-base-100 p-2 text-xs">
+                {promptA}
+              </pre>
+            ) : (
+              <PierreDiffViewer
+                filename="prompt.txt"
+                oldContent={promptA}
+                newContent={promptB}
+                layout="split"
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </details>
+  );
+}
+
+/** The expanded detail of one compared entity. */
 function ExpandedRow({ row }: { row: CompareRow }) {
   const shown = row.a ?? row.b;
   const figurePath = shown?.figure_path?.[0];
   const jsonFigurePath = shown?.json_figure_path?.[0];
   return (
     <tr className="bg-base-200/30">
-      <td colSpan={9} className="p-3">
+      <td colSpan={9} className="space-y-4 p-3">
+        <PromptDiff row={row} />
         <div className="grid gap-4 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
           <div className="rounded-lg border border-base-300 bg-base-200/40 p-3">
             {figurePath && shown ? (
@@ -411,7 +480,7 @@ export function EvaluationComparePageContent() {
       </div>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <SettingsTable a={dataA.run} b={dataB.run} />
+        <SettingsTable a={dataA} b={dataB} />
         <div className="rounded-lg border border-base-300 bg-base-100 p-4">
           <div className="mb-3 text-sm font-medium">Outcome</div>
           <div className="grid gap-3 sm:grid-cols-3">

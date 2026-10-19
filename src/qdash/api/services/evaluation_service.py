@@ -34,6 +34,7 @@ from qdash.api.services.pi_evaluation_service import (
 from qdash.common.utils.datetime import end_of_day, now, parse_date, start_of_day
 from qdash.copilot.config import load_copilot_config
 from qdash.datamodel.evaluation import (
+    EvaluationCallModel,
     EvaluationExampleModel,
     EvaluationFigureModel,
     EvaluationInputModel,
@@ -143,6 +144,13 @@ def _summary(
         failed_count=run.failed_count,
         pending_count=sum(1 for doc in evaluations if doc.status in {"pending", "running"}),
         parsed_count=sum(1 for doc in completed if doc.output and doc.output.parsed),
+        complete_count=sum(1 for doc in completed if doc.output and doc.output.complete),
+        elapsed_ms=(
+            int((run.completed_at - run.requested_at).total_seconds() * 1000)
+            if run.completed_at
+            else None
+        ),
+        duration_ms_total=sum(doc.output.duration_ms for doc in completed if doc.output),
         success_count=sum(1 for doc in completed if _success(doc)),
         agree_count=sum(1 for doc in evaluations if doc.verdict and doc.verdict.agree is True),
         disagree_count=sum(1 for doc in evaluations if doc.verdict and doc.verdict.agree is False),
@@ -198,9 +206,42 @@ def _output_from_record(record: dict[str, Any]) -> EvaluationOutputModel:
         diagnosis=diagnosis if parsed else None,
         raw=evaluation.get("raw"),
         parsed=parsed,
+        attempts=evaluation.get("attempts")
+        if isinstance(evaluation.get("attempts"), int)
+        else None,
+        structured=evaluation.get("structured")
+        if isinstance(evaluation.get("structured"), bool)
+        else None,
+        stop_reason=evaluation.get("stop_reason")
+        if isinstance(evaluation.get("stop_reason"), str)
+        else None,
+        calls=_calls_from(evaluation.get("calls")),
         duration_ms=int(evaluation.get("duration_ms") or 0),
         usage=evaluation.get("usage") if isinstance(evaluation.get("usage"), dict) else None,
     )
+
+
+def _calls_from(value: Any) -> list[EvaluationCallModel]:
+    calls: list[EvaluationCallModel] = []
+    for call in value if isinstance(value, list) else []:
+        if not isinstance(call, dict) or not isinstance(call.get("stop_reason"), str):
+            continue
+        calls.append(
+            EvaluationCallModel(
+                duration_ms=int(call.get("duration_ms") or 0),
+                stop_reason=call["stop_reason"],
+                structured=call.get("structured") is True,
+                output_tokens=(
+                    call.get("output_tokens")
+                    if isinstance(call.get("output_tokens"), int)
+                    else None
+                ),
+                missing_keys=[
+                    key for key in call.get("missing_keys") or [] if isinstance(key, str)
+                ],
+            )
+        )
+    return calls
 
 
 def _planner_from_record(record: dict[str, Any]) -> EvaluationPlannerModel | None:

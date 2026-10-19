@@ -7,6 +7,6 @@
  */
 
 /**
- * The answer text when it was not JSON
+ * The answer text when it was not JSON, or not all of the diagnosis
  */
 export type EvaluationOutputModelRaw = string | null;

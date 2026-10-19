@@ -41,6 +41,8 @@ const item: EvaluationItem = {
       success: true,
     },
     parsed: true,
+    complete: true,
+    missing_keys: [],
     duration_ms: 32858,
   },
   evaluator: {
@@ -57,6 +59,7 @@ const item: EvaluationItem = {
   },
 };
 
+/** Renders a card for a completed evaluation with overrides. */
 function renderCard(override: Partial<EvaluationItem> = {}) {
   const client = new QueryClient();
   return render(
@@ -83,17 +86,19 @@ describe("EvaluationCard", () => {
     expect(screen.getByText("32.9 s")).toBeTruthy();
     expect(screen.getByText("reference 1534 chars")).toBeTruthy();
     expect(screen.getByText("@orangekame3/pi-qcaleval@0.0.1 (042e45)")).toBeTruthy();
-    expect(screen.getByText("What the model saw")).toBeTruthy();
+    expect(screen.getByText("Prompt sent to the model")).toBeTruthy();
     // The full input renders (and loads its figures) only once opened.
     expect(screen.queryByText(/Reference for this experiment/)).toBeNull();
-    const details = screen.getByText("What the model saw").closest("details") as HTMLDetailsElement;
+    const details = screen
+      .getByText("Prompt sent to the model")
+      .closest("details") as HTMLDetailsElement;
     details.open = true;
     fireEvent(details, new Event("toggle"));
     expect(screen.getByText(/Reference for this experiment/)).toBeTruthy();
     expect(screen.getByText("System prompt")).toBeTruthy();
-    expect(screen.getByText("What the planner did")).toBeTruthy();
+    expect(screen.getByText("What Copilot did")).toBeTruthy();
     expect(screen.getByText("qdash_build_qcal_evidence")).toBeTruthy();
-    expect(screen.getByText("planner")).toBeTruthy();
+    expect(screen.getByText("via Copilot")).toBeTruthy();
   });
 
   it("keeps a prose answer readable and marks it", () => {
@@ -111,7 +116,65 @@ describe("EvaluationCard", () => {
     expect(screen.getByText("prose")).toBeTruthy();
     expect(screen.getByText("fallback model")).toBeTruthy();
     expect(screen.getByText("The oscillation decays as expected.")).toBeTruthy();
-    expect(screen.queryByText("What the planner did")).toBeNull();
+    expect(screen.queryByText("What Copilot did")).toBeNull();
+  });
+
+  it("marks a diagnosis that lacks keys and keeps the answer as returned", () => {
+    renderCard({
+      output: {
+        model: "vllm/x",
+        fallback: false,
+        diagnosis: { technical_description: "Two exponential decays." },
+        raw: '{"technical_description": "Two exponential decays."}',
+        parsed: true,
+        complete: false,
+        missing_keys: ["experimental_conclusion", "fit_quality", "success"],
+        attempts: 2,
+        structured: false,
+        calls: [
+          {
+            duration_ms: 195_000,
+            stop_reason: "length",
+            structured: true,
+            output_tokens: 2000,
+            missing_keys: ["success"],
+          },
+          {
+            duration_ms: 30_000,
+            stop_reason: "stop",
+            structured: false,
+            output_tokens: 300,
+            missing_keys: ["experimental_conclusion", "fit_quality", "success"],
+          },
+        ],
+        duration_ms: 225_000,
+      },
+      planner: undefined,
+    });
+    const badge = screen.getByText("incomplete");
+    expect(badge.getAttribute("title")).toBe(
+      "Missing: experimental_conclusion, fit_quality, success",
+    );
+    expect(screen.getByText("Answer as returned")).toBeTruthy();
+    expect(screen.getByText("2 calls: 3.3 min (length) + 30.0 s (stop, incomplete)")).toBeTruthy();
+    expect(screen.getByText("free-form decoding")).toBeTruthy();
+    expect(screen.queryByText("prose")).toBeNull();
+  });
+
+  it("says how many times the model was asked when the calls were not recorded", () => {
+    renderCard({
+      output: {
+        model: "vllm/x",
+        fallback: false,
+        diagnosis: { technical_description: "Two exponential decays." },
+        parsed: true,
+        complete: false,
+        attempts: 2,
+        duration_ms: 1000,
+      },
+      planner: undefined,
+    });
+    expect(screen.getByText("2 attempts")).toBeTruthy();
   });
 
   it("records a verdict and clears it when clicked again", () => {

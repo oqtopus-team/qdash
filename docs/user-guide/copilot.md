@@ -61,6 +61,12 @@ The Metrics page includes a chat panel that opens with the selected task result 
 when a question depends on the selected chip, metric, target direction, or time range. Changing those
 filters can change the records available to the chat; state the intended comparison explicitly.
 
+**Ask AI** on a task result (task detail modals, task result page) asks how you want to ask before
+anything starts: a recorded evaluation by the calibration evaluation model (**Fixed prompt** or
+**Via Copilot**, zero-shot or in-context, see [Reviewing Results](./reviewing-results.md#request-an-ai-evaluation)), or
+**Chat with Copilot**, the conversation described here. Viewers without edit rights go straight to
+the chat.
+
 ## Evaluate Findings
 
 Treat AI output as supporting evidence. Before changing calibration state, excluding a result, or
