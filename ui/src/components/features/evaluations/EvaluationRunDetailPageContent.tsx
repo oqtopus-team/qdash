@@ -8,6 +8,8 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import { EvaluationCard } from "./EvaluationCard";
+import { compareHref } from "./evaluationCompare";
+import { RunPicker } from "./RunPicker";
 import {
   agreementRate,
   evaluatorLabel,
@@ -96,7 +98,14 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
             </div>
           </div>
         </div>
-        <div className="flex flex-shrink-0 flex-wrap gap-2">
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+          <RunPicker
+            chipId={run.chip_id}
+            taskName={run.task_name}
+            excludeRunId={run.run_id}
+            onPick={(other) => router.push(compareHref(run.run_id, other))}
+            className="max-w-xs"
+          />
           {runIsActive(run) && <span className="badge badge-info">running</span>}
           <span className="badge badge-neutral">
             {runDone(run)}/{run.total} done
