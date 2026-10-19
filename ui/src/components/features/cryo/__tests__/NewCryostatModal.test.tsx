@@ -5,7 +5,8 @@ import { NewCryostatModal } from "@/components/features/cryo/CryoPageContent";
 
 const mocks = vi.hoisted(() => ({ mutateAsync: vi.fn() }));
 
-vi.mock("@tanstack/react-query", () => ({
+vi.mock("@tanstack/react-query", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-query")>()),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
