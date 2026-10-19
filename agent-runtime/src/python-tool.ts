@@ -60,7 +60,7 @@ export function buildPythonTool(connection: QDashConnection) {
           : [];
       const text = result.output?.trim() || "(no output)";
       return {
-        content: [
+        output: [
           {
             type: "text" as const,
             text: charts.length > 0 ? `${text}\n\n(chart rendered in the chat UI)` : text,

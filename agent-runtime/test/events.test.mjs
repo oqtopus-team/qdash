@@ -22,6 +22,15 @@ test("tool end becomes a tool_end line", () => {
   );
 });
 
+test("tool results may have non-object JSON details", () => {
+  for (const details of [null, "text", 42, false, []]) {
+    assert.deepEqual(
+      toNdjsonEvents({ type: "tool_execution_end", toolName: "qdash_query", result: { details } }),
+      [{ type: "tool_end", name: "qdash_query", isError: false }],
+    );
+  }
+});
+
 test("a chart in tool details is emitted before tool_end", () => {
   const chart = { data: [{ x: [1], y: [2] }], layout: { title: "T1" } };
   assert.deepEqual(
