@@ -297,13 +297,18 @@ class EvaluationService:
         entity_type: str,
         date: str | None = None,
         task_ids: list[str] | None = None,
+        qids: list[str] | None = None,
         question: str | None = None,
         trigger: str = "bulk",
         mode: str = "direct",
         with_examples: bool = False,
         requested_by: str,
     ) -> RunSelection:
-        """Create a run over the latest evaluable result of `task` per entity."""
+        """Create a run over the latest evaluable result of `task` per entity.
+
+        `task_ids` or `qids` narrow the run to named results or entities; the
+        rest are out of scope rather than skipped.
+        """
         if entity_type not in {"qubit", "coupling"}:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -318,6 +323,8 @@ class EvaluationService:
         if mode == "planner":
             model, _ = planner_model_config()
             planner_model = f"{model['provider']}/{model['name']}"
+        # Taken before `qids` is rebound to the chip's entity ids below.
+        chosen = set(qids or [])
         is_latest = date is None or date == "latest"
         effective_date = None if is_latest else date
         try:
@@ -350,6 +357,8 @@ class EvaluationService:
         evaluations: list[EvaluationDocument] = []
         skipped: dict[str, str] = {}
         for qid in sorted(qids, key=_natural_key):
+            if chosen and qid not in chosen:
+                continue
             doc = latest.get(qid)
             if doc is None:
                 # Out of scope, not skipped, when the caller named the task results.

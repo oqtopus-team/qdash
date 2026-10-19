@@ -18754,6 +18754,21 @@
             "title": "Task Ids",
             "description": "Restrict the run to these task results"
           },
+          "qids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qids",
+            "description": "Restrict the run to the latest results of these qubits or couplings"
+          },
           "question": {
             "anyOf": [
               {

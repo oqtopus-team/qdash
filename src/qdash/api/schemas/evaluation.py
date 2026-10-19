@@ -30,6 +30,10 @@ class CreateEvaluationRunRequest(BaseModel):
     task_ids: list[str] | None = Field(
         default=None, description="Restrict the run to these task results"
     )
+    qids: list[str] | None = Field(
+        default=None,
+        description="Restrict the run to the latest results of these qubits or couplings",
+    )
     question: str | None = Field(
         default=None,
         max_length=2000,

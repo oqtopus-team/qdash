@@ -2,7 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildEvaluationRunRequest, EvaluationRequestModal } from "../EvaluationRequestModal";
+import {
+  buildEvaluationRunRequest,
+  EvaluationRequestModal,
+  evaluationTargets,
+} from "../EvaluationRequestModal";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
@@ -31,7 +35,34 @@ afterEach(() => {
   toast.error.mockClear();
 });
 
+describe("evaluationTargets", () => {
+  it("lists the entities of a chip view in natural order, saying which cannot be judged", () => {
+    expect(
+      evaluationTargets({
+        Q10: { task_id: "t10", status: "completed", figure_path: ["/f.png"] },
+        Q2: { task_id: "t2", status: "running", figure_path: ["/f.png"] },
+        Q1: { task_id: "t1", status: "failed", figure_path: [] },
+        Q3: { task_id: "t3", status: "completed", figure_path: ["/f.png"] },
+      }),
+    ).toEqual([
+      { qid: "Q1", blocked: "no figure" },
+      { qid: "Q2", blocked: "not finished" },
+      { qid: "Q3" },
+      { qid: "Q10" },
+    ]);
+    expect(evaluationTargets(undefined)).toEqual([]);
+  });
+});
+
 describe("buildEvaluationRunRequest", () => {
+  it("narrows the run to chosen entities only when some are given", () => {
+    expect(buildEvaluationRunRequest(scope, "direct", "", false, ["Q1", "Q3"]).qids).toEqual([
+      "Q1",
+      "Q3",
+    ]);
+    expect("qids" in buildEvaluationRunRequest(scope, "direct", "", false, [])).toBe(false);
+  });
+
   it("asks for labeled examples only when the box is ticked", () => {
     expect(buildEvaluationRunRequest(scope, "direct", "", true).with_examples).toBe(true);
     expect("with_examples" in buildEvaluationRunRequest(scope, "direct", "")).toBe(false);
@@ -161,6 +192,48 @@ describe("EvaluationRequestModal", () => {
     expect(onChat).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
     expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("lets the person narrow a chip-wide run to some entities", async () => {
+    mutateAsync.mockResolvedValue({
+      data: { run: { run_id: "evr_10" }, task_ids: ["t1"], skipped: {} },
+    });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <EvaluationRequestModal
+          isOpen
+          onClose={vi.fn()}
+          scope={{
+            ...scope,
+            targets: [{ qid: "Q1" }, { qid: "Q2", blocked: "no figure" }, { qid: "Q3" }],
+          }}
+          scopeLabel="all qubits on 64Qv3"
+        />
+      </QueryClientProvider>,
+    );
+    // Everything evaluable starts selected, and the blocked one cannot be ticked.
+    const picker = screen.getByTestId("target-picker");
+    expect(picker.textContent).toContain("2 of 2 selected");
+    expect((screen.getByLabelText("Q2") as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByTestId("request-summary").textContent).toContain("all qubits on 64Qv3");
+
+    fireEvent.click(screen.getByLabelText("Q3"));
+    expect(picker.textContent).toContain("1 of 2 selected");
+    expect(screen.getByTestId("request-summary").textContent).toContain("1 of 2 qubits on 64Qv3");
+
+    // Nothing chosen: nothing to evaluate.
+    fireEvent.click(screen.getByRole("button", { name: /^None$/ }));
+    expect((screen.getByRole("button", { name: /^Evaluate$/ }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^All$/ }));
+    fireEvent.click(screen.getByLabelText("Q3"));
+
+    fireEvent.click(screen.getByRole("button", { name: /^Evaluate$/ }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(mutateAsync).toHaveBeenCalledWith({
+      data: expect.objectContaining({ qids: ["Q1"] }),
+    });
   });
 
   it("reports the API's reason when nothing could be queued", async () => {

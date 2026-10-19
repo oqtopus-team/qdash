@@ -47,7 +47,10 @@ The calibration evaluation model can judge the figure of a task result against t
 maintained reference. Two entry points lead to the same record:
 
 - **Chip page → Evaluate** evaluates the latest result of the selected task for every qubit or
-  coupling of the chip (or the results of the selected day) as one run.
+  coupling of the chip (or the results of the selected day) as one run. **Targets** lists the
+  entities the grid shows a result for; untick some to narrow the run, and the summary says how
+  many of them it will cover. An entity whose result is still running or has no figure cannot be
+  ticked, and says why.
 - **Task result → Ask AI** evaluates that one result as a run of one. The button is next to the
   result's figure in the task detail modals (task history, metrics history, execution detail) and
   on the **AI evaluation** section of the task result page, with the same choices as the chip

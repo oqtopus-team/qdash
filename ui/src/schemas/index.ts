@@ -144,6 +144,7 @@ export * from './createCouplingNoteCommentParams';
 export * from './createEvaluationRunRequest';
 export * from './createEvaluationRunRequestDate';
 export * from './createEvaluationRunRequestMode';
+export * from './createEvaluationRunRequestQids';
 export * from './createEvaluationRunRequestQuestion';
 export * from './createEvaluationRunRequestTaskIds';
 export * from './createEvaluationRunRequestTrigger';

@@ -471,6 +471,17 @@ def test_task_ids_restrict_the_run_and_running_results_are_skipped(test_client, 
     # including those with no result at all.
     assert restricted.json()["skipped"] == {}
 
+    # The chip page narrows a run to chosen entities; a chosen one whose result
+    # cannot be evaluated is still reported as skipped.
+    by_qid = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={"chip_id": "chip-1", "task": "CheckRabi", "qids": ["0", "2"]},
+    )
+    assert by_qid.status_code == 202, by_qid.text
+    assert by_qid.json()["task_ids"] == ["task-q0"]
+    assert by_qid.json()["skipped"] == {"2": "status running"}
+
 
 def test_a_single_planner_run_records_the_planner_turn(test_client, service):
     _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))

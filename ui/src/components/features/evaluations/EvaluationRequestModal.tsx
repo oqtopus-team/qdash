@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Bot, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   getListEvaluationRunsQueryKey,
@@ -12,11 +12,18 @@ import {
 } from "@/client/evaluation/evaluation";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
-import type { CreateEvaluationRunRequest } from "@/schemas";
+import type { CreateEvaluationRunRequest, Task } from "@/schemas";
 
 import { examplesLabel, modeLabel } from "./evaluationDisplay";
 
 export type EvaluationMode = "direct" | "planner";
+
+/** One entity a chip-wide request could cover, with why its result cannot be judged when it cannot. */
+export interface EvaluationTarget {
+  qid: string;
+  /** "not finished" or "no figure"; absent when the latest result can be evaluated. */
+  blocked?: string;
+}
 
 /** What one evaluation request covers: a whole chip view, or named task results. */
 export interface EvaluationRequestScope {
@@ -27,7 +34,39 @@ export interface EvaluationRequestScope {
   date?: string | null;
   /** Restrict the run to these task results (a single result's review). */
   taskIds?: string[];
+  /**
+   * The entities the chip page shows results for, in natural order, so the
+   * person can narrow a chip-wide run to some of them. Absent on a single
+   * result's request.
+   */
+  targets?: EvaluationTarget[];
   trigger: "bulk" | "single";
+}
+
+/** Natural order of entity ids (Q2 before Q10, 0-1 before 0-10). */
+function compareQids(left: string, right: string): number {
+  return left.localeCompare(right, undefined, { numeric: true });
+}
+
+/**
+ * The targets of a chip view from its per-entity results, as the API will
+ * judge them: a result still running, or without a figure, cannot be
+ * evaluated and is offered only as information.
+ */
+export function evaluationTargets(results: Record<string, Task> | undefined): EvaluationTarget[] {
+  return Object.entries(results ?? {})
+    .map(([qid, task]) => {
+      const finished = task.status === "completed" || task.status === "failed";
+      const figures = task.figure_path?.length ?? 0;
+      const blocked = !finished ? "not finished" : figures === 0 ? "no figure" : undefined;
+      return { qid, ...(blocked ? { blocked } : {}) };
+    })
+    .sort((a, b) => compareQids(a.qid, b.qid));
+}
+
+/** The entity word of a scope, plural. */
+function entityNoun(scope: Pick<EvaluationRequestScope, "entityType">): string {
+  return scope.entityType === "coupling" ? "couplings" : "qubits";
 }
 
 interface EvaluationRequestModalProps {
@@ -148,12 +187,17 @@ const EXAMPLE_OPTIONS: ReadonlyArray<Option<boolean>> = [
   },
 ];
 
-/** The request body for one scope, mode, example setting and optional question. */
+/**
+ * The request body for one scope, mode, example setting and optional question.
+ * `qids` narrows a chip-wide run to chosen entities; left out, the run covers
+ * every entity of the chip view.
+ */
 export function buildEvaluationRunRequest(
   scope: EvaluationRequestScope,
   mode: EvaluationMode,
   question: string,
   withExamples = false,
+  qids?: string[],
 ): CreateEvaluationRunRequest {
   const trimmed = question.trim();
   return {
@@ -165,8 +209,89 @@ export function buildEvaluationRunRequest(
     ...(withExamples ? { with_examples: true } : {}),
     ...(scope.date ? { date: scope.date } : {}),
     ...(scope.taskIds?.length ? { task_ids: scope.taskIds } : {}),
+    ...(qids?.length ? { qids } : {}),
     ...(trimmed ? { question: trimmed } : {}),
   };
+}
+
+/** The chosen targets of a chip-wide request: which, and whether that is all of them. */
+function TargetPicker({
+  targets,
+  excluded,
+  onChange,
+  disabled,
+}: {
+  targets: EvaluationTarget[];
+  excluded: ReadonlySet<string>;
+  onChange: (excluded: Set<string>) => void;
+  disabled: boolean;
+}) {
+  const evaluable = targets.filter((target) => !target.blocked);
+  const chosen = evaluable.filter((target) => !excluded.has(target.qid)).length;
+  const toggle = (qid: string) => {
+    const next = new Set(excluded);
+    if (next.has(qid)) next.delete(qid);
+    else next.add(qid);
+    onChange(next);
+  };
+  return (
+    <fieldset className="space-y-2" data-testid="target-picker">
+      <div className="flex items-center justify-between gap-2">
+        <legend className="label-text font-medium">
+          Targets{" "}
+          <span className="font-normal text-base-content/60">
+            {chosen} of {evaluable.length} selected
+          </span>
+        </legend>
+        <span className="flex gap-1">
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs"
+            onClick={() => onChange(new Set())}
+            disabled={disabled || excluded.size === 0}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs"
+            onClick={() => onChange(new Set(evaluable.map((target) => target.qid)))}
+            disabled={disabled || chosen === 0}
+          >
+            None
+          </button>
+        </span>
+      </div>
+      <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto rounded-md border border-base-300 p-2">
+        {targets.map((target) => {
+          const selected = !target.blocked && !excluded.has(target.qid);
+          return (
+            <label
+              key={target.qid}
+              className={`flex cursor-pointer items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-xs ${
+                target.blocked
+                  ? "cursor-not-allowed border-base-300 text-base-content/40"
+                  : selected
+                    ? "border-primary bg-primary/10"
+                    : "border-base-300"
+              }`}
+              title={target.blocked ? `${target.qid}: ${target.blocked}` : undefined}
+            >
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs"
+                checked={selected}
+                onChange={() => toggle(target.qid)}
+                disabled={disabled || !!target.blocked}
+                aria-label={target.qid}
+              />
+              {target.qid}
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
 }
 
 function errorDetail(error: unknown): string {
@@ -198,11 +323,25 @@ export function EvaluationRequestModal({
   const [mode, setMode] = useState<EvaluationMode>("direct");
   const [withExamples, setWithExamples] = useState(false);
   const [question, setQuestion] = useState("");
+  // Targets the person unticked; empty means the whole chip view, as before.
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const create = useCreateEvaluationRun();
   const isSubmitting = create.isPending;
+  const targets = scope.targets;
+  const evaluable = useMemo(
+    () => (targets ?? []).filter((target) => !target.blocked).map((target) => target.qid),
+    [targets],
+  );
+  const chosen = evaluable.filter((qid) => !excluded.has(qid));
+  const narrowed = targets !== undefined && chosen.length < evaluable.length;
+  const nothingChosen = targets !== undefined && evaluable.length > 0 && chosen.length === 0;
+  const targetLabel = narrowed
+    ? `${chosen.length} of ${evaluable.length} ${entityNoun(scope)} on ${scope.chipId}`
+    : scopeLabel;
 
   const close = () => {
     if (isSubmitting) return;
+    setExcluded(new Set());
     onClose();
   };
 
@@ -214,7 +353,13 @@ export function EvaluationRequestModal({
     }
     try {
       const response = await create.mutateAsync({
-        data: buildEvaluationRunRequest(scope, mode, question, withExamples),
+        data: buildEvaluationRunRequest(
+          scope,
+          mode,
+          question,
+          withExamples,
+          narrowed ? chosen : undefined,
+        ),
       });
       const created = response.data;
       const runId = created.run.run_id;
@@ -234,6 +379,7 @@ export function EvaluationRequestModal({
         },
       );
       setQuestion("");
+      setExcluded(new Set());
       onClose();
     } catch (error) {
       toast.error(errorDetail(error));
@@ -302,6 +448,15 @@ export function EvaluationRequestModal({
             </p>
           ) : (
             <>
+              {targets && targets.length > 0 && (
+                <TargetPicker
+                  targets={targets}
+                  excluded={excluded}
+                  onChange={setExcluded}
+                  disabled={isSubmitting}
+                />
+              )}
+
               <RadioCards
                 name="evaluation-mode"
                 legend="Who prepares the prompt"
@@ -347,7 +502,7 @@ export function EvaluationRequestModal({
               </>
             ) : (
               <>
-                Will evaluate <strong>{scopeLabel}</strong> with{" "}
+                Will evaluate <strong>{targetLabel}</strong> with{" "}
                 <strong>{settingsLabel(mode, withExamples)}</strong>
                 {question.trim() ? ", with your question" : ""}. Recorded as one run.
               </>
@@ -368,7 +523,7 @@ export function EvaluationRequestModal({
             type="button"
             className="btn btn-sm btn-primary gap-2"
             onClick={submit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || (!chatting && nothingChosen)}
           >
             {isSubmitting ? (
               <span className="loading loading-spinner loading-xs" />
