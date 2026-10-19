@@ -83,7 +83,12 @@ class CheckEFChevron(QubexTask):
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "ef_frequency": OutputParameterSpec(
-            unit="GHz", description="Measured e-to-f transition frequency"
+            unit="GHz",
+            description="Measured e-to-f transition frequency",
+            publish_targets=(
+                "ef_frequency",
+                "control_frequency_ef",
+            ),
         ),
         "anharmonicity": OutputParameterSpec(
             unit="GHz", description="Anharmonicity alpha = ef_frequency - control_frequency"
