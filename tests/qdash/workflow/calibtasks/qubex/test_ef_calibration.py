@@ -38,7 +38,7 @@ class _PulseData:
 def _set_inputs(task: Any) -> None:
     values = {
         "control_frequency": 5.0,
-        "ef_frequency": 4.7,
+        "control_frequency_ef": 4.7,
         "control_amplitude": 0.02,
         "readout_frequency": 6.1,
         "readout_amplitude": 0.03,
@@ -87,7 +87,56 @@ def _backend(exp: Any) -> Any:
     return cast("Any", SimpleNamespace(get_instance=lambda: exp))
 
 
-def test_check_ef_rabi_uses_measured_ef_frequency_and_publishes_context(
+@pytest.mark.parametrize(
+    "task_type",
+    [CheckEFRabi, CreateEFHPIPulse, CreateEFPIPulse, EFReadoutClassification],
+)
+@pytest.mark.parametrize(
+    ("frequency_sources", "expected_source"),
+    [
+        ([{"control_frequency_ef": 4.7}], "control_frequency_ef"),
+        ([{"control_frequency_ef": 4.7, "ef_frequency": 4.8}], "control_frequency_ef"),
+        ([{"ef_frequency": 4.8}, {"control_frequency_ef": 4.7}], "control_frequency_ef"),
+        ([{"ef_frequency": 4.7}], "ef_frequency"),
+    ],
+)
+def test_ef_tasks_resolve_control_frequency_before_measured_frequency(
+    task_type: type[CheckEFRabi | CreateEFHPIPulse | CreateEFPIPulse | EFReadoutClassification],
+    frequency_sources: list[dict[str, float]],
+    expected_source: str,
+) -> None:
+    task = task_type()
+    _set_inputs(task)
+    other_inputs = {
+        name: parameter.model_dump()
+        for name, parameter in task.input_parameters.items()
+        if name != "control_frequency_ef"
+    }
+    sources: list[dict[str, Any]] = [
+        {
+            name: {
+                "value": value,
+                "unit": "GHz",
+                "execution_id": f"exec-{name}",
+                "task_id": f"task-{name}",
+            }
+            for name, value in source.items()
+        }
+        for source in frequency_sources
+    ]
+    sources[0].update(other_inputs)
+
+    task._populate_parameters({"self": sources})
+
+    frequency = task.input_parameters["control_frequency_ef"]
+    assert frequency.value == pytest.approx(4.7)
+    assert frequency.unit == "GHz"
+    assert frequency.parameter_name == expected_source
+    assert frequency.execution_id == f"exec-{expected_source}"
+    assert frequency.task_id == f"task-{expected_source}"
+
+
+def test_check_ef_rabi_uses_control_frequency_ef_and_publishes_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task = CheckEFRabi()
@@ -157,6 +206,7 @@ def test_create_ef_pulse_tasks_publish_transition_specific_parameters(
     processed = task.postprocess(_backend(exp), "exec", run_result, "0")
 
     kwargs = getattr(exp, method_name).call_args.kwargs
+    assert exp.applied_frequencies == [{"Q00_ge": 5.0, "Q00-ef": 4.7, "Q00_read": 6.1}]
     assert kwargs["targets"] == "Q00"
     assert kwargs["plot"] is False
     assert processed.output_parameters[output_name].value == pytest.approx(0.21)
@@ -238,6 +288,7 @@ def test_ef_readout_classification_builds_three_state_classifier(
     processed = task.postprocess(_backend(exp), "exec", run_result, "0")
 
     kwargs = exp.build_classifier.call_args.kwargs
+    assert exp.applied_frequencies == [{"Q00_ge": 5.0, "Q00-ef": 4.7, "Q00_read": 6.1}]
     assert kwargs["targets"] == "Q00"
     assert kwargs["n_states"] == 3
     assert kwargs["save_dir"] == exp.classifier_dir

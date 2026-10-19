@@ -2381,8 +2381,11 @@
             "unit": "GHz",
             "user_override": "allowed"
           },
-          "ef_frequency": {
+          "control_frequency_ef": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "ef_frequency"
+            ],
             "resolution": "database_required",
             "unit": "GHz",
             "user_override": "allowed"
@@ -5221,8 +5224,11 @@
             "unit": "GHz",
             "user_override": "allowed"
           },
-          "ef_frequency": {
+          "control_frequency_ef": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "ef_frequency"
+            ],
             "resolution": "database_required",
             "unit": "GHz",
             "user_override": "allowed"
@@ -5375,8 +5381,11 @@
             "unit": "GHz",
             "user_override": "allowed"
           },
-          "ef_frequency": {
+          "control_frequency_ef": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "ef_frequency"
+            ],
             "resolution": "database_required",
             "unit": "GHz",
             "user_override": "allowed"
@@ -6267,8 +6276,11 @@
             "unit": "GHz",
             "user_override": "allowed"
           },
-          "ef_frequency": {
+          "control_frequency_ef": {
             "default_value": null,
+            "fallback_parameter_names": [
+              "ef_frequency"
+            ],
             "resolution": "database_required",
             "unit": "GHz",
             "user_override": "allowed"

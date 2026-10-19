@@ -92,7 +92,14 @@ Each configuration task loads the selected mode and pushes it to the boxes.
 A separate execution must establish its own EF configuration.
 
 The `ef_calibration` template calibrates GE Rabi and HPI before measuring the EF
-transition. Its `CheckEFRabi` task currently delegates GE state preparation to
+transition. `CheckEFChevron` publishes the measured `ef_frequency` to both
+`ef_frequency` and the operational `control_frequency_ef`. The subsequent EF
+Rabi, pulse calibration, and readout classification tasks use `control_frequency_ef`
+for the drive frequency, falling back to `ef_frequency` only when the operational
+parameter is absent. This allows the control frequency to be adjusted independently
+of the measured transition frequency.
+
+The `CheckEFRabi` task currently delegates GE state preparation to
 Qubex's `x180()`, which selects an available DRAG PI, PI, or DRAG HPI before the
 restored HPI. Consequently, existing calibration-note entries can affect the
 preparation pulse even with identical recorded task inputs. Recalibrating HPI

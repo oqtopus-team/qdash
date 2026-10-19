@@ -25,7 +25,9 @@ class EFReadoutClassification(QubexTask):
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("qubit_frequency",), unit="GHz"
         ),
-        "ef_frequency": InputParameterSpec.required_database(unit="GHz"),
+        "control_frequency_ef": InputParameterSpec.required_database(
+            fallback_parameter_names=("ef_frequency",), unit="GHz"
+        ),
         "hpi_amplitude": InputParameterSpec.required_database(unit="a.u."),
         "hpi_duration": InputParameterSpec.required_database(unit="ns"),
         "ef_hpi_amplitude": InputParameterSpec.required_database(unit="a.u."),
@@ -73,7 +75,9 @@ class EFReadoutClassification(QubexTask):
         with exp.modified_frequencies(
             {
                 exp.ctx.resolve_ge_label(label): self._get_calibration_value("control_frequency"),
-                exp.ctx.resolve_ef_label(label): self._get_calibration_value("ef_frequency"),
+                exp.ctx.resolve_ef_label(label): self._get_calibration_value(
+                    "control_frequency_ef"
+                ),
                 exp.ctx.resolve_read_label(label): self._get_calibration_value("readout_frequency"),
             }
         ):
