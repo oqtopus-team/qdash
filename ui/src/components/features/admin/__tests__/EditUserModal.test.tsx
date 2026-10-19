@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EditUserModal } from "@/components/features/admin/EditUserModal";
+import { SystemRole, type UserListItem } from "@/schemas";
 
 const mutateAsync = vi.fn();
 
@@ -9,19 +10,19 @@ vi.mock("@/client/auth/auth", () => ({
   useResetPassword: () => ({ mutateAsync, isPending: false }),
 }));
 
-const baseUser = {
+const baseUser: UserListItem = {
   user_id: "user-1",
   username: "alice",
   organization: "Lab",
   disabled: false,
-  system_role: "user" as const,
+  system_role: SystemRole.user,
   must_change_password: false,
 };
 
 /** Renders the modal with sensible defaults for tests. */
 function renderModal(
   props: Partial<React.ComponentProps<typeof EditUserModal>> = {},
-  user: Partial<typeof baseUser> = {},
+  user: Partial<UserListItem> = {},
 ) {
   const onSave = vi.fn().mockResolvedValue(undefined);
   render(
@@ -92,7 +93,7 @@ describe("EditUserModal", () => {
   });
 
   it("still submits the current system role when the select is disabled for the self user", async () => {
-    const { onSave } = renderModal({ currentUsername: "alice" }, { system_role: "admin" as never });
+    const { onSave } = renderModal({ currentUsername: "alice" }, { system_role: SystemRole.admin });
 
     expect((screen.getByLabelText("System Role") as HTMLSelectElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));

@@ -47,6 +47,7 @@ import { AdminPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDate } from "@/lib/utils/datetime";
 
+/** Admin page with tabs for managing users, projects, and system settings. */
 export function AdminPageContent() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
