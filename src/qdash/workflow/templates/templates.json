@@ -56,6 +56,14 @@
     "function_name": "fine_one"
   },
   {
+    "id": "ef_calibration",
+    "name": "EF Calibration",
+    "description": "Minimal GE pulse setup and EF-transition calibration: ConfigureEF -> GE Rabi -> GE HPI -> EF Chevron -> EF Rabi -> EF HPI -> EF PI -> three-state readout classification. Pre-calibrated GE Rabi, HPI, and DRAG pulses are not required; an existing GE control frequency and readout frequency/amplitude are required. Requires explicit mux_ids or qids and supports ge-ef-cr or ge-ef-fh control layouts.",
+    "category": "production",
+    "filename": "ef_calibration.py",
+    "function_name": "ef_calibration"
+  },
+  {
     "id": "full_calibration",
     "name": "Full Calibration",
     "description": "Complete calibration for explicitly selected mux_ids using step-based pipeline: ConfigureAll -> 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule (forward/reverse) -> 2Q.",

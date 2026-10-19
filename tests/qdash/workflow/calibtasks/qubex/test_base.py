@@ -1,5 +1,6 @@
 """Tests for QubexTask._load_parameters_from_db."""
 
+from types import SimpleNamespace
 from typing import Any, ClassVar, cast
 from unittest.mock import MagicMock, call, patch
 
@@ -10,6 +11,7 @@ from qdash.datamodel.task import InputParameterSpec
 from qdash.datamodel.task import ParameterModel as BaseParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.base import (
+    EF_RABI_CONTEXT_PARAMETER_UNITS,
     RABI_CONTEXT_PARAMETER_UNITS,
     QubexTask,
     readout_duration_run_parameter,
@@ -105,6 +107,89 @@ def test_readout_duration_rejects_value_that_differs_from_session() -> None:
 
     with pytest.raises(ValueError, match="session-scoped"):
         task.resolve_run_parameters(backend, "0")
+
+
+def test_restore_ef_context_uses_transition_label(monkeypatch: pytest.MonkeyPatch) -> None:
+    task = ConcreteQubexTask()
+    task.input_parameters = {
+        name: ParameterModel(value=value, task_id="ef-rabi-task")
+        for name, value in {
+            "ef_rabi_amplitude": 0.4,
+            "ef_rabi_frequency": 12.5,
+            "ef_rabi_phase": 0.1,
+            "ef_rabi_offset": 0.2,
+            "ef_rabi_angle": 0.3,
+            "ef_rabi_noise": 0.01,
+            "ef_rabi_distance": -0.2,
+            "ef_rabi_reference_phase": 0.4,
+            "ef_rabi_r2": 0.98,
+            "ef_hpi_amplitude": 0.16,
+            "ef_hpi_duration": 32.0,
+            "ef_pi_amplitude": 0.31,
+            "ef_pi_duration": 32.0,
+        }.items()
+    }
+    source_task = SimpleNamespace(
+        run_parameters={"readout_duration": {"value": 1024.0}}, input_parameters={}
+    )
+    repository = MagicMock()
+    repository.find.return_value = [source_task]
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.base.MongoTaskResultHistoryRepository",
+        MagicMock(return_value=repository),
+    )
+    exp = MagicMock()
+    exp.readout_duration = 1024.0
+    exp.get_qubit_label.return_value = "Q00"
+    exp.ctx.resolve_ef_label.return_value = "Q00-ef"
+    backend = MagicMock()
+    backend.config = {"project_id": "project"}
+    backend.get_instance.return_value = exp
+
+    task.prepare_run(backend, "0")
+
+    stored = exp.store_rabi_params.call_args.args[0]
+    assert set(stored) == {"Q00-ef"}
+    assert stored["Q00-ef"].frequency == pytest.approx(0.0125)
+    exp.calib_note.update_hpi_param.assert_called_once()
+    assert exp.calib_note.update_hpi_param.call_args.args[0] == "Q00-ef"
+    exp.calib_note.update_pi_param.assert_called_once()
+    assert exp.calib_note.update_pi_param.call_args.args[0] == "Q00-ef"
+
+
+def test_ef_rabi_context_units_are_transition_specific() -> None:
+    assert EF_RABI_CONTEXT_PARAMETER_UNITS == {
+        "ef_rabi_amplitude": "a.u.",
+        "ef_rabi_frequency": "MHz",
+        "ef_rabi_phase": "a.u.",
+        "ef_rabi_offset": "a.u.",
+        "ef_rabi_angle": "rad",
+        "ef_rabi_noise": "a.u.",
+        "ef_rabi_distance": "a.u.",
+        "ef_rabi_reference_phase": "a.u.",
+        "ef_rabi_r2": "",
+    }
+
+
+def test_restore_ef_rabi_context_points_to_ef_source_task_when_provenance_is_missing() -> None:
+    task = ConcreteQubexTask()
+    task.input_parameters = {
+        name: ParameterModel(value=value)
+        for name, value in {
+            "ef_rabi_amplitude": 0.4,
+            "ef_rabi_frequency": 12.5,
+            "ef_rabi_phase": 0.1,
+            "ef_rabi_offset": 0.2,
+            "ef_rabi_angle": 0.3,
+            "ef_rabi_noise": 0.01,
+            "ef_rabi_distance": -0.2,
+            "ef_rabi_reference_phase": 0.4,
+            "ef_rabi_r2": 0.98,
+        }.items()
+    }
+
+    with pytest.raises(ValueError, match="Run CheckEFRabi"):
+        task._restore_ef_rabi_context(MagicMock(), "0")
 
 
 def test_readout_duration_is_restored_for_legacy_snapshot() -> None:

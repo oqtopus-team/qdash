@@ -244,19 +244,30 @@ class QubexBackend(BaseBackend):
         calib_note = json.loads(raw_note)
 
         # Filter to only the calibrated qubit/coupling to avoid TOCTOU.
-        # Each param_type dict is keyed by qubit label (e.g. "Q16", "Q016") or
-        # coupling label (e.g. "Q16-Q22").  We keep only the entry that
-        # matches the qid that was just calibrated.
+        # Each param_type dict is keyed by qubit label (e.g. "Q16", "Q016"),
+        # transition label (e.g. "Q16-ef"), or coupling label (e.g. "Q16-Q22").
+        # We keep only entries that belong to the qid that was just calibrated.
         # Note: qid is numeric (e.g. "16") but keys use label format (e.g. "Q16").
         if qid is not None:
             from qdash.common.domain.qubit import qid_to_label_from_chip
 
             label = qid_to_label_from_chip(qid, project_id=project_id, chip_id=chip_id)
 
+            transition_labels = {
+                f"{label}-ef",
+                f"{label}-fh",
+            }
             filtered: dict[str, Any] = {}
             for param_type, qubits in calib_note.items():
-                if isinstance(qubits, dict) and label in qubits:
-                    filtered[param_type] = {label: qubits[label]}
+                if not isinstance(qubits, dict):
+                    continue
+                matching = {
+                    key: value
+                    for key, value in qubits.items()
+                    if key == label or key in transition_labels
+                }
+                if matching:
+                    filtered[param_type] = matching
             calib_note = filtered
 
         repo = self.calibration_note_repo
