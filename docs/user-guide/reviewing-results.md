@@ -68,6 +68,18 @@ runs made with different extension versions, models or task references. The task
 every evaluation of that result across runs, including judgements the chat planner made on its
 own while answering a question (shown as **Chat** runs).
 
+### Compare two runs
+
+To see what a change made, pick two runs on **AI Evaluations** (the checkbox next to each run)
+and press **Compare**, or open a run and choose another run of the same task from **Compare
+with…**. The compare page shows the two runs' settings side by side with the differing ones
+highlighted (mode, labeled examples, model, extension version, question), the totals, and one
+row per qubit or coupling with each side's fit quality, success and verdict. **Outcome** says
+whether the two judgements agree on fit quality and success; **Only differences** keeps the rows
+that disagree or are missing on one side. A row marked **different results** means the runs
+judged different task results of that entity, for example after a newer calibration. Expand a
+row to read both diagnoses next to the figure and record your verdict on either side.
+
 ## Ask Copilot
 
 AI output is supporting evidence, not an automatic calibration decision. Confirm findings against

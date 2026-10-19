@@ -222,8 +222,15 @@ result or a chat, is on one ledger.
 A run is a snapshot: the same selection evaluated again after a change to
 the extension, the model, or the task's reference yields a second run with
 the same shape, so parse rate, success rate, agreement rate and duration
-can be compared run against run. A run interrupted by an API restart keeps
-its unfinished records as pending; request it again rather than resuming it.
+can be compared run against run. The UI does that on `/evaluations/compare?a=&b=`
+(`ui/src/components/features/evaluations/EvaluationComparePageContent.tsx`, pure
+joining in `evaluationCompare.ts`): the two runs' settings side by side with the
+differing ones flagged, totals, and one row per entity (joined by qid, noting
+whether both judged the same task result) with each side's fit quality, success
+and verdict; a row expands to both records. No API is added: the page reads the
+two run details and joins them in the browser. A run interrupted by an API
+restart keeps its unfinished records as pending; request it again rather than
+resuming it.
 
 ## Two Modes
 
