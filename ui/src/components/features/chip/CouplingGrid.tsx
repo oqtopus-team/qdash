@@ -156,7 +156,7 @@ export function CouplingGrid({
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
   const [isDirectionReversed, setIsDirectionReversed] = useState(false);
   const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
 

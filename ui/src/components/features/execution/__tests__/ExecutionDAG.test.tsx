@@ -46,7 +46,7 @@ vi.mock("@xyflow/react", () => {
       <button
         type="button"
         data-testid="controls-interactive"
-        onClick={() => onInteractiveChange?.(true)}
+        onClick={() => onInteractiveChange?.(false)}
       >
         toggle-lock
       </button>
@@ -90,28 +90,10 @@ afterEach(() => {
 });
 
 describe("ExecutionDAG lock control", () => {
-  it("starts locked with pan/zoom and dragging disabled", () => {
+  it("starts unlocked with pan/zoom and dragging enabled", () => {
     render(<ExecutionDAG tasks={tasks} />);
 
     expect(screen.getByTestId("controls-interactive")).toBeTruthy();
-    expect(mocks.capturedProps).toMatchObject({
-      zoomOnScroll: false,
-      panOnScroll: false,
-      panOnDrag: false,
-      zoomOnPinch: false,
-      zoomOnDoubleClick: false,
-      preventScrolling: false,
-      nodesDraggable: false,
-      nodesConnectable: false,
-      elementsSelectable: false,
-    });
-  });
-
-  it("unlocks pan/zoom and dragging when the lock control is toggled", () => {
-    render(<ExecutionDAG tasks={tasks} />);
-
-    fireEvent.click(screen.getByTestId("controls-interactive"));
-
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: true,
       panOnScroll: false,
@@ -122,6 +104,31 @@ describe("ExecutionDAG lock control", () => {
       nodesDraggable: true,
       nodesConnectable: false,
       elementsSelectable: true,
+    });
+  });
+
+  it("locks pan/zoom and dragging when the lock control is toggled", () => {
+    render(<ExecutionDAG tasks={tasks} />);
+    mocks.fitView.mockClear();
+
+    fireEvent.click(screen.getByTestId("controls-interactive"));
+
+    expect(mocks.fitView).toHaveBeenCalledWith({
+      padding: 0.05,
+      minZoom: 0.1,
+      maxZoom: 1.5,
+      duration: 0,
+    });
+    expect(mocks.capturedProps).toMatchObject({
+      zoomOnScroll: false,
+      panOnScroll: false,
+      panOnDrag: false,
+      zoomOnPinch: false,
+      zoomOnDoubleClick: false,
+      preventScrolling: false,
+      nodesDraggable: false,
+      nodesConnectable: false,
+      elementsSelectable: false,
     });
   });
 });

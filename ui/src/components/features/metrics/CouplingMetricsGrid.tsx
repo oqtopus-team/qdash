@@ -122,7 +122,7 @@ export function CouplingMetricsGrid({
   const [isDirectionReversed, setIsDirectionReversed] = useState(false);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
 
   // Region tab is only available for square grids; fall back to pan-zoom otherwise.
   useEffect(() => {

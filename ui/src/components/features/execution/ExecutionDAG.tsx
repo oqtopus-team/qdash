@@ -141,8 +141,9 @@ interface ExecutionDAGProps {
 }
 
 /**
- * React Flow canvas for the execution graph. Starts locked so the page scrolls normally;
- * the Controls lock button toggles pan, zoom and node dragging.
+ * React Flow canvas for the execution graph. Starts unlocked with pan and zoom enabled;
+ * the Controls lock button locks or unlocks pan, zoom and node dragging, and locking
+ * resets the view to the default fitted view.
  */
 function FlowContent({
   nodes,
@@ -156,7 +157,7 @@ function FlowContent({
   isFullscreen: boolean;
 }) {
   const { fitView } = useReactFlow();
-  const [isLocked, setIsLocked] = useState(true);
+  const [isLocked, setIsLocked] = useState(false);
 
   // Re-fit whenever the container size (fullscreen toggle) changes.
   useEffect(() => {
@@ -208,7 +209,15 @@ function FlowContent({
       }}
     >
       <Background />
-      <Controls showInteractive onInteractiveChange={(interactive) => setIsLocked(!interactive)} />
+      <Controls
+        showInteractive
+        onInteractiveChange={(interactive) => {
+          if (!interactive) {
+            fitView({ ...FIT_VIEW_OPTIONS, duration: 0 });
+          }
+          setIsLocked(!interactive);
+        }}
+      />
       <Panel position="top-left" className="bg-base-100 p-2 rounded flex items-center gap-2">
         <div className="text-sm">Click nodes to see details</div>
         <button
