@@ -4364,6 +4364,92 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CheckThermalExcitation",
+        "description": "Estimate the thermal excitation probability of a qubit.",
+        "file_path": "measurement/check_thermal_excitation.py",
+        "input_parameters": {
+          "control_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_frequency_ef": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "ef_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "ef_pi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_pi_duration": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "hpi_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_duration": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckThermalExcitation",
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Shots per thermal-excitation sequence",
+            "unit": "a.u.",
+            "value": 1048576,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckWaveform",
         "description": "Task to check readout waveforms.",
         "file_path": "cw/check_waveform.py",

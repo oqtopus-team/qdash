@@ -30,6 +30,9 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
 )
 from qdash.workflow.calibtasks.qubex.cw.check_waveform import CheckWaveform
 from qdash.workflow.calibtasks.qubex.measurement.check_ckp import CheckCKP
+from qdash.workflow.calibtasks.qubex.measurement.check_thermal_excitation import (
+    CheckThermalExcitation,
+)
 from qdash.workflow.calibtasks.qubex.measurement.ef_readout_classification import (
     EFReadoutClassification,
 )
@@ -106,6 +109,7 @@ __all__ = [
     "CheckT1Average",
     "CheckT2Echo",
     "CheckT2EchoAverage",
+    "CheckThermalExcitation",
     "CheckWaveform",
     "CheckZX90",
     "Configure",
