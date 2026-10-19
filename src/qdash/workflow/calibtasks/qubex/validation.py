@@ -19,7 +19,7 @@ def require_ef_configuration(exp: Experiment, label: str) -> None:
     except (KeyError, ValueError) as exc:
         raise ValueError(
             f"GE/EF targets are not configured for {label}. Run ConfigureEF in the same "
-            "session before running an EF calibration task."
+            "session before running an EF-dependent task."
         ) from exc
 
 

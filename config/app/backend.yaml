@@ -51,6 +51,7 @@ backends:
         - CreateEFHPIPulse
         - CreateEFPIPulse
         - EFReadoutClassification
+        - CheckThermalExcitation
         - ReadoutClassification
         - RandomizedBenchmarking
         - X90InterleavedRandomizedBenchmarking

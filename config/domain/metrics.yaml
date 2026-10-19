@@ -235,6 +235,14 @@ qubit_metrics:
     evaluation:
       mode: maximize
 
+  thermal_excitation_probability:
+    title: Thermal Excitation Probability
+    unit: "%"
+    scale: 100
+    description: Estimated thermal excited-state population
+    evaluation:
+      mode: minimize
+
   purcell_filter_frequency:
     title: Purcell Filter Frequency
     unit: GHz
