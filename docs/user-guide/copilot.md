@@ -53,13 +53,19 @@ exact tasks each step will run. Nothing starts until you approve the card.
 The plan can only use the step types and task names QDash exposes; it cannot contain code, and
 every task result is judged by the same gates as a saved workflow. The execution appears on the
 **Execution** page tagged `pipeline`. See
-[Calibration Pipeline Spec](../development/workflow/calibration-pipeline.md) for the spec format.
+[Calibration Pipeline Spec](../developer-guide/workflow/calibration-pipeline.md) for the spec format.
 
 ## Metrics Analysis
 
 The Metrics page includes a chat panel that opens with the selected task result as its context. Use it
 when a question depends on the selected chip, metric, target direction, or time range. Changing those
 filters can change the records available to the chat; state the intended comparison explicitly.
+
+**Ask AI** on a task result (task detail modals, task result page) asks how you want to ask before
+anything starts: a recorded evaluation by the calibration evaluation model (**Fixed prompt** or
+**Via Copilot**, zero-shot or in-context, see [Reviewing Results](./reviewing-results.md#request-an-ai-evaluation)), or
+**Chat with Copilot**, the conversation described here. Viewers without edit rights go straight to
+the chat.
 
 ## Evaluate Findings
 

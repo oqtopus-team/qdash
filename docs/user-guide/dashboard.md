@@ -51,17 +51,5 @@ Dashboard pinned target summaries are scoped by the operational context:
 - Existing global chip, qubit, and coupling notes remain available as legacy fallback when no operational scope is selected.
 - Per-metric notes are legacy read-only dashboard context; use pinned summaries or forum discussions for new notes.
 
-## Knowledge feed
-
-Every note edit (upsert / delete) appends a row to the immutable `note_event` collection. This drives:
-
-- Per-chip annotation timeline: `GET /chips/{chip_id}/note-events`
-- Per-target timeline (e.g. all events on Q5): `GET /note-events/by-target?scope=qubit&target_id=5`
-- Cross-chip text search: `GET /note-events/search?q=unstable`
-
-Use these for retrospective audits, knowledge mining, or feeding LLM contexts. The current dashboard does not yet surface a UI for these endpoints — they are available for future work and external integrations.
-
-## Performance
-
-- The dashboard fetches all notes via `GET /chips/{chip_id}/notes-summary`, a single query that joins inline notes from `qubit`, `coupling`, and (filtered) `task_result_history`.
-- A partial sparse index on `task_result_history.user_note.updated_at` ensures the summary scans only annotated rows, even when the chip has hundreds of thousands of task results.
+Every note edit is kept as an event, so a chip's annotation history can be read back later.
+How this works: [Notes architecture](../developer-guide/architecture/notes.md).

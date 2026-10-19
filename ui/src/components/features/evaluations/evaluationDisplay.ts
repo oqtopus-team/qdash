@@ -1,4 +1,9 @@
-import type { EvaluationItem, EvaluationRunSummary } from "@/schemas";
+import type {
+  EvaluationCallModel,
+  EvaluationItem,
+  EvaluationOutputModel,
+  EvaluationRunSummary,
+} from "@/schemas";
 
 /** The parsed JSON diagnosis of an evaluation, when the model answered with one. */
 export type Diagnosis = Record<string, unknown>;
@@ -41,6 +46,27 @@ export function diagnosisText(diagnosis: Diagnosis | null, key: string): string 
   return JSON.stringify(value, null, 2);
 }
 
+/**
+ * How a completed answer fell short of the diagnosis, for a badge: prose
+ * instead of JSON, or JSON lacking some of the six keys (the model closing the
+ * object after the first one). Null when the answer is the whole diagnosis.
+ */
+export function answerShortfall(
+  output: Pick<EvaluationOutputModel, "parsed" | "complete" | "missing_keys"> | null | undefined,
+): { label: string; title: string } | null {
+  if (!output) return null;
+  if (!output.parsed) return { label: "prose", title: "The answer was not the JSON diagnosis" };
+  if (output.complete === false) {
+    const missing = output.missing_keys ?? [];
+    return {
+      label: "incomplete",
+      title:
+        missing.length > 0 ? `Missing: ${missing.join(", ")}` : "The diagnosis lacks some keys",
+    };
+  }
+  return null;
+}
+
 /** Diagnosis sections in the order the evaluation model is asked for them. */
 export const DIAGNOSIS_SECTIONS: ReadonlyArray<{ key: string; label: string }> = [
   { key: "technical_description", label: "What the plot shows" },
@@ -49,8 +75,19 @@ export const DIAGNOSIS_SECTIONS: ReadonlyArray<{ key: string; label: string }> =
   { key: "parameter_extraction", label: "Extracted parameters" },
 ];
 
+/**
+ * Who prepared the prompt: QDash, the same fixed prompt every time (`direct`),
+ * or Copilot, the chat planner, summarising the result and calling the
+ * evaluation itself (`planner`). Independent of whether labeled examples were
+ * shown (see `examplesLabel`).
+ */
 export function modeLabel(mode: string): string {
-  return mode === "planner" ? "Planner" : "Direct";
+  return mode === "planner" ? "Via Copilot" : "Fixed prompt";
+}
+
+/** Whether labeled examples were shown before the figure, in QCalEval's terms. */
+export function examplesLabel(withExamples: boolean | undefined): string {
+  return withExamples ? "In-context" : "Zero-shot";
 }
 
 export function triggerLabel(trigger: string): string {
@@ -66,6 +103,34 @@ export function evaluatorLabel(
   if (!evaluator) return null;
   const base = `${evaluator.name}@${evaluator.version}`;
   return evaluator.commit ? `${base} (${evaluator.commit})` : base;
+}
+
+/** Mean model time per completed evaluation of a run, or null before any completed. */
+export function meanDurationMs(
+  run: Pick<EvaluationRunSummary, "duration_ms_total" | "completed_count">,
+): number | null {
+  return run.completed_count > 0 ? run.duration_ms_total / run.completed_count : null;
+}
+
+/** A run's timing as text: how long it took end to end, and the mean per evaluation. */
+export function runTimingLabel(
+  run: Pick<EvaluationRunSummary, "elapsed_ms" | "duration_ms_total" | "completed_count">,
+): string | null {
+  const parts: string[] = [];
+  const elapsed = formatDuration(run.elapsed_ms);
+  const mean = formatDuration(meanDurationMs(run));
+  if (elapsed) parts.push(`took ${elapsed}`);
+  if (mean) parts.push(`${mean} per evaluation`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/** One model call as text: its duration and how it ended, e.g. "3.3 min (length)". */
+export function callLabel(call: EvaluationCallModel): string {
+  const how =
+    call.stop_reason === "stop" && call.missing_keys && call.missing_keys.length > 0
+      ? "stop, incomplete"
+      : call.stop_reason;
+  return `${formatDuration(call.duration_ms) ?? "?"} (${how})`;
 }
 
 export function formatDuration(ms: number | null | undefined): string | null {

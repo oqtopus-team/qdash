@@ -11,17 +11,17 @@ hero:
     alt: OQTOPUS
   actions:
     - theme: brand
-      text: Operator Guide
-      link: /operator-guide/
+      text: User Guide
+      link: /user-guide/
     - theme: alt
       text: Developer Guide
       link: /developer-guide/
     - theme: alt
       text: Set Up QDash
-      link: /operator-guide/setup
+      link: /user-guide/setup
     - theme: alt
       text: Watch the Demo
-      link: /getting-started/what-is-qdash#demo
+      link: /user-guide/what-is-qdash#demo
 
 features:
   - title: Run Calibrations
@@ -31,7 +31,7 @@ features:
     details: Compare chip metrics, task results, raw artifacts, parameter history, and provenance.
     link: /user-guide/data-and-provenance
   - title: Collaborate on Results
-    details: Connect notes, issues, forum discussions, knowledge cases, and notifications.
+    details: Connect notes, forum threads, knowledge, AI evaluations, and notifications.
     link: /user-guide/reviewing-results
   - title: Share by Project
     details: Keep workflows, calibration data, files, and membership within an explicit project boundary.

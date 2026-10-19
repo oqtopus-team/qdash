@@ -2,13 +2,16 @@
 
 import { ArrowLeft, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { useGetEvaluationRun } from "@/client/evaluation/evaluation";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { formatDateTime } from "@/lib/utils/datetime";
+import type { EvaluationItem, EvaluationRunSummary } from "@/schemas";
 
 import { EvaluationCard } from "./EvaluationCard";
 import { compareHref } from "./evaluationCompare";
+import { promptProfile, rangeLabel, referenceLabel, systemPromptLabel } from "./evaluationPrompt";
 import { RunPicker } from "./RunPicker";
 import {
   agreementRate,
@@ -16,14 +19,87 @@ import {
   modeLabel,
   runDone,
   runIsActive,
+  runTimingLabel,
   triggerLabel,
 } from "./evaluationDisplay";
 
+/** A labeled value in the run summary. */
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
       <div className="text-xs uppercase text-base-content/50">{label}</div>
       <div className="mt-1 text-sm">{value}</div>
+    </div>
+  );
+}
+
+/**
+ * What the evaluation model was given in this run, read off the records: the
+ * system prompt, the reference (task knowledge), labeled examples, figures and
+ * question, and whether they were the same for every evaluation. With Copilot
+ * in the loop they can differ per evaluation, which this makes visible; the
+ * exact prompt of each evaluation is under its own "Prompt sent to the model".
+ */
+function RunPromptPanel({
+  run,
+  evaluations,
+}: {
+  run: EvaluationRunSummary;
+  evaluations: EvaluationItem[];
+}) {
+  const profile = promptProfile(evaluations);
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
+  if (profile.recorded === 0) return null;
+  const consistent =
+    profile.systemPromptVariants <= 1 &&
+    profile.referenceVariants <= 1 &&
+    profile.questionVariants <= 1 &&
+    profile.examples.min === profile.examples.max &&
+    profile.figures.min === profile.figures.max;
+  return (
+    <div
+      className="mb-4 rounded-lg border border-base-300 bg-base-100 p-4"
+      data-testid="run-prompt"
+    >
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium">Prompt</span>
+        <span className="text-xs text-base-content/60">
+          {consistent
+            ? `the same ingredients for all ${profile.recorded} evaluation${profile.recorded === 1 ? "" : "s"}`
+            : `varies across the ${profile.recorded} evaluations${run.mode === "planner" ? " (Copilot wrote the context and may pass its own reference)" : ""}`}
+        </span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-5">
+        <Stat label="System prompt" value={systemPromptLabel(profile)} />
+        <Stat label="Reference" value={referenceLabel(profile)} />
+        <Stat label="Labeled examples" value={rangeLabel(profile.examples)} />
+        <Stat label="Figures" value={rangeLabel(profile.figures)} />
+        <Stat
+          label="Question"
+          value={
+            profile.questionVariants > 1
+              ? "varies"
+              : profile.question || (run.question ? "varies" : "none")
+          }
+        />
+      </div>
+      {profile.systemPrompt && (
+        <details
+          className="mt-3 text-sm"
+          onToggle={(event) => setShowSystemPrompt((event.target as HTMLDetailsElement).open)}
+        >
+          <summary className="cursor-pointer font-medium text-primary">System prompt text</summary>
+          {showSystemPrompt && (
+            <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded bg-base-200/40 p-2 text-xs">
+              {profile.systemPrompt}
+            </pre>
+          )}
+        </details>
+      )}
+      <p className="mt-2 text-xs text-base-content/50">
+        The reference is the task&apos;s knowledge as it was when the run was made; its hash tells
+        two versions apart. Each evaluation below shows the exact prompt it was sent.
+      </p>
     </div>
   );
 }
@@ -119,7 +195,8 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
       <div className="mb-4 rounded-lg border border-base-300 bg-base-100 p-4">
         <div className="grid gap-3 md:grid-cols-6">
           <Stat label="Success" value={`${run.success_count}/${run.completed_count}`} />
-          <Stat label="Parsed as JSON" value={`${run.parsed_count}/${run.completed_count}`} />
+          <Stat label="Complete" value={`${run.complete_count}/${run.completed_count}`} />
+          <Stat label="Time" value={runTimingLabel(run) ?? "-"} />
           <Stat
             label="Agreement"
             value={
@@ -131,8 +208,8 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
           <Stat label="Evaluation model" value={run.model || "-"} />
           <Stat label="Evaluator" value={evaluatorLabel(run.evaluator) || "-"} />
           <Stat
-            label={run.mode === "planner" ? "Planner" : "Mode"}
-            value={run.mode === "planner" ? run.planner_model || "-" : "direct tools"}
+            label={run.mode === "planner" ? "Copilot model" : "Mode"}
+            value={run.mode === "planner" ? run.planner_model || "-" : modeLabel(run.mode)}
           />
         </div>
         {run.question && (
@@ -142,6 +219,8 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
           </div>
         )}
       </div>
+
+      <RunPromptPanel run={run} evaluations={evaluations} />
 
       <div className="space-y-4">
         {evaluations.map((item) => (

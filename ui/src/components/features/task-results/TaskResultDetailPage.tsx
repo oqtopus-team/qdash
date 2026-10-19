@@ -370,6 +370,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         chipId={taskResult.chip_id}
         taskName={taskResult.task_name}
         qid={taskResult.qid}
+        executionId={taskResult.execution_id}
       />
       <TaskResultThreads
         taskId={taskId}

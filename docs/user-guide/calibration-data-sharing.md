@@ -90,5 +90,5 @@ chip and establish its calibration state separately when work needs a different 
 
 Upgrades migrate legacy user-scoped database records and calibration files into the project and
 chip layout automatically during deployment. Operators should follow the
-[project-scoped calibration migration guide](../reference/migration-project-scoped-calibration.md)
+[project-scoped calibration migration guide](./migrations/project-scoped-calibration.md)
 for backup, verification, duplicate handling, and recovery details.

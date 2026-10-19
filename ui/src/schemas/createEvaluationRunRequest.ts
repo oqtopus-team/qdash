@@ -7,6 +7,7 @@
  */
 import type { CreateEvaluationRunRequestDate } from './createEvaluationRunRequestDate';
 import type { CreateEvaluationRunRequestMode } from './createEvaluationRunRequestMode';
+import type { CreateEvaluationRunRequestQids } from './createEvaluationRunRequestQids';
 import type { CreateEvaluationRunRequestQuestion } from './createEvaluationRunRequestQuestion';
 import type { CreateEvaluationRunRequestTaskIds } from './createEvaluationRunRequestTaskIds';
 import type { CreateEvaluationRunRequestTrigger } from './createEvaluationRunRequestTrigger';
@@ -25,6 +26,8 @@ export interface CreateEvaluationRunRequest {
   date?: CreateEvaluationRunRequestDate;
   /** Restrict the run to these task results */
   task_ids?: CreateEvaluationRunRequestTaskIds;
+  /** Restrict the run to the latest results of these qubits or couplings */
+  qids?: CreateEvaluationRunRequestQids;
   /** A specific question for the evaluation model, on top of the diagnosis */
   question?: CreateEvaluationRunRequestQuestion;
   /** "bulk" from the chip page, "single" for one task result */

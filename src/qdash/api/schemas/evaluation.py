@@ -30,6 +30,10 @@ class CreateEvaluationRunRequest(BaseModel):
     task_ids: list[str] | None = Field(
         default=None, description="Restrict the run to these task results"
     )
+    qids: list[str] | None = Field(
+        default=None,
+        description="Restrict the run to the latest results of these qubits or couplings",
+    )
     question: str | None = Field(
         default=None,
         max_length=2000,
@@ -70,6 +74,15 @@ class EvaluationRunSummary(BaseModel):
     failed_count: int
     pending_count: int = Field(..., description="Evaluations not finished yet")
     parsed_count: int = Field(..., description="Completed evaluations whose answer was JSON")
+    complete_count: int = Field(
+        ..., description="Completed evaluations whose diagnosis carries all six keys"
+    )
+    elapsed_ms: int | None = Field(
+        default=None, description="Wall time from the request to the run's completion"
+    )
+    duration_ms_total: int = Field(
+        ..., description="Wall time of the completed evaluations' model calls, added up"
+    )
     success_count: int = Field(
         ..., description="Completed evaluations whose diagnosis reports success"
     )

@@ -6,7 +6,7 @@ import type { ManualParameterUpdateResponse } from "@/schemas";
 import React, { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, History, FileText, GitBranch, Bot, ListTodo } from "lucide-react";
+import { ChevronRight, History, FileText, GitBranch, ListTodo } from "lucide-react";
 
 import type { TaskResult as Task } from "@/schemas";
 
@@ -24,6 +24,8 @@ import {
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
+import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import type { TaskChatContext } from "@/types/copilotChat";
@@ -41,6 +43,7 @@ interface TaskHistoryModalProps {
   selectedDate?: string;
 }
 
+/** Task execution history of a qubit, with the selected result's details. */
 export function TaskHistoryModal({
   chipId,
   qid,
@@ -522,13 +525,15 @@ export function TaskHistoryModal({
               View Provenance Lineage
             </Link>
             {chatContext && (
-              <button
-                onClick={() => handleAskAi(chatContext)}
-                className="btn btn-xs btn-primary gap-1"
-              >
-                <Bot className="h-3 w-3" />
-                Ask AI
-              </button>
+              <AskAiButton
+                taskId={chatContext.taskId}
+                chipId={chatContext.chipId}
+                taskName={chatContext.taskName}
+                qid={chatContext.qid}
+                chatContext={chatContext}
+                onChat={() => handleAskAi(chatContext)}
+                size="xs"
+              />
             )}
           </div>
         </div>
@@ -585,6 +590,17 @@ export function TaskHistoryModal({
       )}
 
       {/* Forum threads about this result */}
+      {/* AI evaluations of this result, requested the same way as from the chip page */}
+      {selectedTask?.task_id && (
+        <TaskResultEvaluations
+          taskId={selectedTask.task_id}
+          chipId={chipId}
+          taskName={selectedTask.name || taskName}
+          qid={qid}
+          onChat={chatContext ? () => handleAskAi(chatContext) : undefined}
+        />
+      )}
+
       {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
     </div>
   );

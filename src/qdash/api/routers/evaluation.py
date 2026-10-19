@@ -66,6 +66,7 @@ async def create_evaluation_run(
         entity_type=body.entity_type,
         date=body.date,
         task_ids=body.task_ids,
+        qids=body.qids,
         question=body.question,
         trigger=body.trigger,
         mode=body.mode,

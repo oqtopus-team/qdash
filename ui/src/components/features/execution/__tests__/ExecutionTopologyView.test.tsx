@@ -59,6 +59,8 @@ vi.mock("@/contexts/ProjectContext", () => ({
   }),
 }));
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
 afterEach(() => {
   cleanup();
 });

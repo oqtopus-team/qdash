@@ -4,10 +4,14 @@ import {
   diagnosisOf,
   diagnosisSuccess,
   evaluatorLabel,
+  examplesLabel,
   fitQuality,
+  formatDuration,
+  meanDurationMs,
   modeLabel,
   triggerLabel,
 } from "./evaluationDisplay";
+import { promptProfile, referenceLabel, systemPromptLabel } from "./evaluationPrompt";
 
 /**
  * Two evaluation runs side by side, entity by entity.
@@ -59,17 +63,23 @@ export function compareQids(left: string, right: string): number {
 
 /**
  * The outcome of one row: fit quality and success compared when both sides
- * completed with a JSON diagnosis; incomplete otherwise (a side missing,
- * pending, failed, or answered in prose).
+ * completed with a JSON diagnosis that reaches a verdict; incomplete otherwise
+ * (a side missing, pending, failed, answered in prose, or a diagnosis without
+ * `success`, or with a fit quality on one side only).
  */
 export function rowOutcome(a: EvaluationItem | null, b: EvaluationItem | null): RowOutcome {
   if (!a || !b || a.status !== "completed" || b.status !== "completed") return "incomplete";
   const da = diagnosisOf(a);
   const db = diagnosisOf(b);
   if (!da || !db) return "incomplete";
-  const sameSuccess = diagnosisSuccess(da) === diagnosisSuccess(db);
-  const sameFit = fitQuality(da) === fitQuality(db);
-  return sameSuccess && sameFit ? "same" : "differs";
+  const successA = diagnosisSuccess(da);
+  const successB = diagnosisSuccess(db);
+  const fitA = fitQuality(da);
+  const fitB = fitQuality(db);
+  if (successA === null || successB === null || (fitA === null) !== (fitB === null)) {
+    return "incomplete";
+  }
+  return successA === successB && fitA === fitB ? "same" : "differs";
 }
 
 /** Rows by entity, in natural order, from the evaluations of two runs. */
@@ -118,25 +128,67 @@ export function summarizeRows(rows: ReadonlyArray<CompareRow>): CompareSummary {
   return summary;
 }
 
-/** The settings of two runs side by side, each flagged when it differs. */
-export function runSettings(a: EvaluationRunSummary, b: EvaluationRunSummary): SettingDiff[] {
-  const settings: Array<[string, string, (run: EvaluationRunSummary) => string]> = [
-    ["chip", "Chip", (run) => run.chip_id],
-    ["task", "Task", (run) => run.task_name],
-    ["entity", "Entities", (run) => run.entity_type],
-    ["date", "Results", (run) => run.date || "latest"],
-    ["trigger", "Trigger", (run) => triggerLabel(run.trigger)],
-    ["mode", "Mode", (run) => modeLabel(run.mode)],
-    ["planner", "Planner", (run) => (run.mode === "planner" ? run.planner_model || "-" : "-")],
-    ["examples", "Labeled examples", (run) => (run.with_examples ? "shown" : "off")],
-    ["question", "Question", (run) => run.question || "-"],
-    ["model", "Evaluation model", (run) => run.model || "-"],
-    ["evaluator", "Evaluator", (run) => evaluatorLabel(run.evaluator) || "-"],
+/** One run and what its evaluations recorded, for the settings table. */
+export interface RunSide {
+  run: EvaluationRunSummary;
+  evaluations?: ReadonlyArray<EvaluationItem>;
+}
+
+/**
+ * One run setting: its key and label, how to read it as text, and, when the
+ * text can hide a difference (two references of the same size, two system
+ * prompts of the same length), what to compare instead.
+ */
+type Setting = [
+  key: string,
+  label: string,
+  read: (side: RunSide) => string,
+  identity?: (side: RunSide) => string,
+];
+
+/**
+ * The settings of two runs side by side, each flagged when it differs. With
+ * the evaluations, the prompt ingredients the records carry (the reference
+ * and the system prompt) are rows too: those are what change when the task's
+ * knowledge or the extension is edited between two runs.
+ */
+export function runSettings(a: RunSide, b: RunSide): SettingDiff[] {
+  const settings: Setting[] = [
+    ["chip", "Chip", ({ run }) => run.chip_id],
+    ["task", "Task", ({ run }) => run.task_name],
+    ["entity", "Entities", ({ run }) => run.entity_type],
+    ["date", "Results", ({ run }) => run.date || "latest"],
+    ["trigger", "Trigger", ({ run }) => triggerLabel(run.trigger)],
+    ["mode", "Mode", ({ run }) => modeLabel(run.mode)],
+    [
+      "planner",
+      "Copilot model",
+      ({ run }) => (run.mode === "planner" ? run.planner_model || "-" : "-"),
+    ],
+    ["examples", "Examples", ({ run }) => examplesLabel(run.with_examples)],
+    ["question", "Question", ({ run }) => run.question || "-"],
+    ["model", "Evaluation model", ({ run }) => run.model || "-"],
+    ["evaluator", "Evaluator", ({ run }) => evaluatorLabel(run.evaluator) || "-"],
+    ["elapsed", "Took", ({ run }) => formatDuration(run.elapsed_ms) ?? "-"],
+    ["duration", "Per evaluation", ({ run }) => formatDuration(meanDurationMs(run)) ?? "-"],
+    [
+      "reference",
+      "Reference",
+      (side) => referenceLabel(promptProfile(side.evaluations ?? [])),
+      (side) => JSON.stringify(promptProfile(side.evaluations ?? []).referenceKeys),
+    ],
+    [
+      "system_prompt",
+      "System prompt",
+      (side) => systemPromptLabel(promptProfile(side.evaluations ?? [])),
+      (side) => JSON.stringify(promptProfile(side.evaluations ?? []).systemPromptValues),
+    ],
   ];
-  return settings.map(([key, label, read]) => {
+  return settings.map(([key, label, read, identity]) => {
     const left = read(a);
     const right = read(b);
-    return { key, label, a: left, b: right, differs: left !== right };
+    const differs = identity ? identity(a) !== identity(b) : left !== right;
+    return { key, label, a: left, b: right, differs };
   });
 }
 

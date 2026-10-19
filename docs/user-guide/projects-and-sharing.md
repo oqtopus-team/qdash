@@ -49,7 +49,7 @@ state, artifact paths, and migration behavior.
 
 ## Programmatic Access
 
-Use the [QDash Client](./qdash-client.md) for scripts and agents. Select a saved profile and pass
+Use the [QDash Client](../reference/clients/python.md) for scripts and agents. Select a saved profile and pass
 the project through its configuration or client API. Low-level API integrations must send both a
 bearer token and the project header:
 

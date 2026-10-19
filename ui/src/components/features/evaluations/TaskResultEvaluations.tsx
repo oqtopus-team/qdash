@@ -1,34 +1,51 @@
 "use client";
 
 import { Bot } from "lucide-react";
-import { useState } from "react";
 
 import { useListEvaluations } from "@/client/evaluation/evaluation";
-import { useProject } from "@/contexts/ProjectContext";
+import { useGetTaskResult } from "@/client/task/task";
+import type { TaskChatContext } from "@/types/copilotChat";
 
+import { AskAiButton } from "./AskAiButton";
 import { EvaluationCard } from "./EvaluationCard";
-import { EvaluationRequestModal } from "./EvaluationRequestModal";
 
 interface TaskResultEvaluationsProps {
   taskId: string;
-  chipId: string | null | undefined;
-  taskName: string;
-  qid: string;
+  /** Pass all three when known; any left out make the section fetch the result to fill them. */
+  chipId?: string | null;
+  taskName?: string;
+  qid?: string;
+  executionId?: string;
+  /** How this surface opens a chat about the result; default: the chat dock. */
+  onChat?: () => void;
 }
 
 /**
- * The AI evaluations of one task result, newest first, with a button to
- * request another. A single result's evaluation takes the same path and leaves
- * the same record as a bulk run from the chip page.
+ * The AI evaluations of one task result, newest first, with the "Ask AI"
+ * entry to request another or chat about the result. A single result's
+ * evaluation takes the same path, with the same choices (model only or via
+ * Copilot, labeled examples, a question), and leaves the same record as a
+ * bulk run from the chip page.
  */
 export function TaskResultEvaluations({
   taskId,
-  chipId,
-  taskName,
-  qid,
+  chipId: givenChipId,
+  taskName: givenTaskName,
+  qid: givenQid,
+  executionId: givenExecutionId,
+  onChat,
 }: TaskResultEvaluationsProps) {
-  const { canEdit } = useProject();
-  const [isRequestOpen, setIsRequestOpen] = useState(false);
+  const needsResult =
+    !givenTaskName || !givenQid || givenChipId === undefined || givenExecutionId === undefined;
+  const { data: resultResponse } = useGetTaskResult(taskId, {
+    query: { enabled: !!taskId && needsResult, staleTime: 60_000 },
+  });
+  const taskName = givenTaskName ?? resultResponse?.data.task_name ?? "";
+  const qid = givenQid ?? resultResponse?.data.qid ?? "";
+  const chipId = givenChipId ?? resultResponse?.data.chip_id ?? null;
+  const executionId = givenExecutionId ?? resultResponse?.data.execution_id ?? "";
+  const chatContext: TaskChatContext | null =
+    chipId && taskName && qid ? { taskName, chipId, qid, executionId, taskId } : null;
   const { data: response } = useListEvaluations(
     { task_id: taskId },
     {
@@ -55,25 +72,20 @@ export function TaskResultEvaluations({
             <span className="badge badge-ghost badge-sm">{evaluations.length}</span>
           )}
         </div>
-        {canEdit && (
-          <button
-            type="button"
-            className="btn btn-sm btn-outline gap-1"
-            onClick={() => setIsRequestOpen(true)}
-            disabled={!chipId}
-            title={
-              chipId ? "Evaluate this result with the calibration evaluation model" : "No chip"
-            }
-          >
-            <Bot className="h-4 w-4" />
-            Evaluate
-          </button>
-        )}
+        <AskAiButton
+          taskId={taskId}
+          chipId={chipId}
+          taskName={taskName}
+          qid={qid}
+          chatContext={chatContext}
+          onChat={onChat}
+          variant="outline"
+        />
       </div>
       {evaluations.length === 0 ? (
         <p className="text-sm text-base-content/50">
-          No AI evaluation yet. Evaluate sends the figure and the task&apos;s reference to the
-          calibration evaluation model and keeps the record here.
+          No AI evaluation yet. Ask AI sends the figure and the task&apos;s reference to the
+          calibration evaluation model and keeps the record here, or opens a chat about the result.
         </p>
       ) : (
         <div className="space-y-3">
@@ -87,20 +99,6 @@ export function TaskResultEvaluations({
             />
           ))}
         </div>
-      )}
-      {chipId && (
-        <EvaluationRequestModal
-          isOpen={isRequestOpen}
-          onClose={() => setIsRequestOpen(false)}
-          scope={{
-            chipId,
-            taskName,
-            entityType: qid.includes("-") ? "coupling" : "qubit",
-            taskIds: [taskId],
-            trigger: "single",
-          }}
-          scopeLabel={`${taskName} · ${qid}`}
-        />
       )}
     </section>
   );
