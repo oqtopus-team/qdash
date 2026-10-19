@@ -17,7 +17,7 @@ export const chartTool = defineTool({
   }),
   replay: "safe",
   execute: async (params) => ({
-    content: [{ type: "text" as const, text: "Chart rendered in the chat UI." }],
+    output: [{ type: "text" as const, text: "Chart rendered in the chat UI." }],
     details: { chart: { data: params.data, layout: params.layout ?? {} } },
   }),
 });

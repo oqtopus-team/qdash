@@ -64,7 +64,7 @@ type SessionEventLike = {
   args?: unknown;
   isError?: boolean;
   changes?: ReadonlyArray<{ type: string; delta?: string }>;
-  result?: { details?: Record<string, unknown> & { chart?: { data: unknown[]; layout: unknown } } };
+  result?: { details?: unknown };
   entry?: {
     model?: ReadonlyArray<{
       role?: string;
@@ -106,7 +106,7 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
   if (event.type === "tool_execution_end") {
     const out: NdjsonEvent[] = [];
     const durableResult = event.entry?.model?.[0];
-    const chart = event.result?.details?.chart ?? chartFromDetails(durableResult?.details);
+    const chart = chartFromDetails(event.result?.details) ?? chartFromDetails(durableResult?.details);
     if (chart) out.push({ type: "chart", chart });
     // Interactive requests end the turn; the UI renders them as cards.
     const details = (event.result?.details ?? durableResult?.details) as

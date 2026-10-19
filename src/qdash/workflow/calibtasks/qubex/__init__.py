@@ -30,6 +30,9 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
 )
 from qdash.workflow.calibtasks.qubex.cw.check_waveform import CheckWaveform
 from qdash.workflow.calibtasks.qubex.measurement.check_ckp import CheckCKP
+from qdash.workflow.calibtasks.qubex.measurement.ef_readout_classification import (
+    EFReadoutClassification,
+)
 from qdash.workflow.calibtasks.qubex.measurement.readout_classification import ReadoutClassification
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_adaptive_chevron import (
     CheckAdaptiveChevron,
@@ -59,8 +62,11 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_pi_pulse import Cre
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_hpi_pulse import CheckDRAGHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_pi_pulse import CheckDRAGPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_chevron import CheckEFChevron
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_rabi import CheckEFRabi
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_hpi_pulse import CreateDRAGHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_pi_pulse import CreateDRAGPIPulse
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_ef_hpi_pulse import CreateEFHPIPulse
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_ef_pi_pulse import CreateEFPIPulse
 from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state import CheckBellState
 from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state_tomography import (
     CheckBellStateTomography,
@@ -84,6 +90,7 @@ __all__ = [
     "CheckDRAGHPIPulse",
     "CheckDRAGPIPulse",
     "CheckEFChevron",
+    "CheckEFRabi",
     "CheckHPIPulse",
     "CheckJAZZ",
     "CheckNoise",
@@ -106,10 +113,13 @@ __all__ = [
     "ConfigureEF",
     "CreateDRAGHPIPulse",
     "CreateDRAGPIPulse",
+    "CreateEFHPIPulse",
+    "CreateEFPIPulse",
     "CreateHPIPulse",
     "CreatePIPulse",
     "CreateZX90",
     "DumpBox",
+    "EFReadoutClassification",
     "LinkUp",
     "QubexTask",
     "RandomizedBenchmarking",

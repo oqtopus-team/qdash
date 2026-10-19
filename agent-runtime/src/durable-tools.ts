@@ -188,7 +188,7 @@ export function adaptCodingAgentTool(
           args: approvalArgs(args),
         };
         return {
-          content: [
+          output: [
             {
               type: "text",
               text: "Approval requested: the user now sees this operation with its arguments and Approve/Decline buttons. Stop here. Their decision arrives as the next message.",
@@ -263,7 +263,7 @@ export function adaptCodingAgentTool(
             }
           : result.details;
       return {
-        content: result.content,
+        output: result.content,
         ...(details === undefined ? {} : { details: asJson(details) }),
         ...(result.isError === undefined ? {} : { isError: result.isError }),
         ...(result.usage === undefined ? {} : { usage: result.usage }),

@@ -108,7 +108,8 @@ test("a checkout tool with a pinned name replaces the pinned implementation", as
   );
 
   assert.equal(extension.tools.length, 1);
-  await extension.tools[0].execute({}, { callId: "call-1" }, { abortSignal: undefined });
+  const result = await extension.tools[0].execute({}, { callId: "call-1" }, { abortSignal: undefined });
+  assert.deepEqual(result.output, []);
   assert.equal(localTool.calls(), 1);
   assert.equal(pinnedTool.calls(), 0);
 });
@@ -269,6 +270,7 @@ test("experimental write tools require opt-in and never run from the model's cal
     context,
   );
   assert.equal(write.calls(), 0);
+  assert.match(requested.output[0].text, /Approval requested/);
   assert.deepEqual(requested.control, { terminate: true });
   assert.deepEqual(requested.details.approval, {
     id: "call-1",
