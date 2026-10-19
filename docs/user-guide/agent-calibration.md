@@ -1,32 +1,40 @@
 # Agent Calibration
 
-QDash agent calibration lets a user-operated AI agent run bounded calibration steps while QDash owns execution, deterministic gates, backend application, provenance, and audit records.
+Agent calibration lets an AI agent you operate run calibration steps one at a time, inside a
+scope you approve first, while QDash executes the measurements, checks the results against
+fixed gates, and records every decision. It is an experimental single-qubit path inspired by
+[Vibe Calibration](https://arxiv.org/abs/2606.22376).
 
-This experimental single-qubit path is inspired by [Vibe Calibration](https://arxiv.org/abs/2606.22376). It completes one Skill node at a time and requires operator-approved session scope before hardware operations.
+You drive it from the `qdash-agent` command of the Python client. How this works:
+[Agent platform](../developer-guide/copilot/agent-platform.md).
 
 ## Install and configure
 
-Install the client from a release or local checkout.
+Install the client, then configure a named profile as described in the
+[Python client](../reference/clients/python.md#configuration). The command reads credentials
+from that profile and never prints them. In a secret-managed environment, set the documented
+`QDASH_*` variables and replace `--profile local` below with `--from-env`.
 
-~~~bash
+```bash
 pip install qdash-client
-~~~
+```
 
-For local development:
+Agent instructions (skills) are distributed separately from
+[oqtopus-team/skills](https://github.com/oqtopus-team/skills).
 
-~~~bash
-uv tool install ./clients/python
-~~~
-
-Configure a named QDash profile as described in the [QDash Client guide](./qdash-client.md). The CLI reads credentials from that profile and does not print them. In a secret-managed environment, set the documented `QDASH_*` variables and replace `--profile local` below with `--from-env`. Agent instructions are distributed separately from [oqtopus-team/skills](https://github.com/oqtopus-team/skills).
-
-Agent endpoints are available to authenticated project members, mutations require editor permission, and workers register the required system deployments at startup. Versioned backend application also requires the existing GitHub configuration credentials and a parameter-to-YAML mapping in `workflow.params_updater.parameter_file_map`.
+You need to be a member of the project; creating sessions and running steps needs editor
+permission. Writing accepted values back to the Qubex configuration files also needs the
+GitHub configuration credentials of the deployment and a parameter-to-file mapping in the
+application configuration (`workflow.params_updater.parameter_file_map`).
 
 ## Create a bounded session
 
-The session fixes the chip, qubits, tasks, parameter bounds, result-quality gates, action budget, expiry, Skill identity, model identity, and whether an agent may explicitly reconfigure hardware. The action budget counts proposed operations; gate evaluation and commit do not consume additional actions.
+A session fixes everything the agent may touch: the chip, the qubits, the tasks, the bounds a
+proposed parameter must fall in, the quality a result must reach, how many actions the agent
+may propose, when the grant expires, which skill and model are acting, and whether the agent may
+reconfigure hardware. Nothing outside the session is accepted later.
 
-~~~bash
+```bash
 qdash-agent --profile local start-session \
   --chip-id chip-001 \
   --qid Q00 \
@@ -39,15 +47,20 @@ qdash-agent --profile local start-session \
   --skill-version 1 \
   --skill-hash sha256:replace-with-skill-hash \
   --model-name local-agent-model
-~~~
+```
 
-Keep the returned `session_id`. Review the complete scope before authorizing a hardware campaign. Omit `--allow-reconfigure` when the campaign must not run an implicit `Configure` task.
+Keep the returned `session_id`. Review the whole scope before authorising a campaign on
+hardware. Leave out `--allow-reconfigure` when the campaign must not reconfigure the device.
+The action budget counts proposed measurements; checking and committing a result do not use
+actions.
 
-## Run and apply one Skill node
+## Run one step
 
-A node performs authorization, staged execution, polling, authoritative candidate extraction, deterministic parameter and quality gates, audited QDash commit, worker-side YAML application, read-back verification, and optional GitHub versioning.
+One step runs a task, extracts the candidate value from the result, checks it against the
+session's bounds and quality gates, and, when asked, commits it to QDash and applies it to the
+backend configuration files.
 
-~~~bash
+```bash
 qdash-agent --profile local run-step \
   --session-id SESSION_ID \
   --task CheckT1 \
@@ -57,29 +70,39 @@ qdash-agent --profile local run-step \
   --reconfigure-before-task \
   --commit \
   --apply-backend
-~~~
+```
 
-The result includes a Prefect `operation_id` and, after QDash creates its execution record, a separate QDash `execution_id`; the runner resolves and polls both. The task runs the way the Task Workbench runs it: inputs come from the current calibration state, and the Qubex session opens with the task's own `readout_duration`. `--source-execution-id` records the execution the step was decided from; the run does not restore its snapshot. In QDash, the execution is named `agent:<task>` and tagged `agent-session:<session_id>` so it can be distinguished from a Task Workbench `quick-run:<task>` or a manual `re-execute:<task>` run. Task measurement always uses `update_params=false`. QDash derives the candidate from the authoritative task result and currently normalizes R² as `r2`; a missing required metric rejects the candidate. `--commit` writes only the accepted value to QDash state. `--apply-backend` then instructs a worker to re-read that committed snapshot, pull the latest config, atomically update mapped Qubex YAML files, read them back, and push only the target files. The response records the base and resulting Git versions.
+| Option | Effect |
+| --- | --- |
+| `--source-execution-id` | Records which execution the step was decided from. The step does not restore that execution's state; it measures from the current calibration state, the way the Task Workbench does. |
+| `--candidate-parameter` | The output parameter to extract and judge. A result that lacks a required quality metric is rejected. |
+| `--reconfigure-before-task` | Reconfigure the hardware before measuring. Only accepted when the session allows it. |
+| `--commit` | Write the accepted value to the calibration state. Nothing is written without it. |
+| `--apply-backend` | After the commit, have a worker update the mapped Qubex configuration files from the committed value, read them back, and push the changed files. The response records the configuration versions before and after. |
+| `--github-push` | Also version the changed files in GitHub. |
 
-Use `--github-push` when changed backend files must also be versioned in GitHub.
+The run appears on the **Execution** page as `agent:<task>`, tagged with the session, so it is
+told apart from a workbench quick run or a manual re-execution. The measurement itself never
+writes parameters; only the gated commit does.
 
-The CLI emits one typed transition:
+The command ends with one of four transitions. An agent must branch on this transition and
+never substitute a number of its own.
 
-- `pass`: all requested stages passed; when backend apply was requested, `backend_verified` is true.
-- `retry`: dispatch or polling did not reach a terminal result within the configured budget.
-- `rollback`: deterministic parameter or quality gates rejected the candidate.
-- `human_escalation`: policy, persistence, backend verification, or versioning failed and requires inspection.
+| Transition | Meaning |
+| --- | --- |
+| `pass` | Every requested stage passed. With `--apply-backend`, the files were verified too. |
+| `retry` | The measurement did not reach a result within the time budget. |
+| `rollback` | The bounds or quality gates rejected the candidate. |
+| `human_escalation` | Policy, persistence, backend verification, or versioning failed. Inspect before continuing. |
 
-An AI agent must branch only on this transition and must never substitute its own numeric candidate.
+## Run a campaign
 
-## Run an autonomous single-qubit campaign
+`run-campaign` runs an ordered plan of steps inside one approved session. Before the first
+measurement it checks the qubit, the tasks, the candidate parameters, the reconfiguration
+permission, and the remaining action budget against the session. A `rollback` or
+`human_escalation` stops the campaign at once.
 
-`run-campaign` advances an ordered, declarative plan inside one previously approved session. It
-preflights the qid, tasks, candidate parameters, reconfiguration permission, and remaining action
-budget before the first hardware operation. A rollback or human escalation stops the campaign
-immediately.
-
-~~~bash
+```bash
 qdash-agent --profile local run-campaign \
   --session-id SESSION_ID \
   --qid Q00 \
@@ -91,19 +114,21 @@ qdash-agent --profile local run-campaign \
     {"task_name":"CreateHPIPulse","candidate_parameter":"hpi_amplitude"},
     {"task_name":"CheckT1","candidate_parameter":"t1"}
   ]'
-~~~
+```
 
-Every node reads the current calibration state, so a value committed by an earlier node is the
-input of the later ones. After a node passes, its authoritative candidate is also carried into later
-nodes as an input parameter override, so a node sees it even when it was not committed. An explicit `parameter_overrides` value on a later node takes precedence over a
-carried value. Every override is checked against the immutable session bounds before dispatch.
+Each node measures from the current calibration state, so a value committed by an earlier node
+feeds the later ones. A value a node accepted is also carried into later nodes as an input, even
+when it was not committed; an explicit `parameter_overrides` on a node wins over a carried
+value, and every override is checked against the session bounds first.
 
-Nodes may define `id`, `on_pass`, and `on_rollback` to form a bounded decision graph. An omitted
-`on_pass` advances to the next array item, `$complete` ends successfully, and an omitted
-`on_rollback` stops with `rollback`. A rollback transition means that QDash rejected the measured
-candidate; it does not carry that candidate into the recovery node.
+### Recovery branches
 
-~~~bash
+Nodes may carry an `id`, `on_pass`, and `on_rollback` to form a small decision graph. Without
+`on_pass` the next node follows; `$complete` ends the campaign successfully; without
+`on_rollback` a rejected candidate stops the campaign. A rejected candidate is not carried into
+the recovery node.
+
+```bash
 qdash-agent --profile local run-campaign \
   --session-id SESSION_ID \
   --qid Q00 \
@@ -126,103 +151,36 @@ qdash-agent --profile local run-campaign \
       "on_rollback":"calibrate-rabi"
     }
   ]'
-~~~
+```
 
-`--max-node-executions` bounds all graph visits, including loops, and must fit within the session's
-remaining action budget before dispatch. If the graph does not finish within the bound, the runner
-returns `human_escalation`. The output `node_path` records every visited node. Revisited nodes use a
-new deterministic idempotency key while transport retries before dispatch reuse the same key.
+`--max-node-executions` bounds every visit, loops included, and must fit in the session's
+remaining action budget. A graph that does not finish within the bound ends in
+`human_escalation`. The output's `node_path` lists every node visited.
 
-With `--commit-on-success`, every node remains staged until the campaign reaches a final `pass`.
-QDash then re-resolves and revalidates the latest accepted candidate for each parameter before
-persisting the same-qid set with one Qubit save and one audit record. A rollback, retry, human
-escalation, or exhausted execution bound leaves the staged candidates uncommitted.
+### Committing
 
-Campaign finalization cannot be combined with per-node `commit_candidate`, `apply_backend`, or
-`push_to_github`. Without `--commit-on-success`, a node may explicitly set those fields to `true`;
-`apply_backend` requires `commit_candidate`, and `push_to_github` requires both. Campaign
-finalization currently updates QDash state only. Applying the complete candidate set to backend
-files remains a separate operation. Hardware reconfiguration remains opt-in per node through
-`reconfigure_before_task` and must also be authorized by the session.
+With `--commit-on-success`, nothing is written until the campaign ends in `pass`; QDash then
+re-checks the latest accepted value of each parameter and saves the set in one step with one
+audit record. Any other ending leaves the values uncommitted. This option cannot be combined
+with per-node `commit_candidate`, `apply_backend`, or `push_to_github`; without it, a node may set
+those itself (`apply_backend` needs `commit_candidate`, and `push_to_github` needs both). A
+campaign commit updates the calibration state only; applying the whole set to the backend files
+is a separate operation.
 
-The runner automatically retries only failures that occur before QDash returns a Prefect operation
-or QDash execution ID. It reuses the same action idempotency key during that recovery. Once a
-hardware operation exists, a timeout returns `retry` to the operator instead of autonomously
-dispatching another measurement.
+The runner retries by itself only failures that happen before a measurement has started, reusing
+the same request so nothing runs twice. Once a measurement exists, a timeout returns `retry` to
+you rather than measuring again. The result lists every step, execution, candidate, commit,
+and planner decision, and the final set of carried parameters.
 
-The session action budget must cover every plan node. Recovery with the same idempotency key does
-not consume another action. The result contains every attempted step, execution ID, candidate,
-commit, planner decision, and the final carried parameter set.
+A planner that chooses the next node at run time, backed by a model, is injected through the
+[Python API](../reference/clients/python.md#agent-calibration); the command runs the plan as
+written.
 
-## Python API
+## Before the first run on hardware
 
-~~~python
-from qdash.client import (
-    AgentCalibrationRunner,
-    AgentCampaignNode,
-    AgentCampaignRunner,
-    AgentPlannerDecision,
-    QDashClient,
-)
-
-
-class CoherencePlanner:
-    def choose_next(self, observation):
-        if observation.last_outcome.transition.value == "rollback":
-            return AgentPlannerDecision("recover-rabi", "use the approved recovery node")
-        return AgentPlannerDecision("$complete", "deterministic gates accepted the candidate")
-
-
-client = QDashClient.from_profile("local")
-try:
-    outcome = AgentCalibrationRunner(client).run_step(
-        session_id="SESSION_ID",
-        task_name="CheckT1",
-        qid="Q00",
-        source_execution_id="SOURCE_EXECUTION_ID",
-        candidate_parameter="t1",
-        reconfigure_before_task=True,
-        commit_candidate=True,
-        apply_backend=True,
-        push_to_github=True,
-    )
-    print(outcome.transition, outcome.reason, outcome.commit)
-
-    approved_nodes = [
-        AgentCampaignNode(
-            node_id="calibrate-rabi",
-            task_name="CheckRabi",
-            candidate_parameter="control_amplitude",
-        ),
-        AgentCampaignNode(
-            node_id="recover-rabi",
-            task_name="CheckRabi",
-            candidate_parameter="control_amplitude",
-            parameter_overrides={"control_amplitude": 0.084},
-        ),
-    ]
-    campaign = AgentCampaignRunner(client).run_campaign(
-        session_id="SESSION_ID",
-        qid="Q00",
-        source_execution_id="SOURCE_EXECUTION_ID",
-        nodes=approved_nodes,
-        max_node_executions=3,
-        planner=CoherencePlanner(),
-        commit_on_success=True,
-    )
-    print(campaign.transition, campaign.planner_decisions, campaign.campaign_commit)
-finally:
-    client.close()
-~~~
-
-The planner receives only bounded campaign observations and may select an ID already present in
-`approved_nodes` or `$complete`. Runner validation rejects unknown IDs, prevents completion after
-rollback, and enforces the preflighted node-execution limit. Planner exceptions and invalid
-decisions end in `human_escalation`. The CLI executes the declarative graph; inject a model-backed
-planner through the Python API when dynamic next-action selection is required.
-
-## Hardware boundary
-
-Backend verification proves that the worker's mapped Qubex YAML values match the gated commit. The next calibration step creates a Qubex backend from those files, connects to hardware, and may run `Configure` only when the session granted it.
-
-Before the first real-device campaign, run a single-qid canary under operator supervision. Confirm the chip, qid, task, source execution, bounds, quality gates, action budget, reconfiguration permission, commit behavior, and Git branch before triggering it. A multi-qubit unattended campaign still requires declarative campaign transitions, topology-safe scheduling, and hardware canary evidence.
+Backend verification proves that the Qubex configuration files match the committed value; the
+next step builds the backend from those files, connects to the hardware, and reconfigures it only
+when the session allows. Run a single-qubit canary under supervision first, and confirm the
+chip, qubit, task, source execution, bounds, quality gates, action budget, reconfiguration
+permission, commit behaviour, and Git branch before starting it. Unattended multi-qubit
+campaigns are not supported.

@@ -53,7 +53,7 @@ exact tasks each step will run. Nothing starts until you approve the card.
 The plan can only use the step types and task names QDash exposes; it cannot contain code, and
 every task result is judged by the same gates as a saved workflow. The execution appears on the
 **Execution** page tagged `pipeline`. See
-[Calibration Pipeline Spec](../development/workflow/calibration-pipeline.md) for the spec format.
+[Calibration Pipeline Spec](../developer-guide/workflow/calibration-pipeline.md) for the spec format.
 
 ## Metrics Analysis
 
