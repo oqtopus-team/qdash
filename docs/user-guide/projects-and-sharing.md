@@ -20,7 +20,7 @@ projects and switch between them without copying data.
 | Editor | Viewer access plus operational changes such as running workflows and editing calibration data. |
 | Owner | Editor access plus project settings, membership, forum categories and labels, and deletion. |
 
-Each project has one owner. Ask a system Admin to transfer ownership before the current owner leaves the project.
+Each project has one owner. Ask a system Admin to transfer ownership before the current owner leaves the project. After a transfer, the previous owner stays in the project as an Editor.
 
 ## Create and Configure Projects
 
