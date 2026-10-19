@@ -20,7 +20,12 @@ import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
 import { useListTaskInfo, useGetTaskFileSettings } from "@/client/task-file/task-file";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
-import { EvaluationRequestModal } from "@/components/features/evaluations/EvaluationRequestModal";
+import {
+  EvaluationRequestModal,
+  evaluationTargets,
+} from "@/components/features/evaluations/EvaluationRequestModal";
+import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
+import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
@@ -87,6 +92,27 @@ export function ChipPageContent() {
   const taskResultStartAt =
     selectedCooldownId || hasTimeRangeParams ? toIsoSeconds(startDate) : null;
   const taskResultEndAt = selectedCooldownId || hasTimeRangeParams ? toIsoSeconds(endDate) : null;
+  // The grid's own queries, shared through the query cache, so the evaluation
+  // request can offer the entities with a result to pick from.
+  const qubitResults = useQubitTaskResults({
+    chipId: selectedChip,
+    task: viewMode === "1q" ? selectedTask : "",
+    selectedDate,
+    startAt: taskResultStartAt,
+    endAt: taskResultEndAt,
+  });
+  const couplingResults = useCouplingTaskResults({
+    chipId: selectedChip,
+    task: viewMode === "2q" ? selectedTask : "",
+    selectedDate,
+    startAt: taskResultStartAt,
+    endAt: taskResultEndAt,
+  });
+  const evaluationResults = (viewMode === "2q" ? couplingResults : qubitResults).data?.data?.result;
+  const evaluationTargetList = useMemo(
+    () => evaluationTargets(evaluationResults),
+    [evaluationResults],
+  );
 
   // Use lightweight endpoints (~0.3KB vs ~300KB with embedded data)
   const { data: chipData } = useGetChip(selectedChip);
@@ -803,6 +829,7 @@ export function ChipPageContent() {
             taskName: selectedTask,
             entityType: viewMode === "2q" ? "coupling" : "qubit",
             date: selectedDate && selectedDate !== "latest" ? selectedDate : null,
+            targets: evaluationTargetList,
             trigger: "bulk",
           }}
           scopeLabel={`${viewMode === "2q" ? "all couplings" : "all qubits"} on ${selectedChip}`}

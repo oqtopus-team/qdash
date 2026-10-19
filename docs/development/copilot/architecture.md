@@ -184,6 +184,21 @@ version, and the checkout commit when a mounted checkout is in use). The route
 is synchronous and needs the same headers as `/chat`; concurrency is the
 caller's to limit.
 
+pi-qcaleval asks the evaluation model for the diagnosis as a JSON object with
+six keys. On a chat-completions API (vLLM) it constrains decoding to that
+schema through `response_format`, since the calibration model, asked for JSON
+in the prompt alone, now and then closes the object after the first key; a
+server that refuses the format is asked plainly. An answer that still lacks
+keys is asked for once more, and the more complete one kept. The record says
+how the answer was obtained (`attempts`, `structured`, `stop_reason`, and
+`calls`: each model call's duration, stop reason and output tokens) and,
+when it is not the whole diagnosis, keeps the text (`raw`) and the keys it
+lacks; the API derives `complete` and `missing_keys` from the diagnosis on
+every read, so older records are judged the same way. A run's summary adds
+its wall time (`elapsed_ms`) and the completed evaluations' model time added
+up (`duration_ms_total`), so two runs can be compared on cost as well as on
+outcome.
+
 The route has two modes. `direct` (the default) runs the two tools as such.
 `planner` opens a throwaway conversation on the given chat model, tells it
 to summarise the result and judge its figure, and reads the record off the

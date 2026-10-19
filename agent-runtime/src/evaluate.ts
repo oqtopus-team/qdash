@@ -126,14 +126,53 @@ export interface EvaluateResult {
     /** The system prompt the model was sent, when the evaluator reports it. */
     system_prompt: string | null;
     diagnosis: Record<string, unknown> | null;
-    /** The answer when it was not the requested JSON. */
+    /** The answer when it was not the requested JSON, or not all of it. */
     raw: string | null;
+    /** Diagnosis keys the answer lacks, when the evaluator reports them. */
+    missing_keys: string[];
+    /** Model calls the evaluator made for the answer, when it reports them. */
+    attempts: number | null;
+    /** Whether decoding was constrained to the diagnosis schema, when the evaluator reports it. */
+    structured: boolean | null;
+    /** Why the model stopped, when the evaluator reports it. */
+    stop_reason: string | null;
+    /** Every model call the evaluator made, in order, when it reports them. */
+    calls: EvaluationCall[];
     duration_ms: number;
     usage: unknown;
   };
   evaluator: ExtensionPackage | null;
   /** The planner turn, in planner mode. */
   planner: PlannerRecord | null;
+}
+
+/** One model call of an evaluation: how long it took and how it ended. */
+export interface EvaluationCall {
+  duration_ms: number;
+  stop_reason: string;
+  structured: boolean;
+  output_tokens?: number;
+  missing_keys?: string[];
+}
+
+/** The evaluator's call records, kept when they have the expected shape. */
+export function callRecords(value: unknown): EvaluationCall[] {
+  if (!Array.isArray(value)) return [];
+  const calls: EvaluationCall[] = [];
+  for (const entry of value) {
+    const c = entry as Partial<EvaluationCall> | null;
+    if (typeof c?.duration_ms !== "number" || typeof c.stop_reason !== "string") continue;
+    calls.push({
+      duration_ms: c.duration_ms,
+      stop_reason: c.stop_reason,
+      structured: c.structured === true,
+      ...(typeof c.output_tokens === "number" ? { output_tokens: c.output_tokens } : {}),
+      ...(Array.isArray(c.missing_keys)
+        ? { missing_keys: c.missing_keys.filter((key): key is string => typeof key === "string") }
+        : {}),
+    });
+  }
+  return calls;
 }
 
 /**
@@ -279,6 +318,11 @@ export function recordFromDetails(
     fallback?: boolean;
     diagnosis?: Record<string, unknown> | null;
     raw?: string;
+    missing_keys?: unknown;
+    attempts?: unknown;
+    structured?: unknown;
+    stop_reason?: unknown;
+    calls?: unknown;
     prompt?: string;
     system_prompt?: string;
     host?: Partial<HostRecord>;
@@ -302,7 +346,16 @@ export function recordFromDetails(
       prompt: typeof d.prompt === "string" ? d.prompt : null,
       system_prompt: typeof d.system_prompt === "string" ? d.system_prompt : null,
       diagnosis,
-      raw: diagnosis ? null : (d.raw ?? extra.text) || null,
+      // The evaluator keeps the text when the answer was not JSON or not all
+      // of the diagnosis; an older one reports it only when not JSON.
+      raw: (typeof d.raw === "string" ? d.raw : diagnosis ? null : extra.text) || null,
+      missing_keys: Array.isArray(d.missing_keys)
+        ? d.missing_keys.filter((key): key is string => typeof key === "string")
+        : [],
+      attempts: typeof d.attempts === "number" ? d.attempts : null,
+      structured: typeof d.structured === "boolean" ? d.structured : null,
+      stop_reason: typeof d.stop_reason === "string" ? d.stop_reason : null,
+      calls: callRecords(d.calls),
       duration_ms: extra.durationMs ?? host.duration_ms ?? 0,
       usage: extra.usage ?? null,
     },

@@ -47,26 +47,60 @@ The calibration evaluation model can judge the figure of a task result against t
 maintained reference. Two entry points lead to the same record:
 
 - **Chip page → Evaluate** evaluates the latest result of the selected task for every qubit or
-  coupling of the chip (or the results of the selected day) as one run.
-- **Task result → AI evaluation → Evaluate** evaluates that one result as a run of one.
+  coupling of the chip (or the results of the selected day) as one run. **Targets** lists the
+  entities the grid shows a result for; untick some to narrow the run, and the summary says how
+  many of them it will cover. An entity whose result is still running or has no figure cannot be
+  ticked, and says why.
+- **Task result → Ask AI** evaluates that one result as a run of one. The button is next to the
+  result's figure in the task detail modals (task history, metrics history, execution detail) and
+  on the **AI evaluation** section of the task result page, with the same choices as the chip
+  page plus a third one, **Chat with Copilot**, which opens a conversation about the result
+  instead of recording an evaluation.
 
-Choose how to evaluate. **Direct** runs the evidence and evaluation tools as such, so the same
-reference reaches the model every time. **Planner** lets the chat planner summarise the result and
-call the evaluation itself, as Ask AI does, and records what it did and answered. An optional
-question is passed to the evaluation model on top of the standard diagnosis.
+Two settings describe an evaluation, and they are independent.
 
-**Show labeled examples** adds the task's expert-labeled example plots from Knowledge before the
-figure, each followed by its diagnosis, the way the QCalEval papers evaluate in context. Off is
-zero-shot. The run records which examples were shown, so two runs of the same results, with and
-without examples, compare the two settings on the same ground truth.
+- **Who prepares the prompt.** **Fixed prompt**: QDash builds it from the result's summary and the
+  task's reference from Knowledge, the same way every time, so runs are reproducible. **Via
+  Copilot**: Copilot (the chat planner) summarises the result and calls the evaluation itself, as
+  AI Chat does; it is slower, and what Copilot did and answered is recorded too.
+- **Examples**, in QCalEval's terms. **Zero-shot**: the figure is judged against the reference
+  alone. **In-context**: the task's expert-labeled example plots from Knowledge are shown before
+  the figure, each followed by its diagnosis. The run records which examples were shown, so two
+  runs of the same results, zero-shot and in-context, compare the two settings on the same ground
+  truth.
+
+An optional question is passed to the evaluation model on top of the standard diagnosis.
 
 Open **AI Evaluations** to follow a run and read each evaluation: the diagnosis (fit quality,
 success, extracted parameters), which model and extension version judged, the exact text the model
-saw, and, in planner mode, the planner's tools and answer. Mark each evaluation **Agree** or
+saw, and, via Copilot, Copilot's tools and answer. Mark each evaluation **Agree** or
 **Disagree**, with a note when useful; the run's agreement rate is the ground truth for comparing
 runs made with different extension versions, models or task references. The task result page lists
 every evaluation of that result across runs, including judgements the chat planner made on its
 own while answering a question (shown as **Chat** runs).
+
+An answer is **complete** when it carries all six parts of the diagnosis. On a vLLM deployment the
+evaluation model's decoding is constrained to that shape; elsewhere, or when the server refuses
+the constraint, the model is asked in the prompt alone and may close its answer after the first
+part, in which case it is asked once more. An answer that still lacks parts is marked
+**incomplete** with the parts it lacks, keeps the text as returned, and is counted apart from the
+complete ones in the run's totals; an answer that is not JSON at all is marked **prose**. The
+compare page treats either as not comparable rather than as a difference.
+
+Time is recorded too. Each evaluation shows how long the model took, and, when it was asked
+more than once, each call with its duration and why it stopped (a constrained answer cut at the
+output budget shows as **length**). A run shows how long it took end to end and the mean per
+evaluation, on the runs list, the run page, and the compare page's settings table, so two
+settings can be weighed on cost as well as on outcome.
+
+### What the model was given
+
+A run's **Prompt** panel says what the evaluation model received, read off the stored records:
+the system prompt, the reference (the task's knowledge as it was at the time, with a hash that
+tells two versions apart), how many labeled examples and figures, and the question, and whether
+these were the same for every evaluation of the run. Via Copilot they can differ, because Copilot
+writes the context and may pass a reference of its own. Each evaluation's **Prompt sent to the
+model** opens the exact text, with the figures where they stood.
 
 ### Compare two runs
 
@@ -78,7 +112,9 @@ row per qubit or coupling with each side's fit quality, success and verdict. **O
 whether the two judgements agree on fit quality and success; **Only differences** keeps the rows
 that disagree or are missing on one side. A row marked **different results** means the runs
 judged different task results of that entity, for example after a newer calibration. Expand a
-row to read both diagnoses next to the figure and record your verdict on either side.
+row to read both diagnoses next to the figure, open **Prompt A vs B** to see the two prompts as a
+diff, and record your verdict on either side. The settings table also carries the reference and
+system prompt each run's records hold, so an edited task knowledge shows up as a difference.
 
 ## Ask Copilot
 

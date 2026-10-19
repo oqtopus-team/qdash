@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   agreementRate,
   diagnosisOf,
+  examplesLabel,
+  modeLabel,
   diagnosisSuccess,
   diagnosisText,
   evaluatorLabel,
@@ -48,6 +50,13 @@ describe("evaluationDisplay", () => {
     ).toBe("@orangekame3/pi-qcaleval@0.0.1 (042e454323b2)");
     expect(evaluatorLabel({ name: "x", version: "1.0.0" })).toBe("x@1.0.0");
     expect(evaluatorLabel(null)).toBeNull();
+  });
+
+  it("names the two axes of a run in the user's terms", () => {
+    expect(modeLabel("direct")).toBe("Fixed prompt");
+    expect(modeLabel("planner")).toBe("Via Copilot");
+    expect(examplesLabel(false)).toBe("Zero-shot");
+    expect(examplesLabel(true)).toBe("In-context");
   });
 
   it("formats durations and agreement", () => {

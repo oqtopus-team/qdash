@@ -4,7 +4,7 @@ import { useListEvaluationRuns } from "@/client/evaluation/evaluation";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { EvaluationRunSummary } from "@/schemas";
 
-import { modeLabel, triggerLabel } from "./evaluationDisplay";
+import { examplesLabel, modeLabel, triggerLabel } from "./evaluationDisplay";
 
 interface RunPickerProps {
   /** Candidates: runs of this chip and task, newest first. */
@@ -23,7 +23,7 @@ function runOptionLabel(run: EvaluationRunSummary): string {
     formatDateTime(run.requested_at),
     triggerLabel(run.trigger),
     modeLabel(run.mode),
-    run.with_examples ? "examples" : null,
+    examplesLabel(run.with_examples),
     run.date ? run.date : null,
     `${run.success_count}/${run.completed_count} success`,
   ];

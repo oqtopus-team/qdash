@@ -7,6 +7,7 @@
  */
 import type { EvaluationRunSummaryCompletedAt } from './evaluationRunSummaryCompletedAt';
 import type { EvaluationRunSummaryDate } from './evaluationRunSummaryDate';
+import type { EvaluationRunSummaryElapsedMs } from './evaluationRunSummaryElapsedMs';
 import type { EvaluationRunSummaryEvaluator } from './evaluationRunSummaryEvaluator';
 import type { EvaluationRunSummaryMode } from './evaluationRunSummaryMode';
 import type { EvaluationRunSummaryModel } from './evaluationRunSummaryModel';
@@ -40,6 +41,12 @@ export interface EvaluationRunSummary {
   pending_count: number;
   /** Completed evaluations whose answer was JSON */
   parsed_count: number;
+  /** Completed evaluations whose diagnosis carries all six keys */
+  complete_count: number;
+  /** Wall time from the request to the run's completion */
+  elapsed_ms?: EvaluationRunSummaryElapsedMs;
+  /** Wall time of the completed evaluations' model calls, added up */
+  duration_ms_total: number;
   /** Completed evaluations whose diagnosis reports success */
   success_count: number;
   /** Evaluations a person agreed with */

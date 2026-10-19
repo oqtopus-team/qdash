@@ -19,9 +19,11 @@ import { compareHref } from "./evaluationCompare";
 import {
   agreementRate,
   evaluatorLabel,
+  examplesLabel,
   modeLabel,
   runDone,
   runIsActive,
+  runTimingLabel,
   triggerLabel,
 } from "./evaluationDisplay";
 
@@ -86,14 +88,16 @@ function RunCard({
               <span className="badge badge-neutral">{run.entity_type}</span>
               <span className="badge badge-outline">{triggerLabel(run.trigger)}</span>
               <span className="badge badge-outline">{modeLabel(run.mode)}</span>
-              {run.with_examples && (
-                <span
-                  className="badge badge-accent badge-outline"
-                  title="Labeled examples were shown before each figure"
-                >
-                  examples
-                </span>
-              )}
+              <span
+                className={`badge badge-outline ${run.with_examples ? "badge-accent" : ""}`}
+                title={
+                  run.with_examples
+                    ? "Labeled examples were shown before each figure"
+                    : "The figure was judged against the reference alone"
+                }
+              >
+                {examplesLabel(run.with_examples)}
+              </span>
               {run.failed_count > 0 && (
                 <span className="badge badge-error">{run.failed_count} failed</span>
               )}
@@ -121,8 +125,8 @@ function RunCard({
                   <span className="badge badge-success gap-1" title="Diagnoses reporting success">
                     <strong>{run.success_count}</strong> success
                   </span>
-                  <span className="badge badge-ghost gap-1" title="Answers parsed as JSON">
-                    <strong>{run.parsed_count}</strong> parsed
+                  <span className="badge badge-ghost gap-1" title="Diagnoses with all six keys">
+                    <strong>{run.complete_count}</strong> complete
                   </span>
                   {agreement !== null && (
                     <span
@@ -136,8 +140,9 @@ function RunCard({
                 </>
               )}
             </div>
-            <div className="text-xs text-base-content/50">
-              Requested {formatDateTime(run.requested_at)}
+            <div className="flex flex-wrap gap-x-2 text-xs text-base-content/50">
+              <span>Requested {formatDateTime(run.requested_at)}</span>
+              {runTimingLabel(run) && <span>{runTimingLabel(run)}</span>}
             </div>
           </div>
           <RunProgress run={run} />
