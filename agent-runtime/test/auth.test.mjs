@@ -103,6 +103,7 @@ test("real pi-qdash reads, approved writes and Python calls keep concurrent user
       };
       const readResult = await read.execute(override, { callId: "read" }, context);
       assert.equal(readResult.isError, undefined);
+      assert.ok(readResult.output.length > 0);
       const write = extension.tools.find((tool) => tool.name === "qdash_create_forum_post");
       const requested = await write.execute(
         {
@@ -119,7 +120,10 @@ test("real pi-qdash reads, approved writes and Python calls keep concurrent user
         ...requested.details.approval,
         args: { ...requested.details.approval.args, ...override },
       });
-      await buildPythonTool(connection).execute({ code: "result = {'output': 'ok'}" }, {}, context);
+      const pythonResult = await buildPythonTool(connection).execute(
+        { code: "result = {'output': 'ok'}" }, {}, context,
+      );
+      assert.deepEqual(pythonResult.output, [{ type: "text", text: "ok" }]);
       return [readResult, requested];
     }),
   );

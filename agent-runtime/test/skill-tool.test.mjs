@@ -20,5 +20,5 @@ test("read_skill offers exactly the loaded skill names", () => {
 
 test("read_skill returns the skill file", async () => {
   const result = await tool.execute({ name: "qdash-calibration-agent" });
-  assert.equal(result.content[0].text, "# Calibration agent\nScope one qubit.");
+  assert.equal(result.output[0].text, "# Calibration agent\nScope one qubit.");
 });

@@ -33,7 +33,7 @@ export function buildSkillTool(skills: readonly SkillSummary[]) {
     execute: async ({ name }) => {
       const skill = byName.get(name);
       if (!skill) throw new Error(`unknown skill: ${name}`);
-      return { content: [{ type: "text", text: readFileSync(skill.filePath, "utf8") }] };
+      return { output: [{ type: "text", text: readFileSync(skill.filePath, "utf8") }] };
     },
   });
 }

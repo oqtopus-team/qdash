@@ -36,7 +36,7 @@ export const askUserTool = defineTool({
   execute: async (params) => {
     const ask: AskRequest = { question: params.question, options: params.options };
     return {
-      content: [
+      output: [
         {
           type: "text",
           text: "The question is shown to the user with these options. Stop here; their answer arrives as the next message.",
