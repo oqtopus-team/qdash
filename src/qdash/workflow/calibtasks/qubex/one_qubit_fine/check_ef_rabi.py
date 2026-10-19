@@ -124,6 +124,13 @@ class CheckEFRabi(QubexTask):
                 exp.ctx.resolve_read_label(label): self._get_calibration_value("readout_frequency"),
             }
         ):
+            # TODO(qubex): expose explicit GE preparation waveforms through
+            # obtain_ef_rabi_params() and ef_rabi_experiment(). The current API
+            # prepares |e> with x180(), which prefers stored DRAG PI, PI, then
+            # DRAG HPI over the HPI restored from this task's recorded inputs.
+            # Once supported, pass a FlatTop built from hpi_amplitude,
+            # hpi_duration, and HPI_RAMPTIME, repeated twice. Do not clear note
+            # entries or patch x180(): those mutate shared session state.
             result = exp.obtain_ef_rabi_params(
                 targets=label,
                 time_range=self.run_parameters["time_range"].get_value(),

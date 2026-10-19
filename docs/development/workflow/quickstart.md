@@ -91,6 +91,14 @@ initial mode or a preceding `ConfigureEF` task.
 Each configuration task loads the selected mode and pushes it to the boxes.
 A separate execution must establish its own EF configuration.
 
+The `ef_calibration` template calibrates GE Rabi and HPI before measuring the EF
+transition. Its `CheckEFRabi` task currently delegates GE state preparation to
+Qubex's `x180()`, which selects an available DRAG PI, PI, or DRAG HPI before the
+restored HPI. Consequently, existing calibration-note entries can affect the
+preparation pulse even with identical recorded task inputs. Recalibrating HPI
+does not invalidate those entries, and running the template in a new session
+does not guarantee their absence if a calibration note is loaded.
+
 EF configuration changes the channel allocation available to CR gates. Before
 returning to CR calibration, run `Configure` without a mode override to restore
 `ge-cr-cr`.

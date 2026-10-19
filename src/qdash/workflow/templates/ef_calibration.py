@@ -5,6 +5,10 @@ from an existing GE control frequency and readout frequency/amplitude, calibrate
 the GE Rabi and HPI pulse, then calibrates the EF frequency, pulses, and three-state
 readout classifier in the same synchronized Qubex session.
 
+CheckEFRabi currently lets Qubex select the GE preparation pulse. Existing GE PI
+or DRAG pulses can take precedence over the HPI calibrated by this flow, so the
+recorded HPI inputs alone do not fully determine the EF Rabi preparation pulse.
+
 Example:
     ef_calibration(username="alice", chip_id="64Qv3", qids=["0", "1"])
 """
