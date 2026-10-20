@@ -27,7 +27,7 @@ docs/
     index.md               Reading order: set up, operate, work with calibrations
     setup.md               Clone, configure, start, sign in
     operations.md          Start, stop, logs, recovery
-    system-updates.md      Release updates through the updater
+    system-updates.md      Apply a stable release from the host
     migrations/            Steps for upgrades that change stored data
     application-tour.md    One page per job after that: running calibrations,
     ...                    reviewing results, copilot, projects, cryo, ...

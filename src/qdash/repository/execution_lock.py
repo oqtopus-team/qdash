@@ -66,8 +66,6 @@ class MongoExecutionLockRepository:
 
     def has_conflict(self, project_id: str, scope: ExecutionResourceScope) -> bool:
         """Inspect current claims without acquiring a lock or creating a record."""
-        if ExecutionLockDocument.maintenance_active():
-            return True
         doc = ExecutionLockDocument.find_one({"project_id": project_id}).run()
         if doc is None:
             return False

@@ -62,8 +62,8 @@ Code from `${localWorkspaceFolder}` or by `compose.devcontainer.yaml` from `$PWD
 `/home/vscode/.codex` are persisted in Docker volumes, so they survive container rebuilds.
 Codex itself is installed under `/opt/codex`, which remains writable by the `vscode` user for
 CLI updates without being hidden by the persisted `.local` volume. Host-side deployment commands
-keep their Python environment and updater runtime state outside the checkout, so they do not reuse
-root-owned DevContainer artifacts.
+keep their Python environment outside the checkout, so they do not reuse root-owned DevContainer
+artifacts.
 
 Use the same `task` commands from the host or DevContainer. Both sessions edit the same source
 checkout and use the same Docker daemon. Run development commands as the `vscode` user in the

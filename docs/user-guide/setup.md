@@ -2,22 +2,22 @@
 
 QDash operators configure the Qubex integration and run the full Docker Compose stack. Host-side
 API and UI processes are documented in [Development Environment Setup](../developer-guide/setup.md).
-Install Docker with Docker Compose and `uv` on the host. Go Task is optional for operators.
+Install Docker with Docker Compose on the host. Go Task is optional for operators.
 
 ## Clone the Repository
 
 Clone the Git repository's release branch. The repository default is `develop`, so select `main`
-explicitly for an installation that will use Admin UI system updates:
+explicitly for a stable installation:
 
 ```bash
 git clone --branch main https://github.com/oqtopus-team/qdash.git
 cd qdash
 ```
 
-The `main` branch represents the latest stable release and its release commits carry
-`vMAJOR.MINOR.PATCH` tags. Do not use `develop`, a feature branch, or a prerelease tag for an
-updatable installation. The installation directory can be anywhere. See
-[System Updates](./system-updates.md#git-branch-and-tag-requirements) for the complete update rules.
+The `main` branch represents stable releases, whose commits carry `vMAJOR.MINOR.PATCH` tags. Do not
+use `develop`, a feature branch, or a prerelease tag for an operational installation. The
+installation directory can be anywhere. Follow [System Updates](./system-updates.md) to move an
+existing installation to another release.
 
 ## Qubex Setup
 
@@ -169,11 +169,10 @@ when recreating containers so interrupted chat and analysis work can resume.
 Start all enabled services:
 
 ```bash
-uv run --env-file .env --isolated --locked --no-dev qdash-updater start
 docker compose up -d --build
 ```
 
-If Go Task is installed, `task deploy-local` performs the same startup and also pulls an optional
+If Go Task is installed, `task deploy-local` performs this startup and also pulls an optional
 external knowledge repository configured by `KNOWLEDGE_REPO_URL`.
 
 Open:
@@ -194,7 +193,6 @@ COMPOSE_PROFILES=agent-runtime,tunnel
 Then run:
 
 ```bash
-uv run --env-file .env --isolated --locked --no-dev qdash-updater start
 docker compose up -d --build
 ```
 
