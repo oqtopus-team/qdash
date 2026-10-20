@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any, ClassVar
@@ -21,6 +22,9 @@ __all__ = [
     "RunParameterModel",
     "RunResult",
 ]
+
+
+logger = logging.getLogger(__name__)
 
 
 class BaseTask(ABC):
@@ -165,34 +169,29 @@ class BaseTask(ABC):
     def _set_run_parameters(self, run_params: dict[str, Any]) -> None:
         """Set run parameters (experiment configuration).
 
+        Only parameters the task declares in ``run_spec`` are set. A task reads
+        its run parameters by name, so a value under any other name (a flow's
+        shared default meant for another task, a stale template entry) would
+        never be used, and recording it would misstate the task's settings.
+
         Args:
         ----
             run_params: Dictionary of run parameters
 
         """
         for name, param_data in run_params.items():
-            if name in self.run_parameters:
-                # Parameter already exists - update its value
-                value = param_data.get("value")
-                if value is not None:
-                    value_type = param_data.get("value_type", self.run_parameters[name].value_type)
-                    converted_value = self._convert_value_to_type(value, value_type)
-                    self.run_parameters[name].value = converted_value
-            else:
-                # Create new RunParameterModel
-                value = param_data.get("value")
-                if value is not None:
-                    value_type = param_data.get("value_type", "float")
-                    unit = param_data.get("unit", "")
-                    description = param_data.get("description", "")
-                    converted_value = self._convert_value_to_type(value, value_type)
-
-                    self.run_parameters[name] = RunParameterModel(
-                        unit=unit,
-                        description=description,
-                        value=converted_value,
-                        value_type=value_type,
-                    )
+            if name not in self.run_parameters:
+                logger.debug(
+                    "%s ignores run parameter %r: not declared in run_spec",
+                    self.__class__.__name__,
+                    name,
+                )
+                continue
+            value = param_data.get("value")
+            if value is not None:
+                value_type = param_data.get("value_type", self.run_parameters[name].value_type)
+                converted_value = self._convert_value_to_type(value, value_type)
+                self.run_parameters[name].value = converted_value
 
     def _set_calibration_inputs(self, calib_inputs: dict[str, Any]) -> None:
         """Set calibration input parameters (for provenance tracking).

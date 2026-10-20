@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, FileCode2, GitCompareArrows, Pencil } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getListTaskKnowledgeQueryKey } from "@/client/task/task";
+import {
+  getGetTaskEvaluationPromptsQueryKey,
+  getListTaskKnowledgeQueryKey,
+} from "@/client/task/task";
 import {
   GitWorkspaceToolbar,
   PullRequestBanner,
@@ -13,6 +16,7 @@ import {
 import { useGitWorkspace } from "@/components/features/files/useGitWorkspace";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FileDiffReviewDialog } from "@/components/ui/FileDiffReviewDialog";
+import { EvaluationPromptPreview } from "@/components/features/task-knowledge/EvaluationPromptPreview";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { useToast } from "@/components/ui/Toast";
@@ -38,6 +42,9 @@ type KnowledgeExample = {
   fit_quality?: string;
   verdict?: string;
   source?: string;
+  status?: string;
+  suggested_range?: string;
+  parameters?: string;
   figures?: KnowledgeFigure[];
   diagnosis?: string;
 };
@@ -110,6 +117,8 @@ function KnowledgeIndexEditor({
       queryClient.invalidateQueries({ queryKey: ["task-knowledge-markdown", taskName] });
       queryClient.invalidateQueries({ queryKey: ["task-knowledge-detail", taskName] });
       queryClient.invalidateQueries({ queryKey: getListTaskKnowledgeQueryKey() });
+      // The prompt preview is built from the saved reference.
+      queryClient.invalidateQueries({ queryKey: getGetTaskEvaluationPromptsQueryKey(taskName) });
       queryClient.invalidateQueries({
         queryKey: workspaceQueryKeys.content(KNOWLEDGE_WORKSPACE, path),
       });
@@ -293,6 +302,8 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
         <MarkdownContent content={markdown} />
       )}
 
+      <EvaluationPromptPreview taskName={taskName} exampleCount={detail?.examples?.length ?? 0} />
+
       {(detail?.examples?.length ?? 0) > 0 && (
         <section className="mt-10">
           <div className="mb-3">
@@ -320,6 +331,19 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
                   )}
                   {example.verdict && (
                     <span className="badge badge-outline badge-sm">{example.verdict}</span>
+                  )}
+                  {example.status && (
+                    <span
+                      className="badge badge-outline badge-sm font-mono"
+                      title="Status code the example demonstrates"
+                    >
+                      {example.status}
+                    </span>
+                  )}
+                  {example.suggested_range && (
+                    <span className="text-xs text-base-content/60">
+                      range {example.suggested_range}
+                    </span>
                   )}
                   {(example.chip || example.qid) && (
                     <span className="text-xs text-base-content/50">
@@ -357,6 +381,12 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
                   </div>
                 )}
                 {example.diagnosis && <MarkdownContent content={example.diagnosis} />}
+                {example.parameters && (
+                  <p className="mt-2 text-xs text-base-content/60">
+                    Parameters read from the plot:{" "}
+                    <code className="font-mono">{example.parameters}</code>
+                  </p>
+                )}
               </article>
             ))}
           </div>

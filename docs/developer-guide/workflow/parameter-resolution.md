@@ -55,6 +55,10 @@ Task construction resolves Run parameters in this order, from highest to lowest 
 4. Shared entries in `CalibConfig.default_run_parameters`
 5. `run_spec` specified on the task class
 
+A value reaches a task only when the task declares that name in its `run_spec`; any other
+name is ignored and logged at debug level, so a shared default meant for one task (a pulse
+duration for the pulse tasks) is neither used nor recorded by the others.
+
 Use `default_run_parameters` only for values intentionally shared by every declaring task.
 A shared value overrides task-specific defaults, including Qubex optimized defaults: qubit
 spectroscopy normally uses a 1024 ns interval and resonator spectroscopy uses 0 ns. Use

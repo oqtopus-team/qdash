@@ -34,7 +34,7 @@ The following data is shared by members of the same project for each chip:
 - The execution counter used to allocate execution IDs
 
 This allows one project member to continue calibration from another member's latest result. A user
-must have the appropriate [project role](./projects-and-sharing.md#team-roles-and-permissions) to
+must have the appropriate [project role](./projects-and-sharing.md#project-roles) to
 update this state.
 
 The user shown on a record identifies who performed the operation. It is an actor snapshot and

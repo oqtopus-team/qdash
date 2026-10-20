@@ -3,15 +3,23 @@ on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
       VERSION: ${{ github.ref_name }}
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
       - run: |
           gh release create "${VERSION}" --title "${VERSION}" --generate-notes
         env:

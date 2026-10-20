@@ -20,6 +20,7 @@ Read in this order the first time; afterwards each page stands on its own.
 - [Application Tour](./application-tour.md): the pages, what each is for, and who can do what.
 - [Authentication](./authentication.md) and [Projects and Sharing](./projects-and-sharing.md):
   accounts, roles, and the project boundary that scopes everything else.
+- [Roles and Permissions](./permissions.md): what each system and project role can do.
 - [Dashboard](./dashboard.md): chip health at a glance.
 - [Running Calibrations](./running-calibrations.md) and [Task Parameters](./task-parameters.md):
   workflows, one-off task runs, and how parameters are resolved.

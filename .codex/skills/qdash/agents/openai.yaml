@@ -1,4 +1,0 @@
-interface:
-  display_name: "QDash"
-  short_description: "Query QDash through saved client profiles"
-  default_prompt: "Use $qdash to inspect QDash through my local qdash-client profile."

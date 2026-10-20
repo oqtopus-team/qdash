@@ -6505,6 +6505,100 @@
         }
       }
     },
+    "/tasks/{task_name}/evaluation-prompts": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Preview the prompts an AI evaluation of a task would send",
+        "description": "The prompts the evaluation model would receive for a task.\n\nThe Agent Runtime builds them the way a direct evaluation does, from the\ntask's reference in Knowledge (and its labeled examples when asked), as\nthe requesting user, without a figure or a model call.",
+        "operationId": "getTaskEvaluationPrompts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          },
+          {
+            "name": "with_examples",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Lay out the task's labeled examples, as an in-context evaluation",
+              "default": false,
+              "title": "With Examples"
+            },
+            "description": "Lay out the task's labeled examples, as an in-context evaluation"
+          },
+          {
+            "name": "question",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A specific question to add",
+              "title": "Question"
+            },
+            "description": "A specific question to add"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationPromptPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{task_name}/knowledge": {
       "get": {
         "tags": [
@@ -19350,6 +19444,18 @@
       },
       "EvaluationCallModel": {
         "properties": {
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question",
+            "description": "The diagnosis question the call asked, when one per call"
+          },
           "duration_ms": {
             "type": "integer",
             "title": "Duration Ms",
@@ -19412,6 +19518,12 @@
             "type": "string",
             "title": "Outcome",
             "description": "The example's labeled outcome",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "The status code the example demonstrated",
             "default": ""
           },
           "figures": {
@@ -19756,6 +19868,29 @@
             "title": "Raw",
             "description": "The answer text when it was not JSON, or not all of the diagnosis"
           },
+          "answers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answers",
+            "description": "Each answered question's text as the model returned it"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Questions",
+            "description": "The questions asked, in order; empty means all six"
+          },
           "parsed": {
             "type": "boolean",
             "title": "Parsed",
@@ -19765,7 +19900,7 @@
           "complete": {
             "type": "boolean",
             "title": "Complete",
-            "description": "Whether the diagnosis carries all six keys (derived)",
+            "description": "Whether the diagnosis answers every question asked (derived)",
             "default": false
           },
           "missing_keys": {
@@ -19774,7 +19909,7 @@
             },
             "type": "array",
             "title": "Missing Keys",
-            "description": "Diagnosis keys the parsed answer lacks (derived)"
+            "description": "Questions asked that the diagnosis lacks (derived)"
           },
           "attempts": {
             "anyOf": [
@@ -19878,6 +20013,104 @@
         ],
         "title": "EvaluationPlannerModel",
         "description": "What the planner did around the evaluation, in planner mode."
+      },
+      "EvaluationPromptPreviewResponse": {
+        "properties": {
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "with_examples": {
+            "type": "boolean",
+            "title": "With Examples",
+            "description": "Whether the task's labeled examples were laid out",
+            "default": false
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "provider/modelId of the model that would judge, when configured"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationPromptQuestion"
+            },
+            "type": "array",
+            "title": "Questions"
+          },
+          "knowledge_chars": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Chars",
+            "description": "Length of the reference the prompts were built from"
+          },
+          "knowledge_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Sha256",
+            "description": "SHA-256 of that reference, to tell two versions apart"
+          },
+          "examples": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationExampleModel"
+            },
+            "type": "array",
+            "title": "Examples",
+            "description": "The labeled examples fetched for the preview"
+          },
+          "examples_used": {
+            "type": "integer",
+            "title": "Examples Used",
+            "description": "How many of them the prompts show",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_name"
+        ],
+        "title": "EvaluationPromptPreviewResponse",
+        "description": "The prompts an evaluation of a task would send, built without a figure or a model call."
+      },
+      "EvaluationPromptQuestion": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "The question key, e.g. fit_reliability"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "description": "The user turn; [figure] marks where an image goes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "prompt"
+        ],
+        "title": "EvaluationPromptQuestion",
+        "description": "One question's prompt, as the evaluation model would receive it."
       },
       "EvaluationRunDetailResponse": {
         "properties": {
@@ -22311,6 +22544,24 @@
           "source": {
             "type": "string",
             "title": "Source",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "The task's status code the example demonstrates, e.g. SUCCESS",
+            "default": ""
+          },
+          "suggested_range": {
+            "type": "string",
+            "title": "Suggested Range",
+            "description": "The corrective range the example's status calls for",
+            "default": ""
+          },
+          "parameters": {
+            "type": "string",
+            "title": "Parameters",
+            "description": "JSON of the values read from the example's plot",
             "default": ""
           },
           "figures": {
@@ -28160,6 +28411,10 @@
             "type": "string",
             "title": "Prompt Text",
             "description": "The background as Markdown, headed by the experiment name"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/TaskReferenceResponse",
+            "description": "The background and question-template parts for the evaluation model"
           }
         },
         "type": "object",
@@ -28226,6 +28481,55 @@
         ],
         "title": "TaskNoteEntry",
         "description": "Task-result note row for the dashboard summary."
+      },
+      "TaskReferenceResponse": {
+        "properties": {
+          "background": {
+            "type": "string",
+            "title": "Background",
+            "description": "What the experiment does and what a successful result looks like",
+            "default": ""
+          },
+          "guidance": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Guidance",
+            "description": "Points the significance question asks to explain"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Parameters",
+            "description": "Extraction schema: parameter name -> JSON type"
+          },
+          "statuses": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Statuses",
+            "description": "Decision criteria: status code -> criterion, SUCCESS first"
+          },
+          "range_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Range Format",
+            "description": "How a suggested corrective range is written"
+          }
+        },
+        "type": "object",
+        "title": "TaskReferenceResponse",
+        "description": "The task's reference for the evaluation model, in QCalEval's shape.\n\nThe background goes before every question; the other fields fill the\nfamily-specific parts of the question templates."
       },
       "TaskResponse": {
         "properties": {

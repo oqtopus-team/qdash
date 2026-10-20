@@ -67,21 +67,47 @@ describe("evaluationCompare", () => {
     expect(["0-10", "0-2"].sort(compareQids)).toEqual(["0-2", "0-10"]);
   });
 
-  it("compares fit quality and success only when both sides answered in JSON", () => {
-    const good = item("Q1", { fit_quality: "good", success: true });
-    expect(rowOutcome(good, item("Q1", { fit_quality: "Good, clean decay", success: true }))).toBe(
+  it("compares status, fit, outcome and success only when both sides answered", () => {
+    const answered = (
+      status: string,
+      fit: string,
+      outcome: string,
+      success: boolean,
+    ): Record<string, unknown> => ({
+      experimental_conclusion: { classification: outcome, reason: "" },
+      fit_reliability: { assessment: fit, reason: "" },
+      calibration_diagnosis: { status, suggested_range: null, notes: "" },
+      success,
+    });
+    const good = item("Q1", answered("SUCCESS", "reliable", "expected", true));
+    expect(rowOutcome(good, item("Q1", answered("SUCCESS", "Reliable", "expected", true)))).toBe(
       "same",
     );
-    expect(rowOutcome(good, item("Q1", { fit_quality: "poor", success: true }))).toBe("differs");
-    expect(rowOutcome(good, item("Q1", { fit_quality: "good", success: false }))).toBe("differs");
+    expect(rowOutcome(good, item("Q1", answered("SUCCESS", "unreliable", "expected", true)))).toBe(
+      "differs",
+    );
+    expect(
+      rowOutcome(good, item("Q1", answered("LOW_CONTRAST", "reliable", "expected", false))),
+    ).toBe("differs");
+    expect(rowOutcome(good, item("Q1", answered("SUCCESS", "reliable", "suboptimal", true)))).toBe(
+      "differs",
+    );
     expect(rowOutcome(good, item("Q1", null))).toBe("incomplete");
-    // A diagnosis without a verdict, or with a fit quality on one side only, is not compared.
+    // A diagnosis without a verdict, or with a labelled answer on one side only, is not compared.
     expect(rowOutcome(good, item("Q1", { technical_description: "only" }))).toBe("incomplete");
     expect(rowOutcome(good, item("Q1", { success: true }))).toBe("incomplete");
-    expect(rowOutcome(good, item("Q1", { success: true }, { status: "failed" }))).toBe(
-      "incomplete",
-    );
+    expect(
+      rowOutcome(
+        good,
+        item("Q1", answered("SUCCESS", "reliable", "expected", true), { status: "failed" }),
+      ),
+    ).toBe("incomplete");
     expect(rowOutcome(good, null)).toBe("incomplete");
+    // Older records with only a success verdict still compare on it.
+    expect(rowOutcome(item("Q1", { success: true }), item("Q1", { success: false }))).toBe(
+      "differs",
+    );
+    expect(rowOutcome(item("Q1", { success: true }), item("Q1", { success: true }))).toBe("same");
   });
 
   it("joins the two runs by entity and keeps whether they judged the same result", () => {

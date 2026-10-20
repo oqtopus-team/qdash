@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { EvaluationCallModel } from './evaluationCallModel';
+import type { EvaluationOutputModelAnswers } from './evaluationOutputModelAnswers';
 import type { EvaluationOutputModelAttempts } from './evaluationOutputModelAttempts';
 import type { EvaluationOutputModelDiagnosis } from './evaluationOutputModelDiagnosis';
 import type { EvaluationOutputModelModel } from './evaluationOutputModelModel';
@@ -26,11 +27,15 @@ export interface EvaluationOutputModel {
   diagnosis?: EvaluationOutputModelDiagnosis;
   /** The answer text when it was not JSON, or not all of the diagnosis */
   raw?: EvaluationOutputModelRaw;
+  /** Each answered question's text as the model returned it */
+  answers?: EvaluationOutputModelAnswers;
+  /** The questions asked, in order; empty means all six */
+  questions?: string[];
   /** Whether the answer parsed as the JSON object */
   parsed?: boolean;
-  /** Whether the diagnosis carries all six keys (derived) */
+  /** Whether the diagnosis answers every question asked (derived) */
   complete?: boolean;
-  /** Diagnosis keys the parsed answer lacks (derived) */
+  /** Questions asked that the diagnosis lacks (derived) */
   missing_keys?: string[];
   /** Model calls made for the answer: 1, or 2 after an incomplete one */
   attempts?: EvaluationOutputModelAttempts;

@@ -11,6 +11,7 @@ from qdash.api.services.pi_chat_service import QDashAuth
 from qdash.api.services.pi_evaluation_service import (
     EvaluationRuntimeError,
     evaluate_task_result,
+    preview_evaluation_prompts,
 )
 
 AUTH = QDashAuth(access_token="user-token", project_id="proj")
@@ -98,3 +99,49 @@ async def test_planner_mode_sends_the_planner_model(monkeypatch) -> None:
         "model": {"provider": "openai-compatible", "name": "qwen"},
         "thinking_level": "low",
     }
+
+
+@pytest.mark.asyncio
+async def test_a_prompt_preview_is_requested_as_the_user(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "runtime-secret")
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["headers"] = dict(request.headers)
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"task_name": "CheckRabi", "questions": []})
+
+    preview = await preview_evaluation_prompts(
+        "CheckRabi", auth=AUTH, with_examples=True, question="Why?", transport=_transport(handler)
+    )
+
+    assert preview == {"task_name": "CheckRabi", "questions": []}
+    assert isinstance(seen["url"], str)
+    assert seen["url"].endswith("/evaluation-prompts")
+    assert seen["body"] == {"task_name": "CheckRabi", "with_examples": True, "question": "Why?"}
+    assert isinstance(seen["headers"], dict)
+    assert seen["headers"]["authorization"] == "Bearer runtime-secret"
+    assert seen["headers"]["x-qdash-token"] == "user-token"
+    assert seen["headers"]["x-qdash-project-id"] == "proj"
+
+
+@pytest.mark.asyncio
+async def test_a_zero_shot_preview_sends_only_the_task_name_and_names_a_failing_stage(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "runtime-secret")
+    bodies: list[object] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return httpx.Response(
+            503, json={"error": "evaluation tools not loaded", "stage": "request"}
+        )
+
+    with pytest.raises(EvaluationRuntimeError) as excinfo:
+        await preview_evaluation_prompts("CheckRabi", auth=AUTH, transport=_transport(handler))
+
+    assert bodies == [{"task_name": "CheckRabi"}]
+    assert excinfo.value.stage == "request"
+    assert excinfo.value.detail == "evaluation tools not loaded"

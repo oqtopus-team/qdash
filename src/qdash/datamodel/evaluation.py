@@ -20,15 +20,16 @@ EvaluationRunStatus = Literal["running", "completed"]
 EvaluationTrigger = Literal["bulk", "single", "chat"]
 # How the evaluation was reached: the two tools run directly, or a planner turn that calls them.
 EvaluationMode = Literal["direct", "planner"]
-# The keys of a diagnosis, as pi-qcaleval asks the evaluation model for them.
-# An answer is complete when it carries all six.
+# The six QCalEval questions, keyed as pi-qcaleval keys the diagnosis (and as
+# the benchmark scripts key their responses). An answer is complete when every
+# question asked was answered; by default all six are.
 DIAGNOSIS_KEYS: tuple[str, ...] = (
     "technical_description",
     "experimental_conclusion",
     "experimental_significance",
-    "fit_quality",
+    "fit_reliability",
     "parameter_extraction",
-    "success",
+    "calibration_diagnosis",
 )
 
 
@@ -49,6 +50,7 @@ class EvaluationExampleModel(BaseModel):
     id: str = Field(default="", description="Example file stem in the knowledge repository")
     title: str = Field(default="")
     outcome: str = Field(default="", description="The example's labeled outcome")
+    status: str = Field(default="", description="The status code the example demonstrated")
     figures: list[EvaluationFigureModel] = Field(default_factory=list)
 
 
@@ -80,6 +82,9 @@ class EvaluationInputModel(BaseModel):
 class EvaluationCallModel(BaseModel):
     """One model call made for an answer: how long it took and how it ended."""
 
+    question: str | None = Field(
+        default=None, description="The diagnosis question the call asked, when one per call"
+    )
     duration_ms: int = Field(..., description="Wall time of the call")
     stop_reason: str = Field(..., description="Why the model stopped, as pi reports it")
     structured: bool = Field(
@@ -106,12 +111,20 @@ class EvaluationOutputModel(BaseModel):
         default=None,
         description="The answer text when it was not JSON, or not all of the diagnosis",
     )
+    answers: dict[str, str] | None = Field(
+        default=None, description="Each answered question's text as the model returned it"
+    )
+    questions: list[str] = Field(
+        default_factory=list,
+        description="The questions asked, in order; empty means all six",
+    )
     parsed: bool = Field(default=False, description="Whether the answer parsed as the JSON object")
     complete: bool = Field(
-        default=False, description="Whether the diagnosis carries all six keys (derived)"
+        default=False,
+        description="Whether the diagnosis answers every question asked (derived)",
     )
     missing_keys: list[str] = Field(
-        default_factory=list, description="Diagnosis keys the parsed answer lacks (derived)"
+        default_factory=list, description="Questions asked that the diagnosis lacks (derived)"
     )
     attempts: int | None = Field(
         default=None, description="Model calls made for the answer: 1, or 2 after an incomplete one"
@@ -136,7 +149,8 @@ class EvaluationOutputModel(BaseModel):
         # Derived from the diagnosis on every load, so records stored before
         # these fields existed carry them too.
         if isinstance(self.diagnosis, dict):
-            self.missing_keys = [key for key in DIAGNOSIS_KEYS if key not in self.diagnosis]
+            asked = self.questions or DIAGNOSIS_KEYS
+            self.missing_keys = [key for key in asked if key not in self.diagnosis]
         else:
             self.missing_keys = []
         self.complete = isinstance(self.diagnosis, dict) and not self.missing_keys

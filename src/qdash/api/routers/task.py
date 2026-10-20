@@ -5,10 +5,15 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
+from fastapi.security import (
+    HTTPAuthorizationCredentials,  # noqa: TC002 - FastAPI resolves annotations
+)
 
 from qdash.api.dependencies import get_flow_service, get_task_file_service, get_task_service
+from qdash.api.lib.auth import bearer_scheme
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
@@ -16,6 +21,7 @@ from qdash.api.lib.project import (
 )
 from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task import (
+    EvaluationPromptPreviewResponse,
     ListTaskKnowledgeResponse,
     ListTaskResponse,
     QuickRunTaskRequest,
@@ -24,6 +30,11 @@ from qdash.api.schemas.task import (
 )
 from qdash.api.services.catalog_task_run import resolve_catalog_task, run_catalog_task
 from qdash.api.services.flow_service import FlowService
+from qdash.api.services.pi_chat_service import QDashAuth
+from qdash.api.services.pi_evaluation_service import (
+    EvaluationRuntimeError,
+    preview_evaluation_prompts,
+)
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_service import TaskService
 
@@ -172,6 +183,44 @@ def get_task_knowledge_markdown(
     """
     content = service.get_task_knowledge_markdown(task_name)
     return Response(content=content, media_type="text/markdown; charset=utf-8")
+
+
+@router.get(
+    "/tasks/{task_name}/evaluation-prompts",
+    response_model=EvaluationPromptPreviewResponse,
+    summary="Preview the prompts an AI evaluation of a task would send",
+    operation_id="getTaskEvaluationPrompts",
+)
+async def get_task_evaluation_prompts(
+    task_name: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    with_examples: bool = Query(
+        False, description="Lay out the task's labeled examples, as an in-context evaluation"
+    ),
+    question: str | None = Query(None, description="A specific question to add"),
+) -> EvaluationPromptPreviewResponse:
+    """The prompts the evaluation model would receive for a task.
+
+    The Agent Runtime builds them the way a direct evaluation does, from the
+    task's reference in Knowledge (and its labeled examples when asked), as
+    the requesting user, without a figure or a model call.
+    """
+    try:
+        payload = await preview_evaluation_prompts(
+            task_name,
+            auth=QDashAuth(access_token=credentials.credentials, project_id=ctx.project_id),
+            with_examples=with_examples,
+            question=(question or "").strip() or None,
+        )
+    except EvaluationRuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"agent runtime unavailable: {exc}",
+        ) from exc
+    return EvaluationPromptPreviewResponse.from_runtime(payload)
 
 
 @router.get(

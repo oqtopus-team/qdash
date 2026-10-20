@@ -41,6 +41,12 @@ tab shows every saved edit as a diff against the last commit before you create t
 task's file is its name, so keep it unchanged; the knowledge repository rejects headings outside the
 template.
 
+Each task's **Knowledge** page has an **Evaluation prompts** panel that shows the six prompts the
+evaluation model would receive for that task, built from the page as it is now: the background,
+the status criteria and parameters derived from it, and, with **In-context** selected, the labeled
+examples in the places they take. Use it after editing a task's knowledge to see what the model
+will read before you run an evaluation.
+
 ## Request an AI Evaluation
 
 The calibration evaluation model can judge the figure of a task result against the task's
@@ -62,35 +68,51 @@ Two settings describe an evaluation, and they are independent.
 | Who prepares the prompt | **Fixed prompt** | QDash builds it from the result's summary and the task's reference, the same way every time, so runs are reproducible. |
 | | **Via Copilot** | Copilot summarises the result and calls the evaluation itself, as AI Chat does. Slower; what Copilot did and answered is recorded too. |
 | Examples | **Zero-shot** | The figure is judged against the reference alone. |
-| | **In-context** | The task's expert-labeled example plots from **Knowledge** are shown before the figure, each with its diagnosis. A task without labeled examples is judged zero-shot even with this setting on; the run shows how many examples were shown. |
+| | **In-context** | The task's expert-labeled example plots from **Knowledge** are shown before the figure as demonstrations: one example per status for the status question, each example's analysis for the significance question, and one example's values for parameter extraction. A task without labeled examples is judged zero-shot even with this setting on; the run shows how many examples were shown. |
 
-An optional question is passed to the evaluation model on top of the standard diagnosis. The
+An optional question is added to the significance question as one more point to address. The
 modal says, before you confirm, exactly what will run and with which settings.
 
 ### Read an evaluation
 
-Open **AI Evaluations** to follow a run and read each evaluation: the diagnosis (fit quality,
-success, extracted parameters), which model judged, the exact text it was given, and, via
-Copilot, what Copilot did and answered. Mark each evaluation **Agree** or **Disagree**, with a
+The model is asked the six questions of the QCalEval benchmark, each on its own, with the
+figure and the task's background from **Knowledge**:
+
+| Question | Answer |
+| --- | --- |
+| What the plot shows | Plot type, axes, and main features |
+| Outcome | One of **expected**, **suboptimal**, **anomalous**, **apparatus**, with a reason |
+| Significance | What the result implies and what calibration step follows |
+| Fit | **reliable**, **unreliable**, or **no fit**, with a reason |
+| Extracted parameters | The values read from the plot, as listed under the task's **Parameters to extract** |
+| Status | A status code from the task's **Common failures** (or **SUCCESS**), a suggested range when it is not a success, and notes |
+
+The model sees the figure, the background, and the sweep the result was measured over (the swept
+parameter's range, step and point count from the run parameters), not the fitted values of the
+result, so its reading of the plot is independent of the fit. An evaluation counts as a
+**success** when the status is SUCCESS.
+
+Open **AI Evaluations** to follow a run and read each evaluation: the answers, which model
+judged, the exact text it was given, and, via Copilot, what Copilot did and answered. Mark each evaluation **Agree** or **Disagree**, with a
 note when useful; the run's agreement rate is the ground truth for comparing runs. The task
 result page lists every evaluation of that result across runs, including judgements Copilot made
 on its own while answering a question (shown as **Chat** runs).
 
-An answer is **complete** when it carries all six parts of the diagnosis. The model is asked once
-more when its first answer is incomplete; an answer that still lacks parts is marked
-**incomplete** with the parts it lacks, and an answer that is not a diagnosis at all is marked
-**prose**. Both keep the text as returned, and neither counts as complete in the run's totals.
+An evaluation is **complete** when every question got an answer. A question whose call failed
+is retried once; one that still has no answer leaves the evaluation marked **incomplete** with
+the questions it lacks, and it does not count as complete in the run's totals. Every answer is
+kept as returned, next to the parsed reading of it.
 
-Each evaluation shows how long the model took and, when it was asked more than once, each call
-with its duration and why it stopped. A run shows how long it took end to end and the mean per
-evaluation, so two settings can be weighed on cost as well as on outcome.
+Each evaluation shows how long the model took and each question's call with its duration and
+why it stopped. A run shows how long it took end to end and the mean per evaluation, so two
+settings can be weighed on cost as well as on outcome.
 
 ### What the model was given
 
-A run's **Prompt** panel says what the evaluation model received: the system prompt, the
-reference (the task's knowledge as it was at the time, with a hash that tells two versions
-apart), how many labeled examples and figures, the question, and whether these were the same
-for every evaluation of the run. Via Copilot they can differ, because Copilot writes the context
+A run's **Prompt** panel says what the evaluation model received: the reference (the task's
+background and criteria as they were at the time, with a hash that tells two versions apart),
+how many labeled examples and figures, the question, and whether these were the same for every
+evaluation of the run. Via Copilot they can differ, because Copilot writes the context
 and may pass a reference of its own. Each evaluation's **Prompt sent to the model** opens the
 exact text, with the figures where they stood.
 
@@ -107,7 +129,7 @@ the figure, open **Prompt A vs B** to see the two prompts as a diff, and record 
 either side. An incomplete or prose answer is shown as not comparable rather than as a
 difference.
 
-How this works: [Copilot architecture](../developer-guide/copilot/architecture.md).
+How this works: [Calibration Evaluation](../developer-guide/copilot/evaluation.md).
 
 ## Ask Copilot
 

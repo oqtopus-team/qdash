@@ -76,8 +76,55 @@ interface EvaluateBody {
   with_examples?: boolean;
 }
 
+interface PromptPreviewBody {
+  task_name?: string;
+  with_examples?: boolean;
+  context?: string;
+  question?: string;
+}
+
 /** Planner-less evaluations in flight, for /health. */
 let evaluating = 0;
+
+/** The prompts an evaluation of a task would send (see evaluate.ts); no model call. */
+async function handleEvaluationPrompts(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = await readJsonBody<PromptPreviewBody>(req, MAX_BODY_BYTES);
+  if (typeof body.task_name !== "string" || !body.task_name.trim()) {
+    sendJson(res, 400, { error: "task_name is required" });
+    return;
+  }
+  let auth;
+  try {
+    auth = requestQDashAuth(req.headers);
+  } catch {
+    sendJson(res, 401, { error: "QDash user authentication is required" });
+    return;
+  }
+  const controller = new AbortController();
+  res.on("close", () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  try {
+    const preview = await runtime.previewEvaluationPrompts(
+      {
+        taskName: body.task_name,
+        withExamples: body.with_examples === true,
+        context: typeof body.context === "string" ? body.context : undefined,
+        question: typeof body.question === "string" ? body.question : undefined,
+      },
+      auth,
+      controller.signal,
+    );
+    sendJson(res, 200, preview);
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    if (error instanceof EvaluationError) {
+      sendJson(res, error.status, { error: error.message, stage: error.stage });
+      return;
+    }
+    throw error;
+  }
+}
 
 /** Convert wire images into Pi image-content blocks. */
 function toImageContent(images: ImageBody[] | undefined) {
@@ -433,6 +480,14 @@ const server = createServer((req, res) => {
       return;
     }
     handleEvaluate(req, res).catch((error: unknown) => handleRouteError(res, error, "evaluate"));
+    return;
+  }
+  if (req.method === "POST" && req.url === "/evaluation-prompts") {
+    if (!authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    handleEvaluationPrompts(req, res).catch((error: unknown) => handleRouteError(res, error, "evaluation-prompts"));
     return;
   }
   if (req.method === "POST" && req.url === "/chat") {

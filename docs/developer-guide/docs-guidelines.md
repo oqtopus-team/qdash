@@ -84,8 +84,8 @@ current. How this works: [Copilot architecture](./copilot/architecture.md).
 ```markdown
 ## Evaluation                                      ← not a user page
 
-The runtime calls `qcal_evaluate` with `response_format: json_schema`; the API
-derives `missing_keys` from the diagnosis on every read ...
+The runtime asks `qcal_evaluate` the six questions in separate calls; the API
+derives `missing_keys` over the questions asked on every read ...
 ```
 
 ## Writing for Developers
@@ -148,6 +148,17 @@ repeat the same pattern in different sections.
 
 **Length** — A page is read in one sitting. Past roughly 400 lines, split it by topic: a testing
 page by test kind, a reference by collection group.
+
+## Checks
+
+Documentation changes must build and keep their external links reachable. Run `task build-docs`
+to validate VitePress routes and local links. Run `task check-docs-links` when Lychee is
+installed to validate links and anchors against the local VitePress layout and external sites.
+
+CI builds the documentation, checks external links in changed Markdown files, and checks every
+internal link and anchor in the generated site on each pull request. A weekly scan checks every
+Markdown file under `docs/` so an external page that later moves or disappears is detected
+without blocking unrelated pull requests.
 
 ## Sidebar
 

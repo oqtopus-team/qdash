@@ -8,6 +8,8 @@ Copilot's behaviour comes from three kinds of knowledge that live in three place
 | Tools and procedures | Tool definitions, "which tool for which question", diagnosis workflows, agent-session workflows | [pi-qdash](https://github.com/oqtopus-team/pi-qdash) (`extensions/`, `skills/`) | Installed into the Agent Runtime image at a pinned version (`agent-runtime/Dockerfile`) |
 | Product behaviour | Persona, approval cards, `ask_user`, output language, turn budgets, model catalog | This repository | `agent-runtime/src/prompt.ts`, `config/copilot/*.yaml` |
 
+The evaluation reference is derived from `index.md`, not written separately: the API's `GET /tasks/{name}/knowledge` serves `reference` with the background (`This is a <task> experiment: <intro>. <Expected plot prose>`), the parameters to extract (one `float` per bullet under **Parameters to extract**), and the status criteria (`SUCCESS` from the "A good result" sentence, then one `UPPER_SNAKE` code per bullet under **Common failures**, with the text up to the first `;` as its criterion). The evaluation model is asked the six QCalEval questions against exactly that, so write those sections as criteria a reader could apply to a plot; the derivation rules and the question each part fills are in [Calibration Evaluation](./evaluation.md). An example under `examples/` may carry `status`, `suggested_range` and `parameters` next to its `outcome`; those are what the in-context demonstrations show for the status, significance and extraction questions.
+
 The split follows what changes together. A skill that names `qdash_list_cooldowns` must ship with the version of pi-qdash that defines that tool, so skills live next to the tools. Task physics is the same whether it is read by Ask AI in the analysis sidebar, the chat, or a pi CLI user, so it has one source that every consumer queries. The approval-card flow exists only in the QDash UI, so its instructions stay here.
 
 ## Rules
@@ -15,7 +17,7 @@ The split follows what changes together. A skill that names `qdash_list_cooldown
 - Do not put physics or expected-result descriptions into a skill or into `prompt.ts`. Add them to the task's `index.md` in qdash-task-knowledge (intro, Expected plot, Common failures, Parameters to extract) and have the skill say "read the task knowledge for X". A validated plot with its diagnosis goes under `examples/` as a demonstration.
 - Do not put pi-qdash tool names into `prompt.ts`. The tool routing guide is the "Preferred tools" section of the pi-qdash `qdash` skill; the runtime reads it at startup, keeps only the tools it exposes, and inlines it into the system prompt (`agent-runtime/src/tool-guide.ts`). The rest of that skill and the other skills stay behind `read_skill`.
 - Do not add QDash-only instructions to a pi-qdash skill. pi CLI users get the same skills without the QDash UI.
-- The distribution source for agent skills is pi-qdash. `.codex/skills/qdash` is a development helper for agents that have no pi extension and is not what sessions record.
+- The distribution source for agent skills is pi-qdash. Skills under this repository's `.agents/skills/` are for agents editing QDash's own code, not for sessions, and are never recorded.
 - Updating knowledge means bumping a version: the pi-qdash version in `agent-runtime/Dockerfile`, or the task-knowledge checkout under `config/task-knowledge`. Agent sessions record the skill name, version, and hash they ran with.
 
 ## Chat prompts

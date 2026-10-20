@@ -20,6 +20,12 @@ export interface KnowledgeExampleResponse {
   fit_quality?: string;
   verdict?: string;
   source?: string;
+  /** The task's status code the example demonstrates, e.g. SUCCESS */
+  status?: string;
+  /** The corrective range the example's status calls for */
+  suggested_range?: string;
+  /** JSON of the values read from the example's plot */
+  parameters?: string;
   figures?: KnowledgeFigureResponse[];
   diagnosis?: string;
   /** The demonstration label: outcome, fit quality, verdict, diagnosis */
