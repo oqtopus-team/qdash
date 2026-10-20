@@ -222,6 +222,13 @@ supplies the status question's suggested-range format
 (`(<min time_range>, <max time_range>) [ns]`) when the task's knowledge states
 none, so the model answers a corrective range in the swept parameter's unit.
 
+`POST /evaluation-prompts` (`previewEvaluationPrompts` in the same file) builds
+the prompts an evaluation of a task would send without a figure or a model
+call: it fetches the task's reference and, on request, its labeled examples
+exactly as a direct evaluation does, and runs `qcal_evaluate` with `dry_run`,
+so the templates stay in one place (the extension). The API serves it as
+`GET /tasks/{task_name}/evaluation-prompts` for the Knowledge page.
+
 The route has two modes. `direct` (the default) runs the two tools as such.
 `planner` opens a throwaway conversation on the given chat model, tells it
 to summarise the result and judge its figure, and reads the record off the

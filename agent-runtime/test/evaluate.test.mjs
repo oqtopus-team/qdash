@@ -472,3 +472,63 @@ test("the sweep gives the status question its range format, unless the knowledge
   assert.equal(bareCall.args.knowledge, undefined);
   assert.deepEqual(bareCall.args.criteria, { range_format: "(<min time_range>, <max time_range>) [ns]" });
 });
+
+import { previewEvaluationPrompts } from "../src/evaluate.ts";
+
+const PREVIEW_IDENTITY = `${REFERENCE.knowledge}\n${JSON.stringify({ parameters: REFERENCE.criteria.parameters, statuses: REFERENCE.criteria.statuses })}`;
+
+test("a prompt preview runs the evaluator dry with the task's reference and examples, no figure", async () => {
+  const d = deps({
+    [EVALUATION_TOOL]: (args) => ({
+      content: [{ type: "text", text: "## fit_reliability\n..." }],
+      details: {
+        model: { provider: "vllm", modelId: "nvidia/Ising-Calibration" },
+        dry_run: true,
+        questions: ["fit_reliability", "calibration_diagnosis"],
+        prompts: { fit_reliability: `F: ${args.context}`, calibration_diagnosis: "C" },
+        examples_used: args.examples ? args.examples.length : 0,
+      },
+    }),
+  });
+  const preview = await previewEvaluationPrompts({ taskName: " CheckRabi ", withExamples: true, question: "Centred?" }, d);
+  assert.deepEqual(d.calls.map((c) => c.name), ["knowledge", "examples", EVALUATION_TOOL]);
+  const args = d.calls[2].args;
+  assert.equal(args.dry_run, true);
+  assert.equal(args.images, undefined);
+  assert.equal(args.context, "Task CheckRabi.");
+  assert.equal(args.question, "Centred?");
+  assert.equal(args.task_name, "CheckRabi");
+  assert.equal(args.knowledge, REFERENCE.knowledge);
+  assert.deepEqual(args.criteria, REFERENCE.criteria);
+  assert.equal(args.use_examples, true);
+  assert.equal(args.examples.length, 1);
+  assert.deepEqual(preview, {
+    task_name: "CheckRabi",
+    with_examples: true,
+    model: "vllm/nvidia/Ising-Calibration",
+    questions: [
+      { key: "fit_reliability", prompt: "F: Task CheckRabi." },
+      { key: "calibration_diagnosis", prompt: "C" },
+    ],
+    // Hashed as passed: compactCriteria orders parameters before statuses.
+    knowledge: {
+      chars: PREVIEW_IDENTITY.length,
+      sha256: createHash("sha256").update(PREVIEW_IDENTITY).digest("hex"),
+    },
+    examples: [{ id: "e1", title: "Short T1", outcome: "suboptimal", status: "SHORT_T1", figures: [{ ...figureRecord({ data: PNG, mimeType: "image/png" }), path: "examples/figures/t1.png" }] }],
+    examples_used: 1,
+  });
+  // Zero-shot, a given context, and no knowledge.
+  const bare = deps({ [EVALUATION_TOOL]: () => ({ content: [], details: { dry_run: true, questions: ["fit_reliability"], prompts: { fit_reliability: "F" } } }) }, null);
+  const zero = await previewEvaluationPrompts({ taskName: "CheckRabi", context: "CheckRabi on Q05" }, bare);
+  assert.deepEqual(bare.calls.map((c) => c.name), ["knowledge", EVALUATION_TOOL]);
+  assert.equal(bare.calls[1].args.context, "CheckRabi on Q05");
+  assert.equal(bare.calls[1].args.knowledge, undefined);
+  assert.equal(zero.model, null);
+  assert.equal(zero.knowledge, null);
+  assert.deepEqual(zero.examples, []);
+  // Errors surface as evaluation-stage errors; a blank task name is a request error.
+  const failing = deps({ [EVALUATION_TOOL]: () => ({ content: [{ type: "text", text: "qcal_evaluate: boom" }], isError: true }) });
+  await assert.rejects(previewEvaluationPrompts({ taskName: "CheckRabi" }, failing), (error) => error instanceof EvaluationError && error.stage === "evaluation" && /boom/.test(error.message));
+  await assert.rejects(previewEvaluationPrompts({ taskName: "  " }, d), (error) => error instanceof EvaluationError && error.status === 400);
+});

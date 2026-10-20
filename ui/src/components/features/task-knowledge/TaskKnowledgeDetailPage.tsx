@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, FileCode2, GitCompareArrows, Pencil } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getListTaskKnowledgeQueryKey } from "@/client/task/task";
+import {
+  getGetTaskEvaluationPromptsQueryKey,
+  getListTaskKnowledgeQueryKey,
+} from "@/client/task/task";
 import {
   GitWorkspaceToolbar,
   PullRequestBanner,
@@ -13,6 +16,7 @@ import {
 import { useGitWorkspace } from "@/components/features/files/useGitWorkspace";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FileDiffReviewDialog } from "@/components/ui/FileDiffReviewDialog";
+import { EvaluationPromptPreview } from "@/components/features/task-knowledge/EvaluationPromptPreview";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { useToast } from "@/components/ui/Toast";
@@ -113,6 +117,8 @@ function KnowledgeIndexEditor({
       queryClient.invalidateQueries({ queryKey: ["task-knowledge-markdown", taskName] });
       queryClient.invalidateQueries({ queryKey: ["task-knowledge-detail", taskName] });
       queryClient.invalidateQueries({ queryKey: getListTaskKnowledgeQueryKey() });
+      // The prompt preview is built from the saved reference.
+      queryClient.invalidateQueries({ queryKey: getGetTaskEvaluationPromptsQueryKey(taskName) });
       queryClient.invalidateQueries({
         queryKey: workspaceQueryKeys.content(KNOWLEDGE_WORKSPACE, path),
       });
@@ -295,6 +301,8 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
       ) : (
         <MarkdownContent content={markdown} />
       )}
+
+      <EvaluationPromptPreview taskName={taskName} exampleCount={detail?.examples?.length ?? 0} />
 
       {(detail?.examples?.length ?? 0) > 0 && (
         <section className="mt-10">

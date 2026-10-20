@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
+from qdash.datamodel.evaluation import EvaluationExampleModel
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 
 
@@ -129,6 +130,70 @@ class TaskKnowledgeResponse(BaseModel):
         default_factory=TaskReferenceResponse,
         description="The background and question-template parts for the evaluation model",
     )
+
+
+class EvaluationPromptQuestion(BaseModel):
+    """One question's prompt, as the evaluation model would receive it."""
+
+    key: str = Field(description="The question key, e.g. fit_reliability")
+    prompt: str = Field(description="The user turn; [figure] marks where an image goes")
+
+
+class EvaluationPromptPreviewResponse(BaseModel):
+    """The prompts an evaluation of a task would send, built without a figure or a model call."""
+
+    task_name: str
+    with_examples: bool = Field(
+        default=False, description="Whether the task's labeled examples were laid out"
+    )
+    model: str | None = Field(
+        default=None, description="provider/modelId of the model that would judge, when configured"
+    )
+    questions: list[EvaluationPromptQuestion] = Field(default_factory=list)
+    knowledge_chars: int | None = Field(
+        default=None, description="Length of the reference the prompts were built from"
+    )
+    knowledge_sha256: str | None = Field(
+        default=None, description="SHA-256 of that reference, to tell two versions apart"
+    )
+    examples: list[EvaluationExampleModel] = Field(
+        default_factory=list, description="The labeled examples fetched for the preview"
+    )
+    examples_used: int = Field(default=0, description="How many of them the prompts show")
+
+    @classmethod
+    def from_runtime(cls, payload: dict[str, Any]) -> "EvaluationPromptPreviewResponse":
+        """Build the response from the runtime's preview body."""
+        knowledge = payload.get("knowledge")
+        if not isinstance(knowledge, dict):
+            knowledge = {}
+        questions = payload.get("questions")
+        examples = payload.get("examples")
+        examples_used = payload.get("examples_used")
+        return cls(
+            task_name=str(payload.get("task_name") or ""),
+            with_examples=payload.get("with_examples") is True,
+            model=payload.get("model") if isinstance(payload.get("model"), str) else None,
+            questions=[
+                EvaluationPromptQuestion(
+                    key=str(q.get("key") or ""), prompt=str(q.get("prompt") or "")
+                )
+                for q in (questions if isinstance(questions, list) else [])
+                if isinstance(q, dict)
+            ],
+            knowledge_chars=knowledge.get("chars")
+            if isinstance(knowledge.get("chars"), int)
+            else None,
+            knowledge_sha256=knowledge.get("sha256")
+            if isinstance(knowledge.get("sha256"), str)
+            else None,
+            examples=[
+                EvaluationExampleModel.model_validate(e)
+                for e in (examples if isinstance(examples, list) else [])
+                if isinstance(e, dict)
+            ],
+            examples_used=examples_used if isinstance(examples_used, int) else 0,
+        )
 
 
 class TaskKnowledgeSummaryResponse(BaseModel):

@@ -41,6 +41,12 @@ tab shows every saved edit as a diff against the last commit before you create t
 task's file is its name, so keep it unchanged; the knowledge repository rejects headings outside the
 template.
 
+Each task's **Knowledge** page has an **Evaluation prompts** panel that shows the six prompts the
+evaluation model would receive for that task, built from the page as it is now: the background,
+the status criteria and parameters derived from it, and, with **In-context** selected, the labeled
+examples in the places they take. Use it after editing a task's knowledge to see what the model
+will read before you run an evaluation.
+
 ## Request an AI Evaluation
 
 The calibration evaluation model can judge the figure of a task result against the task's
