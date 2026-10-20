@@ -13,7 +13,7 @@ QDash consists of three major components.
 - Workflow
   - Prefect-based calibration workflow runtime, deployment service, and user flow worker
 
-![qdash-architecture](../diagrams/qdash-platform-architecture.drawio.png)
+<Diagram name="platform-architecture" caption="QDash runtime services and the requests between them." />
 
 ## Components
 
@@ -55,15 +55,15 @@ tests.
 Calibration follows this flow.
 
 1. The user selects a project, chip, targets, and workflow or task in the UI or client.
-2. The API saves or loads the user flow and asks the deployment service to register a Prefect deployment.
-3. The user flow worker executes the selected calibration tasks. Experimental libraries can be used from task implementations.
-4. The workflow runtime acquires the applicable execution lock before hardware operations.
-5. QDash creates an execution ID that links the run, task results, logs, and artifacts.
+2. When the user saves a flow, the API asks the deployment service to register its Prefect deployment. Running the flow reuses that deployment.
+3. On execution, the API claims the execution lock for the hardware the run needs and mints the execution ID in the same step. It returns 409 if another run holds the lock. The execution ID links the run, task results, logs, and artifacts.
+4. The API creates a Prefect flow run from the deployment and records a `scheduled` execution. The user flow worker picks up the run and adopts that execution.
+5. The worker runs each task through preprocess, run, postprocess, validation, and save. Task implementations can call experimental libraries such as qubex.
 6. Task results and accepted calibration changes are stored in their project and chip context.
 7. Parameter resolution can use the current accepted state as input to later tasks.
 8. If a user cancels a running execution, the API sends a cancel request to Prefect, which terminates the worker process via SIGTERM. The `on_cancellation` hook then updates the execution and task statuses to `cancelled` and releases the execution lock.
 
-![qdash-calibration-flow](../diagrams/calibration-flow.drawio.png)
+<Diagram name="calibration-flow" caption="How a calibration run is dispatched, executed task by task, and closed or cancelled." />
 
 The [Workflow Engine Architecture](./workflow/engine-architecture.md) describes the
 runtime components in detail. [Calibration Data Sharing](../user-guide/calibration-data-sharing.md)
