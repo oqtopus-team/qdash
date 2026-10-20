@@ -16,3 +16,6 @@ include_fragments = "none"
 fallback_extensions = ["md"]
 exclude_all_private = true
 include_mail = false
+
+# GitHub returns 404 to unauthenticated checks for this private dependency.
+exclude = ['^https://github\.com/qiqb-osaka/qdash-task-knowledge$']
