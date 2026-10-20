@@ -1,187 +1,169 @@
-# Workflow Engine Quickstart
+# Workflow Authoring Quickstart
 
-This guide helps you get started with the QDash workflow engine.
+Use a QDash flow template to define targets, an explicit sequence of calibration steps, and the
+parameters those steps need.
 
-## Workflow Shape
+## Start from an Existing Template
 
-The workflow engine executes calibration tasks using [Prefect](https://www.prefect.io/).
-For detailed architecture, see [Engine Architecture](./engine-architecture.md).
+Copy the closest file under `src/qdash/workflow/templates/` before writing a flow from scratch.
+Templates contain the terminal hooks, target validation, task order, and defaults required by the
+current runtime. Their matching tests under `tests/qdash/workflow/` protect those decisions.
 
-## Key Components
+The smallest useful flow has four parts:
 
-```
-workflow/
-├── engine/           # Core execution engine
-│   ├── orchestrator.py   # Session lifecycle (start here)
-│   ├── task_runner.py    # Prefect task wrappers
-│   └── task/             # Task execution layer
-├── calibtasks/       # Calibration task definitions
-└── service/          # High-level service APIs
-```
+1. A Prefect `@flow` with QDash terminal hooks.
+2. A `Target` selected from MUX IDs or explicit qubit IDs.
+3. An explicit list of task names inside one or more `Step` objects.
+4. A `CalibService` that runs those steps.
 
-## Basic Usage
+## Define a Flow
 
-### 1. Running a Calibration Session
+This example follows the structure of `templates/coherence_check.py`. It assumes the selected
+qubits already have the calibration inputs required by `CheckT1` and `CheckRamsey`.
 
 ```python
-from qdash.workflow.engine import CalibOrchestrator, CalibConfig
+from typing import Any
 
-# Configure the session
-config = CalibConfig(
-    username="alice",
-    project_id="proj-1",
-    chip_id="64Qv3",
-    qids=["0", "1"],
-    execution_id="20240101-001",
+from prefect import flow
+
+from qdash.workflow.service import CalibService
+from qdash.workflow.service.calib_service import (
+    on_flow_cancellation,
+    on_flow_crashed,
+    on_flow_failure,
 )
+from qdash.workflow.service.steps import CustomOneQubit
+from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
-# Initialize and run
-orchestrator = CalibOrchestrator(config)
-orchestrator.initialize()
+TASKS = ["Configure", "CheckT1", "CheckRamsey"]
 
-# Execute a task
-result = orchestrator.run_task("CheckRabi", qid="0")
 
-# Complete the session
-orchestrator.complete()
-```
-
-### 2. Understanding the Execution Flow
-
-1. `CalibOrchestrator.initialize()` - Creates directories, connects to backend
-2. `orchestrator.run_task()` - Executes a single calibration task
-3. `orchestrator.complete()` - Finalizes session, saves results to MongoDB
-
-## Writing Flow Templates
-
-Flow templates are user-editable recipes. Keep each step's task names and execution
-order visible in the template file itself.
-
-- Define task lists as explicit lists of task-name strings in the template, or pass
-  a literal list directly to `tasks=`. Do not import task lists from other templates
-  or rely on a calibration step's default task list.
-- Add short comments explaining each stage, repeated calibration round, filter,
-  and hardware configuration checkpoint.
-- When a combined template reproduces standalone stages, keep the task lists
-  explicit in both places and test that their contents and order agree.
-- Preserve intentional repetitions: repeated Rabi checks and readout optimization
-  rounds should remain visible so users can review and edit them.
-
-`one_qubit.py` lists its coarse and fine tasks locally, with a status filter between
-them. Its tests compare those lists with `coarse_one.py` and `fine_one.py`.
-
-## Preparing EF Chevron Measurements
-
-`ConfigureEF` assigns GE and EF drive channels using Qubex's `ge-ef-cr` mode.
-Run it immediately before `CheckEFChevron` in the same worker session:
-
-```python
-tasks = ["ConfigureEF", "CheckEFChevron"]
-```
-
-The qubit must have calibrated `hpi_amplitude`, `hpi_duration`, and readout
-parameters. `CheckEFChevron` restores the half-pi pulse from these inputs and
-verifies that GE and EF targets exist before starting measurement.
-Configuration tasks delegate channel allocation to Qubex.
-
-`Configure` also accepts the `configuration_mode` run parameter: `ge-cr-cr`,
-`ge-ef-cr`, or `ge-ef-fh`. It defaults to `ge-cr-cr`, regardless of the session's
-initial mode or a preceding `ConfigureEF` task.
-`ConfigureEF` defaults to `ge-ef-cr` and also accepts `ge-ef-fh`.
-Each configuration task loads the selected mode and pushes it to the boxes.
-A separate execution must establish its own EF configuration.
-
-The `ef_calibration` template calibrates GE Rabi and HPI before measuring the EF
-transition. `CheckEFChevron` publishes the measured `ef_frequency` to both
-`ef_frequency` and the operational `control_frequency_ef`. The subsequent EF
-Rabi, pulse calibration, and readout classification tasks use `control_frequency_ef`
-for the drive frequency, falling back to `ef_frequency` only when the operational
-parameter is absent. This allows the control frequency to be adjusted independently
-of the measured transition frequency.
-
-The `CheckEFRabi` task currently delegates GE state preparation to
-Qubex's `x180()`, which selects an available DRAG PI, PI, or DRAG HPI before the
-restored HPI. Consequently, existing calibration-note entries can affect the
-preparation pulse even with identical recorded task inputs. Recalibrating HPI
-does not invalidate those entries, and running the template in a new session
-does not guarantee their absence if a calibration note is loaded.
-
-EF configuration changes the channel allocation available to CR gates. Before
-returning to CR calibration, run `Configure` without a mode override to restore
-`ge-cr-cr`.
-
-## Adding a New Calibration Task
-
-1. Create a task class in `workflow/calibtasks/`:
-
-```python
-from qdash.workflow.calibtasks.base import BaseTask
-
-class MyNewTask(BaseTask):
-    name = "MyNewTask"
-    
-    def preprocess(self, backend):
-        # Extract input parameters
-        pass
-    
-    def run(self, backend):
-        # Execute measurement
-        pass
-    
-    def postprocess(self, backend, result):
-        # Process results, generate figures
-        pass
-```
-
-2. Register it in `workflow/calibtasks/active_protocols.py`
-
-## Testing
-
-Use the `FakeBackend` for testing without hardware:
-
-```python
-config = CalibConfig(
-    backend_name="fake",  # Use fake backend
-    project_id="proj-1",
-    ...
+@flow(
+    on_cancellation=[on_flow_cancellation],
+    on_failure=[on_flow_failure],
+    on_crashed=[on_flow_crashed],
 )
-```
-
-See [Testing Guidelines](./testing.md) for more details.
-
-## Cancellation Support
-
-All top-level `@flow` decorators must register the `on_flow_cancellation` hook to support cancellation from the UI:
-
-```python
-from qdash.workflow.service.calib_service import on_flow_cancellation
-
-@flow(on_cancellation=[on_flow_cancellation])
-def my_calibration_flow(
+def coherence_sample(
     username: str,
     chip_id: str,
-    project_id: str | None = None,
+    mux_ids: list[int] | None = None,
+    exclude_qids: list[str] | None = None,
+    qids: list[str] | None = None,
+    tags: list[str] | None = None,
     flow_name: str | None = None,
-    ...
-):
-    cal = CalibService(username, chip_id, ...)
-    try:
-        # ... run tasks ...
-        cal.finish_calibration()
-    except BaseException as e:
-        from qdash.workflow.service.calib_service import _is_cancellation
-        if _is_cancellation(e):
-            cal.cancel_calibration()
-        else:
-            cal.fail_calibration(str(e))
-        raise
+    project_id: str | None = None,
+) -> Any:
+    targets: Target
+    if mux_ids is not None:
+        targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids or [])
+    elif qids is not None:
+        targets = QubitTargets(qids=qids)
+    else:
+        raise ValueError("mux_ids or qids is required; select targets before running this flow")
+
+    steps = [
+        CustomOneQubit(
+            step_name="coherence_sample",
+            tasks=TASKS,
+            mode="synchronized",
+        )
+    ]
+    service = CalibService(
+        username,
+        chip_id,
+        flow_name=flow_name,
+        tags=tags,
+        project_id=project_id,
+    )
+    return service.run(targets, steps)
 ```
 
-When cancelled, Prefect kills the process with SIGTERM and runs the `on_cancellation` hook. The hook updates the execution and task statuses to `cancelled` and releases the execution lock.
+Keep `username`, `chip_id`, `flow_name`, and `project_id` in the signature. QDash injects them when
+it starts a saved flow. Target parameters remain optional in the signature so the same flow can
+accept a MUX selection or an explicit qubit selection, but the function must reject a run with
+neither.
 
-See [Engine Architecture — Cancellation](./engine-architecture.md#cancellation) for implementation details.
+## Choose Targets
 
-## Next Steps
+| Target | Use when | Resolution |
+| --- | --- | --- |
+| `MuxTargets` | Hardware scheduling starts from MUX IDs | Expands each MUX to four qubits and removes `exclude_qids` |
+| `QubitTargets` | The caller selected individual qubits | Uses the supplied qubit IDs |
+| `CouplingTargets` | The flow starts from directed two-qubit pairs | Exposes both coupling IDs and their endpoint qubits |
+| `AllMuxTargets` | The flow targets a 64-qubit layout's MUX IDs 0–15 | Expands that fixed MUX set and applies exclusions |
 
-- [Engine Architecture](./engine-architecture.md) - Deep dive into components
-- [Testing Guidelines](./testing.md) - How to test workflow code
+When both `mux_ids` and `qids` are supplied, standard templates prefer `mux_ids`. Preserve that
+rule across templates so UI and scheduled executions resolve the same request consistently.
+
+## Compose Steps
+
+`CalibrationStep` performs hardware work and receives its own QDash execution record.
+`TransformStep` filters or schedules existing context without creating an execution record.
+`Pipeline` validates each step's `requires` and `provides` fields before the first step runs.
+
+```mermaid
+flowchart LR
+    targets[Target qubits] --> check[CalibrationStep]
+    check --> filter[TransformStep]
+    filter --> fine[CalibrationStep]
+    check -. one Execution .-> history[Execution history]
+    fine -. one Execution .-> history
+```
+
+Keep task lists in the template rather than importing them from another template or relying on a
+step's default list. The visible order is part of the flow contract: repeated measurements and
+configuration checkpoints must remain reviewable in the saved source. If two templates must stay
+aligned, compare their lists in template tests.
+
+## Set Run Parameters
+
+Pass shared fallbacks through `default_run_parameters` and task-specific values through
+`task_run_parameters`:
+
+```python
+service = CalibService(
+    username,
+    chip_id,
+    project_id=project_id,
+    default_run_parameters={
+        "interval": {"value": 150 * 1024, "value_type": "int"},
+    },
+    task_run_parameters={
+        "CheckRamsey": {
+            "shots": {"value": 1024, "value_type": "int"},
+            "update_calibration_parameters": False,
+        },
+    },
+)
+```
+
+Explicit task settings override shared defaults. Setting
+`update_calibration_parameters=False` retains task history without promoting validated outputs to
+the current calibration state. The complete precedence rules are in
+[Parameter Resolution](./parameter-resolution.md).
+
+## Preserve Terminal Handling
+
+Every top-level flow that owns hardware reservations must register `on_flow_cancellation`,
+`on_flow_failure`, and `on_flow_crashed`. Do not reproduce their exception-classification logic in
+the template. Nested single-task flows use the `*_keep_lock` hooks supplied by the service layer.
+
+The hooks finalize execution and task records that the worker cannot close itself and release only
+reservations owned by that flow. [Workflow Engine Architecture](./engine-architecture.md#cancellation)
+explains the two cancellation paths.
+
+## Test the Template
+
+Template tests replace `CalibService` with a recording fake and call the flow function directly.
+Assert target precedence, required-target errors, step types, task order, and parameter dictionaries.
+This catches authoring errors without Prefect infrastructure or laboratory hardware.
+
+Run the matching test first, then the workflow suite:
+
+```bash
+uv run pytest tests/qdash/workflow/test_coherence_check_template.py -v
+task test-workflow
+```
+
+Use [Workflow Testing](./testing.md) to choose broader checks. Saving, registering, and dispatching
+the finished flow crosses the boundaries described in [Workflow Services](./services.md).
