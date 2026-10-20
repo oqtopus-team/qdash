@@ -47,8 +47,8 @@ export const REDIRECTS: Record<string, string> = {
   "/operator-guide/setup": "/user-guide/setup",
   "/operator-guide/system-updates": "/user-guide/system-updates",
   "/operator-guide/workflows": "/developer-guide/workflow/services",
-  "/reference/migration-project-scoped-calibration": "/user-guide/migrations/project-scoped-calibration",
-  "/reference/migration-v1.8.0": "/user-guide/migrations/v1.8.0",
+  "/reference/migration-project-scoped-calibration": "/user-guide/system-updates",
+  "/reference/migration-v1.8.0": "/user-guide/system-updates",
   "/reference/data-models": "/reference/database-structure",
   "/reference/database-documents-calibration": "/reference/database-structure",
   "/reference/database-documents-collaboration": "/reference/database-structure",
@@ -69,4 +69,6 @@ export const REDIRECTS: Record<string, string> = {
   "/user-guide/projects-and-sharing": "/user-guide/projects-and-data-sharing",
   "/user-guide/qdash-client": "/reference/clients/python",
   "/user-guide/qdash-typescript-client": "/reference/clients/typescript",
+  "/user-guide/migrations/project-scoped-calibration": "/user-guide/system-updates",
+  "/user-guide/migrations/v1.8.0": "/user-guide/system-updates",
 };

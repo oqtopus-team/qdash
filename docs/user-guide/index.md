@@ -7,7 +7,9 @@ Use this guide to operate a QDash deployment and complete calibration work in th
 | Goal | Start here |
 | --- | --- |
 | Understand what QDash manages | [What is QDash?](./what-is-qdash.md) |
-| Install a lab deployment | [Setup](./setup.md) |
+| Choose an installation path | [Setup](./setup.md) |
+| Evaluate QDash without hardware | [Fake Backend Setup](./setup/fake-backend.md) |
+| Connect QDash to supported hardware | [Qubex Backend Setup](./setup/qubex-backend.md) |
 | Start, stop, or troubleshoot QDash | [Operations](./operations.md) |
 | Learn the application pages | [Application Tour](./application-tour.md) |
 | Run a workflow or one calibration task | [Running Calibrations](./running-calibrations.md) |
@@ -21,10 +23,6 @@ Use this guide to operate a QDash deployment and complete calibration work in th
 [Setup](./setup.md) takes a new installation from clone to sign-in. After setup, use
 [Operations](./operations.md) for routine service control and recovery, and
 [System Updates](./system-updates.md) to move the installation to another stable release.
-
-Read the migration page for the version or data-model change you are applying:
-[v1.8.0](./migrations/v1.8.0.md) or
-[project-scoped calibration](./migrations/project-scoped-calibration.md).
 
 ## Work in QDash
 

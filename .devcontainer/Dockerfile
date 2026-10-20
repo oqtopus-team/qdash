@@ -5,6 +5,7 @@
 ARG TRUFFLEHOG_VERSION=3.95.3
 ARG BETTERLEAKS_VERSION=v1.3.1
 ARG LEFTHOOK_VERSION=2.1.6
+ARG LYCHEE_VERSION=0.24.2
 ARG UV_VERSION=0.11.11
 ARG BUN_VERSION=1.4.0
 ARG CODEX_VERSION=0.130.0
@@ -85,6 +86,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 ARG TRUFFLEHOG_VERSION
 ARG BETTERLEAKS_VERSION
 ARG LEFTHOOK_VERSION
+ARG LYCHEE_VERSION
 
 # 3.2 Secret scanning tools (betterleaks + trufflehog) and git hooks manager (lefthook)
 RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
@@ -95,6 +97,13 @@ RUN curl -1sLf 'https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.deb.
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=betterleaks-bin /usr/bin/betterleaks /usr/local/bin/betterleaks
+
+# 3.3 Documentation link checker
+COPY ./install-lychee.sh /tmp/install-lychee.sh
+RUN chmod 0755 /tmp/install-lychee.sh \
+    && LYCHEE_VERSION="${LYCHEE_VERSION}" LYCHEE_INSTALL_DIR=/usr/local/bin \
+      /tmp/install-lychee.sh \
+    && rm /tmp/install-lychee.sh
 
 # 4. Editors and shells (Change frequency: Medium)
 RUN apt-get update && apt-get install -y --no-install-recommends \

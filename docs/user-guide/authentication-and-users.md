@@ -20,8 +20,9 @@ personal settings and password changes.
 | Admin | Create users, reset passwords, and open the Admin page. |
 
 The deployment creates its initial administrator during setup. See
-[Setup](./setup.md#qubex-setup) for the required credentials. System administrators do not
-automatically own every project; project membership still controls access to project data.
+[Setup](./setup.md#configure-shared-deployment-settings) for the required credentials. System
+administrators do not automatically own every project; project membership still controls access
+to project data.
 
 ## Create Users
 
