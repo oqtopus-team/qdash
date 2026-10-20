@@ -1,0 +1,18 @@
+# Check web links and local links resolved through the VitePress-compatible root prepared by CI.
+scheme = ["http", "https", "file"]
+
+# Retry transient failures without treating timeouts or rate limits as success.
+max_retries = 3
+retry_wait_time = 2
+timeout = 20
+
+# Keep the scan polite to external services while retaining useful parallelism.
+max_concurrency = 16
+host_concurrency = 4
+host_request_interval = "100ms"
+
+# VitePress-generated HTML is checked separately for local anchors.
+include_fragments = "none"
+fallback_extensions = ["md"]
+exclude_all_private = true
+include_mail = false

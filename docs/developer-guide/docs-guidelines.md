@@ -149,6 +149,17 @@ repeat the same pattern in different sections.
 **Length** — A page is read in one sitting. Past roughly 400 lines, split it by topic: a testing
 page by test kind, a reference by collection group.
 
+## Checks
+
+Documentation changes must build and keep their external links reachable. Run `task build-docs`
+to validate VitePress routes and local links. Run `task check-docs-links` when Lychee is
+installed to validate links and anchors against the local VitePress layout and external sites.
+
+CI builds the documentation, checks external links in changed Markdown files, and checks every
+internal link and anchor in the generated site on each pull request. A weekly scan checks every
+Markdown file under `docs/` so an external page that later moves or disappears is detected
+without blocking unrelated pull requests.
+
 ## Sidebar
 
 The sidebar in `docs/.vitepress/config.mts` has two top-level groups, User Guide and Developer
