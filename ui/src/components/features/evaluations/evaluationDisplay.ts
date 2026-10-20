@@ -26,9 +26,6 @@ function word(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-/** The four QCalEval outcomes of Q2 (experimental_conclusion.classification). */
-export const OUTCOMES = ["expected", "suboptimal", "anomalous", "apparatus"] as const;
-
 /** The outcome the model classified (expected / suboptimal / anomalous / apparatus), or null. */
 export function diagnosisOutcome(diagnosis: Diagnosis | null): string | null {
   const value = word(section(diagnosis, "experimental_conclusion")?.classification);
