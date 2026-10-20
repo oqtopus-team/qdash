@@ -44,6 +44,9 @@ def _qubit_knowledge() -> TaskKnowledge:
                 title="Weak f12 support",
                 outcome="suboptimal",
                 verdict="pass_with_note",
+                status="WEAK_F12",
+                suggested_range="(4.9, 5.1) [GHz]",
+                parameters='{"f01_GHz": 5.02}',
                 figures=[KnowledgeFigure(alt="qid 12 raw", path="examples/figures/q12_raw.jpg")],
                 diagnosis="The f01 peak is supported; the f12 marker is weak.",
             )
@@ -95,6 +98,16 @@ def test_get_task_knowledge_response_inlines_example_figures(tmp_path: Path) -> 
     assert example.figures[0].path == "examples/figures/q12_raw.jpg"
     assert "### Labeled examples" not in response.prompt_text
     assert response.prompt_text.endswith("means apparatus.")
+    # The demonstration fields and the derived reference reach the runtime as served.
+    assert (example.status, example.suggested_range, example.parameters) == (
+        "WEAK_F12",
+        "(4.9, 5.1) [GHz]",
+        '{"f01_GHz": 5.02}',
+    )
+    assert response.reference.background == (
+        "This is a CheckQubitSpectroscopy experiment: Background."
+    )
+    assert response.reference.statuses == {"SUCCESS": "The result matches the expected plot"}
 
 
 def test_list_task_knowledge_counts_examples_and_figures() -> None:

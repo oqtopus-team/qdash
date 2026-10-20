@@ -6,11 +6,14 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { EvaluationCallModelOutputTokens } from './evaluationCallModelOutputTokens';
+import type { EvaluationCallModelQuestion } from './evaluationCallModelQuestion';
 
 /**
  * One model call made for an answer: how long it took and how it ended.
  */
 export interface EvaluationCallModel {
+  /** The diagnosis question the call asked, when one per call */
+  question?: EvaluationCallModelQuestion;
   /** Wall time of the call */
   duration_ms: number;
   /** Why the model stopped, as pi reports it */

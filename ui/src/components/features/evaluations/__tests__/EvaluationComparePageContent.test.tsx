@@ -123,15 +123,15 @@ describe("EvaluationComparePageContent", () => {
     runs.evr_a = {
       run: summary("evr_a"),
       evaluations: [
-        item("evr_a", "Q1", { fit_quality: "good", success: true }),
-        item("evr_a", "Q2", { fit_quality: "good", success: true }),
+        item("evr_a", "Q1", { fit_reliability: { assessment: "reliable" }, success: true }),
+        item("evr_a", "Q2", { fit_reliability: { assessment: "reliable" }, success: true }),
       ],
     };
     runs.evr_b = {
       run: summary("evr_b", { with_examples: true, success_count: 1 }),
       evaluations: [
-        item("evr_b", "Q1", { fit_quality: "good", success: true }),
-        item("evr_b", "Q2", { fit_quality: "poor", success: false }),
+        item("evr_b", "Q1", { fit_reliability: { assessment: "reliable" }, success: true }),
+        item("evr_b", "Q2", { fit_reliability: { assessment: "unreliable" }, success: false }),
       ],
     };
     renderPage();
@@ -152,7 +152,7 @@ describe("EvaluationComparePageContent", () => {
     const table = screen.getByTestId("compare-table");
     expect(within(table).getByText("same")).toBeTruthy();
     expect(within(table).getByText("differs")).toBeTruthy();
-    expect(within(table).getAllByText("poor")).toHaveLength(1);
+    expect(within(table).getAllByText("fit unreliable")).toHaveLength(1);
 
     // Only differences hides the row that agrees.
     fireEvent.click(screen.getByLabelText("Only differences"));

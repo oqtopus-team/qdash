@@ -36,9 +36,15 @@ const item: EvaluationItem = {
     fallback: false,
     diagnosis: {
       technical_description: "Two exponential decays.",
-      fit_quality: "good",
+      experimental_conclusion: { classification: "expected", reason: "Both decays are clean." },
+      fit_reliability: { assessment: "reliable", reason: "The fit follows the data." },
       parameter_extraction: { zx90_gate_fidelity: 0.9882 },
+      calibration_diagnosis: { status: "SUCCESS", suggested_range: null, notes: "Nothing to do." },
       success: true,
+    },
+    answers: {
+      experimental_conclusion: "Classification: Expected behavior\nReason: Both decays are clean.",
+      fit_reliability: "Assessment: Reliable\nReason: The fit follows the data.",
     },
     parsed: true,
     complete: true,
@@ -78,9 +84,16 @@ describe("EvaluationCard", () => {
   it("shows the diagnosis, who judged, what the model saw and what the planner did", () => {
     renderCard();
     expect(screen.getByText("4-6")).toBeTruthy();
-    expect(screen.getByText("fit good")).toBeTruthy();
-    expect(screen.getByText("success")).toBeTruthy();
+    expect(screen.getByText("expected")).toBeTruthy();
+    expect(screen.getByText("fit reliable")).toBeTruthy();
+    expect(screen.getByText("SUCCESS")).toBeTruthy();
     expect(screen.getByText("Two exponential decays.")).toBeTruthy();
+    expect(screen.getByText("Both decays are clean.")).toBeTruthy();
+    expect(screen.getByText("The fit follows the data.")).toBeTruthy();
+    expect(screen.getByText("Nothing to do.")).toBeTruthy();
+    // The raw answers sit behind a toggle, one per question.
+    expect(screen.getByText("Answers as returned")).toBeTruthy();
+    expect(screen.getByText(/Classification: Expected behavior/)).toBeTruthy();
     expect(screen.getByText(/"zx90_gate_fidelity": 0.9882/)).toBeTruthy();
     expect(screen.getByText("vllm/nvidia/Ising-Calibration-1.5-31B-NVFP4")).toBeTruthy();
     expect(screen.getByText("32.9 s")).toBeTruthy();
@@ -133,11 +146,10 @@ describe("EvaluationCard", () => {
         structured: false,
         calls: [
           {
+            question: "experimental_significance",
             duration_ms: 195_000,
             stop_reason: "length",
-            structured: true,
             output_tokens: 2000,
-            missing_keys: ["success"],
           },
           {
             duration_ms: 30_000,
@@ -156,8 +168,12 @@ describe("EvaluationCard", () => {
       "Missing: experimental_conclusion, fit_quality, success",
     );
     expect(screen.getByText("Answer as returned")).toBeTruthy();
-    expect(screen.getByText("2 calls: 3.3 min (length) + 30.0 s (stop, incomplete)")).toBeTruthy();
-    expect(screen.getByText("free-form decoding")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "2 calls: experimental_significance 3.3 min (length) + 30.0 s (stop, incomplete)",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("free-form decoding")).toBeNull();
     expect(screen.queryByText("prose")).toBeNull();
   });
 

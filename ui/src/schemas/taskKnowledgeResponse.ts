@@ -7,6 +7,7 @@
  */
 import type { KnowledgeExampleResponse } from './knowledgeExampleResponse';
 import type { KnowledgeFigureResponse } from './knowledgeFigureResponse';
+import type { TaskReferenceResponse } from './taskReferenceResponse';
 
 /**
  * Task knowledge: the background, its figures, labeled examples, and the rendered prompt.
@@ -20,4 +21,6 @@ export interface TaskKnowledgeResponse {
   examples?: KnowledgeExampleResponse[];
   /** The background as Markdown, headed by the experiment name */
   prompt_text: string;
+  /** The background and question-template parts for the evaluation model */
+  reference?: TaskReferenceResponse;
 }

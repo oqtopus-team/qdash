@@ -30,17 +30,19 @@ import {
 } from "./figure-context.ts";
 import { hostRecord } from "./evaluate.ts";
 import {
+  acceptsCriteria,
   acceptsKnowledge,
   fetchTaskExamples,
   fetchTaskKnowledge,
   hasExamples,
   hasKnowledge,
+  referenceOf,
   requestedTaskName,
   wantsExamples,
   withExamples,
   withKnowledge,
 } from "./knowledge-context.ts";
-import type { LabeledExample } from "./knowledge-context.ts";
+import type { LabeledExample, Reference } from "./knowledge-context.ts";
 import { isTrustedExtension } from "./local-extensions.ts";
 import { withParameterOverrides } from "./tool-schemas.ts";
 
@@ -161,7 +163,7 @@ export function adaptCodingAgentTool(
     replay?: "safe" | "unsafe";
     /** Fill an omitted `images` argument from the newest figure in the transcript. */
     fillImages?: boolean;
-    /** Fill an omitted `knowledge` argument with QDash's review guide for `task_name`. */
+    /** Fill an omitted `knowledge` argument (and `criteria`, when declared) with QDash's reference for `task_name`. */
     fillKnowledge?: boolean;
   } = {},
 ): ToolRegistration {
@@ -217,15 +219,17 @@ export function adaptCodingAgentTool(
         }
       }
       const taskName = requestedTaskName(args);
-      let knowledge: string | undefined;
+      let reference: Reference | undefined;
       if (options.fillKnowledge && taskName && !hasKnowledge(args)) {
         // The model names the task; the reference it is judged against comes
-        // from QDash, as the user, so every evaluation reads the same guide.
-        knowledge = await fetchTaskKnowledge(connection, taskName, context.abortSignal);
-        if (knowledge) {
-          console.log(`[agent-runtime] ${tool.name}: reference for ${taskName} (${knowledge.length} chars)`);
+        // from QDash, as the user, so every evaluation reads the same one.
+        reference = await fetchTaskKnowledge(connection, taskName, context.abortSignal);
+        if (reference) {
+          console.log(
+            `[agent-runtime] ${tool.name}: reference for ${taskName} (${reference.knowledge.length} chars${reference.criteria ? ", criteria" : ""})`,
+          );
         }
-        callArgs = withKnowledge(callArgs as object, knowledge);
+        callArgs = withKnowledge(callArgs as object, reference, acceptsCriteria(parameters));
       }
       let examples: LabeledExample[] | undefined;
       if (options.fillKnowledge && taskName && wantsExamples(args) && !hasExamples(args)) {
@@ -255,7 +259,7 @@ export function adaptCodingAgentTool(
               ...(result.details as object),
               host: hostRecord(
                 callArgs,
-                knowledge ?? ((callArgs as { knowledge?: unknown }).knowledge as string | undefined),
+                reference ?? referenceOf(callArgs),
                 Date.now() - started,
                 figureTaskId,
                 examples,

@@ -14,22 +14,59 @@ export function diagnosisOf(item: Pick<EvaluationItem, "output">): Diagnosis | n
   return diagnosis as Diagnosis;
 }
 
-/** The diagnosis' fit quality as one word (good / marginal / poor), or null. */
-export function fitQuality(diagnosis: Diagnosis | null): string | null {
-  const value = diagnosis?.fit_quality;
-  if (typeof value !== "string") return null;
-  const word = value
-    .trim()
-    .split(/[\s,.:;(]/)[0]
-    ?.toLowerCase();
-  return word || null;
+/** A nested answer of one question, when the diagnosis stores it as an object. */
+function section(diagnosis: Diagnosis | null, key: string): Record<string, unknown> | null {
+  const value = diagnosis?.[key];
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
-export function fitQualityBadgeClass(fit: string | null): string {
-  if (fit === "good") return "badge-success";
-  if (fit === "marginal") return "badge-warning";
-  if (fit === "poor") return "badge-error";
+function word(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+/** The four QCalEval outcomes of Q2 (experimental_conclusion.classification). */
+export const OUTCOMES = ["expected", "suboptimal", "anomalous", "apparatus"] as const;
+
+/** The outcome the model classified (expected / suboptimal / anomalous / apparatus), or null. */
+export function diagnosisOutcome(diagnosis: Diagnosis | null): string | null {
+  const value = word(section(diagnosis, "experimental_conclusion")?.classification);
+  return value ? value.toLowerCase() : null;
+}
+
+export function outcomeBadgeClass(outcome: string | null): string {
+  if (outcome === "expected") return "badge-success";
+  if (outcome === "suboptimal") return "badge-warning";
+  if (outcome === "anomalous" || outcome === "apparatus") return "badge-error";
   return "badge-ghost";
+}
+
+/**
+ * The fit assessment of Q4 (reliable / unreliable / no_fit), or null. A record
+ * made before the per-question protocol carries `fit_quality` instead, which
+ * is not an assessment.
+ */
+export function fitAssessment(diagnosis: Diagnosis | null): string | null {
+  const value = word(section(diagnosis, "fit_reliability")?.assessment);
+  return value ? value.toLowerCase().replace(/\s+/g, "_") : null;
+}
+
+export function fitBadgeClass(fit: string | null): string {
+  if (fit === "reliable") return "badge-success";
+  if (fit === "unreliable") return "badge-error";
+  if (fit === "no_fit") return "badge-warning";
+  return "badge-ghost";
+}
+
+/** The fit assessment as the badge reads it. */
+export function fitLabel(fit: string): string {
+  return fit === "no_fit" ? "no fit" : `fit ${fit}`;
+}
+
+/** The status code of Q6 (calibration_diagnosis.status), or null. */
+export function diagnosisStatus(diagnosis: Diagnosis | null): string | null {
+  return word(section(diagnosis, "calibration_diagnosis")?.status);
 }
 
 /** The diagnosis' success verdict; null when the model left it out. */
@@ -38,12 +75,66 @@ export function diagnosisSuccess(diagnosis: Diagnosis | null): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
 
-/** One diagnosis field as text: strings as they are, structures pretty-printed. */
+/** What the status badge says: the status code, or the success verdict when none was asked. */
+export function statusLabel(diagnosis: Diagnosis | null): string | null {
+  const status = diagnosisStatus(diagnosis);
+  if (status) return status;
+  const success = diagnosisSuccess(diagnosis);
+  return success === null ? null : success ? "success" : "not successful";
+}
+
+function jsonText(value: unknown): string {
+  return JSON.stringify(value, null, 2);
+}
+
+/** A Q1 description as lines: plot type, axes, features. */
+function plotDescription(value: Record<string, unknown>): string {
+  const axis = (key: string): string | null => {
+    const a = value[key];
+    if (typeof a !== "object" || a === null) return typeof a === "string" ? a : null;
+    const { label, scale, range } = a as { label?: unknown; scale?: unknown; range?: unknown };
+    const parts = [
+      typeof label === "string" ? label : null,
+      typeof scale === "string" ? `(${scale})` : null,
+      Array.isArray(range) ? `[${range.join(", ")}]` : null,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(" ") : null;
+  };
+  const lines = [
+    typeof value.plot_type === "string" ? `${value.plot_type} plot` : null,
+    axis("x_axis") ? `x: ${axis("x_axis")}` : null,
+    axis("y_axis") ? `y: ${axis("y_axis")}` : null,
+    typeof value.main_features === "string" ? value.main_features : null,
+  ].filter(Boolean);
+  return lines.length > 0 ? lines.join("\n") : jsonText(value);
+}
+
+/**
+ * One diagnosis section as text: the answer's prose (the reason of a
+ * classification, the notes of a status), structures pretty-printed, strings
+ * as they are. Null when the question was not answered.
+ */
 export function diagnosisText(diagnosis: Diagnosis | null, key: string): string | null {
   const value = diagnosis?.[key];
   if (value === undefined || value === null || value === "") return null;
   if (typeof value === "string") return value;
-  return JSON.stringify(value, null, 2);
+  if (typeof value !== "object" || Array.isArray(value)) return jsonText(value);
+  const object = value as Record<string, unknown>;
+  switch (key) {
+    case "technical_description":
+      return plotDescription(object);
+    case "experimental_conclusion":
+    case "fit_reliability":
+      return word(object.reason) ?? jsonText(object);
+    case "calibration_diagnosis": {
+      const range = word(object.suggested_range);
+      const notes = word(object.notes);
+      const lines = [range ? `Suggested range: ${range}` : null, notes].filter(Boolean);
+      return lines.length > 0 ? lines.join("\n") : jsonText(object);
+    }
+    default:
+      return jsonText(object);
+  }
 }
 
 /**
@@ -67,13 +158,20 @@ export function answerShortfall(
   return null;
 }
 
-/** Diagnosis sections in the order the evaluation model is asked for them. */
+/** Diagnosis sections in the order the evaluation model is asked (QCalEval Q1–Q6). */
 export const DIAGNOSIS_SECTIONS: ReadonlyArray<{ key: string; label: string }> = [
   { key: "technical_description", label: "What the plot shows" },
-  { key: "experimental_conclusion", label: "Conclusion" },
+  { key: "experimental_conclusion", label: "Outcome" },
   { key: "experimental_significance", label: "Significance" },
+  { key: "fit_reliability", label: "Fit" },
   { key: "parameter_extraction", label: "Extracted parameters" },
+  { key: "calibration_diagnosis", label: "Diagnosis" },
 ];
+
+/** The question a section answers, for a heading next to the raw answer. */
+export function questionLabel(key: string): string {
+  return DIAGNOSIS_SECTIONS.find((section) => section.key === key)?.label ?? key;
+}
 
 /**
  * Who prepared the prompt: QDash, the same fixed prompt every time (`direct`),
@@ -124,13 +222,17 @@ export function runTimingLabel(
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-/** One model call as text: its duration and how it ended, e.g. "3.3 min (length)". */
+/**
+ * One model call as text: the question it asked, its duration and how it
+ * ended, e.g. "fit_reliability 3.3 min (length)".
+ */
 export function callLabel(call: EvaluationCallModel): string {
   const how =
     call.stop_reason === "stop" && call.missing_keys && call.missing_keys.length > 0
       ? "stop, incomplete"
       : call.stop_reason;
-  return `${formatDuration(call.duration_ms) ?? "?"} (${how})`;
+  const timing = `${formatDuration(call.duration_ms) ?? "?"} (${how})`;
+  return call.question ? `${call.question} ${timing}` : timing;
 }
 
 export function formatDuration(ms: number | null | undefined): string | null {

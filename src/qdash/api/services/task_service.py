@@ -18,6 +18,7 @@ from qdash.api.schemas.task import (
     ReExecutionEntry,
     TaskKnowledgeResponse,
     TaskKnowledgeSummaryResponse,
+    TaskReferenceResponse,
     TaskResponse,
     TaskResultResponse,
 )
@@ -253,4 +254,5 @@ class TaskService:
                 for example in knowledge.examples
             ],
             prompt_text=knowledge.to_prompt(),
+            reference=TaskReferenceResponse(**knowledge.reference().model_dump()),
         )

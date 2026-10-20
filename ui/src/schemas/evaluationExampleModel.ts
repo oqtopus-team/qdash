@@ -16,5 +16,7 @@ export interface EvaluationExampleModel {
   title?: string;
   /** The example's labeled outcome */
   outcome?: string;
+  /** The status code the example demonstrated */
+  status?: string;
   figures?: EvaluationFigureModel[];
 }
