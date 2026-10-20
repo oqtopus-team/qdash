@@ -11,10 +11,8 @@ knowledge integration, streaming, and restricted analysis tools.
 | Understand the safety boundary for calibration agents | [Agent Platform](./agent-platform.md) |
 | Change task knowledge or agent instructions | [Copilot Knowledge Layout](./knowledge-layout.md) |
 | Change recorded calibration evaluation | [Calibration Evaluation](./evaluation.md) |
-| Change restricted Python analysis | [Sandboxed Python Execution](./sandbox.md) |
-| Stream runtime progress to the UI | [SSE Streaming](./streaming.md) |
-| Keep large tool results out of model context | [Tool Result Compression](./tool-result-compression.md) |
-| Apply reusable LLM integration patterns | [LLM Integration Patterns](./llm-integration-patterns.md) |
+| Change restricted Python analysis | [Python Sandbox](./python-sandbox.md) |
+| Stream runtime progress to the UI | [Chat Streaming](./chat-streaming.md) |
 
-User procedures for chat and agent-driven runs are in [Copilot](../../user-guide/copilot.md) and
+User procedures for chat and agent-driven runs are in [AI Chat](../../user-guide/ai-chat.md) and
 [Agent Calibration](../../user-guide/agent-calibration.md).

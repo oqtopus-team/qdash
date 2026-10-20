@@ -11,7 +11,7 @@ Prefect, and the HTTP contract consumed by the UI and generated clients.
 | Define query parameters, response models, or errors | [API Contracts](./contracts.md) |
 | Place routers, schemas, services, and dependencies | [API Code Structure](./structure.md) |
 | Structure and run backend tests | [API Testing Guidelines](./testing.md) |
-| Build fixtures, authentication tests, and async endpoint tests | [API Endpoint Testing](./testing-endpoints.md) |
+| Build fixtures, authentication tests, and async endpoint tests | [API Endpoint Testing](./endpoint-testing.md) |
 | Inspect the generated HTTP surface | [OpenAPI Reference](../../reference/openapi.md) |
 
 Start with design and contracts for a public API change, then use code structure to place the

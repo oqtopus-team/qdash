@@ -35,5 +35,5 @@ features:
     link: /user-guide/reviewing-results
   - title: Share by Project
     details: Keep workflows, calibration data, files, and membership within an explicit project boundary.
-    link: /user-guide/projects-and-sharing
+    link: /user-guide/projects-and-data-sharing
 ---

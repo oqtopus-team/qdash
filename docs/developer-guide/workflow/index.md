@@ -14,9 +14,7 @@ resolution, persistence, and the boundary between QDash and Prefect.
 | Trace measured outputs into accepted state | [Calibration Data Lifecycle](./calibration-data-lifecycle.md) |
 | Change task input or output resolution | [Parameter Resolution](./parameter-resolution.md) |
 | Change frequency semantics | [Frequency Parameter Policy](./frequency-parameter-policy.md) |
-| Select and run workflow tests | [Workflow Testing Guidelines](./testing.md) |
-| Reuse fixtures and mocks | [Workflow Test Fixtures and Mocking](./testing-fixtures.md) |
-| Follow component-level test patterns | [Workflow Component Tests](./testing-components.md) |
+| Select, structure, and run workflow tests | [Workflow Testing](./testing.md) |
 
 Scheduler-specific designs live under [Architecture Deep Dives](../architecture/index.md).
 

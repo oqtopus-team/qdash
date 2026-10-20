@@ -22,7 +22,7 @@ timezone: str = "Asia/Tokyo"
 
 ### Utility Module
 
-All datetime operations should use `src/qdash/common/datetime_utils.py`:
+All datetime operations should use `src/qdash/common/utils/datetime.py`:
 
 | Function | Description |
 |----------|-------------|
@@ -115,7 +115,7 @@ import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 ## Implementation Files
 
-- `src/qdash/common/datetime_utils.py` — backend utilities
+- `src/qdash/common/utils/datetime.py` — backend utilities
 - `ui/src/lib/utils/datetime.ts` — frontend utilities
 - `src/qdash/api/schemas/*.py` — API schemas
 - `src/qdash/dbmodel/*.py` — DB models

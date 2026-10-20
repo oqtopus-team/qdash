@@ -30,15 +30,15 @@ Read the migration page for the version or data-model change you are applying:
 Start with the [Application Tour](./application-tour.md), then open the guide for the job at
 hand:
 
-- **Access and scope:** [Authentication](./authentication.md),
-  [Projects and Data Sharing](./projects-and-sharing.md), and
-  [Roles and Permissions](./permissions.md).
+- **Access and scope:** [Authentication](./authentication-and-users.md),
+  [Projects and Data Sharing](./projects-and-data-sharing.md), and
+  [Roles and Permissions](./roles-and-permissions.md).
 - **Run calibration:** [Running Calibrations](./running-calibrations.md) and
   [Task Parameters](./task-parameters.md).
 - **Inspect data:** [Dashboard](./dashboard.md) and
   [Calibration Data and Provenance](./data-and-provenance.md).
 - **Collaborate:** [Reviewing and Sharing Results](./reviewing-results.md) and
   [Calibration Data Sharing](./calibration-data-sharing.md).
-- **Track hardware context:** [Cryostats and Cool-downs](./cryo.md).
-- **Use assisted workflows:** [Copilot](./copilot.md) and
+- **Track hardware context:** [Cryostats and Cool-downs](./cryostats-and-cool-downs.md).
+- **Use assisted workflows:** [AI Chat](./ai-chat.md) and
   [Agent Calibration](./agent-calibration.md).

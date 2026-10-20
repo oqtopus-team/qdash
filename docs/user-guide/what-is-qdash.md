@@ -22,7 +22,7 @@ came from. QDash records these parts in one project-scoped workspace.
 | Calibration state | The accepted parameters available to later calibration work. |
 
 Select the active project and chip before starting work. Two projects can use the same chip ID
-without sharing calibration state. [Projects and Data Sharing](./projects-and-sharing.md)
+without sharing calibration state. [Projects and Data Sharing](./projects-and-data-sharing.md)
 explains this boundary.
 
 ## Typical Calibration Loop

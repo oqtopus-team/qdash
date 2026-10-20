@@ -29,7 +29,7 @@ or client contract.
 ## Apply Repository-Wide Conventions
 
 The conventions for [datetime handling](./conventions/datetime.md),
-[logging](./conventions/logging.md), [QID validation](./conventions/qid-validation.md), and
+[logging](./conventions/logging.md), and
 [credential scanning](./conventions/credential-scan.md) apply across component boundaries.
 
 Use [Documentation Guidelines](./docs-guidelines.md) for any page under `docs/`.

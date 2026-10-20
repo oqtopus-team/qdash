@@ -54,5 +54,5 @@ System and project roles answer different questions:
 - The system role controls account administration.
 - The project role controls access to a project's calibration data and operations.
 
-See [Projects and Data Sharing](./projects-and-sharing.md) for owner, editor, and viewer
+See [Projects and Data Sharing](./projects-and-data-sharing.md) for owner, editor, and viewer
 permissions.

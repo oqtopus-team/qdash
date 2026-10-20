@@ -30,7 +30,7 @@ docs/
     system-updates.md      Select a stable release and rebuild from the host
     migrations/            Steps for upgrades that change stored data
     application-tour.md    One page per job after that: running calibrations,
-    ...                    reviewing results, copilot, projects, cryo, ...
+    ...                    reviewing results, AI chat, projects, cryostats, ...
   developer-guide/
     index.md               Reading order: setup, codebase, commands, testing
     setup.md  codebase.md  commands.md  testing.md  development-flow.md
@@ -131,6 +131,10 @@ no filler ("it is important to note that...").
 belongs in CI configuration.
 
 **No "Future Enhancements"** — Track planned work in GitHub Issues.
+
+**Under construction** — Use this marker only for an implemented feature whose guidance depends
+on a product-owner decision. Put it in the nearest navigation or coverage table instead of
+creating an empty placeholder page. Do not infer the missing behavior.
 
 **No "Best Practices" / "Quick Reference" appendices** — Integrate guidance where it is
 relevant.
