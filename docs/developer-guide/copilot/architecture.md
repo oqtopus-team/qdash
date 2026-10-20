@@ -7,7 +7,7 @@ QDash Copilot is an AI-powered assistant that helps experimentalists interpret q
 1. **Chat about a task result** (sidebar or floating window) -- Opened from a task result with that result's context and figures, for questions about one calibration result (e.g., CheckT1, CheckRabi).
 2. **Chat Page** -- A dedicated chat interface for chip-wide questions, cross-qubit comparisons, and exploratory data analysis.
 
-Both are the same chat with the same planner; the first just opens with a task result as its context. The evaluation model's recorded judgements are a separate thing (see "Planner-less evaluation runs"). Forum AI replies are one planner turn each on the same runtime.
+Both are the same chat with the same planner; the first just opens with a task result as its context. The evaluation model's recorded judgements are a separate thing (see [Calibration Evaluation](./evaluation.md)). Forum AI replies are one planner turn each on the same runtime.
 
 Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a sandboxed Python tool served by the API, and SSE streaming for progress.
 
@@ -171,111 +171,13 @@ runtime after editing the extension; the startup log lists the local paths and
 the tools they contributed. Anything placed under `agent-runtime/extensions/` on
 the host is trusted the same way, so keep that directory empty on production hosts.
 
-## Planner-less evaluation runs
+## Evaluation runs
 
-The chat is one entry point to the evaluation core; a bulk request from the
-chip page is another, and it does not need a planner. The runtime's
-`POST /evaluate` route (`agent-runtime/src/evaluate.ts`) runs, for one task
-result, exactly the two tools the planner would call: `qdash_build_qcal_evidence`
-(evidence text plus the task figure) and then `qcal_evaluate`, with the same
-auto-fill as in chat (figure bytes from the evidence, QDash's reference for
-the task name the evidence reports). It answers with a record of what the
-evaluation model saw and said: the evidence context, the figure hashes, the
-reference's size and hash, the exact prompt, the parsed diagnosis or the raw
-answer, the model, the duration, and the extension that judged (package name,
-version, and the checkout commit when a mounted checkout is in use). The route
-is synchronous and needs the same headers as `/chat`; concurrency is the
-caller's to limit.
-
-pi-qcaleval follows the QCalEval protocol ([arXiv 2604.25884](https://arxiv.org/abs/2604.25884)),
-which is also how Ising-Calibration was trained: six questions, each sent as
-its own single user message (no system prompt) made of the background, the
-question template, and the figure at the template's `<image>` position, all
-six in flight at once. The answers are parsed the way the benchmark scores
-them: the outcome from the `Classification:` line (four labels), the fit from
-the `Assessment:` line (reliable / unreliable / no fit), the status from the
-`Status:` line (upper-cased code) with its suggested range and notes, and JSON
-for the plot description and the extracted parameters. The diagnosis stores
-the parsed answer per question plus `success` (status is SUCCESS, or, without
-a status question, the outcome is expected); `answers` keeps every answer as
-returned. In-context mode shows the task's labeled examples in the benchmark's
-few-shot layout and only for the three questions it uses them for: one example
-per status for the status question, each example's analysis for significance,
-one example's values for parameter extraction. A call that fails is retried
-once; nothing is re-asked for its content. The record says how the answers
-were obtained (`attempts`, `stop_reason`, and `calls`: each question's call
-with its duration, stop reason and output tokens) and which questions got no
-answer; the API derives `complete` and `missing_keys` over the questions asked
-on every read, so older records are judged the same way. A run's summary adds
-its wall time (`elapsed_ms`) and the completed evaluations' model time added
-up (`duration_ms_total`), so two runs can be compared on cost as well as on
-outcome.
-
-The direct path builds the evaluation context from the evidence tool's
-structured details, not from its text: the task, target and status, then the
-sweep the plot was taken over (`sweeps`, which pi-qdash reads from the task's
-recorded run parameters with their units: start, stop, points, step) and the
-other run settings (shots, interval). The fitted output parameters and the
-calibration inputs stay out, since the model is meant to read the plot, and
-the benchmark gives it nothing but the plot and the background. The sweep also
-supplies the status question's suggested-range format
-(`(<min time_range>, <max time_range>) [ns]`) when the task's knowledge states
-none, so the model answers a corrective range in the swept parameter's unit.
-
-`POST /evaluation-prompts` (`previewEvaluationPrompts` in the same file) builds
-the prompts an evaluation of a task would send without a figure or a model
-call: it fetches the task's reference and, on request, its labeled examples
-exactly as a direct evaluation does, and runs `qcal_evaluate` with `dry_run`,
-so the templates stay in one place (the extension). The API serves it as
-`GET /tasks/{task_name}/evaluation-prompts` for the Knowledge page.
-
-The route has two modes. `direct` (the default) runs the two tools as such.
-`planner` opens a throwaway conversation on the given chat model, tells it
-to summarise the result and judge its figure, and reads the record off the
-`qcal_evaluate` result it produced; the durable tool wrapper stamps every
-evaluation result with a `host` record (figure hashes, the reference's size
-and hash, the context, the call's duration), so a planner turn leaves the
-same record as a direct evaluation, plus the planner's answer and the tools
-it called. The two modes differ in what reaches the evaluation model (the
-planner writes its own context and may pass its own reference), which is
-exactly what the stored records make comparable.
-
-The API turns that into runs (`src/qdash/api/services/evaluation_service.py`,
-router `src/qdash/api/routers/evaluation.py`): `POST /evaluations/runs`
-selects the latest evaluable result of one task per qubit or coupling of a
-chip (or that of one day, or a given list of task results), stores one
-pending `evaluation` record per task result under an `evaluation_run` (with
-its `trigger`, `bulk` from the chip page or `single` for one task result, and
-its `mode`, `direct` or `planner` with the chat's planner model), and
-executes them in the background of the API worker as the requesting user, a
-few at a time (`EVALUATION_CONCURRENCY`, default 2). Entities without an
-evaluable result (no result, no figure, still running) are reported as
-skipped. `GET /evaluations/runs` and `GET /evaluations/runs/{run_id}` show
-progress and the records; `GET /evaluations?task_id=` lists every evaluation
-of one task result across runs; `PUT /evaluations/{id}/verdict` stores a
-person's agreement or disagreement, the ground truth for comparing runs.
-
-The chat is the third entry. When the planner calls `qcal_evaluate` during a
-chat, the durable tool wrapper's `host` record (which also names the task
-result the figures were fetched for) rides on the runtime's `tool_end` event,
-and the API files it as a run of one with `trigger: "chat"` and the planner's
-final answer; the trace shows "recorded as an evaluation" with a link. A
-judgement of a figure that no tool fetched (a user attachment) is not recorded.
-So every judgement the evaluation model makes, from the chip page, a single
-result or a chat, is on one ledger.
-
-A run is a snapshot: the same selection evaluated again after a change to
-the extension, the model, or the task's reference yields a second run with
-the same shape, so parse rate, success rate, agreement rate and duration
-can be compared run against run. The UI does that on `/evaluations/compare?a=&b=`
-(`ui/src/components/features/evaluations/EvaluationComparePageContent.tsx`, pure
-joining in `evaluationCompare.ts`): the two runs' settings side by side with the
-differing ones flagged, totals, and one row per entity (joined by qid, noting
-whether both judged the same task result) with each side's fit quality, success
-and verdict; a row expands to both records. No API is added: the page reads the
-two run details and joins them in the browser. A run interrupted by an API
-restart keeps its unfinished records as pending; request it again rather than
-resuming it.
+The chat is one entry point to the evaluation model; a bulk request from the
+chip page is another, and a single task result a third. All three leave the
+same record. The runtime's `POST /evaluate` route, the reference and examples
+it fills in from the task knowledge, the record, runs and their comparison are
+described in [Calibration Evaluation](./evaluation.md).
 
 ## Two Modes
 
