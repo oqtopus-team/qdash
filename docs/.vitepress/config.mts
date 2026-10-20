@@ -104,6 +104,7 @@ export default withMermaid(
                 { text: "Application Tour", link: "/user-guide/application-tour" },
                 { text: "Authentication", link: "/user-guide/authentication" },
                 { text: "Projects and Sharing", link: "/user-guide/projects-and-sharing" },
+                { text: "Roles and Permissions", link: "/user-guide/permissions" },
                 { text: "Dashboard", link: "/user-guide/dashboard" },
                 { text: "Running Calibrations", link: "/user-guide/running-calibrations" },
                 { text: "Task Parameters", link: "/user-guide/task-parameters" },
