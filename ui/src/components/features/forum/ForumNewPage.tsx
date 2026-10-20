@@ -78,7 +78,7 @@ export function parseLabels(values: string[]): string[] {
 }
 
 /** Zod schema for the new thread form; limits mirror the backend ForumPostCreate. */
-export const newThreadSchema = z.object({
+const newThreadSchema = z.object({
   category: z
     .string()
     .trim()
