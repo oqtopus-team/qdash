@@ -149,6 +149,12 @@ repeat the same pattern in different sections.
 
 **Tables** — For structured data (settings, endpoints, file mappings). Not for prose.
 
+**Diagrams** — Use Mermaid for compact flows and sequences that remain readable in Markdown.
+Use `<Diagram name="..." caption="..." />` with a theme-aware SVG in `docs/diagrams/` when an
+architecture or lifecycle needs more deliberate layout. SVG diagrams must use VitePress color
+variables, include `role="img"` and a descriptive `aria-label`, and keep marker IDs unique. The
+nearby prose must still communicate the consequence for readers who cannot see the diagram.
+
 **Emoji** — None. Plain text for status in tables (Yes/No).
 
 **Length** — A page is read in one sitting. Past roughly 400 lines, split it by topic: a testing

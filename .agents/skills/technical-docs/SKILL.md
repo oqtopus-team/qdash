@@ -56,10 +56,12 @@ Google style, applied to this repository:
   content wants prose or its own section.
 - **Diagrams for relationships that prose hides.** Use a small Mermaid flowchart, sequence
   diagram, state diagram, or class diagram when the reader must track at least three components,
-  branches, transitions, or parallel and sequential phases. Keep labels concrete, explain the
-  consequence in nearby prose, and make the surrounding text sufficient for readers who cannot
-  see the diagram. Do not diagram a list, a single linear action, or the same information already
-  clear in a table.
+  branches, transitions, or parallel and sequential phases. For dense architecture and lifecycle
+  views that need deliberate layout, add a theme-aware SVG under `docs/diagrams/` and embed it as
+  `<Diagram name="..." caption="..." />`; follow the accessibility and styling rules in
+  `docs/developer-guide/docs-guidelines.md`. Keep labels concrete, explain the consequence in
+  nearby prose, and make the surrounding text sufficient for readers who cannot see the diagram.
+  Do not diagram a list, a single linear action, or the same information already clear in a table.
 - **Keep markdown compact.** Tables use `| --- |` separators without column padding; docs are
   not run through a formatter in CI, so match the surrounding file.
 

@@ -13,7 +13,7 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 
 ## Component Diagram
 
-![Copilot Architecture](../../diagrams/copilot-architecture.drawio.png)
+<Diagram name="copilot-architecture" caption="A Copilot turn: the API forwards it to the Agent runtime, whose tools call back into the API as the signed-in user." />
 
 ## Key Files
 

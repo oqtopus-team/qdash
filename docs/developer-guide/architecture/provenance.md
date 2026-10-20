@@ -4,9 +4,7 @@ The Provenance system tracks how calibration parameters are generated and modifi
 
 ## W3C PROV-DM Concepts
 
-QDash provenance is based on three core concepts (Entity, Activity, Agent) and their relations. See the diagram below for the full architecture and lineage graph example:
-
-![Provenance Lineage](../../diagrams/provenance-lineage.drawio.png)
+QDash provenance is based on three core concepts (Entity, Activity, Agent) and their relations.
 
 ### Mapping to QDash
 
@@ -24,11 +22,13 @@ QDash provenance is based on three core concepts (Entity, Activity, Agent) and t
 | `wasDerivedFrom` | Entity was derived from Entity | `t1:Q0:v2` was derived from `qubit_frequency:Q0:v3` |
 | `used` | Activity used Entity | `CheckT1` task used `qubit_frequency:Q0:v3` |
 
+<Diagram name="provenance-lineage" caption="One CheckT1 run records used, wasGeneratedBy, and wasDerivedFrom relations. Inputs resolve to their current version, which can come from an earlier execution." />
+
 ## Architecture
 
 ### Components
 
-The Provenance architecture (API Layer → ProvenanceService → Repositories → MongoDB collections) is shown in the diagram above.
+<Diagram name="provenance-architecture" caption="Workflow and API services write the three provenance collections; ProvenanceService reads them for the /provenance endpoints." />
 
 ### Data Models
 
@@ -212,7 +212,7 @@ response = {
 
 ## Lineage Graph Visualization
 
-The diagram above shows cross-execution parameter tracing (Execution 002 → 003) with
+The [Relation Types](#relation-types) diagram shows cross-execution parameter tracing (Execution 002 → 003) with
 wasGeneratedBy, used, and wasDerivedFrom relations.
 
 ## Database Collections
@@ -333,5 +333,5 @@ When a calibration task completes, record the following:
 
 1. `wasGeneratedBy`: Generated parameter → Activity
 2. `used`: Activity → Input parameters used
-3. `wasDerivedFrom`: New version → Previous version (for same parameter)
+3. `wasDerivedFrom`: Generated parameter → each input parameter the activity used
 

@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 290" role="img" aria-label="ProvenanceRecorder in the user flow worker, ManualUpdateService, and SeedImportService write parameter_versions, provenance_relations, and activities in MongoDB. ProvenanceService in the API reads them and serves the /provenance endpoints to the UI.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-ui { fill: rgba(46, 160, 67, 0.12); stroke: #2ea043; stroke-width: 1.5; }
+    .qd-api { fill: rgba(219, 109, 40, 0.12); stroke: #db6d28; stroke-width: 1.5; }
+    .qd-wf { fill: rgba(130, 80, 223, 0.12); stroke: #8250df; stroke-width: 1.5; }
+    .qd-data { fill: rgba(9, 105, 218, 0.10); stroke: #0969da; stroke-width: 1.5; }
+    .qd-lane { fill: rgba(128, 128, 128, 0.06); stroke: var(--vp-c-text-3, #8c959f); stroke-width: 1.2; stroke-dasharray: 5 4; }
+    .qd-lane-title { fill: var(--vp-c-text-1, #1f2328); font-size: 13px; font-weight: 600; }
+  </style>
+  <defs>
+    <marker id="qd-prova-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+  </defs>
+
+  <g class="qd-root">
+    <!-- Writers -->
+    <rect x="20" y="30" width="190" height="56" rx="8" class="qd-wf"/>
+    <text x="115" y="54" class="qd-title">ProvenanceRecorder</text>
+    <text x="115" y="72" class="qd-sub">worker · after each task</text>
+
+    <rect x="20" y="117" width="190" height="56" rx="8" class="qd-api"/>
+    <text x="115" y="141" class="qd-title">ManualUpdateService</text>
+    <text x="115" y="159" class="qd-sub">API · manual edits</text>
+
+    <rect x="20" y="204" width="190" height="56" rx="8" class="qd-api"/>
+    <text x="115" y="228" class="qd-title">SeedImportService</text>
+    <text x="115" y="246" class="qd-sub">API · seed import</text>
+
+    <!-- MongoDB collections -->
+    <rect x="300" y="20" width="260" height="250" rx="10" class="qd-lane"/>
+    <text x="316" y="44" class="qd-lane-title">MongoDB</text>
+
+    <path d="M320,64 v34 a110,8 0 0,0 220,0 v-34" class="qd-data"/>
+    <ellipse cx="430" cy="64" rx="110" ry="8" class="qd-data"/>
+    <text x="430" y="88" class="qd-title">parameter_versions</text>
+    <text x="430" y="103" class="qd-sub">entities · one per value</text>
+
+    <path d="M320,132 v34 a110,8 0 0,0 220,0 v-34" class="qd-data"/>
+    <ellipse cx="430" cy="132" rx="110" ry="8" class="qd-data"/>
+    <text x="430" y="156" class="qd-title">provenance_relations</text>
+    <text x="430" y="171" class="qd-sub">edges · source → target</text>
+
+    <path d="M320,200 v34 a110,8 0 0,0 220,0 v-34" class="qd-data"/>
+    <ellipse cx="430" cy="200" rx="110" ry="8" class="qd-data"/>
+    <text x="430" y="224" class="qd-title">activities</text>
+    <text x="430" y="239" class="qd-sub">task runs</text>
+
+    <!-- Reader side -->
+    <rect x="650" y="117" width="170" height="56" rx="8" class="qd-api"/>
+    <text x="735" y="141" class="qd-title">ProvenanceService</text>
+    <text x="735" y="159" class="qd-sub">API · graph walks</text>
+
+    <rect x="910" y="117" width="110" height="56" rx="8" class="qd-ui"/>
+    <text x="965" y="141" class="qd-title">UI</text>
+    <text x="965" y="159" class="qd-sub">/provenance</text>
+
+    <!-- Edges -->
+    <line x1="210" y1="58" x2="298" y2="58" class="qd-edge" marker-end="url(#qd-prova-arrow)"/>
+    <text x="254" y="50" class="qd-label" text-anchor="middle">writes</text>
+    <line x1="210" y1="145" x2="298" y2="145" class="qd-edge" marker-end="url(#qd-prova-arrow)"/>
+    <text x="254" y="137" class="qd-label" text-anchor="middle">writes</text>
+    <line x1="210" y1="232" x2="298" y2="232" class="qd-edge" marker-end="url(#qd-prova-arrow)"/>
+    <text x="254" y="224" class="qd-label" text-anchor="middle">writes</text>
+
+    <line x1="562" y1="145" x2="648" y2="145" class="qd-edge" marker-start="url(#qd-prova-arrow)"/>
+    <text x="605" y="137" class="qd-label" text-anchor="middle">reads</text>
+
+    <line x1="908" y1="145" x2="822" y2="145" class="qd-edge" marker-end="url(#qd-prova-arrow)"/>
+    <text x="865" y="137" class="qd-label" text-anchor="middle">GET</text>
+  </g>
+</svg>

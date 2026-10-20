@@ -76,6 +76,8 @@ For a single target, `TaskExecutor.execute()` performs these phases:
 6. Save figures, history, provenance, and permitted backend updates.
 7. Mark the task completed or failed and return `TaskExecutionResult`.
 
+<Diagram name="task-lifecycle" caption="Which component writes what during each TaskExecutor phase, and where it lands. Execution state is saved on a separate path." />
+
 Batch execution follows the same policy through `execute_batch()`, but calls the task's
 `batch_run()` once and then distributes results to individual target records. Use a batch task
 only when one backend experiment genuinely covers all supplied qubits.
@@ -110,6 +112,8 @@ Top-level flows that own a reservation use the ordinary terminal hooks. Nested s
 use the `*_keep_lock` variants so they cannot release a reservation owned by the parent pipeline.
 The shared flow helpers in `service/calib_service.py` implement the exception classification and
 terminal behavior; flow templates should not reproduce that policy independently.
+
+<Diagram name="execution-reservation" caption="The pipeline owner reserves hardware once; borrowers are checked against that reservation, and only the owner's terminal paths release it." />
 
 ## Extension Points
 

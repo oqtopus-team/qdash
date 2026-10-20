@@ -58,6 +58,8 @@ The OpenAPI document generates `ui/src/client/` and `ui/src/schemas/` through
 `ui/src/lib/api/custom-instance.ts`, which adds the bearer token and active project header and
 provides request cancellation.
 
+<Diagram name="ui-data-flow" caption="Request paths from a feature component to FastAPI, and the build-time loop that generates the hooks." />
+
 Do not edit generated files or replace a generated endpoint with an ad hoc request. Change the
 backend schema or route, run `task generate`, and add a focused hook only when the feature needs
 composition that the generated hook does not provide.

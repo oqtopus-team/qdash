@@ -14,6 +14,8 @@ next to the tools they name (see [Knowledge Layout](./knowledge-layout.md)); a s
 skill's name, version, and hash rather than treating the repository-local helper as the
 distribution source.
 
+<Diagram name="agent-platform" caption="The agent only sends requests; QDash checks each one, measures without writing, gates the staged output, and writes only an accepted candidate." />
+
 ## Session contract
 
 An agent creates a bounded session before proposing anything. The session fixes the chip, the
