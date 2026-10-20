@@ -93,7 +93,9 @@ async def test_a_blank_question_is_not_sent_and_missing_fields_default(
         question="   ",
     )
 
-    assert preview.await_args.kwargs["question"] is None
+    await_args = preview.await_args
+    assert await_args is not None
+    assert await_args.kwargs["question"] is None
     assert response.with_examples is False
     assert response.model is None
     assert response.questions == []
