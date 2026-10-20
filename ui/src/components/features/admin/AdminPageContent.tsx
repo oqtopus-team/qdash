@@ -47,6 +47,7 @@ import { AdminPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDate } from "@/lib/utils/datetime";
 
+/** Admin page with tabs for managing users, projects, and system settings. */
 export function AdminPageContent() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -176,6 +177,7 @@ export function AdminPageContent() {
     setSelectedUsernames([]);
   };
 
+  /** Updates the selected user and rethrows failures so the edit modal can display them. */
   const handleUpdateUser = async (updates: {
     organization?: string;
     disabled?: boolean;
@@ -193,6 +195,7 @@ export function AdminPageContent() {
       setSelectedUser(null);
     } catch (err) {
       console.error("Failed to update user:", err);
+      throw err;
     }
   };
 
