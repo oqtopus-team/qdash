@@ -1,18 +1,13 @@
 # Reference
 
-Use these pages to look up QDash schemas, database structures, indexes, and generated client
-contracts. Explanations and change procedures remain in the Developer Guide.
+Use these pages to look up QDash database collections and generated or public client contracts.
+Explanations and change procedures remain in the Developer Guide.
 
 ## Database
 
 | Information | Reference |
 | --- | --- |
-| Collections, relationships, and data flow | [Database Structure](./database-structure.md) |
-| Shared application data models | [Data Models](./data-models.md) |
-| Calibration documents | [Calibration Documents](./database-documents-calibration.md) |
-| Execution documents | [Execution Documents](./database-documents-execution.md) |
-| Project and collaboration documents | [Collaboration Documents](./database-documents-collaboration.md) |
-| MongoDB indexes | [Database Indexes](./database-indexes.md) |
+| Collection names and their document classes | [Database Collections](./database-structure.md) |
 
 ## API and Clients
 

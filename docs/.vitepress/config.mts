@@ -227,12 +227,7 @@ export default withMermaid(
               collapsed: true,
               items: [
                 { text: "Overview", link: "/reference/" },
-                { text: "Database Structure", link: "/reference/database-structure" },
-                { text: "Data Models", link: "/reference/data-models" },
-                { text: "Calibration Documents", link: "/reference/database-documents-calibration" },
-                { text: "Execution Documents", link: "/reference/database-documents-execution" },
-                { text: "Collaboration Documents", link: "/reference/database-documents-collaboration" },
-                { text: "Database Indexes", link: "/reference/database-indexes" },
+                { text: "Database Collections", link: "/reference/database-structure" },
                 { text: "OpenAPI", link: "/reference/openapi" },
                 { text: "Python Client", link: "/reference/clients/python" },
                 { text: "TypeScript Client", link: "/reference/clients/typescript" },
