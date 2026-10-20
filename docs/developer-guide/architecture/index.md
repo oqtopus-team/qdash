@@ -11,7 +11,7 @@ or workflow subsystem.
 | [Provenance](./provenance.md) | Parameter history, lineage traversal, impact analysis, and persistence. |
 | [Notes](./notes.md) | Scoped summaries, result notes, audit events, and note search. |
 | [1-Qubit Scheduler](./one-qubit-scheduler.md) | Wiring-aware grouping and stage generation for single-qubit calibration. |
-| [1-Qubit Ordering Plugins](./one-qubit-ordering-plugins.md) | Ordering strategies and synchronized scheduling inside 1-qubit groups. |
+| [1-Qubit Ordering Strategies](./one-qubit-ordering-strategies.md) | Ordering strategies and synchronized scheduling inside 1-qubit groups. |
 | [CR Gate Scheduler](./cr-scheduler.md) | Conflict detection and graph coloring for two-qubit calibration. |
 
 The [Workflow Development](../workflow/index.md) section explains the engine that consumes these
