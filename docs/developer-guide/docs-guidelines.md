@@ -25,10 +25,10 @@ docs/
   index.md                 Two entry points: User Guide, Developer Guide
   user-guide/
     index.md               Reading order: set up, operate, work with calibrations
-    setup.md               Clone, configure, start, sign in
+    setup.md               Choose a backend, then clone, configure, start, sign in
+    setup/                  Fake and Qubex backend-specific configuration
     operations.md          Start, stop, logs, recovery
     system-updates.md      Select a stable release and rebuild from the host
-    migrations/            Steps for upgrades that change stored data
     application-tour.md    One page per job after that: running calibrations,
     ...                    reviewing results, AI chat, projects, cryostats, ...
   developer-guide/

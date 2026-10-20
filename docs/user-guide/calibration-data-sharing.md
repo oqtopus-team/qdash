@@ -40,11 +40,4 @@ projects contain a chip with the same ID.
 QDash does not provide a normal UI action to move calibration state between projects. Establish or
 import the state in the intended project instead.
 
-## Upgrade Existing Data
-
-Deployments created before project-scoped calibration need their legacy records and artifacts
-assigned to projects. Follow the
-[project-scoped calibration migration](./migrations/project-scoped-calibration.md) for backup,
-duplicate handling, verification, and recovery.
-
 For membership and role changes, see [Projects and Data Sharing](./projects-and-data-sharing.md).

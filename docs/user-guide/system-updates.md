@@ -19,8 +19,8 @@ This is a one-time transition step. Current releases do not install or run the h
 
 ## Prepare the Update
 
-Read the target release notes and any linked migration guide before changing the checkout. A
-release that changes stored data can require a backup or a separate migration procedure.
+Read the target release notes before changing the checkout. A release that changes stored data
+can require a backup or a release-specific procedure.
 
 1. Confirm that no calibration or other workflow is running.
 2. Complete or cancel running work from the QDash execution pages.
@@ -91,13 +91,12 @@ unavailable.
 
 ## Recover from a Failed Update
 
-Follow the target release's migration guide when deployment fails after a data migration. Moving
-the Git checkout back does not reverse MongoDB, PostgreSQL, calibration-data, or configuration
-changes. Restore the backups required by that guide before starting the previous application
-version.
+Follow the target release notes when deployment fails after stored data changes. Moving the Git
+checkout back does not reverse MongoDB, PostgreSQL, calibration-data, or configuration changes.
+Restore the backups required by that release before starting the previous application version.
 
-If the failure occurs before a data migration and the release notes permit a code-only rollback,
-move `main` back to the previously deployed stable tag and rebuild:
+If the failure occurs before stored data changes are applied and the release notes permit a
+code-only rollback, move `main` back to the previously deployed stable tag and rebuild:
 
 ```bash
 git reset --hard <previous-tag>

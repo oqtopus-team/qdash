@@ -88,14 +88,16 @@ export default withMermaid(
             {
               text: "Set Up and Operate",
               items: [
-                { text: "Setup", link: "/user-guide/setup" },
+                {
+                  text: "Setup",
+                  items: [
+                    { text: "Choose a Backend", link: "/user-guide/setup" },
+                    { text: "Fake Backend", link: "/user-guide/setup/fake-backend" },
+                    { text: "Qubex Backend", link: "/user-guide/setup/qubex-backend" },
+                  ],
+                },
                 { text: "Operations", link: "/user-guide/operations" },
                 { text: "System Updates", link: "/user-guide/system-updates" },
-                { text: "Upgrade to v1.8.0", link: "/user-guide/migrations/v1.8.0" },
-                {
-                  text: "Upgrade to Project-Scoped Calibration",
-                  link: "/user-guide/migrations/project-scoped-calibration",
-                },
               ],
             },
             {
