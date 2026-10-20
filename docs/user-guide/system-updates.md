@@ -1,101 +1,108 @@
 # System Updates
 
-QDash system updates let a system administrator deploy the latest stable source release without
-giving the API process direct Git or Docker access.
+Update a QDash source deployment from the host by selecting a stable release tag and rebuilding
+the Docker Compose stack.
 
-## Architecture
+Run these commands from the QDash repository root. Schedule a maintenance window because QDash is
+unavailable while its containers are stopped and rebuilt.
 
-The updater is a small host-side process that runs outside the main QDash Docker Compose project.
-The API authenticates administrators, refuses updates while a calibration lock is held, and
-forwards only fixed status and update operations over a Unix domain socket. The updater owns the
-Git checkout, Docker Compose commands, persistent operation state, and rollback attempt, so
-restarting the QDash API does not terminate an update.
+## Stop the Legacy Updater
 
-Do not run the updater inside the main `compose.yaml`. Updating QDash stops and rebuilds that
-Compose project. The updater must remain alive throughout that process.
-
-## Git branch and tag requirements
-
-The installation directory is unrestricted, but the source checkout must meet these conditions:
-
-- The current branch is `main`.
-- `HEAD` is exactly at a stable tag named `vMAJOR.MINOR.PATCH`.
-- The tracked worktree has no local modifications.
-- The configured Git remote, `origin` by default, provides a newer stable tag.
-- The target tag contains a manifest that permits automatic updates.
-
-The updater compares tags using semantic version order and considers only stable tags in the
-`origin/main` history. It ignores untagged commits, prerelease tags such as `v2.0.0-rc.1`, and tags
-that do not match the stable version format. A successful update fast-forwards the local `main`
-branch to the selected tag. It never merges a divergent branch or updates `develop` or a feature
-branch.
-
-## Release safety manifest
-
-Automatic updates are allowed only when the target stable tag contains `update-manifest.json` with
-these values:
-
-```json
-{
-  "schema_version": 1,
-  "automatic_update": true,
-  "migration_mode": "compose"
-}
-```
-
-Set `automatic_update` to `false` and explain the manual procedure in `notes` when a release needs
-a backup, migration, or deployment step that `docker compose up -d --build` cannot perform safely.
-The Admin UI will show the release as unavailable for automatic update.
-
-## Starting QDash
-
-Clone QDash in any directory and check out the `main` release branch according to
-[Operator Setup](./setup.md#clone-the-repository). Start the updater and Compose directly with the
-tools already used by QDash deployments:
+Releases that show an update control under Admin **System** run a separate updater process on the
+host. Stop that process from the old checkout before moving to a release that removes the control:
 
 ```bash
-uv run --env-file .env --isolated --locked --no-dev qdash-updater start
+uv run --env-file .env --isolated --locked --no-dev qdash-updater stop
+```
+
+This is a one-time transition step. Current releases do not install or run the host updater.
+
+## Prepare the Update
+
+Read the target release notes and any linked migration guide before changing the checkout. A
+release that changes stored data can require a backup or a separate migration procedure.
+
+1. Confirm that no calibration or other workflow is running.
+2. Complete or cancel running work from the QDash execution pages.
+3. Back up MongoDB, PostgreSQL, calibration data, and Qubex configuration when required by the
+   release notes or your recovery policy.
+4. Confirm that the checkout is on `main` and has no tracked changes:
+
+   ```bash
+   git branch --show-current
+   git describe --tags --exact-match
+   git status --short
+   ```
+
+   The branch command must print `main`. Record the version printed by the tag command in case a
+   rollback is necessary. The status command must print nothing. Commit or preserve local changes
+   before continuing.
+
+## Select a Release
+
+Fetch the release tags from `origin`:
+
+```bash
+git fetch origin --tags --prune
+git tag --list 'v[0-9]*' --sort=-v:refname
+```
+
+Select a stable `vMAJOR.MINOR.PATCH` tag. Do not select a prerelease tag such as
+`v2.0.0-rc.1`. Replace `<target-tag>` in the following steps with the selected tag.
+
+Confirm that the target belongs to the stable branch before stopping QDash:
+
+```bash
+git merge-base --is-ancestor <target-tag> origin/main
+```
+
+The command must exit successfully. If it does not, do not deploy that tag.
+
+## Deploy the Release
+
+Stop QDash, advance `main` to the target without creating a merge commit, validate Compose, and
+rebuild the stack:
+
+```bash
+docker compose down
+git merge --ff-only <target-tag>
+docker compose config --quiet
 docker compose up -d --build
 ```
 
-Go Task is optional. When it is installed, `task deploy`, `task deploy-local`, and
-`task deploy-local-fake` automatically run the equivalent updater command before starting Compose.
-No updater configuration or system service installation is required.
+`git merge --ff-only` refuses a divergent update instead of combining release code with local
+commits. Resolve the branch state before retrying; do not force the merge.
 
-The updater uses the current repository as the installation directory and stores its socket, PID,
-log, and operation state under `${XDG_STATE_HOME}/qdash/updater/`, or
-`~/.local/state/qdash/updater/` when `XDG_STATE_HOME` is unset. The main Compose file mounts that
-directory into the API container. Keeping runtime files outside the checkout prevents ownership
-conflicts when the same checkout is used from both the host and a devcontainer. The socket is not
-reachable over TCP and needs no GitHub or shared bearer token. Public QDash repositories fetch
-stable tags anonymously from the configured Git remote.
+## Verify the Deployment
 
-The `--isolated` option is intentional. It keeps the host updater out of the repository's `.venv`,
-which may have been created inside a devcontainer with a different interpreter or file owner.
-`--locked --no-dev` uses the committed dependency versions without installing development tools.
+Check the containers and browser-facing services after the build finishes:
 
-Use `uv run --env-file .env --isolated --locked --no-dev qdash-updater status` to check the process
-and `uv run --env-file .env --isolated --locked --no-dev qdash-updater stop` to stop it. Replace
-`status` with `run` to run it in the foreground for troubleshooting. The equivalent Task commands are
-`task updater-status`, `task updater-stop`, and `task updater`. Advanced deployments can override
-`QDASH_UPDATER_REPOSITORY`,
-`QDASH_UPDATER_RUNTIME_DIR`, `QDASH_UPDATER_SOCKET`, `QDASH_UPDATER_STATE_PATH`, or
-`QDASH_UPDATER_HEALTH_URL` in `.env`, but these settings are optional.
+```bash
+docker compose ps
+```
 
-## Update behavior
+- QDash UI: <http://localhost:5714/login>
+- API documentation: <http://localhost:5715/docs>
+- Prefect: <http://localhost:4200>
 
-The Admin **System** tab shows the current exact release tag, latest stable tag, tracked worktree
-state, and any blocking reason. Starting an update performs these steps:
+Use the ports from `.env` if the deployment overrides the defaults. Follow service logs as
+described in [Operations](./operations.md#inspect-logs) when a container is unhealthy or a page is
+unavailable.
 
-1. Verify that QDash is on `main`, at an exact stable tag, with a clean tracked working tree.
-2. Fetch tags and validate the target release manifest.
-3. Refuse the request if another update or a calibration is running.
-4. Stop the API, UI, deployment service, and user-flow worker.
-5. Fast-forward `main` to the target tag and validate the Compose configuration.
-6. Run `docker compose up -d --build`; the Compose-managed idempotent migration must complete.
-7. Wait for the configured API health URL.
+## Recover from a Failed Update
 
-If checkout or deployment fails after changing revisions, the updater checks out the previous
-commit and attempts to rebuild and restart it. This is a code rollback, not a database rollback.
-A release that cannot safely run the previous code after migration must disable automatic updates
-in its manifest and document a backup-based maintenance procedure.
+Follow the target release's migration guide when deployment fails after a data migration. Moving
+the Git checkout back does not reverse MongoDB, PostgreSQL, calibration-data, or configuration
+changes. Restore the backups required by that guide before starting the previous application
+version.
+
+If the failure occurs before a data migration and the release notes permit a code-only rollback,
+move `main` back to the previously deployed stable tag and rebuild:
+
+```bash
+git reset --hard <previous-tag>
+docker compose up -d --build
+```
+
+`git reset --hard` discards tracked changes. Confirm the target tag and preserve any local work
+before running it.

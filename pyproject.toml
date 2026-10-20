@@ -17,10 +17,6 @@ dependencies = [
     "qdash-api",
 ]
 
-[project.scripts]
-qdash-updater = "qdash.updater.__main__:main"
-
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

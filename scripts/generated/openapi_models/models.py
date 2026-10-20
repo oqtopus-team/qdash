@@ -157,33 +157,6 @@ class AgentSessionStatus(StrEnum):
     expired = "expired"
 
 
-class AnalysisResponse(BaseModel):
-    """
-    Structured analysis returned by the LLM.
-    """
-
-    summary: Annotated[str, Field(title="Summary")]
-    """
-    One-line result summary
-    """
-    assessment: Annotated[str, Field(title="Assessment")]
-    """
-    Overall assessment: good / warning / bad
-    """
-    explanation: Annotated[str, Field(title="Explanation")]
-    """
-    Detailed analysis and interpretation
-    """
-    potential_issues: Annotated[list[str] | None, Field(title="Potential Issues")] = None
-    """
-    Detected potential issues
-    """
-    recommendations: Annotated[list[str] | None, Field(title="Recommendations")] = None
-    """
-    Recommended next actions
-    """
-
-
 class ApplyAgentCandidateRequest(BaseModel):
     """
     Dispatch a committed candidate for worker-side backend application.
@@ -192,18 +165,6 @@ class ApplyAgentCandidateRequest(BaseModel):
     idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
     expected_state_version: Annotated[int, Field(ge=0, title="Expected State Version")]
     push_to_github: Annotated[bool, Field(title="Push To Github")] = False
-
-
-class ApprovalDecision(BaseModel):
-    """
-    The user's decision on a write operation the assistant asked approval for.
-    """
-
-    id: Annotated[str, Field(title="Id")]
-    """
-    Tool call id from the approval card
-    """
-    approve: Annotated[bool, Field(title="Approve")]
 
 
 class ArtifactPreviewResponse(BaseModel):
@@ -335,23 +296,6 @@ class CandidateGateResponse(BaseModel):
     reason: Annotated[str, Field(title="Reason")]
     minimum: Annotated[float | None, Field(title="Minimum")] = None
     maximum: Annotated[float | None, Field(title="Maximum")] = None
-
-
-class MimeType(StrEnum):
-    image_png = "image/png"
-    image_jpeg = "image/jpeg"
-
-
-class ChatImageAttachment(BaseModel):
-    """
-    One figure the user attached to a chat message.
-    """
-
-    data: Annotated[str, Field(max_length=6291456, min_length=1, title="Data")]
-    """
-    Base64 image bytes without a data: prefix
-    """
-    mimeType: Annotated[MimeType, Field(title="Mimetype")]
 
 
 class ChipDatesResponse(BaseModel):
@@ -552,6 +496,48 @@ class CopilotChatSessionSummary(BaseModel):
     updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
 
 
+class CopilotPreferences(BaseModel):
+    """
+    The current user's Copilot preferences.
+    """
+
+    instructions: Annotated[str, Field(max_length=2000, title="Instructions")] = ""
+    """
+    Instructions added to every chat of this user (style, language, formats). They apply to chat only, not to evaluations or forum replies, and cannot override the approval of write operations.
+    """
+    max_instructions_chars: Annotated[int, Field(title="Max Instructions Chars")] = 2000
+    """
+    Longest instructions accepted
+    """
+
+
+class CopilotPreferencesUpdate(BaseModel):
+    """
+    Replace the current user's Copilot instructions; empty clears them.
+    """
+
+    instructions: Annotated[str, Field(max_length=2000, title="Instructions")] = ""
+
+
+class CopilotSystemPrompt(BaseModel):
+    """
+    What QDash tells the chat model, read-only: its system prompt and this user's part.
+    """
+
+    system_prompt: Annotated[str, Field(title="System Prompt")]
+    """
+    QDash's system prompt for chats, set by the application
+    """
+    user_preferences: Annotated[str | None, Field(title="User Preferences")] = None
+    """
+    This user's instructions as they are appended to it, or None when unset
+    """
+    tools: Annotated[list[str] | None, Field(title="Tools")] = None
+    """
+    Tools offered to the chat; their descriptions are sent with each request
+    """
+
+
 class CouplingGateDuration(BaseModel):
     """
     Gate duration of the coupling.
@@ -588,6 +574,79 @@ class CreateCopilotChatSessionRequest(BaseModel):
     title: Annotated[str, Field(title="Title")] = "New Chat"
     context: Annotated[dict[str, Any] | None, Field(title="Context")] = None
     messages: Annotated[list[CopilotChatMessageSchema] | None, Field(title="Messages")] = None
+
+
+class Question(RootModel[str]):
+    root: Annotated[str, Field(max_length=2000, title="Question")]
+    """
+    A specific question for the evaluation model, on top of the diagnosis
+    """
+
+
+class Trigger(StrEnum):
+    """
+    "bulk" from the chip page, "single" for one task result
+    """
+
+    bulk = "bulk"
+    single = "single"
+    chat = "chat"
+
+
+class Mode(StrEnum):
+    """
+    "direct" runs the evaluation tools; "planner" lets the chat planner call them
+    """
+
+    direct = "direct"
+    planner = "planner"
+
+
+class CreateEvaluationRunRequest(BaseModel):
+    """
+    Evaluate the latest result of one task for every entity on a chip.
+    """
+
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    """
+    Chip ID
+    """
+    task: Annotated[str, Field(title="Task")]
+    """
+    Calibration task name
+    """
+    entity_type: Annotated[str, Field(title="Entity Type")] = "qubit"
+    """
+    "qubit" or "coupling"
+    """
+    date: Annotated[str | None, Field(title="Date")] = None
+    """
+    YYYYMMDD to evaluate that day's results instead of the latest ones
+    """
+    task_ids: Annotated[list[str] | None, Field(title="Task Ids")] = None
+    """
+    Restrict the run to these task results
+    """
+    qids: Annotated[list[str] | None, Field(title="Qids")] = None
+    """
+    Restrict the run to the latest results of these qubits or couplings
+    """
+    question: Annotated[Question | None, Field(title="Question")] = None
+    """
+    A specific question for the evaluation model, on top of the diagnosis
+    """
+    trigger: Annotated[Trigger, Field(title="Trigger")] = Trigger.bulk
+    """
+    "bulk" from the chip page, "single" for one task result
+    """
+    with_examples: Annotated[bool, Field(title="With Examples")] = False
+    """
+    Show the task's expert-labeled example plots before the figure (in-context examples)
+    """
+    mode: Annotated[Mode, Field(title="Mode")] = Mode.direct
+    """
+    "direct" runs the evaluation tools; "planner" lets the chat planner call them
+    """
 
 
 class CryostatCreateRequest(BaseModel):
@@ -726,14 +785,252 @@ class EvaluateCandidateGateRequest(BaseModel):
     value: Annotated[float, Field(title="Value")]
 
 
+class EvaluationCallModel(BaseModel):
+    """
+    One model call made for an answer: how long it took and how it ended.
+    """
+
+    question: Annotated[str | None, Field(title="Question")] = None
+    """
+    The diagnosis question the call asked, when one per call
+    """
+    duration_ms: Annotated[int, Field(title="Duration Ms")]
+    """
+    Wall time of the call
+    """
+    stop_reason: Annotated[str, Field(title="Stop Reason")]
+    """
+    Why the model stopped, as pi reports it
+    """
+    structured: Annotated[bool, Field(title="Structured")] = False
+    """
+    Whether the call was constrained to the diagnosis schema
+    """
+    output_tokens: Annotated[int | None, Field(title="Output Tokens")] = None
+    """
+    Output tokens of the call
+    """
+    missing_keys: Annotated[list[str] | None, Field(title="Missing Keys")] = None
+    """
+    Diagnosis keys the call's answer lacked
+    """
+
+
+class EvaluationFigureModel(BaseModel):
+    """
+    One figure the evaluation model saw, by hash rather than by bytes.
+    """
+
+    sha256: Annotated[str, Field(title="Sha256")]
+    """
+    SHA-256 of the decoded image bytes
+    """
+    mime_type: Annotated[str, Field(title="Mime Type")]
+    """
+    Image media type
+    """
+    bytes: Annotated[int, Field(title="Bytes")]
+    """
+    Decoded image size in bytes
+    """
+    path: Annotated[str | None, Field(title="Path")] = None
+    """
+    Path in the knowledge repository, for an example figure
+    """
+
+
+class Status1(StrEnum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
+class EvaluationOutputModel(BaseModel):
+    """
+    What the evaluation model answered.
+    """
+
+    model: Annotated[str | None, Field(title="Model")] = None
+    """
+    provider/modelId that judged the plot
+    """
+    fallback: Annotated[bool, Field(title="Fallback")] = False
+    """
+    True when no calibration VLM was configured and another model judged
+    """
+    diagnosis: Annotated[dict[str, Any] | None, Field(title="Diagnosis")] = None
+    """
+    The parsed JSON diagnosis, when the answer was JSON
+    """
+    raw: Annotated[str | None, Field(title="Raw")] = None
+    """
+    The answer text when it was not JSON, or not all of the diagnosis
+    """
+    answers: Annotated[dict[str, str] | None, Field(title="Answers")] = None
+    """
+    Each answered question's text as the model returned it
+    """
+    questions: Annotated[list[str] | None, Field(title="Questions")] = None
+    """
+    The questions asked, in order; empty means all six
+    """
+    parsed: Annotated[bool, Field(title="Parsed")] = False
+    """
+    Whether the answer parsed as the JSON object
+    """
+    complete: Annotated[bool, Field(title="Complete")] = False
+    """
+    Whether the diagnosis answers every question asked (derived)
+    """
+    missing_keys: Annotated[list[str] | None, Field(title="Missing Keys")] = None
+    """
+    Questions asked that the diagnosis lacks (derived)
+    """
+    attempts: Annotated[int | None, Field(title="Attempts")] = None
+    """
+    Model calls made for the answer: 1, or 2 after an incomplete one
+    """
+    structured: Annotated[bool | None, Field(title="Structured")] = None
+    """
+    Whether decoding was constrained to the diagnosis schema
+    """
+    stop_reason: Annotated[str | None, Field(title="Stop Reason")] = None
+    """
+    Why the model stopped, as pi reports it
+    """
+    calls: Annotated[list[EvaluationCallModel] | None, Field(title="Calls")] = None
+    """
+    Every model call made for the answer, in order, when the evaluator reports them
+    """
+    duration_ms: Annotated[int, Field(title="Duration Ms")] = 0
+    """
+    Wall time of the evaluation call, every model call included
+    """
+    usage: Annotated[dict[str, Any] | None, Field(title="Usage")] = None
+    """
+    Token usage, as pi reports it
+    """
+
+
+class EvaluationPlannerModel(BaseModel):
+    """
+    What the planner did around the evaluation, in planner mode.
+    """
+
+    model: Annotated[str, Field(title="Model")]
+    """
+    provider/modelId of the planner
+    """
+    answer: Annotated[str, Field(title="Answer")] = ""
+    """
+    The planner's final answer
+    """
+    tool_calls: Annotated[list[str] | None, Field(title="Tool Calls")] = None
+    """
+    Tools the planner called, in order
+    """
+    duration_ms: Annotated[int, Field(title="Duration Ms")] = 0
+    """
+    Wall time of the whole planner turn
+    """
+
+
+class EvaluationPromptQuestion(BaseModel):
+    """
+    One question's prompt, as the evaluation model would receive it.
+    """
+
+    key: Annotated[str, Field(title="Key")]
+    """
+    The question key, e.g. fit_reliability
+    """
+    prompt: Annotated[str, Field(title="Prompt")]
+    """
+    The user turn; [figure] marks where an image goes
+    """
+
+
+class Trigger1(StrEnum):
+    bulk = "bulk"
+    single = "single"
+    chat = "chat"
+
+
+class Mode1(StrEnum):
+    direct = "direct"
+    planner = "planner"
+
+
+class Status2(StrEnum):
+    running = "running"
+    completed = "completed"
+
+
+class EvaluationVerdictModel(BaseModel):
+    """
+    A person's judgement of one evaluation, the ground truth for comparing runs.
+    """
+
+    agree: Annotated[bool | None, Field(title="Agree")] = None
+    """
+    True when the person agrees with the evaluation, False when not, None to clear
+    """
+    note: Annotated[str | None, Field(title="Note")] = None
+    """
+    Why, in the person's words
+    """
+    username: Annotated[str, Field(title="Username")]
+    """
+    Who judged
+    """
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    """
+    When the verdict was last changed
+    """
+
+
+class EvaluatorModel(BaseModel):
+    """
+    The extension that produced the evaluation.
+    """
+
+    name: Annotated[str, Field(title="Name")]
+    """
+    Package name, e.g. @orangekame3/pi-qcaleval
+    """
+    version: Annotated[str, Field(title="Version")]
+    """
+    Package version from its manifest
+    """
+    source: Annotated[str, Field(title="Source")]
+    """
+    "checkout" (mounted) or "package" (pinned install)
+    """
+    commit: Annotated[str | None, Field(title="Commit")] = None
+    """
+    Checkout HEAD commit, when known
+    """
+
+
+class SourceExecutionId(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1, title="Source Execution Id")]
+    """
+    Execution the action was decided from, kept for provenance. The run reads the current calibration state, as a Task Workbench run does.
+    """
+
+
 class ExecuteAgentActionRequest(BaseModel):
     """
     Dispatch one authorized run-task action as a staged measurement.
     """
 
-    source_execution_id: Annotated[
-        str, Field(max_length=200, min_length=1, title="Source Execution Id")
-    ]
+    source_execution_id: Annotated[SourceExecutionId | None, Field(title="Source Execution Id")] = (
+        None
+    )
+    """
+    Execution the action was decided from, kept for provenance. The run reads the current calibration state, as a Task Workbench run does.
+    """
     update_params: Annotated[bool, Field(title="Update Params")] = False
     reconfigure: Annotated[bool, Field(title="Reconfigure")] = False
 
@@ -873,33 +1170,6 @@ class ExecutionResponseSummary(BaseModel):
     elapsed_time: Annotated[timedelta | None, Field(title="Elapsed Time")] = None
     tags: Annotated[list[str], Field(title="Tags")]
     note: Annotated[dict[str, Any], Field(title="Note")]
-
-
-class ExpectedResultResponse(BaseModel):
-    """
-    Response model for expected result description.
-    """
-
-    description: Annotated[str, Field(title="Description")]
-    result_type: Annotated[str, Field(title="Result Type")] = ""
-    x_axis: Annotated[str, Field(title="X Axis")] = ""
-    y_axis: Annotated[str, Field(title="Y Axis")] = ""
-    z_axis: Annotated[str, Field(title="Z Axis")] = ""
-    fit_model: Annotated[str, Field(title="Fit Model")] = ""
-    typical_range: Annotated[str, Field(title="Typical Range")] = ""
-    good_visual: Annotated[str, Field(title="Good Visual")] = ""
-
-
-class FailureModeResponse(BaseModel):
-    """
-    Response model for a structured failure mode.
-    """
-
-    severity: Annotated[str, Field(title="Severity")]
-    description: Annotated[str, Field(title="Description")]
-    cause: Annotated[str, Field(title="Cause")] = ""
-    visual: Annotated[str, Field(title="Visual")] = ""
-    next_action: Annotated[str, Field(title="Next Action")] = ""
 
 
 class FidelityCondition(BaseModel):
@@ -1248,6 +1518,74 @@ class ForumImageUploadResponse(BaseModel):
     """
 
 
+class ForumLabelCreate(BaseModel):
+    """
+    Request schema for creating a forum label.
+    """
+
+    name: Annotated[str, Field(max_length=80, min_length=1, title="Name")]
+    """
+    Display name
+    """
+    description: Annotated[str, Field(max_length=200, title="Description")] = ""
+    """
+    Short description
+    """
+    color: Annotated[str, Field(pattern="^#[0-9a-fA-F]{6}$", title="Color")]
+    """
+    Display hex color
+    """
+
+
+class ForumLabelResponse(BaseModel):
+    """
+    Response schema for a forum label.
+    """
+
+    key: Annotated[str, Field(title="Key")]
+    """
+    Stable label key
+    """
+    name: Annotated[str, Field(title="Name")]
+    """
+    Display name
+    """
+    description: Annotated[str, Field(title="Description")] = ""
+    """
+    Short label description
+    """
+    color: Annotated[str, Field(title="Color")]
+    """
+    Display hex color
+    """
+
+
+class Color1(RootModel[str]):
+    root: Annotated[str, Field(pattern="^#[0-9a-fA-F]{6}$", title="Color")]
+    """
+    Display hex color
+    """
+
+
+class ForumLabelUpdate(BaseModel):
+    """
+    Request schema for updating a forum label.
+    """
+
+    name: Annotated[Name | None, Field(title="Name")] = None
+    """
+    Display name
+    """
+    description: Annotated[Description | None, Field(title="Description")] = None
+    """
+    Short description
+    """
+    color: Annotated[Color1 | None, Field(title="Color")] = None
+    """
+    Display hex color
+    """
+
+
 class Title(RootModel[str]):
     root: Annotated[str, Field(max_length=200, title="Title")]
     """
@@ -1262,7 +1600,7 @@ class AssigneeUsername(RootModel[str]):
     """
 
 
-class Status1(StrEnum):
+class Status3(StrEnum):
     """
     Thread workflow status
     """
@@ -1301,6 +1639,13 @@ class CooldownId(RootModel[str]):
     """
 
 
+class TaskId(RootModel[str]):
+    root: Annotated[str, Field(max_length=128, title="Task Id")]
+    """
+    Task result this thread is about. Chip and target are filled from it when not given.
+    """
+
+
 class ForumPostCreate(BaseModel):
     """
     Request schema for creating a forum thread or reply.
@@ -1334,15 +1679,15 @@ class ForumPostCreate(BaseModel):
     """
     Parent forum post ID for replies. None for root threads.
     """
-    labels: Annotated[list[str] | None, Field(max_length=1, title="Labels")] = None
+    labels: Annotated[list[str] | None, Field(title="Labels")] = None
     """
-    Operator label for root threads
+    Operator labels for root threads
     """
     assignee_username: Annotated[AssigneeUsername | None, Field(title="Assignee Username")] = None
     """
     Assigned project member username
     """
-    status: Annotated[Status1, Field(title="Status")] = Status1.open
+    status: Annotated[Status3, Field(title="Status")] = Status3.open
     """
     Thread workflow status
     """
@@ -1362,111 +1707,16 @@ class ForumPostCreate(BaseModel):
     """
     Linked cool-down ID
     """
+    task_id: Annotated[TaskId | None, Field(title="Task Id")] = None
+    """
+    Task result this thread is about. Chip and target are filled from it when not given.
+    """
 
 
 class Number(RootModel[int]):
     root: Annotated[int, Field(ge=1, title="Number")]
     """
     Project-scoped forum thread number. Replies share the root thread number.
-    """
-
-
-class ForumPostResponse(BaseModel):
-    """
-    Response schema for a forum post.
-    """
-
-    id: Annotated[str, Field(title="Id")]
-    """
-    Forum post document ID
-    """
-    project_id: Annotated[str, Field(title="Project Id")]
-    """
-    Owning project identifier
-    """
-    number: Annotated[Number | None, Field(title="Number")] = None
-    """
-    Project-scoped forum thread number. Replies share the root thread number.
-    """
-    category: Annotated[str, Field(title="Category")]
-    """
-    Forum category key
-    """
-    user_id: Annotated[str | None, Field(title="User Id")] = None
-    """
-    Post author user ID
-    """
-    username: Annotated[str, Field(title="Username")]
-    """
-    Post author username
-    """
-    avatar_key: Annotated[str | None, Field(title="Avatar Key")] = None
-    """
-    Post author avatar preset key
-    """
-    title: Annotated[str | None, Field(title="Title")] = None
-    """
-    Thread title
-    """
-    content: Annotated[str, Field(title="Content")]
-    """
-    Markdown content
-    """
-    content_blocks: Annotated[list[dict[str, Any]] | None, Field(title="Content Blocks")] = None
-    """
-    BlockNote document JSON. Source of truth for rich content; content is derived.
-    """
-    parent_id: Annotated[str | None, Field(title="Parent Id")] = None
-    """
-    Parent forum post ID
-    """
-    labels: Annotated[list[str] | None, Field(title="Labels")] = None
-    """
-    Operator label for root threads
-    """
-    assignee_username: Annotated[str | None, Field(title="Assignee Username")] = None
-    """
-    Assigned project member username
-    """
-    status: Annotated[Status1, Field(title="Status")] = Status1.open
-    """
-    Thread workflow status
-    """
-    chip_id: Annotated[str | None, Field(title="Chip Id")] = None
-    """
-    Linked chip ID
-    """
-    target_type: Annotated[str | None, Field(title="Target Type")] = None
-    """
-    Linked target type
-    """
-    target_id: Annotated[str | None, Field(title="Target Id")] = None
-    """
-    Linked target ID
-    """
-    cooldown_id: Annotated[str | None, Field(title="Cooldown Id")] = None
-    """
-    Linked cool-down ID
-    """
-    reply_count: Annotated[int, Field(title="Reply Count")] = 0
-    """
-    Number of replies to this thread
-    """
-    is_deleted: Annotated[bool, Field(title="Is Deleted")] = False
-    """
-    Whether this post is archived/deleted
-    """
-    is_ai_reply: Annotated[bool, Field(title="Is Ai Reply")] = False
-    """
-    Whether this reply was generated by AI
-    """
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    """
-    When the post was created
-    """
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-    """
-    When the post was last updated
     """
 
 
@@ -1492,13 +1742,6 @@ class Title1(RootModel[str]):
     """
 
 
-class Labels(RootModel[list[str]]):
-    root: Annotated[list[str], Field(max_length=1, title="Labels")]
-    """
-    Updated operator label for root threads
-    """
-
-
 class AssigneeUsername1(RootModel[str]):
     root: Annotated[str, Field(max_length=64, title="Assignee Username")]
     """
@@ -1506,7 +1749,7 @@ class AssigneeUsername1(RootModel[str]):
     """
 
 
-class Status3(StrEnum):
+class Status5(StrEnum):
     """
     Updated thread workflow status
     """
@@ -1566,15 +1809,15 @@ class ForumPostUpdate(BaseModel):
     """
     BlockNote document JSON. Source of truth for rich content; content is derived.
     """
-    labels: Annotated[Labels | None, Field(title="Labels")] = None
+    labels: Annotated[list[str] | None, Field(title="Labels")] = None
     """
-    Updated operator label for root threads
+    Updated operator labels for root threads
     """
     assignee_username: Annotated[AssigneeUsername1 | None, Field(title="Assignee Username")] = None
     """
     Updated assigned project member username
     """
-    status: Annotated[Status3 | None, Field(title="Status")] = None
+    status: Annotated[Status5 | None, Field(title="Status")] = None
     """
     Updated thread workflow status
     """
@@ -1594,6 +1837,21 @@ class ForumPostUpdate(BaseModel):
     """
     Updated linked cool-down ID
     """
+
+
+class ForumTaskResultSummary(BaseModel):
+    """
+    The task result a thread is about, as the forum shows it without another request.
+    """
+
+    task_id: Annotated[str, Field(title="Task Id")]
+    task_name: Annotated[str, Field(title="Task Name")]
+    qid: Annotated[str, Field(title="Qid")]
+    chip_id: Annotated[str | None, Field(title="Chip Id")] = None
+    status: Annotated[str, Field(title="Status")]
+    end_at: Annotated[AwareDatetime | None, Field(title="End At")] = None
+    figure_path: Annotated[list[str] | None, Field(title="Figure Path")] = None
+    json_figure_path: Annotated[list[str] | None, Field(title="Json Figure Path")] = None
 
 
 class GetFlowResponse(BaseModel):
@@ -1658,7 +1916,7 @@ class GitPushRequest(BaseModel):
     Request model for Git push operation.
     """
 
-    commit_message: Annotated[str, Field(title="Commit Message")] = "Update config files from UI"
+    commit_message: Annotated[str, Field(title="Commit Message")] = "Update files from UI"
 
 
 class InputParameterModel(BaseModel):
@@ -1672,402 +1930,15 @@ class InputParameterModel(BaseModel):
     description: Annotated[str, Field(title="Description")] = ""
 
 
-class Title2(RootModel[str]):
-    root: Annotated[str, Field(max_length=200, title="Title")]
+class KnowledgeFigureResponse(BaseModel):
     """
-    Issue title. Required for root issues, None for replies.
-    """
-
-
-class IssueCreate(BaseModel):
-    """
-    Request schema for creating an issue.
+    A figure of the knowledge, inlined so the UI can show it without another request.
     """
 
-    title: Annotated[Title2 | None, Field(title="Title")] = None
-    """
-    Issue title. Required for root issues, None for replies.
-    """
-    content: Annotated[str, Field(max_length=5000, min_length=1, title="Content")]
-    """
-    Issue text content
-    """
-    parent_id: Annotated[str | None, Field(title="Parent Id")] = None
-    """
-    Parent issue ID for replies. None for root issues.
-    """
-
-
-class IssueKnowledgeResponse(BaseModel):
-    """
-    Response schema for a knowledge case.
-    """
-
-    id: Annotated[str, Field(title="Id")]
-    """
-    Document ID
-    """
-    issue_id: Annotated[str, Field(title="Issue Id")]
-    """
-    Source issue ID
-    """
-    task_id: Annotated[str, Field(title="Task Id")]
-    """
-    Associated task result ID
-    """
-    task_name: Annotated[str, Field(title="Task Name")]
-    """
-    Calibration task class name
-    """
-    status: Annotated[str, Field(title="Status")]
-    """
-    Lifecycle status: draft, approved, rejected
-    """
-    title: Annotated[str, Field(title="Title")]
-    """
-    Short descriptive title
-    """
-    date: Annotated[str, Field(title="Date")] = ""
-    """
-    Date of the incident
-    """
-    severity: Annotated[str, Field(title="Severity")] = "warning"
-    """
-    Severity level
-    """
-    chip_id: Annotated[str, Field(title="Chip Id")] = ""
-    """
-    Chip identifier
-    """
-    qid: Annotated[str, Field(title="Qid")] = ""
-    """
-    Qubit identifier
-    """
-    resolution_status: Annotated[str, Field(title="Resolution Status")] = "resolved"
-    """
-    Case outcome
-    """
-    human_label: Annotated[str, Field(title="Human Label")] = ""
-    """
-    Human review label
-    """
-    failure_mode_labels: Annotated[list[str] | None, Field(title="Failure Mode Labels")] = None
-    """
-    Failure labels
-    """
-    case_type: Annotated[list[str] | None, Field(title="Case Type")] = None
-    """
-    Knowledge case type labels
-    """
-    model_error_type: Annotated[str, Field(title="Model Error Type")] = ""
-    """
-    Verifier error/outcome type
-    """
-    resolution_label: Annotated[str, Field(title="Resolution Label")] = ""
-    """
-    Structured resolution label
-    """
-    symptom: Annotated[str, Field(title="Symptom")] = ""
-    """
-    Observed symptom
-    """
-    model_prediction: Annotated[str, Field(title="Model Prediction")] = ""
-    """
-    Verifier/model prediction summary
-    """
-    human_review_decision: Annotated[str, Field(title="Human Review Decision")] = ""
-    """
-    Human review decision summary
-    """
-    root_cause: Annotated[str, Field(title="Root Cause")] = ""
-    """
-    Identified root cause
-    """
-    resolution: Annotated[str, Field(title="Resolution")] = ""
-    """
-    How the issue was resolved
-    """
-    boundary_criteria: Annotated[str, Field(title="Boundary Criteria")] = ""
-    """
-    Boundary criteria
-    """
-    lesson_learned: Annotated[list[str] | None, Field(title="Lesson Learned")] = None
-    """
-    Key takeaways
-    """
-    applicability: Annotated[str, Field(title="Applicability")] = ""
-    """
-    When this case should be retrieved
-    """
-    counterexample: Annotated[str, Field(title="Counterexample")] = ""
-    """
-    What rule this case counters
-    """
-    prompt_guidance: Annotated[str, Field(title="Prompt Guidance")] = ""
-    """
-    Prompt/checklist guidance
-    """
-    figure_paths: Annotated[list[str] | None, Field(title="Figure Paths")] = None
-    """
-    Task result figure paths
-    """
-    thread_image_urls: Annotated[list[str] | None, Field(title="Thread Image Urls")] = None
-    """
-    Image URLs from issue thread
-    """
-    reviewed_by_user_id: Annotated[str | None, Field(title="Reviewed By User Id")] = None
-    """
-    Reviewer user ID
-    """
-    reviewed_by: Annotated[str | None, Field(title="Reviewed By")] = None
-    """
-    Reviewer username snapshot
-    """
-    pr_url: Annotated[str | None, Field(title="Pr Url")] = None
-    """
-    GitHub PR URL (set on approve)
-    """
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    """
-    When the draft was created
-    """
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-    """
-    When the draft was last updated
-    """
-
-
-class Title3(RootModel[str]):
-    root: Annotated[str, Field(max_length=200, title="Title")]
-    """
-    Updated title
-    """
-
-
-class Severity(StrEnum):
-    """
-    Updated severity
-    """
-
-    critical = "critical"
-    warning = "warning"
-    info = "info"
-
-
-class HumanLabel(RootModel[str]):
-    root: Annotated[str, Field(max_length=64, title="Human Label")]
-    """
-    Human label
-    """
-
-
-class FailureModeLabels(RootModel[list[str]]):
-    root: Annotated[list[str], Field(max_length=50, title="Failure Mode Labels")]
-
-
-class CaseType(RootModel[list[str]]):
-    root: Annotated[list[str], Field(max_length=50, title="Case Type")]
-
-
-class ModelErrorType(RootModel[str]):
-    root: Annotated[str, Field(max_length=64, title="Model Error Type")]
-
-
-class ResolutionLabel(RootModel[str]):
-    root: Annotated[str, Field(max_length=64, title="Resolution Label")]
-
-
-class Symptom(RootModel[str]):
-    root: Annotated[str, Field(max_length=5000, title="Symptom")]
-    """
-    Updated symptom
-    """
-
-
-class ModelPrediction(RootModel[str]):
-    root: Annotated[str, Field(max_length=5000, title="Model Prediction")]
-
-
-class HumanReviewDecision(RootModel[str]):
-    root: Annotated[str, Field(max_length=5000, title="Human Review Decision")]
-
-
-class RootCause(RootModel[str]):
-    root: Annotated[str, Field(max_length=5000, title="Root Cause")]
-    """
-    Updated root cause
-    """
-
-
-class Resolution(RootModel[str]):
-    root: Annotated[str, Field(max_length=5000, title="Resolution")]
-    """
-    Updated resolution
-    """
-
-
-class BoundaryCriteria(RootModel[str]):
-    root: Annotated[str, Field(max_length=5000, title="Boundary Criteria")]
-
-
-class LessonLearned(RootModel[list[str]]):
-    root: Annotated[list[str], Field(max_length=50, title="Lesson Learned")]
-    """
-    Updated lessons
-    """
-
-
-class Applicability(RootModel[str]):
-    root: Annotated[str, Field(max_length=5000, title="Applicability")]
-
-
-class Counterexample(RootModel[str]):
-    root: Annotated[str, Field(max_length=5000, title="Counterexample")]
-
-
-class PromptGuidance(RootModel[str]):
-    root: Annotated[str, Field(max_length=5000, title="Prompt Guidance")]
-
-
-class IssueKnowledgeUpdate(BaseModel):
-    """
-    Request schema for editing a knowledge draft.
-    """
-
-    title: Annotated[Title3 | None, Field(title="Title")] = None
-    """
-    Updated title
-    """
-    severity: Annotated[Severity | None, Field(title="Severity")] = None
-    """
-    Updated severity
-    """
-    human_label: Annotated[HumanLabel | None, Field(title="Human Label")] = None
-    """
-    Human label
-    """
-    failure_mode_labels: Annotated[FailureModeLabels | None, Field(title="Failure Mode Labels")] = (
-        None
-    )
-    case_type: Annotated[CaseType | None, Field(title="Case Type")] = None
-    model_error_type: Annotated[ModelErrorType | None, Field(title="Model Error Type")] = None
-    resolution_label: Annotated[ResolutionLabel | None, Field(title="Resolution Label")] = None
-    symptom: Annotated[Symptom | None, Field(title="Symptom")] = None
-    """
-    Updated symptom
-    """
-    model_prediction: Annotated[ModelPrediction | None, Field(title="Model Prediction")] = None
-    human_review_decision: Annotated[
-        HumanReviewDecision | None, Field(title="Human Review Decision")
-    ] = None
-    root_cause: Annotated[RootCause | None, Field(title="Root Cause")] = None
-    """
-    Updated root cause
-    """
-    resolution: Annotated[Resolution | None, Field(title="Resolution")] = None
-    """
-    Updated resolution
-    """
-    boundary_criteria: Annotated[BoundaryCriteria | None, Field(title="Boundary Criteria")] = None
-    lesson_learned: Annotated[LessonLearned | None, Field(title="Lesson Learned")] = None
-    """
-    Updated lessons
-    """
-    applicability: Annotated[Applicability | None, Field(title="Applicability")] = None
-    counterexample: Annotated[Counterexample | None, Field(title="Counterexample")] = None
-    prompt_guidance: Annotated[PromptGuidance | None, Field(title="Prompt Guidance")] = None
-
-
-class IssueResponse(BaseModel):
-    """
-    Response schema for a single issue.
-    """
-
-    id: Annotated[str, Field(title="Id")]
-    """
-    Issue document ID
-    """
-    task_id: Annotated[str, Field(title="Task Id")]
-    """
-    Associated task ID
-    """
-    user_id: Annotated[str | None, Field(title="User Id")] = None
-    """
-    Issue author user ID
-    """
-    username: Annotated[str, Field(title="Username")]
-    """
-    Issue author username
-    """
-    avatar_key: Annotated[str | None, Field(title="Avatar Key")] = None
-    """
-    Issue author avatar preset key
-    """
-    title: Annotated[str | None, Field(title="Title")] = None
-    """
-    Issue title
-    """
-    content: Annotated[str, Field(title="Content")]
-    """
-    Issue text content
-    """
-    created_at: Annotated[AwareDatetime, Field(title="Created At")]
-    """
-    When the issue was created
-    """
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-    """
-    When the issue was last updated
-    """
-    parent_id: Annotated[str | None, Field(title="Parent Id")] = None
-    """
-    Parent issue ID for replies
-    """
-    reply_count: Annotated[int, Field(title="Reply Count")] = 0
-    """
-    Number of replies to this issue
-    """
-    is_closed: Annotated[bool, Field(title="Is Closed")] = False
-    """
-    Whether this thread is closed
-    """
-    is_ai_reply: Annotated[bool, Field(title="Is Ai Reply")] = False
-    """
-    Whether this reply was generated by AI
-    """
-
-
-class Title4(RootModel[str]):
-    root: Annotated[str, Field(max_length=200, title="Title")]
-    """
-    Updated title (root issues only)
-    """
-
-
-class IssueUpdate(BaseModel):
-    """
-    Request schema for updating an issue.
-    """
-
-    title: Annotated[Title4 | None, Field(title="Title")] = None
-    """
-    Updated title (root issues only)
-    """
-    content: Annotated[str, Field(max_length=5000, min_length=1, title="Content")]
-    """
-    Updated issue text content
-    """
-
-
-class KnowledgeImageResponse(BaseModel):
-    """
-    Response model for a task knowledge image reference.
-    """
-
-    alt_text: Annotated[str, Field(title="Alt Text")]
-    relative_path: Annotated[str, Field(title="Relative Path")]
-    section: Annotated[str, Field(title="Section")]
+    alt: Annotated[str, Field(title="Alt")] = ""
+    path: Annotated[str, Field(title="Path")]
     base64_data: Annotated[str, Field(title="Base64 Data")] = ""
+    mime_type: Annotated[str, Field(title="Mime Type")] = ""
 
 
 class LineageEdgeResponse(BaseModel):
@@ -2163,37 +2034,12 @@ class ListForumCategoriesResponse(BaseModel):
     categories: Annotated[list[ForumCategoryResponse], Field(title="Categories")]
 
 
-class ListForumPostsResponse(BaseModel):
+class ListForumLabelsResponse(BaseModel):
     """
-    Paginated list of forum posts.
-    """
-
-    posts: Annotated[list[ForumPostResponse], Field(title="Posts")]
-    total: Annotated[int, Field(title="Total")]
-    skip: Annotated[int, Field(title="Skip")]
-    limit: Annotated[int, Field(title="Limit")]
-
-
-class ListIssueKnowledgeResponse(BaseModel):
-    """
-    Paginated list of knowledge cases.
+    List of forum labels.
     """
 
-    items: Annotated[list[IssueKnowledgeResponse], Field(title="Items")]
-    total: Annotated[int, Field(title="Total")]
-    skip: Annotated[int, Field(title="Skip")]
-    limit: Annotated[int, Field(title="Limit")]
-
-
-class ListIssuesResponse(BaseModel):
-    """
-    Paginated list of issues.
-    """
-
-    issues: Annotated[list[IssueResponse], Field(title="Issues")]
-    total: Annotated[int, Field(title="Total")]
-    skip: Annotated[int, Field(title="Skip")]
-    limit: Annotated[int, Field(title="Limit")]
+    labels: Annotated[list[ForumLabelResponse], Field(title="Labels")]
 
 
 class ManualCorrectionPoint(BaseModel):
@@ -2431,33 +2277,6 @@ class MetricsSummaryResponse(BaseModel):
     averages: Annotated[dict[str, float | None], Field(title="Averages")] = {}
 
 
-class ModelConfig(BaseModel):
-    """
-    Model configuration for CopilotKit.
-    """
-
-    provider: Annotated[str, Field(title="Provider")] = "openai"
-    name: Annotated[str, Field(title="Name")] = "gpt-4.1"
-    temperature: Annotated[float | None, Field(title="Temperature")] = 0.7
-    max_output_tokens: Annotated[int, Field(title="Max Output Tokens")] = 16384
-    base_url: Annotated[str | None, Field(title="Base Url")] = None
-    api_key_env: Annotated[str | None, Field(title="Api Key Env")] = None
-    keep_alive: Annotated[str | None, Field(title="Keep Alive")] = None
-    num_ctx: Annotated[int | None, Field(title="Num Ctx")] = None
-    top_p: Annotated[float | None, Field(title="Top P")] = None
-    top_k: Annotated[int | None, Field(title="Top K")] = None
-    sampling_params: Annotated[dict[str, Any] | None, Field(title="Sampling Params")] = None
-    sampling_params_by_thinking_level: Annotated[
-        dict[str, dict[str, Any]] | None,
-        Field(title="Sampling Params By Thinking Level"),
-    ] = None
-    reasoning_effort: Annotated[str | None, Field(title="Reasoning Effort")] = None
-    disable_thinking_instruction: Annotated[bool, Field(title="Disable Thinking Instruction")] = (
-        False
-    )
-    api_style: Annotated[str, Field(title="Api Style")] = "responses"
-
-
 class Source2Enum(StrEnum):
     database = "database"
 
@@ -2682,15 +2501,6 @@ class NumericBounds(BaseModel):
 
     minimum: Annotated[float | None, Field(title="Minimum")] = None
     maximum: Annotated[float | None, Field(title="Maximum")] = None
-
-
-class OutputParameterInfoResponse(BaseModel):
-    """
-    Response model for output parameter description.
-    """
-
-    name: Annotated[str, Field(title="Name")]
-    description: Annotated[str, Field(title="Description")]
 
 
 class ParameterChangeResponse(BaseModel):
@@ -2977,7 +2787,7 @@ class Position(BaseModel):
     y: Annotated[float, Field(title="Y")]
 
 
-class Description1(RootModel[str]):
+class Description2(RootModel[str]):
     root: Annotated[str, Field(max_length=500, title="Description")]
     """
     Project description
@@ -2993,7 +2803,7 @@ class ProjectCreate(BaseModel):
     """
     Project display name
     """
-    description: Annotated[Description1 | None, Field(title="Description")] = None
+    description: Annotated[Description2 | None, Field(title="Description")] = None
     """
     Project description
     """
@@ -3032,7 +2842,7 @@ class ProjectRole(StrEnum):
     viewer = "viewer"
 
 
-class Name1(RootModel[str]):
+class Name2(RootModel[str]):
     root: Annotated[str, Field(max_length=100, min_length=1, title="Name")]
     """
     Project display name
@@ -3044,11 +2854,11 @@ class ProjectUpdate(BaseModel):
     Request schema for updating a project.
     """
 
-    name: Annotated[Name1 | None, Field(title="Name")] = None
+    name: Annotated[Name2 | None, Field(title="Name")] = None
     """
     Project display name
     """
-    description: Annotated[Description1 | None, Field(title="Description")] = None
+    description: Annotated[Description2 | None, Field(title="Description")] = None
     """
     Project description
     """
@@ -3250,13 +3060,6 @@ class ResonatorAssignmentOrder(RootModel[list[ResonatorAssignmentOrderItem]]):
     """
 
 
-class ResonatorAssignmentOrder1(RootModel[None]):
-    root: Annotated[None, Field(title="Resonator Assignment Order")]
-    """
-    Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once.
-    """
-
-
 class ReanalyzeResonatorSpectroscopyParams(BaseModel):
     """
     Optional analysis-parameter overrides for resonator spectroscopy.
@@ -3294,8 +3097,7 @@ class ReanalyzeResonatorSpectroscopyParams(BaseModel):
     Strength cutoff for the high_frequency_strength estimator.
     """
     resonator_assignment_order: Annotated[
-        ResonatorAssignmentOrder | ResonatorAssignmentOrder1 | None,
-        Field(title="Resonator Assignment Order"),
+        ResonatorAssignmentOrder | None, Field(title="Resonator Assignment Order")
     ] = None
     """
     Qubit offsets in increasing resonator-frequency order. Must contain each offset from 0 to 3 exactly once.
@@ -3611,6 +3413,28 @@ class SeedImportSource(StrEnum):
     manual = "manual"
 
 
+class Note(RootModel[str]):
+    root: Annotated[str, Field(max_length=2000, title="Note")]
+    """
+    Why
+    """
+
+
+class SetEvaluationVerdictRequest(BaseModel):
+    """
+    A person's judgement of one evaluation.
+    """
+
+    agree: Annotated[bool | None, Field(title="Agree")]
+    """
+    True to agree, False to disagree, null to clear the verdict
+    """
+    note: Annotated[Note | None, Field(title="Note")] = None
+    """
+    Why
+    """
+
+
 class SettingsResponse(BaseModel):
     """
     Settings for the QDash application.
@@ -3633,14 +3457,6 @@ class SettingsResponse(BaseModel):
     ui_port: Annotated[int, Field(title="Ui Port")] = 5714
     log_level: Annotated[str, Field(title="Log Level")] = "INFO"
     timezone: Annotated[str, Field(title="Timezone")] = "Asia/Tokyo"
-
-
-class StartSystemUpdateRequest(BaseModel):
-    """
-    Start request guarded against stale status screens.
-    """
-
-    expected_current_version: Annotated[str | None, Field(title="Expected Current Version")] = None
 
 
 class TaskName(RootModel[str]):
@@ -3677,38 +3493,6 @@ class SystemRole(StrEnum):
 
     admin = "admin"
     user = "user"
-
-
-class SystemUpdateState(StrEnum):
-    """
-    Lifecycle state returned by the host updater.
-    """
-
-    idle = "idle"
-    queued = "queued"
-    running = "running"
-    rolling_back = "rolling_back"
-    succeeded = "succeeded"
-    failed = "failed"
-    rolled_back = "rolled_back"
-
-
-class SystemUpdateStatusResponse(BaseModel):
-    """
-    Current installation and latest stable release status.
-    """
-
-    enabled: Annotated[bool, Field(title="Enabled")]
-    current_version: Annotated[str, Field(title="Current Version")]
-    current_commit: Annotated[str, Field(title="Current Commit")]
-    latest_version: Annotated[str | None, Field(title="Latest Version")] = None
-    update_available: Annotated[bool, Field(title="Update Available")] = False
-    can_update: Annotated[bool, Field(title="Can Update")] = False
-    dirty: Annotated[bool, Field(title="Dirty")] = False
-    blocked_reason: Annotated[str | None, Field(title="Blocked Reason")] = None
-    operation_id: Annotated[str | None, Field(title="Operation Id")] = None
-    operation_state: SystemUpdateState = SystemUpdateState.idle
-    checked_at: Annotated[AwareDatetime, Field(title="Checked At")]
 
 
 class Tag(BaseModel):
@@ -3878,11 +3662,8 @@ class TaskKnowledgeSummaryResponse(BaseModel):
     name: Annotated[str, Field(title="Name")]
     category: Annotated[str, Field(title="Category")] = ""
     summary: Annotated[str, Field(title="Summary")]
-    failure_mode_count: Annotated[int, Field(title="Failure Mode Count")] = 0
-    case_count: Annotated[int, Field(title="Case Count")] = 0
-    image_count: Annotated[int, Field(title="Image Count")] = 0
-    has_analysis_guide: Annotated[bool, Field(title="Has Analysis Guide")] = False
-    has_review_guide: Annotated[bool, Field(title="Has Review Guide")] = False
+    example_count: Annotated[int, Field(title="Example Count")] = 0
+    figure_count: Annotated[int, Field(title="Figure Count")] = 0
 
 
 class TaskNoteEntry(BaseModel):
@@ -3893,9 +3674,35 @@ class TaskNoteEntry(BaseModel):
     task_id: Annotated[str, Field(title="Task Id")]
     qid: Annotated[str, Field(title="Qid")]
     note: NoteModel
-    ai_review_note: NoteModel | None = None
+
+
+class TaskReferenceResponse(BaseModel):
     """
-    AI-generated review note for this task result
+    The task's reference for the evaluation model, in QCalEval's shape.
+
+    The background goes before every question; the other fields fill the
+    family-specific parts of the question templates.
+    """
+
+    background: Annotated[str, Field(title="Background")] = ""
+    """
+    What the experiment does and what a successful result looks like
+    """
+    guidance: Annotated[list[str] | None, Field(title="Guidance")] = None
+    """
+    Points the significance question asks to explain
+    """
+    parameters: Annotated[dict[str, str] | None, Field(title="Parameters")] = None
+    """
+    Extraction schema: parameter name -> JSON type
+    """
+    statuses: Annotated[dict[str, str] | None, Field(title="Statuses")] = None
+    """
+    Decision criteria: status code -> criterion, SUCCESS first
+    """
+    range_format: Annotated[str | None, Field(title="Range Format")] = None
+    """
+    How a suggested corrective range is written
     """
 
 
@@ -4192,10 +3999,6 @@ class TaskResultResponse(BaseModel):
     start_at: Annotated[AwareDatetime | None, Field(title="Start At")] = None
     end_at: Annotated[AwareDatetime | None, Field(title="End At")] = None
     elapsed_time: Annotated[timedelta | None, Field(title="Elapsed Time")] = None
-    ai_review_note: NoteModel | None = None
-    """
-    AI-generated review note for this task result
-    """
 
 
 class TimeSeriesData(BaseModel):
@@ -4239,7 +4042,7 @@ class UnreadNotificationCountResponse(BaseModel):
     unread_count: Annotated[int, Field(ge=0, title="Unread Count")]
 
 
-class Note(RootModel[str]):
+class Note1(RootModel[str]):
     root: Annotated[str, Field(max_length=5000, title="Note")]
     """
     Free-form note text (overwrites note.content)
@@ -4253,7 +4056,7 @@ class UpdateChipRequest(BaseModel):
 
     topology_id: Annotated[str | None, Field(title="Topology Id")] = None
     activity_status: Annotated[ActivityStatus | None, Field(title="Activity Status")] = None
-    note: Annotated[Note | None, Field(title="Note")] = None
+    note: Annotated[Note1 | None, Field(title="Note")] = None
     """
     Free-form note text (overwrites note.content)
     """
@@ -4582,55 +4385,6 @@ class AgentSessionResponse(BaseModel):
     expires_at: Annotated[AwareDatetime, Field(title="Expires At")]
 
 
-class AnalyzeRequest(BaseModel):
-    """
-    Request body for POST /copilot/analyze.
-    """
-
-    images: Annotated[list[ChatImageAttachment] | None, Field(max_length=4, title="Images")] = None
-    """
-    Figures attached to this turn (at most 12 MiB of base64 in total).
-    """
-    task_name: Annotated[str, Field(title="Task Name")]
-    """
-    Task class name (e.g. CheckT1)
-    """
-    chip_id: Annotated[str, Field(title="Chip Id")]
-    qid: Annotated[str, Field(title="Qid")]
-    execution_id: Annotated[str, Field(title="Execution Id")]
-    task_id: Annotated[str, Field(title="Task Id")]
-    message: Annotated[str, Field(title="Message")]
-    """
-    User question / message
-    """
-    session_id: Annotated[str | None, Field(title="Session Id")] = None
-    """
-    Analysis session identifier. Required by the Pi backend, which restores conversation state from the persisted session.
-    """
-    request_id: Annotated[str | None, Field(title="Request Id")] = None
-    """
-    Idempotency key for recovering or retrying one Pi submission.
-    """
-    image_base64: Annotated[str | None, Field(title="Image Base64")] = None
-    """
-    Base64-encoded result figure (for multimodal analysis)
-    """
-    conversation_history: Annotated[
-        list[dict[str, str]] | None, Field(title="Conversation History")
-    ] = None
-    """
-    Previous conversation messages [{role, content}, ...]
-    """
-    model_override: ModelConfig | None = None
-    """
-    Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used.
-    """
-    approval: ApprovalDecision | None = None
-    """
-    Decision on the write operation the previous turn asked approval for.
-    """
-
-
 class BackendConfigResponse(BaseModel):
     """
     Response model for backend configuration.
@@ -4818,6 +4572,182 @@ class DeviceTopologyRequest(BaseModel):
     condition: Condition | None = None
 
 
+class EvaluationExampleModel(BaseModel):
+    """
+    One labeled example shown before the figure, by identity and figure hashes.
+    """
+
+    id: Annotated[str, Field(title="Id")] = ""
+    """
+    Example file stem in the knowledge repository
+    """
+    title: Annotated[str, Field(title="Title")] = ""
+    outcome: Annotated[str, Field(title="Outcome")] = ""
+    """
+    The example's labeled outcome
+    """
+    status: Annotated[str, Field(title="Status")] = ""
+    """
+    The status code the example demonstrated
+    """
+    figures: Annotated[list[EvaluationFigureModel] | None, Field(title="Figures")] = None
+
+
+class EvaluationInputModel(BaseModel):
+    """
+    What the evaluation model was given.
+    """
+
+    context: Annotated[str, Field(title="Context")]
+    """
+    Evidence text passed as the experiment context
+    """
+    prompt: Annotated[str | None, Field(title="Prompt")] = None
+    """
+    The exact user turn sent to the evaluation model; [figure] marks an image
+    """
+    system_prompt: Annotated[str | None, Field(title="System Prompt")] = None
+    """
+    The system prompt sent to the evaluation model
+    """
+    question: Annotated[str | None, Field(title="Question")] = None
+    """
+    Specific question, when one was asked
+    """
+    knowledge_chars: Annotated[int | None, Field(title="Knowledge Chars")] = None
+    """
+    Length of the host-supplied reference, when one was found
+    """
+    knowledge_sha256: Annotated[str | None, Field(title="Knowledge Sha256")] = None
+    """
+    SHA-256 of the host-supplied reference text
+    """
+    figures: Annotated[list[EvaluationFigureModel] | None, Field(title="Figures")] = None
+    examples: Annotated[list[EvaluationExampleModel] | None, Field(title="Examples")] = None
+    """
+    Labeled examples shown before the figure; empty for a zero-shot evaluation
+    """
+
+
+class EvaluationItem(BaseModel):
+    """
+    One evaluation of one task result.
+    """
+
+    evaluation_id: Annotated[str, Field(title="Evaluation Id")]
+    run_id: Annotated[str, Field(title="Run Id")]
+    task_id: Annotated[str, Field(title="Task Id")]
+    task_name: Annotated[str, Field(title="Task Name")]
+    qid: Annotated[str, Field(title="Qid")]
+    execution_id: Annotated[str, Field(title="Execution Id")]
+    figure_path: Annotated[list[str] | None, Field(title="Figure Path")] = None
+    """
+    The task result's figures, for display
+    """
+    json_figure_path: Annotated[list[str] | None, Field(title="Json Figure Path")] = None
+    status: Annotated[Status1, Field(title="Status")]
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    started_at: Annotated[AwareDatetime | None, Field(title="Started At")] = None
+    completed_at: Annotated[AwareDatetime | None, Field(title="Completed At")] = None
+    error: Annotated[str | None, Field(title="Error")] = None
+    input: EvaluationInputModel | None = None
+    output: EvaluationOutputModel | None = None
+    evaluator: EvaluatorModel | None = None
+    planner: EvaluationPlannerModel | None = None
+    verdict: EvaluationVerdictModel | None = None
+
+
+class EvaluationPromptPreviewResponse(BaseModel):
+    """
+    The prompts an evaluation of a task would send, built without a figure or a model call.
+    """
+
+    task_name: Annotated[str, Field(title="Task Name")]
+    with_examples: Annotated[bool, Field(title="With Examples")] = False
+    """
+    Whether the task's labeled examples were laid out
+    """
+    model: Annotated[str | None, Field(title="Model")] = None
+    """
+    provider/modelId of the model that would judge, when configured
+    """
+    questions: Annotated[list[EvaluationPromptQuestion] | None, Field(title="Questions")] = None
+    knowledge_chars: Annotated[int | None, Field(title="Knowledge Chars")] = None
+    """
+    Length of the reference the prompts were built from
+    """
+    knowledge_sha256: Annotated[str | None, Field(title="Knowledge Sha256")] = None
+    """
+    SHA-256 of that reference, to tell two versions apart
+    """
+    examples: Annotated[list[EvaluationExampleModel] | None, Field(title="Examples")] = None
+    """
+    The labeled examples fetched for the preview
+    """
+    examples_used: Annotated[int, Field(title="Examples Used")] = 0
+    """
+    How many of them the prompts show
+    """
+
+
+class EvaluationRunSummary(BaseModel):
+    """
+    One run with its progress and agreement counts.
+    """
+
+    run_id: Annotated[str, Field(title="Run Id")]
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    task_name: Annotated[str, Field(title="Task Name")]
+    entity_type: Annotated[str, Field(title="Entity Type")]
+    date: Annotated[str | None, Field(title="Date")] = None
+    question: Annotated[str | None, Field(title="Question")] = None
+    trigger: Annotated[Trigger1, Field(title="Trigger")]
+    mode: Annotated[Mode1, Field(title="Mode")]
+    with_examples: Annotated[bool, Field(title="With Examples")] = False
+    planner_model: Annotated[str | None, Field(title="Planner Model")] = None
+    requested_by: Annotated[str, Field(title="Requested By")]
+    requested_at: Annotated[AwareDatetime, Field(title="Requested At")]
+    completed_at: Annotated[AwareDatetime | None, Field(title="Completed At")] = None
+    status: Annotated[Status2, Field(title="Status")]
+    total: Annotated[int, Field(title="Total")]
+    completed_count: Annotated[int, Field(title="Completed Count")]
+    failed_count: Annotated[int, Field(title="Failed Count")]
+    pending_count: Annotated[int, Field(title="Pending Count")]
+    """
+    Evaluations not finished yet
+    """
+    parsed_count: Annotated[int, Field(title="Parsed Count")]
+    """
+    Completed evaluations whose answer was JSON
+    """
+    complete_count: Annotated[int, Field(title="Complete Count")]
+    """
+    Completed evaluations whose diagnosis carries all six keys
+    """
+    elapsed_ms: Annotated[int | None, Field(title="Elapsed Ms")] = None
+    """
+    Wall time from the request to the run's completion
+    """
+    duration_ms_total: Annotated[int, Field(title="Duration Ms Total")]
+    """
+    Wall time of the completed evaluations' model calls, added up
+    """
+    success_count: Annotated[int, Field(title="Success Count")]
+    """
+    Completed evaluations whose diagnosis reports success
+    """
+    agree_count: Annotated[int, Field(title="Agree Count")]
+    """
+    Evaluations a person agreed with
+    """
+    disagree_count: Annotated[int, Field(title="Disagree Count")]
+    """
+    Evaluations a person disagreed with
+    """
+    model: Annotated[str | None, Field(title="Model")] = None
+    evaluator: EvaluatorModel | None = None
+
+
 class ExecutePipelineResponse(BaseModel):
     """
     Dispatch result plus the resolved plan that was started.
@@ -4875,39 +4805,151 @@ class ExecutionComparisonResponse(BaseModel):
     unchanged_count: Annotated[int, Field(title="Unchanged Count")]
 
 
+class ForumPostResponse(BaseModel):
+    """
+    Response schema for a forum post.
+    """
+
+    id: Annotated[str, Field(title="Id")]
+    """
+    Forum post document ID
+    """
+    project_id: Annotated[str, Field(title="Project Id")]
+    """
+    Owning project identifier
+    """
+    number: Annotated[Number | None, Field(title="Number")] = None
+    """
+    Project-scoped forum thread number. Replies share the root thread number.
+    """
+    category: Annotated[str, Field(title="Category")]
+    """
+    Forum category key
+    """
+    user_id: Annotated[str | None, Field(title="User Id")] = None
+    """
+    Post author user ID
+    """
+    username: Annotated[str, Field(title="Username")]
+    """
+    Post author username
+    """
+    avatar_key: Annotated[str | None, Field(title="Avatar Key")] = None
+    """
+    Post author avatar preset key
+    """
+    title: Annotated[str | None, Field(title="Title")] = None
+    """
+    Thread title
+    """
+    content: Annotated[str, Field(title="Content")]
+    """
+    Markdown content
+    """
+    content_blocks: Annotated[list[dict[str, Any]] | None, Field(title="Content Blocks")] = None
+    """
+    BlockNote document JSON. Source of truth for rich content; content is derived.
+    """
+    parent_id: Annotated[str | None, Field(title="Parent Id")] = None
+    """
+    Parent forum post ID
+    """
+    labels: Annotated[list[str] | None, Field(title="Labels")] = None
+    """
+    Operator labels for root threads
+    """
+    assignee_username: Annotated[str | None, Field(title="Assignee Username")] = None
+    """
+    Assigned project member username
+    """
+    status: Annotated[Status3, Field(title="Status")] = Status3.open
+    """
+    Thread workflow status
+    """
+    chip_id: Annotated[str | None, Field(title="Chip Id")] = None
+    """
+    Linked chip ID
+    """
+    target_type: Annotated[str | None, Field(title="Target Type")] = None
+    """
+    Linked target type
+    """
+    target_id: Annotated[str | None, Field(title="Target Id")] = None
+    """
+    Linked target ID
+    """
+    cooldown_id: Annotated[str | None, Field(title="Cooldown Id")] = None
+    """
+    Linked cool-down ID
+    """
+    task_id: Annotated[str | None, Field(title="Task Id")] = None
+    """
+    Task result this thread is about
+    """
+    task_result: ForumTaskResultSummary | None = None
+    """
+    Summary of that task result, on threads and listings
+    """
+    reply_count: Annotated[int, Field(title="Reply Count")] = 0
+    """
+    Number of replies to this thread
+    """
+    is_deleted: Annotated[bool, Field(title="Is Deleted")] = False
+    """
+    Whether this post is archived/deleted
+    """
+    is_ai_reply: Annotated[bool, Field(title="Is Ai Reply")] = False
+    """
+    Whether this reply was generated by AI
+    """
+    created_at: Annotated[AwareDatetime, Field(title="Created At")]
+    """
+    When the post was created
+    """
+    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
+    """
+    When the post was last updated
+    """
+
+
 class HTTPValidationError(BaseModel):
     detail: Annotated[list[ValidationError] | None, Field(title="Detail")] = None
 
 
-class KnowledgeCaseResponse(BaseModel):
+class KnowledgeExampleResponse(BaseModel):
     """
-    Response model for a knowledge case (postmortem).
+    An expert-labeled example plot of the task.
     """
 
+    id: Annotated[str, Field(title="Id")]
     title: Annotated[str, Field(title="Title")]
     date: Annotated[str, Field(title="Date")] = ""
-    severity: Annotated[str, Field(title="Severity")] = "warning"
-    chip_id: Annotated[str, Field(title="Chip Id")] = ""
+    chip: Annotated[str, Field(title="Chip")] = ""
     qid: Annotated[str, Field(title="Qid")] = ""
-    status: Annotated[str, Field(title="Status")] = "resolved"
-    human_label: Annotated[str, Field(title="Human Label")] = ""
-    failure_mode_labels: Annotated[list[str], Field(title="Failure Mode Labels")] = []
-    case_type: Annotated[list[str], Field(title="Case Type")] = []
-    model_error_type: Annotated[str, Field(title="Model Error Type")] = ""
-    resolution_label: Annotated[str, Field(title="Resolution Label")] = ""
-    symptom: Annotated[str, Field(title="Symptom")] = ""
-    model_prediction: Annotated[str, Field(title="Model Prediction")] = ""
-    human_review_decision: Annotated[str, Field(title="Human Review Decision")] = ""
-    root_cause: Annotated[str, Field(title="Root Cause")] = ""
-    resolution: Annotated[str, Field(title="Resolution")] = ""
-    boundary_criteria: Annotated[str, Field(title="Boundary Criteria")] = ""
-    lesson_learned: Annotated[list[str], Field(title="Lesson Learned")] = []
-    applicability: Annotated[str, Field(title="Applicability")] = ""
-    counterexample: Annotated[str, Field(title="Counterexample")] = ""
-    prompt_guidance: Annotated[str, Field(title="Prompt Guidance")] = ""
-    images: Annotated[
-        list[KnowledgeImageResponse], Field(title="Images", validate_default=True)
+    outcome: Annotated[str, Field(title="Outcome")]
+    fit_quality: Annotated[str, Field(title="Fit Quality")] = ""
+    verdict: Annotated[str, Field(title="Verdict")] = ""
+    source: Annotated[str, Field(title="Source")] = ""
+    status: Annotated[str, Field(title="Status")] = ""
+    """
+    The task's status code the example demonstrates, e.g. SUCCESS
+    """
+    suggested_range: Annotated[str, Field(title="Suggested Range")] = ""
+    """
+    The corrective range the example's status calls for
+    """
+    parameters: Annotated[str, Field(title="Parameters")] = ""
+    """
+    JSON of the values read from the example's plot
+    """
+    figures: Annotated[
+        list[KnowledgeFigureResponse], Field(title="Figures", validate_default=True)
     ] = []
+    diagnosis: Annotated[str, Field(title="Diagnosis")] = ""
+    label: Annotated[str, Field(title="Label")] = ""
+    """
+    The demonstration label: outcome, fit quality, verdict, diagnosis
+    """
 
 
 class LatestTaskResultResponse(BaseModel):
@@ -5004,6 +5046,33 @@ class ListCouplingsResponse(BaseModel):
 
 class ListCryostatsResponse(BaseModel):
     cryostats: Annotated[list[CryostatResponse], Field(title="Cryostats")]
+
+
+class ListEvaluationRunsResponse(BaseModel):
+    """
+    Runs, newest first.
+    """
+
+    runs: Annotated[list[EvaluationRunSummary], Field(title="Runs")]
+
+
+class ListEvaluationsResponse(BaseModel):
+    """
+    Evaluations of one task result, newest first.
+    """
+
+    evaluations: Annotated[list[EvaluationItem], Field(title="Evaluations")]
+
+
+class ListForumPostsResponse(BaseModel):
+    """
+    Paginated list of forum posts.
+    """
+
+    posts: Annotated[list[ForumPostResponse], Field(title="Posts")]
+    total: Annotated[int, Field(title="Total")]
+    skip: Annotated[int, Field(title="Skip")]
+    limit: Annotated[int, Field(title="Limit")]
 
 
 class ListNoteEventsResponse(BaseModel):
@@ -5353,24 +5422,6 @@ class SeedImportResponse(BaseModel):
     """
 
 
-class SystemUpdateOperationResponse(BaseModel):
-    """
-    Progress for one updater-owned operation.
-    """
-
-    operation_id: Annotated[str, Field(title="Operation Id")]
-    state: SystemUpdateState
-    source_version: Annotated[str, Field(title="Source Version")]
-    target_version: Annotated[str, Field(title="Target Version")]
-    stage: Annotated[str, Field(title="Stage")]
-    message: Annotated[str, Field(title="Message")]
-    progress: Annotated[int, Field(ge=0, le=100, title="Progress")]
-    started_at: Annotated[AwareDatetime, Field(title="Started At")]
-    updated_at: Annotated[AwareDatetime, Field(title="Updated At")]
-    completed_at: Annotated[AwareDatetime | None, Field(title="Completed At")] = None
-    log_tail: Annotated[list[str] | None, Field(title="Log Tail")] = None
-
-
 class TaskHistoryResponse(BaseModel):
     """
     Response model for fetching task history.
@@ -5382,36 +5433,29 @@ class TaskHistoryResponse(BaseModel):
 
 class TaskKnowledgeResponse(BaseModel):
     """
-    Response model for task knowledge (LLM-oriented domain knowledge).
+    Task knowledge: the background, its figures, labeled examples, and the rendered prompt.
     """
 
     name: Annotated[str, Field(title="Name")]
     category: Annotated[str, Field(title="Category")] = ""
-    summary: Annotated[str, Field(title="Summary")]
-    what_it_measures: Annotated[str, Field(title="What It Measures")]
-    physical_principle: Annotated[str, Field(title="Physical Principle")]
-    expected_result: ExpectedResultResponse
-    evaluation_criteria: Annotated[str, Field(title="Evaluation Criteria")]
-    check_questions: Annotated[list[str], Field(title="Check Questions")] = []
-    failure_modes: Annotated[list[FailureModeResponse], Field(title="Failure Modes")]
-    tips: Annotated[list[str], Field(title="Tips")]
-    output_parameters_info: Annotated[
-        list[OutputParameterInfoResponse],
-        Field(title="Output Parameters Info", validate_default=True),
+    """
+    calibtasks package, e.g. one_qubit_coarse
+    """
+    background: Annotated[str, Field(title="Background")] = ""
+    figures: Annotated[
+        list[KnowledgeFigureResponse], Field(title="Figures", validate_default=True)
     ] = []
-    analysis_guide: Annotated[list[str], Field(title="Analysis Guide")] = []
-    prerequisites: Annotated[list[str], Field(title="Prerequisites")] = []
-    images: Annotated[
-        list[KnowledgeImageResponse], Field(title="Images", validate_default=True)
+    examples: Annotated[
+        list[KnowledgeExampleResponse], Field(title="Examples", validate_default=True)
     ] = []
-    review_markdown: Annotated[str, Field(title="Review Markdown")] = ""
-    review_images: Annotated[
-        list[KnowledgeImageResponse],
-        Field(title="Review Images", validate_default=True),
-    ] = []
-    cases: Annotated[list[KnowledgeCaseResponse], Field(title="Cases", validate_default=True)] = []
     prompt_text: Annotated[str, Field(title="Prompt Text")]
-    review_prompt_text: Annotated[str, Field(title="Review Prompt Text")] = ""
+    """
+    The background as Markdown, headed by the experiment name
+    """
+    reference: TaskReferenceResponse | None = None
+    """
+    The background and question-template parts for the evaluation model
+    """
 
 
 class UISettings(BaseModel):
@@ -5471,6 +5515,22 @@ class BulkUserImportResponse(BaseModel):
     total: Annotated[int, Field(title="Total")]
 
 
+class CreateEvaluationRunResponse(BaseModel):
+    """
+    The run that was started and what it covers.
+    """
+
+    run: EvaluationRunSummary
+    task_ids: Annotated[list[str], Field(title="Task Ids")]
+    """
+    Task results queued for evaluation
+    """
+    skipped: Annotated[dict[str, str] | None, Field(title="Skipped")] = None
+    """
+    Entities not queued, by id, with the reason
+    """
+
+
 class Device(BaseModel):
     """
     Device information.
@@ -5481,6 +5541,15 @@ class Device(BaseModel):
     qubits: Annotated[list[Qubit], Field(title="Qubits")]
     couplings: Annotated[list[Coupling], Field(title="Couplings")]
     calibrated_at: Annotated[AwareDatetime | str, Field(title="Calibrated At")]
+
+
+class EvaluationRunDetailResponse(BaseModel):
+    """
+    One run with every evaluation in it.
+    """
+
+    run: EvaluationRunSummary
+    evaluations: Annotated[list[EvaluationItem], Field(title="Evaluations")]
 
 
 class ExecutionResponseDetail(BaseModel):

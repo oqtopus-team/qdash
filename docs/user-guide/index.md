@@ -9,7 +9,7 @@ reviewing a calibration result.
   and sign in.
 - [Operations](./operations.md): start, stop, inspect logs, and handle common
   local failures.
-- [System Updates](./system-updates.md): pull a new release and apply it. An
+- [System Updates](./system-updates.md): select and deploy a stable release from the host. An
   upgrade that changes stored data has its own page: [v1.8.0](./migrations/v1.8.0.md),
   [project-scoped calibration](./migrations/project-scoped-calibration.md).
 
