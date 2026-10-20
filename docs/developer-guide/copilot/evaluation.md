@@ -3,7 +3,7 @@
 An evaluation is a recorded judgement of one task result's figure by the calibration evaluation
 model, which answers the six questions of the QCalEval benchmark against the task's reference
 from the knowledge repository. This page is the mechanism; the procedures are in
-[Reviewing Results](../../user-guide/reviewing-results.md#request-an-ai-evaluation).
+[AI Evaluations](../../user-guide/ai-evaluations.md).
 
 Two words recur. A **record** is one evaluation: what the model was given, what it answered,
 and what a person said about it. A **run** is a set of records requested together, which is the

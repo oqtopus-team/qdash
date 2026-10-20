@@ -19,8 +19,9 @@ personal settings and password changes.
 | User | Sign in, update the own account, and access assigned projects. |
 | Admin | Create users, reset passwords, and open the Admin page. |
 
-The initial administrator is configured with `QDASH_ADMIN_USERNAME`. System administrators do
-not automatically own every project; project membership still controls access to project data.
+The deployment creates its initial administrator during setup. See
+[Setup](./setup.md#qubex-setup) for the required credentials. System administrators do not
+automatically own every project; project membership still controls access to project data.
 
 ## Create Users
 
@@ -39,9 +40,8 @@ reset.
 
 ## API Authentication
 
-Automation should use a saved [QDash Client](../reference/clients/python.md) profile or its documented
-`QDASH_*` environment variables. The client handles authentication and project headers without
-placing tokens directly in shell history.
+Automation should use a saved [QDash Client](../reference/clients/python.md) profile. The client
+handles authentication and project selection without placing tokens directly in shell history.
 
 For a custom API integration, use the interactive OpenAPI page linked from QDash or the
 [OpenAPI reference](../reference/openapi.md) for the current authentication operation, project

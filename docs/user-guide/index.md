@@ -13,6 +13,7 @@ Use this guide to operate a QDash deployment and complete calibration work in th
 | Run a workflow or one calibration task | [Running Calibrations](./running-calibrations.md) |
 | Investigate calibration state or history | [Calibration Data and Provenance](./data-and-provenance.md) |
 | Review and discuss a result | [Reviewing and Sharing Results](./reviewing-results.md) |
+| Evaluate task-result figures with AI | [AI Evaluations](./ai-evaluations.md) |
 | Use QDash from a script | [Python client](../reference/clients/python.md) or [TypeScript client](../reference/clients/typescript.md) |
 
 ## Operate a Deployment
@@ -37,7 +38,8 @@ hand:
   [Task Parameters](./task-parameters.md).
 - **Inspect data:** [Dashboard](./dashboard.md) and
   [Calibration Data and Provenance](./data-and-provenance.md).
-- **Collaborate:** [Reviewing and Sharing Results](./reviewing-results.md) and
+- **Collaborate:** [Reviewing and Sharing Results](./reviewing-results.md),
+  [AI Evaluations](./ai-evaluations.md), and
   [Calibration Data Sharing](./calibration-data-sharing.md).
 - **Track hardware context:** [Cryostats and Cool-downs](./cryostats-and-cool-downs.md).
 - **Use assisted workflows:** [AI Chat](./ai-chat.md) and

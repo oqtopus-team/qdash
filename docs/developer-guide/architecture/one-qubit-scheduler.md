@@ -2,7 +2,7 @@
 
 The 1-qubit scheduler generates optimized execution schedules for single-qubit calibration based on box (enclosure) constraints.
 
-## Overview
+## Scheduling Model
 
 ### Purpose
 

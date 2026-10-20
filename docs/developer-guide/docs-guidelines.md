@@ -36,7 +36,7 @@ docs/
     setup.md  codebase.md  commands.md  testing.md  development-flow.md
     docs-guidelines.md     This page
     conventions/           Rules that apply across the code: datetime, logging,
-                           qid validation, credential scanning
+                           credential scanning
     api/  ui/  workflow/  copilot/
       index.md             Entry point for each component
       ...                  Design, architecture, testing, and deep dives

@@ -2,7 +2,7 @@
 
 QDash supports superconducting quantum processors with square lattice topology, where qubits are arranged in a 2D grid with nearest-neighbor coupling.
 
-## Overview
+## Topology Model
 
 ### Supported Chip Sizes
 

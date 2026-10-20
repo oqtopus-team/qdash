@@ -1,17 +1,19 @@
 # Roles and Permissions
 
-QDash authorizes requests with two independent layers: a system role on the account and a project role on each membership.
+QDash uses a system role for platform administration and a project role for access to each
+project.
 
 ## Role Layers
 
 | Layer | Roles | Controls |
 | --- | --- | --- |
-| System role (`SystemRole`) | User, Admin | Account administration, project creation, and platform operations. |
-| Project role (`ProjectRole`) | Viewer, Editor, Owner | Access to one project's data and operations. |
+| System role | User, Admin | Account administration and project creation. |
+| Project role | Viewer, Editor, Owner | Access to one project's data and operations. |
 
 Project roles map to coarse permissions: Viewer has read, Editor has read and write, and Owner has read, write, and admin. New members default to Viewer.
 
-A system Admin has no automatic access to project data. Project permissions come only from membership or ownership, so an Admin who is not a member of a project receives `403` on its project-scoped endpoints. Admins can add themselves as a member through the Admin page or API.
+A system Admin has no automatic access to project data. Admins can add themselves to a project
+from **Admin** when they need project access.
 
 ## System Capabilities
 
@@ -25,7 +27,6 @@ A system Admin has no automatic access to project data. Project permissions come
 | Delete projects they do not own, manage members of any project | No | Yes |
 | Transfer project ownership | No | Yes |
 | Open the Admin page | No | Yes |
-| Run system updates, reload configuration caches | No | Yes |
 
 ## Project Capabilities
 
@@ -67,7 +68,9 @@ The [forum](./reviewing-results.md) combines project roles with authorship of a 
 | Create, rename, and delete categories | No | No | Yes | No |
 | Create, rename, and delete labels | No | Yes | Yes | No |
 
-Thread metadata belongs to the root thread, so replies have content only. Editors can change metadata but not the content of other members' posts, and they can also create, rename, and delete labels. Because status is thread metadata, Editors can also close or reopen a thread by editing it; the dedicated close and reopen endpoints accept only the author and Owner.
+Thread metadata belongs to the root thread. Editors can change that metadata, including status,
+but cannot change another member's post content. Editors can also create, rename, and delete
+labels.
 
 The Post author column applies to the author's own posts and adds to the author's project role, so a Viewer can still edit and delete their own posts. Authors must remain project members to reach the forum. Resolved threads no longer accept replies.
 
@@ -78,4 +81,5 @@ The sidebar hides entries the current user cannot use:
 - Workflow, Tasks, and Config appear only for Editors and Owners, as do the Prefect and API Docs links.
 - Admin appears only for system Admins.
 
-Hiding a control is a convenience, not enforcement: project-scoped API endpoints check the project role on each request.
+Hidden controls make the available actions easier to understand. QDash also checks the project
+role when each action is requested.

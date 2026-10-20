@@ -2,7 +2,7 @@
 
 The CR (Cross-Resonance) gate scheduler generates optimized execution schedules for two-qubit gate calibration on superconducting quantum processors.
 
-## Overview
+## Scheduling Model
 
 ### Purpose
 
