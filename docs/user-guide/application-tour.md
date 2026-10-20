@@ -54,8 +54,8 @@ permission. See [Running Calibrations](./running-calibrations.md) for the end-to
 | Page | Purpose | Guide |
 | --- | --- | --- |
 | **Inbox** | Review mentions, replies, and system notifications. | [Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) |
-| **Forum** | Hold project-wide discussions that are not tied to one result. | [Reviewing and Sharing Results](./reviewing-results.md#track-a-problem) |
-| **Knowledge** | Maintain task background and expert-labeled examples. | [Reviewing and Sharing Results](./reviewing-results.md#reuse-knowledge) |
+| **Forum** | Hold project-wide discussions that are not tied to one result. | [Reviewing and Sharing Results](./reviewing-results.md#start-a-discussion) |
+| **Knowledge** | Maintain task background and expert-labeled examples. | [Reviewing and Sharing Results](./reviewing-results.md#reuse-the-finding) |
 
 See [Reviewing and Sharing Results](./reviewing-results.md) for how these records relate.
 
