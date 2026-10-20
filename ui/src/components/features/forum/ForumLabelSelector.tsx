@@ -89,14 +89,14 @@ function focusFirstForumLabelItem(container: HTMLElement | null) {
   item?.focus();
 }
 
-/** Dropdown for applying labels to a forum thread, with search and owner-only label creation. */
+/** Dropdown for applying labels to a forum thread, with search and editor-level label creation. */
 export function ForumLabelPicker({
   labels,
   selectedLabels,
   onToggle,
   disabled = false,
 }: ForumLabelPickerProps) {
-  const { isOwner } = useProject();
+  const { canEdit } = useProject();
   const queryClient = useQueryClient();
   const createMutation = useCreateForumLabel();
   const [query, setQuery] = useState("");
@@ -106,7 +106,7 @@ export function ForumLabelPicker({
   const selectedDefinitions = selectedLabels.map((key) => getForumLabel(key, labels));
   const trimmedQuery = query.trim();
   const filteredLabels = filterForumLabels(labels, query);
-  const showCreateOption = isOwner && shouldShowCreateForumLabelOption(query, labels);
+  const showCreateOption = canEdit && shouldShowCreateForumLabelOption(query, labels);
 
   const handleCreateLabel = async () => {
     if (!showCreateOption || createMutation.isPending) return;

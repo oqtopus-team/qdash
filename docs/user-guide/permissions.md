@@ -65,9 +65,9 @@ The [forum](./reviewing-results.md) combines project roles with authorship of a 
 | Delete a thread or reply | No | No | Yes | Yes |
 | Close or reopen a thread | No | Yes | Yes | Yes |
 | Create, rename, and delete categories | No | No | Yes | No |
-| Create, rename, and delete labels | No | No | Yes | No |
+| Create, rename, and delete labels | No | Yes | Yes | No |
 
-Thread metadata belongs to the root thread, so replies have content only. Editors can change metadata but not the content of other members' posts, and they can apply existing labels but cannot define new ones. Because status is thread metadata, Editors can also close or reopen a thread by editing it; the dedicated close and reopen endpoints accept only the author and Owner.
+Thread metadata belongs to the root thread, so replies have content only. Editors can change metadata but not the content of other members' posts, and they can also create, rename, and delete labels. Because status is thread metadata, Editors can also close or reopen a thread by editing it; the dedicated close and reopen endpoints accept only the author and Owner.
 
 The Post author column applies to the author's own posts and adds to the author's project role, so a Viewer can still edit and delete their own posts. Authors must remain project members to reach the forum. Resolved threads no longer accept replies.
 

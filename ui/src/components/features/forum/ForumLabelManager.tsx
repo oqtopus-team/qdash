@@ -55,7 +55,7 @@ type ForumLabelManagerProps = {
   labels: ForumLabelDefinition[];
 };
 
-/** Owner-only CRUD panel for forum labels: create, edit, and delete. */
+/** Editor-level CRUD panel for forum labels: create, edit, and delete. */
 export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
   const queryClient = useQueryClient();
   const [labelName, setLabelName] = useState("");

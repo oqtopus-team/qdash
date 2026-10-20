@@ -361,20 +361,68 @@ def test_create_forum_label_slug_collision_gets_numeric_suffix(test_client, init
     assert second.json()["key"] == "bug-2"
 
 
-def test_editor_and_viewer_cannot_create_forum_label(test_client, init_db):
-    """Only project owners can manage forum labels."""
+def test_editor_can_create_update_and_delete_forum_label(test_client, init_db):
+    """Project editors can create, update, and delete forum labels."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_user("editor", "editor_token", ProjectRole.EDITOR)
+    _create_project()
+    headers = _headers("editor_token")
+
+    created = test_client.post(
+        "/forum/labels", headers=headers, json={"name": "Hardware", "color": "#123456"}
+    )
+    assert created.status_code == 201, created.text
+    key = created.json()["key"]
+
+    updated = test_client.patch(
+        f"/forum/labels/{key}", headers=headers, json={"name": "Hardware v2"}
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["name"] == "Hardware v2"
+
+    deleted = test_client.delete(f"/forum/labels/{key}", headers=headers)
+    assert deleted.status_code == 200, deleted.text
+
+    [owner_key] = _create_named_labels(test_client, _headers("owner_token"), "Owner label")
+    updated_owner_label = test_client.patch(
+        f"/forum/labels/{owner_key}", headers=headers, json={"name": "Owner label v2"}
+    )
+    assert updated_owner_label.status_code == 200, updated_owner_label.text
+    deleted_owner_label = test_client.delete(f"/forum/labels/{owner_key}", headers=headers)
+    assert deleted_owner_label.status_code == 200, deleted_owner_label.text
+
+    listed = test_client.get("/forum/labels", headers=headers)
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["labels"] == []
+
+
+def test_viewer_cannot_manage_forum_labels(test_client, init_db):
+    """Project viewers get 403 when creating, updating, or deleting forum labels."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_user("viewer", "viewer_token", ProjectRole.VIEWER)
     _create_project()
+    owner_headers = _headers("owner_token")
+    viewer_headers = _headers("viewer_token")
 
-    for token in ("editor_token", "viewer_token"):
-        response = test_client.post(
-            "/forum/labels",
-            headers=_headers(token),
-            json={"name": "Hardware", "color": "#123456"},
-        )
-        assert response.status_code == 403
+    created = test_client.post(
+        "/forum/labels", headers=owner_headers, json={"name": "Hardware", "color": "#123456"}
+    )
+    assert created.status_code == 201, created.text
+    key = created.json()["key"]
+
+    assert (
+        test_client.post(
+            "/forum/labels", headers=viewer_headers, json={"name": "Other", "color": "#654321"}
+        ).status_code
+        == 403
+    )
+    assert (
+        test_client.patch(
+            f"/forum/labels/{key}", headers=viewer_headers, json={"name": "Changed"}
+        ).status_code
+        == 403
+    )
+    assert test_client.delete(f"/forum/labels/{key}", headers=viewer_headers).status_code == 403
 
 
 def test_delete_forum_label_removes_it_from_posts(test_client, init_db):

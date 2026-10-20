@@ -17,6 +17,7 @@ from qdash.api.lib.auth import bearer_scheme
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
+    get_project_context_editor,
     get_project_context_owner,
 )
 from qdash.api.lib.sse import sse_event
@@ -153,10 +154,10 @@ def list_forum_labels(
 )
 def create_forum_label(
     body: ForumLabelCreate,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> ForumLabelResponse:
-    """Create a forum label. Only project owners can manage labels; the key is server-generated."""
+    """Create a forum label. Only project owners and editors can manage labels; the key is server-generated."""
     return service.create_label(
         project_id=ctx.project_id,
         name=body.name,
@@ -174,10 +175,10 @@ def create_forum_label(
 def update_forum_label(
     label_key: str,
     body: ForumLabelUpdate,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> ForumLabelResponse:
-    """Update a forum label. Only project owners can manage labels."""
+    """Update a forum label. Only project owners and editors can manage labels."""
     return service.update_label(
         project_id=ctx.project_id,
         key=label_key,
@@ -195,10 +196,10 @@ def update_forum_label(
 )
 def delete_forum_label(
     label_key: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[ForumService, Depends(get_forum_service)],
 ) -> SuccessResponse:
-    """Delete a forum label. Only project owners can manage labels."""
+    """Delete a forum label. Only project owners and editors can manage labels."""
     return service.delete_label(project_id=ctx.project_id, key=label_key)
 
 
