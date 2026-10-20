@@ -1,473 +1,153 @@
 # Workflow Engine Architecture
 
-The `qdash.workflow.engine` module provides the core infrastructure for calibration workflow execution: task lifecycle management, state tracking, scheduling, data persistence (MongoDB + filesystem), and hardware backend abstraction.
+The workflow engine turns a calibration task name and target into a tracked hardware operation.
+It owns task execution and persistence; Prefect-facing session composition belongs to the service
+layer described in [Workflow Services](./services.md).
 
-## Architecture Diagram
+## Responsibility Boundaries
 
-![Workflow Engine Architecture](../../diagrams/workflow-engine-architecture.drawio.png)
+| Component | Responsibility | Does not own |
+| --- | --- | --- |
+| `CalibService` | Pipeline lifecycle, hardware reservation, Prefect terminal hooks, and high-level steps | Task internals |
+| `CalibOrchestrator` | One execution's backend, task context, and execution record | Cross-step scheduling or resource reservation |
+| `ExecutionService` | Execution state transitions and repository persistence | Task-result state |
+| `TaskContext` | In-memory task state, artifacts, and the configured `TaskExecutor` | Execution-level status |
+| `TaskExecutor` | Preprocess, run, postprocess, validation, and result persistence | Prefect flow structure |
+| Backend | Hardware-specific operations and calibration-note updates | QDash lifecycle policy |
 
-## Module Structure
+`CalibService` is the normal entry point for flow authors. Direct use of
+`CalibOrchestrator` is useful in engine tests and low-level integrations, but callers then own
+initialization and terminal handling themselves.
 
-```
-engine/
-├── __init__.py          # Public API exports
-├── orchestrator.py      # CalibOrchestrator - session lifecycle
-├── config.py            # CalibConfig - session configuration
-├── task_runner.py       # Prefect task wrappers
-├── params_updater.py    # Backend parameter updates
-├── util.py              # Utility functions
-│
-├── task/                # Task execution layer
-│   ├── context.py       # TaskContext - execution context
-│   ├── executor.py      # TaskExecutor - task lifecycle
-│   ├── state_manager.py # TaskStateManager - state tracking
-│   ├── result_processor.py # Result validation
-│   └── history_recorder.py # History recording
-│
-├── execution/           # Execution management layer
-│   ├── service.py       # ExecutionService - session tracking
-│   ├── state_manager.py # ExecutionStateManager
-│   └── models.py        # Execution data models
-│
-├── scheduler/           # Scheduling layer
-│   ├── cr_scheduler.py  # CRScheduler - 2-qubit scheduling
-│   ├── one_qubit_scheduler.py  # 1-qubit scheduling
-│   └── plugins.py       # Ordering strategies
-│
-├── repository/          # Data persistence layer
-│   ├── protocols.py     # Repository interfaces
-│   ├── mongo_impl.py    # MongoDB implementations
-│   ├── mongo_execution.py  # Execution repository
-│   └── filesystem_impl.py  # Filesystem implementations
-│
-└── backend/             # Hardware abstraction layer
-    ├── base.py          # BaseBackend abstract class
-    ├── factory.py       # Backend factory
-    ├── qubex.py         # Qubex backend
-    └── fake.py          # Fake backend for testing
+## Execution Path
+
+```mermaid
+sequenceDiagram
+    participant Flow as Prefect flow
+    participant Service as CalibService
+    participant Orchestrator as CalibOrchestrator
+    participant Runner as Prefect task wrapper
+    participant Executor as TaskExecutor
+
+    Flow->>Service: start pipeline
+    Service->>Service: reserve complete hardware scope
+    Service->>Orchestrator: initialize execution
+    Orchestrator->>Orchestrator: create state, context, and backend
+    Flow->>Service: run step
+    Service->>Orchestrator: run_task or run_task_batch
+    Orchestrator->>Runner: submit task
+    Runner->>Executor: execute lifecycle
+    Executor-->>Orchestrator: task state and calibration data
+    Orchestrator-->>Service: task outputs
+    Service->>Service: finish, fail, or cancel; release reservation
 ```
 
-## Core Components
-
-### 1. CalibOrchestrator
-
-**Location**: `engine/orchestrator.py`
-
-**Purpose**: Manages the complete lifecycle of a calibration session.
-
-**Responsibilities**:
-- Creates directory structure for calibration data
-- Initializes ExecutionService, TaskContext, and Backend
-- Coordinates task execution via `run_task()`
-- Handles session completion and failure
-
-**Usage**:
-```python
-from qdash.workflow.engine import CalibOrchestrator, CalibConfig
-
-config = CalibConfig(
-    username="alice",
-    project_id="proj-1",
-    chip_id="64Qv3",
-    qids=["0", "1"],
-    execution_id="20240101-001",
-)
-orchestrator = CalibOrchestrator(config)
-orchestrator.initialize()
-
-# Run tasks
-result = orchestrator.run_task("CheckRabi", qid="0")
-
-# Complete session
-orchestrator.complete()
-```
-
-### 2. TaskContext
-
-**Location**: `engine/task/context.py`
-
-**Purpose**: Container for task execution state and results.
-
-**Key Attributes**:
-- `execution_id`: Current execution identifier
-- `task_result`: Container for qubit/coupling/global task results
-- `calib_data`: Calibration data (parameters extracted from tasks)
-
-### 3. TaskExecutor
-
-**Location**: `engine/task/executor.py`
-
-**Purpose**: Executes individual calibration tasks with proper lifecycle management.
-
-**Execution Flow**:
-
-See the **Task Executor Flow** diagram for the complete execution lifecycle, state machine, and repository pattern:
-
-![Task Executor Flow](../../diagrams/task-executor-flow.drawio.png)
-
-### 4. TaskStateManager
-
-**Location**: `engine/task/state_manager.py`
-
-**Purpose**: Manages task state transitions and parameter storage.
-
-**State Transitions**: SCHEDULED → RUNNING → COMPLETED / FAILED / CANCELLED (see Task Executor Flow diagram above)
-
-**Key Methods**:
-- `ensure_task_exists()`: Create task entry if not exists
-- `start_task()`: Mark task as running
-- `put_input_parameters()`: Store input parameters
-- `put_output_parameters()`: Store output parameters
-- `update_task_status_to_completed()`: Mark success
-- `update_task_status_to_failed()`: Mark failure
-- `end_task()`: Record end timestamp
-
-### 5. ExecutionService
-
-**Location**: `engine/execution/service.py`
-
-**Purpose**: Manages workflow execution sessions in MongoDB.
-
-**Responsibilities**:
-- Creates and tracks execution records
-- Updates task results during execution
-- Manages execution status (RUNNING, COMPLETED, FAILED)
-- Handles tags and metadata
-
-### 6. Schedulers
-
-#### CRScheduler (2-Qubit)
-
-**Location**: `engine/scheduler/cr_scheduler.py`
-
-**Purpose**: Schedules 2-qubit (Cross-Resonance) calibration tasks.
-
-**Features**:
-- Graph coloring for conflict avoidance
-- MUX-aware parallel grouping
-- Multiple coloring strategies
-
-#### OneQubitScheduler (1-Qubit)
-
-**Location**: `engine/scheduler/one_qubit_scheduler.py`
-
-**Purpose**: Schedules 1-qubit calibration tasks.
-
-**Features**:
-- Box-aware grouping (BOX_A, BOX_B, BOX_MIXED)
-- Synchronized execution mode
-- Pluggable ordering strategies
-
-### 7. Repository Layer
-
-**Location**: `engine/repository/`
-
-**Purpose**: Data persistence abstraction using the Repository Pattern.
-
-The Repository Pattern separates data access logic from business logic, enabling:
-- **Testability**: Swap MongoDB for InMemory implementations in tests
-- **Flexibility**: Easy to change persistence mechanisms
-- **Clean Architecture**: Business logic doesn't depend on database details
-
-The Repository Pattern is visualized in the Task Executor Flow diagram (see above).
-
-**Protocols** (interfaces in `protocols.py`):
-
-| Protocol | Purpose |
-|----------|---------|
-| `TaskResultHistoryRepository` | Task result history recording |
-| `ChipRepository` | Chip configuration access |
-| `ChipHistoryRepository` | Chip history snapshots |
-| `CalibDataSaver` | Figure and raw data saving |
-| `ExecutionRepository` | Execution session records |
-| `CalibrationNoteRepository` | Calibration note storage |
-| `QubitCalibrationRepository` | Qubit calibration data updates |
-| `CouplingCalibrationRepository` | Coupling calibration data updates |
-| `ExecutionCounterRepository` | Atomic execution ID counter |
-| `ExecutionLockRepository` | Wiring-aware execution resource locking |
-| `UserRepository` | User preferences |
-| `TaskRepository` | Task name lookup |
-
-**MongoDB Implementations**:
-- `MongoTaskResultHistoryRepository`
-- `MongoChipRepository`
-- `MongoChipHistoryRepository`
-- `MongoExecutionRepository`
-- `MongoCalibrationNoteRepository`
-- `MongoQubitCalibrationRepository`
-- `MongoCouplingCalibrationRepository`
-- `MongoExecutionCounterRepository`
-- `MongoExecutionLockRepository`
-- `MongoUserRepository`
-- `MongoTaskRepository`
-
-Execution locks are scoped to a chip and the MUX/wiring resources resolved from
-the run's `mux_ids`, `qids`, or single `qid` target. Runs on different chips or
-disjoint hardware resources can execute concurrently. Runs with overlapping
-readout or control modules remain mutually exclusive, including different
-channels on the same module. Module claims use the same resource resolver as
-the CR scheduler. Runs whose targets or wiring cannot be resolved claim the
-whole chip as a conservative fallback.
-
-Before a step pipeline starts, its reservation includes the union of its input
-targets, explicit `ConfigureAll` MUXes, and predefined `SetCRSchedule` pairs.
-Unknown step classes reserve the whole chip. The reservation remains held
-across filtering and step transitions, using a fixed owner independent of the
-execution-history ID created for each step. Task calls and isolated workers
-reject targets outside that reservation before touching hardware.
-
-The API cannot determine every future step of a saved Python flow from its
-input parameters, so saved-flow dispatch and UI availability checks reserve
-the whole chip. Single-task runs retain target-scoped reservations. The UI
-disables conflicting runs and explains the chip-wide reservation in the flow
-confirmation dialog. No user flow code is executed by the availability check.
-
-**InMemory Implementations** (for testing):
-- `InMemoryExecutionRepository`
-- `InMemoryChipRepository`
-- `InMemoryChipHistoryRepository`
-- `InMemoryTaskResultHistoryRepository`
-- `InMemoryCalibrationNoteRepository`
-- `InMemoryQubitCalibrationRepository`
-- `InMemoryCouplingCalibrationRepository`
-- `InMemoryExecutionCounterRepository`
-- `InMemoryExecutionLockRepository`
-- `InMemoryUserRepository`
-- `InMemoryTaskRepository`
-
-**Filesystem Implementations**:
-- `FilesystemCalibDataSaver`: Local filesystem for figures/data
-
-**Usage with Dependency Injection**:
-
-```python
-# Production code (MongoDB)
-from qdash.repository import MongoChipRepository
-
-chip_repo = MongoChipRepository()
-chip = chip_repo.get_current_chip(username="alice")
-
-# Test code (InMemory)
-from qdash.repository.inmemory import InMemoryChipRepository
-
-chip_repo = InMemoryChipRepository()
-chip_repo.add_chip("alice", mock_chip)  # Test helper
-
-# With DI in service
-scheduler = CRScheduler(
-    username="alice",
-    chip_id="64Qv3",
-    chip_repo=InMemoryChipRepository(),  # Inject for testing
-)
-```
-
-### 8. Backend Layer
-
-**Location**: `engine/backend/`
-
-**Purpose**: Hardware abstraction.
-
-**BaseBackend Interface**:
-```python
-class BaseBackend(ABC):
-    name: str
-
-    @abstractmethod
-    def connect(self) -> None: ...
-
-    @abstractmethod
-    def get_instance(self) -> Any: ...
-
-    @abstractmethod
-    def save_note(...) -> None: ...
-
-    @abstractmethod
-    def update_note(...) -> None: ...
-```
-
-**Implementations**:
-- `QubexBackend`: Real hardware via qubex library
-- `FakeBackend`: Simulation for testing
-
-## Data Flow
-
-The data flow (Preprocess → Run → Postprocess) and persistence flow (TaskStateManager, TaskHistoryRecorder, FilesystemCalibDataSaver, ExecutionService) are illustrated in the Task Executor Flow diagram above.
-
-## Execution Record Lifecycle
-
-An execution record exists from the moment a run is requested, not from the moment the flow process reaches `CalibService`.
-
-| Step | Actor | Effect |
-|------|-------|--------|
-| Trigger | API (`FlowService._create_scheduled_execution`) | Creates the `execution_history` row with `status=scheduled` and `note.flow_run_id`, immediately after the Prefect flow run is created |
-| First calibration step | `CalibService._initialize()` | Claims that row via `MongoExecutionRepository.claim_scheduled_execution()` and reuses its `execution_id`; `scheduled` → `running` |
-| Later calibration steps | `CalibService._run_pipeline()` | Creates a separate Execution for each calibration step |
-| Step end | `finish_calibration()` / `fail_calibration()` / `cancel_calibration()` | The current step becomes `completed`, `failed`, or `cancelled`; earlier completed steps retain their status |
-
-`CalibService.run(targets, steps=...)` owns the Execution lifecycle. Each calibration step gets one Execution, and its tasks, scheduling rounds, and isolated workers share that ID. Transform steps, such as filters and schedule generation, do not create Executions. No additional parent Execution is created. For example, `coarse_one` creates one Execution for `OneQubitCheck`, while the `one_qubit` template creates separate Executions for `OneQubitCheck` and `OneQubitFineTune`.
-
-The first calibration step adopts the API reservation through an atomic `find_one_and_update` guarded by `note.claimed_at`. Later calibration steps allocate their own IDs. Each step records `step_name`, its position in the pipeline as `step_index`, and `pipeline_name` in its note; `flow_run_id` associates all steps with the same Prefect run.
-
-Templates do not configure `skip_execution`. Saved templates that still pass `skip_execution=True` are supported: `run()` automatically enables Execution persistence for calibration steps. The flag remains an internal option for isolated workers, which borrow their step's Execution without claiming, creating, or finalizing another row. Strategies execute within the session supplied by the pipeline and do not call `init_calibration()` or `finish_calibration()` themselves.
-
-Runs that do not go through the API — cron schedules, where the Prefect scheduler creates the flow run directly — have no pre-created row, so `CalibService` allocates the `execution_id` itself as before.
-
-Pre-creation is best effort. It is skipped when no `chip_id` can be resolved, and any failure is logged and swallowed: the Prefect flow run already exists at that point, and a bookkeeping failure is not a reason to cancel a healthy calibration. Such a run simply falls back to the cron-schedule path above — `CalibService` allocates its own `execution_id` at flow start — and the API response reports the Prefect flow run ID as `execution_id` until then.
-
-### Mutual Exclusion
-
-Calibrations are mutually exclusive per project, guarded by `ExecutionLockDocument`. The lock is claimed by the API at dispatch time rather than by the flow process at start time, so it covers the whole life of a run: `FlowService._claim_execution_lock` mints the `execution_id` and takes the lock with it as owner before the Prefect flow run is created, answering `409` when the lock is held. The claim is a single atomic upsert — it matches an unlocked record, and when the project is already locked it falls through to an insert that the unique index on `project_id` rejects — so two simultaneous requests cannot both dispatch. `CalibService._initialize()` then reacquires the lock owned by the execution it claims (`try_lock` yields to the same owner), while a lock owned by anything else still raises `RuntimeError`.
-
-Runs that do not go through the API, such as cron schedules, find the lock free and take it in `CalibService` as before. The claim is also skipped when no `chip_id` can be resolved, since there is then no `execution_id` to own the lock; those runs fall back to the same path.
-
-Claiming at dispatch means the API takes the lock and the flow releases it, so dispatch failures in between have to release it themselves: `FlowService` does that when the flow run cannot be created, and when the `scheduled` row cannot be saved. The lock remains owned by the first step throughout the pipeline, including between steps, and is released only when the pipeline exits. Terminal flow hooks also release a lock owned by an already completed step from the same flow, so a crash during a later step or a transform does not strand the lock. The one case with no owner left to act is a run that dies before its flow process starts; `ExecutionService.get_lock_status()` reconciles a still `scheduled` execution against Prefect for exactly that reason, on the poll the UI already makes.
-
-### Reconciliation with Prefect
-
-Hooks only fire while the Prefect runner is alive. When the runner itself dies, nothing closes the execution and it stays `running` forever. `ExecutionService._reconcile_with_prefect()` (API) closes that gap when an execution detail is read: open executions holding a `note.flow_run_id` are looked up in Prefect and finalized when their flow run has already reached a terminal state. Execution-list reads do not call Prefect synchronously, so history remains available when Prefect is slow or unavailable.
-
-| Prefect flow run state | Execution status | Result |
-|------------------------|------------------|--------|
-| `FAILED` / `CRASHED`   | `running` / `scheduled` | `failed`, non-terminal tasks closed |
-| `CANCELLED`            | `running` / `scheduled` | `cancelled`, non-terminal tasks closed |
-| `COMPLETED`            | `scheduled`      | `completed` — the flow never started a calibration execution |
-| `COMPLETED`            | `running`        | `failed` — the flow ended without closing its own record |
-| anything else, or flow run not found | any | unchanged |
-
-Both the hooks and the reconciliation share `qdash.repository.execution_finalizer.finalize_executions_by_flow_run_id()`.
+The Prefect wrappers in `engine/task_runner.py` are intentionally thin. They invoke the executor
+and save `TaskContext`; task semantics remain testable without a running Prefect server.
+
+## State and Persistence
+
+QDash keeps execution state and task state separate.
+
+- `ExecutionStateManager` holds the execution status, note, timing, and in-memory calibration
+  data. `ExecutionService` persists state changes through `ExecutionRepository` and uses
+  optimistic locking for concurrent note updates.
+- `TaskStateManager` is the source of truth for per-target task status, parameters, messages,
+  figures, and raw-data paths.
+- `TaskHistoryRecorder` writes task-result history and optional provenance records.
+- `BackendSaver` decides which validated outputs update the backend and accepted calibration
+  state. `persist_output_parameters=False` records the task without promoting its outputs.
+- `FilesystemCalibDataSaver` writes artifacts beneath the execution's project- and chip-scoped
+  calibration directory.
+
+`ExecutionService.merge_calib_data()` updates only its in-memory model. Task and chip repositories
+own durable calibration results; do not assume that saving an execution document persists its
+`calib_data` field.
+
+## Task Lifecycle
+
+For a single target, `TaskExecutor.execute()` performs these phases:
+
+1. Resolve database or snapshot inputs and apply user overrides.
+2. Validate effective inputs and mark the task as running.
+3. Run optional preprocessing, prepare the hardware call, and execute the task.
+4. Save raw data before task-specific postprocessing.
+5. Validate R² and fidelity and process output parameters.
+6. Save figures, history, provenance, and permitted backend updates.
+7. Mark the task completed or failed and return `TaskExecutionResult`.
+
+Batch execution follows the same policy through `execute_batch()`, but calls the task's
+`batch_run()` once and then distributes results to individual target records. Use a batch task
+only when one backend experiment genuinely covers all supplied qubits.
+
+Parameter precedence and snapshot behavior are documented in
+[Parameter Resolution](./parameter-resolution.md). The promotion of measured values into accepted
+state is documented in [Calibration Data Lifecycle](./calibration-data-lifecycle.md).
+
+## Hardware Reservations
+
+`CalibService` resolves qubit or MUX inputs into an `ExecutionResourceScope` before hardware work.
+A pipeline reserves the union of all step scopes before its first step and retains the same owner
+until the pipeline reaches a terminal path. Child workers use `use_lock=False` and borrow the
+parent execution; they must not acquire or release the parent's reservation.
+
+Repository implementations compare the requested chip, resource keys, and `exclusive` flag
+atomically. A task whose requested scope exceeds the pipeline reservation is rejected before the
+backend call.
 
 ## Cancellation
 
-### Overview
+Cancellation has two paths because a running worker can observe either a Prefect cancellation
+exception or a process termination signal.
 
-Flow cancellation allows users to stop a running calibration from the UI. The cancellation lifecycle involves the API, Prefect, and the workflow engine.
+- A `CancelledRun` or `CancelledError` handled inside the flow calls
+  `CalibService.cancel_calibration()`.
+- A Prefect-installed termination signal leaves the execution open. The registered
+  `on_flow_cancellation` or `on_flow_crashed` hook finds executions by `flow_run_id`, assigns the
+  correct terminal status, finalizes unfinished tasks, and releases the reservation.
 
-### Mechanism
-
-Prefect 3 cancels flows by sending **SIGTERM** to the worker process. This means Python `except` blocks do not execute when a flow is cancelled. Instead, Prefect provides an `on_cancellation` hook that runs in a separate process after the SIGTERM kill.
-
-### Implementation
-
-All top-level `@flow` decorators register the `on_flow_cancellation` hook:
-
-```python
-from qdash.workflow.service.calib_service import on_flow_cancellation
-
-@flow(on_cancellation=[on_flow_cancellation])
-def my_calibration_flow(...):
-    ...
-```
-
-The hook:
-
-1. Reads flow run parameters (`project_id`, `flow_run_id`) from the Prefect flow run context
-2. Initializes the database connection (since it runs in a new process)
-3. Finds the execution by `note.flow_run_id` in `execution_history`
-4. Updates all non-terminal tasks (running/scheduled/pending) to `cancelled`
-5. Sets the execution status to `cancelled`
-6. Releases the execution lock when it is owned by an Execution from this flow, including a completed earlier step; legacy unowned locks are released when an open Execution is closed
-
-### flow_run_id Bridge
-
-QDash uses date-based execution IDs (`YYYYMMDD-NNN`), while Prefect uses UUIDs for flow runs. The bridge is:
-
-- The execution record carries the Prefect UUID in `execution.note["flow_run_id"]` from its first write — set by the API when it pre-creates the `scheduled` row, and by `CalibService._initialize()` for every execution the flow creates itself
-- The cancel API accepts the Prefect `flow_run_id` (UUID) directly
-- The `on_cancellation` hook uses `flow_run_id` to look up the QDash execution
-
-### Status Transitions on Cancel
-
-| Entity    | Before Cancel                          | After Cancel  |
-|-----------|----------------------------------------|---------------|
-| Execution | `running`                              | `cancelled`   |
-| Task      | `running` / `scheduled` / `pending`    | `cancelled`   |
-| Task      | `completed` / `failed` / `skipped`     | *(unchanged)* |
-
-### CalibService Methods
-
-| Method                                     | Purpose                                       |
-|--------------------------------------------|-----------------------------------------------|
-| `on_flow_cancellation()`                   | Prefect hook — runs after SIGTERM              |
-| `on_flow_failure()` / `on_flow_crashed()`  | Prefect hooks for exceptions and crashes       |
-| `cancel_calibration()`                     | In-process cancellation (for exception path)   |
-| `finalize_executions_by_flow_run_id()`     | Shared finalizer in `qdash.repository.execution_finalizer` |
-| `_finalize_tasks_on_cancel()`              | Batch-update non-terminal tasks                |
-| `_is_cancellation(e)`                      | Detect CancelledRun/CancelledError exception   |
+Top-level flows that own a reservation use the ordinary terminal hooks. Nested single-task flows
+use the `*_keep_lock` variants so they cannot release a reservation owned by the parent pipeline.
+The shared flow helpers in `service/calib_service.py` implement the exception classification and
+terminal behavior; flow templates should not reproduce that policy independently.
 
 ## Extension Points
 
-### Adding a New Backend
+### Add a calibration task
 
-1. Create `engine/backend/your_backend.py`:
-```python
-from qdash.workflow.engine.backend.base import BaseBackend
+Implement the task contract under `workflow/calibtasks/`, register the class in the backend's task
+configuration, and test preprocessing, effective parameter resolution, result validation, and
+failure behavior. Keep backend calls inside the task's run phase and persistence policy inside the
+engine.
 
-class YourBackend(BaseBackend):
-    name = "your_backend"
+### Add a backend
 
-    def connect(self) -> None:
-        # Initialize hardware connection
-        pass
+Implement `BaseBackend`, add construction logic to `engine/backend/factory.py`, and provide tests
+for connection lifecycle and the task operations it supports. Avoid branching on backend names in
+the orchestrator or executor.
 
-    def get_instance(self) -> Any:
-        # Return experiment session
-        pass
-```
+### Add persistence behavior
 
-2. Register in `engine/backend/factory.py`
+Depend on repository protocols and inject an in-memory implementation in tests. State-transition
+rules belong in a state manager or service; database-specific query logic belongs in the repository
+implementation.
 
-### Adding a New Scheduler Strategy
+### Change scheduling
 
-1. Implement the strategy in `engine/scheduler/plugins.py`
-2. Register in the scheduler's strategy registry
+Schedulers return execution groups but do not execute them. See the
+[1-Qubit Scheduler](../architecture/one-qubit-scheduler.md),
+[1-Qubit Ordering Strategies](../architecture/one-qubit-ordering-strategies.md), and
+[CR Gate Scheduler](../architecture/cr-scheduler.md) before changing parallelism.
 
-### Adding a New Repository Implementation
+## Source and Tests
 
-1. Define or use existing protocol from `engine/repository/protocols.py`:
-```python
-@runtime_checkable
-class YourRepository(Protocol):
-    def find(self, id: str) -> YourModel | None: ...
-    def save(self, model: YourModel) -> None: ...
-```
+| Concern | Source | Focused tests |
+| --- | --- | --- |
+| Session composition | `engine/orchestrator.py` | `tests/qdash/workflow/engine/test_orchestrator_*.py` |
+| Execution lifecycle | `engine/execution/` | `tests/qdash/workflow/engine/execution/` |
+| Task lifecycle | `engine/task/` and `engine/task_runner.py` | `tests/qdash/workflow/engine/task/` |
+| High-level lifecycle and reservations | `service/calib_service.py` | `tests/qdash/workflow/service/test_calib_service.py` |
+| Scheduling | `engine/scheduler/` | `tests/qdash/workflow/engine/scheduler/` |
 
-2. Create MongoDB implementation:
-```python
-# engine/repository/mongo_your.py
-class MongoYourRepository:
-    def find(self, id: str) -> YourModel | None:
-        doc = YourDocument.find_one({"id": id}).run()
-        return self._to_model(doc) if doc else None
-
-    def save(self, model: YourModel) -> None:
-        YourDocument.from_model(model).save()
-```
-
-3. Create InMemory implementation for testing:
-```python
-# engine/repository/inmemory_impl.py
-class InMemoryYourRepository:
-    def __init__(self):
-        self._store: dict[str, YourModel] = {}
-
-    def find(self, id: str) -> YourModel | None:
-        return self._store.get(id)
-
-    def save(self, model: YourModel) -> None:
-        self._store[model.id] = model
-
-    def clear(self) -> None:  # Test helper
-        self._store.clear()
-```
-
-4. Export from `engine/repository/__init__.py`
-
-5. Use with dependency injection in services:
-```python
-class YourService:
-    def __init__(self, *, repo: YourRepository | None = None):
-        if repo is None:
-            from ... import MongoYourRepository
-            repo = MongoYourRepository()
-        self._repo = repo
-```
+Run `task test-workflow` after engine changes. Also run the repository or API test suites when a
+change crosses those boundaries.

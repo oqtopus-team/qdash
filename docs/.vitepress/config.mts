@@ -215,7 +215,7 @@ export default withMermaid(
               items: [
                 { text: "Overview", link: "/developer-guide/architecture/" },
                 { text: "1-Qubit Scheduler", link: "/developer-guide/architecture/one-qubit-scheduler" },
-                { text: "Ordering Plugins", link: "/developer-guide/architecture/one-qubit-ordering-plugins" },
+                { text: "Ordering Strategies", link: "/developer-guide/architecture/one-qubit-ordering-strategies" },
                 { text: "CR Scheduler", link: "/developer-guide/architecture/cr-scheduler" },
                 { text: "Square Lattice", link: "/developer-guide/architecture/square-lattice-topology" },
                 { text: "Notes", link: "/developer-guide/architecture/notes" },
