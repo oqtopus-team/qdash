@@ -56,8 +56,7 @@ For detailed setup instructions, see [docs/developer-guide/setup.md](docs/develo
 | UI Architecture    | [docs/developer-guide/ui/architecture.md](docs/developer-guide/ui/architecture.md)   |
 | API Design         | [docs/developer-guide/api/design.md](docs/developer-guide/api/design.md)             |
 | Development Flow   | [docs/developer-guide/development-flow.md](docs/developer-guide/development-flow.md) |
-| Database Structure | [docs/reference/database-structure.md](docs/reference/database-structure.md) |
-| Database Indexes   | [docs/reference/database-indexes.md](docs/reference/database-indexes.md)     |
+| Database Collections | [docs/reference/database-structure.md](docs/reference/database-structure.md) |
 | Notes Architecture | [docs/developer-guide/architecture/notes.md](docs/developer-guide/architecture/notes.md)                     |
 | Copilot Knowledge  | [docs/developer-guide/copilot/knowledge-layout.md](docs/developer-guide/copilot/knowledge-layout.md) |
 | Dashboard Guide    | [docs/user-guide/dashboard.md](docs/user-guide/dashboard.md)                 |

@@ -68,7 +68,9 @@ class NoteModel(BaseModel):
 
 `updated_at = None` distinguishes "never noted" from "noted then cleared".
 
-`NoteEventDocument` is the audit row. See [Collaboration Documents](../../reference/database-documents-collaboration.md#noteeventdocument) for the full field list.
+`NoteEventDocument` is the audit row. Its fields and indexes are defined in
+`src/qdash/dbmodel/note_event.py`; the collection is listed in
+[Database Collections](../../reference/database-structure.md#notes-forum-and-notifications).
 
 ## Endpoints
 

@@ -34,8 +34,7 @@ Read `docs/developer-guide/architecture.md` and the more specific docs under `do
 - Workflow architecture: `docs/developer-guide/workflow/engine-architecture.md`
 - Workflow testing: `docs/developer-guide/workflow/testing.md`
 - Documentation guidelines: `docs/developer-guide/docs-guidelines.md`
-- Database structure: `docs/reference/database-structure.md`
-- Database indexes: `docs/reference/database-indexes.md`
+- Database collections: `docs/reference/database-structure.md`
 
 ## Generated Code
 

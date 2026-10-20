@@ -44,8 +44,8 @@ docs/
                            provenance, notes, agent platform
   reference/
     index.md               Entry point for generated and tabular reference
-    database-structure.md  Overview, collections, data flow
-    data-models.md  database-documents-*.md  database-indexes.md  openapi.md
+    database-structure.md  Collection-to-document source map
+    openapi.md             Generated HTTP operations and schemas
     clients/               Python and TypeScript client packages
 ```
 
