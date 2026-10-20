@@ -65,13 +65,11 @@ the runtime runs the operation only after the user clicks **Approve**, with the 
 decision is accepted only for the approval the latest answer asked for, so it cannot run the same
 operation twice.
 
-A chat turn runs until it answers or the user presses Stop; there is no time limit by default,
+A chat turn runs until it answers or the user presses **Stop**; there is no time limit by default,
 because a tool waiting on a calibration can legitimately be quiet for an hour. While a turn is
-quiet the runtime sends a keepalive every `AGENT_RUNTIME_PING_MS` (default 15 s), forwarded as an
-SSE comment, so proxies and tunnels do not drop the idle stream, and the API applies no read
-timeout to the runtime stream. Stop in the chat aborts the turn in the runtime through
-`POST /copilot/chat/stop`; closing the browser alone does not, and a retry with the same request
-recovers the committed answer. Two optional budgets remain for deployments that want them:
+quiet, the runtime sends a keepalive every `AGENT_RUNTIME_PING_MS` (default 15 s) so proxies and
+tunnels do not drop the stream. **Stop** aborts the active turn; closing the browser alone does
+not. Two optional budgets remain for deployments that want them:
 `AGENT_RUNTIME_WRAP_UP_MS` tells the model to stop calling tools and answer with what it has after
 that long, and `AGENT_RUNTIME_TIMEOUT_MS` aborts the turn outright (both in ms, 0 disables).
 `AGENT_RUNTIME_MODEL_STREAM_TIMEOUT_MS` (default 180 s) still limits a single model request.

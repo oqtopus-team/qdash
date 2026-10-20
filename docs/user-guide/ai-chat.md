@@ -1,4 +1,4 @@
-# Copilot
+# AI Chat
 
 QDash provides conversational analysis tools that use project calibration context without
 replacing operator judgment.

@@ -61,7 +61,7 @@ For detailed setup instructions, see [docs/developer-guide/setup.md](docs/develo
 | Notes Architecture | [docs/developer-guide/architecture/notes.md](docs/developer-guide/architecture/notes.md)                     |
 | Copilot Knowledge  | [docs/developer-guide/copilot/knowledge-layout.md](docs/developer-guide/copilot/knowledge-layout.md) |
 | Dashboard Guide    | [docs/user-guide/dashboard.md](docs/user-guide/dashboard.md)                 |
-| Cryo Guide         | [docs/user-guide/cryo.md](docs/user-guide/cryo.md)                           |
+| Cryo Guide         | [docs/user-guide/cryostats-and-cool-downs.md](docs/user-guide/cryostats-and-cool-downs.md)                           |
 | Docs Guidelines    | [docs/developer-guide/docs-guidelines.md](docs/developer-guide/docs-guidelines.md)   |
 
 ## Claude Code Custom Commands

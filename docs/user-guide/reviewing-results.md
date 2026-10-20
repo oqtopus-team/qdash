@@ -135,7 +135,7 @@ How this works: [Calibration Evaluation](../developer-guide/copilot/evaluation.m
 
 AI output is supporting evidence, not an automatic calibration decision. Confirm findings against
 the task result, raw artifacts, task knowledge, and current calibration context before changing
-parameters or excluding data. See [Copilot](./copilot.md) for the chat and analysis workflows.
+parameters or excluding data. See [Copilot](./ai-chat.md) for the chat and analysis workflows.
 
 ## Follow Notifications
 

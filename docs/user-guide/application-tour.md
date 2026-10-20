@@ -13,18 +13,18 @@ or changing calibration data. Project roles control what is visible:
 - Project owners manage membership and project settings.
 - System administrators manage users and system-wide settings from **Admin**.
 
-See [Projects and Sharing](./projects-and-sharing.md) for membership and role details.
+See [Projects and Data Sharing](./projects-and-data-sharing.md) for membership and role details.
 
 ## Overview
 
-| Page | Purpose |
-| --- | --- |
-| **Home** | Start common work and review active executions, failed tasks, and recent notifications. |
-| **Dashboard** | Scan all configured chip metrics, coverage, distributions, and scoped notes. |
-| **Metrics** | Inspect one metric across qubits or couplings and compare its history. |
-| **Chip** | Browse calibration tasks and the latest results on the chip topology. |
-| **Analysis** | Plot and compare chip parameters over a selected time range. |
-| **AI Chat** | Ask questions using the [project-aware Copilot interface](./copilot.md). |
+| Page | Purpose | Guide |
+| --- | --- | --- |
+| **Home** | Start common work and review active executions, failed tasks, and recent notifications. | This page |
+| **Dashboard** | Scan all configured chip metrics, coverage, distributions, and scoped notes. | [Dashboard](./dashboard.md) |
+| **Metrics** | Inspect one metric across qubits or couplings and compare its history. | [Calibration Data and Provenance](./data-and-provenance.md) |
+| **Chip** | Browse calibration tasks and the latest results on the chip topology. | [Calibration Data and Provenance](./data-and-provenance.md) |
+| **Analysis** | Plot and compare chip parameters over a selected time range. | [Calibration Data and Provenance](./data-and-provenance.md) |
+| **AI Chat** | Ask questions using project calibration context. | [AI Chat](./ai-chat.md) |
 
 Use **Dashboard** for broad health checks, **Metrics** for a parameter-focused investigation, and
 **Chip** when the calibration task or physical target is the starting point.
@@ -36,37 +36,41 @@ until the form is submitted.
 
 ## Operate
 
-| Page | Purpose |
-| --- | --- |
-| **Workflow** | Create, edit, schedule, and run project workflow definitions. |
-| **Execution** | Monitor workflow runs, topology, statuses, timing, and task output. |
-| **Task Results** | Search task outcomes across executions and focus on failures. |
-| **Tasks** | Run an individual calibration task with resolved parameters. |
-| **Cryo** | Manage cryostats, cool-downs, and wiring context. |
-| **Import** | Compare and import initial calibration parameters from Qubex YAML. |
+| Page | Purpose | Guide |
+| --- | --- | --- |
+| **Workflow** | Create, edit, schedule, and run project workflow definitions. | [Running Calibrations](./running-calibrations.md) |
+| **Execution** | Monitor workflow runs, topology, statuses, timing, and task output. | [Running Calibrations](./running-calibrations.md) |
+| **Task Results** | Search task outcomes across executions and focus on failures. | [Reviewing and Sharing Results](./reviewing-results.md) |
+| **AI Evaluations** | Request, inspect, and compare recorded evaluations of task results. | [Reviewing and Sharing Results](./reviewing-results.md#request-an-ai-evaluation) |
+| **Tasks** | Run an individual calibration task with resolved parameters. | [Running Calibrations](./running-calibrations.md) |
+| **Cryo** | Manage cryostats, cool-downs, and wiring context. | [Cryostats and Cool-downs](./cryostats-and-cool-downs.md) |
+| **Calibration DB** | Compare and import initial calibration parameters from Qubex YAML. | [Calibration Data and Provenance](./data-and-provenance.md#import-initial-parameters) |
 
 Workflow, Tasks, and some external operational links are shown only to members with edit
 permission. See [Running Calibrations](./running-calibrations.md) for the end-to-end flow.
 
 ## Collaborate
 
-| Page | Purpose |
-| --- | --- |
-| **Inbox** | Review mentions, replies, and system notifications. |
-| **Forum** | Hold project-wide discussions that are not tied to one result. |
-| **Knowledge** | Read and edit each task's background and expert-labeled example plots, grouped like the calibtasks packages; pull and open pull requests against the knowledge repository. |
+| Page | Purpose | Guide |
+| --- | --- | --- |
+| **Inbox** | Review mentions, replies, and system notifications. | [Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) |
+| **Forum** | Hold project-wide discussions that are not tied to one result. | [Reviewing and Sharing Results](./reviewing-results.md#track-a-problem) |
+| **Knowledge** | Maintain task background and expert-labeled examples. | [Reviewing and Sharing Results](./reviewing-results.md#reuse-knowledge) |
 
 See [Reviewing and Sharing Results](./reviewing-results.md) for how these records relate.
 
 ## Manage
 
-| Page | Purpose |
-| --- | --- |
-| **Config** | Edit the Qubex configuration files, review all saved changes as diffs, and pull or open pull requests. |
-| **Settings** | Change appearance, account settings, active project, and project membership. |
-| **Admin** | Manage system users and administrative settings. |
+**Under construction** marks an implemented page whose operating guidance still needs a product
+decision or review. The marker does not mean that the feature is unavailable.
 
-The Files and Admin pages are permission-gated. File saves, Git operations, imports, workflow
+| Page | Purpose | Guide |
+| --- | --- | --- |
+| **Config** | Edit Qubex configuration files and synchronize their repository. | **Under construction** |
+| **Settings** | Change appearance, account settings, active project, and project membership. | **Under construction** |
+| **Admin** | Manage system users and administrative settings. | **Under construction** |
+
+The Config and Admin pages are permission-gated. File saves, Git operations, imports, workflow
 runs, and administrative actions change shared state; confirm the active project before using
 them.
 

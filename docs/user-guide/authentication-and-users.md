@@ -4,8 +4,8 @@ QDash combines system-wide user accounts with project-specific roles.
 
 ## Sign In
 
-Open `/login` and enter your username and password. After authentication, QDash opens the
-Execution page in your default project.
+Open the QDash sign-in page and enter your username and password. After authentication, QDash
+opens the Execution page in your default project.
 
 ![Signing in to QDash](/images/guides/login.gif)
 
@@ -43,10 +43,9 @@ Automation should use a saved [QDash Client](../reference/clients/python.md) pro
 `QDASH_*` environment variables. The client handles authentication and project headers without
 placing tokens directly in shell history.
 
-Raw API consumers authenticate through `/auth/login`, send the returned bearer token in the
-`Authorization` header, and select project-scoped data with `X-Project-Id`. Use the interactive
-OpenAPI page linked from QDash or the [OpenAPI reference](../reference/openapi.md) for current
-request and response schemas.
+For a custom API integration, use the interactive OpenAPI page linked from QDash or the
+[OpenAPI reference](../reference/openapi.md) for the current authentication operation, project
+header, and request and response schemas.
 
 ## Authorization Layers
 
@@ -55,5 +54,5 @@ System and project roles answer different questions:
 - The system role controls account administration.
 - The project role controls access to a project's calibration data and operations.
 
-See [Projects and Data Sharing](./projects-and-sharing.md) for owner, editor, and viewer
+See [Projects and Data Sharing](./projects-and-data-sharing.md) for owner, editor, and viewer
 permissions.

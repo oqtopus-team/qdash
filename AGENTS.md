@@ -25,7 +25,7 @@ Read `docs/developer-guide/architecture.md` and the more specific docs under `do
 - Development flow and commits: `docs/developer-guide/development-flow.md`
 - API design: `docs/developer-guide/api/design.md`
 - API testing: `docs/developer-guide/api/testing.md`
-- API endpoint testing: `docs/developer-guide/api/testing-endpoints.md`
+- API endpoint testing: `docs/developer-guide/api/endpoint-testing.md`
 - UI guidelines: `docs/developer-guide/ui/guidelines.md`
 - UI architecture: `docs/developer-guide/ui/architecture.md`
 - UI testing: `docs/developer-guide/ui/testing.md`

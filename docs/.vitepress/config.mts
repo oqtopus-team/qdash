@@ -102,17 +102,29 @@ export default withMermaid(
               text: "Work in QDash",
               items: [
                 { text: "Application Tour", link: "/user-guide/application-tour" },
-                { text: "Authentication", link: "/user-guide/authentication" },
-                { text: "Projects and Sharing", link: "/user-guide/projects-and-sharing" },
-                { text: "Roles and Permissions", link: "/user-guide/permissions" },
+                {
+                  text: "Authentication and Users",
+                  link: "/user-guide/authentication-and-users",
+                },
+                {
+                  text: "Projects and Data Sharing",
+                  link: "/user-guide/projects-and-data-sharing",
+                },
+                {
+                  text: "Roles and Permissions",
+                  link: "/user-guide/roles-and-permissions",
+                },
                 { text: "Dashboard", link: "/user-guide/dashboard" },
                 { text: "Running Calibrations", link: "/user-guide/running-calibrations" },
                 { text: "Task Parameters", link: "/user-guide/task-parameters" },
                 { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
                 { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
-                { text: "Copilot", link: "/user-guide/copilot" },
+                { text: "AI Chat", link: "/user-guide/ai-chat" },
                 { text: "Agent Calibration", link: "/user-guide/agent-calibration" },
-                { text: "Cryostats and Cool-downs", link: "/user-guide/cryo" },
+                {
+                  text: "Cryostats and Cool-downs",
+                  link: "/user-guide/cryostats-and-cool-downs",
+                },
                 {
                   text: "Calibration Data Sharing",
                   link: "/user-guide/calibration-data-sharing",
@@ -138,7 +150,6 @@ export default withMermaid(
               items: [
                 { text: "Datetime Handling", link: "/developer-guide/conventions/datetime" },
                 { text: "Logging", link: "/developer-guide/conventions/logging" },
-                { text: "QID Validation", link: "/developer-guide/conventions/qid-validation" },
                 { text: "Credential Scanning", link: "/developer-guide/conventions/credential-scan" },
               ],
             },
@@ -146,17 +157,19 @@ export default withMermaid(
               text: "API",
               collapsed: true,
               items: [
+                { text: "Overview", link: "/developer-guide/api/" },
                 { text: "Design Guidelines", link: "/developer-guide/api/design" },
                 { text: "Contracts", link: "/developer-guide/api/contracts" },
                 { text: "Code Structure", link: "/developer-guide/api/structure" },
                 { text: "Testing", link: "/developer-guide/api/testing" },
-                { text: "Endpoint Testing", link: "/developer-guide/api/testing-endpoints" },
+                { text: "Endpoint Testing", link: "/developer-guide/api/endpoint-testing" },
               ],
             },
             {
               text: "UI",
               collapsed: true,
               items: [
+                { text: "Overview", link: "/developer-guide/ui/" },
                 { text: "Architecture", link: "/developer-guide/ui/architecture" },
                 { text: "Guidelines", link: "/developer-guide/ui/guidelines" },
                 { text: "Components and State", link: "/developer-guide/ui/components" },
@@ -171,6 +184,7 @@ export default withMermaid(
               text: "Workflow",
               collapsed: true,
               items: [
+                { text: "Overview", link: "/developer-guide/workflow/" },
                 { text: "Quickstart", link: "/developer-guide/workflow/quickstart" },
                 { text: "Engine Architecture", link: "/developer-guide/workflow/engine-architecture" },
                 { text: "Services", link: "/developer-guide/workflow/services" },
@@ -179,22 +193,19 @@ export default withMermaid(
                 { text: "Parameter Resolution", link: "/developer-guide/workflow/parameter-resolution" },
                 { text: "Frequency Parameter Policy", link: "/developer-guide/workflow/frequency-parameter-policy" },
                 { text: "Testing", link: "/developer-guide/workflow/testing" },
-                { text: "Test Fixtures and Mocking", link: "/developer-guide/workflow/testing-fixtures" },
-                { text: "Component Tests", link: "/developer-guide/workflow/testing-components" },
               ],
             },
             {
               text: "Copilot",
               collapsed: true,
               items: [
+                { text: "Overview", link: "/developer-guide/copilot/" },
                 { text: "Architecture", link: "/developer-guide/copilot/architecture" },
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },
                 { text: "Knowledge Layout", link: "/developer-guide/copilot/knowledge-layout" },
                 { text: "Calibration Evaluation", link: "/developer-guide/copilot/evaluation" },
-                { text: "Sandbox", link: "/developer-guide/copilot/sandbox" },
-                { text: "LLM Integration Patterns", link: "/developer-guide/copilot/llm-integration-patterns" },
-                { text: "SSE Streaming", link: "/developer-guide/copilot/streaming" },
-                { text: "Tool Result Compression", link: "/developer-guide/copilot/tool-result-compression" },
+                { text: "Python Sandbox", link: "/developer-guide/copilot/python-sandbox" },
+                { text: "Chat Streaming", link: "/developer-guide/copilot/chat-streaming" },
               ],
             },
             {
@@ -214,6 +225,7 @@ export default withMermaid(
               text: "Reference",
               collapsed: true,
               items: [
+                { text: "Overview", link: "/reference/" },
                 { text: "Database Structure", link: "/reference/database-structure" },
                 { text: "Data Models", link: "/reference/data-models" },
                 { text: "Calibration Documents", link: "/reference/database-documents-calibration" },

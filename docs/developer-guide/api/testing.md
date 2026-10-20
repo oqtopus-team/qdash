@@ -1,7 +1,7 @@
 # API Testing Guidelines
 
 How backend tests are laid out, named, structured, and measured; fixtures, database setup,
-endpoint tests, mocking, and async tests are in [API Endpoint Testing](./testing-endpoints.md).
+endpoint tests, mocking, and async tests are in [API Endpoint Testing](./endpoint-testing.md).
 
 ## Test Directory Structure
 
@@ -45,7 +45,7 @@ tests/
 
 - **Mirror source structure**: `tests/qdash/api/routers/` corresponds to `src/qdash/api/routers/`
 - **Module-specific conftest**: Place fixtures in `conftest.py` at the appropriate level; the
-  root fixtures are described in [Fixtures](./testing-endpoints.md#fixtures)
+  root fixtures are described in [Fixtures](./endpoint-testing.md#fixtures)
 
 ---
 
@@ -169,7 +169,7 @@ def chip_list_test(self):         # Wrong prefix
 ### Arrange-Act-Assert
 
 All tests should follow the AAA (Arrange-Act-Assert) pattern. The `test_client` fixture used
-here is defined in [Fixtures](./testing-endpoints.md#fixtures):
+here is defined in [Fixtures](./endpoint-testing.md#fixtures):
 
 ```python
 def test_list_chips_with_data(self, test_client):
@@ -294,7 +294,7 @@ def create_test_coupling(qid: str) -> CouplingModel:
 
 ### Fixtures for Test Data
 
-Fixture scopes and naming are covered in [Fixtures](./testing-endpoints.md#fixtures).
+Fixture scopes and naming are covered in [Fixtures](./endpoint-testing.md#fixtures).
 
 ```python
 @pytest.fixture

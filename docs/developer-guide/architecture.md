@@ -25,6 +25,7 @@ tracking, file management, and Copilot-assisted analysis.
 
 The UI client and standalone TypeScript client are generated with Orval from the API's OpenAPI
 schema. API contract changes therefore require client regeneration with `task generate`.
+[UI Development](./ui/index.md) maps the routes, component rules, state patterns, and checks.
 
 ![qdash-ui](/images/qdash-ui.png)
 
@@ -32,6 +33,7 @@ schema. API contract changes therefore require client regeneration with `task ge
 
 The API receives user requests, enforces authentication and project access, communicates with
 MongoDB and Prefect, and exposes the OpenAPI schema used to generate the UI and standalone TypeScript clients.
+[API Development](./api/index.md) maps the HTTP contract, code structure, and tests.
 
 ![server-example](/images/server-example.png)
 
@@ -43,6 +45,8 @@ executes user flows with the user flow worker.
 
 Calibration task implementations call the laboratory libraries they need, while QDash supplies
 execution context, parameter resolution, persistence, scheduling, and status tracking.
+[Workflow Development](./workflow/index.md) maps the engine, services, parameter policies, and
+tests.
 
 ![workflow-example](/images/qcflow-example.png)
 
