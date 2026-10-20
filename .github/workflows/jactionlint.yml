@@ -9,6 +9,8 @@ on:
       - ".github/**"
       - "action.yml"
       - "action.yaml"
+      - "**/action.yml"
+      - "**/action.yaml"
   pull_request:
     branches:
       - main
@@ -17,6 +19,8 @@ on:
       - ".github/**"
       - "action.yml"
       - "action.yaml"
+      - "**/action.yml"
+      - "**/action.yaml"
   workflow_dispatch:
 
 permissions: {}
@@ -37,5 +41,22 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install verified jactionlint
+        shell: bash
+        env:
+          JACTIONLINT_SHA256: 8137d5bfe266dd5e48d2af2306827785ce07c6988e04b1c3d6ad4776e97d27d2
+          JACTIONLINT_VERSION: 2.2.0
+        run: |
+          install_dir="${RUNNER_TEMP}/jactionlint"
+          archive="${RUNNER_TEMP}/jactionlint.tar.gz"
+          mkdir -p "${install_dir}"
+          curl --fail --location --silent --show-error \
+            --output "${archive}" \
+            "https://github.com/jdx/jactionlint/releases/download/v${JACTIONLINT_VERSION}/jactionlint_${JACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${JACTIONLINT_SHA256}  ${archive}" | sha256sum --check -
+          tar -xzf "${archive}" -C "${install_dir}"
+
       - name: Lint GitHub Actions workflows
         uses: jdx/jactionlint@1027f0a131ab98bc7e191d995bfa15dbed5bbf8f # v2.2.0
+        with:
+          executable: ${{ runner.temp }}/jactionlint/jactionlint

@@ -32,7 +32,7 @@ jobs:
 
       - name: Extract commit messages
         run: |
-          COMMITS=$(git log --format=%B origin/develop..HEAD)
+          COMMITS=$(git log --format=%s origin/develop..HEAD)
           echo "$COMMITS"
           echo "$COMMITS" > commits.txt
 

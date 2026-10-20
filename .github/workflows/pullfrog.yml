@@ -29,7 +29,7 @@ jobs:
       OPENAI_COMPATIBLE_MAX_OUTPUT: ${{ vars.OPENAI_COMPATIBLE_MAX_OUTPUT || '4096' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
           fetch-depth: 1
@@ -45,6 +45,6 @@ jobs:
         continue-on-error: true
 
       - name: Run agent
-        uses: pullfrog/pullfrog@1ab92a2eb5c2268dcd803ac8bfb0984375e210ab
+        uses: pullfrog/pullfrog@1ab92a2eb5c2268dcd803ac8bfb0984375e210ab # v0.1.67
         with:
           prompt: ${{ inputs.prompt }}
