@@ -2,7 +2,7 @@
 
 This guide helps you get started with the QDash workflow engine.
 
-## Overview
+## Workflow Shape
 
 The workflow engine executes calibration tasks using [Prefect](https://www.prefect.io/).
 For detailed architecture, see [Engine Architecture](./engine-architecture.md).

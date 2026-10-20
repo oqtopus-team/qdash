@@ -1,107 +1,58 @@
 # Task Parameters
 
-QDash separates calibration inputs, experiment settings, and calibrated outputs so that each execution records where its values came from and whether results change the current calibration state.
+Review task parameters before a run to control the experiment without accidentally replacing the
+project's current calibration values.
 
-## Parameter types
+## Recognize the Parameter Types
 
-| Type | Purpose | Examples |
+| Type | What it controls | Example |
 | --- | --- | --- |
-| Input parameters | Existing calibration values consumed by a task | `qubit_frequency`, `readout_amplitude` |
-| Run parameters | Settings that control the experiment | `shots`, `interval`, `time_range` |
-| Output parameters | New calibrated values produced by the task | `rabi_frequency`, `t1` |
+| Input parameter | An existing calibration value consumed by the task | `qubit_frequency` |
+| Run parameter | How this experiment runs | `shots` |
+| Output parameter | A value calculated by the task | `t1` |
 
-An empty Input parameter field in the Tasks page means “use the value resolved by QDash.” It does not send an empty value to the task. Select a chip and target and use **Reload** to preview the current database value. Entering a value makes it an explicit override for that run.
+## Use the Current Calibration Values
 
-```mermaid
-flowchart LR
-    Start[Start task] --> Override{User override?}
-    Override -->|Yes| User[Use entered value]
-    Override -->|No| Database{Current DB value?}
-    Database -->|Yes| DB[Use DB value]
-    Database -->|No| Fallback{Task fallback?}
-    Fallback -->|Yes| Default[Use task fallback]
-    Fallback -->|No| Missing[Use empty parameter metadata]
-    User --> Run[Run experiment]
-    DB --> Run
-    Default --> Run
-    Missing --> Run
-    Run --> Save{Save calibrated outputs?}
-    Save -->|Yes| Persist[Update calibration state]
-    Save -->|No| Result[Keep result and artifacts only]
-```
+Use the default resolution when you want a task to start from the current state:
 
-## Which input value is used
+1. Open **Tasks** and select a task.
+2. Select **Chip** and enter a **Qubit or coupling**.
+3. Leave fields under **Input parameter overrides** blank.
+4. Select **Reload** to preview the current values and check hardware availability.
+5. Review the resolved values before selecting **Run task**.
 
-For a normal workflow run, each task loads its declared Input parameters from the current calibration database during preprocessing. A default declared in the task code is used only when the database does not contain that parameter.
+An empty input override means “resolve this value for me”; it does not send an empty value to the
+task. Selecting **Reload** copies the current values into the fields. Those populated fields are
+explicit overrides for the run, but **Reload** does not change the calibration database.
 
-Tasks declare required database dependencies explicitly. If a required value is missing, execution fails with the missing parameter name instead of silently substituting zero or an empty value.
+## Override a Value for One Run
 
-For a run started from the Tasks page, QDash uses this precedence:
+Enter an input value when this run must use a value other than the current calibration state.
+Enter experiment settings such as shots or sweep limits under **Run parameters**.
 
-1. A value entered by the user
-2. The current calibration database value for the selected chip and target
-3. A fallback value declared by the task
+QDash uses an entered input value before a current calibration value or a task fallback. A task
+that requires a missing value stops with the parameter name instead of silently using zero.
 
-User overrides are applied again after preprocessing. This ensures that preprocessing cannot replace an explicit value entered in the Tasks page.
+## Decide Whether to Save Outputs
 
-Leaving an override blank selects the normal database or fallback resolution. Clicking **Reload** copies current database values into the form; those populated fields become explicit overrides when the task is started. Reload does not modify the database.
+Leave **Save calibrated outputs to DB** off for an exploratory run. QDash records the result,
+effective parameters, figures, and raw data without replacing current calibration values.
 
-## Re-execution behavior
+Enable it only when successful output parameters should become the current values for later
+tasks. The warning below the setting confirms that the run can change shared state. Mapped backend
+configuration is also updated when that integration is enabled.
 
-QDash supports two different forms of re-execution.
+## Re-run Previous Work
 
-### Re-executing an execution
+Re-running an execution restores its task and run context, then resolves calibration inputs from
+the current state. Use this route to repeat a flow while intentionally picking up newer
+calibration values.
 
-Re-executing an execution starts the selected flow with the previous execution ID as its snapshot source. For each matching task name and target, QDash restores the recorded Input and Run parameters before preprocessing.
+Re-running one task result opens the current task definition with compatible values from the
+source result. Review any skipped historical fields, then edit the restored values before
+selecting **Run task**. Values entered in the form take priority.
 
-Input parameters are then refreshed by task preprocessing from the current calibration database. This means a re-execution is reproducible for Run parameters, while calibration inputs follow the current database unless the flow supplies an explicit Input override.
+Always check **Save calibrated outputs to DB** again on a re-run; reproducing a measurement and
+accepting its outputs are separate decisions.
 
-If a task and target did not exist in the source execution, QDash continues with the task’s normal defaults and current database inputs.
-
-### Re-executing a task result
-
-Re-executing an individual task result restores that task’s recorded Input and Run parameter snapshot. Any values entered in the re-execution dialog take priority. Input overrides are applied again after the current database has been loaded.
-
-The effective precedence is:
-
-1. Explicit user override
-2. Current calibration database value loaded during preprocessing
-3. Value recorded in the source task result
-4. Fallback declared by the task
-
-For Run parameters, preprocessing does not normally load database values, so the precedence is:
-
-1. Explicit user override
-2. Value recorded in the source task result
-3. Workflow default
-4. Task default
-
-```mermaid
-flowchart TB
-    subgraph Input[Input parameter precedence]
-        IU[User override] --> IDB[Current calibration DB]
-        IDB --> IS[Source snapshot]
-        IS --> IF[Task fallback]
-    end
-    subgraph Run[Run parameter precedence]
-        RU[User override] --> RS[Source snapshot]
-        RS --> RW[Workflow default]
-        RW --> RF[Task default]
-    end
-```
-
-## Saving calibrated outputs
-
-Executing a task always records its execution status, effective parameters, figures, raw data paths, and task result history. Saving calibrated outputs is a separate choice.
-
-When **Save calibrated outputs to DB** is off, calculated outputs remain visible in the execution result but do not update the authoritative calibration database or backend parameter files. This is the safer mode for exploratory runs.
-
-When it is on, successful output parameters update the calibration database and are synchronized to the backend where supported. Validation failures do not normally update backend parameters. A force-update option used by some re-execution paths can allow backend updates after failed validation and should be used deliberately.
-
-A frequency result can update both a measured device parameter and its operational drive setting.
-The [task frequency matrix](../developer-guide/workflow/frequency-parameter-policy.md#task-frequency-matrix)
-lists the input precedence and database destinations for each frequency calibration task.
-
-## Target selection
-
-Qubit tasks load values from the selected qubit. Coupling tasks may load from the control qubit, target qubit, or coupling record according to each parameter’s declared role. A coupling target uses the `control-target` form, such as `0-1`.
+How this works: [Parameter Resolution](../developer-guide/workflow/parameter-resolution.md).

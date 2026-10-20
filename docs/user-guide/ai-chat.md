@@ -43,8 +43,8 @@ settings; the application's part is edited in the deployment, not in Settings.
 
 ### Run a calibration pipeline from chat
 
-With the Pi backend and write tools enabled (`AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true`), the
-assistant can compose a calibration from QDash's step catalog and run it as one execution. Ask for
+When an operator enables write tools, the assistant can compose a calibration from QDash's step
+catalog and run it as one execution. Ask for
 the calibration in plain terms, for example "run the coarse one-qubit check on Q00 and Q01, then
 measure T1 and T2 on the ones that pass". The assistant reads the available step types and tasks,
 validates its plan with QDash, and shows an approval card listing the targets, the steps, and the
@@ -61,11 +61,10 @@ The Metrics page includes a chat panel that opens with the selected task result 
 when a question depends on the selected chip, metric, target direction, or time range. Changing those
 filters can change the records available to the chat; state the intended comparison explicitly.
 
-**Ask AI** on a task result (task detail modals, task result page) asks how you want to ask before
-anything starts: a recorded evaluation by the calibration evaluation model (**Fixed prompt** or
-**Via Copilot**, zero-shot or in-context, see [Reviewing Results](./reviewing-results.md#request-an-ai-evaluation)), or
-**Chat with Copilot**, the conversation described here. Viewers without edit rights go straight to
-the chat.
+**Ask AI** on a task result offers two routes before anything starts. **Evaluate the figure**
+creates a recorded evaluation with the settings described in
+[AI Evaluations](./ai-evaluations.md). **Chat with Copilot** opens the conversation described
+here. Viewers without edit rights go straight to the chat.
 
 ## Evaluate Findings
 
@@ -78,6 +77,5 @@ starting another hardware run:
 - use deterministic quality gates where the workflow provides them;
 - record the decision in a note or a forum thread when others need the context.
 
-Provider availability and model selection depend on the deployment configuration. Operators
-configure those providers in `.env`; missing provider credentials disable the corresponding AI
-capability rather than the rest of QDash.
+Provider availability and model selection depend on the deployment configuration. A missing AI
+provider disables that capability rather than the rest of QDash.

@@ -119,6 +119,7 @@ export default withMermaid(
                 { text: "Task Parameters", link: "/user-guide/task-parameters" },
                 { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
                 { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
+                { text: "AI Evaluations", link: "/user-guide/ai-evaluations" },
                 { text: "AI Chat", link: "/user-guide/ai-chat" },
                 { text: "Agent Calibration", link: "/user-guide/agent-calibration" },
                 {

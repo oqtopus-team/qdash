@@ -1,6 +1,6 @@
 # Copilot Architecture
 
-## Overview
+## Responsibility Boundary
 
 QDash Copilot is an AI-powered assistant that helps experimentalists interpret qubit calibration results. It provides two interaction modes:
 
