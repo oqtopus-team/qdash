@@ -321,6 +321,28 @@ tasks:
     cmds:
       - bun run docs:build
 
+  check-docs-links:
+    desc: Check documentation links (requires Lychee)
+    deps: [build-docs]
+    cmds:
+      - |
+        LYCHEE_ROOT_DIR="$(mktemp -d)"
+        trap 'rm -rf "${LYCHEE_ROOT_DIR}"' EXIT
+        mkdir "${LYCHEE_ROOT_DIR}/source" "${LYCHEE_ROOT_DIR}/site"
+        ln -s "$(pwd)/docs/index.md" "${LYCHEE_ROOT_DIR}/source/index.md"
+        for asset in docs/public/*; do
+          ln -s "$(pwd)/${asset}" "${LYCHEE_ROOT_DIR}/source/$(basename "${asset}")"
+        done
+        for section in developer-guide user-guide reference; do
+          ln -s "$(pwd)/docs/${section}" "${LYCHEE_ROOT_DIR}/source/${section}"
+        done
+        git ls-files docs | awk '/\.md$/ { print }' > "${LYCHEE_ROOT_DIR}/inputs"
+        lychee --config lychee.toml --root-dir "${LYCHEE_ROOT_DIR}/source" \
+          --files-from "${LYCHEE_ROOT_DIR}/inputs"
+        ln -s "$(pwd)/docs/.vitepress/dist" "${LYCHEE_ROOT_DIR}/site/qdash"
+        lychee --config lychee.toml --offline --scheme file --include-fragments=full \
+          --root-dir "${LYCHEE_ROOT_DIR}/site" -- 'docs/.vitepress/dist/**/*.html'
+
   # =============================================================================
   # Linting & Formatting (local development - auto-fix)
   # =============================================================================

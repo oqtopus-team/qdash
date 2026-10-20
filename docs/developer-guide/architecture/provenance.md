@@ -212,7 +212,8 @@ response = {
 
 ## Lineage Graph Visualization
 
-The lineage graph example showing cross-execution parameter tracing (Execution 002 → 003) with wasGeneratedBy, used, and wasDerivedFrom relations is included in the [Provenance Lineage diagram](../../diagrams/provenance-lineage.drawio.png) above.
+The diagram above shows cross-execution parameter tracing (Execution 002 → 003) with
+wasGeneratedBy, used, and wasDerivedFrom relations.
 
 ## Database Collections
 
