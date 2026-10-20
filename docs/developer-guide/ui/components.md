@@ -1,253 +1,83 @@
 # Components and State
 
-How QDash components are organized and written, and which tool holds each kind of state. The visual rules (icons, colors, empty and loading states) are in [design-policy.md](./design-policy.md); the data-flow diagrams are in [architecture.md](./architecture.md).
+QDash components separate reusable interaction behavior from feature-specific composition, while
+state stays with the narrowest owner that needs it.
 
-## Component Design
+## Choose a Component Location
 
-### DaisyUI and Radix Responsibilities
+| Component kind | Location | Example |
+| --- | --- | --- |
+| Generic interaction or presentation | `components/ui/` | `Dialog`, `DataTable`, `EmptyState` |
+| Feature-specific composition | `components/features/<feature>/` | `EvaluationRequestModal` |
+| Plot or chart wrapper | `components/charts/` | `Plot`, `PlotCard` |
+| Application shell | `components/layout/` | `AppLayout`, `GlobalCommandPalette` |
+| Cross-feature selector | `components/selectors/` | `ChipSelector` |
 
-QDash uses DaisyUI and Radix UI together rather than migrating wholesale from one to the other.
+Move a component into `components/ui/` only after its API is independent of a feature model. A
+shared visual shape with feature-specific data behavior remains in the feature directory.
 
-- Use DaisyUI for the visual system: buttons, cards, form controls, badges, tables, loading states, themes, and semantic colors.
-- Use an established Radix-based component from `ui/src/components/ui/` when an interaction needs focus trapping or restoration, keyboard navigation, portals, outside-click or Escape dismissal, or collision-aware positioning.
-- Style Radix primitives with Tailwind and DaisyUI semantic colors so they remain consistent across light and dark themes.
-- Reuse `Dialog` and `DropdownMenu` instead of importing Radix packages directly in feature components.
-- Do not add a new headless primitive merely to replace a working DaisyUI visual component. Confirm that the interaction has behavioral or accessibility requirements first.
+## Choose the Interaction Foundation
 
-Typical choices:
+QDash uses DaisyUI and Radix for different responsibilities:
 
-| UI need | Preferred foundation |
-| ------- | -------------------- |
-| Button, card, input, badge, table | DaisyUI |
-| Modal dialog | Shared Radix `Dialog` primitive |
-| Action or multi-select menu | Shared Radix `DropdownMenu` primitive |
-| Page-specific spacing and layout | Tailwind CSS |
-| Select, popover, tooltip, or collapsible | Evaluate behavior first; introduce a shared headless primitive only when needed |
+| Need | Foundation |
+| --- | --- |
+| Button, card, input, badge, alert, table, loading state | DaisyUI |
+| Dialog focus trapping and restoration | `components/ui/Dialog.tsx` |
+| Keyboard-aware menu with a portal | `components/ui/DropdownMenu.tsx` |
+| Collision-aware accessible tooltip | `components/ui/Tooltip.tsx` |
+| Feature layout and spacing | Tailwind utilities |
 
-The same rule from the design side: [design-policy.md](./design-policy.md#interaction-and-visual-layers).
+Reuse the shared Radix wrappers instead of importing Radix packages in feature components. Style
+their content with DaisyUI semantic colors so every theme remains readable. Do not introduce a
+headless primitive only to replace a working DaisyUI visual component.
 
-### Component Organization
+## Choose a State Owner
 
-Organize components by feature and reusability:
+| State lifetime | Owner |
+| --- | --- |
+| Remote record or request status | Generated TanStack Query hook |
+| Shareable or refresh-stable filter | Existing `use*UrlState` hook |
+| Cross-route session state | Existing context |
+| One component or subtree | Local state or focused custom hook |
+| Validated form | React Hook Form and Zod |
 
-```
-components/
-├── ui/                         # Generic, reusable UI components
-│   ├── Button.tsx
-│   ├── Card.tsx
-│   ├── DataTable.tsx
-│   └── Modal.tsx
-├── charts/                     # Chart components
-│   ├── TaskFigure.tsx
-│   └── PlotlyChart.tsx
-├── features/                   # Feature-specific components
-│   ├── analysis/
-│   │   ├── HistogramView.tsx
-│   │   └── CDFView.tsx
-│   ├── chip/
-│   │   ├── ChipPageContent.tsx
-│   │   └── QubitGrid.tsx
-│   └── metrics/
-│       └── MetricsView.tsx
-├── layout/                     # Layout components
-│   ├── AppLayout.tsx
-│   ├── Navbar.tsx
-│   └── Sidebar.tsx
-└── selectors/                  # Selection components
-    ├── ChipSelector.tsx
-    └── DateRangeSelector.tsx
-```
+Do not copy query results into Context. Do not put a temporary modal flag into a global provider.
+When a mutation succeeds, invalidate the affected query key instead of manually synchronizing
+multiple copies of the response.
 
-### Component Structure
+## Reuse Page Primitives
 
-```tsx
-// Good - Clear structure with types
-import { useState } from "react";
-import type { ChipData } from "@/schemas";
+Feature pages should compose the existing primitives before creating new ones:
 
-interface ChipCardProps {
-  chip: ChipData;
-  onSelect: (chipId: string) => void;
-  isSelected?: boolean;
-}
+- `PageContainer` and `PageHeader` establish page width and heading actions.
+- `PageFiltersBar` gives filters consistent responsive behavior.
+- `DataTable` handles shared table behavior.
+- `EmptyState`, `ErrorCard`, `Loader`, and skeletons cover non-success states.
+- `ConfirmDialog` covers destructive confirmation.
+- `Toast` reports completed background actions or failures that are not tied to one field.
 
-export function ChipCard({
-  chip,
-  onSelect,
-  isSelected = false,
-}: ChipCardProps) {
-  const [isHovered, setIsHovered] = useState(false);
+Use field-level text for validation errors and inline alerts when the error belongs to a visible
+section. A toast must not be the only place a reader can discover why a form field is invalid.
 
-  return (
-    <div
-      className={`card ${isSelected ? "border-primary" : ""}`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onClick={() => onSelect(chip.chip_id)}
-    >
-      <h3>{chip.chip_id}</h3>
-      {/* ... */}
-    </div>
-  );
-}
-```
+## Preserve Component Invariants
 
-### Props Interface
+- Props use explicit interfaces or imported domain types; avoid `any`.
+- Interactive elements expose an accessible name and work from the keyboard.
+- A component does not fetch data when its parent already owns the same query.
+- Lists use stable domain identifiers as keys.
+- Loading, empty, error, and success states are distinct.
+- Destructive actions require an explicit confirmation unless they are trivially reversible.
+- Feature files import generated schemas rather than redefining API response shapes.
 
-Always define props using TypeScript interfaces:
+## Add a Shared Primitive
 
-```tsx
-// Good - Explicit interface
-interface DataTableProps {
-  data: Record<string, unknown>[];
-  columns: ColumnDefinition[];
-  onRowClick?: (row: Record<string, unknown>) => void;
-  isLoading?: boolean;
-}
+1. Search `components/ui/` and feature directories for an existing behavior.
+2. Confirm that at least two callers can use a feature-independent API.
+3. Choose DaisyUI for visual components or an established Radix wrapper for complex interaction.
+4. Add the primitive and its focused test under `components/ui/__tests__/`.
+5. Migrate only the callers in scope; avoid a repository-wide visual rewrite in the same change.
+6. Document the primitive here only when it establishes a new project-wide rule.
 
-export function DataTable({
-  data,
-  columns,
-  onRowClick,
-  isLoading = false,
-}: DataTableProps) {
-  // ...
-}
-
-// Bad - Inline types or any
-export function DataTable({ data, columns }: { data: any; columns: any }) {
-  // ...
-}
-```
-
----
-
-## State Management
-
-### Form State and Validation
-
-Use React Hook Form with Zod for forms that have validation, multiple fields, or submission value
-normalization. Keep UI-only state such as password visibility outside the form. Prefer field-level error
-messages connected with `aria-describedby`; reserve alerts and toasts for submission or server errors.
-
-Simple search fields, toggles, and single-value controls do not need a form library.
-
-### Server State with TanStack Query
-
-Use TanStack Query for all API data fetching:
-
-```tsx
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getChipList, updateChip } from "@/client/chip/chip";
-
-// Good - Query with proper typing
-export function ChipList() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["chips"],
-    queryFn: () => getChipList(),
-  });
-
-  if (isLoading) return <LoadingSpinner />;
-  if (error) return <ErrorMessage error={error} />;
-
-  return (
-    <ul>
-      {data?.chips.map((chip) => (
-        <li key={chip.chip_id}>{chip.chip_id}</li>
-      ))}
-    </ul>
-  );
-}
-
-// Good - Mutation with cache invalidation
-export function useUpdateChip() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (params: { chipId: string; data: UpdateChipRequest }) =>
-      updateChip(params.chipId, params.data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chips"] });
-    },
-  });
-}
-```
-
-### Query Key Conventions
-
-```tsx
-// Good - Hierarchical query keys
-queryKey: ["chips"]; // All chips
-queryKey: ["chips", chipId]; // Specific chip
-queryKey: ["chips", chipId, "qubits"]; // Qubits for a chip
-queryKey: ["chips", chipId, "qubits", qid]; // Specific qubit
-
-// Good - With filters
-queryKey: ["tasks", { chipId, status: "active" }];
-```
-
-How invalidation cascades through hierarchical keys: [architecture.md](./architecture.md#query-key-strategy).
-
-### Client State with Context
-
-Use React Context for global client state:
-
-```tsx
-// contexts/ProjectContext.tsx
-import { createContext, useContext, useState, ReactNode } from "react";
-
-interface ProjectContextType {
-  selectedProject: string | null;
-  setSelectedProject: (project: string) => void;
-}
-
-const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
-
-export function ProjectProvider({ children }: { children: ReactNode }) {
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
-
-  return (
-    <ProjectContext.Provider value={{ selectedProject, setSelectedProject }}>
-      {children}
-    </ProjectContext.Provider>
-  );
-}
-
-export function useProjectContext() {
-  const context = useContext(ProjectContext);
-  if (!context) {
-    throw new Error("useProjectContext must be used within a ProjectProvider");
-  }
-  return context;
-}
-```
-
-The variant that persists the selection to `localStorage`: [architecture.md](./architecture.md#pattern-context-for-global-state).
-
-### URL State with nuqs
-
-Use `nuqs` for URL-synchronized state:
-
-```tsx
-import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
-
-export function FilteredList() {
-  // State synced to URL: ?search=foo&page=2
-  const [search, setSearch] = useQueryState(
-    "search",
-    parseAsString.withDefault(""),
-  );
-  const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
-
-  return (
-    <div>
-      <input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search..."
-      />
-      {/* ... */}
-    </div>
-  );
-}
-```
+See [Styling](./styling.md) for class and theme rules and [UI Testing](./testing.md) for interaction
+tests.

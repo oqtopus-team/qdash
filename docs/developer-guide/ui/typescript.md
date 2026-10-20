@@ -1,70 +1,69 @@
 # TypeScript
 
-Type rules for `ui/` code; the compiler runs in strict mode and the Docker build fails on any implicit `any`. How to run the checks and fix the common errors: [testing.md](./testing.md#type-checking).
+The QDash UI uses strict TypeScript to keep generated API contracts, component props, and state
+transitions explicit.
 
-## Strict Mode
+## Compiler Invariants
 
-The project uses TypeScript strict mode. Ensure all types are explicit:
+`ui/tsconfig.json` enables `strict`, `noUnusedLocals`, `noUnusedParameters`, and
+`noFallthroughCasesInSwitch`, and it emits no JavaScript. Next.js owns production output.
 
-```json
-// tsconfig.json
-{
-  "compilerOptions": {
-    "strict": true,
-    "noImplicitAny": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true
-  }
-}
+Run type generation before TypeScript when route types may have changed:
+
+```bash
+cd ui
+bunx next typegen
+bunx tsc --noEmit
 ```
 
-## Import Types
+`task ci-ui` runs both commands in this order.
 
-Use `import type` for type-only imports:
+## Reuse Contract Types
 
-```tsx
-// Good - Type-only import
-import type { ChipSummary, TaskInfo } from "@/schemas";
-import type { AxiosResponse } from "axios";
+Import API request and response types from `@/schemas`. Import component-specific types from their
+owning module. Do not copy a generated interface into a feature directory to make a mismatch
+compile.
 
-// Regular import for values
-import { useQuery } from "@tanstack/react-query";
+Use `import type` when an import is erased at runtime:
+
+```ts
+import type { ChipSummary, CreateChipRequest } from "@/schemas";
 ```
 
-## Avoid `any`
+## Narrow Unknown Values
 
-Never use `any` type. Use proper types or `unknown` with type guards:
+Use `unknown` for data whose shape is not established, then narrow it with runtime checks. Use
+`Record<string, unknown>` only when the code genuinely accepts arbitrary keys.
 
-```tsx
-// Good
-function processData(data: Record<string, unknown>) {
-  if (typeof data.name === "string") {
-    console.log(data.name);
-  }
-}
+Avoid `any`. A third-party boundary that lacks usable types can justify a narrow local assertion,
+but the assertion must not spread into component props or feature state.
 
-// Bad
-function processData(data: any) {
-  console.log(data.name);
-}
-```
+## Let Generated Hooks Carry Types
 
-## Type Assertions
+Generated query and mutation hooks already type their responses, errors, variables, and callback
+arguments. Do not wrap them in an untyped `useQuery` or `useMutation` call merely to rename the
+operation.
 
-Prefer type guards over type assertions:
+Add an explicit annotation when data crosses a generic library boundary or when inference loses a
+domain constraint. Do not annotate every array callback when its collection is already typed.
 
-```tsx
-// Good - Type guard
-function isChipData(data: unknown): data is ChipData {
-  return typeof data === "object" && data !== null && "chip_id" in data;
-}
+## Model Component State Precisely
 
-if (isChipData(response)) {
-  console.log(response.chip_id);
-}
+Use string unions or discriminated unions for finite UI states instead of independent booleans
+that can represent impossible combinations. Keep nullable server data distinct from loading and
+error status.
 
-// Bad - Type assertion
-const chip = response as ChipData; // Unsafe
-```
+Component props use an interface or named type when the shape is reused or represents the public
+component API. Callback props describe their argument and return types explicitly.
 
-Callback and array-method parameters need explicit annotations too; see [api-integration.md](./api-integration.md#type-annotations-for-callbacks).
+## Treat Assertions as Boundaries
+
+Prefer a type guard to a broad `as` assertion. When an assertion is unavoidable, keep it at the
+deserialization, DOM, or library boundary and return a correctly typed value to the rest of the
+feature.
+
+Do not use non-null assertions to hide a state the UI can actually reach. Render the missing,
+loading, or error state instead.
+
+See [API Integration](./api-integration.md) for generated hook usage and
+[UI Testing](./testing.md#check-types-and-static-rules) for the complete static checks.
