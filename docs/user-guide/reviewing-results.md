@@ -129,7 +129,7 @@ the figure, open **Prompt A vs B** to see the two prompts as a diff, and record 
 either side. An incomplete or prose answer is shown as not comparable rather than as a
 difference.
 
-How this works: [Copilot architecture](../developer-guide/copilot/architecture.md).
+How this works: [Calibration Evaluation](../developer-guide/copilot/evaluation.md).
 
 ## Ask Copilot
 

@@ -100,7 +100,7 @@ Prefer focused tests for narrow changes, then broader checks when touching share
 
 ## Documentation Conventions
 
-- Follow `docs/developer-guide/docs-guidelines.md`.
+- Follow `docs/developer-guide/docs-guidelines.md` and use the `technical-docs` skill (`.agents/skills/technical-docs/SKILL.md`) to write, verify and review a page.
 - Start docs with a direct context sentence.
 - Do not add manual tables of contents, summary sections, empty checklists, future-enhancement sections, or emoji.
 - Link relevant docs inline instead of adding broad related-document lists.
