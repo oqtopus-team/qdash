@@ -17,6 +17,7 @@ jobs:
   pullfrog:
     name: Review
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       id-token: write
@@ -30,6 +31,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
+          persist-credentials: false
           fetch-depth: 1
 
       - name: Setup Bun

@@ -1,0 +1,5 @@
+profile: default
+
+rules:
+  missing-timeout:
+    default-minutes: 60
