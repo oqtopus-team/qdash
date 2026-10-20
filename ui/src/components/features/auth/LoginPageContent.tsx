@@ -3,18 +3,40 @@
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, BookOpen, Eye, EyeOff, GitBranch, Loader2, Moon, Sun } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { DARK_THEMES } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
+const loginSchema = z.object({
+  username: z.string().trim().min(1, "User ID is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
+
+/** Joins the truthy ids into an aria-describedby value, or undefined when none apply. */
+function describedBy(...ids: (string | false | undefined)[]) {
+  return ids.filter(Boolean).join(" ") || undefined;
+}
+
+/** Renders the sign-in page with a schema-validated login form. */
 export function LoginPageContent() {
-  const [userName, setUserName] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { username: "", password: "" },
+  });
   const { login: authLogin, loading } = useAuth();
   const { theme, setTheme } = useTheme();
 
@@ -24,12 +46,18 @@ export function LoginPageContent() {
     setTheme(isDarkTheme ? "light" : "dark");
   }, [isDarkTheme, setTheme]);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  /** Clears any stale submission error, then validates and submits the form. */
+  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    setError("");
+    return handleSubmit(submit)(event);
+  };
+
+  /** Logs in with the validated values and redirects, or records a submission error. */
+  const submit = async (values: LoginFormData) => {
     setError("");
 
     try {
-      await authLogin(userName, password);
+      await authLogin(values.username, values.password);
       window.location.href = "/execution";
     } catch {
       setError("Login failed. Please check your user ID and password.");
@@ -114,7 +142,7 @@ export function LoginPageContent() {
             </h2>
             <p className="mt-1 text-sm text-base-content/60">Sign in to continue to QDash.</p>
 
-            <form onSubmit={handleSubmit} className="mt-6" aria-busy={loading}>
+            <form onSubmit={onSubmit} className="mt-6" aria-busy={loading} noValidate>
               <fieldset disabled={loading} className="contents">
                 <div className="form-control">
                   <label className="label" htmlFor="userName">
@@ -122,18 +150,22 @@ export function LoginPageContent() {
                   </label>
                   <input
                     id="userName"
-                    name="username"
                     type="text"
-                    required
                     autoComplete="username"
                     autoCapitalize="none"
                     spellCheck="false"
                     autoFocus
-                    className="input input-bordered w-full focus:input-primary"
+                    className={`input input-bordered w-full focus:input-primary ${errors.username ? "input-error" : ""}`}
                     placeholder="Enter your user ID"
-                    value={userName}
-                    onChange={(event) => setUserName(event.target.value)}
+                    aria-invalid={Boolean(errors.username)}
+                    aria-describedby={describedBy(errors.username?.message && "userName-error")}
+                    {...register("username")}
                   />
+                  {errors.username && (
+                    <p id="userName-error" className="mt-1 text-sm text-error">
+                      {errors.username.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-control mt-3">
@@ -143,15 +175,16 @@ export function LoginPageContent() {
                   <div className="relative">
                     <input
                       id="password"
-                      name="password"
                       type={showPassword ? "text" : "password"}
-                      required
                       autoComplete="current-password"
-                      className="input input-bordered w-full pr-12 focus:input-primary"
+                      className={`input input-bordered w-full pr-12 focus:input-primary ${errors.password ? "input-error" : ""}`}
                       placeholder="Enter your password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      aria-describedby={error ? "login-error" : undefined}
+                      aria-invalid={Boolean(errors.password)}
+                      aria-describedby={describedBy(
+                        errors.password?.message && "password-error",
+                        error && "login-error",
+                      )}
+                      {...register("password")}
                     />
                     <span className="absolute right-1 top-1/2 -translate-y-1/2">
                       <button
@@ -168,6 +201,11 @@ export function LoginPageContent() {
                       </button>
                     </span>
                   </div>
+                  {errors.password && (
+                    <p id="password-error" className="mt-1 text-sm text-error">
+                      {errors.password.message}
+                    </p>
+                  )}
                 </div>
               </fieldset>
 
@@ -180,7 +218,7 @@ export function LoginPageContent() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || isSubmitting}
                 className="btn btn-primary btn-glow mt-6 w-full"
               >
                 {loading && <Loader2 size={18} className="animate-spin" aria-hidden="true" />}
