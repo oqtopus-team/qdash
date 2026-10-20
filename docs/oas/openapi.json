@@ -6505,6 +6505,100 @@
         }
       }
     },
+    "/tasks/{task_name}/evaluation-prompts": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Preview the prompts an AI evaluation of a task would send",
+        "description": "The prompts the evaluation model would receive for a task.\n\nThe Agent Runtime builds them the way a direct evaluation does, from the\ntask's reference in Knowledge (and its labeled examples when asked), as\nthe requesting user, without a figure or a model call.",
+        "operationId": "getTaskEvaluationPrompts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          },
+          {
+            "name": "with_examples",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Lay out the task's labeled examples, as an in-context evaluation",
+              "default": false,
+              "title": "With Examples"
+            },
+            "description": "Lay out the task's labeled examples, as an in-context evaluation"
+          },
+          {
+            "name": "question",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A specific question to add",
+              "title": "Question"
+            },
+            "description": "A specific question to add"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationPromptPreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{task_name}/knowledge": {
       "get": {
         "tags": [
@@ -19919,6 +20013,104 @@
         ],
         "title": "EvaluationPlannerModel",
         "description": "What the planner did around the evaluation, in planner mode."
+      },
+      "EvaluationPromptPreviewResponse": {
+        "properties": {
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "with_examples": {
+            "type": "boolean",
+            "title": "With Examples",
+            "description": "Whether the task's labeled examples were laid out",
+            "default": false
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "provider/modelId of the model that would judge, when configured"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationPromptQuestion"
+            },
+            "type": "array",
+            "title": "Questions"
+          },
+          "knowledge_chars": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Chars",
+            "description": "Length of the reference the prompts were built from"
+          },
+          "knowledge_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Sha256",
+            "description": "SHA-256 of that reference, to tell two versions apart"
+          },
+          "examples": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationExampleModel"
+            },
+            "type": "array",
+            "title": "Examples",
+            "description": "The labeled examples fetched for the preview"
+          },
+          "examples_used": {
+            "type": "integer",
+            "title": "Examples Used",
+            "description": "How many of them the prompts show",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_name"
+        ],
+        "title": "EvaluationPromptPreviewResponse",
+        "description": "The prompts an evaluation of a task would send, built without a figure or a model call."
+      },
+      "EvaluationPromptQuestion": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "The question key, e.g. fit_reliability"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "description": "The user turn; [figure] marks where an image goes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "prompt"
+        ],
+        "title": "EvaluationPromptQuestion",
+        "description": "One question's prompt, as the evaluation model would receive it."
       },
       "EvaluationRunDetailResponse": {
         "properties": {

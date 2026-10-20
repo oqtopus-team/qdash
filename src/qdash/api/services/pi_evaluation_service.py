@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 # The calibration VLM answers in tens of seconds; connect and write stay short.
 EVALUATE_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=30.0, pool=10.0)
+# A prompt preview only fetches the task's reference and renders templates.
+PREVIEW_TIMEOUT = httpx.Timeout(connect=10.0, read=60.0, write=30.0, pool=10.0)
 
 
 class EvaluationRuntimeError(RuntimeError):
@@ -71,6 +73,44 @@ async def evaluate_task_result(
             headers={**_runtime_headers(), **auth.headers()},
             json=payload,
         )
+    return _runtime_result(response)
+
+
+async def preview_evaluation_prompts(
+    task_name: str,
+    *,
+    auth: QDashAuth,
+    with_examples: bool = False,
+    question: str | None = None,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> dict[str, Any]:
+    """Ask the runtime for the prompts an evaluation of `task_name` would send.
+
+    The runtime builds them the way a direct evaluation does (the task's
+    reference and, with `with_examples`, its labeled examples, fetched as the
+    given user) without a figure or a model call. Returns the runtime's
+    preview (`questions`, `model`, `knowledge`, `examples`, `examples_used`).
+    Raises `EvaluationRuntimeError` with the failing stage when the runtime
+    answered with an error, and `httpx.HTTPError` when it could not be reached.
+    """
+    payload: dict[str, Any] = {"task_name": task_name}
+    if with_examples:
+        payload["with_examples"] = True
+    if question:
+        payload["question"] = question
+    async with httpx.AsyncClient(
+        timeout=PREVIEW_TIMEOUT, trust_env=False, transport=transport
+    ) as client:
+        response = await client.post(
+            f"{RUNTIME_URL}/evaluation-prompts",
+            headers={**_runtime_headers(), **auth.headers()},
+            json=payload,
+        )
+    return _runtime_result(response)
+
+
+def _runtime_result(response: httpx.Response) -> dict[str, Any]:
+    """The runtime's JSON body, or the `EvaluationRuntimeError` its error body names."""
     if response.status_code == httpx.codes.OK:
         return cast("dict[str, Any]", response.json())
     try:

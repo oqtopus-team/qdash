@@ -25,7 +25,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  EvaluationPromptPreviewResponse,
   ExecuteFlowResponse,
+  GetTaskEvaluationPromptsParams,
   GetTaskKnowledgeParams,
   HTTPValidationError,
   ListTaskKnowledgeResponse,
@@ -517,6 +519,111 @@ export function useGetTaskKnowledgeMarkdown<TData = Awaited<ReturnType<typeof ge
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetTaskKnowledgeMarkdownQueryOptions(taskName,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * The prompts the evaluation model would receive for a task.
+ *
+ * The Agent Runtime builds them the way a direct evaluation does, from the
+ * task's reference in Knowledge (and its labeled examples when asked), as
+ * the requesting user, without a figure or a model call.
+ * @summary Preview the prompts an AI evaluation of a task would send
+ */
+export const getTaskEvaluationPrompts = (
+    taskName: string,
+    params?: GetTaskEvaluationPromptsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<EvaluationPromptPreviewResponse>(
+      {url: `/tasks/${taskName}/evaluation-prompts`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetTaskEvaluationPromptsQueryKey = (taskName: string,
+    params?: GetTaskEvaluationPromptsParams,) => {
+    return [
+    `/tasks/${taskName}/evaluation-prompts`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTaskEvaluationPromptsQueryOptions = <TData = Awaited<ReturnType<typeof getTaskEvaluationPrompts>>, TError = HTTPValidationError>(taskName: string,
+    params?: GetTaskEvaluationPromptsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskEvaluationPrompts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTaskEvaluationPromptsQueryKey(taskName,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTaskEvaluationPrompts>>> = ({ signal }) => getTaskEvaluationPrompts(taskName,params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: taskName !== null && taskName !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskEvaluationPrompts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTaskEvaluationPromptsQueryResult = NonNullable<Awaited<ReturnType<typeof getTaskEvaluationPrompts>>>
+export type GetTaskEvaluationPromptsQueryError = HTTPValidationError
+
+
+export function useGetTaskEvaluationPrompts<TData = Awaited<ReturnType<typeof getTaskEvaluationPrompts>>, TError = HTTPValidationError>(
+ taskName: string,
+    params: undefined |  GetTaskEvaluationPromptsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskEvaluationPrompts>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTaskEvaluationPrompts>>,
+          TError,
+          Awaited<ReturnType<typeof getTaskEvaluationPrompts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTaskEvaluationPrompts<TData = Awaited<ReturnType<typeof getTaskEvaluationPrompts>>, TError = HTTPValidationError>(
+ taskName: string,
+    params?: GetTaskEvaluationPromptsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskEvaluationPrompts>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTaskEvaluationPrompts>>,
+          TError,
+          Awaited<ReturnType<typeof getTaskEvaluationPrompts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTaskEvaluationPrompts<TData = Awaited<ReturnType<typeof getTaskEvaluationPrompts>>, TError = HTTPValidationError>(
+ taskName: string,
+    params?: GetTaskEvaluationPromptsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskEvaluationPrompts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Preview the prompts an AI evaluation of a task would send
+ */
+
+export function useGetTaskEvaluationPrompts<TData = Awaited<ReturnType<typeof getTaskEvaluationPrompts>>, TError = HTTPValidationError>(
+ taskName: string,
+    params?: GetTaskEvaluationPromptsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskEvaluationPrompts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTaskEvaluationPromptsQueryOptions(taskName,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

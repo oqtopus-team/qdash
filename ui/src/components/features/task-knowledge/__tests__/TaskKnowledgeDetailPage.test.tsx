@@ -13,7 +13,10 @@ const { axiosGet, saveContent, getContent, projectState } = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/contexts/ProjectContext", () => ({ useProject: () => projectState }));
-vi.mock("@/lib/api/custom-instance", () => ({ AXIOS_INSTANCE: { get: axiosGet } }));
+vi.mock("@/lib/api/custom-instance", () => ({
+  AXIOS_INSTANCE: { get: axiosGet },
+  customInstance: vi.fn(),
+}));
 vi.mock("@/components/ui/Toast", () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }));

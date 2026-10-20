@@ -58,10 +58,13 @@ import {
   EvaluationError,
   evaluateTask,
   plannerInstruction,
+  previewEvaluationPrompts,
   plannerOutcome,
   recordFromDetails,
   type EvaluateRequest,
   type EvaluateResult,
+  type PromptPreview,
+  type PromptPreviewRequest,
   type ToolRun,
 } from "./evaluate.ts";
 import { formatSettledDetail } from "./events.ts";
@@ -383,6 +386,45 @@ export class SharedRuntime {
         fetchKnowledge: (taskName) => fetchTaskKnowledge(connection, taskName, signal),
         fetchExamples: (taskName) => fetchTaskExamples(connection, taskName, signal),
         evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
+      });
+    } finally {
+      await connection.close();
+    }
+  }
+
+  /**
+   * The prompts an evaluation of a task would send, built the way a direct
+   * evaluation builds them (QDash's reference and examples, the evaluator's
+   * templates) but without a figure or a model call.
+   */
+  async previewEvaluationPrompts(
+    request: PromptPreviewRequest,
+    auth: QDashAuth,
+    signal?: AbortSignal,
+  ): Promise<PromptPreview> {
+    const evaluation = this.enabledTools.get(EVALUATION_TOOL);
+    if (!evaluation) {
+      throw new EvaluationError("request", `evaluation tools not loaded: ${EVALUATION_TOOL}`, 503);
+    }
+    const connection = await createQDashConnection(auth);
+    try {
+      return await previewEvaluationPrompts(request, {
+        runTool: async (name, args) => {
+          const tool = this.enabledTools.get(name);
+          if (!tool) throw new EvaluationError("request", `tool ${name} is not enabled`, 503);
+          return (await runCodingAgentTool(
+            tool.definition,
+            `preview:${randomUUID()}`,
+            args,
+            signal,
+            this.modelRuntime,
+            WORK_DIR,
+            connection,
+            undefined,
+          )) as ToolRun;
+        },
+        fetchKnowledge: (taskName) => fetchTaskKnowledge(connection, taskName, signal),
+        fetchExamples: (taskName) => fetchTaskExamples(connection, taskName, signal),
       });
     } finally {
       await connection.close();

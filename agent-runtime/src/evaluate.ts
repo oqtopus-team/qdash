@@ -577,6 +577,80 @@ export function figureCount(value: unknown): number {
   return Math.min(Math.max(Math.floor(value), 1), MAX_EVALUATION_FIGURES);
 }
 
+export interface PromptPreviewRequest {
+  taskName: string;
+  /** Show the task's labeled examples, as an in-context evaluation would. */
+  withExamples?: boolean;
+  /** The context line to show; a generic one names the task when absent. */
+  context?: string;
+  question?: string;
+}
+
+/** The prompts an evaluation of a task would send, built without a figure or a model call. */
+export interface PromptPreview {
+  task_name: string;
+  with_examples: boolean;
+  /** `provider/modelId` of the model that would judge, when one is configured. */
+  model: string | null;
+  questions: Array<{ key: string; prompt: string }>;
+  knowledge: { chars: number; sha256: string } | null;
+  examples: ExampleRecord[];
+  examples_used: number;
+}
+
+/**
+ * Build the prompts an evaluation of `taskName` would send, through the same
+ * fill as a real evaluation (QDash's reference and labeled examples, as the
+ * user) and the evaluator's own templates (`dry_run`), so the Knowledge page
+ * shows exactly what a task's reference turns into. No figure is needed and
+ * the model is not asked.
+ */
+export async function previewEvaluationPrompts(
+  request: PromptPreviewRequest,
+  deps: Pick<EvaluateDeps, "runTool" | "fetchKnowledge" | "fetchExamples">,
+): Promise<PromptPreview> {
+  const taskName = request.taskName.trim();
+  if (!taskName) throw new EvaluationError("request", "task_name is required", 400);
+  const knowledge = await deps.fetchKnowledge(taskName);
+  const examples = request.withExamples && deps.fetchExamples ? await deps.fetchExamples(taskName) : [];
+  const question = request.question?.trim();
+  const criteria = compactCriteria(knowledge?.criteria);
+  const args = {
+    context: request.context?.trim() || `Task ${taskName}.`,
+    ...(question ? { question } : {}),
+    task_name: taskName,
+    ...(knowledge ? { knowledge: knowledge.knowledge } : {}),
+    ...(criteria ? { criteria } : {}),
+    ...(request.withExamples ? { use_examples: true } : {}),
+    ...(examples.length > 0 ? { examples: examples.map(toolExample) } : {}),
+    dry_run: true,
+  };
+  const result = await deps.runTool(EVALUATION_TOOL, args);
+  if (result.isError) {
+    throw new EvaluationError("evaluation", textOf(result.content) || `${EVALUATION_TOOL} failed`);
+  }
+  const d = (result.details ?? {}) as {
+    model?: { provider?: string; modelId?: string };
+    questions?: unknown;
+    prompts?: unknown;
+    examples_used?: unknown;
+  };
+  const prompts = (d.prompts && typeof d.prompts === "object" ? d.prompts : {}) as Record<string, unknown>;
+  const keys = Array.isArray(d.questions)
+    ? d.questions.filter((key): key is string => typeof key === "string")
+    : Object.keys(prompts);
+  const identity = knowledge ? referenceIdentity({ knowledge: knowledge.knowledge, criteria }) : undefined;
+  return {
+    task_name: taskName,
+    with_examples: request.withExamples === true,
+    model: d.model?.provider && d.model.modelId ? `${d.model.provider}/${d.model.modelId}` : null,
+    questions: keys.map((key) => ({ key, prompt: typeof prompts[key] === "string" ? (prompts[key] as string) : "" })),
+    knowledge: identity ? { chars: identity.length, sha256: sha256(identity) } : null,
+    examples: examples.map(exampleRecord),
+    examples_used: typeof d.examples_used === "number" ? d.examples_used : 0,
+  };
+}
+
 /**
  * Summarise one task result as evidence, then judge its figure.
  *

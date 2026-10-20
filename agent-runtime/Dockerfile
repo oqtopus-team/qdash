@@ -22,7 +22,7 @@ RUN mkdir -p $PI_CODING_AGENT_DIR \
 RUN bunx @earendil-works/pi-coding-agent install npm:@oqtopus-team/pi-qdash@0.1.11-beta.19
 # pi-qcaleval is trusted as a whole (TRUSTED_EXTENSION_PACKAGES in
 # src/allowed-tools.ts), so this pin is its release gate.
-RUN bunx @earendil-works/pi-coding-agent install npm:@orangekame3/pi-qcaleval@0.0.2-beta.10
+RUN bunx @earendil-works/pi-coding-agent install npm:@orangekame3/pi-qcaleval@0.0.2-beta.12
 
 COPY agent-runtime/src ./src
 # The agent dir and workspace are written at runtime (models.json, agent files),
