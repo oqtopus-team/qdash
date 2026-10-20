@@ -1,142 +1,115 @@
 # API Code Structure
 
-How routers, schemas, services and dependencies are laid out under `src/qdash/api/`, and how an endpoint is evolved without breaking clients. The conventions for the endpoints themselves are on [API Design](./design.md) and [API Contracts](./contracts.md).
+The API package separates application assembly, HTTP adaptation, business operations, dependency
+wiring, and persistence so each layer can change and be tested at its own boundary.
 
-## File Naming
+## Follow the Request Path
 
-### Router Files
+A project-scoped request passes through the application and dependency layers before a service
+uses repositories:
 
-Router files should use **snake_case** matching the resource name:
-
-```
-src/project/api/routers/
-├── resource.py           # Resource endpoints
-├── sub_resource.py       # Multi-word resource endpoints
-├── auth.py               # Authentication endpoints
-└── settings.py           # Settings endpoints
-```
-
-### Schema Files
-
-Schema files should match their corresponding router:
-
-```
-src/project/api/schemas/
-├── resource.py           # ResourceResponse, ListResourcesResponse, etc.
-├── sub_resource.py       # SubResourceResponse, etc.
-├── auth.py               # User, TokenResponse, etc.
-└── error.py              # ErrorResponse, Detail
+```mermaid
+flowchart LR
+    app[create_app] --> registry[router_registry]
+    registry --> auth[get_current_active_user]
+    auth --> project[ProjectContext dependency]
+    project --> route[router handler]
+    route --> service[service]
+    service --> repository[repository]
+    repository --> database[(MongoDB)]
 ```
 
-### Naming Rules
+`create_app()` in `src/qdash/api/app/factory.py` owns middleware, router registration, OpenAPI
+customization, and the application lifespan. The deployed API uses `root_path="/api"` for proxy
+metadata; router declarations and `TestClient` requests use paths such as `/chips` without an
+additional `/api` prefix.
 
-| Type            | Convention      | Example                |
-| --------------- | --------------- | ---------------------- |
-| Router file     | `snake_case.py` | `task_result.py`       |
-| Schema file     | `snake_case.py` | `task_result.py`       |
-| Response model  | `PascalCase`    | `ListChipsResponse`    |
-| Request model   | `PascalCase`    | `CreateChipRequest`    |
-| Router variable | `router`        | `router = APIRouter()` |
+## Put Code in the Owning Layer
 
-### Import Conventions
+| Location | Responsibility |
+| --- | --- |
+| `app/factory.py` | Construct the FastAPI application and customize OpenAPI |
+| `app/router_registry.py` | Mount routers, tags, prefixes, and default authentication |
+| `routers/` | Parse HTTP input, select dependencies, call services, and shape HTTP output |
+| `schemas/` | Define request and response models |
+| `services/` | Enforce domain rules and coordinate repositories or external systems |
+| `dependencies/` | Construct and cache repositories, services, and runtimes |
+| `lib/auth.py` and `lib/project.py` | Resolve identity, project context, and permissions |
+| `middleware/` | Apply request-wide HTTP behavior |
+| `db/session.py` | Own the database connection lifecycle |
+| `src/qdash/repository/` | Persist and query domain records |
+
+New router handlers should stay thin. They may translate a known domain failure into an HTTP
+response, but data access, multi-step mutation, and integration orchestration belong in a service.
+Prefer schema or domain values at the service boundary. Existing services can raise
+`HTTPException`, and file services return `FileResponse`; keep such FastAPI coupling within the
+domain that already owns it instead of spreading it to unrelated services.
+
+Match domain filenames across layers when one domain owns the code, for example
+`routers/flow.py`, `schemas/flow.py`, and `services/flow_service.py`. A large service can become a
+package, as `services/chip/` does, without changing the router's public contract.
+
+## Wire Dependencies Through Providers
+
+`src/qdash/api/dependencies/__init__.py` exposes provider functions for repositories and services.
+`@cached_dependency_provider` wraps long-lived providers with a one-entry `lru_cache` and registers
+their cache-clear hook.
 
 ```python
-# In main.py - import router modules
-from project.api.routers import (
-    auth,
-    resource,
-    sub_resource,
-    settings,
-)
-
-# In router files - import schemas
-from project.api.schemas.resource import (
-    ResourceResponse,
-    CreateResourceRequest,
-    ListResourcesResponse,
-)
-```
-
-## Service Layer
-
-Business logic lives in service classes under `src/qdash/api/services/`. Routers handle HTTP concerns only (request parsing, response formatting, status codes) and delegate to services.
-
-### File Layout
-
-```
-src/qdash/api/
-├── routers/           # HTTP layer: request/response, DI, status codes
-│   ├── copilot.py
-│   ├── forum.py
-│   └── auth.py
-├── services/          # Business logic: data loading, validation, orchestration
-│   ├── copilot_data_service.py
-│   └── auth_service.py
-├── lib/               # Shared utilities: SSE formatting, auth helpers, config
-│   ├── sse.py
-│   ├── file_utils.py
-│   └── copilot_analysis.py
-├── schemas/           # Pydantic request/response models
-└── dependencies.py    # DI wiring (@lru_cache singletons)
-```
-
-### Dependency Injection
-
-Services are instantiated as singletons via `@lru_cache` functions in `dependencies.py` and injected into routers with `Depends()`.
-
-```python
-# dependencies.py
-@lru_cache(maxsize=1)
-def get_auth_service() -> AuthService:
-    return AuthService(
-        user_repository=get_user_repository(),
-        project_service=get_project_service(),
+@cached_dependency_provider
+def get_chip_service() -> ChipService:
+    return ChipService(
+        chip_repository=get_chip_repository(),
+        execution_counter_repository=get_execution_counter_repository(),
+        task_result_repository=get_task_result_repository(),
     )
-
-# routers/auth.py
-@router.post("/register")
-def register_user(
-    auth_service: Annotated[AuthService, Depends(get_auth_service)],
-) -> UserWithToken:
-    user, _ = auth_service.register_user(user_data, admin)
-    auth_service.onboard_user(user)
-    return UserWithToken(...)
 ```
 
-### Guidelines
+Inject providers with `Annotated[..., Depends(...)]` rather than constructing a repository or
+service in a route. Constructor injection makes service tests replace collaborators without
+starting the application.
 
-- **One service per domain** -- `ForumService` handles the forum, `AuthService` handles auth.
-- **Routers stay thin** -- No DB queries, no business rules, no data transformation in routers.
-- **Services are framework-agnostic** -- Services raise `HTTPException` for now but don't depend on `Request`/`Response`.
-- **Static methods for pure logic** -- Use `@staticmethod` for functions that don't need instance state (e.g., `ForumService.strip_mention()`).
-- **Compose via constructor injection** -- If service A needs service B, inject B through `__init__`.
+Tests that inspect provider identity or change provider configuration call
+`clear_dependency_caches()`. FastAPI `app.dependency_overrides` is for replacing a provider at the
+HTTP boundary; remove an override after the test.
 
-## Migration Strategy
+## Register a Router Once
 
-When adding new endpoints or modifying existing ones:
+`RouterRegistration` entries in `src/qdash/api/app/router_registry.py` classify routers as public or
+protected and assign their tag and optional prefix. Protected routers receive the active-user
+dependency automatically.
 
-1. **Follow conventions from the start**: Apply [API Design](./design.md) and [API Contracts](./contracts.md) to all new development
-2. **Update clients immediately**: Regenerate API clients after changes (`task generate`)
-3. **Avoid breaking changes**: If breaking changes are necessary, use versioning or deprecation
+A domain can expose separate public and protected `APIRouter` objects, as Copilot and Forum do.
+Register each object with the intended policy instead of making an entire domain public for one
+unauthenticated endpoint.
 
-### Deprecation Pattern
+Router-local prefixes are useful when every route shares the same domain root, while registry
+prefixes support mounting a router under a shared application path. Keep one owner for each prefix
+so the final path is apparent from the router and registry together.
 
-```python
-# Step 1: Add new endpoint, deprecate old
-@router.get("/chip", deprecated=True)  # Old - mark as deprecated
-def list_chips_deprecated():
-    return list_chips()
+## Add or Change an Endpoint
 
-@router.get("/chips", response_model=ListChipsResponse)  # New
-def list_chips():
-    pass
-```
+An endpoint change normally touches these artifacts in order:
 
-### Versioning Pattern
+1. Define or update request and response models in `schemas/`.
+2. Add the domain behavior to a service and its focused tests.
+3. Add the dependency provider when the service or repository is new.
+4. Add the route with its project dependency, `response_model`, summary, and explicit
+   `operation_id`.
+5. Register a new router in `router_registry.py`.
+6. Add router tests for serialization, authentication, authorization, and errors.
+7. Run `task generate` when the HTTP contract changes.
 
-```python
-# For significant breaking changes, consider API versioning
-@router.get("/v2/chips", response_model=ListChipsResponse)
-def list_chips_v2():
-    pass
-```
+Use [API Design](./design.md) for paths, methods, operation IDs, and tags. Use
+[API Contracts](./contracts.md) for models, errors, and compatibility. [API Testing](./testing.md)
+explains which test layer proves each part.
+
+## Source and Tests
+
+| Concern | Source | Focused tests |
+| --- | --- | --- |
+| Application construction and OpenAPI | `src/qdash/api/app/` | `tests/qdash/api/test_app_factory.py` |
+| Dependency providers | `src/qdash/api/dependencies/` | `tests/qdash/api/test_dependencies.py` |
+| Identity and project permissions | `src/qdash/api/lib/auth.py`, `src/qdash/api/lib/project.py` | `tests/qdash/api/lib/test_project_permissions.py` |
+| Domain HTTP contract | `src/qdash/api/routers/<domain>.py` | `tests/qdash/api/routers/test_<domain>.py` |
+| Domain behavior | `src/qdash/api/services/<domain>_service.py` | `tests/qdash/api/services/test_<domain>_service.py` |
