@@ -30,12 +30,17 @@ import {
   answerShortfall,
   callLabel,
   diagnosisOf,
+  diagnosisOutcome,
   diagnosisSuccess,
   diagnosisText,
   evaluatorLabel,
-  fitQuality,
-  fitQualityBadgeClass,
+  fitAssessment,
+  fitBadgeClass,
+  fitLabel,
   formatDuration,
+  outcomeBadgeClass,
+  questionLabel,
+  statusLabel,
 } from "./evaluationDisplay";
 import { promptSummary } from "./evaluationPrompt";
 
@@ -158,9 +163,12 @@ export function EvaluationCard({
   showRunLink = false,
 }: EvaluationCardProps) {
   const diagnosis = diagnosisOf(item);
-  const fit = fitQuality(diagnosis);
+  const outcome = diagnosisOutcome(diagnosis);
+  const fit = fitAssessment(diagnosis);
   const success = diagnosisSuccess(diagnosis);
+  const status = statusLabel(diagnosis);
   const output = item.output;
+  const answers = Object.entries(output?.answers ?? {}).filter(([, text]) => text);
   const input = item.input;
   const figurePath = item.figure_path?.[0];
   const jsonFigurePath = item.json_figure_path?.[0];
@@ -200,12 +208,21 @@ export function EvaluationCard({
             {item.status !== "completed" && (
               <span className="badge badge-ghost badge-sm">{item.status}</span>
             )}
-            {fit && (
-              <span className={`badge badge-sm ${fitQualityBadgeClass(fit)}`}>fit {fit}</span>
+            {outcome && (
+              <span
+                className={`badge badge-sm ${outcomeBadgeClass(outcome)}`}
+                title="Outcome the model classified"
+              >
+                {outcome}
+              </span>
             )}
-            {success !== null && (
-              <span className={`badge badge-sm ${success ? "badge-success" : "badge-warning"}`}>
-                {success ? "success" : "not successful"}
+            {fit && <span className={`badge badge-sm ${fitBadgeClass(fit)}`}>{fitLabel(fit)}</span>}
+            {status && (
+              <span
+                className={`badge badge-sm ${success ? "badge-success" : "badge-warning"}`}
+                title="Calibration status the model determined"
+              >
+                {status}
               </span>
             )}
             {shortfall && (
@@ -245,11 +262,6 @@ export function EvaluationCard({
                   {output.attempts} attempts
                 </span>
               )
-            )}
-            {output?.structured === false && (
-              <span title="The server did not constrain decoding to the diagnosis schema">
-                free-form decoding
-              </span>
             )}
             {evaluator && <span className="font-mono">{evaluator}</span>}
             {item.completed_at && <span>{formatDateTime(item.completed_at)}</span>}
@@ -296,6 +308,28 @@ export function EvaluationCard({
               </div>
               <p className="mt-1 whitespace-pre-wrap text-sm text-base-content/80">{output.raw}</p>
             </div>
+          )}
+
+          {item.status === "completed" && answers.length > 0 && (
+            <details className="text-sm">
+              <summary className="cursor-pointer font-medium text-primary">
+                Answers as returned
+                <span className="ml-2 text-xs font-normal text-base-content/60">
+                  {answers.length} question{answers.length === 1 ? "" : "s"}
+                </span>
+              </summary>
+              <div className="mt-2 space-y-3 rounded-lg border border-base-300 bg-base-200/40 p-3">
+                {answers.map(([key, text]) => (
+                  <div key={key}>
+                    <div className="text-xs uppercase text-base-content/50">
+                      {questionLabel(key)}
+                      <span className="ml-2 font-mono normal-case text-base-content/40">{key}</span>
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-base-content/80">{text}</p>
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
 
           {input?.prompt && (

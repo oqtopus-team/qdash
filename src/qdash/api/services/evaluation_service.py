@@ -175,6 +175,7 @@ def _input_from_record(record: dict[str, Any], question: str | None) -> Evaluati
                 id=str(example.get("id") or ""),
                 title=str(example.get("title") or ""),
                 outcome=str(example.get("outcome") or ""),
+                status=str(example.get("status") or ""),
                 figures=_figures_from(example.get("figures")),
             )
             for example in record.get("examples") or []
@@ -205,6 +206,8 @@ def _output_from_record(record: dict[str, Any]) -> EvaluationOutputModel:
         fallback=evaluation.get("fallback") is True,
         diagnosis=diagnosis if parsed else None,
         raw=evaluation.get("raw"),
+        answers=_answers_from(evaluation.get("answers")),
+        questions=[key for key in evaluation.get("questions") or [] if isinstance(key, str)],
         parsed=parsed,
         attempts=evaluation.get("attempts")
         if isinstance(evaluation.get("attempts"), int)
@@ -221,6 +224,15 @@ def _output_from_record(record: dict[str, Any]) -> EvaluationOutputModel:
     )
 
 
+def _answers_from(value: Any) -> dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    answers = {
+        str(key): text for key, text in value.items() if isinstance(text, str) and text.strip()
+    }
+    return answers or None
+
+
 def _calls_from(value: Any) -> list[EvaluationCallModel]:
     calls: list[EvaluationCallModel] = []
     for call in value if isinstance(value, list) else []:
@@ -228,6 +240,7 @@ def _calls_from(value: Any) -> list[EvaluationCallModel]:
             continue
         calls.append(
             EvaluationCallModel(
+                question=call.get("question") if isinstance(call.get("question"), str) else None,
                 duration_ms=int(call.get("duration_ms") or 0),
                 stop_reason=call["stop_reason"],
                 structured=call.get("structured") is True,

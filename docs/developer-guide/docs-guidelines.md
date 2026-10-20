@@ -84,8 +84,8 @@ current. How this works: [Copilot architecture](./copilot/architecture.md).
 ```markdown
 ## Evaluation                                      ← not a user page
 
-The runtime calls `qcal_evaluate` with `response_format: json_schema`; the API
-derives `missing_keys` from the diagnosis on every read ...
+The runtime asks `qcal_evaluate` the six questions in separate calls; the API
+derives `missing_keys` over the questions asked on every read ...
 ```
 
 ## Writing for Developers

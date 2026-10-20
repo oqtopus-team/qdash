@@ -29,10 +29,17 @@ describe("run timing", () => {
     expect(runTimingLabel({ duration_ms_total: 0, completed_count: 0 })).toBeNull();
   });
 
-  it("labels one model call by its duration and how it ended", () => {
+  it("labels one model call by its question, duration and how it ended", () => {
     expect(callLabel({ duration_ms: 195_000, stop_reason: "length", structured: true })).toBe(
       "3.3 min (length)",
     );
+    expect(
+      callLabel({
+        question: "experimental_significance",
+        duration_ms: 42_000,
+        stop_reason: "stop",
+      }),
+    ).toBe("experimental_significance 42.0 s (stop)");
     expect(
       callLabel({ duration_ms: 12_000, stop_reason: "stop", structured: true, missing_keys: [] }),
     ).toBe("12.0 s (stop)");

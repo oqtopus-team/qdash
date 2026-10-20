@@ -2,10 +2,12 @@ import type { EvaluationItem, EvaluationRunSummary } from "@/schemas";
 
 import {
   diagnosisOf,
+  diagnosisOutcome,
+  diagnosisStatus,
   diagnosisSuccess,
   evaluatorLabel,
   examplesLabel,
-  fitQuality,
+  fitAssessment,
   formatDuration,
   meanDurationMs,
   modeLabel,
@@ -62,10 +64,10 @@ export function compareQids(left: string, right: string): number {
 }
 
 /**
- * The outcome of one row: fit quality and success compared when both sides
- * completed with a JSON diagnosis that reaches a verdict; incomplete otherwise
- * (a side missing, pending, failed, answered in prose, or a diagnosis without
- * `success`, or with a fit quality on one side only).
+ * The outcome of one row: success, status, fit assessment and outcome compared
+ * when both sides completed with a diagnosis that reaches a verdict;
+ * incomplete otherwise (a side missing, pending, failed, answered in prose, a
+ * diagnosis without `success`, or a labelled answer on one side only).
  */
 export function rowOutcome(a: EvaluationItem | null, b: EvaluationItem | null): RowOutcome {
   if (!a || !b || a.status !== "completed" || b.status !== "completed") return "incomplete";
@@ -74,12 +76,16 @@ export function rowOutcome(a: EvaluationItem | null, b: EvaluationItem | null): 
   if (!da || !db) return "incomplete";
   const successA = diagnosisSuccess(da);
   const successB = diagnosisSuccess(db);
-  const fitA = fitQuality(da);
-  const fitB = fitQuality(db);
-  if (successA === null || successB === null || (fitA === null) !== (fitB === null)) {
-    return "incomplete";
-  }
-  return successA === successB && fitA === fitB ? "same" : "differs";
+  if (successA === null || successB === null) return "incomplete";
+  // The labelled answers: status (Q6), fit assessment (Q4), outcome (Q2). One
+  // answered on one side only cannot be compared.
+  const labels = [diagnosisStatus, fitAssessment, diagnosisOutcome].map((read) => [
+    read(da),
+    read(db),
+  ]);
+  if (labels.some(([left, right]) => (left === null) !== (right === null))) return "incomplete";
+  const same = successA === successB && labels.every(([left, right]) => left === right);
+  return same ? "same" : "differs";
 }
 
 /** Rows by entity, in natural order, from the evaluations of two runs. */

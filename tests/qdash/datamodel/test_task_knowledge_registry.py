@@ -148,3 +148,90 @@ def test_prompt_rendering_and_example_labels() -> None:
 def test_category_is_the_calibtasks_package_of_the_knowledge_entry(knowledge_repo: Path) -> None:
     assert tk.get_task_category_dir("CheckT1") == "one_qubit_coarse"
     assert tk.get_task_category_dir("Nope") == "other"
+
+
+CHECK_RABI_INDEX = """Measures Rabi oscillation to extract drive amplitude, frequency, and IQ-plane parameters.
+
+Rabi oscillation parameters: amplitude, frequency (drive strength), phase, offset.
+
+## Expected plot
+
+Damped sinusoidal oscillation of the rotated IQ signal vs pulse duration. Frequency gives Ω_R,
+envelope gives the decay time τ. A good result: clear sinusoidal oscillation with high contrast
+and slow decay envelope.
+
+Axes: Pulse duration (ns), Rotated IQ signal (arb. units).
+
+## Common failures
+
+- Low contrast (<70%) — small oscillation amplitude, large DC offset; next: check readout fidelity.
+- Rapid decay — oscillation amplitude drops quickly with pulse duration; next: check T1.
+- Short T1 (<20 μs): the curve flattens well before the maximum delay; check TLS
+  defects near the qubit frequency.
+
+## Parameters to extract
+
+- rabi_frequency: Rabi oscillation frequency (MHz)
+- rabi_amplitude: Rabi oscillation amplitude (a.u.)
+- contrast_ok: whether the contrast is sufficient (bool)
+- oscillation_count: number of visible periods
+"""
+
+
+def test_reference_is_derived_from_the_index_template() -> None:
+    reference = tk.TaskKnowledge(name="CheckRabi", background=CHECK_RABI_INDEX).reference()
+
+    assert reference.background == (
+        "This is a CheckRabi experiment: Measures Rabi oscillation to extract drive amplitude, "
+        "frequency, and IQ-plane parameters. Damped sinusoidal oscillation of the rotated IQ "
+        "signal vs pulse duration. Frequency gives Ω_R, envelope gives the decay time τ. A good "
+        "result: clear sinusoidal oscillation with high contrast and slow decay envelope."
+    )
+    assert list(reference.statuses) == ["SUCCESS", "LOW_CONTRAST", "RAPID_DECAY", "SHORT_T1"]
+    assert reference.statuses["SUCCESS"] == (
+        "clear sinusoidal oscillation with high contrast and slow decay envelope"
+    )
+    assert reference.statuses["LOW_CONTRAST"] == "small oscillation amplitude, large DC offset"
+    assert reference.statuses["RAPID_DECAY"] == (
+        "oscillation amplitude drops quickly with pulse duration"
+    )
+    assert reference.statuses["SHORT_T1"] == "the curve flattens well before the maximum delay"
+    assert reference.parameters == {
+        "rabi_frequency": "float",
+        "rabi_amplitude": "float",
+        "contrast_ok": "true | false",
+        "oscillation_count": "int",
+    }
+    assert reference.guidance == []
+    assert reference.range_format is None
+
+
+def test_reference_without_template_sections_still_has_a_background_and_success() -> None:
+    reference = tk.TaskKnowledge(name="LinkUp", background="Links the boxes up.").reference()
+
+    assert reference.background == "This is a LinkUp experiment: Links the boxes up."
+    assert reference.statuses == {"SUCCESS": "The result matches the expected plot"}
+    assert reference.parameters == {}
+
+    bare = tk.derive_reference("", "")
+    assert bare.background == "This is a calibration experiment."
+
+
+def test_example_demonstration_fields_are_optional_and_labeled() -> None:
+    example = tk.KnowledgeExample(
+        id="e1",
+        title="Short T1",
+        outcome="suboptimal",
+        status="SHORT_T1",
+        suggested_range="(0, 50) [μs]",
+        parameters='{"t1": 14.2}',
+        diagnosis="T1 = 14 μs.",
+    )
+
+    assert example.label() == "Outcome: suboptimal\nStatus: SHORT_T1\nT1 = 14 μs."
+    assert (example.status, example.suggested_range, example.parameters) == (
+        "SHORT_T1",
+        "(0, 50) [μs]",
+        '{"t1": 14.2}',
+    )
+    assert tk.KnowledgeExample(id="e2", title="t", outcome="expected").status == ""

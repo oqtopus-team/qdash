@@ -198,6 +198,30 @@ class TestDefaultRunParameterInjection:
         assert "bad_param" not in task.run_parameters
         assert "another_bad" not in task.run_parameters
 
+    def test_shared_defaults_reach_only_tasks_that_declare_them(self):
+        """A flow's shared default for another task's parameter is not recorded on this task."""
+        config = CalibConfig(
+            username="alice",
+            chip_id="chip-1",
+            qids=["0"],
+            execution_id="exec-1",
+            project_id="project-1",
+            backend_name=BACKEND,
+            default_run_parameters={
+                "shots": {"value": 4096, "value_type": "int"},
+                # Pulse durations a fine-tune flow shares for its pulse tasks.
+                "hpi_duration": {"value": 32, "value_type": "int"},
+                "drag_hpi_duration": {"value": 16, "value_type": "int"},
+            },
+        )
+        orchestrator = CalibOrchestrator(config)
+
+        task = orchestrator._create_task_instance(TASK_NAME, None)
+
+        assert task.run_parameters["shots"].value == 4096
+        assert "hpi_duration" not in task.run_parameters
+        assert "drag_hpi_duration" not in task.run_parameters
+
 
 class TestTaskRunParameterInjection:
     """Test task-specific parameters separately from shared defaults."""
@@ -209,11 +233,11 @@ class TestTaskRunParameterInjection:
                 backend_name=BACKEND,
                 default_run_parameters={
                     "shots": {"value": 4096, "value_type": "int"},
-                    "shared_only": {"value": 7, "value_type": "int"},
+                    "readout_duration": {"value": 7, "value_type": "float"},
                     TASK_NAME: {
                         "shots": {"value": 2048, "value_type": "int"},
                         "time_range": {"value": (0, 601, 12), "value_type": "range"},
-                        "legacy_only": {"value": 8, "value_type": "int"},
+                        "interval": {"value": 8, "value_type": "int"},
                     },
                 },
                 task_run_parameters={
@@ -233,8 +257,9 @@ class TestTaskRunParameterInjection:
 
         assert task.run_parameters["shots"].value == 512
         assert task.run_parameters["time_range"].value == (0, 501, 10)
-        assert task.run_parameters["legacy_only"].value == 8
-        assert task.run_parameters["shared_only"].value == 7
+        # Legacy per-task and shared entries still reach the declared names.
+        assert task.run_parameters["interval"].value == 8
+        assert task.run_parameters["readout_duration"].value == 7
 
     def test_update_policy_is_not_injected_as_a_run_parameter(self) -> None:
         config = cast(
@@ -473,24 +498,30 @@ class TestBaseTaskSetRunParameters:
         assert task.run_parameters["shots"].value == 9999
         assert task.run_parameters["shots"].value != original_shots
 
-    def test_set_run_parameters_adds_new(self):
-        """Test _set_run_parameters creates new parameter."""
+    def test_set_run_parameters_ignores_undeclared_names(self):
+        """A name the task does not declare in run_spec is not recorded.
+
+        The task reads run parameters by name, so an undeclared value would
+        never be used; recording it would misstate the task's settings.
+        """
         instances = generate_task_instances(
             task_names=[TASK_NAME],
             task_details={TASK_NAME: {}},
             backend=BACKEND,
         )
         task = instances[TASK_NAME]
+        declared = set(task.run_parameters)
 
         task._set_run_parameters(
             {
                 "custom_param": {"value": 42, "value_type": "int", "unit": "ms"},
+                "shots": {"value": 128},
             }
         )
 
-        assert "custom_param" in task.run_parameters
-        assert task.run_parameters["custom_param"].value == 42
-        assert task.run_parameters["custom_param"].unit == "ms"
+        assert set(task.run_parameters) == declared
+        assert "custom_param" not in task.run_parameters
+        assert task.run_parameters["shots"].value == 128
 
     def test_set_run_parameters_preserves_unmodified(self):
         """Test _set_run_parameters does not affect other parameters."""

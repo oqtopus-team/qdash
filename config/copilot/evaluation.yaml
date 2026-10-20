@@ -22,8 +22,10 @@ evaluation_models:
     api_key_env: VLLM_API_KEY
     # Must not exceed the server's max_model_len (16384 on llm.qiqb.dev).
     num_ctx: 16384
-    # Model card recommendation. The model is not a thinking model.
-    temperature: 0.2
+    # Greedy decoding, as the QCalEval benchmark queries every model: the same
+    # plot and prompt give the same diagnosis, so two runs can be compared.
+    # (The model card suggests 0.2.) The model is not a thinking model.
+    temperature: 0.0
     reasoning_effort: none
     disable_thinking_instruction: true
     # The prompt (system prompt + tool schemas) already takes roughly half of

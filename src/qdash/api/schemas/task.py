@@ -73,10 +73,44 @@ class KnowledgeExampleResponse(BaseModel):
     fit_quality: str = ""
     verdict: str = ""
     source: str = ""
+    status: str = Field(
+        default="", description="The task's status code the example demonstrates, e.g. SUCCESS"
+    )
+    suggested_range: str = Field(
+        default="", description="The corrective range the example's status calls for"
+    )
+    parameters: str = Field(
+        default="", description="JSON of the values read from the example's plot"
+    )
     figures: list[KnowledgeFigureResponse] = []
     diagnosis: str = ""
     label: str = Field(
         default="", description="The demonstration label: outcome, fit quality, verdict, diagnosis"
+    )
+
+
+class TaskReferenceResponse(BaseModel):
+    """The task's reference for the evaluation model, in QCalEval's shape.
+
+    The background goes before every question; the other fields fill the
+    family-specific parts of the question templates.
+    """
+
+    background: str = Field(
+        default="", description="What the experiment does and what a successful result looks like"
+    )
+    guidance: list[str] = Field(
+        default_factory=list, description="Points the significance question asks to explain"
+    )
+    parameters: dict[str, str] = Field(
+        default_factory=dict, description="Extraction schema: parameter name -> JSON type"
+    )
+    statuses: dict[str, str] = Field(
+        default_factory=dict,
+        description="Decision criteria: status code -> criterion, SUCCESS first",
+    )
+    range_format: str | None = Field(
+        default=None, description="How a suggested corrective range is written"
     )
 
 
@@ -90,6 +124,10 @@ class TaskKnowledgeResponse(BaseModel):
     examples: list[KnowledgeExampleResponse] = []
     prompt_text: str = Field(
         description="The background as Markdown, headed by the experiment name"
+    )
+    reference: TaskReferenceResponse = Field(
+        default_factory=TaskReferenceResponse,
+        description="The background and question-template parts for the evaluation model",
     )
 
 

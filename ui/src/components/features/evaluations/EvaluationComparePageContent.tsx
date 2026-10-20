@@ -36,9 +36,11 @@ import {
   agreementRate,
   diagnosisOf,
   diagnosisSuccess,
-  fitQuality,
-  fitQualityBadgeClass,
+  fitAssessment,
+  fitBadgeClass,
+  fitLabel,
   runIsActive,
+  statusLabel,
   runTimingLabel,
 } from "./evaluationDisplay";
 import { RunPicker } from "./RunPicker";
@@ -174,13 +176,14 @@ function JudgementCells({ item }: { item: EvaluationItem | null }) {
     );
   }
   const diagnosis = diagnosisOf(item);
-  const fit = fitQuality(diagnosis);
+  const fit = fitAssessment(diagnosis);
   const success = diagnosisSuccess(diagnosis);
+  const status = statusLabel(diagnosis);
   return (
     <>
       <td>
         {fit ? (
-          <span className={`badge badge-sm ${fitQualityBadgeClass(fit)}`}>{fit}</span>
+          <span className={`badge badge-sm ${fitBadgeClass(fit)}`}>{fitLabel(fit)}</span>
         ) : (
           <span className="badge badge-sm badge-outline">
             {diagnosis ? (item.output?.complete === false ? "incomplete" : "-") : "prose"}
@@ -188,11 +191,11 @@ function JudgementCells({ item }: { item: EvaluationItem | null }) {
         )}
       </td>
       <td>
-        {success === null ? (
+        {status === null ? (
           <span className="text-base-content/40">-</span>
         ) : (
           <span className={`badge badge-sm ${success ? "badge-success" : "badge-warning"}`}>
-            {success ? "success" : "not successful"}
+            {status}
           </span>
         )}
       </td>
@@ -400,8 +403,8 @@ export function EvaluationComparePageContent() {
             {dataA && ` · ${dataA.run.task_name} · ${dataA.run.chip_id}`}
           </h1>
           <p className="mt-1 text-xs text-base-content/50">
-            The same results judged twice, entity by entity. Outcome compares fit quality and
-            success where both sides answered in JSON.
+            The same results judged twice, entity by entity. Outcome compares the status, fit
+            assessment, outcome and success where both sides answered.
           </p>
         </div>
       </div>
@@ -532,10 +535,10 @@ export function EvaluationComparePageContent() {
                   <th className="w-8" />
                   <th>Entity</th>
                   <th colSpan={3} className="border-l border-base-300">
-                    A · fit / success / verdict
+                    A · fit / status / verdict
                   </th>
                   <th colSpan={3} className="border-l border-base-300">
-                    B · fit / success / verdict
+                    B · fit / status / verdict
                   </th>
                   <th className="border-l border-base-300">Outcome</th>
                 </tr>

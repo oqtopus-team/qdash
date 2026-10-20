@@ -17,6 +17,7 @@ import base64
 import json
 import logging
 import os
+import re
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -64,6 +65,16 @@ class KnowledgeExample(BaseModel):
     fit_quality: str = Field(default="", description="good | marginal | poor")
     verdict: str = Field(default="", description="pass | pass_with_note | fail")
     source: str = ""
+    status: str = Field(
+        default="",
+        description="The task's status code the example demonstrates (QCalEval Q6), e.g. SUCCESS",
+    )
+    suggested_range: str = Field(
+        default="", description="The corrective range the example's status calls for, as text"
+    )
+    parameters: str = Field(
+        default="", description="JSON of the values read from the example's plot (QCalEval Q5)"
+    )
     figures: list[KnowledgeFigure] = Field(default_factory=list)
     diagnosis: str = Field(default="", description="The diagnosis the way the model should answer")
 
@@ -74,7 +85,159 @@ class KnowledgeExample(BaseModel):
             parts.append(f"Fit quality: {self.fit_quality}")
         if self.verdict:
             parts.append(f"Verdict: {self.verdict}")
+        if self.status:
+            parts.append(f"Status: {self.status}")
         return "\n".join([*parts, self.diagnosis]).strip()
+
+
+class TaskReference(BaseModel):
+    """The task's background the way QCalEval gives it before a plot, with the
+    family-specific parts of its question templates.
+
+    Derived from ``index.md``: the background from the intro and the expected
+    plot, the status criteria from the expected plot and the common failures,
+    the extraction schema from the parameters to extract.
+    """
+
+    background: str = Field(
+        default="", description="Two to four sentences: what the experiment does, what success is"
+    )
+    guidance: list[str] = Field(
+        default_factory=list, description="Points the significance question asks to explain"
+    )
+    parameters: dict[str, str] = Field(
+        default_factory=dict, description="Extraction schema: parameter name -> JSON type"
+    )
+    statuses: dict[str, str] = Field(
+        default_factory=dict,
+        description="Decision criteria: status code -> criterion, SUCCESS first",
+    )
+    range_format: str | None = Field(
+        default=None, description="How a suggested corrective range is written"
+    )
+
+
+_HEADING_RE = re.compile(r"^##\s+(.+?)\s*$")
+_BULLET_RE = re.compile(r"^\s*[-*]\s+(.*)$")
+_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z\[(])")
+
+
+def _sections(background: str) -> tuple[str, dict[str, str]]:
+    """The intro before the first ``##`` heading, and each section's text by lowercased heading."""
+    intro: list[str] = []
+    sections: dict[str, list[str]] = {}
+    current: list[str] | None = None
+    for line in background.splitlines():
+        match = _HEADING_RE.match(line)
+        if match:
+            current = sections.setdefault(match.group(1).strip().lower(), [])
+            continue
+        (intro if current is None else current).append(line)
+    return "\n".join(intro).strip(), {k: "\n".join(v).strip() for k, v in sections.items()}
+
+
+def _paragraphs(text: str) -> list[str]:
+    """Prose paragraphs of a section: bullet lists and blank lines left out."""
+    paragraphs: list[str] = []
+    for block in re.split(r"\n\s*\n", text):
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if not lines or _BULLET_RE.match(lines[0]):
+            continue
+        paragraphs.append(" ".join(lines))
+    return paragraphs
+
+
+def _bullets(text: str) -> list[str]:
+    """List items of a section, continuation lines joined."""
+    items: list[str] = []
+    for line in text.splitlines():
+        match = _BULLET_RE.match(line)
+        if match:
+            items.append(match.group(1).strip())
+        elif items and line.strip():
+            items[-1] = f"{items[-1]} {line.strip()}"
+    return items
+
+
+def _sentences(text: str) -> list[str]:
+    return [s.strip() for s in _SENTENCE_RE.split(text) if s.strip()]
+
+
+def _status_code(title: str) -> str:
+    """``Low contrast (<70%)`` -> ``LOW_CONTRAST``."""
+    bare = re.sub(r"\([^)]*\)", "", title)
+    code = re.sub(r"[^A-Za-z0-9]+", "_", bare).strip("_").upper()
+    return code or "FAILURE"
+
+
+def _split_failure(item: str) -> tuple[str, str]:
+    """A common-failure bullet as (title, criterion).
+
+    ``Low contrast (<70%) — small amplitude; next: check readout`` and
+    ``Short T1 (<20 μs): the curve flattens early; check TLS`` both split at
+    their first separator; the criterion stops at the first ``;``.
+    """
+    for separator in (" \u2014 ", " \u2013 ", ": "):  # em dash, en dash, colon
+        if separator in item:
+            title, rest = item.split(separator, 1)
+            break
+    else:
+        words = item.split()
+        title, rest = " ".join(words[:4]), item
+    criterion = rest.split(";", 1)[0].strip().rstrip(".")
+    return title.strip(), criterion
+
+
+def _parameter_type(description: str) -> str:
+    lowered = description.lower()
+    if "bool" in lowered:
+        return "true | false"
+    if re.search(r"\b(int|integer|count|number of)\b", lowered):
+        return "int"
+    return "float"
+
+
+def derive_reference(name: str, background: str) -> TaskReference:
+    """The QCalEval-style reference of a task from its ``index.md`` body."""
+    intro, sections = _sections(background)
+    expected = _paragraphs(sections.get("expected plot", ""))
+    intro_paragraphs = _paragraphs(intro)
+    pieces = [f"This is a {name} experiment:" if name else "This is a calibration experiment:"]
+    if intro_paragraphs:
+        pieces.append(intro_paragraphs[0])
+    if expected:
+        pieces.append(expected[0])
+    text = " ".join(pieces).strip()
+    if text.endswith(":"):
+        text = text[:-1] + "."
+
+    statuses: dict[str, str] = {}
+    expected_sentences = _sentences(expected[0]) if expected else []
+    success = next(
+        (s for s in expected_sentences if re.match(r"a good result\b", s, re.IGNORECASE)), None
+    )
+    if success:
+        success = re.sub(r"^a good result\s*[:\uff1a]?\s*", "", success, flags=re.IGNORECASE)
+    elif expected_sentences:
+        success = expected_sentences[0]
+    statuses["SUCCESS"] = (success or "The result matches the expected plot").rstrip(".")
+    for item in _bullets(sections.get("common failures", "")):
+        title, criterion = _split_failure(item)
+        code = _status_code(title)
+        if code in statuses:
+            continue
+        statuses[code] = criterion or title
+
+    parameters: dict[str, str] = {}
+    for item in _bullets(sections.get("parameters to extract", "")):
+        if ":" not in item:
+            continue
+        pname, description = item.split(":", 1)
+        pname = pname.strip().strip("`")
+        if pname and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", pname):
+            parameters[pname] = _parameter_type(description)
+
+    return TaskReference(background=text, statuses=statuses, parameters=parameters)
 
 
 class TaskKnowledge(BaseModel):
@@ -121,6 +284,10 @@ class TaskKnowledge(BaseModel):
     def summary(self) -> str:
         """The background's first paragraph, for listings."""
         return self.background.split("\n\n", 1)[0].strip()
+
+    def reference(self) -> TaskReference:
+        """The background and question-template parts for the evaluation model."""
+        return derive_reference(self.name, self.background)
 
     def to_prompt(self, *, include_examples: bool = False) -> str:
         """Render the task's reference text for a model: the background as written.

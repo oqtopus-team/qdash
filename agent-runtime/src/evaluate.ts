@@ -15,7 +15,8 @@
 
 import { createHash } from "node:crypto";
 
-import type { LabeledExample } from "./knowledge-context.ts";
+import { compactCriteria, referenceIdentity, toolExample } from "./knowledge-context.ts";
+import type { LabeledExample, Reference } from "./knowledge-context.ts";
 import type { ExtensionPackage } from "./local-extensions.ts";
 
 /** The pi-qdash tool that turns a task result into evidence text plus its figure. */
@@ -41,6 +42,8 @@ export interface ExampleRecord {
   id: string;
   title: string;
   outcome: string;
+  /** The example's status code, when it carries one (its Q6 label). */
+  status?: string;
   /** Each figure's hash, plus its path in the knowledge repository so it can be shown again. */
   figures: Array<FigureRecord & { path?: string }>;
 }
@@ -76,8 +79,8 @@ export interface ToolRun {
 export interface EvaluateDeps {
   /** Run one enabled extension tool with the user's QDash connection. */
   runTool(name: string, args: Record<string, unknown>): Promise<ToolRun>;
-  /** QDash's review guide for a task, as the user; undefined when it has none. */
-  fetchKnowledge(taskName: string): Promise<string | undefined>;
+  /** QDash's reference for a task (background and criteria), as the user; undefined when it has none. */
+  fetchKnowledge(taskName: string): Promise<Reference | undefined>;
   /** QDash's labeled examples for a task, as the user; empty when it has none. */
   fetchExamples?(taskName: string): Promise<LabeledExample[]>;
   /** The package that provides the evaluation tool, for the record. */
@@ -110,10 +113,10 @@ export interface EvaluateResult {
   /** The task's name as QDash knows it, when the evidence names it. */
   task_name: string | null;
   target: { kind?: string; id?: string; chip_id?: string } | null;
-  /** The evidence text the evaluation model received as context. */
+  /** The context the evaluation model received: the task and its target, without fitted values. */
   context: string;
   figures: FigureRecord[];
-  /** The reference the host supplied, by size and hash; the prompt holds the text. */
+  /** The reference the host supplied (background and criteria), by size and hash; the prompt holds the text. */
   knowledge: { chars: number; sha256: string } | null;
   /** The labeled examples shown before the figure; empty for a zero-shot evaluation. */
   examples: ExampleRecord[];
@@ -121,14 +124,18 @@ export interface EvaluateResult {
     /** `provider/modelId` of the model that judged the plot. */
     model: string | null;
     fallback: boolean;
-    /** The user turn the model was sent: reference, context, question. */
+    /** Every question prompt the model was sent, with [figure] where an image was. */
     prompt: string | null;
     /** The system prompt the model was sent, when the evaluator reports it. */
     system_prompt: string | null;
     diagnosis: Record<string, unknown> | null;
     /** The answer when it was not the requested JSON, or not all of it. */
     raw: string | null;
-    /** Diagnosis keys the answer lacks, when the evaluator reports them. */
+    /** Each answered question's text as the model returned it, when the evaluator reports them. */
+    answers: Record<string, string> | null;
+    /** The questions asked, in order, when the evaluator reports them. */
+    questions: string[];
+    /** Questions the answer lacks, when the evaluator reports them. */
     missing_keys: string[];
     /** Model calls the evaluator made for the answer, when it reports them. */
     attempts: number | null;
@@ -148,6 +155,8 @@ export interface EvaluateResult {
 
 /** One model call of an evaluation: how long it took and how it ended. */
 export interface EvaluationCall {
+  /** The question the call asked, when the evaluator asks per question. */
+  question?: string;
   duration_ms: number;
   stop_reason: string;
   structured: boolean;
@@ -163,6 +172,7 @@ export function callRecords(value: unknown): EvaluationCall[] {
     const c = entry as Partial<EvaluationCall> | null;
     if (typeof c?.duration_ms !== "number" || typeof c.stop_reason !== "string") continue;
     calls.push({
+      ...(typeof c.question === "string" ? { question: c.question } : {}),
       duration_ms: c.duration_ms,
       stop_reason: c.stop_reason,
       structured: c.structured === true,
@@ -249,10 +259,116 @@ export function evidenceSummary(details: unknown): {
   };
 }
 
+/**
+ * The context the evaluation model is given, from the evidence tool's
+ * `details.evidence`: the task, its target and status, and the task's own
+ * message when it left one. Undefined when the evidence carries no details
+ * (an older evidence tool), so the caller falls back to its text.
+ */
+export function evidenceContext(details: unknown): string | undefined {
+  const evidence = (details as { evidence?: unknown } | null)?.evidence;
+  if (!evidence || typeof evidence !== "object") return undefined;
+  const task = (evidence as { task?: unknown }).task;
+  const target = (evidence as { target?: unknown }).target;
+  const name = stringField(task, "name");
+  if (!name) return undefined;
+  const kind = stringField(target, "kind");
+  const id = stringField(target, "id");
+  const chipId = stringField(target, "chipId");
+  const status = stringField(task, "status");
+  let line = `Task ${name}`;
+  if (id) line += ` on ${kind && kind !== "system" ? `${kind} ${id}` : id}`;
+  if (chipId) line += ` (chip ${chipId})`;
+  if (status) line += `, status ${status}`;
+  line += ".";
+  const lines = [line];
+  const sweeps = evidenceSweeps(details);
+  if (sweeps.length > 0) lines.push(`Sweep: ${sweeps.map(formatSweep).join("; ")}.`);
+  const settings = runSettings(evidence, new Set(sweeps.map((sweep) => sweep.name)));
+  if (settings.length > 0) lines.push(`Settings: ${settings.join("; ")}.`);
+  const notes = (evidence as { notes?: unknown }).notes;
+  const message =
+    typeof notes === "string" ? notes.split("\n").find((text) => text.startsWith("Task message: ")) : undefined;
+  if (message) lines.push(message);
+  return lines.join("\n");
+}
+
+/** A swept parameter as the evidence tool records it: the axis the plot was taken along. */
+export interface EvidenceSweep {
+  name: string;
+  unit: string;
+  spacing: "linear" | "log" | "list";
+  start: number;
+  stop: number;
+  points: number;
+  step?: number;
+}
+
+/** The sweeps the evidence tool read from the task's run parameters, when it reports them. */
+export function evidenceSweeps(details: unknown): EvidenceSweep[] {
+  const evidence = (details as { evidence?: { sweeps?: unknown } } | null)?.evidence;
+  const sweeps = Array.isArray(evidence?.sweeps) ? evidence.sweeps : [];
+  return sweeps.filter(
+    (sweep): sweep is EvidenceSweep =>
+      typeof (sweep as EvidenceSweep)?.name === "string" &&
+      typeof (sweep as EvidenceSweep).start === "number" &&
+      typeof (sweep as EvidenceSweep).stop === "number" &&
+      typeof (sweep as EvidenceSweep).points === "number",
+  );
+}
+
+/** A number for the model: up to four significant digits, no trailing zeros. */
+function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  if (Number.isInteger(value) && Math.abs(value) < 1e15) return String(value);
+  const text = Math.abs(value) >= 1e6 || Math.abs(value) < 1e-4 ? value.toExponential(3) : value.toPrecision(4);
+  return text.includes("e") ? text.replace(/\.?0+e/, "e") : text.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+}
+
+function withUnit(value: number, unit: string): string {
+  const text = formatNumber(value);
+  return unit && unit !== "a.u." ? `${text} ${unit}` : text;
+}
+
+function formatSweep(sweep: EvidenceSweep): string {
+  const range = `${sweep.name} ${formatNumber(sweep.start)} to ${withUnit(sweep.stop, sweep.unit ?? "")}`;
+  if (sweep.spacing === "log") return `${range}, ${sweep.points} points log-spaced`;
+  if (sweep.spacing === "list" || sweep.step === undefined) return `${range}, ${sweep.points} points`;
+  return `${range} in steps of ${withUnit(sweep.step, sweep.unit ?? "")} (${sweep.points} points)`;
+}
+
+/** Scalar run settings as "name value unit", the sweeps left out. */
+function runSettings(evidence: object, skip: ReadonlySet<string>): string[] {
+  const parameters = (evidence as { runParameters?: unknown }).runParameters;
+  if (!parameters || typeof parameters !== "object") return [];
+  const items: string[] = [];
+  for (const [name, record] of Object.entries(parameters as Record<string, unknown>)) {
+    if (skip.has(name) || !record || typeof record !== "object") continue;
+    const { value, unit } = record as { value?: unknown; unit?: unknown };
+    const unitText = typeof unit === "string" ? unit : "";
+    if (typeof value === "number") items.push(`${name} ${withUnit(value, unitText)}`);
+    else if (typeof value === "boolean") items.push(`${name} ${value}`);
+    else if (typeof value === "string" && value.length <= 40) items.push(`${name} ${value}`);
+  }
+  return items;
+}
+
+/**
+ * The Q6 suggested-range format from the task's sweep, as the benchmark words
+ * it for each family ("(<min 1/alpha>, <max 1/alpha>)"): the swept parameter
+ * with its unit. Undefined when the evidence reports no sweep.
+ */
+export function sweepRangeFormat(details: unknown): string | undefined {
+  const sweep = evidenceSweeps(details)[0];
+  if (!sweep) return undefined;
+  const unit = sweep.unit && sweep.unit !== "a.u." ? ` [${sweep.unit}]` : "";
+  return `(<min ${sweep.name}>, <max ${sweep.name}>)${unit}`;
+}
+
 /** The host record for one evaluation call, from its (filled) arguments. */
 export function hostRecord(
   args: unknown,
-  knowledge: string | undefined,
+  reference: Reference | undefined,
   durationMs?: number,
   taskId?: string,
   examples?: LabeledExample[],
@@ -275,24 +391,40 @@ export function hostRecord(
     question: typeof a.question === "string" && a.question.trim() ? a.question : null,
     task_name: typeof a.task_name === "string" && a.task_name.trim() ? a.task_name : null,
     figures: images.map(figureRecord),
-    knowledge: knowledge ? { chars: knowledge.length, sha256: sha256(knowledge) } : null,
+    knowledge: reference ? referenceRecord(reference) : null,
     ...(examples && examples.length > 0 ? { examples: examples.map(exampleRecord) } : {}),
     ...(durationMs === undefined ? {} : { duration_ms: durationMs }),
     ...(taskId ? { task_id: taskId } : {}),
   };
 }
 
-/** The record of one labeled example: identity and figure hashes. */
+/** Size and hash of the reference text and criteria together. */
+function referenceRecord(reference: Reference): { chars: number; sha256: string } {
+  const identity = referenceIdentity(reference);
+  return { chars: identity.length, sha256: sha256(identity) };
+}
+
+/** The record of one labeled example: identity, status, and figure hashes. */
 export function exampleRecord(example: LabeledExample): ExampleRecord {
   return {
     id: example.id,
     title: example.title,
     outcome: example.outcome,
+    ...(example.status ? { status: example.status } : {}),
     figures: example.images.map((image, index) => {
       const path = example.paths?.[index];
       return { ...figureRecord(image), ...(path ? { path } : {}) };
     }),
   };
+}
+
+/** The evaluator's per-question answers, kept when they are a map of text. */
+function answerRecord(value: unknown): Record<string, string> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const entries = Object.entries(value as Record<string, unknown>).filter(
+    (entry): entry is [string, string] => typeof entry[1] === "string",
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
 }
 
 /**
@@ -318,6 +450,8 @@ export function recordFromDetails(
     fallback?: boolean;
     diagnosis?: Record<string, unknown> | null;
     raw?: string;
+    answers?: unknown;
+    questions?: unknown;
     missing_keys?: unknown;
     attempts?: unknown;
     structured?: unknown;
@@ -349,6 +483,10 @@ export function recordFromDetails(
       // The evaluator keeps the text when the answer was not JSON or not all
       // of the diagnosis; an older one reports it only when not JSON.
       raw: (typeof d.raw === "string" ? d.raw : diagnosis ? null : extra.text) || null,
+      answers: answerRecord(d.answers),
+      questions: Array.isArray(d.questions)
+        ? d.questions.filter((key): key is string => typeof key === "string")
+        : [],
       missing_keys: Array.isArray(d.missing_keys)
         ? d.missing_keys.filter((key): key is string => typeof key === "string")
         : [],
@@ -368,7 +506,8 @@ export function recordFromDetails(
 export function plannerInstruction(taskId: string, question?: string, withExamples = false): string {
   const lines = [
     `Evaluate QDash task result ${taskId} with pi-qcaleval.`,
-    `First call ${EVIDENCE_TOOL} for it, then ${EVALUATION_TOOL} with task_name set to the task's name and that summary as context.`,
+    `First call ${EVIDENCE_TOOL} for it, then ${EVALUATION_TOOL} with task_name set to the task's name.`,
+    "As context pass only the task name and its target (qubit or coupling, chip) from the evidence, not the fitted metrics: the evaluation model judges the plot on its own, the way the QCalEval benchmark does.",
   ];
   if (withExamples) {
     lines.push(
@@ -376,7 +515,9 @@ export function plannerInstruction(taskId: string, question?: string, withExampl
     );
   }
   if (question?.trim()) lines.push(`Pass this question to ${EVALUATION_TOOL}: ${question.trim()}`);
-  lines.push("Report fit_quality and success, and say in one or two sentences whether you agree with the diagnosis.");
+  lines.push(
+    "Report the status (calibration_diagnosis), the fit reliability and the outcome classification, and say in one or two sentences whether you agree with the diagnosis.",
+  );
   return lines.join("\n");
 }
 
@@ -440,9 +581,10 @@ export function figureCount(value: unknown): number {
  * Summarise one task result as evidence, then judge its figure.
  *
  * The evaluation tool gets what the planner's call would get after the
- * runtime's auto-fill: the evidence text as context, the figure bytes from the
- * evidence result, and QDash's reference for the task name the evidence
- * reports.
+ * runtime's auto-fill: the task and its target as context, the figure bytes
+ * from the evidence result, and QDash's reference for the task name the
+ * evidence reports. The fitted values the evidence text carries stay out of
+ * the context: as in the QCalEval benchmark, the model reads them off the plot.
  */
 export async function evaluateTask(
   request: EvaluateRequest,
@@ -453,17 +595,24 @@ export async function evaluateTask(
   const maxFigures = figureCount(request.maxFigures);
 
   const evidence = await deps.runTool(EVIDENCE_TOOL, { taskId, maxFigures });
-  const context = textOf(evidence.content);
+  const evidenceText = textOf(evidence.content);
   if (evidence.isError) {
-    throw new EvaluationError("evidence", context || `${EVIDENCE_TOOL} failed`);
+    throw new EvaluationError("evidence", evidenceText || `${EVIDENCE_TOOL} failed`);
   }
   const images = imagesOf(evidence.content);
   if (images.length === 0) {
     throw new EvaluationError("evidence", `task ${taskId} has no figure to evaluate`, 422);
   }
   const { taskName, target } = evidenceSummary(evidence.details);
+  const context = evidenceContext(evidence.details) ?? evidenceText;
 
   const knowledge = taskName ? await deps.fetchKnowledge(taskName) : undefined;
+  // The task's own sweep gives the status question its range format, unless
+  // the knowledge states one.
+  const criteria = compactCriteria({
+    ...knowledge?.criteria,
+    ...(knowledge?.criteria?.range_format ? {} : { range_format: sweepRangeFormat(evidence.details) }),
+  });
   const examples =
     request.withExamples && taskName && deps.fetchExamples ? await deps.fetchExamples(taskName) : [];
   const question = request.question?.trim();
@@ -471,9 +620,10 @@ export async function evaluateTask(
     context,
     ...(question ? { question } : {}),
     ...(taskName ? { task_name: taskName } : {}),
-    ...(knowledge ? { knowledge } : {}),
+    ...(knowledge ? { knowledge: knowledge.knowledge } : {}),
+    ...(criteria ? { criteria } : {}),
     ...(request.withExamples ? { use_examples: true } : {}),
-    ...(examples.length > 0 ? { examples: examples.map(({ label, images }) => ({ label, images })) } : {}),
+    ...(examples.length > 0 ? { examples: examples.map(toolExample) } : {}),
     images,
   };
   const started = Date.now();
@@ -484,7 +634,8 @@ export async function evaluateTask(
   }
   const details = {
     ...((evaluation.details ?? {}) as object),
-    host: hostRecord(args, knowledge, duration, undefined, examples),
+    // The record hashes the reference as passed: the criteria the sweep completed.
+    host: hostRecord(args, knowledge || criteria ? { knowledge: knowledge?.knowledge ?? "", criteria } : undefined, duration, undefined, examples),
   };
   return recordFromDetails(taskId, details, {
     mode: "direct",

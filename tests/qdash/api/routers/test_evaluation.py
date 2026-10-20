@@ -28,13 +28,28 @@ from qdash.repository.task_result_history import MongoTaskResultHistoryRepositor
 HEADERS = {"Authorization": "Bearer eval_token", "X-Project-Id": "eval_project"}
 AUTH = QDashAuth(access_token="eval_token", project_id="eval_project")
 
+# One answer per QCalEval question, as pi-qcaleval parses them, plus the derived success.
 DIAGNOSIS: dict[str, Any] = {
-    "technical_description": "A damped cosine.",
-    "experimental_conclusion": "Rabi frequency 12.5 MHz.",
+    "technical_description": {
+        "plot_type": "scatter",
+        "x_axis": {"label": "Pulse duration (ns)", "scale": "linear", "range": [0, 200]},
+        "y_axis": {"label": "Signal", "scale": "linear", "range": [-1, 1]},
+        "main_features": "A damped cosine.",
+    },
+    "experimental_conclusion": {"classification": "expected", "reason": "Clear oscillation."},
     "experimental_significance": "The drive amplitude is right.",
-    "fit_quality": "good",
+    "fit_reliability": {"assessment": "reliable", "reason": "The fit tracks the data."},
     "parameter_extraction": {"rabi_frequency": 12.5},
+    "calibration_diagnosis": {"status": "SUCCESS", "suggested_range": None, "notes": "Good."},
     "success": True,
+}
+ANSWERS: dict[str, str] = {
+    "technical_description": '{"plot_type": "scatter"}',
+    "experimental_conclusion": "Classification: Expected behavior\nReason: Clear oscillation.",
+    "experimental_significance": "The drive amplitude is right.",
+    "fit_reliability": "Assessment: Reliable\nReason: The fit tracks the data.",
+    "parameter_extraction": '{"rabi_frequency": 12.5}',
+    "calibration_diagnosis": "Status: SUCCESS\nSuggested range: N/A\nNotes: Good.",
 }
 
 RECORD: dict[str, Any] = {
@@ -49,6 +64,7 @@ RECORD: dict[str, Any] = {
             "id": "short-t1",
             "title": "Short T1",
             "outcome": "suboptimal",
+            "status": "SHORT_T1",
             "figures": [
                 {
                     "sha256": "ef" * 32,
@@ -66,17 +82,18 @@ RECORD: dict[str, Any] = {
         "system_prompt": "You evaluate superconducting qubit calibration experiment plots.",
         "diagnosis": DIAGNOSIS,
         "raw": None,
-        "attempts": 1,
-        "structured": True,
+        "answers": ANSWERS,
+        "questions": list(ANSWERS),
+        "attempts": 6,
         "stop_reason": "stop",
         "calls": [
             {
-                "duration_ms": 30500,
+                "question": question,
+                "duration_ms": 5000,
                 "stop_reason": "stop",
-                "structured": True,
-                "output_tokens": 337,
-                "missing_keys": [],
+                "output_tokens": 60,
             }
+            for question in ANSWERS
         ],
         "duration_ms": 31000,
         "usage": {"input": 1145, "output": 337},
@@ -263,23 +280,29 @@ def test_execution_records_what_the_model_saw_and_answered(test_client, service)
     assert good["input"]["figures"][0]["path"] is None
     assert good["input"]["system_prompt"].startswith("You evaluate")
     example = good["input"]["examples"][0]
-    assert (example["id"], example["outcome"]) == ("short-t1", "suboptimal")
+    assert (example["id"], example["outcome"], example["status"]) == (
+        "short-t1",
+        "suboptimal",
+        "SHORT_T1",
+    )
     assert example["figures"][0]["path"] == "examples/figures/t1.png"
     assert good["output"]["diagnosis"] == DIAGNOSIS
+    assert good["output"]["answers"] == ANSWERS
+    assert good["output"]["questions"] == list(ANSWERS)
     assert good["output"]["parsed"] is True
     assert good["output"]["complete"] is True
     assert good["output"]["missing_keys"] == []
-    assert (good["output"]["attempts"], good["output"]["structured"]) == (1, True)
+    assert (good["output"]["attempts"], good["output"]["structured"]) == (6, None)
     assert good["output"]["stop_reason"] == "stop"
-    assert good["output"]["calls"] == [
-        {
-            "duration_ms": 30500,
-            "stop_reason": "stop",
-            "structured": True,
-            "output_tokens": 337,
-            "missing_keys": [],
-        }
-    ]
+    assert len(good["output"]["calls"]) == 6
+    assert good["output"]["calls"][3] == {
+        "question": "fit_reliability",
+        "duration_ms": 5000,
+        "stop_reason": "stop",
+        "structured": False,
+        "output_tokens": 60,
+        "missing_keys": [],
+    }
     # The run's timing: its own wall time, and the completed evaluations' model time added up.
     assert run["elapsed_ms"] >= 0
     assert run["duration_ms_total"] == 31000
@@ -331,23 +354,33 @@ def test_a_prose_answer_is_kept_raw_and_counted_as_unparsed(test_client, service
 
 def test_a_partial_json_answer_is_parsed_but_counted_as_incomplete(test_client, service):
     _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
-    text = '{"technical_description": "A damped cosine."}'
+    # Of the six questions only the first was answered: the rest errored or ran
+    # past the output budget, so the evaluator reports them missing.
+    text = '{"plot_type": "scatter"}'
     partial = {
         **RECORD,
         "evaluation": {
             **RECORD["evaluation"],
-            "diagnosis": {"technical_description": "A damped cosine."},
+            "diagnosis": {"technical_description": {"plot_type": "scatter"}, "success": None},
             "raw": text,
+            "answers": {"technical_description": text, "experimental_significance": ""},
+            "questions": [],
             "missing_keys": [key for key in DIAGNOSIS if key != "technical_description"],
             "attempts": 2,
             "structured": False,
             "calls": [
-                {"duration_ms": 195000, "stop_reason": "length", "structured": True},
                 {
+                    "question": "technical_description",
+                    "duration_ms": 195000,
+                    "stop_reason": "length",
+                    "structured": True,
+                },
+                {
+                    "question": "calibration_diagnosis",
                     "duration_ms": 30000,
                     "stop_reason": "stop",
                     "structured": False,
-                    "missing_keys": ["success"],
+                    "missing_keys": ["calibration_diagnosis"],
                 },
                 {"bogus": True},
             ],
@@ -373,17 +406,60 @@ def test_a_partial_json_answer_is_parsed_but_counted_as_incomplete(test_client, 
     assert output["missing_keys"] == [
         "experimental_conclusion",
         "experimental_significance",
-        "fit_quality",
+        "fit_reliability",
         "parameter_extraction",
-        "success",
+        "calibration_diagnosis",
     ]
     assert output["raw"] == text
+    # Empty answers are dropped; the question list is empty, so all six count.
+    assert output["answers"] == {"technical_description": text}
+    assert output["questions"] == []
     assert (output["attempts"], output["structured"]) == (2, False)
-    assert [(call["duration_ms"], call["stop_reason"]) for call in output["calls"]] == [
-        (195000, "length"),
-        (30000, "stop"),
+    assert [
+        (call["question"], call["duration_ms"], call["stop_reason"]) for call in output["calls"]
+    ] == [
+        ("technical_description", 195000, "length"),
+        ("calibration_diagnosis", 30000, "stop"),
     ]
-    assert output["calls"][1]["missing_keys"] == ["success"]
+    assert output["calls"][1]["missing_keys"] == ["calibration_diagnosis"]
+
+
+def test_completeness_follows_the_questions_asked(test_client, service):
+    """A subset of questions answered in full is complete; the derived success stays."""
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    subset = {
+        **RECORD,
+        "evaluation": {
+            **RECORD["evaluation"],
+            "diagnosis": {
+                "calibration_diagnosis": DIAGNOSIS["calibration_diagnosis"],
+                "success": True,
+            },
+            "answers": {"calibration_diagnosis": ANSWERS["calibration_diagnosis"]},
+            "questions": ["calibration_diagnosis"],
+            "attempts": 1,
+            "calls": [
+                {"question": "calibration_diagnosis", "duration_ms": 4000, "stop_reason": "stop"}
+            ],
+        },
+    }
+
+    async def evaluate(task_id: str, **_: Any):
+        return subset
+
+    service._evaluate = evaluate
+    run_id = test_client.post(
+        "/evaluations/runs", headers=HEADERS, json={"chip_id": "chip-1", "task": "CheckRabi"}
+    ).json()["run"]["run_id"]
+
+    asyncio.run(service.execute_run(run_id, AUTH))
+
+    detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
+    assert (detail["run"]["complete_count"], detail["run"]["success_count"]) == (1, 1)
+    output = detail["evaluations"][0]["output"]
+    assert output["complete"] is True
+    assert output["missing_keys"] == []
+    assert output["questions"] == ["calibration_diagnosis"]
 
 
 def test_verdicts_are_recorded_counted_and_cleared(test_client, service):
@@ -604,6 +680,7 @@ def test_example_setting_reaches_runtime_and_records_are_persisted(
                 "id": "short-rabi",
                 "title": "Short Rabi decay",
                 "outcome": "suboptimal",
+                "status": "RAPID_DECAY",
                 "figures": [
                     {
                         "sha256": "ef" * 32,

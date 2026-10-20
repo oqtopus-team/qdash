@@ -152,14 +152,17 @@ is usually corrupt; they are kept only when the conversation holds no figure.
 
 A checkout tool that declares `task_name` and `knowledge` parameters (again
 `qcal_evaluate`) gets `knowledge` filled the same way: when the model names the
-task and passes no reference of its own, the runtime fetches the task's review
-guide from the QDash API as the user (`GET /tasks/{task_name}/knowledge`,
-`review_prompt_text`, or the full `prompt_text` for a task without a review
-guide, cut at 6000 characters) and passes it. Every evaluation of a task is thus
-read against the same host-maintained reference, kept in the task knowledge
-repository, rather than against a summary the planner improvised. The exact
-text the evaluation model received is stored in the tool result's
-`details.prompt`.
+task and passes no reference of its own, the runtime fetches the task's
+knowledge from the QDash API as the user (`GET /tasks/{task_name}/knowledge`)
+and passes its `reference`: the experiment background as `knowledge` (a few
+sentences: what the experiment does, what the expected plot looks like) and,
+when the tool declares it, `criteria` (the parameters to extract and the
+status codes with their criteria, derived from the task's Common failures).
+A task without a derived reference gets its full `prompt_text`, cut at 6000
+characters. Every evaluation of a task is thus read against the same
+host-maintained reference, kept in the task knowledge repository, rather than
+against a summary the planner improvised. The exact text the evaluation model
+received is stored in the tool result's `details.prompt`.
 
 The runtime's `/chat` body carries two image lists: `initial_images` (the
 task chat's opening figures, attached only when the conversation is new)
@@ -184,20 +187,40 @@ version, and the checkout commit when a mounted checkout is in use). The route
 is synchronous and needs the same headers as `/chat`; concurrency is the
 caller's to limit.
 
-pi-qcaleval asks the evaluation model for the diagnosis as a JSON object with
-six keys. On a chat-completions API (vLLM) it constrains decoding to that
-schema through `response_format`, since the calibration model, asked for JSON
-in the prompt alone, now and then closes the object after the first key; a
-server that refuses the format is asked plainly. An answer that still lacks
-keys is asked for once more, and the more complete one kept. The record says
-how the answer was obtained (`attempts`, `structured`, `stop_reason`, and
-`calls`: each model call's duration, stop reason and output tokens) and,
-when it is not the whole diagnosis, keeps the text (`raw`) and the keys it
-lacks; the API derives `complete` and `missing_keys` from the diagnosis on
-every read, so older records are judged the same way. A run's summary adds
+pi-qcaleval follows the QCalEval protocol ([arXiv 2604.25884](https://arxiv.org/abs/2604.25884)),
+which is also how Ising-Calibration was trained: six questions, each sent as
+its own single user message (no system prompt) made of the background, the
+question template, and the figure at the template's `<image>` position, all
+six in flight at once. The answers are parsed the way the benchmark scores
+them: the outcome from the `Classification:` line (four labels), the fit from
+the `Assessment:` line (reliable / unreliable / no fit), the status from the
+`Status:` line (upper-cased code) with its suggested range and notes, and JSON
+for the plot description and the extracted parameters. The diagnosis stores
+the parsed answer per question plus `success` (status is SUCCESS, or, without
+a status question, the outcome is expected); `answers` keeps every answer as
+returned. In-context mode shows the task's labeled examples in the benchmark's
+few-shot layout and only for the three questions it uses them for: one example
+per status for the status question, each example's analysis for significance,
+one example's values for parameter extraction. A call that fails is retried
+once; nothing is re-asked for its content. The record says how the answers
+were obtained (`attempts`, `stop_reason`, and `calls`: each question's call
+with its duration, stop reason and output tokens) and which questions got no
+answer; the API derives `complete` and `missing_keys` over the questions asked
+on every read, so older records are judged the same way. A run's summary adds
 its wall time (`elapsed_ms`) and the completed evaluations' model time added
 up (`duration_ms_total`), so two runs can be compared on cost as well as on
 outcome.
+
+The direct path builds the evaluation context from the evidence tool's
+structured details, not from its text: the task, target and status, then the
+sweep the plot was taken over (`sweeps`, which pi-qdash reads from the task's
+recorded run parameters with their units: start, stop, points, step) and the
+other run settings (shots, interval). The fitted output parameters and the
+calibration inputs stay out, since the model is meant to read the plot, and
+the benchmark gives it nothing but the plot and the background. The sweep also
+supplies the status question's suggested-range format
+(`(<min time_range>, <max time_range>) [ns]`) when the task's knowledge states
+none, so the model answers a corrective range in the swept parameter's unit.
 
 The route has two modes. `direct` (the default) runs the two tools as such.
 `planner` opens a throwaway conversation on the given chat model, tells it
