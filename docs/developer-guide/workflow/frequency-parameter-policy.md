@@ -45,6 +45,33 @@ next bringup task consumes the value measured in the current workflow instead of
 value. Adaptive Chevron, fixed-grid Chevron, and Ramsey produce a physical qubit-frequency result
 and also make it the next operating control frequency.
 
+### EF frequency and configuration
+
+EF calibration separates the measured transition from its operational drive frequency in the same
+way as GE calibration.
+
+| Task or task family | Frequency input | Frequency result | Published database parameters |
+| --- | --- | --- | --- |
+| `CheckEFChevron` | `control_frequency` plus the current `anharmonicity` estimate | Measured EF transition and anharmonicity | `ef_frequency`, `control_frequency_ef`, `anharmonicity` |
+| `CheckEFRabi`, EF pulse creation, and EF readout classification | `control_frequency_ef`; fallback: `ef_frequency` | No transition-frequency result | None |
+
+`ConfigureEF` must run in the same worker session before an EF measurement. It loads and pushes
+either the `ge-ef-cr` layout, which is the default, or `ge-ef-fh`. EF tasks reject a session whose
+GE and EF targets are not available. Ordinary `Configure` defaults to `ge-cr-cr`, even after an EF
+configuration task, so a flow returning to CR calibration must run `Configure` to restore the CR
+layout.
+
+The `ef_calibration` template keeps all EF tasks in one synchronized `CustomOneQubit` step. It
+starts from existing GE control and readout frequencies and readout amplitude, then runs
+`ConfigureEF`, calibrates GE Rabi and HPI, measures the EF transition, and calibrates EF pulses and
+three-state readout. `CheckEFChevron` therefore receives the HPI parameters created earlier in the
+same task list; a pre-existing HPI calibration is not required by the template.
+
+`CheckEFRabi` records the GE HPI inputs used by the task, but Qubex currently prepares the
+`|e>` state through `x180()`. That call can prefer a stored DRAG PI, PI, or DRAG HPI pulse over the
+restored HPI. Existing calibration-note entries can therefore change state preparation even when
+the recorded task inputs match. Starting a new QDash execution does not remove those entries.
+
 ### Resonator and readout frequency
 
 | Task or task family | Readout-frequency input | Frequency result | Published database parameters |
