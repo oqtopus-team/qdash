@@ -1,58 +1,35 @@
 # Developer Guide
 
-This guide is for people changing QDash code. Procedures for running and using QDash are in the
-[User Guide](../user-guide/index.md); this guide explains how the system is built and how to
-change it.
+Use this guide to understand, change, test, and contribute to QDash. Procedures for operating the
+product are in the [User Guide](../user-guide/index.md).
 
-## Start Here
+## Make Your First Change
 
-- [Architecture](./architecture.md): the three components and how a
-  calibration flows through them.
-- [Setup](./setup.md): a working local stack for development.
-- [Codebase](./codebase.md): where API, UI, workflow, and shared code live, and what is generated.
-- [Commands](./commands.md): the `task` commands used day to day.
-- [Testing](./testing.md): which checks to run for which change.
-- [Development Flow](./development-flow.md) and
-  [Docs Guidelines](./docs-guidelines.md): branches, commits, and how
-  documentation is organised and written.
+1. Read [Architecture](./architecture.md) to see the UI, API, and workflow boundaries.
+2. Follow [Development Setup](./setup.md) to start a local environment.
+3. Use [Codebase](./codebase.md) to find the owning package and generated files.
+4. Choose commands from [Command Reference](./commands.md).
+5. Run the checks selected by [Testing](./testing.md).
+6. Follow [Development Flow](./development-flow.md) when preparing the pull request.
 
-## Conventions
+## Choose a Component
 
-Rules that hold across the code: [datetime handling](./conventions/datetime.md),
-[logging](./conventions/logging.md), [QID validation](./conventions/qid-validation.md),
-[credential scanning](./conventions/credential-scan.md).
+| Area | Owns | Start here |
+| --- | --- | --- |
+| API | Authentication, project access, persistence, and HTTP contracts | [API development](./api/index.md) |
+| UI | Routes, interaction, server state, and presentation | [UI development](./ui/index.md) |
+| Workflow | Calibration execution, scheduling, parameters, and Prefect integration | [Workflow development](./workflow/index.md) |
+| Copilot | Chat, evaluation, agent execution, and sandboxing | [Copilot development](./copilot/index.md) |
+| Cross-component design | Data flow, schedulers, topology, notes, and provenance | [Architecture deep dives](./architecture/index.md) |
 
-## Components
+Each component overview points to its architecture, implementation rules, and focused test
+guides. Use [Reference](../reference/index.md) when you need an exact schema, index, generated API,
+or client contract.
 
-Each component has its design, its architecture, and its own testing page.
+## Apply Repository-Wide Conventions
 
-- API: [design guidelines](./api/design.md), [contracts](./api/contracts.md), [code structure](./api/structure.md), [testing](./api/testing.md),
-  [endpoint testing](./api/testing-endpoints.md)
-- UI: [architecture](./ui/architecture.md), [guidelines](./ui/guidelines.md),
-  [components and state](./ui/components.md), [styling](./ui/styling.md),
-  [TypeScript](./ui/typescript.md), [API integration](./ui/api-integration.md),
-  [design policy](./ui/design-policy.md), [testing](./ui/testing.md)
-- Workflow: [quickstart](./workflow/quickstart.md),
-  [engine architecture](./workflow/engine-architecture.md),
-  [services](./workflow/services.md),
-  [calibration data lifecycle](./workflow/calibration-data-lifecycle.md),
-  [parameter resolution](./workflow/parameter-resolution.md),
-  [testing](./workflow/testing.md), [fixtures](./workflow/testing-fixtures.md),
-  [component tests](./workflow/testing-components.md)
-- Copilot: [architecture](./copilot/architecture.md),
-  [agent platform](./copilot/agent-platform.md),
-  [knowledge layout](./copilot/knowledge-layout.md),
-  [sandbox](./copilot/sandbox.md), [streaming](./copilot/streaming.md)
+The conventions for [datetime handling](./conventions/datetime.md),
+[logging](./conventions/logging.md), [QID validation](./conventions/qid-validation.md), and
+[credential scanning](./conventions/credential-scan.md) apply across component boundaries.
 
-## Architecture Deep Dives
-
-Cross-component designs: [schedulers and ordering](./architecture/index.md),
-[notes](./architecture/notes.md), [provenance](./architecture/provenance.md).
-
-## Reference
-
-[Database structure](../reference/database-structure.md) with its
-[data models](../reference/data-models.md) and document pages,
-[database indexes](../reference/database-indexes.md), [OpenAPI](../reference/openapi.md), and the
-[Python](../reference/clients/python.md) and [TypeScript](../reference/clients/typescript.md)
-client packages.
+Use [Documentation Guidelines](./docs-guidelines.md) for any page under `docs/`.

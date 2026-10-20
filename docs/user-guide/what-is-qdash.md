@@ -4,42 +4,46 @@ layout: doc
 
 # What is QDash?
 
-QDash is a web platform for operating qubit calibration workflows, inspecting calibration state,
-and sharing results within a project.
+QDash keeps calibration execution, results, and operator context together for each quantum chip.
 
-## Concept
+## What QDash Manages
 
-To improve the accuracy of qubit calibration, it is essential to consolidate and analyze all related information systematically. QDash enables automatic management and analysis of calibration results—including when and with what settings measurements were obtained—contributing to improved calibration accuracy.
+Calibration work produces more than a final parameter value. Operators also need the inputs,
+measurement artifacts, execution status, history, and discussion that explain where the value
+came from. QDash records these parts in one project-scoped workspace.
 
-## Architecture
+| Concept | Meaning in QDash |
+| --- | --- |
+| Project | The access and storage boundary shared by a team. |
+| Chip | The device whose calibration state is being maintained. |
+| Workflow | A reusable graph of calibration tasks that can be run or scheduled. |
+| Task | One calibration operation that measures or checks selected targets. |
+| Execution | One run, including status, logs, task results, and artifacts. |
+| Calibration state | The accepted parameters available to later calibration work. |
 
-QDash has three main application components:
+Select the active project and chip before starting work. Two projects can use the same chip ID
+without sharing calibration state. [Projects and Data Sharing](./projects-and-sharing.md)
+explains this boundary.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         QDash Platform                          │
-├─────────────┬─────────────────────────┬─────────────────────────┤
-│   Frontend  │        Backend          │    Workflow Engine      │
-│  (Next.js)  │       (FastAPI)         │       (Prefect)         │
-│             │                         │                         │
-│  - React    │  - REST API             │  - Calibration flows    │
-│  - TanStack │  - MongoDB (Bunnet)     │  - Python Flow Editor   │
-│  - Plotly   │  - PostgreSQL           │  - qubex integration    │
-│  - DaisyUI  │  - JWT Auth             │  - Deployment service   │
-└─────────────┴─────────────────────────┴─────────────────────────┘
-```
+## Typical Calibration Loop
 
-## Key Features
+1. Select the project and chip that own the calibration state.
+2. Run a reusable workflow or one task from the workbench.
+3. Monitor the execution and inspect its task results and artifacts.
+4. Compare the result with metric history and parameter provenance.
+5. Record notes or open a forum thread when the result needs context or follow-up.
+6. Use the resulting state as input to later calibration work.
 
-- **Calibration operation**: Create, schedule, and monitor workflows, or run one task from the
-  task workbench.
-- **State inspection**: Review chip topology, configured metrics, task results, artifacts,
-  time-series data, and parameter provenance.
-- **Project collaboration**: Share calibration state and files through explicit project roles,
-  notes, issues, forum discussions, notifications, and knowledge cases.
-- **Assisted analysis**: Use project-aware chat and the analysis sidebar as supporting evidence
-  during result analysis.
-- **Client access**: Integrate through the REST API or the generated Python and TypeScript clients.
+[Running Calibrations](./running-calibrations.md) covers steps 1–3.
+[Calibration Data and Provenance](./data-and-provenance.md) covers step 4, and
+[Reviewing and Sharing Results](./reviewing-results.md) covers step 5.
+
+## Ways to Work
+
+Use the web application for interactive operation and investigation. The generated Python and
+TypeScript clients provide the same API for scripts, notebooks, and integrations. Copilot can
+help explore project data, but the operator remains responsible for checking evidence and making
+hardware decisions.
 
 ## Demo
 
@@ -48,33 +52,6 @@ time-series analysis.
 
 <video controls playsinline preload="metadata" poster="/images/qdash-demo-poster.png" src="/videos/qdash-demo.mp4" style="width: 100%; border-radius: 8px;"></video>
 
-The video is rendered from screenshots with [Remotion](https://www.remotion.dev/); the source
-lives in `docs/demos/video/`.
-
-## Technology Stack
-
-### Frontend
-
-- **Framework**: Next.js 16, React 19
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS, DaisyUI
-- **Charts**: Plotly.js, XYFlow
-- **State Management**: TanStack Query
-
-### Backend
-
-- **Framework**: FastAPI
-- **Language**: Python 3.10-3.12
-- **Database**: MongoDB (Bunnet ODM), PostgreSQL
-- **Authentication**: JWT
-
-### Workflow Engine
-
-- **Orchestration**: Prefect 3
-- **Quantum Library**: qubex
-
-Use [Operator Setup](./setup.md) to deploy QDash or
-[Developer Setup](../developer-guide/setup.md) to prepare a development environment. The
-[Application Tour](./application-tour.md) maps the available features, while the
-[Architecture](../developer-guide/architecture.md) and [Database Structure](../reference/database-structure.md)
-describe the implementation.
+Continue with the [Application Tour](./application-tour.md) to find each feature, or
+[set up QDash](./setup.md) for a lab. Developers can start with the
+[system architecture](../developer-guide/architecture.md).

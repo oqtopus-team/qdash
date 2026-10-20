@@ -389,10 +389,6 @@ Look for:
 - `winningPlan.inputStage.stage` == "IXSCAN"
 - `executionStats.totalDocsExamined` ≈ `executionStats.nReturned`
 
-## PostgreSQL - Prefect Metadata (Future)
-
-_To be documented when Prefect integration requires optimization_
-
 ## Monitoring
 
 ### Query Performance Alerts

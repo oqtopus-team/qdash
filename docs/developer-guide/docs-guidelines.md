@@ -27,7 +27,7 @@ docs/
     index.md               Reading order: set up, operate, work with calibrations
     setup.md               Clone, configure, start, sign in
     operations.md          Start, stop, logs, recovery
-    system-updates.md      Apply a stable release from the host
+    system-updates.md      Select a stable release and rebuild from the host
     migrations/            Steps for upgrades that change stored data
     application-tour.md    One page per job after that: running calibrations,
     ...                    reviewing results, copilot, projects, cryo, ...
@@ -38,11 +38,12 @@ docs/
     conventions/           Rules that apply across the code: datetime, logging,
                            qid validation, credential scanning
     api/  ui/  workflow/  copilot/
-                           One directory per component: design, architecture,
-                           testing, and the component's own deep dives
+      index.md             Entry point for each component
+      ...                  Design, architecture, testing, and deep dives
     architecture/          Cross-component design: schedulers, topology,
                            provenance, notes, agent platform
   reference/
+    index.md               Entry point for generated and tabular reference
     database-structure.md  Overview, collections, data flow
     data-models.md  database-documents-*.md  database-indexes.md  openapi.md
     clients/               Python and TypeScript client packages

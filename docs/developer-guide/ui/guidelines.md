@@ -8,9 +8,9 @@ Conventions for code under `ui/`: the stack, where files live, how they are name
 
 | Technology | Version | Purpose                         |
 | ---------- | ------- | ------------------------------- |
-| Next.js    | 15.x    | React framework with App Router |
-| React      | 18.x    | UI library                      |
-| TypeScript | 5.x     | Type-safe JavaScript            |
+| Next.js    | 16.x    | React framework with App Router |
+| React      | 19.x    | UI library                      |
+| TypeScript | 6.x     | Type-safe JavaScript            |
 | Bun        | 1.4.0+  | Package manager and runtime     |
 
 ### UI Libraries

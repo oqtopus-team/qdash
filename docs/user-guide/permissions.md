@@ -79,14 +79,3 @@ The sidebar hides entries the current user cannot use:
 - Admin appears only for system Admins.
 
 Hiding a control is a convenience, not enforcement: project-scoped API endpoints check the project role on each request.
-
-## Implementation Files
-
-| File | Purpose |
-| --- | --- |
-| `src/qdash/datamodel/user.py` | System roles |
-| `src/qdash/datamodel/project.py` | Project roles and permission mapping |
-| `src/qdash/api/lib/project.py` | Project context dependencies for viewer, editor, and owner checks |
-| `src/qdash/api/routers/admin.py` | Admin-only endpoints |
-| `src/qdash/api/services/forum_service.py` | Forum author and role rules |
-| `ui/src/components/layout/navigation.ts` | Sidebar visibility |

@@ -7,7 +7,7 @@
 QDash UI uses a layered testing approach:
 
 1. **Unit Tests** - Vitest + React Testing Library for hooks and utilities
-2. **Static Analysis** - TypeScript type checking and ESLint
+2. **Static Analysis** - TypeScript type checking and Oxlint
 3. **Build Verification** - Production build validation
 4. **Manual Testing** - Feature testing in development environment
 
@@ -15,8 +15,8 @@ QDash UI uses a layered testing approach:
 
 ```mermaid
 flowchart TB
-    subgraph E2E["E2E Tests (Future: Playwright/Cypress)"]
-        E2EContent["Manual testing now"]
+    subgraph Manual["Manual Verification"]
+        ManualContent["Routes and user interactions"]
     end
 
     subgraph Unit["Unit Tests (Vitest + React Testing Library)"]
@@ -24,10 +24,10 @@ flowchart TB
     end
 
     subgraph Static["Static Analysis"]
-        StaticContent["TypeScript + ESLint + Build Check"]
+        StaticContent["TypeScript + Oxlint + Build Check"]
     end
 
-    E2E --- Unit
+    Manual --- Unit
     Unit --- Static
 ```
 
@@ -172,7 +172,7 @@ vi.useRealTimers();
 vi.spyOn(document, "createElement");
 ```
 
-#### Testing with React Query (Future)
+#### Testing with React Query
 
 ```tsx
 import { describe, it, expect } from "vitest";

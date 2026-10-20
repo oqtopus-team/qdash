@@ -4,8 +4,8 @@ QDash combines system-wide user accounts with project-specific roles.
 
 ## Sign In
 
-Open `/login` and enter your username and password. After authentication, QDash opens the
-Execution page in your default project.
+Open the QDash sign-in page and enter your username and password. After authentication, QDash
+opens the Execution page in your default project.
 
 ![Signing in to QDash](/images/guides/login.gif)
 
@@ -43,10 +43,9 @@ Automation should use a saved [QDash Client](../reference/clients/python.md) pro
 `QDASH_*` environment variables. The client handles authentication and project headers without
 placing tokens directly in shell history.
 
-Raw API consumers authenticate through `/auth/login`, send the returned bearer token in the
-`Authorization` header, and select project-scoped data with `X-Project-Id`. Use the interactive
-OpenAPI page linked from QDash or the [OpenAPI reference](../reference/openapi.md) for current
-request and response schemas.
+For a custom API integration, use the interactive OpenAPI page linked from QDash or the
+[OpenAPI reference](../reference/openapi.md) for the current authentication operation, project
+header, and request and response schemas.
 
 ## Authorization Layers
 

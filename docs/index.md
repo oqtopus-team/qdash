@@ -5,7 +5,7 @@ layout: home
 hero:
   name: QDash
   text: Qubit Calibration Platform
-  tagline: Manage and monitor qubit calibration workflows with ease
+  tagline: Run calibration workflows, inspect results, and preserve their context
   image:
     src: /oqtopus_logo.svg
     alt: OQTOPUS
@@ -25,10 +25,10 @@ hero:
 
 features:
   - title: Run Calibrations
-    details: Create, schedule, and monitor project workflows or run an individual task from the workbench.
+    details: Create, schedule, and monitor workflows, or run an individual task from the workbench.
     link: /user-guide/running-calibrations
   - title: Inspect Calibration State
-    details: Compare chip metrics, task results, raw artifacts, parameter history, and provenance.
+    details: Compare metrics, task results, artifacts, parameter history, and provenance for a chip.
     link: /user-guide/data-and-provenance
   - title: Collaborate on Results
     details: Connect notes, forum threads, knowledge, AI evaluations, and notifications.
