@@ -96,8 +96,8 @@ Because Trufflehog walks **full git history**, the exclude list must cover both 
 | `\.betterleaks\.toml` | tracked | Contains the Betterleaks allowlist itself — the literal `mongodb://root:example@mongo:27017` and placeholder tokens (`ADMIN_TOKEN`, `YOUR_TOKEN`) would otherwise be re-flagged as credentials. None are real secrets; see the Betterleaks allowlist tables above. |
 | `\.gitleaks\.toml` | deleted (history only) | Removed when the project migrated from Gitleaks to Betterleaks. Earlier commits still contain it with the same example values, so it stays excluded for history scans. |
 | `docs/design/api-testing-guidelines\.md` | deleted (history only) | Removed in commit `50b0fd31`. Old API testing guideline document that referenced example tokens. Excluded so historical commits do not trigger findings. |
-| `docs/developer-guide/api/endpoint-testing\.md` | tracked | API endpoint testing guide. Its fixture samples contain the example MongoDB DSN `mongodb://root:example@mongo:27017`. Not a live credential. |
-| `docs/developer-guide/api/testing\.md` | tracked | API testing guide. May reference token names and example fixtures in code samples. None are live credentials. |
+| `docs/developer-guide/api/endpoint-testing\.md` | tracked | Earlier revisions contained an example MongoDB DSN. The path remains excluded because Betterleaks scans Git history. |
+| `docs/developer-guide/api/testing\.md` | tracked | Earlier revisions contained example tokens and fixtures. The path remains excluded because Betterleaks scans Git history. |
 | `docs/developer-guide/conventions/credential-scan\.md` | tracked | This document itself. Contains example tool output with mock values such as `AKIAIOSFODNN7EXAMPLE` and fabricated commit hashes used to illustrate finding format. |
 | `docs/development/api/testing\.md`, `docs/development/credential-scan\.md` | moved (history only) | The two pages above before the documentation was reorganised into the two guides. |
 | `poetry\.lock` | deleted (history only) | Removed in commit `e840268b` when the project moved to `uv`. Lockfile entries contain public package integrity digests that look high-entropy. |

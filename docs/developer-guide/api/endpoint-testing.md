@@ -1,408 +1,129 @@
 # API Endpoint Testing
 
-Fixtures, database setup, endpoint tests, mocking, and async tests for the FastAPI backend;
-naming, structure, assertions, and coverage rules are in [API Testing Guidelines](./testing.md).
+Endpoint tests send requests through the FastAPI application and verify the HTTP contract together
+with authentication, project selection, authorization, persistence, and response serialization.
 
-## Fixtures
+## Use the Shared Test Application
 
-### Root Fixtures (`conftest.py`)
+`tests/conftest.py` creates a new in-memory `mongomock` database for each test through `init_db`.
+The `test_client` fixture depends on that database and wraps `qdash.api.main.app` with FastAPI's
+`TestClient`.
 
-Define common fixtures at the root level:
-
-```python
-# tests/conftest.py
-
-import pytest
-from dataclasses import dataclass
-
-@dataclass
-class TestSettings:
-    """Test configuration settings."""
-    mongo_test_dsn: str = os.getenv("MONGO_TEST_DSN", "mongodb://root:example@mongo:27017")
-    mongo_test_db: str = os.getenv("MONGO_TEST_DB", "qdash_test")
-
-
-@pytest.fixture(scope="session")
-def test_settings() -> TestSettings:
-    """Get test settings."""
-    return TestSettings()
-
-
-@pytest.fixture(scope="session")
-def mongo_client(test_settings: TestSettings) -> Generator[MongoClient, None, None]:
-    """Create MongoDB client for testing (session-scoped)."""
-    client: MongoClient = MongoClient(test_settings.mongo_test_dsn)
-    yield client
-    client.close()
-
-
-@pytest.fixture
-def init_db(mongo_client: MongoClient, test_settings: TestSettings) -> Generator[Database, None, None]:
-    """Initialize Bunnet with test database."""
-    from qdash.api.db.session import set_test_client
-
-    set_test_client(mongo_client, db_name=test_settings.mongo_test_db)
-    db = mongo_client[test_settings.mongo_test_db]
-    yield db
-
-    # Clean up: drop all collections after each test
-    for collection_name in db.list_collection_names():
-        db.drop_collection(collection_name)
-
-
-@pytest.fixture
-def test_client(init_db):
-    """FastAPI test client with test MongoDB."""
-    from fastapi.testclient import TestClient
-    from qdash.api.main import app
-
-    return TestClient(app)
+```mermaid
+flowchart LR
+    init[init_db<br/>fresh mongomock database] --> client[test_client<br/>FastAPI TestClient]
+    records[Module fixtures<br/>users, projects, records] --> request[Endpoint request]
+    headers[Auth fixtures<br/>token and project] --> request
+    client --> request
+    request --> response[Status and JSON assertions]
 ```
 
-### Fixture Scopes
+The root fixture also replaces Prefect modules before QDash imports them. Endpoint tests that need
+specific Prefect behavior must patch the QDash call site rather than importing a real Prefect
+server.
 
-| Scope      | Use Case                          | Example                         |
-| ---------- | --------------------------------- | ------------------------------- |
-| `function` | Default; fresh fixture per test   | `test_client`, `init_db`        |
-| `class`    | Shared within test class          | Class-specific setup            |
-| `module`   | Shared within test file           | Module-specific setup           |
-| `session`  | Shared across entire test session | `mongo_client`, `test_settings` |
+Keep `init_db` or `test_client` in a fixture's dependency list when that fixture inserts Bunnet
+documents. This ensures the in-memory database is initialized before the insert.
 
-### Fixture Naming
+## Create Authentication and Project Context
 
-```python
-# Good - Descriptive fixture names
-@pytest.fixture
-def test_client():
-    """FastAPI test client."""
-    pass
-
-@pytest.fixture
-def system_info():
-    """Create test system info."""
-    pass
-
-@pytest.fixture
-def sample_chip():
-    """Create a sample chip for testing."""
-    pass
-
-# Bad - Vague names
-@pytest.fixture
-def data():
-    pass
-
-@pytest.fixture
-def fixture1():
-    pass
-```
-
-### Autouse Fixtures
-
-Use `autouse=True` sparingly, for setup that must run for every test:
+Most project-scoped routes require both a valid bearer token and an active project membership.
+Create the user, project, and membership together, then send the token and project ID:
 
 ```python
-@pytest.fixture(autouse=True)
-def _init_db(mongodb_client: MongoClient) -> None:
-    """Initialize database before each test."""
-    init_bunnet(
-        database=mongodb_client.test_db,
-        document_models=[ChipDocument],
-    )
-    # Clear collection before each test
-    try:
-        ChipDocument.get_motor_collection().drop()
-    except Exception:
-        pass
+@pytest.fixture
+def auth_headers(test_project):
+    return {
+        "Authorization": "Bearer test_token",
+        "X-Project-Id": "test_project",
+    }
 ```
 
----
+The `test_project` fixture must insert a `UserDocument` whose `access_token` matches the bearer
+token, a `ProjectDocument`, and an active `ProjectMembershipDocument`. Use the role required by the
+route: viewer for reads, editor for operational writes, or owner for project administration.
 
-## Database Testing
+Test each applicable boundary independently:
 
-Tests connect to the MongoDB instance running in Docker Compose through the session-scoped
-`mongo_client` fixture above; `MONGO_TEST_DSN` and `MONGO_TEST_DB` override the connection.
+| Scenario | Expected contract |
+| --- | --- |
+| Missing bearer token | `401 Unauthorized` |
+| Unknown token | `401 Unauthorized` |
+| Disabled user | `403 Forbidden` |
+| Missing project context with no usable default | `400 Bad Request` |
+| User is not a project member | `403 Forbidden` |
+| Role lacks the route permission | `403 Forbidden` |
+| Resource belongs to another project | `404 Not Found` for project-scoped lookup |
 
-Always clean up test data. The `init_db` fixture drops every collection in the test database
-after each test, so tests never see data left behind by another test.
+Project lookup prioritizes a path parameter, then `X-Project-Id`, then the user's default project.
+When that precedence matters to a route, create conflicting values and assert which project the
+response uses.
 
----
+## Exercise the HTTP Contract
 
-## API Endpoint Testing
-
-### Basic Endpoint Test
+Use the route path exactly as it is mounted in the application. QDash routes do not use an
+additional `/api` prefix in `TestClient` calls.
 
 ```python
 class TestChipRouter:
-    """Tests for chip-related API endpoints."""
+    def test_list_chips_empty(self, test_client, test_project, auth_headers):
+        response = test_client.get("/chips", headers=auth_headers)
 
-    def test_list_chips_empty(self, test_client):
-        """Test listing chips when no chips exist."""
-        response = test_client.get(
-            "/api/chip",
-            headers={"X-Username": "test_user"},
-        )
         assert response.status_code == 200
-        assert response.json() == []
-```
+        assert response.json() == {"chips": [], "total": 0}
 
-### Testing with Authentication
-
-Always include required headers:
-
-```python
-def test_fetch_chip_success(self, test_client):
-    """Test fetching a specific chip by ID."""
-    # Arrange
-    chip = ChipDocument(
-        chip_id="test_chip_fetch",
-        username="test_user",
-        size=144,
-        system_info=SystemInfoModel(),
-    )
-    chip.insert()
-
-    # Act
-    response = test_client.get(
-        "/api/chip/test_chip_fetch",
-        headers={"X-Username": "test_user"},  # Required auth header
-    )
-
-    # Assert
-    assert response.status_code == 200
-```
-
-### Testing Error Responses
-
-```python
-def test_fetch_chip_not_found(self, test_client):
-    """Test fetching a non-existent chip returns 404."""
-    response = test_client.get(
-        "/api/chip/nonexistent_chip",
-        headers={"X-Username": "test_user"},
-    )
-
-    assert response.status_code == 404
-    assert "not found" in response.json()["detail"].lower()
-
-
-def test_create_chip_invalid_size(self, test_client):
-    """Test creating a chip with invalid size returns 400."""
-    response = test_client.post(
-        "/api/chip",
-        headers={"X-Username": "test_user"},
-        json={"chip_id": "invalid_chip", "size": 100},  # Invalid size
-    )
-
-    assert response.status_code == 400
-```
-
-### Testing Access Control
-
-```python
-def test_fetch_chip_wrong_user(self, test_client):
-    """Test that fetching another user's chip returns 404."""
-    # Arrange: Create a chip for user1
-    chip = ChipDocument(
-        chip_id="user1_chip",
-        username="user1",
-        size=64,
-        system_info=SystemInfoModel(),
-    )
-    chip.insert()
-
-    # Act: Try to fetch as user2
-    response = test_client.get(
-        "/api/chip/user1_chip",
-        headers={"X-Username": "user2"},
-    )
-
-    # Assert: Should not find the chip (access control)
-    assert response.status_code == 404
-```
-
----
-
-## Mocking and Patching
-
-### Using monkeypatch
-
-Use pytest's `monkeypatch` fixture for patching:
-
-```python
-def test_flow_session_attributes(self, monkeypatch):
-    """Test that FlowSession initializes with correct attributes."""
-
-    # Mock ExecutionManager to avoid DB dependencies
-    class MockExecutionManager:
-        def __init__(self, **kwargs):
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-            self.calib_data_path = kwargs.get("calib_data_path", "")
-            self.calib_data = type("obj", (object,), {"qubit": {}, "coupling": {}})()
-
-        def save(self):
-            return self
-
-        def start_execution(self):
-            return self
-
-    class MockSession:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def connect(self):
-            pass
-
-    # Patch the imports
-    monkeypatch.setattr(
-        "qdash.workflow.helpers.flow_helpers.ExecutionManager",
-        MockExecutionManager,
-    )
-    monkeypatch.setattr(
-        "qdash.workflow.helpers.flow_helpers.create_backend",
-        lambda **kwargs: MockSession(),
-    )
-
-    # Create session
-    session = FlowSession(
-        username="test_user",
-        execution_id="20240101-001",
-        chip_id="chip_1",
-    )
-
-    # Verify
-    assert session.username == "test_user"
-```
-
-### Mock Class Pattern
-
-Create reusable mock classes:
-
-```python
-class MockExecutionManager:
-    """Mock ExecutionManager for testing."""
-
-    def __init__(self, **kwargs):
-        self.calib_data_path = kwargs.get("calib_data_path", "")
-        self.calib_data = type("obj", (object,), {"qubit": {}, "coupling": {}})()
-        self.completed = False
-
-    def save(self):
-        return self
-
-    def start_execution(self):
-        return self
-
-    def complete_execution(self):
-        self.completed = True
-        return self
-```
-
----
-
-## Async Testing
-
-### Configure pytest-asyncio
-
-```python
-# In conftest.py
-pytest_plugins = ("pytest_asyncio",)
-pytest.mark.asyncio_default_fixture_loop_scope = "function"
-```
-
-### Async Test Functions
-
-```python
-import pytest
-
-@pytest.mark.asyncio
-async def test_async_operation():
-    """Test an async operation."""
-    result = await some_async_function()
-    assert result is not None
-```
-
-### Async Fixtures
-
-```python
-@pytest.fixture
-async def async_client():
-    """Create async test client."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        yield client
-```
-
----
-
-## Example Test File
-
-```python
-"""Tests for chip router endpoints."""
-
-import pytest
-from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.chip import ChipDocument
-
-
-class TestChipRouter:
-    """Tests for chip-related API endpoints."""
-
-    def test_list_chips_empty(self, test_client):
-        """Test listing chips when no chips exist."""
-        response = test_client.get(
-            "/api/chip",
-            headers={"X-Username": "test_user"},
-        )
-        assert response.status_code == 200
-        assert response.json() == []
-
-    def test_list_chips_with_data(self, test_client):
-        """Test listing chips when chips exist."""
-        # Arrange
-        chip = ChipDocument(
-            chip_id="test_chip_001",
+    def test_get_chip_wrong_project(self, test_client, test_project, auth_headers):
+        ChipDocument(
+            chip_id="other_project_chip",
             username="test_user",
+            project_id="other_project",
             size=64,
-            qubits={},
-            couplings={},
             system_info=SystemInfoModel(),
-        )
-        chip.insert()
+        ).insert()
 
-        # Act
-        response = test_client.get(
-            "/api/chip",
-            headers={"X-Username": "test_user"},
-        )
-
-        # Assert
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 1
-        assert data[0]["chip_id"] == "test_chip_001"
-        assert data[0]["size"] == 64
-
-    def test_fetch_chip_not_found(self, test_client):
-        """Test fetching a non-existent chip returns 404."""
-        response = test_client.get(
-            "/api/chip/nonexistent_chip",
-            headers={"X-Username": "test_user"},
-        )
+        response = test_client.get("/chips/other_project_chip", headers=auth_headers)
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
-
-    def test_create_chip_success(self, test_client):
-        """Test creating a new chip."""
-        response = test_client.post(
-            "/api/chip",
-            headers={"X-Username": "test_user"},
-            json={"chip_id": "new_chip", "size": 64},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["chip_id"] == "new_chip"
-        assert data["size"] == 64
 ```
+
+For write routes, assert both the response and the stored record. A successful JSON response does
+not prove that project IDs, audit fields, or related documents were persisted correctly. For list
+routes, insert a record in another project and prove that it is excluded.
+
+## Replace External Boundaries
+
+Patch network clients, file operations, notification senders, and orchestration calls where the
+router or service imports them. Use `AsyncMock` for awaited collaborators and configure the return
+shape expected by the production code.
+
+Assert cleanup behavior on failure paths. For example, a dispatch test must verify that a claimed
+hardware resource is released when Prefect run creation fails. Temporary file tests should use
+pytest's `tmp_path` and patch the configured root rather than write into repository directories.
+
+FastAPI dependency overrides are appropriate when the dependency itself is outside the test's
+scope. Restore `app.dependency_overrides` after the test, preferably with a yielding fixture, so
+one test cannot change another test's application.
+
+## Test Validation at the Boundary
+
+Send JSON rather than constructing a Pydantic model directly when the behavior belongs to the HTTP
+boundary. Cover required fields, invalid enum values, malformed identifiers, and mutually
+exclusive fields that the route exposes. Assert FastAPI's `422` response for schema validation and
+the route's documented status for domain validation.
+
+Use direct schema tests under `tests/qdash/api/schemas/` for exhaustive field combinations. Keep
+the router test to the combinations needed to prove that the endpoint applies that schema.
+
+## Find Representative Tests
+
+| Concern | Example |
+| --- | --- |
+| Authentication and project isolation | `tests/qdash/api/routers/test_chip.py` |
+| Role-specific flow operations and external orchestration | `tests/qdash/api/routers/test_flow.py` |
+| Administrative permissions | `tests/qdash/api/routers/test_admin.py` |
+| Dependency-provider caching | `tests/qdash/api/test_dependencies.py` |
+| Direct async service behavior | `tests/qdash/api/services/test_flow_service.py` |
+
+Run one endpoint module with `uv run pytest <path> -v`. Run `task test-api` before handing off a
+change that affects shared authentication, project context, application construction, or multiple
+routers. General test placement and suite selection are in [API Testing](./testing.md).
