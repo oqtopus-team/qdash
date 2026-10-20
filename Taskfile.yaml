@@ -196,8 +196,9 @@ tasks:
       - docker compose down
 
   dev-local-setup:
-    desc: Install dependencies needed by host-side API/UI development
+    desc: Install dependencies and tools needed by local development
     cmds:
+      - .devcontainer/install-lychee.sh
       - uv sync --locked --all-groups --all-packages
       - mkdir -p "${CONFIG_PATH:-./config/qubex-config}"
       - bun install --cwd ui --frozen-lockfile
@@ -322,7 +323,7 @@ tasks:
       - bun run docs:build
 
   check-docs-links:
-    desc: Check documentation links (requires Lychee)
+    desc: Build docs and check external links, local links, and anchors
     deps: [build-docs]
     cmds:
       - |

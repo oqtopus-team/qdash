@@ -134,12 +134,16 @@ task dev-local-down
 
 ## Refresh Dependencies
 
-The DevContainer installs Python, frontend, and Lefthook dependencies automatically during
-creation. To refresh dependencies manually, run:
+The DevContainer includes Lychee and installs Python, frontend, and Lefthook dependencies during
+creation. To refresh dependencies and install the local documentation checker manually, run:
 
 ```shell
 task dev-local-setup
 ```
+
+The setup task installs Lychee in `$HOME/.local/bin` when the active environment does not already
+provide the pinned version. Keep that directory on `PATH` when running host-side tasks outside the
+DevContainer or Nix shell.
 
 ## Run the Development Stack
 

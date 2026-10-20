@@ -18,7 +18,8 @@ Copilot knowledge repository configured by `KNOWLEDGE_REPO_URL`.
 
 The `agent-runtime` service is opt-in. Set `COMPOSE_PROFILES=agent-runtime` in `.env` when
 `config/copilot/config.yaml` uses `copilot_backend: pi`. Leave it unset for the in-process
-`litellm` backend. For a remote deployment, follow [Remote Access](./setup.md#remote-access)
+`litellm` backend. For a remote deployment, follow
+[Enable Remote Access](./setup.md#enable-remote-access)
 instead of changing profiles at the command line.
 
 Host-side API and UI processes are a development workflow. Use

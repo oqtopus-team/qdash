@@ -44,6 +44,7 @@
             go-task
             jq
             lefthook
+            lychee
             lsof
             nodejs_24
             pkg-config
@@ -60,7 +61,7 @@
           };
 
           shellHook = ''
-            export PATH="$PWD/ui/node_modules/.bin:$PATH:$PWD/.venv/bin"
+            export PATH="$HOME/.local/bin:$PWD/ui/node_modules/.bin:$PATH:$PWD/.venv/bin"
 
             if [ ! -d .venv ]; then
               echo "Run: uv sync --locked --all-groups --all-packages"
