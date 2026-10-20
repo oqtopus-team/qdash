@@ -77,7 +77,7 @@ For detailed setup instructions, see [docs/developer-guide/setup.md](docs/develo
 - **Don't edit generated code**: `ui/src/client/` and `ui/src/schemas/` are auto-generated from OpenAPI
 - **Regenerate after API changes**: Run `task generate` when backend API changes
 - **Follow existing patterns**: Check `docs/developer-guide/ui/guidelines.md` for coding standards
-- **Follow docs guidelines**: Check `docs/developer-guide/docs-guidelines.md` when writing documentation, and use the `technical-docs` skill (`.agents/skills/technical-docs/SKILL.md`, shared with Codex; `.claude/skills/` links to it) to write, verify and review a page
+- **Follow docs guidelines**: Check `docs/developer-guide/docs-guidelines.md` when writing documentation. Use the shared `technical-docs` skill to write, verify and review a page, and the shared `document-changes` skill to audit code changes for documentation impact (`.agents/skills/` is the source; `.claude/skills/` links to it)
 - **Use conventional commits**: See `docs/developer-guide/development-flow.md`
 
 ## Useful Links
