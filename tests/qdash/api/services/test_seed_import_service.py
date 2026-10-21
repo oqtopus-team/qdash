@@ -23,6 +23,7 @@ class TestSeedImportServiceConfiguration:
         assert _load_importable_parameter_names() == {
             "control_amplitude",
             "control_frequency",
+            "control_frequency_ef",
             "readout_amplitude",
             "readout_frequency",
         }
@@ -404,7 +405,7 @@ class TestSeedImportServiceImportFromQubex:
     ):
         """Omitted parameters import only defaults permitted by the allowlist."""
         service._config_base = str(tmp_path)
-        service._importable_parameters = {"control_frequency"}
+        service._importable_parameters = {"control_frequency_ef"}
         params_dir = tmp_path / "chip001" / "params"
         params_dir.mkdir(parents=True)
         request = SeedImportRequest(
