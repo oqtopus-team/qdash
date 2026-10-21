@@ -16,15 +16,15 @@ product are in the [User Guide](../user-guide/index.md).
 
 | Area | Owns | Start here |
 | --- | --- | --- |
-| API | Authentication, project access, persistence, and HTTP contracts | [API development](./api/index.md) |
-| UI | Routes, interaction, server state, and presentation | [UI development](./ui/index.md) |
-| Workflow | Calibration execution, scheduling, parameters, and Prefect integration | [Workflow development](./workflow/index.md) |
-| Copilot | Chat, evaluation, agent execution, and sandboxing | [Copilot development](./copilot/index.md) |
-| Cross-component design | Data flow, schedulers, topology, notes, and provenance | [Architecture deep dives](./architecture/index.md) |
+| API | Authentication, project access, persistence, and HTTP contracts | [API Design Guidelines](./api/design.md) |
+| UI | Routes, interaction, server state, and presentation | [UI Architecture](./ui/architecture.md) |
+| Workflow | Calibration execution, scheduling, parameters, and Prefect integration | [Workflow Engine Architecture](./workflow/engine-architecture.md) |
+| Copilot | Chat, evaluation, agent execution, and sandboxing | [Copilot Architecture](./copilot/architecture.md) |
+| Cross-component design | Data flow, schedulers, topology, notes, and provenance | [Architecture](./architecture.md) |
 
-Each component overview points to its architecture, implementation rules, and focused test
-guides. Use [Reference](../reference/index.md) when you need an exact schema, index, generated API,
-or client contract.
+Use the component groups in the sidebar to open implementation rules and focused test guides. Use
+[Reference](../reference/index.md) when you need an exact schema, index, generated API, or client
+contract.
 
 ## Apply Repository-Wide Conventions
 
