@@ -30,7 +30,7 @@ EF_CALIBRATION_TASKS: list[str] = [
     "ConfigureEF",
     "CheckRabi",
     "CreateHPIPulse",
-    "CheckEFChevron",
+    "CheckAdaptiveEFChevron",
     "CheckEFRabi",
     "CreateEFHPIPulse",
     "CreateEFPIPulse",
@@ -99,7 +99,7 @@ def ef_calibration(
             "CreateHPIPulse": {
                 "hpi_duration": {"value": 32, "value_type": "int"},
             },
-            "CheckEFChevron": {
+            "CheckAdaptiveEFChevron": {
                 "shots": {"value": 256, "value_type": "int"},
             },
             "CreateEFHPIPulse": {

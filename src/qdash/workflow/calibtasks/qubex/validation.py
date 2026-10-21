@@ -23,6 +23,20 @@ def require_ef_configuration(exp: Experiment, label: str) -> None:
         ) from exc
 
 
+def require_fh_configuration(exp: Experiment, label: str) -> None:
+    """Require actual GE, EF, and FH targets for an FH-dependent task."""
+    try:
+        exp.targets[exp.ctx.resolve_ge_label(label)]
+        exp.targets[exp.ctx.resolve_ef_label(label)]
+        exp.targets[exp.ctx.resolve_fh_label(label)]
+    except (KeyError, ValueError) as exc:
+        raise ValueError(
+            f"GE/EF/FH targets are not configured for {label}. Run ConfigureEF with "
+            "configuration_mode='ge-ef-fh' in the same session before running an "
+            "FH-dependent task."
+        ) from exc
+
+
 def finite_value_error(
     value: Any, name: str, *, minimum: float | None = None, maximum: float | None = None
 ) -> str | None:

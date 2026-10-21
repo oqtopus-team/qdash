@@ -1,4 +1,4 @@
-"""Measure EF frequency and anharmonicity with Qubex chevron analysis."""
+"""Measure EF frequency and anharmonicity with Qubex adaptive chevron analysis."""
 
 import math
 from typing import ClassVar
@@ -27,10 +27,10 @@ from qdash.workflow.calibtasks.qubex.validation import (
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
-class CheckEFChevron(QubexTask):
-    """Measure f_ef and alpha = f_ef - f_ge using the Qubex session's GE pulses."""
+class CheckAdaptiveEFChevron(QubexTask):
+    """Adaptively measure f_ef and alpha = f_ef - f_ge using Qubex GE pulses."""
 
-    name: str = "CheckEFChevron"
+    name: str = "CheckAdaptiveEFChevron"
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(

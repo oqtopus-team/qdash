@@ -28,6 +28,7 @@ params_updater:
     control_frequency: control_frequency.yaml
     qubit_frequency: qubit_frequency.yaml
     control_frequency_ef: control_frequency_ef.yaml
+    control_frequency_fh: control_frequency_fh.yaml
     anharmonicity: qubit_anharmonicity.yaml
     x90_gate_fidelity: x90_gate_fidelity.yaml
     x180_gate_fidelity: x180_gate_fidelity.yaml
@@ -58,6 +59,7 @@ github:
     - control_frequency.yaml
     - qubit_frequency.yaml
     - control_frequency_ef.yaml
+    - control_frequency_fh.yaml
     - qubit_anharmonicity.yaml
     - readout_frequency.yaml
     - resonator_frequency.yaml

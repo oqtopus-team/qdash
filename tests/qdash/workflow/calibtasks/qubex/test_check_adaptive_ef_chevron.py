@@ -14,12 +14,14 @@ from qdash.common.config.metrics import load_metrics_config
 from qdash.datamodel.task import InputParameterModel
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
 from qdash.workflow.calibtasks.base import RunResult
-from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_chevron import CheckEFChevron
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_adaptive_ef_chevron import (
+    CheckAdaptiveEFChevron,
+)
 from qdash.workflow.engine.task.backend_saver import BackendSaver
 
 
-def _task() -> CheckEFChevron:
-    task = CheckEFChevron()
+def _task() -> CheckAdaptiveEFChevron:
+    task = CheckAdaptiveEFChevron()
     for name, value in {
         "control_frequency": 5.001,
         "hpi_amplitude": 0.1,
@@ -72,7 +74,7 @@ def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monk
         estimate_ef_frequency_from_chevron_adaptive, return_value=_result().raw_result
     )
     with patch(
-        "qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_chevron."
+        "qdash.workflow.calibtasks.qubex.one_qubit_fine.check_adaptive_ef_chevron."
         "estimate_ef_frequency_from_chevron_adaptive",
         estimate,
     ):
@@ -113,7 +115,7 @@ def test_run_uses_qubex_missing_anharmonicity_default_when_ef_frequency_is_unset
     )
 
     with patch(
-        "qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_chevron."
+        "qdash.workflow.calibtasks.qubex.one_qubit_fine.check_adaptive_ef_chevron."
         "estimate_ef_frequency_from_chevron_adaptive",
         estimate,
     ):
@@ -124,7 +126,7 @@ def test_run_uses_qubex_missing_anharmonicity_default_when_ef_frequency_is_unset
 
 def test_ef_chevron_does_not_declare_anharmonicity_as_an_input() -> None:
     """Keep persisted anharmonicity out of EF chevron seed selection."""
-    assert "anharmonicity" not in CheckEFChevron.input_spec
+    assert "anharmonicity" not in CheckAdaptiveEFChevron.input_spec
 
 
 def test_run_rejects_missing_ef_target_before_measurement() -> None:
@@ -136,7 +138,7 @@ def test_run_rejects_missing_ef_target_before_measurement() -> None:
     backend = SimpleNamespace(get_instance=lambda: exp)
     with (
         patch(
-            "qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_chevron."
+            "qdash.workflow.calibtasks.qubex.one_qubit_fine.check_adaptive_ef_chevron."
             "estimate_ef_frequency_from_chevron_adaptive"
         ) as estimate,
         pytest.raises(ValueError, match="Run ConfigureEF"),
@@ -182,9 +184,9 @@ def test_postprocess_rejects_invalid_measurements(frequency, ratio) -> None:
 
 
 def test_registered_task_saves_both_qubit_metrics() -> None:
-    task = generate_task_instances(["CheckEFChevron"], {"CheckEFChevron": {}}, "qubex")[
-        "CheckEFChevron"
-    ]
+    task = generate_task_instances(
+        ["CheckAdaptiveEFChevron"], {"CheckAdaptiveEFChevron": {}}, "qubex"
+    )["CheckAdaptiveEFChevron"]
     task.input_parameters["control_frequency"] = InputParameterModel(value=5.001)
     output = task.postprocess(_backend(), "exec-1", _result(), "0").output_parameters
     state_manager = MagicMock()
@@ -204,3 +206,8 @@ def test_registered_task_saves_both_qubit_metrics() -> None:
     metrics = load_metrics_config().qubit_metrics
     assert metrics["ef_frequency"].unit == "GHz" and metrics["ef_frequency"].scale == 1
     assert metrics["anharmonicity"].unit == "MHz" and metrics["anharmonicity"].scale == 1000
+
+
+def test_legacy_task_name_is_not_registered() -> None:
+    with pytest.raises(ValueError, match="CheckEFChevron"):
+        generate_task_instances(["CheckEFChevron"], {"CheckEFChevron": {}}, "qubex")
