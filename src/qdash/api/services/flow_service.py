@@ -67,7 +67,7 @@ def _to_deployment_service_path(file_path: Path) -> Path:
 def _build_flow_run_url(flow_run_id: str) -> str:
     """Build the browser-facing Prefect UI URL for a flow run."""
     settings = get_settings()
-    base = settings.prefect_ui_url.strip().rstrip("/")
+    base = settings.qdash_prefect_ui_url.strip().rstrip("/")
     if not base:
         base = f"http://localhost:{settings.prefect_port}"
     return f"{base}/runs/flow-run/{flow_run_id}"
