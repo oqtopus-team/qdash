@@ -10,6 +10,7 @@ seed_import:
     - control_amplitude.yaml
     - readout_amplitude.yaml
     - control_frequency.yaml
+    - control_frequency_ef.yaml
     - readout_frequency.yaml
 
 params_updater:
