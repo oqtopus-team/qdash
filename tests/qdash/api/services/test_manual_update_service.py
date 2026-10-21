@@ -169,9 +169,16 @@ def test_validate_source_rejects_unknown_output_parameter() -> None:
         )
 
 
-def test_correction_point_requires_source_task() -> None:
-    with pytest.raises(ValidationError, match="source_task_id is required"):
-        _request(source_task_id=None, correction_point={"x": 9.95, "y": -25.0})
+@pytest.mark.parametrize("correction_point", [None, {"x": 9.95, "y": -25.0}])
+def test_manual_update_requires_source_task(correction_point: dict[str, float] | None) -> None:
+    values: dict[str, Any] = {
+        "chip_id": "16Q",
+        "qid": "4",
+        "parameters": {"readout_frequency": {"value": 10.123, "unit": "GHz"}},
+        "correction_point": correction_point,
+    }
+    with pytest.raises(ValidationError, match="source_task_id"):
+        ManualParameterUpdateRequest(**values)
 
 
 def test_persistence_failure_does_not_update_calibration_and_removes_artifacts(
@@ -271,7 +278,10 @@ def manual_backend(tmp_path, init_db, monkeypatch):
     params_dir.mkdir(parents=True)
     path = params_dir / "readout_frequency.yaml"
     path.write_text("# backend\ndata:\n  Q04: 9.0\n  Q05: 8.0\n")
-    return ManualUpdateService(), path
+    service = ManualUpdateService()
+    # Source validation has dedicated tests; these tests exercise persistence.
+    monkeypatch.setattr(service, "_validate_source_task", lambda request, project_id: _source())
+    return service, path
 
 
 @pytest.mark.parametrize("push_failure", [False, True])
@@ -301,7 +311,7 @@ def test_manual_edit_pushes_after_local_commit_and_keeps_values_on_failure(
         return "abc123"
 
     monkeypatch.setattr("qdash.api.services.calibration_github_service.push_config_files", publish)
-    result = service.update_parameters(_request(source_task_id=None), "project", "tester")
+    result = service.update_parameters(_request(), "project", "tester")
     assert len(captured) == 1
     assert result.github_sync.status == ("failed" if push_failure else "synced")
     assert _qubit_data()["readout_frequency"]["value"] == 10.123
@@ -315,7 +325,7 @@ def test_manual_edit_pushes_after_local_commit_and_keeps_values_on_failure(
 
 def test_retry_publishes_current_yaml_without_another_edit(manual_backend, monkeypatch):
     service, path = manual_backend
-    result = service.update_parameters(_request(source_task_id=None), "project", "tester")
+    result = service.update_parameters(_request(), "project", "tester")
     path.write_text("data:\n  Q04: 10.2\n")
     monkeypatch.setattr(
         "qdash.api.services.calibration_github_service.config_github_credentials_available",
@@ -336,7 +346,7 @@ def test_retry_publishes_current_yaml_without_another_edit(manual_backend, monke
 
 def test_disabled_github_never_pushes_even_with_credentials(manual_backend, monkeypatch):
     service, _ = manual_backend
-    result = service.update_parameters(_request(source_task_id=None), "project", "tester")
+    result = service.update_parameters(_request(), "project", "tester")
     monkeypatch.setattr(
         "qdash.api.services.calibration_github_service.config_github_credentials_available",
         lambda: True,
@@ -360,7 +370,7 @@ def test_manual_update_persists_yaml_and_database(manual_backend):
     from ruamel.yaml import YAML
 
     service, path = manual_backend
-    result = service.update_parameters(_request(source_task_id=None), "project", "tester")
+    result = service.update_parameters(_request(), "project", "tester")
 
     assert _qubit_data()["readout_frequency"]["value"] == 10.123
     assert _qubit_data()["untouched"] == {"value": 7}
@@ -372,9 +382,7 @@ def test_manual_update_persists_yaml_and_database(manual_backend):
 
 def test_spectroscopy_correction_also_updates_yaml(manual_backend):
     service, path = manual_backend
-    source = _source()
-    with patch.object(service, "_validate_source_task", return_value=source):
-        result = service.update_parameters(_request(), "project", "tester")
+    result = service.update_parameters(_request(), "project", "tester")
     assert "10.123" in path.read_text()
     history = TaskResultHistoryDocument.find_one({"task_id": result.task_id}).run()
     assert history is not None
@@ -390,7 +398,7 @@ def test_yaml_failure_does_not_update_database(manual_backend):
         ),
         pytest.raises(OSError, match="write failed"),
     ):
-        service.update_parameters(_request(source_task_id=None), "project", "tester")
+        service.update_parameters(_request(), "project", "tester")
     assert _qubit_data()["readout_frequency"]["value"] == 9.0
     history = TaskResultHistoryDocument.find_one({"name": "ManualParameterEdit"}).run()
     assert history is not None
@@ -409,7 +417,7 @@ def test_database_failure_restores_yaml(manual_backend, missing):
         ),
         pytest.raises(RuntimeError, match="DB failed"),
     ):
-        service.update_parameters(_request(source_task_id=None), "project", "tester")
+        service.update_parameters(_request(), "project", "tester")
     if missing:
         assert not path.exists()
     else:
@@ -422,7 +430,7 @@ def test_manual_update_creates_missing_yaml(manual_backend):
 
     service, path = manual_backend
     path.unlink()
-    result = service.update_parameters(_request(source_task_id=None), "project", "tester")
+    result = service.update_parameters(_request(), "project", "tester")
     assert YAML().load(path.read_text()) == {"data": {"Q04": 10.123}}
     assert _qubit_data()["readout_frequency"]["value"] == 10.123
     history = TaskResultHistoryDocument.find_one({"task_id": result.task_id}).run()
@@ -441,7 +449,6 @@ def test_failure_after_database_write_restores_database_and_yaml(manual_backend)
     ):
         service.update_parameters(
             _request(
-                source_task_id=None,
                 parameters={
                     "readout_frequency": {"value": 10.123},
                     "new_diagnostic": {"value": 2},
@@ -461,7 +468,7 @@ def test_database_only_diagnostic_does_not_require_yaml(manual_backend):
     service, path = manual_backend
     path.unlink()
     service.update_parameters(
-        _request(source_task_id=None, parameters={"coarse_qubit_frequency": {"value": 4.2}}),
+        _request(parameters={"coarse_qubit_frequency": {"value": 4.2}}),
         "project",
         "tester",
     )
@@ -472,7 +479,7 @@ def test_foreign_project_cannot_change_yaml(manual_backend):
     service, path = manual_backend
     before = path.read_bytes()
     with pytest.raises(HTTPException, match="Chip not found"):
-        service.update_parameters(_request(source_task_id=None), "other-project", "tester")
+        service.update_parameters(_request(), "other-project", "tester")
     assert path.read_bytes() == before
 
 
@@ -480,9 +487,7 @@ def test_chip_path_traversal_cannot_change_yaml(manual_backend):
     service, path = manual_backend
     before = path.read_bytes()
     with pytest.raises(HTTPException, match="Invalid chip ID"):
-        service.update_parameters(
-            _request(source_task_id=None, chip_id="../16Q"), "project", "tester"
-        )
+        service.update_parameters(_request(chip_id="../16Q"), "project", "tester")
     assert path.read_bytes() == before
 
 
@@ -502,7 +507,6 @@ def test_coupling_update_and_rollback_use_coupling_label(manual_backend, history
     path = qubit_path.parent / "zx90_gate_fidelity.yaml"
     path.write_text("data:\n  Q04-Q05: 0.9\n")
     request = _request(
-        source_task_id=None,
         qid="4-5",
         parameters={"zx90_gate_fidelity": {"value": 0.99}},
     )

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
-import { Pencil, Save, X } from "lucide-react";
+import { useMemo } from "react";
 
 import { getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
 
@@ -17,9 +16,6 @@ interface ParametersTableProps {
   title: string;
   parameters: Record<string, unknown>;
   parameterDefinitions?: Record<string, unknown>;
-  editable?: boolean;
-  onSave?: (params: Record<string, unknown>) => void;
-  isSaving?: boolean;
   /** Map of param name -> manual override info. Shows strikethrough on original value. */
   overrides?: Record<string, ParameterOverride>;
 }
@@ -110,14 +106,11 @@ function formatValue(v: unknown): string {
   return String(v ?? "N/A");
 }
 
-/** Render a fully-expanded parameters table with optional inline editing. */
+/** Render a fully-expanded parameters table with manual-edit markers. */
 export function ParametersTable({
   title,
   parameters,
   parameterDefinitions,
-  editable = false,
-  onSave,
-  isSaving = false,
   overrides,
 }: ParametersTableProps) {
   const entries = useMemo(() => Object.entries(parameters), [parameters]);
@@ -150,46 +143,6 @@ export function ParametersTable({
       ),
     [entries],
   );
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedValues, setEditedValues] = useState<Record<string, string>>({});
-
-  const startEditing = useCallback(() => {
-    const initial: Record<string, string> = {};
-    for (const [key, val] of entries) {
-      const paramValue =
-        typeof val === "object" && val !== null && "value" in val
-          ? (val as Record<string, unknown>)
-          : { value: val };
-      // If there's an override, start with the overridden value
-      const override = overrides?.[key];
-      initial[key] = override ? String(override.currentValue) : String(paramValue.value ?? "");
-    }
-    setEditedValues(initial);
-    setIsEditing(true);
-  }, [entries, overrides]);
-
-  const cancelEditing = useCallback(() => {
-    setIsEditing(false);
-    setEditedValues({});
-  }, []);
-
-  const handleSave = useCallback(() => {
-    if (!onSave) return;
-    const updated: Record<string, unknown> = {};
-    for (const [key, val] of entries) {
-      const original =
-        typeof val === "object" && val !== null && "value" in val
-          ? (val as Record<string, unknown>)
-          : { value: val };
-      const newValueStr = editedValues[key];
-      const parsed = Number(newValueStr);
-      const newValue = isNaN(parsed) ? newValueStr : parsed;
-      updated[key] = { ...original, value: newValue };
-    }
-    onSave(updated);
-    setIsEditing(false);
-  }, [onSave, entries, editedValues]);
-
   const renderTable = (tableEntries: [string, unknown][]) => (
     <table className="table table-zebra table-xs w-full">
       <thead>
@@ -259,19 +212,7 @@ export function ParametersTable({
                   showsDatabaseComparison ? "bg-success/10 text-success font-semibold" : ""
                 }`}
               >
-                {isEditing ? (
-                  <input
-                    type="text"
-                    className="input input-xs input-bordered w-full max-w-[140px] font-mono"
-                    value={editedValues[key] ?? ""}
-                    onChange={(e) =>
-                      setEditedValues((prev) => ({
-                        ...prev,
-                        [key]: e.target.value,
-                      }))
-                    }
-                  />
-                ) : override ? (
+                {override ? (
                   <span className="flex items-center gap-1.5">
                     <span className="line-through text-base-content/40">
                       {formatValue(paramValue.value)}
@@ -304,43 +245,6 @@ export function ParametersTable({
             <CalibrationUpdateStatusBadge parameters={parameters} />
           )}
         </div>
-        {editable && onSave && (
-          <div className="flex items-center gap-1">
-            {isEditing ? (
-              <>
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="btn btn-xs btn-primary gap-1"
-                >
-                  {isSaving ? (
-                    <span className="loading loading-spinner loading-xs" />
-                  ) : (
-                    <Save className="w-3 h-3" />
-                  )}
-                  Save
-                </button>
-                <button
-                  onClick={cancelEditing}
-                  disabled={isSaving}
-                  className="btn btn-xs btn-ghost gap-1"
-                >
-                  <X className="w-3 h-3" />
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={startEditing}
-                className="btn btn-xs btn-ghost gap-1"
-                title="Edit parameters"
-              >
-                <Pencil className="w-3 h-3" />
-                Edit
-              </button>
-            )}
-          </div>
-        )}
       </div>
       {regularEntries.length > 0 && renderTable(regularEntries)}
       {parameterGroups.map(([groupName, group]) => (
