@@ -93,7 +93,7 @@ function DownloadArchiveButton({ taskName }: { taskName: string }) {
       className="btn btn-sm btn-outline gap-1"
       onClick={download}
       disabled={downloading}
-      title="index.md, examples and figures as a zip: edit it locally and upload it as a knowledge draft in an AI evaluation"
+      title="task.md, examples and figures as a zip: edit it locally and upload it as a knowledge draft in an AI evaluation"
     >
       {downloading ? (
         <span className="loading loading-spinner loading-xs" />

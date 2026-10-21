@@ -36,7 +36,7 @@ def knowledge_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     repo = tmp_path / "task-knowledge"
     task_dir = repo / "one_qubit_coarse" / "CheckRabi"
     task_dir.mkdir(parents=True)
-    (task_dir / "index.md").write_text("# CheckRabi\n\nRabi oscillation.\n", encoding="utf-8")
+    (task_dir / "task.md").write_text("# CheckRabi\n\nRabi oscillation.\n", encoding="utf-8")
     (task_dir / "expected.png").write_bytes(b"\x89PNG-rabi")
     (repo / "task-knowledge.json").write_text(
         json.dumps(
@@ -66,7 +66,7 @@ def test_the_task_directory_downloads_as_a_zip(
     assert response.headers["content-type"] == "application/zip"
     assert 'filename="CheckRabi.zip"' in response.headers["content-disposition"]
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
-        assert sorted(archive.namelist()) == ["CheckRabi/expected.png", "CheckRabi/index.md"]
+        assert sorted(archive.namelist()) == ["CheckRabi/expected.png", "CheckRabi/task.md"]
         assert archive.read("CheckRabi/expected.png") == b"\x89PNG-rabi"
 
 

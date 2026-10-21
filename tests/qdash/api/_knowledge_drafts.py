@@ -17,7 +17,10 @@ def warn(message):
 
 
 def _parse_task(task_dir, category):
-    lines = (task_dir / "index.md").read_text(encoding="utf-8").splitlines()
+    document = task_dir / "task.md"
+    if not document.is_file():
+        document = task_dir / "index.md"
+    lines = document.read_text(encoding="utf-8").splitlines()
     title = next((line[2:].strip() for line in lines if line.startswith("# ")), None)
     if title is None:
         warn(f"{task_dir.name}: no H1 title")
@@ -63,7 +66,7 @@ def make_zip(files: dict[str, bytes | str], *, links: tuple[str, ...] = ()) -> b
 
 
 RABI: dict[str, bytes | str] = {
-    "CheckRabi/index.md": INDEX,
+    "CheckRabi/task.md": INDEX,
     "CheckRabi/examples/short.md": "The decay is too fast.",
     "CheckRabi/examples/short.png": PNG,
 }

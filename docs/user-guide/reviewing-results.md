@@ -55,8 +55,8 @@ edit does not change what everyone else's evaluations and chats read.
 
 1. On **Knowledge**, open the task and select **Download zip**.
 2. Update the task background, expected plot, common failures, parameters to extract, or
-   examples in the unzipped `index.md` and `examples/`. Keep the task title and required section
-   headings unchanged.
+   examples in the unzipped `task.md` and `examples/`. Keep the task title and required section
+   headings unchanged, and preserve the YAML frontmatter identity fields.
 3. Zip the folder again and evaluate with it as a knowledge draft; see
    [Try a Knowledge Change Before Proposing It](./ai-evaluations.md#try-a-knowledge-change-before-proposing-it).
 4. Propose the change as a pull request to the task-knowledge repository. After it merges, the

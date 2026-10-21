@@ -204,7 +204,7 @@ class TaskService:
         )
 
     def get_task_knowledge_markdown(self, task_name: str) -> str:
-        """The task's ``index.md`` with its figures inlined as data URIs.
+        """The task's ``task.md`` with its figures inlined as data URIs.
 
         Falls back to the rendered prompt when the markdown file is not on disk.
         """
@@ -215,12 +215,19 @@ class TaskService:
                 detail=f"Task '{task_name}' does not have knowledge defined",
             )
         task_dir = knowledge.task_dir()
-        md_path = task_dir / "index.md" if task_dir else None
+        md_path = None
+        if task_dir:
+            md_path = next(
+                (path for name in ("task.md", "index.md") if (path := task_dir / name).is_file()),
+                None,
+            )
         content = (
             md_path.read_text(encoding="utf-8")
             if md_path and md_path.is_file()
             else knowledge.to_prompt()
         )
+        content = re.sub(r"\A---[ \t]*\n.*?\n---[ \t]*(?:\n|\Z)", "", content, flags=re.S)
+        content = content.lstrip()
 
         def _inline(match: re.Match[str]) -> str:
             alt, rel_path = match.group(1), match.group(2)

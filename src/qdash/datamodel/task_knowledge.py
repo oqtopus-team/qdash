@@ -95,7 +95,7 @@ class TaskReference(BaseModel):
     """The task's background the way QCalEval gives it before a plot, with the
     family-specific parts of its question templates.
 
-    Derived from ``index.md``: the background from the intro and the expected
+    Derived from ``task.md``: the background from the intro and the expected
     plot, the status criteria from the expected plot and the common failures,
     the extraction schema from the parameters to extract.
     """
@@ -199,7 +199,7 @@ def _parameter_type(description: str) -> str:
 
 
 def derive_reference(name: str, background: str) -> TaskReference:
-    """The QCalEval-style reference of a task from its ``index.md`` body."""
+    """The QCalEval-style reference of a task from its ``task.md`` body."""
     intro, sections = _sections(background)
     expected = _paragraphs(sections.get("expected plot", ""))
     intro_paragraphs = _paragraphs(intro)
@@ -245,7 +245,7 @@ class TaskKnowledge(BaseModel):
     """What the knowledge repository says about one calibration task.
 
     The shape follows the QCalEval / Ising-Calibration papers: a prose
-    background for the experiment (the task's ``index.md``) and labeled
+    background for the experiment (the task's ``task.md``) and labeled
     example plots. The category is the calibtasks package the task lives in.
     Old-format entries (summary, what_it_measures, ...) are read for their
     background only.
@@ -256,10 +256,10 @@ class TaskKnowledge(BaseModel):
     name: str = Field(description="Task name (e.g. CheckT1)")
     category: str = Field(default="", description="calibtasks package (e.g. one_qubit_coarse)")
     background: str = Field(
-        default="", description="The task's index.md: what the experiment does and shows"
+        default="", description="The task's task.md: what the experiment does and shows"
     )
     figures: list[KnowledgeFigure] = Field(
-        default_factory=list, description="Figures index.md references"
+        default_factory=list, description="Figures task.md references"
     )
     examples: list[KnowledgeExample] = Field(default_factory=list)
 

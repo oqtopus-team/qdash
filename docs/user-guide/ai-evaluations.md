@@ -46,8 +46,9 @@ run.
 Evaluate against a knowledge draft to see how an edited reference changes the judgments. The
 draft is read only by the run you start with it; **Knowledge** stays the same for everyone.
 
-1. On **Knowledge**, open the task and select **Download zip**. Edit `index.md` and
-   `examples/` in the unzipped folder, then zip the folder again. The zip holds one task, either
+1. On **Knowledge**, open the task and select **Download zip**. Edit `task.md` and
+   `examples/` in the unzipped folder without changing their YAML frontmatter identity fields,
+   then zip the folder again. The zip holds one task, either
    at the top or in one folder named after the task. It may contain only `.md`, `.png`, `.jpg`,
    `.jpeg` and `.webp` files, up to 200 files, 20 MB zipped and 50 MB unpacked.
 2. Start an evaluation of that task as described above.

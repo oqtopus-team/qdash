@@ -19,11 +19,18 @@ PNG = b"\x89PNG\r\n\x1a\n"
 
 
 def _knowledge_repo(tmp_path: Path) -> Path:
-    """A knowledge checkout with one task: index.md, an expected figure, one example."""
+    """A knowledge checkout with one task: task.md, an expected figure, one example."""
     task_dir = tmp_path / "task-knowledge" / "cw" / "CheckQubitSpectroscopy"
     (task_dir / "examples" / "figures").mkdir(parents=True)
-    (task_dir / "index.md").write_text(
-        "# CheckQubitSpectroscopy\n\nBackground.\n\n![overview](./figures/overview.png)\n",
+    (task_dir / "task.md").write_text(
+        "---\n"
+        "type: qdash.calibration-task\n"
+        "profile: qdash-calibration/v1\n"
+        "name: CheckQubitSpectroscopy\n"
+        "category: cw\n"
+        "---\n\n"
+        "# CheckQubitSpectroscopy\n\nBackground.\n\n"
+        "![overview](./figures/overview.png)\n",
         encoding="utf-8",
     )
     (task_dir / "figures").mkdir()
