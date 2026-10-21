@@ -51,7 +51,7 @@ def test_a_task_directory_is_stored_under_the_project_by_its_hash(
     assert draft.warnings == []
     stored = tmp_path / "calib_data" / "projects" / "proj-1" / "knowledge-drafts" / draft.draft_id
     assert (stored / "draft.zip").read_bytes() == data
-    assert (stored / "task" / "CheckRabi" / "index.md").is_file()
+    assert (stored / "task" / "CheckRabi" / "task.md").is_file()
     assert [e.id for e in draft.knowledge.examples] == ["short"]
     assert draft.knowledge.reference().statuses["SUCCESS"] == "a damped cosine"
     # Figures resolve inside the draft, not the shared repository.
@@ -61,7 +61,7 @@ def test_a_task_directory_is_stored_under_the_project_by_its_hash(
 
 def test_a_flat_zip_is_named_after_its_h1(store: kds.KnowledgeDraftStore) -> None:
     draft = store.create(
-        "proj-1", make_zip({"index.md": INDEX}), filename="flat.zip", uploaded_by="alice"
+        "proj-1", make_zip({"task.md": INDEX}), filename="flat.zip", uploaded_by="alice"
     )
 
     assert draft.task_name == "CheckRabi"
@@ -70,9 +70,21 @@ def test_a_flat_zip_is_named_after_its_h1(store: kds.KnowledgeDraftStore) -> Non
     assert draft.knowledge.task_dir().name == "CheckRabi"  # type: ignore[union-attr]
 
 
+def test_a_legacy_index_zip_remains_readable(store: kds.KnowledgeDraftStore) -> None:
+    draft = store.create(
+        "proj-1",
+        make_zip({"CheckRabi/index.md": INDEX}),
+        filename="legacy.zip",
+        uploaded_by="alice",
+    )
+
+    assert draft.task_name == "CheckRabi"
+    assert draft.warnings == []
+
+
 def test_the_generators_warnings_are_kept(store: kds.KnowledgeDraftStore) -> None:
     draft = store.create(
-        "proj-1", make_zip({"Rabi/index.md": INDEX}), filename="rabi.zip", uploaded_by="alice"
+        "proj-1", make_zip({"Rabi/task.md": INDEX}), filename="rabi.zip", uploaded_by="alice"
     )
 
     assert draft.task_name == "CheckRabi"
@@ -105,13 +117,13 @@ def test_drafts_are_scoped_to_their_project(store: kds.KnowledgeDraftStore) -> N
     ("data", "detail"),
     [
         (b"not a zip", "not a zip file"),
-        (make_zip({"CheckRabi/index.md": INDEX, "../evil.md": "x"}), "inside the task directory"),
-        (make_zip({"/abs/index.md": INDEX}), "inside the task directory"),
-        (make_zip({"CheckRabi/index.md": INDEX, "CheckRabi/run.py": "x"}), "files are allowed"),
-        (make_zip({"CheckRabi/index.md": INDEX}, links=("CheckRabi/link.md",)), "links"),
-        (make_zip({"A/index.md": INDEX, "B/index.md": INDEX}), "one task directory"),
-        (make_zip({"CheckRabi/notes.md": "x"}), "index.md is missing"),
-        (make_zip({"index.md": "no title"}), "could not be read as task knowledge"),
+        (make_zip({"CheckRabi/task.md": INDEX, "../evil.md": "x"}), "inside the task directory"),
+        (make_zip({"/abs/task.md": INDEX}), "inside the task directory"),
+        (make_zip({"CheckRabi/task.md": INDEX, "CheckRabi/run.py": "x"}), "files are allowed"),
+        (make_zip({"CheckRabi/task.md": INDEX}, links=("CheckRabi/link.md",)), "links"),
+        (make_zip({"A/task.md": INDEX, "B/task.md": INDEX}), "one task directory"),
+        (make_zip({"CheckRabi/notes.md": "x"}), "task.md is missing"),
+        (make_zip({"task.md": "no title"}), "could not be read as task knowledge"),
     ],
 )
 def test_unusable_zips_are_rejected(
@@ -129,7 +141,7 @@ def test_unusable_zips_are_rejected(
 def test_archive_noise_is_ignored(store: kds.KnowledgeDraftStore) -> None:
     files: dict[str, bytes | str] = {
         **RABI,
-        "__MACOSX/CheckRabi/._index.md": "x",
+        "__MACOSX/CheckRabi/._task.md": "x",
         "CheckRabi/.DS_Store": "x",
     }
 
@@ -141,7 +153,7 @@ def test_archive_noise_is_ignored(store: kds.KnowledgeDraftStore) -> None:
 def test_size_limits_apply_to_the_zip_and_what_it_expands_to(
     store: kds.KnowledgeDraftStore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    data = make_zip({"CheckRabi/index.md": INDEX + "x" * 4096})
+    data = make_zip({"CheckRabi/task.md": INDEX + "x" * 4096})
     monkeypatch.setattr(kds, "MAX_ZIP_BYTES", len(data) - 1)
     with pytest.raises(HTTPException, match="exceeds"):
         store.create("proj-1", data, filename="big.zip", uploaded_by="alice")
@@ -166,7 +178,7 @@ def test_a_downloaded_task_archive_uploads_as_the_same_knowledge(
 ) -> None:
     task_dir = tmp_path / "repo" / "one_qubit_coarse" / "CheckRabi"
     (task_dir / "examples").mkdir(parents=True)
-    (task_dir / "index.md").write_text(INDEX, encoding="utf-8")
+    (task_dir / "task.md").write_text(INDEX, encoding="utf-8")
     (task_dir / "examples" / "short.md").write_text("The decay is too fast.", encoding="utf-8")
     (task_dir / "examples" / "short.png").write_bytes(PNG)
     # Left out of the archive: files a draft may not hold, dotfiles, links.
@@ -180,7 +192,7 @@ def test_a_downloaded_task_archive_uploads_as_the_same_knowledge(
         assert sorted(archive.namelist()) == [
             "CheckRabi/examples/short.md",
             "CheckRabi/examples/short.png",
-            "CheckRabi/index.md",
+            "CheckRabi/task.md",
         ]
     draft = store.create("proj-1", data, filename="CheckRabi.zip", uploaded_by="alice")
     assert draft.warnings == []
@@ -197,7 +209,7 @@ def test_a_drafts_archive_is_the_upload_under_its_file_name(
 
     assert path.read_bytes() == data
     assert name == "rabi.zip"
-    unnamed = store.create("proj-1", make_zip({"index.md": INDEX}), filename="", uploaded_by="a")
+    unnamed = store.create("proj-1", make_zip({"task.md": INDEX}), filename="", uploaded_by="a")
     assert store.archive("proj-1", unnamed.draft_id)[1] == "CheckRabi.zip"
     with pytest.raises(HTTPException) as exc_info:
         store.archive("proj-2", draft.draft_id)

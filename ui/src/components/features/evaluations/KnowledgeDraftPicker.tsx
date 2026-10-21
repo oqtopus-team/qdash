@@ -16,7 +16,7 @@ interface KnowledgeDraftPickerProps {
 }
 
 /**
- * Drop a zipped task directory (`index.md` and `examples/`) to use it instead
+ * Drop a zipped task directory (`task.md` and `examples/`) to use it instead
  * of the shared knowledge, for an evaluation run or a prompt preview. The API
  * stores it as a draft of the project; nothing in Knowledge changes, and only
  * what names the draft reads it.
@@ -124,7 +124,7 @@ export function KnowledgeDraftPicker({
           <Upload className="h-4 w-4 shrink-0" />
         )}
         <span className="text-base-content/70">
-          The shared knowledge of {taskName} is used. Drop a zipped task directory (index.md,
+          The shared knowledge of {taskName} is used. Drop a zipped task directory (task.md,
           examples/) to use that draft instead; Knowledge does not change.
         </span>
       </button>

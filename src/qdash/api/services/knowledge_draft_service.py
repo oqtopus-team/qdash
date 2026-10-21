@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DRAFTS_DIR_NAME = "knowledge-drafts"
+TASK_MARKDOWN_NAMES = ("task.md", "index.md")
 MAX_ZIP_BYTES = 20 * 1024 * 1024
 MAX_EXTRACTED_BYTES = 50 * 1024 * 1024
 MAX_ENTRIES = 200
@@ -79,9 +80,9 @@ def _task_members(
 ) -> tuple[list[tuple[zipfile.ZipInfo, PurePosixPath]], str | None]:
     """The files of the one task in the archive, relative to its directory.
 
-    Accepts ``index.md`` at the top or inside a single top-level directory,
-    whose name is returned. Rejects absolute or escaping paths, links, and
-    file types a task directory does not hold.
+    Accepts ``task.md`` (or legacy ``index.md``) at the top or inside a single
+    top-level directory, whose name is returned. Rejects absolute or escaping
+    paths, links, and file types a task directory does not hold.
     """
     files: list[tuple[zipfile.ZipInfo, PurePosixPath]] = []
     for info in archive.infolist():
@@ -106,21 +107,23 @@ def _task_members(
     if sum(info.file_size for info, _ in files) > MAX_EXTRACTED_BYTES:
         raise _bad_request(f"the zip expands to more than {MAX_EXTRACTED_BYTES // 2**20} MB")
 
-    if any(path == PurePosixPath("index.md") for _, path in files):
+    if any(path == PurePosixPath(name) for _, path in files for name in TASK_MARKDOWN_NAMES):
         return files, None
     roots = {path.parts[0] for _, path in files if len(path.parts) > 1}
     if len(roots) != 1 or any(len(path.parts) == 1 for _, path in files):
         raise _bad_request(
-            "the zip must hold one task directory: index.md at the top or in a single folder"
+            "the zip must hold one task directory: task.md at the top or in a single folder"
         )
     root = roots.pop()
-    if not any(path == PurePosixPath(root, "index.md") for _, path in files):
-        raise _bad_request(f"{root}/index.md is missing")
+    if not any(
+        path == PurePosixPath(root, name) for _, path in files for name in TASK_MARKDOWN_NAMES
+    ):
+        raise _bad_request(f"{root}/task.md is missing")
     return [(info, PurePosixPath(*path.parts[1:])) for info, path in files], root
 
 
-def _h1_title(index_md: bytes) -> str | None:
-    for line in index_md.decode("utf-8", errors="replace").splitlines():
+def _h1_title(markdown: bytes) -> str | None:
+    for line in markdown.decode("utf-8", errors="replace").splitlines():
         if line.startswith("# "):
             return line[2:].strip()
     return None
@@ -135,8 +138,13 @@ def _extract(data: bytes, dest: Path) -> Path:
     with archive:
         files, root = _task_members(archive)
         if root is None:
-            index = next(info for info, path in files if path == PurePosixPath("index.md"))
-            title = _h1_title(archive.read(index)) or ""
+            document = next(
+                info
+                for name in TASK_MARKDOWN_NAMES
+                for info, path in files
+                if path == PurePosixPath(name)
+            )
+            title = _h1_title(archive.read(document)) or ""
             root = title if _TASK_NAME_RE.fullmatch(title) else "task"
         if not _TASK_NAME_RE.fullmatch(root):
             raise _bad_request(f"{root}: a task directory is named after the task")
@@ -221,7 +229,10 @@ class KnowledgeDraftStore:
         staging = drafts_dir / f".staging-{uuid.uuid4().hex}"
         try:
             task_dir = _extract(data, staging / "task")
-            title = _h1_title((task_dir / "index.md").read_bytes()) or task_dir.name
+            document = next(
+                task_dir / name for name in TASK_MARKDOWN_NAMES if (task_dir / name).is_file()
+            )
+            title = _h1_title(document.read_bytes()) or task_dir.name
             try:
                 knowledge, warnings = parse_task_dir(task_dir, category=_category(title))
             except RuntimeError as exc:
@@ -230,7 +241,7 @@ class KnowledgeDraftStore:
                 ) from exc
             if knowledge is None:
                 raise _bad_request(
-                    "index.md could not be read as task knowledge: "
+                    "task.md could not be read as task knowledge: "
                     + ("; ".join(warnings) or "no H1 title")
                 )
             (staging / "draft.zip").write_bytes(data)

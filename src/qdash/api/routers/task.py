@@ -185,7 +185,7 @@ def get_task_knowledge_markdown(
 ) -> Response:
     """Get raw markdown content for a task knowledge entry.
 
-    Returns the index.md content with image references replaced
+    Returns the task.md content with image references replaced
     by inline base64 data URIs for self-contained rendering.
     """
     content = service.get_task_knowledge_markdown(task_name)
@@ -202,7 +202,7 @@ def get_task_knowledge_markdown(
     },
 )
 def download_task_knowledge_archive(task_name: str) -> Response:
-    """The task's ``index.md``, examples and figures, zipped under ``<task_name>/``.
+    """The task's ``task.md``, examples and figures, zipped under ``<task_name>/``.
 
     The zip is the starting point of a knowledge draft: edit it locally and
     upload it from the evaluation dialog. Raises 404 when the task has no

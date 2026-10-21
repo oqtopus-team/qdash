@@ -176,4 +176,4 @@ class KnowledgeDraftResponse(BaseModel):
         ..., description="The background and criteria the evaluation model would get"
     )
     example_count: int = Field(..., description="Labeled examples the draft holds")
-    figure_count: int = Field(..., description="Figures of index.md and the examples")
+    figure_count: int = Field(..., description="Figures of task.md and the examples")

@@ -20,7 +20,7 @@ unit of comparison.
 | API and UI | Runs: selection, background execution, storage, verdicts, chat recording, comparison | `src/qdash/api/services/evaluation_service.py`, `ui/src/components/features/evaluations/` |
 
 Nothing about the physics of a task lives in QDash code. The reference is derived from the
-task's `index.md`, the demonstrations are its `examples/`, and the question templates belong to
+task's `task.md`, the demonstrations are its `examples/`, and the question templates belong to
 the extension. QDash decides what else reaches the model (the context) and keeps the records.
 
 ## The protocol
@@ -50,11 +50,11 @@ parameters the plot determines, and offer `SUCCESS`, `SUBOPTIMAL`, `NO_SIGNAL` a
 ## From task knowledge to the prompt
 
 `GET /tasks/{task_name}/knowledge` serves a task's `reference`, derived on every read from its
-`index.md` by `derive_reference` (`src/qdash/datamodel/task_knowledge.py`), and its examples
+`task.md` by `derive_reference` (`src/qdash/datamodel/task_knowledge.py`), and its examples
 with figure bytes inlined. The runtime fetches it as the requesting user and passes it to
 `qcal_evaluate` as `knowledge` (the background) and `criteria` (the rest).
 
-| `index.md` | Becomes | Rule |
+| `task.md` | Becomes | Rule |
 | --- | --- | --- |
 | Intro, first paragraph | background | `This is a <task> experiment: <intro>. <expected plot>` |
 | `## Expected plot`, first paragraph | background, and the `SUCCESS` criterion | The sentence beginning `A good result`, with that prefix dropped; the first sentence when there is none |
@@ -67,7 +67,7 @@ to the first `;`. A bullet without a separator uses its first four words as the 
 whole text as the criterion. A code seen twice keeps its first criterion. The model reads the
 criterion verbatim as its decision rule, so write it as a test a reader could apply to the plot.
 
-`guidance` and `range_format` are not derived from `index.md`. The significance question uses
+`guidance` and `range_format` are not derived from `task.md`. The significance question uses
 the extension's default guidance, and the suggested-range format comes from the result's sweep
 (below). Only prose paragraphs feed the background, so a section that opens with a bullet list
 contributes nothing to it. A task with knowledge but no derivable background (an old-format
@@ -161,7 +161,7 @@ planner's final answer. A figure no tool fetched, such as a user attachment, is 
 ### Knowledge drafts
 
 A knowledge draft is one task's knowledge directory, uploaded as a zip, that a run reads in
-place of the shared `task-knowledge.json`. It lets a person measure an edit to `index.md` or
+place of the shared `task-knowledge.json`. It lets a person measure an edit to `task.md` or
 `examples/` before proposing it to the knowledge repository, without changing what any other
 user's chat or evaluation reads.
 
@@ -237,18 +237,19 @@ the cost of in-context examples shows next to their effect. There is no compare 
 
 ## Changing it
 
-**A task's reference.** Edit the task's `index.md` in the knowledge repository, within its
-template; the Knowledge page's **Download zip** (`GET /tasks/{task_name}/knowledge/archive`)
-gives the published directory to start from. Evaluate the edited directory as a knowledge draft
-against a run on the shared knowledge before proposing it; the **Evaluation prompts** panel
-previews the shared reference or a dropped draft. The Knowledge page does not write: updating a
-deployment means merging into the repository and moving the `config/task-knowledge` checkout
-(`task knowledge-pull`).
+**A task's reference.** Edit the task's `task.md` in the knowledge repository, within its
+template and keep its YAML frontmatter identity unchanged. The Knowledge page's **Download zip**
+(`GET /tasks/{task_name}/knowledge/archive`) gives the published directory to start from. Evaluate
+the edited directory as a knowledge draft against a run on the shared knowledge before proposing
+it; the **Evaluation prompts** panel previews the shared reference or a dropped draft. The
+Knowledge page does not write: updating a deployment means merging into the repository and moving
+the `config/task-knowledge` checkout (`task knowledge-pull`).
 
-**A demonstration.** Add `examples/<slug>.md` with a figure, `outcome`, and the QCalEval labels
-(`status` from the task's criteria, `suggested_range`, `parameters`), then regenerate
-`task-knowledge.json` with the repository's `generate.py`. Label the success case too: the
-status question shows one example per status.
+**A demonstration.** Add `examples/<slug>.md` with a figure and YAML frontmatter containing
+`type: qdash.calibration-example`, `profile: qdash-calibration/v1`, `outcome`, and the QCalEval
+labels (`status` from the task's criteria, `suggested_range`, `parameters`), then regenerate
+`task-knowledge.json` with the repository's `generate.py`. Label the success case too: the status
+question shows one example per status.
 
 **A question template or its parsing.** Change pi-qcaleval. A checkout under
 `agent-runtime/extensions/` is loaded in place of the pinned package (restart the runtime; the

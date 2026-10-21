@@ -801,7 +801,7 @@ def test_a_knowledge_draft_is_uploaded_and_served_as_task_knowledge(test_client,
 
 
 def test_an_unusable_zip_is_rejected_on_upload(test_client, project, drafts):
-    response = _upload(test_client, {"CheckRabi/index.md": "# CheckRabi", "CheckRabi/x.py": "x"})
+    response = _upload(test_client, {"CheckRabi/task.md": "# CheckRabi", "CheckRabi/x.py": "x"})
 
     assert response.status_code == 400
     assert "files are allowed" in response.json()["detail"]

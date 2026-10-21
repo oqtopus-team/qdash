@@ -110,7 +110,7 @@ export const workspaceQueryKeys = {
 
 /**
  * Workspace path of an image a Markdown file references, such as
- * `./check_rabi_expected_1.png` next to `index.md`. Null for URLs, absolute
+ * `./check_rabi_expected_1.png` next to `task.md`. Null for URLs, absolute
  * paths, and paths that climb out of the workspace: those are left to the browser.
  */
 export function resolveWorkspaceImagePath(markdownPath: string, src: string): string | null {
